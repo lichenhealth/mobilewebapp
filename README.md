@@ -49,7 +49,7 @@ Once deployed over HTTPS:
 - **Android Chrome**: hamburger → "Install app" (or the auto-prompt this app shows after ~4s)
 - **Desktop Chrome/Edge**: the install icon appears in the address bar
 
-The manifest is at `public/manifest.webmanifest`. Icons are in `public/icons/` — regenerate with `python3 public/icons/_make_icons.py` if you redesign the mark.
+The manifest is at `public/manifest.webmanifest`. Icons are in `public/icons/` — the canonical brand asset is `logo.svg` (rendered inline by the `LichenMark` component). PNG sizes are pre-generated for PWA install requirements; if the SVG changes, re-export PNGs at 32 / 192 / 512 / 180 (apple-touch) and a 512 maskable variant.
 
 ## Deploying — three good options
 
