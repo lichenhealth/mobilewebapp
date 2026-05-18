@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
-import IconRow from '../components/IconRow';
+import IconRow, { IconRowItem } from '../components/IconRow';
 import CommunityCard from '../components/CommunityCard';
-import { Icon } from '../components/Icon';
+import { Icon, IconName } from '../components/Icon';
 import {
   getGroup,
   getCommunity,
   GROUP_FEEDS,
 } from '../data/network';
 import './Community.css'; // reuse layout
+
+const SCOPE_DESTINATIONS: Partial<Record<IconName, string>> = {
+  store: '/market',
+};
 
 export default function Group() {
   const { id = '' } = useParams();
@@ -22,6 +26,15 @@ export default function Group() {
 
   const posts = GROUP_FEEDS[group.id] ?? [];
   const parent = group.communityId ? getCommunity(group.communityId) : null;
+
+  // Store icon → /market?from=group:<id>, filtering to this group's members
+  const scopedIcons: IconRowItem[] = group.categoryIcons.map((ci) => {
+    const dest = SCOPE_DESTINATIONS[ci.icon];
+    return {
+      ...ci,
+      to: dest ? `${dest}?from=group:${group.id}` : undefined,
+    };
+  });
 
   return (
     <div className="cmty">
@@ -55,7 +68,7 @@ export default function Group() {
 
       <FilterRow options={group.filters} value={filter} onChange={setFilter} />
 
-      <IconRow items={group.categoryIcons} />
+      <IconRow items={scopedIcons} />
 
       <section className="cmty__feed">
         {posts.map((c, i) => (

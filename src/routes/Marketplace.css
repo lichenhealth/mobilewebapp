@@ -44,6 +44,57 @@
   line-height: 1.55;
 }
 
+/* ─── Scope banner ──────────────────────────────────────────────────── */
+.mkt__scope {
+  margin: 0 var(--s-5) var(--s-2);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 10px 14px;
+  background: var(--peach-tint);
+  border: 1px solid var(--peach);
+  border-radius: var(--r-sm);
+  flex-wrap: wrap;
+}
+.mkt__scope-eyebrow {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.mkt__scope-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-variation-settings: '"opsz" 144, "SOFT" 100';
+  font-size: 18px;
+  color: var(--peach-deep);
+  letter-spacing: -0.015em;
+}
+.mkt__scope-kind {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--peach-deep);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: rgb(245 163 109 / 0.18);
+}
+.mkt__scope-clear {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: var(--peach-deep);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-family: inherit;
+}
+.mkt__scope-clear:hover { color: var(--ink); }
+
 /* ─── Tabs ──────────────────────────────────────────────────────────── */
 .mkt__tabs {
   display: flex;

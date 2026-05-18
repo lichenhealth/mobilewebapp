@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
-import IconRow from '../components/IconRow';
+import IconRow, { IconRowItem } from '../components/IconRow';
 import CommunityCard from '../components/CommunityCard';
-import { Icon } from '../components/Icon';
+import { Icon, IconName } from '../components/Icon';
 import {
   getCommunity,
   COMMUNITY_FEEDS,
   GROUPS,
 } from '../data/network';
 import './Community.css';
+
+/** Icons that have a "section" they point to. When clicked from within a
+ *  community/group context, they navigate to that section scoped to this
+ *  community/group via ?from=community:<id>. */
+const SCOPE_DESTINATIONS: Partial<Record<IconName, string>> = {
+  store: '/market',
+};
 
 export default function Community() {
   const { id = '' } = useParams();
@@ -23,6 +30,16 @@ export default function Community() {
 
   const posts = COMMUNITY_FEEDS[community.id] ?? [];
   const childGroups = GROUPS.filter((g) => g.communityId === community.id);
+
+  // Compute scoped destinations for category icons. The store icon in Mons Sana
+  // navigates to /market?from=community:mons-sana, filtering to Mons Sana members.
+  const scopedIcons: IconRowItem[] = community.categoryIcons.map((ci) => {
+    const dest = SCOPE_DESTINATIONS[ci.icon];
+    return {
+      ...ci,
+      to: dest ? `${dest}?from=community:${community.id}` : undefined,
+    };
+  });
 
   return (
     <div className="cmty">
@@ -46,7 +63,7 @@ export default function Community() {
 
       <FilterRow options={community.filters} value={filter} onChange={setFilter} />
 
-      <IconRow items={community.categoryIcons} />
+      <IconRow items={scopedIcons} />
 
       {childGroups.length > 0 && (
         <section className="cmty__groups">

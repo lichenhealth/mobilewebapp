@@ -64,6 +64,8 @@ export interface CommunityMeta {
   description: string;
   members: number;
   newThisWeek: number;
+  /** Network member ids in this community (people, providers, orgs, places) */
+  memberIds: string[];
   /** Filter chips for the community feed */
   filters: string[];
   /** Round icon-button row shown above the feed */
@@ -78,6 +80,7 @@ export const COMMUNITIES: CommunityMeta[] = [
     description: 'A quiet circle of practitioners working at the intersection of bodywork, land care, and contemplative practice.',
     members: 248,
     newThisWeek: 3,
+    memberIds: ['joon', 'rosa', 'bailey', 'marcus', 'mara', 'theo', 'equine-reiki', 'studio-3'],
     filters: ['All', 'Social', 'Creative', 'Educational', 'Actionable'],
     categoryIcons: [
       { icon: 'search',         label: 'Search'   },
@@ -99,11 +102,13 @@ export const COMMUNITIES: CommunityMeta[] = [
     description: 'A small, deliberate circle of people exploring consciousness, plant medicine, and contemplative recovery.',
     members: 96,
     newThisWeek: 2,
+    memberIds: ['bailey', 'marcus', 'rosa', 'heroes-journey'],
     filters: ['All', 'Social', 'Educational', 'Actionable'],
     categoryIcons: [
       { icon: 'search',         label: 'Search'   },
       { icon: 'plus',           label: 'Post'     },
       { icon: 'profile',        label: 'Members'  },
+      { icon: 'store',          label: 'Goods'    },
       { icon: 'graduation-cap', label: 'Learn'    },
       { icon: 'book',           label: 'Library'  },
       { icon: 'sparkle',        label: 'Events'   },
@@ -195,6 +200,8 @@ export interface GroupMeta {
   handle: string;
   description: string;
   members: number;
+  /** Network member ids in this group */
+  memberIds: string[];
   /** Optional parent community */
   communityId?: string;
   filters: string[];
@@ -208,13 +215,14 @@ export const GROUPS: GroupMeta[] = [
     handle: '@cascadia-growers',
     description: 'Seasonal sowing, seed swaps, growing notes, mutual aid for brassicas season.',
     members: 184,
+    memberIds: ['mara', 'theo', 'rosa', 'marcus', 'june', 'bailey', 'cascadia-coop', 'back-garden'],
     filters: ['All', 'Notes', 'Swaps', 'Events'],
     categoryIcons: [
-      { icon: 'search', label: 'Search'   },
-      { icon: 'plus',   label: 'Post'     },
-      { icon: 'profile',label: 'Members'  },
-      { icon: 'sparkle',label: 'Events'   },
-      { icon: 'store',  label: 'Swaps'    },
+      { icon: 'search',  label: 'Search'   },
+      { icon: 'plus',    label: 'Post'     },
+      { icon: 'profile', label: 'Members'  },
+      { icon: 'store',   label: 'Swaps'    },
+      { icon: 'sparkle', label: 'Events'   },
     ],
   },
   {
@@ -223,6 +231,7 @@ export const GROUPS: GroupMeta[] = [
     handle: '@sunday-suppers',
     description: 'Rotating dinners at members\u2019 tables. Bring something or just bring yourself.',
     members: 62,
+    memberIds: ['june', 'theo', 'rosa', 'mara', 'long-table'],
     filters: ['All', 'Upcoming', 'Past'],
     categoryIcons: [
       { icon: 'search',     label: 'Search'   },
@@ -230,6 +239,7 @@ export const GROUPS: GroupMeta[] = [
       { icon: 'profile',    label: 'Members'  },
       { icon: 'sparkle',    label: 'Events'   },
       { icon: 'fork-spoon', label: 'Menus'    },
+      { icon: 'store',      label: 'Goods'    },
     ],
   },
   {
@@ -238,6 +248,7 @@ export const GROUPS: GroupMeta[] = [
     handle: '@mons-sana-bodywork',
     description: 'Mons Sana members offering and receiving bodywork \u2014 craniosacral, somatic experiencing, and adjacent.',
     members: 38,
+    memberIds: ['bailey', 'rosa', 'equine-reiki'],
     communityId: 'mons-sana',
     filters: ['All', 'Notes', 'Cases', 'Events'],
     categoryIcons: [
@@ -246,6 +257,7 @@ export const GROUPS: GroupMeta[] = [
       { icon: 'profile', label: 'Members'  },
       { icon: 'health',  label: 'Cases'    },
       { icon: 'sparkle', label: 'Events'   },
+      { icon: 'store',   label: 'Services' },
     ],
   },
 ];
@@ -254,7 +266,59 @@ export function getGroup(id: string): GroupMeta | undefined {
   return GROUPS.find((g) => g.id === id);
 }
 
-// ─── Group feeds ─────────────────────────────────────────────────────
+// ─── Scope resolution ───────────────────────────────────────────────
+// Given a scope expression like "community:mons-sana", "group:cascadia-growers",
+// or "type:provider", returns the set of @handles that belong to that scope.
+// Used by the Marketplace (and future sections) to filter listings by context.
+
+export type ScopeKind = 'community' | 'group' | 'type';
+
+export interface Scope {
+  kind: ScopeKind;
+  id: string;          // community id, group id, or NetworkType
+  label: string;       // human-readable name for the chip
+}
+
+/** Parse a "kind:id" string into a Scope, returning null if unrecognized. */
+export function parseScope(raw: string | null): Scope | null {
+  if (!raw) return null;
+  const [kind, id] = raw.split(':');
+  if (kind === 'community') {
+    const c = COMMUNITIES.find((x) => x.id === id);
+    if (!c) return null;
+    return { kind: 'community', id, label: c.name };
+  }
+  if (kind === 'group') {
+    const g = GROUPS.find((x) => x.id === id);
+    if (!g) return null;
+    return { kind: 'group', id, label: g.name };
+  }
+  if (kind === 'type') {
+    const label = NETWORK_LABELS[id as NetworkType];
+    if (!label) return null;
+    return { kind: 'type', id, label };
+  }
+  return null;
+}
+
+/** Set of @handles belonging to a given scope (used to filter listings, etc). */
+export function handlesInScope(scope: Scope): Set<string> {
+  const handles = new Set<string>();
+  const addMember = (memberId: string) => {
+    const member = NETWORK_MEMBERS.find((m) => m.id === memberId);
+    if (member) handles.add(member.handle);
+  };
+  if (scope.kind === 'community') {
+    const c = COMMUNITIES.find((x) => x.id === scope.id);
+    c?.memberIds.forEach(addMember);
+  } else if (scope.kind === 'group') {
+    const g = GROUPS.find((x) => x.id === scope.id);
+    g?.memberIds.forEach(addMember);
+  } else if (scope.kind === 'type') {
+    NETWORK_MEMBERS.filter((m) => m.type === scope.id).forEach((m) => handles.add(m.handle));
+  }
+  return handles;
+}
 export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
   'cascadia-growers': [
     {

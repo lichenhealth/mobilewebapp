@@ -10,15 +10,15 @@ const FILTERS = ['All', 'Social', 'Creative', 'Educational', 'Actionable', 'Q&A'
 const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search'      },
   { icon: 'plus',           label: 'Post'        },
-  { icon: 'store',          label: 'Commerce'    },
-  { icon: 'briefcase',      label: 'Work'        },
+  { icon: 'store',          label: 'Marketplace', to: '/market'        },
+  { icon: 'briefcase',      label: 'Work',        to: '/work'          },
   { icon: 'graduation-cap', label: 'Education'   },
   { icon: 'fork-spoon',     label: 'Food'        },
   { icon: 'palette',        label: 'Creative'    },
-  { icon: 'location',       label: 'Places'      },
+  { icon: 'location',       label: 'Places',      to: '/places'        },
   { icon: 'health',         label: 'Health'      },
-  { icon: 'book',           label: 'Library'     },
-  { icon: 'sparkle',        label: 'Concierge'   },
+  { icon: 'book',           label: 'Library',     to: '/library'       },
+  { icon: 'sparkle',        label: 'Concierge',   to: '/concierge'     },
 ];
 
 export default function Home() {
