@@ -14,13 +14,17 @@ export type IconName =
   | 'bell'
   | 'book'
   | 'bookmark'
+  | 'brain'
   | 'briefcase'
   | 'calendar'
   | 'chat'
   | 'check'
   | 'check-double'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'close'
   | 'concierge'
+  | 'dollar'
   | 'fork-spoon'
   | 'globe'
   | 'graduation-cap'
@@ -30,6 +34,7 @@ export type IconName =
   | 'image'
   | 'info'
   | 'install'
+  | 'leaf'
   | 'location'
   | 'maps'
   | 'menu'
@@ -45,6 +50,7 @@ export type IconName =
   | 'saved'
   | 'search'
   | 'send'
+  | 'settings'
   | 'shield-user'
   | 'smile'
   | 'sparkle'
@@ -274,6 +280,36 @@ const ICONS: Record<IconName, IconEntry> = {
     strokeWidth: 0.62,
     content: <><path d="M192.456 529.714C191.821 529.714 191.306 529.199 191.306 528.564C191.306 527.929 191.821 527.414 192.456 527.414C193.091 527.414 193.606 527.929 193.606 528.564C193.606 529.199 193.091 529.714 192.456 529.714Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M190.785 531.489C190.943 531.322 191.127 531.179 191.329 531.065C191.673 530.872 192.061 530.77 192.456 530.77C192.85 530.77 193.238 530.872 193.582 531.065C193.731 531.148 193.869 531.248 193.995 531.361" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M188.735 529.345C187.948 529.345 187.31 528.707 187.31 527.92C187.31 527.133 187.948 526.495 188.735 526.495C189.522 526.495 190.16 527.133 190.16 527.92C190.16 528.707 189.522 529.345 188.735 529.345Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M191.405 533.415C191.334 532.564 191.121 532.004 191.005 531.807C190.758 531.386 190.41 531.038 189.995 530.797C189.58 530.556 189.112 530.429 188.636 530.429C188.16 530.429 187.692 530.556 187.277 530.797C186.946 530.99 186.657 531.25 186.429 531.562L186.283 531.779" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M190 533.643C187.436 533.643 185.357 531.564 185.357 529C185.357 526.436 187.436 524.357 190 524.357C192.564 524.357 194.643 526.436 194.643 529C194.643 531.564 192.564 533.643 190 533.643Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
+  'brain': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <><path d="M9.5 3.5a3 3 0 00-3 3v.6a3 3 0 00-2.5 2.95V12a3 3 0 002.5 2.95v.6a3 3 0 003 3h2.5V3.5H9.5z" stroke="currentColor" strokeLinejoin="round"/><path d="M14.5 3.5a3 3 0 013 3v.6a3 3 0 012.5 2.95V12a3 3 0 01-2.5 2.95v.6a3 3 0 01-3 3H12V3.5h2.5z" stroke="currentColor" strokeLinejoin="round"/><path d="M9.5 8h-1M9.5 11.5h-1M14.5 8h1M14.5 11.5h1" stroke="currentColor" strokeLinecap="round"/></>,
+  },
+  'settings': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <><circle cx="12" cy="12" r="3" stroke="currentColor"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeLinejoin="round"/></>,
+  },
+  'chevron-left': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M15 6l-6 6 6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  'chevron-right': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M9 6l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  'dollar': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.5,
+    content: <><path d="M12 3v18M16.5 7.5C16.5 5.84 14.49 4.5 12 4.5S7.5 5.84 7.5 7.5s2.01 3 4.5 3 4.5 1.34 4.5 3-2.01 3-4.5 3-4.5-1.34-4.5-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  'leaf': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <><path d="M20 4c-3 0-12 1-15 4s-3 8 1 12 9 4 12 1 4-12 4-15-1-2-2-2zM4 20l8-8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
@@ -302,6 +338,7 @@ export function Icon({
       strokeWidth={strokeWidth ?? icon.strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
+      overflow="visible"
       aria-hidden="true"
       {...rest}
     >

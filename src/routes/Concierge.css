@@ -1,137 +1,321 @@
-.concierge { display: flex; flex-direction: column; }
-
-.concierge__head {
-  padding: var(--s-5) var(--s-5) var(--s-4);
+.conc {
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
 }
 
-.concierge__title {
-  font-family: var(--font-display);
-  font-size: var(--t-xl);
-  line-height: 1.2;
+.conc__head {
+  padding: var(--s-5) var(--s-5) var(--s-2);
+  text-align: center;
+}
+
+.conc__title {
+  font-family: var(--font-body);
+  font-weight: 100;
+  font-size: var(--t-2xl);
   letter-spacing: -0.025em;
-  font-weight: 400;
-  font-variation-settings: '"opsz" 144, "SOFT" 100';
+  color: var(--ink);
 }
 
-.concierge__sub {
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 1.55;
-  color: var(--ink-muted);
-  max-width: 38ch;
-}
-
-/* ─── Ask box ─────────────────────────────────────────────────────── */
-.concierge__ask {
-  margin: 0 var(--s-5) var(--s-3);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--s-3);
+/* ─── Tabs (WOW / KOC / Chat / Urgent Care) ─────────────────────────── */
+.conc__tabs {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--s-2);
   padding: var(--s-3) var(--s-4);
-  background: var(--bone-warm);
-  border: 1px solid var(--bone-edge);
-  border-radius: var(--r-full);
-  box-shadow: var(--sh-soft);
-  color: var(--ink-muted);
-  transition: border-color var(--d-fast) var(--ease-out);
+  border-bottom: 1px solid var(--bone-edge-soft);
 }
-.concierge__ask:focus-within { border-color: var(--peach); }
 
-.concierge__input {
+.conc__tab {
+  flex: 0 0 auto;
+  padding: 6px 2px;
   background: transparent;
   border: 0;
-  outline: 0;
-  font-size: var(--t-base);
+  font-family: inherit;
+  font-size: 15px;
   font-weight: 300;
-  color: var(--ink);
-  width: 100%;
+  letter-spacing: -0.005em;
+  color: var(--ink-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--d-fast) var(--ease-out);
 }
-.concierge__input::placeholder { color: var(--ink-faint); }
-
-.concierge__send {
-  width: 28px;
-  height: 28px;
+.conc__tab:hover { color: var(--ink); }
+.conc__tab.is-active {
+  color: var(--peach);
+  font-weight: 400;
+}
+.conc__tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--peach);
   border-radius: var(--r-full);
-  background: var(--ink);
-  color: var(--bone-warm);
+}
+
+/* ─── Tools row (search · brain · scope · pager) ────────────────────── */
+.conc__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-5);
+}
+
+.conc__tool-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  color: var(--ink-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--d-fast) var(--ease-out),
-              opacity var(--d-fast) var(--ease-out),
-              transform var(--d-fast) var(--ease-out);
+  cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
 }
-.concierge__send:disabled { opacity: 0.25; cursor: not-allowed; }
-.concierge__send:not(:disabled):hover { background: var(--peach); }
-.concierge__send:active { transform: scale(0.9); }
-
-/* ─── Suggestion chips ────────────────────────────────────────────── */
-.concierge__suggestions {
-  display: flex;
-  gap: var(--s-2);
-  padding: 0 var(--s-5) var(--s-5);
-  flex-wrap: wrap;
+.conc__tool-circle:hover { border-color: var(--ink-muted); }
+.conc__tool-circle.is-active {
+  background: var(--peach);
+  border-color: var(--peach);
+  color: var(--bone-warm);
 }
 
-.concierge__chip {
-  padding: 6px 12px;
+.conc__brain {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-full);
+  background: transparent;
+  border: 1px solid var(--bone-edge);
+  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.conc__brain.is-on {
+  background: var(--peach);
+  border-color: var(--peach);
+  color: var(--bone-warm);
+}
+.conc__brain:hover { transform: scale(1.05); }
+.conc__brain:active { transform: scale(0.95); }
+
+.conc__scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 12px;
   border: 1px solid var(--bone-edge);
   border-radius: var(--r-full);
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--ink-soft);
   background: var(--bone-warm);
-  transition: border-color var(--d-fast) var(--ease-out),
-              color var(--d-fast) var(--ease-out);
 }
-.concierge__chip:hover { border-color: var(--peach); color: var(--peach); }
+.conc__scope-label {
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+}
+.conc__scope-arrow {
+  background: transparent;
+  border: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.conc__scope-arrow:hover { color: var(--ink); }
 
-/* ─── Pick group ──────────────────────────────────────────────────── */
-.concierge__pick {
-  padding: 0 var(--s-5) var(--s-5);
+.conc__pager {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+.conc__pager-btn { width: 28px; height: 28px; }
+
+/* ─── Search bar (toggleable) ───────────────────────────────────────── */
+.conc__search {
+  margin: 0 var(--s-5) var(--s-2);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px 14px;
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  color: var(--ink-muted);
+}
+.conc__search:focus-within { border-color: var(--peach); }
+.conc__search-input {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--ink);
+}
+.conc__search-clear {
+  width: 20px; height: 20px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--bone-deep);
+}
+
+/* ─── Snapshot card (WOW) ───────────────────────────────────────────── */
+.snap {
+  margin: 0 var(--s-5) var(--s-4);
+  padding: var(--s-4);
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
+  gap: var(--s-4);
 }
 
-.pick-head {
+.snap__head {
   display: grid;
-  grid-template-columns: auto 24px 1fr;
+  grid-template-columns: 40px 1fr auto;
   align-items: center;
   gap: var(--s-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--bone-edge-soft);
 }
 
-.pick-head__num {
+.snap__avatar {
+  width: 40px; height: 40px;
+  border-radius: var(--r-full);
+  display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display);
   font-style: italic;
-  font-variation-settings: '"opsz" 144, "SOFT" 100';
-  font-size: var(--t-2xl);
+  font-variation-settings: '"opsz" 144';
+  font-size: 17px;
+  color: var(--bone-warm);
+}
+
+.snap__name {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+}
+.snap__date {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.snap__h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  margin-bottom: var(--s-2);
+}
+.snap__h3--center { text-align: center; }
+
+.snap__summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-3);
+  align-items: start;
+}
+@media (max-width: 380px) {
+  .snap__summary { grid-template-columns: 1fr; }
+}
+
+.snap__summary-text { min-width: 0; }
+
+.snap__body-text {
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.snap__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--bone-edge-soft);
+}
+
+.snap__list {
+  list-style: decimal inside;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.snap__list-item {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--peach);
-  letter-spacing: -0.03em;
-  line-height: 1;
+  letter-spacing: -0.01em;
 }
 
-.pick-head__line {
-  height: 1px;
-  background: var(--bone-edge);
+.snap__ai-ref {
+  color: var(--peach);
+  font-weight: 400;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.snap__ai-ref.is-off {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
 
-.pick-head__label {
-  font-size: 11px;
+/* ─── Tab placeholders (KOC / Urgent Care) ─────────────────────────── */
+.conc__placeholder {
+  padding: var(--s-7) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+}
+.conc__placeholder-icon {
+  width: 60px; height: 60px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-soft);
+}
+.conc__placeholder-title {
+  font-family: var(--font-body);
+  font-weight: 100;
+  font-size: 24px;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+.conc__placeholder-sub {
+  font-size: 13px;
   font-weight: 300;
   color: var(--ink-muted);
-  letter-spacing: -0.005em;
+  max-width: 32ch;
+  line-height: 1.5;
 }
 
-.concierge__end {
+.conc__end {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--s-2);
-  padding: var(--s-6) var(--s-5) var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--bone-edge-soft);
   color: var(--ink-faint);
 }

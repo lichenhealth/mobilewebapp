@@ -39,7 +39,8 @@ export default function App() {
         <Routes>
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
-          <Route path="/concierge" element={<Concierge />} />
+          <Route path="/concierge"      element={<Concierge />} />
+          <Route path="/concierge/:tab" element={<Concierge />} />
           <Route path="/chat"      element={<Chat />} />
           <Route path="/chat/:id"  element={<ChatThread />} />
           <Route path="/calendar"  element={<Calendar />} />
