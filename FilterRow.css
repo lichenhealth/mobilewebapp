@@ -1,0 +1,36 @@
+.filter-row {
+  padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--bone-edge);
+  gap: var(--s-5);
+}
+
+.filter-row__tab {
+  position: relative;
+  padding: var(--s-3) 0;
+  font-size: var(--t-md);
+  font-weight: 200;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  transition: color var(--d-fast) var(--ease-out);
+}
+
+.filter-row__tab.is-active {
+  color: var(--peach);
+  font-weight: 600;
+}
+
+.filter-row__tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--peach);
+  border-radius: 2px;
+}
+
+.filter-row__tab:hover:not(.is-active) {
+  color: var(--ink-soft);
+}

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: deep moss with subtle warmth -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#2D3A2A"/>
+      <stop offset="100%" stop-color="#1F2A1E"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Mycelium: branching network -->
+  <g stroke="#C5B584" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.95">
+    <!-- Central node -->
+    <circle cx="256" cy="256" r="18" fill="#C5B584" stroke="none"/>
+
+    <!-- Primary branches -->
+    <path d="M256 256 Q 200 200, 150 170"/>
+    <path d="M256 256 Q 312 200, 362 170"/>
+    <path d="M256 256 Q 200 312, 150 342"/>
+    <path d="M256 256 Q 312 312, 362 342"/>
+    <path d="M256 256 Q 256 180, 256 130"/>
+    <path d="M256 256 Q 256 332, 256 382"/>
+
+    <!-- Secondary branches -->
+    <path d="M150 170 Q 120 150, 100 130" stroke-width="6"/>
+    <path d="M150 170 Q 130 200, 110 220" stroke-width="6"/>
+    <path d="M362 170 Q 392 150, 412 130" stroke-width="6"/>
+    <path d="M362 170 Q 382 200, 402 220" stroke-width="6"/>
+    <path d="M150 342 Q 120 362, 100 382" stroke-width="6"/>
+    <path d="M362 342 Q 392 362, 412 382" stroke-width="6"/>
+    <path d="M256 130 Q 230 110, 215 95" stroke-width="6"/>
+    <path d="M256 130 Q 282 110, 297 95" stroke-width="6"/>
+    <path d="M256 382 Q 230 402, 215 417" stroke-width="6"/>
+    <path d="M256 382 Q 282 402, 297 417" stroke-width="6"/>
+
+    <!-- Nodes (lichen dots) -->
+    <circle cx="150" cy="170" r="10" fill="#E8D9A6" stroke="none"/>
+    <circle cx="362" cy="170" r="10" fill="#E8D9A6" stroke="none"/>
+    <circle cx="150" cy="342" r="10" fill="#E8D9A6" stroke="none"/>
+    <circle cx="362" cy="342" r="10" fill="#E8D9A6" stroke="none"/>
+    <circle cx="256" cy="130" r="10" fill="#E8D9A6" stroke="none"/>
+    <circle cx="256" cy="382" r="10" fill="#E8D9A6" stroke="none"/>
+
+    <circle cx="100" cy="130" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="110" cy="220" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="412" cy="130" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="402" cy="220" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="100" cy="382" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="412" cy="382" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="215" cy="95" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="297" cy="95" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="215" cy="417" r="6" fill="#B8623C" stroke="none"/>
+    <circle cx="297" cy="417" r="6" fill="#B8623C" stroke="none"/>
+  </g>
+</svg>

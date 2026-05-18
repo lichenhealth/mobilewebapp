@@ -1,0 +1,200 @@
+.community__head {
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.community__title {
+  font-family: var(--font-display);
+  font-size: var(--t-xl);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  font-variation-settings: '"opsz" 144, "SOFT" 100';
+}
+.community__sub {
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.community__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+}
+
+/* ─── Member card ───────────────────────────────────────────────── */
+.member-card {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  box-shadow: var(--sh-soft);
+}
+
+.member-card__head {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.member-card__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--peach-tint), var(--bone-deep));
+  border: 1px solid var(--bone-edge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 20px;
+  font-variation-settings: '"opsz" 144';
+  color: var(--ink-soft);
+}
+
+.member-card__id { min-width: 0; }
+
+.member-card__name {
+  font-size: var(--t-md);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.member-card__handle {
+  font-size: 11px;
+  color: var(--peach);
+  margin-top: 2px;
+}
+
+.member-card__follow {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.member-card__bio {
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  letter-spacing: -0.005em;
+}
+
+.member-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--bone-edge-soft);
+}
+
+.member-card__metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-weight: 300;
+}
+.member-card__metric-n {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.member-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ─── Group card ────────────────────────────────────────────────── */
+.group-card {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  display: grid;
+  grid-template-columns: 36px 1fr 16px;
+  gap: var(--s-3);
+  align-items: center;
+  box-shadow: var(--sh-soft);
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.group-card:hover { border-color: var(--peach); }
+
+.group-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  background: var(--peach-tint);
+  color: var(--peach-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.group-card__row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.group-card__name {
+  font-size: var(--t-base);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.group-card__pulse {
+  color: var(--moss);
+  font-size: 8px;
+  animation: pulse 2.4s infinite var(--ease-in-out);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+.group-card__desc {
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--ink-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.group-card__meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: var(--s-1);
+}
+
+/* ─── Empty state ───────────────────────────────────────────────── */
+.community__empty {
+  padding: var(--s-9) var(--s-7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--ink-muted);
+  text-align: center;
+}
+.community__empty-text {
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.6;
+  max-width: 28ch;
+  color: var(--ink-muted);
+}

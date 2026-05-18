@@ -1,0 +1,96 @@
+/* ====================================================================
+   LICHEN — Design tokens (aligned to wireframe)
+   Cream canvas, white cards, soft peach accent, Archivo type.
+==================================================================== */
+
+:root {
+  /* ─── Color ─────────────────────────────────────────────────────── */
+  --bone:        #F0EEE9;     /* primary canvas — matches wireframe */
+  --bone-warm:   #FFFFFF;     /* lifted surfaces / cards */
+  --bone-deep:   #E6E2DA;     /* recessed */
+  --bone-edge:   #D9D9D9;     /* hairline borders (from wireframe) */
+  --bone-edge-soft: #ECE8DF;
+
+  --ink:         #12181C;     /* primary text (from wireframe) */
+  --ink-soft:    #2A3338;
+  --ink-muted:   #6B7479;
+  --ink-faint:   #979797;     /* meta/labels (from wireframe) */
+
+  --peach:       #F5A36D;     /* primary accent (from wireframe) */
+  --peach-deep:  #E08749;
+  --peach-light: #FBD9C0;
+  --peach-tint:  #FCEEDF;
+
+  --moss:        #4A5D3F;     /* secondary accent — sparingly */
+  --moss-tint:   #E6ECE0;
+
+  --rust:        #B8623C;     /* rare, hot emphasis */
+  --berry:       #7C3F4F;
+  --sky:         #6B8A9C;
+
+  --shadow-color: 18 24 28;   /* rgb of ink, for shadows */
+
+  /* ─── Type ──────────────────────────────────────────────────────── */
+  --font-display: 'Fraunces', 'Times New Roman', Georgia, serif;
+  --font-body:    'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Sizes */
+  --t-2xs:   10px;
+  --t-xs:    11px;
+  --t-sm:    13px;
+  --t-base:  14px;
+  --t-md:    15px;
+  --t-lg:    18px;
+  --t-xl:    22px;
+  --t-2xl:   28px;
+  --t-3xl:   36px;
+  --t-4xl:   48px;
+
+  --lh-tight:  1.1;
+  --lh-snug:   1.2;
+  --lh-normal: 1.45;
+  --lh-loose:  1.65;
+
+  /* ─── Spacing ───────────────────────────────────────────────────── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 56px;
+  --s-10: 72px;
+
+  /* ─── Radii ─────────────────────────────────────────────────────── */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   9px;            /* matches wireframe card radius */
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-full: 9999px;
+
+  /* ─── Shadows ───────────────────────────────────────────────────── */
+  --sh-soft:  0 1px 2px rgb(var(--shadow-color) / 0.03),
+              0 2px 6px rgb(var(--shadow-color) / 0.03);
+  --sh-card:  0 1px 2px rgb(var(--shadow-color) / 0.04),
+              0 4px 14px rgb(var(--shadow-color) / 0.05);
+  --sh-pop:   0 4px 12px rgb(var(--shadow-color) / 0.08),
+              0 16px 40px rgb(var(--shadow-color) / 0.12);
+
+  /* ─── Layout ────────────────────────────────────────────────────── */
+  --app-max: 430px;
+  --nav-h:   84px;
+  --top-h:   60px;
+  --safe-top: env(safe-area-inset-top, 0);
+  --safe-bot: env(safe-area-inset-bottom, 0);
+
+  /* ─── Motion ────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --d-fast: 140ms;
+  --d-base: 220ms;
+  --d-slow: 380ms;
+}

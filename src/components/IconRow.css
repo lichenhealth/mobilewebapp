@@ -1,0 +1,25 @@
+.icon-row {
+  padding: var(--s-3) var(--s-5);
+  gap: var(--s-2);
+}
+
+.icon-row__btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  background: var(--bone-warm);
+  color: var(--ink-soft);
+  transition: transform var(--d-fast) var(--ease-out),
+              border-color var(--d-fast) var(--ease-out),
+              color var(--d-fast) var(--ease-out);
+}
+
+.icon-row__btn:hover {
+  border-color: var(--peach);
+  color: var(--peach);
+}
+.icon-row__btn:active { transform: scale(0.92); }

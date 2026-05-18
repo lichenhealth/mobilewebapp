@@ -1,0 +1,77 @@
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--app-max);
+  background: var(--bone);
+  border-top: 1px solid var(--bone-edge);
+  padding-bottom: var(--safe-bot);
+  z-index: 50;
+}
+
+.bottom-nav__list {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  padding: var(--s-3) var(--s-1) var(--s-4);
+}
+
+.bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px;
+  color: var(--ink-faint);
+  transition: color var(--d-base) var(--ease-out),
+              transform var(--d-base) var(--ease-out);
+  position: relative;
+}
+
+.bottom-nav__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--d-base) var(--ease-out);
+}
+
+.bottom-nav__label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-feature-settings: 'tnum' on;
+}
+
+.bottom-nav__item.is-active {
+  color: var(--ink);
+}
+.bottom-nav__item.is-active .bottom-nav__icon {
+  transform: translateY(-1px);
+}
+.bottom-nav__item.is-active::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 2px;
+  background: var(--peach);
+  border-radius: 2px;
+}
+
+.bottom-nav__item:active { transform: scale(0.94); }
+
+/* Home indicator pill (iOS-style decorative) */
+.bottom-nav__indicator {
+  width: 134px;
+  height: 4px;
+  background: var(--ink);
+  border-radius: 4px;
+  margin: 0 auto 8px;
+  opacity: 0.65;
+}
