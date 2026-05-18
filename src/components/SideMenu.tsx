@@ -19,9 +19,9 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { to: '/home',      label: 'Home',      icon: 'home',           blurb: 'Today, in the network',     status: 'live'  },
-  { to: '/community', label: 'Community', icon: 'profile',        blurb: 'People & groups you trust', status: 'live'  },
+  { to: '/community', label: 'Community', icon: 'profile',        blurb: 'Mons Sana — your circle', status: 'live'  },
   { to: '/concierge', label: 'Concierge', icon: 'concierge',      blurb: 'Three picks, slow',          status: 'live'  },
-  { to: '/chat',      label: 'Chat',      icon: 'chat',           blurb: 'Quiet conversations',       status: 'soon'  },
+  { to: '/chat',      label: 'Chat',      icon: 'chat',           blurb: 'Conversations & groups',     status: 'live'  },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar',       blurb: 'Suppers, swaps, workshops', status: 'soon'  },
   { to: '/saved',     label: 'Saved',     icon: 'saved',          blurb: 'Things to come back to',     status: 'soon'  },
   { to: '/maps',      label: 'Maps',      icon: 'maps',           blurb: 'A bioregional view',         status: 'soon'  },

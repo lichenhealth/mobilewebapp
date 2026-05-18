@@ -7,7 +7,9 @@ A slow, considered community PWA — installable, mobile-responsive, no service 
 Three primary screens are fully designed and built:
 
 - **`/home`** — the daily feed, mirroring the wireframe card structure (avatar + title + handle, body text with image-badge, engagement row: Trust / Recommend / Share / Save / Chat). Includes filter tabs (All / Social / Creative / Educational / Actionable / Q&A) and the round category-icon row.
-- **`/community`** — three tabs (People / Groups / Discussions) with member cards, group rows, and a quiet empty state.
+- **`/community`** — the **Mons Sana** community home, built against the `COMMUNITY_HOME` Figma frame. Big centered Archivo Thin title, the same FilterRow + IconRow as Home, then a feed of *CommunityCards* with centered titles, a center-stage user-group / event / art icon, and a different engagement set: Love / Comment / Share / Recommend / Save (no Trust, per the wireframe).
+- **`/chat`** — Signal-style conversation list. Search bar at top (filters by name + handle + message content, with live highlighting). Pinned conversations sort first; everything else by recency. Distinguishes 1:1 vs group via avatar treatment (single circle vs stacked three).
+- **`/chat/:id`** — the individual chat thread. Hides the top bar and bottom nav for a full-screen feel. Group threads show sender names + tiny colored avatars on incoming messages. Bubbles support **replies** (quoted inset with peach left-border), **reactions** (tappable pills hugging the bubble), and the **••• action menu** which surfaces quick emoji reactions + Reply / Save / Info. Auto-grow textarea, Enter-to-send, Shift+Enter for newline. Mock messages are mutable in local state — sending appends to the list immediately, reactions toggle live.
 - **`/concierge`** — curated "three things" daily picks with an ask-the-concierge input.
 
 The other 11 nav destinations (Chat, Calendar, Saved, Maps, Profile, Places, Market, Work, Events, Library, Groups, Mycelium) are wired up as placeholder routes so the bottom nav and side menu both work end-to-end. Build them out in pass two.

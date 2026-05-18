@@ -33,7 +33,19 @@ export type IconName =
   | 'arrow-right'
   | 'arrow-up'
   | 'close'
-  | 'install';
+  | 'install'
+  | 'arrow-left'
+  | 'smile'
+  | 'paperclip'
+  | 'mic'
+  | 'more-horizontal'
+  | 'pin'
+  | 'check'
+  | 'check-double'
+  | 'reply'
+  | 'info'
+  | 'image'
+  | 'heart-line';
 
 const PATHS: Record<IconName, JSX.Element> = {
   // ─── Bottom nav ────────────────────────────────────────────────────
@@ -207,6 +219,75 @@ const PATHS: Record<IconName, JSX.Element> = {
   install: (
     <>
       <path d="M12 4v12M6 10l6 6 6-6M4 20h16" />
+    </>
+  ),
+  'arrow-left': (
+    <>
+      <path d="M19 12H5M11 6l-6 6 6 6" />
+    </>
+  ),
+  smile: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="9" cy="10" r="0.6" fill="currentColor" />
+      <circle cx="15" cy="10" r="0.6" fill="currentColor" />
+      <path d="M8.5 14.5c.8 1.5 2 2.3 3.5 2.3s2.7-.8 3.5-2.3" />
+    </>
+  ),
+  paperclip: (
+    <>
+      <path d="M20 12.5 12.5 20a5 5 0 0 1-7-7L13 5.5a3.5 3.5 0 1 1 5 5l-7.5 7.5a2 2 0 0 1-3-3l7-7" />
+    </>
+  ),
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="12" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+    </>
+  ),
+  'more-horizontal': (
+    <>
+      <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 17v5M7 11.5 12 7l5 4.5-1.5 3-7 0L7 11.5ZM9 4.5h6L13.5 7h-3L9 4.5Z" />
+    </>
+  ),
+  check: (
+    <>
+      <path d="m5 12 5 5L20 7" />
+    </>
+  ),
+  'check-double': (
+    <>
+      <path d="m3 12 4 4 7-7M11 16l3 3 8-12" />
+    </>
+  ),
+  reply: (
+    <>
+      <path d="M9 17 4 12l5-5M4 12h11a5 5 0 0 1 5 5v3" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 16v-5M12 8h.01" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="4.5" width="18" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m3 17 5-5 4 4 3-3 6 6" />
+    </>
+  ),
+  'heart-line': (
+    <>
+      <path d="M12 19.5s-7-4.4-7-9.5a4.5 4.5 0 0 1 7-3.7A4.5 4.5 0 0 1 19 10c0 5.1-7 9.5-7 9.5Z" />
     </>
   ),
 };

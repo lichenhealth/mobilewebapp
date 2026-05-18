@@ -1,16 +1,5 @@
 import Placeholder from './Placeholder';
 
-export function Chat() {
-  return (
-    <Placeholder
-      title="Chat"
-      icon="chat"
-      intro="Direct conversations and small-group threads, with read receipts that respect both people's time."
-      hint="Coming in pass two"
-    />
-  );
-}
-
 export function Calendar() {
   return (
     <Placeholder

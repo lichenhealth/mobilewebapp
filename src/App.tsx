@@ -3,7 +3,9 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './routes/Home';
 import Community from './routes/Community';
 import Concierge from './routes/Concierge';
-import { Chat, Calendar, Saved, Maps, Profile } from './routes/Stubs';
+import Chat from './routes/Chat';
+import ChatThread from './routes/ChatThread';
+import { Calendar, Saved, Maps, Profile } from './routes/Stubs';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -20,22 +22,26 @@ function ScrollToTop() {
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Chat thread is full-screen — hide the global top bar and bottom nav
+  const isChatThread = /^\/chat\/[^/]+/.test(pathname);
 
   return (
     <div className="app-shell">
       <ScrollToTop />
-      <TopBar onMenu={() => setMenuOpen(true)} />
-      <main className="scroll-view">
+      {!isChatThread && <TopBar onMenu={() => setMenuOpen(true)} />}
+      <main className="scroll-view" style={isChatThread ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home"      element={<Home />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/concierge" element={<Concierge />} />
-          <Route path="/chat"      element={<Chat />} />
-          <Route path="/calendar"  element={<Calendar />} />
-          <Route path="/saved"     element={<Saved />} />
-          <Route path="/maps"      element={<Maps />} />
-          <Route path="/profile"   element={<Profile />} />
+          <Route path="/home"        element={<Home />} />
+          <Route path="/community"   element={<Community />} />
+          <Route path="/concierge"   element={<Concierge />} />
+          <Route path="/chat"        element={<Chat />} />
+          <Route path="/chat/:id"    element={<ChatThread />} />
+          <Route path="/calendar"    element={<Calendar />} />
+          <Route path="/saved"       element={<Saved />} />
+          <Route path="/maps"        element={<Maps />} />
+          <Route path="/profile"     element={<Profile />} />
 
           {/* Side-menu passages — placeholders until pass 2 */}
           <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming in pass two" />} />
@@ -49,9 +55,9 @@ export default function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
-      <BottomNav />
+      {!isChatThread && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <InstallPrompt />
+      {!isChatThread && <InstallPrompt />}
     </div>
   );
 }
