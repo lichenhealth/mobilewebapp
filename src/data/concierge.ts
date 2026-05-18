@@ -70,3 +70,249 @@ export const TODAY_SNAPSHOT: HealthSnapshot = {
     },
   ],
 };
+
+// ─── KOC: Kaleidoscope of Care (weekly plan) ────────────────────────
+// Items use a tiny markup syntax inside their `text` field:
+//   [phrase]      → peach-underlined "intervention" link
+//   {icon-name}   → small inline icon (any IconName)
+
+export interface CareItem {
+  text: string;
+}
+
+export interface ProviderContribution {
+  handle: string;
+  items: CareItem[];
+}
+
+export interface CarePlanDay {
+  label: string;            // "Daily", "Monday, 5/19", etc.
+  providers: ProviderContribution[];
+}
+
+export interface CarePlan {
+  dateRange: string;        // "5/18/26 - 5/23/26"
+  patient: { name: string; monogram: string; color: string };
+  days: CarePlanDay[];
+}
+
+export const WEEK_CARE_PLAN_FORWARD_DECL = null; // real declaration below — keep this to satisfy lint
+
+// ─── Concierge Chat (care team + AI assistant) ──────────────────────
+// A dedicated thread between the user, their care providers, and their
+// AI assistant. Lives at /concierge/chat (NOT the same as the global /chat).
+
+export type ChatSender = 'self' | 'provider' | 'ai';
+
+export interface ChatMessage {
+  id: string;
+  sender: ChatSender;
+  authorName: string;
+  authorMonogram?: string;
+  authorColor?: string;
+  /** Body text. Supports:
+   *    @handle      → peach mention
+   *    [phrase]     → peach-underlined link
+   *    \n\n         → paragraph break */
+  text: string;
+  time: string;
+}
+
+export interface ChatDay {
+  label: string;       // "Thursday, May 17th"
+  messages: ChatMessage[];
+}
+
+export const CONCIERGE_CHAT: ChatDay[] = [
+  {
+    label: 'Thursday, May 17th',
+    messages: [
+      {
+        id: 'm1',
+        sender: 'self',
+        authorName: 'Crystal Jones',
+        authorMonogram: 'C',
+        authorColor: '#7E6B96',
+        text: 'Hey Team, I\u2019m feeling much better than last week and haven\u2019t had any challenges integrating the supplements @cherlynnresager suggested.',
+        time: '12:23 pm',
+      },
+      {
+        id: 'm2',
+        sender: 'provider',
+        authorName: 'Payton Skawinski',
+        authorMonogram: 'P',
+        authorColor: '#6B8A9C',
+        text: 'Awesome! I just wrote up a prescription for the dynamite supplements, which are naturopathic but should get some insurance coverage, @crystaljones.',
+        time: '1:53 pm',
+      },
+      {
+        id: 'm3',
+        sender: 'ai',
+        authorName: 'Crystal Jones\u2019 AI Assistant',
+        text:
+          'Good news! @crystaljones\u2019 insurance covers 80% of @dynamite\u2019s [Daily Foundations Pack]. I\u2019ve attached the complete Aetna claim for her to submit.\n\n' +
+          'Just FYI: Fellow founder @mindyyadav has a very similar profile and finds the following sleep meditation to augment the supplements nicely.\n\n' +
+          'Also, fellow founder @markbrown has a solution to one of your roadblocks and you have one for his. I\u2019ve created a collaborative business plan for you to review to see if you would like to propose a collaboration. Happy to facilitate an intro.',
+        time: '2:14 pm',
+      },
+      {
+        id: 'm4',
+        sender: 'provider',
+        authorName: 'Cherlynn Resager',
+        authorMonogram: 'C',
+        authorColor: '#7C8A6D',
+        text:
+          'Wonderful progress, @crystaljones. Keep the smoothies + supplements going through the weekend, and let\u2019s plan a check-in next Tuesday.',
+        time: '3:08 pm',
+      },
+    ],
+  },
+];
+
+export const WEEK_CARE_PLAN: CarePlan = {
+  dateRange: '5/18/26 \u2013 5/23/26',
+  patient: { name: 'Kelly Bolton', monogram: 'K', color: '#7E6B96' },
+  days: [
+    {
+      label: 'Daily',
+      providers: [
+        {
+          handle: '@CherlynnResager',
+          items: [
+            { text: '[Green Smoothie] {fork-spoon} (1x day/am)' },
+            { text: '[Dynamite Supplements] (DM Plus am/Tri-Mins pm)' },
+            { text: '30 minutes on the [biomat] at [Lichen Bainbridge Island] (PM, if possible)' },
+          ],
+        },
+        {
+          handle: '@GalynBurke',
+          items: [
+            { text: '[Inner Child Meditation] {mic}' },
+          ],
+        },
+        {
+          handle: '@PaytonSkawinski',
+          items: [
+            { text: 'Stay at [50mg Zoloft], daily' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Monday, 5/19',
+      providers: [
+        {
+          handle: '@GalynBurke',
+          items: [
+            { text: '[Polaris Heal the Healer Module] {graduation-cap}' },
+          ],
+        },
+        {
+          handle: '@PaytonSkawinski',
+          items: [
+            { text: '3pm [blood draw] at [Lynwood Office] {calendar} {location}' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Tuesday, 5/20',
+      providers: [
+        {
+          handle: '@ZiaSparkleheart',
+          items: [
+            { text: '[Huachuma Ceremony] at [Lichen Bainbridge Island]' },
+            { text: 'No food after midnight on Monday. No other mind-altering substances within 24 hours of ceremony.' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Wednesday, 5/21',
+      providers: [
+        {
+          handle: '@CherlynnResager',
+          items: [
+            { text: 'Recovery day. Hydrate, [bone broth] {fork-spoon}, gentle movement only.' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Thursday, 5/22',
+      providers: [
+        {
+          handle: '@GalynBurke',
+          items: [
+            { text: '[Somatic Therapy] {mic} \u2014 60 min, 2pm' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Friday, 5/23',
+      providers: [
+        {
+          handle: '@PaytonSkawinski',
+          items: [
+            { text: 'Weekly check-in {calendar} \u2014 4pm telehealth' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+// ─── Urgent Care ─────────────────────────────────────────────────────
+// On-call practitioner the user can reach right now. If the practitioner
+// is part of the user's care team, they get a priority-routing flag so
+// they pick up with full case context.
+
+export interface OnCallPractitioner {
+  id: string;
+  name: string;
+  monogram: string;
+  color: string;
+  role: string;             // "Naturopath", "Therapist", etc.
+  blurb: string;            // one-line context
+  isOnUserTeam: boolean;    // true → priority-routed with case context
+  responseTime: string;     // "< 5 minutes", "~10 minutes"
+  status: 'available' | 'busy' | 'soon';
+}
+
+export const ON_CALL_NOW: OnCallPractitioner = {
+  id: 'payton-skawinski',
+  name: 'Payton Skawinski',
+  monogram: 'P',
+  color: '#6B8A9C',
+  role: 'Psychiatric NP',
+  blurb: 'Has your full case context — pick up where you left off.',
+  isOnUserTeam: true,
+  responseTime: '< 5 minutes',
+  status: 'available',
+};
+
+export const BACKUP_PRACTITIONERS: OnCallPractitioner[] = [
+  {
+    id: 'maya-okonkwo',
+    name: 'Maya Okonkwo, RN',
+    monogram: 'M',
+    color: '#7C8A6D',
+    role: 'Triage Nurse',
+    blurb: 'Lichen urgent care, on call until 11pm MT.',
+    isOnUserTeam: false,
+    responseTime: '~10 minutes',
+    status: 'available',
+  },
+  {
+    id: 'sam-river',
+    name: 'Sam River, LCSW',
+    monogram: 'S',
+    color: '#9C7355',
+    role: 'Crisis Counselor',
+    blurb: 'Available for mental-health urgent support.',
+    isOnUserTeam: false,
+    responseTime: '~15 minutes',
+    status: 'soon',
+  },
+];
