@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
+import { MyceliumMark } from './MyceliumMark';
 import './TopBar.css';
 
 interface TopBarProps {
@@ -10,14 +11,34 @@ interface TopBarProps {
 }
 
 /** Section identity: when on these route prefixes, show a section-specific
- *  icon-in-circle instead of the Lichen wordmark. */
-const SECTION_LOGOS: { prefix: string; icon: IconName; label: string }[] = [
-  { prefix: '/market',      icon: 'store',         label: 'Marketplace' },
-  { prefix: '/mycelium',    icon: 'sparkle',       label: 'Mycelium'    },
-  { prefix: '/communities', icon: 'user-multiple', label: 'Communities' },
-  { prefix: '/community',   icon: 'user-multiple', label: 'Communities' },
-  { prefix: '/groups',      icon: 'user-multiple', label: 'Groups'      },
-  { prefix: '/concierge',   icon: 'health',        label: 'Concierge'   },
+ *  logo instead of the Lichen wordmark. Order matters — first match wins,
+ *  so more specific prefixes go first. */
+interface SectionLogo {
+  prefix: string;
+  label: string;
+  /** Either an icon name (rendered inside the standard black-filled circle)
+   *  or `custom` (rendered directly — for branded marks like Mycelium). */
+  icon?: IconName;
+  custom?: boolean;
+}
+
+const SECTION_LOGOS: SectionLogo[] = [
+  { prefix: '/market',      label: 'Marketplace', icon: 'store'         },
+  { prefix: '/mycelium',    label: 'Mycelium',    custom: true          },
+  { prefix: '/communities', label: 'Communities', icon: 'user-multiple' },
+  { prefix: '/community',   label: 'Communities', icon: 'user-multiple' },
+  { prefix: '/groups',      label: 'Groups',      icon: 'user-multiple' },
+  { prefix: '/concierge',   label: 'Concierge',   icon: 'health'        },
+  { prefix: '/chat',        label: 'Chat',        icon: 'chat'          },
+  { prefix: '/calendar',    label: 'Calendar',    icon: 'calendar'      },
+  { prefix: '/saved',       label: 'Saved',       icon: 'bookmark'      },
+  { prefix: '/maps',        label: 'Maps',        icon: 'globe'         },
+  { prefix: '/profile',     label: 'Profile',     icon: 'profile'       },
+  { prefix: '/work',        label: 'Work',        icon: 'briefcase'     },
+  { prefix: '/events',      label: 'Events',      icon: 'sparkle'       },
+  { prefix: '/library',     label: 'Library',     icon: 'book'          },
+  { prefix: '/places',      label: 'Places',      icon: 'location'      },
+  { prefix: '/donate',      label: 'Donate',      icon: 'heart-line'    },
 ];
 
 /** Routes that show a settings gear next to the bell */
@@ -45,16 +66,27 @@ export default function TopBar({
 
       <div className="top-bar__logo">
         {section ? (
-          <div
-            className="top-bar__section-mark"
-            role="img"
-            aria-label={section.label}
-            title={section.label}
-          >
-            <Icon name={section.icon} size={26} />
-          </div>
+          section.custom && section.prefix === '/mycelium' ? (
+            <div
+              className="top-bar__section-mark top-bar__section-mark--custom"
+              role="img"
+              aria-label={section.label}
+              title={section.label}
+            >
+              <MyceliumMark size={68} />
+            </div>
+          ) : (
+            <div
+              className="top-bar__section-mark"
+              role="img"
+              aria-label={section.label}
+              title={section.label}
+            >
+              <Icon name={section.icon!} size={34} />
+            </div>
+          )
         ) : (
-          <LichenMark size={48} />
+          <LichenMark size={68} />
         )}
       </div>
 
