@@ -53,6 +53,19 @@
   z-index: -1;
 }
 
+/* Section-identity logo (e.g. storefront-in-circle for Marketplace) */
+.top-bar__section-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: var(--bone-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.top-bar__section-mark svg { color: var(--bone-warm); }
+
 .top-bar__bell { justify-self: end; }
 
 .top-bar__badge {

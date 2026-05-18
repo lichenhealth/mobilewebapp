@@ -6,6 +6,7 @@ import CommunityList from './routes/CommunityList';
 import Group from './routes/Group';
 import GroupList from './routes/GroupList';
 import Mycelium from './routes/Mycelium';
+import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
@@ -60,12 +61,15 @@ export default function App() {
           <Route path="/groups"      element={<GroupList />} />
           <Route path="/groups/:id"  element={<Group />} />
 
+          {/* Marketplace */}
+          <Route path="/market"        element={<Marketplace />} />
+          <Route path="/market/:kind"  element={<Marketplace />} />
+
           {/* Donate */}
           <Route path="/donate" element={<Donate />} />
 
           {/* Side-menu passages — placeholders */}
           <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
-          <Route path="/market"   element={<Placeholder title="Market"   icon="store"          intro="Local goods at fair prices. Trusted sellers only — no rankings, no ads." hint="Coming soon" />} />
           <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
           <Route path="/events"   element={<Placeholder title="Events"   icon="sparkle"        intro="Mostly in-person. Workshops, suppers, gatherings on the land." hint="Coming soon" />} />
           <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming soon" />} />

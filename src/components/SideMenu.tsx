@@ -49,6 +49,18 @@ const SECTIONS: NavSection[] = [
     items: GROUPS.map((g) => ({ label: g.name, href: `/groups/${g.id}` })),
     defaultExpanded: false,
   },
+  {
+    key: 'marketplace',
+    title: 'Marketplace',
+    href: '/market',
+    items: [
+      { label: 'Goods',    href: '/market/goods'    },
+      { label: 'Services', href: '/market/services' },
+      { label: 'Spaces',   href: '/market/spaces'   },
+      { label: 'ISO',      href: '/market/iso'      },
+    ],
+    defaultExpanded: false,
+  },
 ];
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {

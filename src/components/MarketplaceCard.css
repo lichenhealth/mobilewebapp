@@ -1,0 +1,183 @@
+.mkt-card {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  cursor: pointer;
+  transition: border-color var(--d-fast) var(--ease-out),
+              transform var(--d-fast) var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+.mkt-card:hover { border-color: var(--peach); transform: translateY(-1px); }
+
+/* ─── Head ──────────────────────────────────────────────────────────── */
+.mkt-card__head {
+  display: grid;
+  grid-template-columns: 40px 1fr 32px;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.mkt-card__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-variation-settings: '"opsz" 144';
+  font-size: 17px;
+  color: var(--bone-warm);
+}
+
+.mkt-card__id { min-width: 0; }
+
+.mkt-card__title {
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.mkt-card__handle {
+  font-size: 11px;
+  color: var(--peach);
+  font-weight: 300;
+  margin-top: 2px;
+}
+
+.mkt-card__mode {
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+.mkt-card__mode--sm { width: 20px; height: 20px; }
+
+/* ─── Body ──────────────────────────────────────────────────────────── */
+.mkt-card__body {
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 300;
+  color: var(--ink-muted);
+  padding: 0 4px;
+}
+
+/* ─── Meta row (price, location, mode) ──────────────────────────────── */
+.mkt-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  padding: 0 4px;
+}
+
+.mkt-card__price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.mkt-card__loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mkt-card__loc svg { color: var(--peach); }
+
+.mkt-card__mode-chip {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--bone-deep);
+  color: var(--ink-muted);
+  margin-left: auto;
+}
+
+/* ─── Footer (engagement) ───────────────────────────────────────────── */
+.mkt-card__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  margin: 0 calc(-1 * var(--s-4));
+  margin-top: var(--s-1);
+  border-top: 1px solid var(--bone-edge);
+}
+
+.mkt-card__action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 4px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+  position: relative;
+}
+.mkt-card__action:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: var(--bone-edge);
+}
+.mkt-card__action:hover { color: var(--ink); background: rgb(0 0 0 / 0.02); }
+.mkt-card__action.is-active { color: var(--peach); }
+.mkt-card__action.is-active svg { color: var(--peach); }
+
+.mkt-card__count {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-left: 2px;
+}
+.mkt-card__action.is-active .mkt-card__count { color: var(--peach); font-weight: 600; }
+
+/* ─── Compact variant ───────────────────────────────────────────────── */
+.mkt-card--compact {
+  display: grid;
+  grid-template-columns: 40px 1fr auto 20px;
+  gap: var(--s-3);
+  align-items: center;
+  padding: 12px var(--s-4);
+  border-radius: var(--r-sm);
+}
+.mkt-card--compact .mkt-card__title { font-size: 13px; }
+.mkt-card--compact .mkt-card__handle { color: var(--ink-faint); }
+.mkt-card__compact-price {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
