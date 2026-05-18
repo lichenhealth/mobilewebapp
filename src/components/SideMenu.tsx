@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Icon, IconName } from './Icon';
-import { LichenMark } from './LichenMark';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Icon } from './Icon';
+import { COMMUNITIES, GROUPS, NETWORK_LABELS } from '../data/network';
 import './SideMenu.css';
 
 interface SideMenuProps {
@@ -9,37 +9,55 @@ interface SideMenuProps {
   onClose: () => void;
 }
 
-interface Section {
-  to: string;
+interface SubItem {
   label: string;
-  icon: IconName;
-  blurb: string;
-  status?: 'live' | 'soon' | 'quiet';
+  href: string;
 }
 
-const SECTIONS: Section[] = [
-  { to: '/home',      label: 'Home',      icon: 'home',           blurb: 'Today, in the network',     status: 'live'  },
-  { to: '/community', label: 'Community', icon: 'profile',        blurb: 'Mons Sana — your circle', status: 'live'  },
-  { to: '/concierge', label: 'Concierge', icon: 'concierge',      blurb: 'Three picks, slow',          status: 'live'  },
-  { to: '/chat',      label: 'Chat',      icon: 'chat',           blurb: 'Conversations & groups',     status: 'live'  },
-  { to: '/calendar',  label: 'Calendar',  icon: 'calendar',       blurb: 'Suppers, swaps, workshops', status: 'soon'  },
-  { to: '/saved',     label: 'Saved',     icon: 'saved',          blurb: 'Things to come back to',     status: 'soon'  },
-  { to: '/maps',      label: 'Maps',      icon: 'maps',           blurb: 'A bioregional view',         status: 'soon'  },
-  { to: '/profile',   label: 'Profile',   icon: 'profile',        blurb: 'The you that lives here',    status: 'soon'  },
-];
+interface NavSection {
+  key: string;
+  title: string;
+  href: string;
+  items: SubItem[];
+  defaultExpanded: boolean;
+}
 
-const PASSAGES: Section[] = [
-  { to: '/places',   label: 'Places',   icon: 'location',       blurb: 'Spaces members open up'      },
-  { to: '/market',   label: 'Market',   icon: 'store',          blurb: 'Local goods, fair prices'    },
-  { to: '/work',     label: 'Work',     icon: 'briefcase',      blurb: 'Help wanted, help offered'   },
-  { to: '/events',   label: 'Events',   icon: 'sparkle',        blurb: 'In-person, mostly'           },
-  { to: '/library',  label: 'Library',  icon: 'book',           blurb: 'Essays, field guides, zines' },
-  { to: '/groups',   label: 'Groups',   icon: 'graduation-cap', blurb: 'Smaller circles'             },
-  { to: '/mycelium', label: 'Mycelium', icon: 'sparkle',        blurb: 'The underlayer'              },
+const SECTIONS: NavSection[] = [
+  {
+    key: 'mycelium',
+    title: 'Mycelium',
+    href: '/mycelium',
+    items: (Object.keys(NETWORK_LABELS) as Array<keyof typeof NETWORK_LABELS>).map(
+      (type) => ({
+        label: NETWORK_LABELS[type],
+        href: `/mycelium/${type === 'person' ? 'people' : type === 'place' ? 'places' : `${type}s`}`,
+      })
+    ),
+    defaultExpanded: true,
+  },
+  {
+    key: 'communities',
+    title: 'Communities',
+    href: '/communities',
+    items: COMMUNITIES.map((c) => ({ label: c.name, href: `/communities/${c.id}` })),
+    defaultExpanded: true,
+  },
+  {
+    key: 'groups',
+    title: 'Groups',
+    href: '/groups',
+    items: GROUPS.map((g) => ({ label: g.name, href: `/groups/${g.id}` })),
+    defaultExpanded: false,
+  },
 ];
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
-  // Lock body scroll while open + close on Escape
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
+  );
+
+  // Lock body scroll + close on Escape
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -51,77 +69,71 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     };
   }, [open, onClose]);
 
+  const go = (href: string) => {
+    navigate(href);
+    onClose();
+  };
+
+  const toggleAndGo = (section: NavSection) => {
+    setExpanded((e) => ({ ...e, [section.key]: !e[section.key] }));
+    go(section.href);
+  };
+
   return (
     <div className={'side-menu' + (open ? ' is-open' : '')} aria-hidden={!open}>
       <div className="side-menu__scrim" onClick={onClose} />
       <aside className="side-menu__panel" role="dialog" aria-label="Navigation">
-        <header className="side-menu__head">
-          <LichenMark size={52} />
-          <button
-            className="side-menu__close"
-            onClick={onClose}
-            aria-label="Close menu"
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </header>
+        <button
+          className="side-menu__close"
+          onClick={onClose}
+          aria-label="Close menu"
+        >
+          <Icon name="close" size={18} />
+        </button>
 
-        <div className="side-menu__section-label">Primary</div>
-        <nav className="side-menu__list">
+        <nav className="side-menu__nav">
           {SECTIONS.map((s) => (
-            <NavLink
-              key={s.to}
-              to={s.to}
-              onClick={onClose}
-              className={({ isActive }) =>
-                'side-menu__item' + (isActive ? ' is-active' : '')
-              }
-            >
-              <span className="side-menu__icon">
-                <Icon name={s.icon} size={16} />
-              </span>
-              <span className="side-menu__text">
-                <span className="side-menu__label">{s.label}</span>
-                <span className="side-menu__blurb">{s.blurb}</span>
-              </span>
-              {s.status === 'soon' && (
-                <span className="side-menu__status">soon</span>
+            <div key={s.key} className="side-menu__section">
+              <button
+                className="side-menu__header"
+                onClick={() => toggleAndGo(s)}
+                aria-expanded={expanded[s.key]}
+              >
+                <span className="side-menu__header-label">{s.title}</span>
+                <span
+                  className={
+                    'side-menu__chevron' +
+                    (expanded[s.key] ? ' is-open' : '')
+                  }
+                  aria-hidden="true"
+                />
+              </button>
+              {expanded[s.key] && s.items.length > 0 && (
+                <ul className="side-menu__sub-list">
+                  {s.items.map((item) => (
+                    <li key={item.href}>
+                      <button
+                        className="side-menu__sub-item"
+                        onClick={() => go(item.href)}
+                      >
+                        {item.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </NavLink>
+            </div>
           ))}
-        </nav>
 
-        <div className="side-menu__divider" />
-
-        <div className="side-menu__section-label">Passages</div>
-        <nav className="side-menu__list">
-          {PASSAGES.map((s) => (
-            <NavLink
-              key={s.to}
-              to={s.to}
-              onClick={onClose}
-              className={({ isActive }) =>
-                'side-menu__item' + (isActive ? ' is-active' : '')
-              }
+          <div className="side-menu__section">
+            <button
+              className="side-menu__donate"
+              onClick={() => go('/donate')}
             >
-              <span className="side-menu__icon">
-                <Icon name={s.icon} size={16} />
-              </span>
-              <span className="side-menu__text">
-                <span className="side-menu__label">{s.label}</span>
-                <span className="side-menu__blurb">{s.blurb}</span>
-              </span>
-              <span className="side-menu__status">soon</span>
-            </NavLink>
-          ))}
+              Donate
+            </button>
+          </div>
         </nav>
-
-        <footer className="side-menu__foot">
-          <p className="side-menu__foot-text">
-            <span className="display-italic">Lichen</span> grows where two things help
-            each other live. Pass two builds the rest of the rooms.
-          </p>
-        </footer>
       </aside>
     </div>
   );

@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './routes/Home';
 import Community from './routes/Community';
+import CommunityList from './routes/CommunityList';
+import Group from './routes/Group';
+import GroupList from './routes/GroupList';
+import Mycelium from './routes/Mycelium';
 import Concierge from './routes/Concierge';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
+import Donate from './routes/Donate';
 import { Calendar, Saved, Maps, Profile } from './routes/Stubs';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
@@ -23,7 +28,6 @@ function ScrollToTop() {
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
-  // Chat thread is full-screen — hide the global top bar and bottom nav
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
 
   return (
@@ -32,25 +36,39 @@ export default function App() {
       {!isChatThread && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home"        element={<Home />} />
-          <Route path="/community"   element={<Community />} />
-          <Route path="/concierge"   element={<Concierge />} />
-          <Route path="/chat"        element={<Chat />} />
-          <Route path="/chat/:id"    element={<ChatThread />} />
-          <Route path="/calendar"    element={<Calendar />} />
-          <Route path="/saved"       element={<Saved />} />
-          <Route path="/maps"        element={<Maps />} />
-          <Route path="/profile"     element={<Profile />} />
+          <Route path="/"          element={<Navigate to="/home" replace />} />
+          <Route path="/home"      element={<Home />} />
+          <Route path="/concierge" element={<Concierge />} />
+          <Route path="/chat"      element={<Chat />} />
+          <Route path="/chat/:id"  element={<ChatThread />} />
+          <Route path="/calendar"  element={<Calendar />} />
+          <Route path="/saved"     element={<Saved />} />
+          <Route path="/maps"      element={<Maps />} />
+          <Route path="/profile"   element={<Profile />} />
 
-          {/* Side-menu passages — placeholders until pass 2 */}
-          <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming in pass two" />} />
-          <Route path="/market"   element={<Placeholder title="Market"   icon="store"          intro="Local goods at fair prices. Trusted sellers only — no rankings, no ads." hint="Coming in pass two" />} />
-          <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming in pass two" />} />
-          <Route path="/events"   element={<Placeholder title="Events"   icon="sparkle"        intro="Mostly in-person. Workshops, suppers, gatherings on the land." hint="Coming in pass two" />} />
-          <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming in pass two" />} />
-          <Route path="/groups"   element={<Placeholder title="Groups"   icon="graduation-cap" intro="Smaller circles within the network — closed by default, open when you ask." hint="Coming in pass two" />} />
-          <Route path="/mycelium" element={<Placeholder title="Mycelium" icon="sparkle"        intro="The underlayer of the network — connections, threads, the long memory." hint="Coming in pass two" />} />
+          {/* Mycelium — your full network */}
+          <Route path="/mycelium"        element={<Mycelium />} />
+          <Route path="/mycelium/:type"  element={<Mycelium />} />
+
+          {/* Communities — feed per community */}
+          <Route path="/communities"      element={<CommunityList />} />
+          <Route path="/communities/:id"  element={<Community />} />
+          {/* Legacy /community path — redirect */}
+          <Route path="/community"        element={<Navigate to="/communities/mons-sana" replace />} />
+
+          {/* Groups — feed per group */}
+          <Route path="/groups"      element={<GroupList />} />
+          <Route path="/groups/:id"  element={<Group />} />
+
+          {/* Donate */}
+          <Route path="/donate" element={<Donate />} />
+
+          {/* Side-menu passages — placeholders */}
+          <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
+          <Route path="/market"   element={<Placeholder title="Market"   icon="store"          intro="Local goods at fair prices. Trusted sellers only — no rankings, no ads." hint="Coming soon" />} />
+          <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
+          <Route path="/events"   element={<Placeholder title="Events"   icon="sparkle"        intro="Mostly in-person. Workshops, suppers, gatherings on the land." hint="Coming soon" />} />
+          <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming soon" />} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

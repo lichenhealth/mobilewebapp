@@ -1,164 +1,165 @@
+/* ====================================================================
+   LICHEN — Side Menu (drawer)
+   Calm, expandable sections. Matches the Figma SIDE_NAVIGATION mockup.
+==================================================================== */
+
 .side-menu {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 60;
   pointer-events: none;
 }
-
 .side-menu.is-open { pointer-events: auto; }
 
 .side-menu__scrim {
   position: absolute;
   inset: 0;
   background: rgb(18 24 28 / 0);
-  transition: background var(--d-base) var(--ease-out);
+  transition: background var(--d-med) var(--ease-out);
 }
-.side-menu.is-open .side-menu__scrim {
-  background: rgb(18 24 28 / 0.4);
-  backdrop-filter: blur(2px);
-}
+.side-menu.is-open .side-menu__scrim { background: rgb(18 24 28 / 0.4); }
 
 .side-menu__panel {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 50%;
+  transform: translate(-100%, 0) translateX(calc(-1 * (var(--app-max) / 2)));
   height: 100dvh;
-  width: min(86vw, 360px);
+  width: 100%;
+  max-width: var(--app-max);
   background: var(--bone);
   border-right: 1px solid var(--bone-edge);
-  box-shadow: 12px 0 40px rgb(var(--shadow-color) / 0.12);
   display: flex;
   flex-direction: column;
-  padding: calc(var(--safe-top) + var(--s-4)) var(--s-5) var(--s-5);
-  transform: translateX(-105%);
-  transition: transform var(--d-slow) var(--ease-out);
+  padding: calc(var(--safe-top) + 80px) 0 calc(var(--nav-h) + var(--safe-bot));
   overflow-y: auto;
-  scrollbar-width: thin;
+  transition: transform var(--d-slow) var(--ease-spring);
 }
-
-.side-menu.is-open .side-menu__panel { transform: translateX(0); }
-
-.side-menu__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: var(--s-5);
-  border-bottom: 1px solid var(--bone-edge);
+.side-menu.is-open .side-menu__panel {
+  transform: translate(0, 0) translateX(calc(-1 * (var(--app-max) / 2)));
+}
+@media (max-width: 430px) {
+  /* On narrow screens, app-shell is full width so center calc collapses */
+  .side-menu__panel {
+    left: 0;
+    transform: translateX(-100%);
+  }
+  .side-menu.is-open .side-menu__panel {
+    transform: translateX(0);
+  }
 }
 
 .side-menu__close {
-  width: 32px; height: 32px;
+  position: absolute;
+  top: calc(var(--safe-top) + 16px);
+  right: 20px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--r-full);
+  background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
+  color: var(--ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-muted);
-  background: var(--bone-warm);
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.side-menu__close:hover { border-color: var(--ink); }
+.side-menu__close:active { transform: scale(0.95); }
+
+.side-menu__nav {
+  display: flex;
+  flex-direction: column;
+  padding: 0 36px;
+  gap: var(--s-4);
+}
+
+/* ─── Section ───────────────────────────────────────────────────────── */
+.side-menu__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.side-menu__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.1;
+  cursor: pointer;
+  align-self: flex-start;
   transition: color var(--d-fast) var(--ease-out);
 }
-.side-menu__close:hover { color: var(--ink); }
+.side-menu__header:hover { color: var(--ink-soft); }
+.side-menu__header:active { transform: translateX(1px); }
 
-.side-menu__section-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  padding: var(--s-5) 0 var(--s-2);
+.side-menu__header-label { display: inline-block; }
+
+/* Solid black disclosure triangle: ▶ collapsed, ▼ open */
+.side-menu__chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 7px solid var(--ink);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: transform var(--d-med) var(--ease-spring);
+  transform-origin: 35% 50%;
 }
+.side-menu__chevron.is-open { transform: rotate(90deg); }
 
-.side-menu__list {
+/* ─── Sub-items ─────────────────────────────────────────────────────── */
+.side-menu__sub-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.side-menu__item {
-  display: grid;
-  grid-template-columns: 32px 1fr auto;
-  gap: var(--s-3);
-  align-items: center;
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  transition: background var(--d-fast) var(--ease-out);
-  color: var(--ink);
-}
-.side-menu__item:hover { background: var(--bone-warm); }
-.side-menu__item.is-active { background: var(--bone-warm); }
-.side-menu__item.is-active .side-menu__label { color: var(--peach); }
-
-.side-menu__icon {
-  width: 32px; height: 32px;
-  border-radius: var(--r-sm);
-  background: var(--bone-warm);
-  border: 1px solid var(--bone-edge);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-soft);
-}
-.side-menu__item.is-active .side-menu__icon {
-  background: var(--peach-tint);
-  border-color: var(--peach);
-  color: var(--peach-deep);
-}
-
-.side-menu__text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.side-menu__label {
-  font-size: var(--t-base);
-  font-weight: 400;
-  letter-spacing: -0.015em;
-}
-
-.side-menu__blurb {
-  font-size: 11px;
+.side-menu__sub-item {
+  background: transparent;
+  border: 0;
+  padding: 6px 0;
+  font-family: inherit;
+  font-size: 18px;
   font-weight: 300;
-  color: var(--ink-muted);
   letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--ink-soft);
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out),
+              transform var(--d-fast) var(--ease-out);
+}
+.side-menu__sub-item:hover {
+  color: var(--ink);
+  transform: translateX(2px);
 }
 
-.side-menu__status {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  padding: 2px 6px;
-  border-radius: var(--r-xs);
-  background: var(--bone-deep);
-}
-
-.side-menu__divider {
-  height: 1px;
-  background: var(--bone-edge);
-  margin: var(--s-3) calc(-1 * var(--s-5)) 0;
-}
-
-.side-menu__foot {
-  margin-top: auto;
-  padding-top: var(--s-7);
-  padding-bottom: var(--safe-bot);
-  border-top: 1px solid var(--bone-edge);
-  margin-left: calc(-1 * var(--s-5));
-  margin-right: calc(-1 * var(--s-5));
-  padding-left: var(--s-5);
-  padding-right: var(--s-5);
-}
-.side-menu__foot-text {
-  font-size: 12px;
+/* ─── Donate (peach call-to-action) ─────────────────────────────────── */
+.side-menu__donate {
+  margin-top: var(--s-3);
+  background: transparent;
+  border: 0;
+  padding: 6px 0;
+  font-family: inherit;
+  font-size: 30px;
   font-weight: 300;
-  color: var(--ink-muted);
-  line-height: 1.55;
-  padding-top: var(--s-4);
+  letter-spacing: -0.02em;
+  color: var(--peach);
+  text-align: left;
+  align-self: flex-start;
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out);
 }
+.side-menu__donate:hover { color: var(--peach-deep); }
