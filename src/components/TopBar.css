@@ -21,23 +21,23 @@
 .top-bar > * { pointer-events: auto; }
 
 .top-bar__icon {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--bone-edge);
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--ink);
   border-radius: var(--r-full);
-  background: var(--bone-warm);
+  background: transparent;
   color: var(--ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: transform var(--d-fast) var(--ease-out),
-              border-color var(--d-fast) var(--ease-out);
+              background var(--d-fast) var(--ease-out);
   position: relative;
   /* Small icons sit at the top of the bar */
   margin-top: 4px;
 }
 .top-bar__icon:active { transform: scale(0.94); }
-.top-bar__icon:hover { border-color: var(--ink); }
+.top-bar__icon:hover { background: rgb(18 24 28 / 0.05); }
 
 .top-bar__logo {
   display: flex;

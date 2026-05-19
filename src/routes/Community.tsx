@@ -33,11 +33,16 @@ export default function Community() {
 
   // Compute scoped destinations for category icons. The store icon in Mons Sana
   // navigates to /market?from=community:mons-sana, filtering to Mons Sana members.
-  const scopedIcons: IconRowItem[] = community.categoryIcons.map((ci) => {
+  // Also inserts a visual divider between compose actions (search, post) and
+  // destination icons so they feel like distinct groups.
+  const scopedIcons: IconRowItem[] = community.categoryIcons.map((ci, i, arr) => {
     const dest = SCOPE_DESTINATIONS[ci.icon];
+    const isCompose = ci.icon === 'search' || ci.icon === 'plus';
+    const prevWasCompose = i > 0 && (arr[i - 1].icon === 'search' || arr[i - 1].icon === 'plus');
     return {
       ...ci,
       to: dest ? `${dest}?from=community:${community.id}` : undefined,
+      divider: !isCompose && prevWasCompose,
     };
   });
 

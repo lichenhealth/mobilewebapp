@@ -7,6 +7,9 @@ export interface IconRowItem {
   label: string;
   /** Optional route to navigate to when this icon is tapped */
   to?: string;
+  /** When true, render a visual gap before this item — used to separate
+   *  "compose" actions (search, post) from "destinations" (marketplace, work, etc.) */
+  divider?: boolean;
 }
 
 interface IconRowProps {
@@ -18,20 +21,27 @@ export default function IconRow({ items, onSelect }: IconRowProps) {
   const navigate = useNavigate();
   return (
     <div className="icon-row h-scroll" role="toolbar" aria-label="Categories">
-      {items.map(({ icon, label, to }) => (
-        <button
-          key={label}
-          className="icon-row__btn"
-          onClick={() => {
-            if (to) navigate(to);
-            onSelect?.(label);
-          }}
-          aria-label={label}
-          title={label}
-        >
-          <Icon name={icon} size={16} />
-        </button>
-      ))}
+      {items.flatMap(({ icon, label, to, divider }, i) => {
+        const nodes = [];
+        if (divider && i > 0) {
+          nodes.push(<span key={`${label}-div`} className="icon-row__divider" aria-hidden="true" />);
+        }
+        nodes.push(
+          <button
+            key={label}
+            className="icon-row__btn"
+            onClick={() => {
+              if (to) navigate(to);
+              onSelect?.(label);
+            }}
+            aria-label={label}
+            title={label}
+          >
+            <Icon name={icon} size={18} />
+          </button>
+        );
+        return nodes;
+      })}
     </div>
   );
 }

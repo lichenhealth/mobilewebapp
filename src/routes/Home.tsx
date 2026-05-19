@@ -10,7 +10,7 @@ const FILTERS = ['All', 'Social', 'Creative', 'Educational', 'Actionable', 'Q&A'
 const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search'      },
   { icon: 'plus',           label: 'Post'        },
-  { icon: 'store',          label: 'Marketplace', to: '/market'        },
+  { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
   { icon: 'graduation-cap', label: 'Education'   },
   { icon: 'fork-spoon',     label: 'Food'        },

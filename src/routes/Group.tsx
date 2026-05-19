@@ -27,12 +27,16 @@ export default function Group() {
   const posts = GROUP_FEEDS[group.id] ?? [];
   const parent = group.communityId ? getCommunity(group.communityId) : null;
 
-  // Store icon → /market?from=group:<id>, filtering to this group's members
-  const scopedIcons: IconRowItem[] = group.categoryIcons.map((ci) => {
+  // Store icon → /market?from=group:<id>, filtering to this group's members.
+  // Also inserts a divider between compose actions and destination icons.
+  const scopedIcons: IconRowItem[] = group.categoryIcons.map((ci, i, arr) => {
     const dest = SCOPE_DESTINATIONS[ci.icon];
+    const isCompose = ci.icon === 'search' || ci.icon === 'plus';
+    const prevWasCompose = i > 0 && (arr[i - 1].icon === 'search' || arr[i - 1].icon === 'plus');
     return {
       ...ci,
       to: dest ? `${dest}?from=group:${group.id}` : undefined,
+      divider: !isCompose && prevWasCompose,
     };
   });
 

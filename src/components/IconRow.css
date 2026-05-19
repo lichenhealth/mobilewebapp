@@ -1,11 +1,14 @@
 .icon-row {
   padding: var(--s-3) var(--s-5);
-  gap: var(--s-2);
+  gap: 6px;
+  display: flex;
+  align-items: center;
 }
 
 .icon-row__btn {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -23,3 +26,10 @@
   color: var(--peach);
 }
 .icon-row__btn:active { transform: scale(0.92); }
+
+/* Visual separation between "compose" actions (Search, Post) and the
+   "destinations" group (Marketplace, Work, Library, etc.). */
+.icon-row__divider {
+  width: 16px;
+  flex-shrink: 0;
+}
