@@ -31,10 +31,10 @@ interface ActionItem {
 const ACTIONS: ActionItem[] = [
   { icon: 'search',         label: 'Search',  kind: 'search' },
   { icon: 'plus',           label: 'Post',    kind: 'post'   },
-  { icon: 'heart-line',     label: 'Gifts',   kind: 'mode-filter', mode: 'gift'     },
-  { icon: 'user-multiple',  label: 'Trade',   kind: 'mode-filter', mode: 'trade'    },
-  { icon: 'calendar',       label: 'Rent',    kind: 'mode-filter', mode: 'rent'     },
-  { icon: 'reply',          label: 'Lend',    kind: 'mode-filter', mode: 'lend'     },
+  { icon: 'heart-line',     label: 'Gift',    kind: 'mode-filter', mode: 'gift'     },
+  { icon: 'trade',          label: 'Trade',   kind: 'mode-filter', mode: 'trade'    },
+  { icon: 'rent',           label: 'Rent',    kind: 'mode-filter', mode: 'rent'     },
+  { icon: 'lend',           label: 'Lend',    kind: 'mode-filter', mode: 'lend'     },
   { icon: 'sparkle',        label: 'Sliding', kind: 'mode-filter', mode: 'sliding'  },
   { icon: 'store',          label: 'Sale',    kind: 'mode-filter', mode: 'sale'     },
 ];

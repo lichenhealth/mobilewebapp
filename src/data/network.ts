@@ -129,8 +129,16 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       handle: '@mons-sana',
       avatarMonogram: 'M',
       categoryIcon: 'graduation-cap',
-      display: { kind: 'group', count: 14, label: '14 sitting tonight' },
-      loveCount: 28, commentCount: 6, loved: true,
+      display: { kind: 'group', count: 14, label: 'sitting tonight' },
+      mycelium: {
+        trusted: [
+          { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+        ],
+        recommended: [
+          { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+          { handle: '@bailey-co', name: 'Bailey Carr', monogram: 'B', color: '#7E6B96' },
+        ],
+      },
     },
     {
       title: 'Land Tending Day \u2014 May 24',
@@ -138,7 +146,12 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'L',
       categoryIcon: 'sparkle',
       display: { kind: 'event', count: 22, label: 'attending' },
-      loveCount: 41, commentCount: 12,
+      mycelium: {
+        trusted: [
+          { handle: '@theo-meridian', name: 'Theo Albright', monogram: 'T', color: '#9C7355' },
+          { handle: '@rosa-quietlibrary', name: 'Rosa Glenn', monogram: 'R', color: '#6B8A9C' },
+        ],
+      },
     },
     {
       title: 'New Member Welcome',
@@ -146,7 +159,7 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'W',
       categoryIcon: 'profile',
       display: { kind: 'group', count: 3, label: 'new this week' },
-      loveCount: 17, commentCount: 4, saved: true,
+      saved: true,
     },
     {
       title: 'Open Studio \u2014 Joon\u2019s Tempera',
@@ -154,7 +167,7 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'J',
       categoryIcon: 'palette',
       display: { kind: 'art', label: 'Saturday, 2\u20136pm' },
-      loveCount: 9, commentCount: 2,
+      
     },
   ],
   'stargate': [
@@ -163,16 +176,16 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       handle: '@stargate',
       avatarMonogram: 'S',
       categoryIcon: 'graduation-cap',
-      display: { kind: 'group', count: 9, label: '9 attending this week' },
-      loveCount: 22, commentCount: 7, loved: true,
+      display: { kind: 'group', count: 9, label: 'attending this week' },
+      
     },
     {
       title: 'Reading: Iain McGilchrist',
       handle: '@stargate-library',
       avatarMonogram: 'R',
       categoryIcon: 'book',
-      display: { kind: 'group', count: 14, label: '14 reading' },
-      loveCount: 19, commentCount: 11,
+      display: { kind: 'group', count: 14, label: 'reading' },
+      
     },
     {
       title: 'Quiet Day at the River \u2014 June 1',
@@ -180,7 +193,7 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'Q',
       categoryIcon: 'sparkle',
       display: { kind: 'event', count: 7, label: 'attending' },
-      loveCount: 12, commentCount: 3, saved: true,
+      saved: true,
     },
     {
       title: 'Stewards Office Hours',
@@ -188,7 +201,7 @@ export const COMMUNITY_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'O',
       categoryIcon: 'shield-user',
       display: { kind: 'group', count: 4, label: 'stewards on call' },
-      loveCount: 8, commentCount: 1,
+      
     },
   ],
 };
@@ -326,8 +339,8 @@ export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
       handle: '@mara-cascadia',
       avatarMonogram: 'M',
       categoryIcon: 'sparkle',
-      display: { kind: 'group', count: 6, label: '6 replies' },
-      loveCount: 11, commentCount: 6,
+      display: { kind: 'group', count: 6, label: 'replies' },
+      
     },
     {
       title: 'Seed swap Saturday \u2014 back garden',
@@ -335,15 +348,15 @@ export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'S',
       categoryIcon: 'store',
       display: { kind: 'event', count: 28, label: 'bringing seeds' },
-      loveCount: 34, commentCount: 9, loved: true,
+      
     },
     {
       title: 'Ashmead\u2019s Kernel scions available',
       handle: '@mara-cascadia',
       avatarMonogram: 'M',
       categoryIcon: 'palette',
-      display: { kind: 'group', count: 4, label: '4 takers so far' },
-      loveCount: 12, commentCount: 4,
+      display: { kind: 'group', count: 4, label: 'takers so far' },
+      
     },
   ],
   'sunday-suppers': [
@@ -353,7 +366,7 @@ export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'J',
       categoryIcon: 'fork-spoon',
       display: { kind: 'event', count: 9, label: 'coming' },
-      loveCount: 18, commentCount: 5, loved: true,
+      
     },
     {
       title: 'Hosts for July',
@@ -361,7 +374,7 @@ export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'H',
       categoryIcon: 'profile',
       display: { kind: 'group', count: 5, label: 'tables open' },
-      loveCount: 7, commentCount: 2,
+      
     },
   ],
   'mons-sana-bodywork': [
@@ -371,15 +384,15 @@ export const GROUP_FEEDS: Record<string, CommunityCardProps[]> = {
       avatarMonogram: 'C',
       categoryIcon: 'health',
       display: { kind: 'event', count: 6, label: 'practitioners' },
-      loveCount: 11, commentCount: 3,
+      
     },
     {
       title: 'Case notes: chronic shoulder holding',
       handle: '@rosa-quietlibrary',
       avatarMonogram: 'R',
       categoryIcon: 'graduation-cap',
-      display: { kind: 'group', count: 4, label: '4 reflections' },
-      loveCount: 8, commentCount: 4,
+      display: { kind: 'group', count: 4, label: 'reflections' },
+      
     },
   ],
 };

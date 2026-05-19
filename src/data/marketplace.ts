@@ -6,6 +6,7 @@
 ==================================================================== */
 
 import { IconName } from '../components/Icon';
+import { MyceliumSignals } from '../components/EngagementFooter';
 
 export type ListingKind = 'good' | 'service' | 'space' | 'iso';
 export type ListingMode = 'sale' | 'gift' | 'rent' | 'lend' | 'trade' | 'sliding';
@@ -30,9 +31,9 @@ export const MODE_LABELS: Record<ListingMode, string> = {
 export const MODE_ICONS: Record<ListingMode, IconName> = {
   sale: 'store',
   gift: 'heart-line',
-  rent: 'calendar',
-  lend: 'reply',
-  trade: 'user-multiple',
+  rent: 'rent',
+  lend: 'lend',
+  trade: 'trade',
   sliding: 'sparkle',
 };
 
@@ -48,11 +49,14 @@ export interface Listing {
   price: string;
   /** Where the listing is located (city, region, "remote") */
   location?: string;
-  /** Engagement counts */
+  /** Legacy count fields — no longer shown in UI (relevance over volume) but
+   *  kept on the type so existing mock data still validates. */
   trust: number;
   recommends: number;
   comments: number;
-  /** State */
+  /** Network signals: who in your mycelium has trusted / recommended this */
+  mycelium?: MyceliumSignals;
+  /** Your own state */
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
@@ -75,6 +79,15 @@ export const LISTINGS: Listing[] = [
     location: 'Wallowa, OR',
     trust: 47, recommends: 22, comments: 8,
     trusted: true,
+    mycelium: {
+      trusted: [
+        { handle: '@mara-cascadia',   name: 'Mara Beckett',  monogram: 'M', color: '#7C8A6D' },
+        { handle: '@theo-meridian',   name: 'Theo Albright', monogram: 'T', color: '#9C7355' },
+      ],
+      recommended: [
+        { handle: '@mara-cascadia',   name: 'Mara Beckett',  monogram: 'M', color: '#7C8A6D' },
+      ],
+    },
     color: '#4A5D3F',
   },
   {
@@ -88,6 +101,11 @@ export const LISTINGS: Listing[] = [
     price: 'Trade welcome',
     location: 'Hood River, OR',
     trust: 18, recommends: 14, comments: 6,
+    mycelium: {
+      recommended: [
+        { handle: '@rosa-quietlibrary', name: 'Rosa Glenn',  monogram: 'R', color: '#6B8A9C' },
+      ],
+    },
     color: '#7C8A6D',
   },
   {
@@ -101,6 +119,16 @@ export const LISTINGS: Listing[] = [
     price: 'Free',
     location: 'The Back Garden',
     trust: 12, recommends: 9, comments: 3,
+    mycelium: {
+      trusted: [
+        { handle: '@bailey-co', name: 'Bailey Carr', monogram: 'B', color: '#7E6B96' },
+        { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+        { handle: '@theo-meridian', name: 'Theo Albright', monogram: 'T', color: '#9C7355' },
+      ],
+      recommended: [
+        { handle: '@bailey-co', name: 'Bailey Carr', monogram: 'B', color: '#7E6B96' },
+      ],
+    },
     color: '#6B8A9C',
   },
   {

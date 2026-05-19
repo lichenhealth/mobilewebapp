@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Icon } from './Icon';
+import EngagementFooter from './EngagementFooter';
 import { Listing, MODE_ICONS, MODE_LABELS } from '../data/marketplace';
 import './MarketplaceCard.css';
 
@@ -9,31 +9,6 @@ interface Props {
 }
 
 export default function MarketplaceCard({ listing, onClick }: Props) {
-  const [trusted, setTrusted] = useState(listing.trusted ?? false);
-  const [recommended, setRecommended] = useState(listing.recommended ?? false);
-  const [saved, setSaved] = useState(listing.saved ?? false);
-  const [trustCount, setTrustCount] = useState(listing.trust);
-  const [recCount, setRecCount] = useState(listing.recommends);
-
-  const toggleTrust = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTrusted((t) => {
-      setTrustCount((c) => c + (t ? -1 : 1));
-      return !t;
-    });
-  };
-  const toggleRec = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRecommended((t) => {
-      setRecCount((c) => c + (t ? -1 : 1));
-      return !t;
-    });
-  };
-  const toggleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSaved((s) => !s);
-  };
-
   return (
     <article className="mkt-card" onClick={onClick}>
       <header className="mkt-card__head">
@@ -68,39 +43,12 @@ export default function MarketplaceCard({ listing, onClick }: Props) {
         </span>
       </div>
 
-      <footer className="mkt-card__foot">
-        <button
-          className={'mkt-card__action' + (trusted ? ' is-active' : '')}
-          onClick={toggleTrust}
-        >
-          <Icon name="shield-user" size={12} />
-          <span>Trust</span>
-          <span className="mkt-card__count">{trustCount}</span>
-        </button>
-        <button
-          className={'mkt-card__action' + (recommended ? ' is-active' : '')}
-          onClick={toggleRec}
-        >
-          <Icon name="thumbs-up" size={12} />
-          <span>Recommend</span>
-          <span className="mkt-card__count">{recCount}</span>
-        </button>
-        <button className="mkt-card__action" onClick={(e) => e.stopPropagation()}>
-          <Icon name="send" size={12} />
-          <span>Share</span>
-        </button>
-        <button
-          className={'mkt-card__action' + (saved ? ' is-active' : '')}
-          onClick={toggleSave}
-        >
-          <Icon name="bookmark" size={12} />
-          <span>Save</span>
-        </button>
-        <button className="mkt-card__action" onClick={(e) => e.stopPropagation()}>
-          <Icon name="message" size={12} />
-          <span>Chat</span>
-        </button>
-      </footer>
+      <EngagementFooter
+        mycelium={listing.mycelium}
+        trusted={listing.trusted}
+        recommended={listing.recommended}
+        saved={listing.saved}
+      />
     </article>
   );
 }

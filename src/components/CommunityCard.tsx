@@ -1,4 +1,5 @@
 import { Icon, IconName } from './Icon';
+import EngagementFooter, { MyceliumSignals } from './EngagementFooter';
 import './CommunityCard.css';
 
 export interface CommunityCardProps {
@@ -10,13 +11,13 @@ export interface CommunityCardProps {
   // Centered display element inside the card body
   display?: {
     kind: 'group' | 'event' | 'art';
-    count?: number;               // shown beneath the icon (e.g. "10" people)
+    count?: number;               // (legacy — no longer rendered; kept for back-compat)
     label?: string;
   };
   // Engagement
-  loveCount?: number;
-  commentCount?: number;
-  loved?: boolean;
+  mycelium?: MyceliumSignals;     // network signals (peach icons on left)
+  trusted?: boolean;
+  recommended?: boolean;
   saved?: boolean;
 }
 
@@ -27,9 +28,9 @@ export default function CommunityCard({
   handle,
   categoryIcon,
   display,
-  loveCount,
-  commentCount,
-  loved,
+  mycelium,
+  trusted,
+  recommended,
   saved,
 }: CommunityCardProps) {
   return (
@@ -62,13 +63,12 @@ export default function CommunityCard({
       )}
 
       {/* ENGAGEMENT */}
-      <footer className="cmty-card__foot">
-        <EngBtn icon="heart-fill" label="Love" count={loveCount} active={loved} />
-        <EngBtn icon="message"    label="Comment" count={commentCount} />
-        <EngBtn icon="send"       label="Share" />
-        <EngBtn icon="thumbs-up"  label="Recommend" />
-        <EngBtn icon="bookmark"   label="Save" active={saved} />
-      </footer>
+      <EngagementFooter
+        mycelium={mycelium}
+        trusted={trusted}
+        recommended={recommended}
+        saved={saved}
+      />
     </article>
   );
 }
@@ -76,7 +76,6 @@ export default function CommunityCard({
 // ─── Center display: large icon + optional count ────────────────────
 function CenterDisplay({
   kind,
-  count,
   label,
 }: NonNullable<CommunityCardProps['display']>) {
   return (
@@ -86,9 +85,6 @@ function CenterDisplay({
         {kind === 'event' && <EventArt />}
         {kind === 'art' && <ArtArt />}
       </div>
-      {count !== undefined && (
-        <div className="cmty-display__count">{count}</div>
-      )}
       {label && <div className="cmty-display__label">{label}</div>}
     </div>
   );
@@ -133,44 +129,5 @@ function ArtArt() {
   );
 }
 
-// ─── Engagement button (subset of the home card's; no Trust) ────────
-type EngIcon = 'heart-fill' | 'message' | 'send' | 'thumbs-up' | 'bookmark';
-
-function EngBtn({
-  icon,
-  label,
-  count,
-  active,
-}: {
-  icon: EngIcon;
-  label: string;
-  count?: number;
-  active?: boolean;
-}) {
-  return (
-    <button className={'eng-btn-cmty' + (active ? ' is-active' : '')}>
-      <span className="eng-btn-cmty__icon">
-        {icon === 'heart-fill' ? (
-          <HeartIcon filled={!!active} />
-        ) : (
-          <Icon name={icon as IconName} size={14} />
-        )}
-      </span>
-      <span className="eng-btn-cmty__label">
-        {count !== undefined && <span className="eng-btn-cmty__count">{count}</span>}
-        {label}
-      </span>
-    </button>
-  );
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24"
-         fill={filled ? 'currentColor' : 'none'}
-         stroke="currentColor" strokeWidth="1.6"
-         strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20s-7-4.4-7-9.5a4.5 4.5 0 0 1 7-3.7A4.5 4.5 0 0 1 19 10c0 5.1-7 10-7 10Z" />
-    </svg>
-  );
-}
+// (Engagement footer moved to shared EngagementFooter component;
+//  CenterDisplay no longer renders a numeric count — no volume signaling.)

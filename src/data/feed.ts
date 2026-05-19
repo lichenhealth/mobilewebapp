@@ -14,8 +14,15 @@ export const FEED: FeedCardProps[] = [
       bottomLabel: 'Order',
       tone: 'peach',
     },
-    trustCount: 124,
-    recommendCount: 38,
+    mycelium: {
+      trusted: [
+        { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+        { handle: '@theo-meridian', name: 'Theo Albright', monogram: 'T', color: '#9C7355' },
+      ],
+      recommended: [
+        { handle: '@bailey-co', name: 'Bailey Carr', monogram: 'B', color: '#7E6B96' },
+      ],
+    },
     trusted: true,
   },
   {
@@ -31,8 +38,11 @@ export const FEED: FeedCardProps[] = [
       bottomLabel: 'Join',
       tone: 'peach',
     },
-    trustCount: 64,
-    recommendCount: 22,
+    mycelium: {
+      recommended: [
+        { handle: '@bailey-co', name: 'Bailey Carr', monogram: 'B', color: '#7E6B96' },
+      ],
+    },
   },
   {
     title: 'Equine Assisted Reiki',
@@ -40,15 +50,22 @@ export const FEED: FeedCardProps[] = [
     avatarMonogram: 'B',
     categoryIcons: ['health', 'location'],
     body:
-      "We are thrilled to announce the addition of equine-assisted Reiki sessions at the Bailey ranch — a slow, embodied practice that pairs traditional energy work with the steady presence of our resident horses. Sessions are 90 minutes and held weekly.",
+      "We are thrilled to announce the addition of equine-assisted Reiki sessions at the Bailey ranch \u2014 a slow, embodied practice that pairs traditional energy work with the steady presence of our resident horses. Sessions are 90 minutes and held weekly.",
     image: {
       pattern: 'reiki',
       topLabel: 'Book',
       bottomLabel: 'Visit',
       tone: 'peach',
     },
-    trustCount: 41,
-    recommendCount: 17,
+    mycelium: {
+      trusted: [
+        { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+      ],
+      recommended: [
+        { handle: '@mara-cascadia', name: 'Mara Beckett', monogram: 'M', color: '#7C8A6D' },
+        { handle: '@rosa-quietlibrary', name: 'Rosa Glenn', monogram: 'R', color: '#6B8A9C' },
+      ],
+    },
   },
   {
     title: 'Spring Seed Swap',
@@ -56,9 +73,8 @@ export const FEED: FeedCardProps[] = [
     avatarMonogram: 'G',
     categoryIcons: ['palette', 'sparkle'],
     body:
-      "Bring what you have, take what you need. We'll be in the back garden of the community house from 10 to 2 on Saturday — heirloom tomatoes, native flowers, herbs, and the usual brassicas. Coffee provided.",
-    trustCount: 89,
-    recommendCount: 31,
+      "Bring what you have, take what you need. We'll be in the back garden of the community house from 10 to 2 on Saturday \u2014 heirloom tomatoes, native flowers, herbs, and the usual brassicas. Coffee provided.",
+    // No mycelium signals — demonstrates the "actions only" state
     saved: true,
   },
 ];

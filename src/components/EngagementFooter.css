@@ -1,0 +1,161 @@
+/* Shared engagement footer used by FeedCard, CommunityCard, MarketplaceCard.
+ * Left zone shows mycelium signals (peach icons when active).
+ * Right zone shows the user's own actions.
+ * No counts anywhere — relevance over volume. */
+
+.engage {
+  border-top: 1px solid var(--bone-edge-soft);
+}
+
+.engage__row {
+  display: flex;
+  align-items: stretch;
+  min-height: 36px;
+}
+
+/* LEFT: mycelium signals — small peach-filled circles */
+.engage__signals {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 14px;
+  flex-shrink: 0;
+}
+
+.engage__signal {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  background: var(--peach);
+  color: var(--bone-warm);
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+}
+.engage__signal:hover { background: var(--peach-deep); }
+.engage__signal:active { transform: scale(0.92); }
+.engage__signal.is-open {
+  background: var(--peach-deep);
+}
+
+/* Vertical separator between signals zone and actions zone */
+.engage__divider {
+  width: 1px;
+  background: var(--bone-edge);
+  margin: 6px 0;
+  flex-shrink: 0;
+}
+
+/* RIGHT: actions */
+.engage__actions {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.engage__action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 4px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out);
+  min-width: 0;
+}
+.engage__action svg {
+  color: var(--ink-soft);
+  transition: color var(--d-fast) var(--ease-out);
+}
+.engage__action:hover {
+  color: var(--ink);
+}
+.engage__action:hover svg {
+  color: var(--ink);
+}
+.engage__action:active {
+  opacity: 0.6;
+}
+.engage__action.is-active {
+  color: var(--peach);
+}
+.engage__action.is-active svg {
+  color: var(--peach);
+}
+
+/* Inline expansion panel: reveals who in your mycelium trusted/recommended */
+.engage__panel {
+  padding: 10px 14px 12px;
+  background: var(--peach-tint);
+  border-top: 1px solid var(--peach);
+}
+
+.engage__panel-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+  letter-spacing: -0.005em;
+}
+
+.engage__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.engage__member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.engage__member-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--bone-warm);
+  flex-shrink: 0;
+}
+
+.engage__member-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.engage__member-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.engage__member-handle {
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--ink-muted);
+}

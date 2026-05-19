@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
 import { Icon, IconName } from './Icon';
+import EngagementFooter, { MyceliumSignals } from './EngagementFooter';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -18,10 +18,9 @@ export interface FeedCardProps {
     bottomLabel: string;
     tone?: 'peach' | 'moss' | 'ink';
   };
-  // Engagement controls
-  trustCount?: number;
-  recommendCount?: number;
-  trusted?: boolean;
+  // Engagement
+  mycelium?: MyceliumSignals;  // network signals (peach icons on left)
+  trusted?: boolean;            // your own state
   recommended?: boolean;
   saved?: boolean;
   // Eyebrow tag (optional)
@@ -36,8 +35,7 @@ export default function FeedCard({
   categoryIcons = [],
   body,
   image,
-  trustCount,
-  recommendCount,
+  mycelium,
   trusted,
   recommended,
   saved,
@@ -89,23 +87,12 @@ export default function FeedCard({
       </div>
 
       {/* ENGAGEMENT */}
-      <footer className="feed-card__foot">
-        <EngagementButton
-          icon="shield-user"
-          label="Trust"
-          count={trustCount}
-          active={trusted}
-        />
-        <EngagementButton
-          icon="thumbs-up"
-          label="Recommend"
-          count={recommendCount}
-          active={recommended}
-        />
-        <EngagementButton icon="send" label="Share" />
-        <EngagementButton icon="bookmark" label="Save" active={saved} />
-        <EngagementButton icon="message" label="Chat" />
-      </footer>
+      <EngagementFooter
+        mycelium={mycelium}
+        trusted={trusted}
+        recommended={recommended}
+        saved={saved}
+      />
     </article>
   );
 }
@@ -193,29 +180,4 @@ function PatternArt({ name }: { name: 'beef' | 'support' | 'reiki' | 'sky' }) {
   );
 }
 
-// ─── Engagement button ──────────────────────────────────────────────
-interface EngBtnProps {
-  icon: IconName;
-  label: string;
-  count?: number;
-  active?: boolean;
-  onClick?: () => void;
-}
-
-function EngagementButton({ icon, label, count, active, onClick }: EngBtnProps) {
-  return (
-    <button
-      className={'eng-btn' + (active ? ' is-active' : '')}
-      onClick={onClick}
-      aria-pressed={active}
-    >
-      <span className="eng-btn__icon">
-        <Icon name={icon} size={14} />
-      </span>
-      <span className="eng-btn__label">
-        {count !== undefined && <span className="eng-btn__count">{count}</span>}
-        {label}
-      </span>
-    </button>
-  );
-}
+// ─── (Engagement footer moved to shared EngagementFooter component) ──
