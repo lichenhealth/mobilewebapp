@@ -6,7 +6,7 @@
   width: 100%;
   max-width: var(--app-max);
   height: calc(var(--top-h) + var(--safe-top));
-  padding: var(--safe-top) var(--s-5) 0;
+  padding: calc(var(--safe-top) + 18px) var(--s-5) 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: start;

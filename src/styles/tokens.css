@@ -83,7 +83,7 @@
   /* ─── Layout ────────────────────────────────────────────────────── */
   --app-max: 430px;
   --nav-h:   84px;
-  --top-h:   60px;
+  --top-h:   110px;
   --safe-top: env(safe-area-inset-top, 0);
   --safe-bot: env(safe-area-inset-bottom, 0);
 
