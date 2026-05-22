@@ -49,14 +49,6 @@
   margin-top: 0;
   align-self: start;
 }
-.top-bar__logo::before {
-  content: '';
-  position: absolute;
-  inset: -8px -16px;
-  background: radial-gradient(circle at center, rgb(245 163 109 / 0.18), transparent 70%);
-  pointer-events: none;
-  z-index: -1;
-}
 
 /* Section-identity logo (e.g. storefront-in-circle for Marketplace).
  * Treatment matches Mycelium: black outline circle, transparent background

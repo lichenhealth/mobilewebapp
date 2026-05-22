@@ -88,7 +88,7 @@ export default function EngagementFooter({
                 aria-label={`Trusted by ${trustedBy.length} in your mycelium`}
                 title="Trusted by your mycelium"
               >
-                <Icon name="shield-user" size={14} />
+                <Icon name="shield-user" size={11} />
               </button>
             )}
             {recommendedBy.length > 0 && (
@@ -100,7 +100,7 @@ export default function EngagementFooter({
                 aria-label={`Recommended by ${recommendedBy.length} in your mycelium`}
                 title="Recommended by your mycelium"
               >
-                <Icon name="thumbs-up" size={14} />
+                <Icon name="thumbs-up" size={11} />
               </button>
             )}
           </div>
