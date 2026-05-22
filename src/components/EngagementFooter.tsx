@@ -115,35 +115,35 @@ export default function EngagementFooter({
             className={'engage__action' + (myTrust ? ' is-active' : '')}
             onClick={handleTrust}
           >
-            <Icon name="shield-user" size={12} />
+            <Icon name="shield-user" size={13} />
             <span>Trust</span>
           </button>
           <button
             className={'engage__action' + (myRec ? ' is-active' : '')}
             onClick={handleRec}
           >
-            <Icon name="thumbs-up" size={12} />
+            <Icon name="thumbs-up" size={13} />
             <span>Recommend</span>
           </button>
           <button
             className="engage__action"
             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
           >
-            <Icon name="send" size={12} />
+            <Icon name="send" size={13} />
             <span>Share</span>
           </button>
           <button
             className={'engage__action' + (mySaved ? ' is-active' : '')}
             onClick={handleSave}
           >
-            <Icon name="bookmark" size={12} />
+            <Icon name="bookmark" size={13} />
             <span>Save</span>
           </button>
           <button
             className="engage__action"
             onClick={(e) => { e.stopPropagation(); onChat?.(); }}
           >
-            <Icon name="message" size={12} />
+            <Icon name="message" size={13} />
             <span>Chat</span>
           </button>
         </div>

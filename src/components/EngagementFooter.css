@@ -10,7 +10,7 @@
 .engage__row {
   display: flex;
   align-items: stretch;
-  min-height: 36px;
+  min-height: 42px;
 }
 
 /* LEFT: mycelium signals — small peach-filled circles */
@@ -18,13 +18,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px 6px 14px;
+  padding: 0 12px;
   flex-shrink: 0;
 }
 
 .engage__signal {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--r-full);
   background: var(--peach);
   color: var(--bone-warm);
@@ -35,18 +35,18 @@
   cursor: pointer;
   transition: transform var(--d-fast) var(--ease-out),
               background var(--d-fast) var(--ease-out);
+  padding: 0;
 }
+.engage__signal svg { display: block; }
 .engage__signal:hover { background: var(--peach-deep); }
 .engage__signal:active { transform: scale(0.92); }
-.engage__signal.is-open {
-  background: var(--peach-deep);
-}
+.engage__signal.is-open { background: var(--peach-deep); }
 
 /* Vertical separator between signals zone and actions zone */
 .engage__divider {
   width: 1px;
   background: var(--bone-edge);
-  margin: 6px 0;
+  margin: 8px 0;
   flex-shrink: 0;
 }
 
@@ -64,20 +64,27 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 10px 4px;
+  padding: 10px 6px;
   background: transparent;
   border: 0;
+  border-right: 1px solid var(--bone-edge-soft);
   font-family: inherit;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 400;
   letter-spacing: -0.005em;
   color: var(--ink-faint);
   cursor: pointer;
-  transition: color var(--d-fast) var(--ease-out);
+  white-space: nowrap;
   min-width: 0;
+  line-height: 1.2;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.engage__action:last-child {
+  border-right: 0;
 }
 .engage__action svg {
   color: var(--ink-soft);
+  flex-shrink: 0;
   transition: color var(--d-fast) var(--ease-out);
 }
 .engage__action:hover {

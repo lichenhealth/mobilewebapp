@@ -58,23 +58,29 @@
   z-index: -1;
 }
 
-/* Section-identity logo (e.g. storefront-in-circle for Marketplace) */
+/* Section-identity logo (e.g. storefront-in-circle for Marketplace).
+ * Treatment matches Mycelium: black outline circle, transparent background
+ * (so the peach radial glow from .top-bar__logo::before shows through),
+ * black icon inside. */
 .top-bar__section-mark {
   width: 68px;
   height: 68px;
   border-radius: var(--r-full);
-  background: var(--ink);
-  color: var(--bone-warm);
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.top-bar__section-mark svg { color: var(--bone-warm); }
+.top-bar__section-mark svg { color: var(--ink); }
 
 /* Custom variant — used for branded marks like Mycelium that already
- * include their own circle outline. No black fill background. */
+ * include their own circle outline in the SVG. No wrapper border to
+ * avoid a double-circle. */
 .top-bar__section-mark--custom {
   background: transparent;
+  border: 0;
   color: var(--ink);
   width: 68px;
   height: 68px;
