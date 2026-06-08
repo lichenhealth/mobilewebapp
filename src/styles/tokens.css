@@ -31,7 +31,7 @@
   --shadow-color: 18 24 28;   /* rgb of ink, for shadows */
 
   /* ─── Type ──────────────────────────────────────────────────────── */
-  --font-display: 'Fraunces', 'Times New Roman', Georgia, serif;
+  --font-display: 'Cormorant', 'Times New Roman', Georgia, serif;
   --font-body:    'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 

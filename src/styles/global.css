@@ -52,7 +52,6 @@ input, textarea, select { font: inherit; color: inherit; }
 /* ─── Type utilities ───────────────────────────────────────────────── */
 .display {
   font-family: var(--font-display);
-  font-variation-settings: 'opsz' 144, 'SOFT' 100;
   font-weight: 400;
   letter-spacing: -0.025em;
   line-height: var(--lh-tight);
@@ -60,7 +59,6 @@ input, textarea, select { font: inherit; color: inherit; }
 .display-italic {
   font-family: var(--font-display);
   font-style: italic;
-  font-variation-settings: 'opsz' 144, 'SOFT' 100;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: var(--lh-tight);
