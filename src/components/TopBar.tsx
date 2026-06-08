@@ -86,7 +86,7 @@ export default function TopBar({
             </div>
           )
         ) : (
-          <LichenMark size={68} />
+          <div className="top-bar__home-logo"><LichenMark size={56} /><span className="top-bar__wordmark">Lichen</span></div>
         )}
       </div>
 

@@ -80,6 +80,8 @@
 .top-bar__section-mark--custom svg { color: var(--ink); }
 
 .top-bar__bell { justify-self: end; }
+.top-bar__home-logo { display: flex; flex-direction: column; align-items: center; }
+.top-bar__wordmark { font-family: var(--font-display); font-weight: 500; font-size: 15px; line-height: 1; letter-spacing: 0.01em; color: var(--ink); margin-top: -2px; }
 
 .top-bar__right {
   display: inline-flex;
