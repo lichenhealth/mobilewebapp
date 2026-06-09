@@ -18,7 +18,6 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'location',       label: 'Places',      to: '/places'        },
   { icon: 'health',         label: 'Health'      },
   { icon: 'book',           label: 'Library',     to: '/library'       },
-  { icon: 'sparkle',        label: 'Concierge',   to: '/concierge'     },
 ];
 
 export default function Home() {
