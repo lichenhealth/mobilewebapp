@@ -1,5 +1,5 @@
 import { Icon, IconName } from './Icon';
-import EngagementFooter, { MyceliumSignals } from './EngagementFooter';
+import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -23,6 +23,7 @@ export interface FeedCardProps {
   trusted?: boolean;            // your own state
   recommended?: boolean;
   saved?: boolean;
+  availability?: ActionAvailability;
   // Eyebrow tag (optional)
   eyebrow?: string;
 }
@@ -39,6 +40,7 @@ export default function FeedCard({
   trusted,
   recommended,
   saved,
+  availability,
   eyebrow,
 }: FeedCardProps) {
   return (
@@ -92,6 +94,7 @@ export default function FeedCard({
         trusted={trusted}
         recommended={recommended}
         saved={saved}
+        availability={availability}
       />
     </article>
   );

@@ -166,3 +166,16 @@
   font-weight: 300;
   color: var(--ink-muted);
 }
+
+/* Empty signal — no one in your mycelium has engaged: gray + inert */
+.engage__signal.is-empty { background: var(--bone-deep); cursor: default; }
+.engage__signal.is-empty svg { color: var(--ink-muted); }
+.engage__signal.is-empty:hover { background: var(--bone-deep); }
+.engage__signal.is-empty:active { transform: none; }
+
+/* Unavailable action — content isn't meta-tracked for this action: lighter gray */
+.engage__action:disabled,
+.engage__action:disabled:hover { color: #C2C2C2; cursor: default; }
+.engage__action:disabled svg,
+.engage__action:disabled:hover svg { color: #C2C2C2; }
+.engage__action:disabled:active { opacity: 1; }

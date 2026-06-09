@@ -1,5 +1,5 @@
 import { Icon, IconName } from './Icon';
-import EngagementFooter, { MyceliumSignals } from './EngagementFooter';
+import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import './CommunityCard.css';
 
 export interface CommunityCardProps {
@@ -19,6 +19,7 @@ export interface CommunityCardProps {
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
+  availability?: ActionAvailability;
 }
 
 export default function CommunityCard({
@@ -32,6 +33,7 @@ export default function CommunityCard({
   trusted,
   recommended,
   saved,
+  availability,
 }: CommunityCardProps) {
   return (
     <article className="cmty-card">
@@ -68,6 +70,7 @@ export default function CommunityCard({
         trusted={trusted}
         recommended={recommended}
         saved={saved}
+        availability={availability}
       />
     </article>
   );

@@ -24,6 +24,7 @@ export const FEED: FeedCardProps[] = [
       ],
     },
     trusted: true,
+    availability: { share: false }, // demo: Share shows as unavailable (lighter gray)
   },
   {
     title: 'Support Recovery',

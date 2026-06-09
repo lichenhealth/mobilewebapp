@@ -48,6 +48,7 @@ export default function MarketplaceCard({ listing, onClick }: Props) {
         trusted={listing.trusted}
         recommended={listing.recommended}
         saved={listing.saved}
+        availability={listing.availability}
       />
     </article>
   );

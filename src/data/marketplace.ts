@@ -6,7 +6,7 @@
 ==================================================================== */
 
 import { IconName } from '../components/Icon';
-import { MyceliumSignals } from '../components/EngagementFooter';
+import { MyceliumSignals, ActionAvailability } from '../components/EngagementFooter';
 
 export type ListingKind = 'good' | 'service' | 'space' | 'iso';
 export type ListingMode = 'sale' | 'gift' | 'rent' | 'lend' | 'trade' | 'sliding';
@@ -60,6 +60,8 @@ export interface Listing {
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
+  /** Per-action availability (omitted = available) */
+  availability?: ActionAvailability;
   /** Visual: monogram background color */
   color?: string;
 }
