@@ -199,3 +199,65 @@ input, textarea, select { font: inherit; color: inherit; }
 }
 .h-scroll::-webkit-scrollbar { display: none; }
 .h-scroll > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+/* ===== Desktop layout — persistent sidebar, fuller content (>=1024px) ===== */
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 1240px;
+    display: grid;
+    grid-template-columns: 268px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  /* Side menu becomes a permanent left sidebar */
+  .side-menu {
+    position: sticky;
+    inset: auto;
+    top: 0;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: start;
+    height: 100dvh;
+    pointer-events: auto;
+    z-index: 1;
+  }
+  .side-menu__scrim { display: none; }
+  .side-menu__close { display: none; }
+  .side-menu__panel {
+    position: static;
+    transform: none;
+    left: auto;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    padding-top: calc(var(--safe-top) + 32px);
+    border-right: 1px solid var(--bone-edge);
+  }
+  /* Top bar sits above the content column; hamburger no longer needed */
+  .top-bar {
+    position: sticky;
+    top: 0;
+    left: auto;
+    transform: none;
+    width: auto;
+    max-width: none;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .top-bar__icon[aria-label="Open menu"] { display: none; }
+  /* Content column fills the remaining width */
+  .scroll-view {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: var(--s-6);
+    padding-bottom: var(--s-6);
+  }
+  /* Bottom nav replaced by the sidebar */
+  .bottom-nav { display: none; }
+  /* Fuller feed: two columns of cards */
+  .home__feed {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-5);
+    align-items: start;
+  }
+}
