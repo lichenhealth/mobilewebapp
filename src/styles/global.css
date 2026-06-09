@@ -244,6 +244,8 @@ input, textarea, select { font: inherit; color: inherit; }
     grid-row: 1;
   }
   .top-bar__icon[aria-label="Open menu"] { display: none; }
+  .top-bar__logo { grid-column: 2; justify-self: center; }
+  .top-bar__right { grid-column: 3; justify-self: end; }
   /* Content column fills the remaining width */
   .scroll-view {
     grid-column: 2;
