@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Icon } from './Icon';
+import { useNavigate, NavLink } from 'react-router-dom';
+import { Icon, IconName } from './Icon';
 import { COMMUNITIES, GROUPS, NETWORK_LABELS } from '../data/network';
 import './SideMenu.css';
 
@@ -22,6 +22,16 @@ interface NavSection {
   defaultExpanded: boolean;
 }
 
+const PRIMARY: { to: string; label: string; icon: IconName }[] = [
+  { to: '/home',      label: 'Home',      icon: 'home' },
+  { to: '/concierge', label: 'Concierge', icon: 'concierge' },
+  { to: '/chat',      label: 'Chat',      icon: 'chat' },
+  { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
+  { to: '/saved',     label: 'Saved',     icon: 'saved' },
+  { to: '/maps',      label: 'Maps',      icon: 'maps' },
+  { to: '/profile',   label: 'Profile',   icon: 'profile' },
+];
+
 const SECTIONS: NavSection[] = [
   {
     key: 'mycelium',
@@ -33,14 +43,14 @@ const SECTIONS: NavSection[] = [
         href: `/mycelium/${type === 'person' ? 'people' : type === 'place' ? 'places' : `${type}s`}`,
       })
     ),
-    defaultExpanded: true,
+    defaultExpanded: false,
   },
   {
     key: 'communities',
     title: 'Communities',
     href: '/communities',
     items: COMMUNITIES.map((c) => ({ label: c.name, href: `/communities/${c.id}` })),
-    defaultExpanded: true,
+    defaultExpanded: false,
   },
   {
     key: 'groups',
@@ -104,6 +114,22 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         </button>
 
         <nav className="side-menu__nav">
+          <div className="side-menu__primary">
+            {PRIMARY.map((p) => (
+              <NavLink
+                key={p.to}
+                to={p.to}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
+                }
+              >
+                <Icon name={p.icon} size={20} />
+                <span>{p.label}</span>
+              </NavLink>
+            ))}
+          </div>
+
           {SECTIONS.map((s) => (
             <div key={s.key} className="side-menu__section">
               <button

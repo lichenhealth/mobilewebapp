@@ -163,3 +163,35 @@
   transition: color var(--d-fast) var(--ease-out);
 }
 .side-menu__donate:hover { color: var(--peach-deep); }
+
+/* ─── Primary destinations (desktop sidebar only) ───────────────────── */
+.side-menu__primary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--bone-edge);
+}
+.side-menu__primary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 0;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  align-self: flex-start;
+  transition: color var(--d-fast) var(--ease-out),
+              transform var(--d-fast) var(--ease-out);
+}
+.side-menu__primary-item:hover { color: var(--ink-soft); transform: translateX(2px); }
+.side-menu__primary-item.is-active { color: var(--peach-deep); }
+
+/* Hide on mobile/tablet — the bottom nav covers these there */
+@media (max-width: 1023px) {
+  .side-menu__primary { display: none; }
+}
