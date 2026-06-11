@@ -1,31 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import './Onboarding.css';
 
 type SpaceKind = 'organization' | 'community' | 'group';
+type DraftSpace = { id: number; kind: SpaceKind; name: string };
 
 const CAPS = [
   { id: 'service_provider', label: 'Service Provider', desc: 'You offer services — healing, coaching, facilitation.' },
   { id: 'goods_provider',  label: 'Goods Provider',  desc: 'You offer goods — remedies, crafts, food, wares.' },
 ];
 
-const KINDS: { id: SpaceKind; label: string; desc: string }[] = [
-  { id: 'organization', label: 'Organization', desc: 'A clinic, nonprofit, or business.' },
-  { id: 'community',    label: 'Community',    desc: 'A place-based or affinity community.' },
-  { id: 'group',        label: 'Group',        desc: 'A smaller circle within a community.' },
+const KINDS: { id: SpaceKind; label: string }[] = [
+  { id: 'organization', label: 'Organization' },
+  { id: 'community',    label: 'Community' },
+  { id: 'group',        label: 'Group' },
 ];
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user, loading, markOnboarded } = useAuth();
   const [caps, setCaps] = useState<string[]>([]);
-  const [runsSpace, setRunsSpace] = useState(false);
-  const [spaceKind, setSpaceKind] = useState<SpaceKind>('community');
-  const [spaceName, setSpaceName] = useState('');
+  const [spaces, setSpaces] = useState<DraftSpace[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const nextId = useRef(1);
 
   useEffect(() => {
     if (!loading && !user) navigate('/signup', { replace: true });
@@ -34,12 +34,22 @@ export default function Onboarding() {
   function toggleCap(id: string) {
     setCaps((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   }
+  function addSpace() {
+    setSpaces((s) => [...s, { id: nextId.current++, kind: 'community', name: '' }]);
+  }
+  function updateSpace(id: number, patch: Partial<DraftSpace>) {
+    setSpaces((s) => s.map((sp) => (sp.id === id ? { ...sp, ...patch } : sp)));
+  }
+  function removeSpace(id: number) {
+    setSpaces((s) => s.filter((sp) => sp.id !== id));
+  }
 
   async function finish() {
     if (!user) return;
     setError('');
-    if (runsSpace && !spaceName.trim()) {
-      setError('Please name your ' + spaceKind + ', or choose "I’ll do this later."');
+    const named = spaces.filter((s) => s.name.trim());
+    if (spaces.length !== named.length) {
+      setError('Please name each space, or remove the blank ones.');
       return;
     }
     setSaving(true);
@@ -51,10 +61,9 @@ export default function Onboarding() {
           .upsert(rows, { onConflict: 'profile_id,capability', ignoreDuplicates: true });
         if (capErr) throw capErr;
       }
-      if (runsSpace && spaceName.trim()) {
-        const { error: spaceErr } = await supabase
-          .from('spaces')
-          .insert({ kind: spaceKind, name: spaceName.trim(), created_by: user.id });
+      if (named.length) {
+        const rows = named.map((s) => ({ kind: s.kind, name: s.name.trim(), created_by: user.id }));
+        const { error: spaceErr } = await supabase.from('spaces').insert(rows);
         if (spaceErr) throw spaceErr;
       }
       const { error: onbErr } = await supabase
@@ -91,8 +100,7 @@ export default function Onboarding() {
           <span className="onb__leaf">🌱</span>
           <h1 className="onb__title">Welcome to Lichen</h1>
           <p className="onb__sub">
-            You’re a member now. Tell us a little about how you’ll show up —
-            all optional, and you can change it anytime.
+            You’re a member now. Tell us how you’ll show up — all optional, and you can change it anytime.
           </p>
         </header>
 
@@ -114,42 +122,43 @@ export default function Onboarding() {
         </section>
 
         <section className="onb__section">
-          <h2 className="onb__h2">Do you run a space?</h2>
-          <label className="onb__toggle">
-            <input
-              type="checkbox"
-              checked={runsSpace}
-              onChange={(e) => setRunsSpace(e.target.checked)}
-            />
-            <span>Yes — I run an organization, community, or group</span>
-          </label>
-          {runsSpace && (
-            <div className="onb__space">
-              <div className="onb__kinds">
-                {KINDS.map((k) => (
-                  <button
-                    type="button"
-                    key={k.id}
-                    className={'onb__kind' + (spaceKind === k.id ? ' is-on' : '')}
-                    onClick={() => setSpaceKind(k.id)}
-                  >
-                    <strong>{k.label}</strong>
-                    <span>{k.desc}</span>
-                  </button>
-                ))}
+          <h2 className="onb__h2">Do you run any spaces?</h2>
+          <p className="onb__lead">
+            Add as many organizations, communities, or groups as you run — you’ll be admin of each.
+          </p>
+
+          {spaces.map((s) => (
+            <div className="onb__draft" key={s.id}>
+              <div className="onb__draft-head">
+                <div className="onb__seg">
+                  {KINDS.map((k) => (
+                    <button
+                      type="button"
+                      key={k.id}
+                      className={'onb__seg-btn' + (s.kind === k.id ? ' is-on' : '')}
+                      onClick={() => updateSpace(s.id, { kind: k.id })}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="onb__remove" onClick={() => removeSpace(s.id)} aria-label="Remove">
+                  ×
+                </button>
               </div>
               <input
                 className="onb__input"
                 type="text"
-                value={spaceName}
-                onChange={(e) => setSpaceName(e.target.value)}
-                placeholder={'Name your ' + spaceKind}
+                value={s.name}
+                onChange={(e) => updateSpace(s.id, { name: e.target.value })}
+                placeholder={'Name your ' + s.kind}
               />
-              <p className="onb__hint">
-                You’ll be its admin. You can invite people and add more spaces later.
-              </p>
             </div>
-          )}
+          ))}
+
+          <button type="button" className="onb__add" onClick={addSpace}>
+            + Add {spaces.length ? 'another' : 'a space'}
+          </button>
         </section>
 
         {error && <p className="onb__error">{error}</p>}

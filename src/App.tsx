@@ -47,10 +47,6 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* TEMP DEBUG — remove after diagnosing */}
-      <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: '#111', color: '#3f6', font: '11px monospace', padding: '3px 7px', opacity: 0.9 }}>
-        onb={String(onboarded)} usr={user ? 'y' : 'n'} ld={String(loading)} auth={String(isAuth)} {pathname}
-      </div>
       <ScrollToTop />
       {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread || isAuth ? { padding: 0, minHeight: 0 } : undefined}>
