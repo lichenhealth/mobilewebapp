@@ -11,7 +11,10 @@ import Concierge from './routes/Concierge';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
-import { Calendar, Saved, Maps, Profile } from './routes/Stubs';
+import { Calendar, Saved, Maps } from './routes/Stubs';
+import Profile from './routes/Profile';
+import SignUp from './routes/SignUp';
+import Login from './routes/Login';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -30,12 +33,13 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
+  const isAuth = pathname === '/login' || pathname === '/signup';
 
   return (
     <div className="app-shell">
       <ScrollToTop />
-      {!isChatThread && <TopBar onMenu={() => setMenuOpen(true)} />}
-      <main className="scroll-view" style={isChatThread ? { padding: 0, minHeight: 0 } : undefined}>
+      {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
+      <main className="scroll-view" style={isChatThread || isAuth ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
@@ -47,6 +51,8 @@ export default function App() {
           <Route path="/saved"     element={<Saved />} />
           <Route path="/maps"      element={<Maps />} />
           <Route path="/profile"   element={<Profile />} />
+          <Route path="/login"     element={<Login />} />
+          <Route path="/signup"    element={<SignUp />} />
 
           {/* Mycelium — your full network */}
           <Route path="/mycelium"        element={<Mycelium />} />
@@ -78,9 +84,9 @@ export default function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
-      {!isChatThread && <BottomNav />}
+      {!isChatThread && !isAuth && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-      {!isChatThread && <InstallPrompt />}
+      {!isChatThread && !isAuth && <InstallPrompt />}
     </div>
   );
 }

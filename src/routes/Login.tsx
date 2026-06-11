@@ -1,0 +1,61 @@
+import { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../auth/AuthProvider';
+import './Auth.css';
+
+export default function Login() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => { if (user) navigate('/home'); }, [user, navigate]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setLoading(false);
+    if (signInError) { setError(signInError.message); return; }
+    navigate('/home');
+  }
+
+  return (
+    <div className="auth">
+      <div className="auth__card">
+        <div className="auth__brand">
+          <span className="auth__leaf">🌱</span>
+          <h1 className="auth__title">Welcome back</h1>
+          <p className="auth__sub">Log in to your Lichen account.</p>
+        </div>
+        <form className="auth__form" onSubmit={handleSubmit}>
+          <label className="auth__label">
+            Email
+            <input className="auth__input" type="email" value={email}
+              onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+          </label>
+          <label className="auth__label">
+            Password
+            <input className="auth__input" type="password" value={password}
+              onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password" />
+          </label>
+          {error && <p className="auth__error">{error}</p>}
+          <button className="btn btn-primary auth__submit" type="submit" disabled={loading}>
+            {loading ? 'Logging in…' : 'Log in'}
+          </button>
+        </form>
+        <p className="auth__switch">
+          New here? <Link to="/signup">Create an account</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
