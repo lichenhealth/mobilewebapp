@@ -1,0 +1,42 @@
+.onb {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: var(--bone);
+  padding: var(--s-6) var(--s-5);
+}
+.onb__card { width: 100%; max-width: 420px; }
+.onb__head { text-align: center; margin-bottom: var(--s-7); }
+.onb__leaf { font-size: 30px; display: block; margin-bottom: var(--s-2); }
+.onb__title { font-family: var(--font-display); font-size: var(--t-3xl); font-weight: 600; color: var(--ink); line-height: var(--lh-tight); }
+.onb__sub { font-size: var(--t-sm); color: var(--ink-muted); margin-top: var(--s-3); line-height: var(--lh-normal); }
+.onb__section { margin-bottom: var(--s-7); }
+.onb__h2 { font-size: var(--t-md); font-weight: 600; color: var(--ink); margin-bottom: var(--s-3); }
+.onb__chips, .onb__kinds { display: flex; flex-direction: column; gap: var(--s-2); }
+.onb__chip, .onb__kind {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  background: var(--bone-warm);
+  transition: border-color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
+}
+.onb__chip strong, .onb__kind strong { font-size: var(--t-base); color: var(--ink); font-weight: 600; }
+.onb__chip span, .onb__kind span { font-size: var(--t-xs); color: var(--ink-muted); }
+.onb__chip.is-on, .onb__kind.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.onb__toggle { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-base); color: var(--ink-soft); cursor: pointer; }
+.onb__toggle input { width: 18px; height: 18px; accent-color: var(--peach); }
+.onb__space { margin-top: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.onb__input {
+  padding: 12px 14px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); font-size: var(--t-base); color: var(--ink);
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.onb__input::placeholder { color: var(--ink-faint); }
+.onb__input:focus { outline: none; border-color: var(--peach); }
+.onb__hint { font-size: var(--t-xs); color: var(--ink-faint); }
+.onb__error { font-size: var(--t-sm); color: var(--rust); background: var(--peach-tint); border-radius: var(--r-sm); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-4); }
+.onb__actions { display: flex; flex-direction: column; gap: var(--s-3); align-items: center; }
+.onb__finish { width: 100%; padding: 13px; }
+.onb__skip { font-size: var(--t-sm); color: var(--ink-muted); }
+.onb__skip:hover { color: var(--ink); }

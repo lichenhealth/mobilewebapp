@@ -1,21 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../auth/AuthProvider';
 import './Auth.css';
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
-  useEffect(() => { if (user) navigate('/home'); }, [user, navigate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,7 +27,7 @@ export default function SignUp() {
     setLoading(false);
     if (signUpError) { setError(signUpError.message); return; }
     if (data.session) {
-      navigate('/home');
+      navigate('/onboarding', { replace: true });
     } else {
       setNotice('Account created. Check your email to confirm, then log in.');
     }

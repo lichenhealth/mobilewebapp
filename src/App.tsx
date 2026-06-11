@@ -15,6 +15,7 @@ import { Calendar, Saved, Maps } from './routes/Stubs';
 import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
+import Onboarding from './routes/Onboarding';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -33,7 +34,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
-  const isAuth = pathname === '/login' || pathname === '/signup';
+  const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
 
   return (
     <div className="app-shell">
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/profile"   element={<Profile />} />
           <Route path="/login"     element={<Login />} />
           <Route path="/signup"    element={<SignUp />} />
+          <Route path="/onboarding" element={<Onboarding />} />
 
           {/* Mycelium — your full network */}
           <Route path="/mycelium"        element={<Mycelium />} />
