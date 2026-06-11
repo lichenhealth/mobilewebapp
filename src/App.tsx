@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './routes/Home';
 import Community from './routes/Community';
 import CommunityList from './routes/CommunityList';
@@ -21,6 +21,7 @@ import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
+import { useAuth } from './auth/AuthProvider';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -35,6 +36,14 @@ export default function App() {
   const { pathname } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
+  const navigate = useNavigate();
+  const { user, loading, onboarded } = useAuth();
+  useEffect(() => {
+    if (loading || onboarded === null) return;
+    if (user && onboarded === false && !isAuth) {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [user, loading, onboarded, isAuth, pathname, navigate]);
 
   return (
     <div className="app-shell">

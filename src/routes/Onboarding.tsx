@@ -19,7 +19,7 @@ const KINDS: { id: SpaceKind; label: string; desc: string }[] = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, markOnboarded } = useAuth();
   const [caps, setCaps] = useState<string[]>([]);
   const [runsSpace, setRunsSpace] = useState(false);
   const [spaceKind, setSpaceKind] = useState<SpaceKind>('community');
@@ -57,6 +57,10 @@ export default function Onboarding() {
           .insert({ kind: spaceKind, name: spaceName.trim(), created_by: user.id });
         if (spaceErr) throw spaceErr;
       }
+      const { error: onbErr } = await supabase
+        .from('profiles').update({ onboarded: true }).eq('id', user.id);
+      if (onbErr) throw onbErr;
+      markOnboarded();
       navigate('/home', { replace: true });
     } catch (e) {
       const msg = e && typeof e === 'object' && 'message' in e
@@ -65,6 +69,15 @@ export default function Onboarding() {
       setError(msg);
       setSaving(false);
     }
+  }
+
+  async function skip() {
+    if (user) {
+      setSaving(true);
+      await supabase.from('profiles').update({ onboarded: true }).eq('id', user.id);
+      markOnboarded();
+    }
+    navigate('/home', { replace: true });
   }
 
   if (loading || !user) {
@@ -145,7 +158,7 @@ export default function Onboarding() {
           <button className="btn btn-primary onb__finish" onClick={finish} disabled={saving}>
             {saving ? 'Setting up…' : 'Enter Lichen'}
           </button>
-          <button className="onb__skip" type="button" onClick={() => navigate('/home', { replace: true })} disabled={saving}>
+          <button className="onb__skip" type="button" onClick={skip} disabled={saving}>
             I’ll do this later
           </button>
         </div>
