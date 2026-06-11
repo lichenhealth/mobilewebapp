@@ -36,9 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) { setOnboarded(null); return; }
     let active = true;
     supabase.from('profiles').select('onboarded').eq('id', userId).single()
-      .then(({ data }) => {
-        if (active) setOnboarded(data ? Boolean((data as { onboarded: boolean }).onboarded) : false);
-      });
+      .then(
+        ({ data, error }) => {
+          if (!active) return;
+          if (error) { setOnboarded(false); return; }
+          setOnboarded(Boolean((data as { onboarded: boolean } | null)?.onboarded));
+        },
+        () => { if (active) setOnboarded(false); }
+      );
     return () => { active = false; };
   }, [userId]);
 
