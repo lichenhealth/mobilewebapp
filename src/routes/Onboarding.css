@@ -70,3 +70,11 @@
 .onb__finish { width: 100%; padding: 13px; }
 .onb__skip { font-size: var(--t-sm); color: var(--ink-muted); }
 .onb__skip:hover { color: var(--ink); }
+
+/* category pickers (shown when a provider capability is on) */
+.onb__picker { margin-top: var(--s-3); }
+.onb__picker .onb__lead { margin-bottom: var(--s-2); }
+
+/* four space kinds now — let the segmented control wrap gracefully */
+.onb__seg { flex-wrap: wrap; }
+.onb__seg-btn { min-width: 64px; }

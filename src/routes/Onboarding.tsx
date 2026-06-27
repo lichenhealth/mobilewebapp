@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Onboarding.css';
 
-type SpaceKind = 'organization' | 'community' | 'group';
+type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type DraftSpace = { id: number; kind: SpaceKind; name: string };
 
 const CAPS = [
@@ -16,6 +17,7 @@ const KINDS: { id: SpaceKind; label: string }[] = [
   { id: 'organization', label: 'Organization' },
   { id: 'community',    label: 'Community' },
   { id: 'group',        label: 'Group' },
+  { id: 'place',        label: 'Place' },
 ];
 
 export default function Onboarding() {
@@ -23,6 +25,9 @@ export default function Onboarding() {
   const { user, loading, markOnboarded } = useAuth();
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [serviceCats, setServiceCats] = useState<string[]>([]);
+  const [goodCats, setGoodCats] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const nextId = useRef(1);
@@ -30,6 +35,18 @@ export default function Onboarding() {
   useEffect(() => {
     if (!loading && !user) navigate('/signup', { replace: true });
   }, [loading, user, navigate]);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('categories')
+      .select('id, domain, name, sort')
+      .order('sort', { ascending: true })
+      .then(({ data }) => {
+        if (active && data) setCategories(data as Category[]);
+      });
+    return () => { active = false; };
+  }, []);
 
   function toggleCap(id: string) {
     setCaps((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
@@ -61,6 +78,19 @@ export default function Onboarding() {
           .upsert(rows, { onConflict: 'profile_id,capability', ignoreDuplicates: true });
         if (capErr) throw capErr;
       }
+
+      const catIds = [
+        ...(caps.includes('goods_provider') ? goodCats : []),
+        ...(caps.includes('service_provider') ? serviceCats : []),
+      ];
+      if (catIds.length) {
+        const rows = catIds.map((category_id) => ({ profile_id: user.id, category_id }));
+        const { error: catErr } = await supabase
+          .from('profile_categories')
+          .upsert(rows, { onConflict: 'profile_id,category_id', ignoreDuplicates: true });
+        if (catErr) throw catErr;
+      }
+
       if (named.length) {
         const rows = named.map((s) => ({ kind: s.kind, name: s.name.trim(), created_by: user.id }));
         const { error: spaceErr } = await supabase.from('spaces').insert(rows);
@@ -93,6 +123,9 @@ export default function Onboarding() {
     return <div className="onb"><p className="onb__sub" style={{ marginTop: 40 }}>Loading…</p></div>;
   }
 
+  const showServices = caps.includes('service_provider');
+  const showGoods = caps.includes('goods_provider');
+
   return (
     <div className="onb">
       <div className="onb__card">
@@ -119,12 +152,35 @@ export default function Onboarding() {
               </button>
             ))}
           </div>
+
+          {showServices && (
+            <div className="onb__picker">
+              <p className="onb__lead">What services do you offer?</p>
+              <CategoryPicker
+                domain="service"
+                categories={categories}
+                selected={serviceCats}
+                onChange={setServiceCats}
+              />
+            </div>
+          )}
+          {showGoods && (
+            <div className="onb__picker">
+              <p className="onb__lead">What goods do you offer?</p>
+              <CategoryPicker
+                domain="good"
+                categories={categories}
+                selected={goodCats}
+                onChange={setGoodCats}
+              />
+            </div>
+          )}
         </section>
 
         <section className="onb__section">
           <h2 className="onb__h2">Do you run any spaces?</h2>
           <p className="onb__lead">
-            Add as many organizations, communities, or groups as you run — you’ll be admin of each.
+            Add as many organizations, communities, groups, or places as you run — you’ll be the super admin of each.
           </p>
 
           {spaces.map((s) => (

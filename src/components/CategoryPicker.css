@@ -1,0 +1,71 @@
+.cat { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.cat__toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 11px 14px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); font-size: var(--t-base); color: var(--ink);
+  font-weight: 600;
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.cat__toggle:focus { outline: none; border-color: var(--peach); }
+.cat__chev { font-size: var(--t-2xs); color: var(--ink-faint); }
+
+.cat__chips { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.cat__chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; font-size: var(--t-xs); font-weight: 600;
+  color: var(--peach-deep); background: var(--peach-tint);
+  border: 1px solid var(--peach-light); border-radius: var(--r-full);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.cat__chip:hover { background: var(--peach-light); }
+.cat__chip-x { font-size: 13px; line-height: 1; color: var(--peach-deep); }
+
+.cat__panel {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: var(--s-3);
+  display: flex; flex-direction: column; gap: var(--s-3);
+  box-shadow: var(--sh-soft);
+}
+.cat__search {
+  padding: 10px 12px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-sm); background: var(--bone);
+  font-size: var(--t-base); color: var(--ink);
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.cat__search::placeholder { color: var(--ink-faint); }
+.cat__search:focus { outline: none; border-color: var(--peach); }
+
+.cat__list {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 240px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.cat__item {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 9px 10px; text-align: left;
+  font-size: var(--t-base); color: var(--ink-soft);
+  border-radius: var(--r-sm);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.cat__item:hover { background: var(--bone); }
+.cat__item.is-on { color: var(--ink); font-weight: 600; }
+.cat__box {
+  width: 18px; height: 18px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #fff;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-xs);
+  background: var(--bone);
+  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
+}
+.cat__item.is-on .cat__box { background: var(--peach); border-color: var(--peach); }
+.cat__empty { font-size: var(--t-sm); color: var(--ink-faint); padding: var(--s-2); }
+
+.cat__done {
+  align-self: flex-end; padding: 8px 18px;
+  font-size: var(--t-sm); font-weight: 600; color: #fff;
+  background: var(--peach); border-radius: var(--r-sm);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.cat__done:hover { background: var(--peach-deep); }
