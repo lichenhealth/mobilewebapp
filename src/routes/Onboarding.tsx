@@ -13,11 +13,11 @@ const CAPS = [
   { id: 'goods_provider',  label: 'Goods Provider',  desc: 'You offer goods — remedies, crafts, food, wares.' },
 ];
 
-const KINDS: { id: SpaceKind; label: string }[] = [
-  { id: 'organization', label: 'Organization' },
-  { id: 'community',    label: 'Community' },
-  { id: 'group',        label: 'Group' },
-  { id: 'place',        label: 'Place' },
+const SPACE_SECTIONS: { kind: SpaceKind; q: string; desc: string; one: string }[] = [
+  { kind: 'organization', q: 'Do you run any organizations?', desc: 'Clinics, nonprofits, businesses, or practices you lead.', one: 'organization' },
+  { kind: 'community',    q: 'Do you run any communities?',   desc: 'People gathered around a shared purpose or place.',     one: 'community' },
+  { kind: 'group',        q: 'Do you run any groups?',        desc: 'Smaller circles — cohorts, teams, or working groups.',  one: 'group' },
+  { kind: 'place',        q: 'Do you run any places?',        desc: 'Stewarded locations — land, centers, sanctuaries, venues.', one: 'place' },
 ];
 
 export default function Onboarding() {
@@ -51,8 +51,8 @@ export default function Onboarding() {
   function toggleCap(id: string) {
     setCaps((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   }
-  function addSpace() {
-    setSpaces((s) => [...s, { id: nextId.current++, kind: 'community', name: '' }]);
+  function addSpace(kind: SpaceKind) {
+    setSpaces((s) => [...s, { id: nextId.current++, kind, name: '' }]);
   }
   function updateSpace(id: number, patch: Partial<DraftSpace>) {
     setSpaces((s) => s.map((sp) => (sp.id === id ? { ...sp, ...patch } : sp)));
@@ -66,7 +66,7 @@ export default function Onboarding() {
     setError('');
     const named = spaces.filter((s) => s.name.trim());
     if (spaces.length !== named.length) {
-      setError('Please name each space, or remove the blank ones.');
+      setError('Please name each one, or remove the blank ones.');
       return;
     }
     setSaving(true);
@@ -177,45 +177,40 @@ export default function Onboarding() {
           )}
         </section>
 
-        <section className="onb__section">
-          <h2 className="onb__h2">Do you run any spaces?</h2>
-          <p className="onb__lead">
-            Add as many organizations, communities, groups, or places as you run — you’ll be the super admin of each.
-          </p>
+        {SPACE_SECTIONS.map((sec) => {
+          const mine = spaces.filter((s) => s.kind === sec.kind);
+          const article = /^[aeiou]/i.test(sec.one) ? 'an' : 'a';
+          return (
+            <section className="onb__section" key={sec.kind}>
+              <h2 className="onb__h2">{sec.q}</h2>
+              <p className="onb__lead">{sec.desc} You’ll be the super admin of each.</p>
 
-          {spaces.map((s) => (
-            <div className="onb__draft" key={s.id}>
-              <div className="onb__draft-head">
-                <div className="onb__seg">
-                  {KINDS.map((k) => (
-                    <button
-                      type="button"
-                      key={k.id}
-                      className={'onb__seg-btn' + (s.kind === k.id ? ' is-on' : '')}
-                      onClick={() => updateSpace(s.id, { kind: k.id })}
-                    >
-                      {k.label}
-                    </button>
-                  ))}
+              {mine.map((s) => (
+                <div className="onb__draft" key={s.id}>
+                  <input
+                    className="onb__input"
+                    type="text"
+                    value={s.name}
+                    onChange={(e) => updateSpace(s.id, { name: e.target.value })}
+                    placeholder={'Name your ' + sec.one}
+                  />
+                  <button
+                    type="button"
+                    className="onb__remove"
+                    onClick={() => removeSpace(s.id)}
+                    aria-label="Remove"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button type="button" className="onb__remove" onClick={() => removeSpace(s.id)} aria-label="Remove">
-                  ×
-                </button>
-              </div>
-              <input
-                className="onb__input"
-                type="text"
-                value={s.name}
-                onChange={(e) => updateSpace(s.id, { name: e.target.value })}
-                placeholder={'Name your ' + s.kind}
-              />
-            </div>
-          ))}
+              ))}
 
-          <button type="button" className="onb__add" onClick={addSpace}>
-            + Add {spaces.length ? 'another' : 'a space'}
-          </button>
-        </section>
+              <button type="button" className="onb__add" onClick={() => addSpace(sec.kind)}>
+                + Add {mine.length ? 'another' : `${article} ${sec.one}`}
+              </button>
+            </section>
+          );
+        })}
 
         {error && <p className="onb__error">{error}</p>}
 

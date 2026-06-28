@@ -78,3 +78,16 @@
 /* four space kinds now — let the segmented control wrap gracefully */
 .onb__seg { flex-wrap: wrap; }
 .onb__seg-btn { min-width: 64px; }
+
+/* per-kind space rows: name input beside a remove button */
+.onb__row { display: flex; align-items: center; gap: var(--s-2); }
+.onb__row .onb__input { flex: 1; }
+
+/* four-section spaces: each section fixes the kind, so drafts are just
+   a name field + remove (no segmented control). Simpler inline row. */
+.onb__draft {
+  flex-direction: row; align-items: center;
+  border: none; background: none; padding: 0;
+  margin-bottom: var(--s-2);
+}
+.onb__draft .onb__input { flex: 1; }
