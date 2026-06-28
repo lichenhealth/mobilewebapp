@@ -91,3 +91,6 @@
   margin-bottom: var(--s-2);
 }
 .onb__draft .onb__input { flex: 1; }
+
+/* Lichen logo mark in the onboarding header (replaces the seed) */
+.onb__logo { display: flex; justify-content: center; margin-bottom: var(--s-2); }

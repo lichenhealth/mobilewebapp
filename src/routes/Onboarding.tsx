@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
+import { LichenMark } from '../components/LichenMark';
 import './Onboarding.css';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
@@ -130,7 +131,7 @@ export default function Onboarding() {
     <div className="onb">
       <div className="onb__card">
         <header className="onb__head">
-          <span className="onb__leaf">🌱</span>
+          <div className="onb__logo"><LichenMark size={60} /></div>
           <h1 className="onb__title">Welcome to Lichen</h1>
           <p className="onb__sub">
             You’re a member now. Tell us how you’ll show up — all optional, and you can change it anytime.
@@ -138,7 +139,7 @@ export default function Onboarding() {
         </header>
 
         <section className="onb__section">
-          <h2 className="onb__h2">Do you offer anything?</h2>
+          <h2 className="onb__h2">Do you offer any goods or services?</h2>
           <div className="onb__chips">
             {CAPS.map((c) => (
               <button
