@@ -49,7 +49,7 @@ RESEND_API_KEY, any Stripe keys, Supabase service-role key live in Supabase secr
 2. Resend email: verify `lichen.health` domain, set `RESEND_API_KEY`, deploy the edge function.
 3. Concierge: wire the roster ("people whose care team you're on") + WOW/KOC to real data (currently mock).
 4. Advanced search panel (Figma mockup exists).
-5. Privacy hardening before public launch: `profiles` is currently readable by all authenticated members (incl. email) — tighten to a name-only view.
+5. ~~Privacy hardening: tighten `profiles` email visibility~~ — DONE (2026-06-29). `profiles` SELECT for `authenticated` is now column-scoped to every column EXCEPT `email`. Own email comes from the auth session; care-invite lookup uses `find_member_by_email()` and the admin supporter list uses `admin_list_supporters()` (both SECURITY DEFINER). Migrations `20260629120000_add_member_email_rpcs.sql` + `20260629120100_restrict_profile_email.sql`. Still open: broader privacy review of other tables before public launch.
 
 ## Housekeeping
 - Downloads folder has accumulated many `lichen-*` zip duplicates from the old manual deploy flow — irrelevant to the repo, but the source-of-truth is always `main` on GitHub.
