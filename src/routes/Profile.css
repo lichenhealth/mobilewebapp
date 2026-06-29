@@ -51,3 +51,7 @@
 .prof__add-row .prof__input { flex: 1; }
 
 .prof__signout { margin-top: var(--s-7); text-align: center; }
+
+/* category pickers within "What you offer" */
+.prof__picker { margin-top: var(--s-3); }
+.prof__picker-lead { font-size: var(--t-sm); color: var(--ink-soft); margin-bottom: var(--s-2); }

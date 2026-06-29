@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
 
-type SpaceKind = 'organization' | 'community' | 'group';
-type MySpace = { id: string; name: string; kind: SpaceKind; role: 'admin' | 'member' };
+type SpaceKind = 'organization' | 'community' | 'group' | 'place';
+type SpaceRole = 'super_admin' | 'admin' | 'member';
+type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
 type ProfileRow = { email: string | null; created_at: string; full_name: string | null; headline: string | null; bio: string | null };
-type MemberRow = { role: 'admin' | 'member'; spaces: { id: string; name: string; kind: SpaceKind } | null };
+type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 
 const CAPS = [
   { id: 'service_provider', label: 'Service Provider' },
@@ -17,7 +19,11 @@ const KINDS: { id: SpaceKind; label: string }[] = [
   { id: 'organization', label: 'Organization' },
   { id: 'community', label: 'Community' },
   { id: 'group', label: 'Group' },
+  { id: 'place', label: 'Place' },
 ];
+const ROLE_LABEL: Record<SpaceRole, string> = {
+  super_admin: 'super admin', admin: 'admin', member: 'member',
+};
 
 export default function Profile() {
   const { user, loading } = useAuth();
@@ -29,6 +35,9 @@ export default function Profile() {
   const [bio, setBio] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<MySpace[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [serviceCats, setServiceCats] = useState<string[]>([]);
+  const [goodCats, setGoodCats] = useState<string[]>([]);
 
   const [loadingData, setLoadingData] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -41,10 +50,12 @@ export default function Profile() {
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoadingData(true);
-    const [pRes, cRes, mRes] = await Promise.all([
+    const [pRes, cRes, mRes, catRes, pcRes] = await Promise.all([
       supabase.from('profiles').select('email,created_at,full_name,headline,bio').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
+      supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
+      supabase.from('profile_categories').select('category_id, categories(domain)').eq('profile_id', user.id),
     ]);
     const p = pRes.data as ProfileRow | null;
     if (p) {
@@ -61,6 +72,10 @@ export default function Profile() {
     setSpaces(mRows.filter((r) => r.spaces).map((r) => ({
       id: r.spaces!.id, name: r.spaces!.name, kind: r.spaces!.kind, role: r.role,
     })));
+    setCategories(((catRes.data as Category[] | null) ?? []));
+    const pcRows = (pcRes.data as { category_id: string; categories: { domain: 'good' | 'service' } | null }[] | null) ?? [];
+    setServiceCats(pcRows.filter((r) => r.categories?.domain === 'service').map((r) => r.category_id));
+    setGoodCats(pcRows.filter((r) => r.categories?.domain === 'good').map((r) => r.category_id));
     setLoadingData(false);
   }, [user]);
 
@@ -95,6 +110,27 @@ export default function Profile() {
     }
   }
 
+  // Persist category changes immediately (added -> upsert, removed -> delete)
+  async function setCatsForDomain(domain: 'good' | 'service', ids: string[]) {
+    if (!user) return;
+    setError('');
+    const prev = domain === 'service' ? serviceCats : goodCats;
+    const added = ids.filter((x) => !prev.includes(x));
+    const removed = prev.filter((x) => !ids.includes(x));
+    if (domain === 'service') setServiceCats(ids); else setGoodCats(ids);
+    if (added.length) {
+      const rows = added.map((category_id) => ({ profile_id: user.id, category_id }));
+      const { error: e } = await supabase.from('profile_categories')
+        .upsert(rows, { onConflict: 'profile_id,category_id', ignoreDuplicates: true });
+      if (e) setError(e.message);
+    }
+    if (removed.length) {
+      const { error: e } = await supabase.from('profile_categories')
+        .delete().eq('profile_id', user.id).in('category_id', removed);
+      if (e) setError(e.message);
+    }
+  }
+
   async function addSpace() {
     if (!user || !newName.trim()) return;
     setAddingSpace(true); setError('');
@@ -124,6 +160,9 @@ export default function Profile() {
     return <div className="prof"><p className="prof__muted">Loading...</p></div>;
   }
   if (!user) return null;
+
+  const showServices = caps.includes('service_provider');
+  const showGoods = caps.includes('goods_provider');
 
   return (
     <div className="prof">
@@ -167,25 +206,53 @@ export default function Profile() {
             </button>
           ))}
         </div>
+
+        {showServices && (
+          <div className="prof__picker">
+            <p className="prof__picker-lead">Services you offer</p>
+            <CategoryPicker
+              domain="service"
+              categories={categories}
+              selected={serviceCats}
+              onChange={(ids) => setCatsForDomain('service', ids)}
+              userId={user.id}
+            />
+          </div>
+        )}
+        {showGoods && (
+          <div className="prof__picker">
+            <p className="prof__picker-lead">Goods you offer</p>
+            <CategoryPicker
+              domain="good"
+              categories={categories}
+              selected={goodCats}
+              onChange={(ids) => setCatsForDomain('good', ids)}
+              userId={user.id}
+            />
+          </div>
+        )}
       </section>
 
       <section className="prof__section">
         <h2 className="prof__h2">Your spaces</h2>
         {spaces.length === 0 && <p className="prof__empty">You don't run or belong to any spaces yet.</p>}
         <div className="prof__spaces">
-          {spaces.map((s) => (
-            <div className="prof__space" key={s.id}>
-              <span className="prof__space-kind">{s.kind}</span>
-              <input
-                className="prof__space-name"
-                value={s.name}
-                readOnly={s.role !== 'admin'}
-                onChange={(e) => editLocalName(s.id, e.target.value)}
-                onBlur={(e) => { if (s.role === 'admin') renameSpace(s.id, e.target.value); }}
-              />
-              <span className="prof__space-role">{s.role}</span>
-            </div>
-          ))}
+          {spaces.map((s) => {
+            const canEdit = s.role === 'admin' || s.role === 'super_admin';
+            return (
+              <div className="prof__space" key={s.id}>
+                <span className="prof__space-kind">{s.kind}</span>
+                <input
+                  className="prof__space-name"
+                  value={s.name}
+                  readOnly={!canEdit}
+                  onChange={(e) => editLocalName(s.id, e.target.value)}
+                  onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
+                />
+                <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
+              </div>
+            );
+          })}
         </div>
 
         <div className="prof__add">
