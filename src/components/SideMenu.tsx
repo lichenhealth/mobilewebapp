@@ -130,7 +130,10 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <span>{p.label}</span>
               </NavLink>
             ))}
-            {isAdmin && (
+          </div>
+
+          {isAdmin && (
+            <div className="side-menu__admin">
               <NavLink
                 to="/admin/categories"
                 onClick={onClose}
@@ -141,8 +144,6 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <Icon name="sparkle" size={20} />
                 <span>Review categories</span>
               </NavLink>
-            )}
-            {isAdmin && (
               <NavLink
                 to="/admin/supporters"
                 onClick={onClose}
@@ -153,8 +154,8 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <Icon name="sparkle" size={20} />
                 <span>Gift access</span>
               </NavLink>
-            )}
-          </div>
+            </div>
+          )}
 
           {SECTIONS.map((s) => (
             <div key={s.key} className="side-menu__section">
