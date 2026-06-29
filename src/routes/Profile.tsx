@@ -10,6 +10,16 @@ type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
 type ProfileRow = { email: string | null; created_at: string; full_name: string | null; headline: string | null; bio: string | null };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
+type CareStatus = 'pending' | 'active';
+type CareRow = {
+  id: string;
+  patient_id: string;
+  caregiver_id: string;
+  status: CareStatus;
+  initiated_by: string;
+  patientName: string;
+  caregiverName: string;
+};
 
 const CAPS = [
   { id: 'service_provider', label: 'Service Provider' },
@@ -48,6 +58,12 @@ export default function Profile() {
   const [addingKind, setAddingKind] = useState<SpaceKind | null>(null);
   const [error, setError] = useState('');
 
+  const [care, setCare] = useState<CareRow[]>([]);
+  const [caregiverEmail, setCaregiverEmail] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
+  const [careMsg, setCareMsg] = useState('');
+  const [careBusy, setCareBusy] = useState(false);
+
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoadingData(true);
@@ -80,10 +96,62 @@ export default function Profile() {
     setLoadingData(false);
   }, [user]);
 
+  const loadCare = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('care_team_members')
+      .select('id, patient_id, caregiver_id, status, initiated_by, patient:profiles!care_team_members_patient_id_fkey(full_name), caregiver:profiles!care_team_members_caregiver_id_fkey(full_name)');
+    const rows = ((data as unknown as {
+      id: string; patient_id: string; caregiver_id: string; status: CareStatus; initiated_by: string;
+      patient: { full_name: string | null } | null; caregiver: { full_name: string | null } | null;
+    }[]) ?? []).map((r) => ({
+      id: r.id, patient_id: r.patient_id, caregiver_id: r.caregiver_id,
+      status: r.status, initiated_by: r.initiated_by,
+      patientName: r.patient?.full_name ?? 'Member',
+      caregiverName: r.caregiver?.full_name ?? 'Member',
+    }));
+    setCare(rows);
+  }, [user]);
+
   useEffect(() => {
     if (!loading && !user) { navigate('/login', { replace: true }); return; }
-    if (user) loadAll();
-  }, [user, loading, navigate, loadAll]);
+    if (user) { loadAll(); loadCare(); }
+  }, [user, loading, navigate, loadAll, loadCare]);
+
+  async function inviteCare(role: 'caregiver' | 'patient', emailRaw: string) {
+    if (!user) return;
+    setCareMsg(''); setCareBusy(true);
+    const em = emailRaw.trim();
+    if (!em) { setCareBusy(false); return; }
+    const { data: found } = await supabase
+      .from('profiles').select('id, full_name').ilike('email', em).maybeSingle();
+    if (!found) { setCareBusy(false); setCareMsg('No member found with that email.'); return; }
+    const f = found as { id: string; full_name: string | null };
+    if (f.id === user.id) { setCareBusy(false); setCareMsg('That email is you!'); return; }
+    const row = role === 'caregiver'
+      ? { patient_id: user.id, caregiver_id: f.id, initiated_by: user.id, status: 'pending' as const }
+      : { patient_id: f.id, caregiver_id: user.id, initiated_by: user.id, status: 'pending' as const };
+    const { error: e } = await supabase.from('care_team_members').insert(row);
+    setCareBusy(false);
+    if (e) {
+      setCareMsg(/duplicate|unique/i.test(e.message) ? 'That care connection already exists.' : e.message);
+      return;
+    }
+    if (role === 'caregiver') setCaregiverEmail(''); else setPatientEmail('');
+    setCareMsg('Request sent — pending their approval.');
+    loadCare();
+  }
+
+  async function approveCare(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('care_team_members').update({ status: 'active' }).eq('id', id);
+    if (e) setError(e.message); else loadCare();
+  }
+  async function removeCare(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('care_team_members').delete().eq('id', id);
+    if (e) setError(e.message); else loadCare();
+  }
 
   async function saveProfile() {
     if (!user) return;
@@ -165,6 +233,9 @@ export default function Profile() {
 
   const showServices = caps.includes('service_provider');
   const showGoods = caps.includes('goods_provider');
+  const meId = user.id;
+  const myTeam = care.filter((c) => c.patient_id === meId);     // caregivers caring for me
+  const iCareFor = care.filter((c) => c.caregiver_id === meId); // people I care for
 
   return (
     <div className="prof">
@@ -233,6 +304,71 @@ export default function Profile() {
             />
           </div>
         )}
+      </section>
+
+      <section className="prof__section">
+        <h2 className="prof__h2">Your care team</h2>
+        <p className="prof__care-lead">People who help care for you. They approve before joining.</p>
+        {myTeam.length === 0 && <p className="prof__empty">No one on your care team yet.</p>}
+        <div className="prof__care-list">
+          {myTeam.map((c) => {
+            const incoming = c.status === 'pending' && c.initiated_by !== meId;
+            return (
+              <div className="prof__care-row" key={c.id}>
+                <div className="prof__care-id">
+                  <span className="prof__care-name">{c.caregiverName}</span>
+                  {c.status === 'pending' && (
+                    <span className="prof__care-tag">{incoming ? 'wants to join' : 'invited · awaiting'}</span>
+                  )}
+                </div>
+                <div className="prof__care-actions">
+                  {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
+                  <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Remove' : incoming ? 'Decline' : 'Cancel'}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="prof__add-row">
+          <input className="prof__input" type="email" value={caregiverEmail}
+            onChange={(e) => { setCaregiverEmail(e.target.value); setCareMsg(''); }}
+            placeholder="Add a caregiver by email" />
+          <button className="btn btn-primary" onClick={() => inviteCare('caregiver', caregiverEmail)}
+            disabled={careBusy || !caregiverEmail.trim()}>Invite</button>
+        </div>
+      </section>
+
+      <section className="prof__section">
+        <h2 className="prof__h2">People you care for</h2>
+        <p className="prof__care-lead">Members who’ve added you as a caregiver, or whom you’ve offered to help.</p>
+        {iCareFor.length === 0 && <p className="prof__empty">You’re not on anyone’s care team yet.</p>}
+        <div className="prof__care-list">
+          {iCareFor.map((c) => {
+            const incoming = c.status === 'pending' && c.initiated_by !== meId;
+            return (
+              <div className="prof__care-row" key={c.id}>
+                <div className="prof__care-id">
+                  <span className="prof__care-name">{c.patientName}</span>
+                  {c.status === 'pending' && (
+                    <span className="prof__care-tag">{incoming ? 'added you · approve?' : 'offered · awaiting'}</span>
+                  )}
+                </div>
+                <div className="prof__care-actions">
+                  {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
+                  <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Leave' : incoming ? 'Decline' : 'Cancel'}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="prof__add-row">
+          <input className="prof__input" type="email" value={patientEmail}
+            onChange={(e) => { setPatientEmail(e.target.value); setCareMsg(''); }}
+            placeholder="Offer to care for someone by email" />
+          <button className="btn btn-primary" onClick={() => inviteCare('patient', patientEmail)}
+            disabled={careBusy || !patientEmail.trim()}>Offer</button>
+        </div>
+        {careMsg && <p className="prof__care-msg">{careMsg}</p>}
       </section>
 
       {SPACE_SECTIONS.map((sec) => {
