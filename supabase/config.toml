@@ -1,0 +1,6 @@
+# Supabase CLI configuration.
+# Links this repo to the hosted project so `supabase` commands know which
+# project to talk to. The CLI fills in sensible defaults for everything else.
+#
+# project_id is the project ref (from the dashboard URL / Project Settings).
+project_id = "mjqnaevertyzgjlpwynr"
