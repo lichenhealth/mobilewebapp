@@ -11,6 +11,7 @@ reviewable changes. Keep Plan Mode on for anything touching the database or auth
 - Backend: Supabase (project `mjqnaevertyzgjlpwynr`). Anon key is hardcoded in `src/lib/supabase.ts` (public by design; RLS protects data).
 - DB schema is version-controlled in `supabase/migrations/00000000000000_init.sql` — a `pg_dump --schema-only --schema=public` baseline of the live DB (captured 2026-06-29) plus a manually-appended `auth.users` signup trigger. It's a record/backup, not auto-applied. The live schema is still edited in the Supabase dashboard, so this file can drift — refresh it after DB changes. Tooling: Supabase CLI is linked (`supabase/config.toml`); `pg_dump` lives at `/opt/homebrew/opt/libpq/bin/pg_dump` (no Docker). `supabase db dump`/`db pull` need Docker, which isn't installed — use the direct `pg_dump` against the session pooler instead.
 - Marketing site is a separate repo (`lichenhealth/lichen-health`, Astro) — not this one.
+- Two domains: **`lichen.healthcare`** = this PWA (DNS on Vercel) · **`lichen.health`** = marketing site (website served by Vercel, but DNS nameservers are still on **Wix** — only the A record was moved, not the nameservers). Transactional email sends from `lichen.healthcare` because Wix can't host the subdomain MX Resend needs. Eventual consolidation onto one domain (for shared login) is an open strategy question.
 - Run `tsc -b` and `vite build` locally before committing; fix all type errors (the project builds clean today).
 
 ## Conventions
@@ -46,7 +47,7 @@ RESEND_API_KEY, any Stripe keys, Supabase service-role key live in Supabase secr
 
 ## Open threads / next up
 1. Stripe: monthly, invite-only supporter tier. Need checkout function + webhook (sets `source='stripe'`) + gift→paid conversion. Schema is ready in `subscriptions`.
-2. Resend email: verify `lichen.health` domain, set `RESEND_API_KEY`, deploy the edge function.
+2. ~~Resend email~~ — DONE (2026-06-29). `send-care-invite` edge function is written, deployed, and verified sending real invites. Sends from `Lichen <care@lichen.healthcare>` (NOT lichen.health — see domains note below). `RESEND_API_KEY` is set as a Supabase Edge Function secret. Resend domain `lichen.healthcare` is verified (DKIM/SPF/MX added to Vercel DNS via auto-config). Deploy with `supabase functions deploy send-care-invite` (works without Docker — ignore the "Docker is not running" warning).
 3. Concierge: wire the roster ("people whose care team you're on") + WOW/KOC to real data (currently mock).
 4. Advanced search panel (Figma mockup exists).
 5. ~~Privacy hardening: tighten `profiles` email visibility~~ — DONE (2026-06-29). `profiles` SELECT for `authenticated` is now column-scoped to every column EXCEPT `email`. Own email comes from the auth session; care-invite lookup uses `find_member_by_email()` and the admin supporter list uses `admin_list_supporters()` (both SECURITY DEFINER). Migrations `20260629120000_add_member_email_rpcs.sql` + `20260629120100_restrict_profile_email.sql`. Still open: broader privacy review of other tables before public launch.
