@@ -56,3 +56,6 @@
 .auth-page__meta span { font-size: var(--t-xs); color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; display: block; }
 .auth-page__meta strong { font-size: var(--t-base); color: var(--ink); }
 .auth-page__actions { display: flex; gap: var(--s-3); justify-content: center; margin-top: var(--s-5); }
+
+/* Lichen logo mark on auth screens (replaces the seed emoji) */
+.auth__logo { display: flex; justify-content: center; margin-bottom: var(--s-2); }

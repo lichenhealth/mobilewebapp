@@ -1,0 +1,31 @@
+.adminc { max-width: 640px; margin: 0 auto; padding: var(--s-4) var(--s-3) var(--s-6); }
+.adminc__head { margin-bottom: var(--s-4); }
+.adminc__title { font-family: var(--font-display); font-size: var(--t-2xl); color: var(--ink); }
+.adminc__sub { font-size: var(--t-sm); color: var(--ink-soft); margin-top: var(--s-1); }
+.adminc__muted { color: var(--ink-faint); padding: var(--s-4); }
+.adminc__empty { color: var(--ink-soft); padding: var(--s-4) 0; }
+.adminc__error { color: #b3261e; font-size: var(--t-sm); margin-bottom: var(--s-2); }
+.adminc__list { display: flex; flex-direction: column; gap: var(--s-2); }
+.adminc__row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-3); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm);
+}
+.adminc__info { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.adminc__badge {
+  font-size: var(--t-2xs); text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 8px; border-radius: var(--r-full); font-weight: 700;
+}
+.adminc__badge--good    { color: var(--peach-deep); background: var(--peach-tint); }
+.adminc__badge--service { color: #4a6b52; background: #e7efe4; }
+.adminc__name { font-weight: 600; color: var(--ink); }
+.adminc__by { font-size: var(--t-xs); color: var(--ink-faint); }
+.adminc__actions { display: flex; gap: var(--s-2); flex-shrink: 0; }
+.adminc__btn {
+  padding: 7px 14px; font-size: var(--t-sm); font-weight: 600;
+  border-radius: var(--r-sm); transition: background var(--d-fast) var(--ease-out);
+}
+.adminc__btn--approve { color: #fff; background: var(--peach); }
+.adminc__btn--approve:hover:not(:disabled) { background: var(--peach-deep); }
+.adminc__btn--reject { color: var(--ink-soft); background: var(--bone); border: 1px solid var(--bone-edge); }
+.adminc__btn:disabled { opacity: 0.5; }

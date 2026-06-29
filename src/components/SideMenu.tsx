@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { COMMUNITIES, GROUPS, NETWORK_LABELS } from '../data/network';
+import { useAuth } from '../auth/AuthProvider';
 import './SideMenu.css';
 
 interface SideMenuProps {
@@ -75,6 +76,7 @@ const SECTIONS: NavSection[] = [
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
@@ -128,6 +130,18 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <span>{p.label}</span>
               </NavLink>
             ))}
+            {isAdmin && (
+              <NavLink
+                to="/admin/categories"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
+                }
+              >
+                <Icon name="sparkle" size={20} />
+                <span>Review categories</span>
+              </NavLink>
+            )}
           </div>
 
           {SECTIONS.map((s) => (

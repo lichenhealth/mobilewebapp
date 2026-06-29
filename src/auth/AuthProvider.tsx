@@ -8,17 +8,19 @@ type AuthState = {
   user: User | null;
   loading: boolean;
   onboarded: boolean | null;   // null = not yet known
+  isAdmin: boolean;
   markOnboarded: () => void;
 };
 
 const AuthContext = createContext<AuthState>({
-  session: null, user: null, loading: true, onboarded: null, markOnboarded: () => {},
+  session: null, user: null, loading: true, onboarded: null, isAdmin: false, markOnboarded: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -33,16 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!userId) { setOnboarded(null); return; }
+    if (!userId) { setOnboarded(null); setIsAdmin(false); return; }
     let active = true;
-    supabase.from('profiles').select('onboarded').eq('id', userId).single()
+    supabase.from('profiles').select('onboarded, is_admin').eq('id', userId).single()
       .then(
         ({ data, error }) => {
           if (!active) return;
-          if (error) { setOnboarded(false); return; }
-          setOnboarded(Boolean((data as { onboarded: boolean } | null)?.onboarded));
+          if (error) { setOnboarded(false); setIsAdmin(false); return; }
+          const row = data as { onboarded: boolean; is_admin: boolean } | null;
+          setOnboarded(Boolean(row?.onboarded));
+          setIsAdmin(Boolean(row?.is_admin));
         },
-        () => { if (active) setOnboarded(false); }
+        () => { if (active) { setOnboarded(false); setIsAdmin(false); } }
       );
     return () => { active = false; };
   }, [userId]);
@@ -50,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const markOnboarded = useCallback(() => setOnboarded(true), []);
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, onboarded, markOnboarded }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, onboarded, isAdmin, markOnboarded }}>
       {children}
     </AuthContext.Provider>
   );

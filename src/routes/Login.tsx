@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { LichenMark } from '../components/LichenMark';
 import './Auth.css';
 
 export default function Login() {
@@ -32,7 +33,7 @@ export default function Login() {
     <div className="auth">
       <div className="auth__card">
         <div className="auth__brand">
-          <span className="auth__leaf">🌱</span>
+          <div className="auth__logo"><LichenMark size={56} /></div>
           <h1 className="auth__title">Welcome back</h1>
           <p className="auth__sub">Log in to your Lichen account.</p>
         </div>

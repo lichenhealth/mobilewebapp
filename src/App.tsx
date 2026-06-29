@@ -16,6 +16,7 @@ import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
 import Onboarding from './routes/Onboarding';
+import AdminCategories from './routes/AdminCategories';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/login"     element={<Login />} />
           <Route path="/signup"    element={<SignUp />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/admin/categories" element={<AdminCategories />} />
 
           {/* Mycelium — your full network */}
           <Route path="/mycelium"        element={<Mycelium />} />

@@ -162,6 +162,7 @@ export default function Onboarding() {
                 categories={categories}
                 selected={serviceCats}
                 onChange={setServiceCats}
+                userId={user.id}
               />
             </div>
           )}
@@ -173,6 +174,7 @@ export default function Onboarding() {
                 categories={categories}
                 selected={goodCats}
                 onChange={setGoodCats}
+                userId={user.id}
               />
             </div>
           )}
