@@ -40,7 +40,9 @@ reviewable changes. Keep Plan Mode on for anything touching the database or auth
 - `Profile.tsx` — about, capabilities + category editing, per-kind space sections, care-team management (invite/approve/remove, non-member email invites), tier badge.
 - `Chat.tsx` / `ChatThread.tsx` — real Supabase chats + messages + realtime (`src/lib/chatApi.ts`). No reactions/replies (no schema for them yet).
 - `Concierge.tsx` — STILL mock data (`src/data/concierge.ts`): WOW / KOC / Chat / Urgent tabs. Not yet wired to real data.
-- Edge function `supabase/functions/send-care-invite` (Resend) — sends care invites; reads `RESEND_API_KEY` secret.
+- Edge functions (Resend; deploy via `supabase functions deploy <name>`, no Docker needed; both read the `RESEND_API_KEY` secret):
+  - `send-care-invite` — care-team invites.
+  - `send-invite` — general "Invite to Lichen" member invites. Powers the `/invite` screen (`Invite.tsx`, side-menu entry "Invite to Lichen"); emails a `/signup` link, no tracking/DB. The screen guards against inviting existing members via the `find_member_by_email()` RPC.
 
 ## Secrets — never hardcode
 RESEND_API_KEY, any Stripe keys, Supabase service-role key live in Supabase secrets / env, never in the repo.
