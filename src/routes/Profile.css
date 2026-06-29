@@ -55,3 +55,6 @@
 /* category pickers within "What you offer" */
 .prof__picker { margin-top: var(--s-3); }
 .prof__picker-lead { font-size: var(--t-sm); color: var(--ink-soft); margin-bottom: var(--s-2); }
+
+/* per-kind sections: give each add-row a little breathing room under its list */
+.prof__add-row { margin-top: var(--s-2); }

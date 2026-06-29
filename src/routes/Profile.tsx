@@ -15,11 +15,11 @@ const CAPS = [
   { id: 'service_provider', label: 'Service Provider' },
   { id: 'goods_provider', label: 'Goods Provider' },
 ];
-const KINDS: { id: SpaceKind; label: string }[] = [
-  { id: 'organization', label: 'Organization' },
-  { id: 'community', label: 'Community' },
-  { id: 'group', label: 'Group' },
-  { id: 'place', label: 'Place' },
+const SPACE_SECTIONS: { kind: SpaceKind; title: string; one: string }[] = [
+  { kind: 'organization', title: 'Your organizations', one: 'organization' },
+  { kind: 'community',    title: 'Your communities',   one: 'community' },
+  { kind: 'group',        title: 'Your groups',        one: 'group' },
+  { kind: 'place',        title: 'Your places',        one: 'place' },
 ];
 const ROLE_LABEL: Record<SpaceRole, string> = {
   super_admin: 'super admin', admin: 'admin', member: 'member',
@@ -42,9 +42,10 @@ export default function Profile() {
   const [loadingData, setLoadingData] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
-  const [newKind, setNewKind] = useState<SpaceKind>('community');
-  const [newName, setNewName] = useState('');
-  const [addingSpace, setAddingSpace] = useState(false);
+  const [newNames, setNewNames] = useState<Record<SpaceKind, string>>({
+    organization: '', community: '', group: '', place: '',
+  });
+  const [addingKind, setAddingKind] = useState<SpaceKind | null>(null);
   const [error, setError] = useState('');
 
   const loadAll = useCallback(async () => {
@@ -131,13 +132,14 @@ export default function Profile() {
     }
   }
 
-  async function addSpace() {
-    if (!user || !newName.trim()) return;
-    setAddingSpace(true); setError('');
-    const { error: e } = await supabase.from('spaces').insert({ kind: newKind, name: newName.trim(), created_by: user.id });
-    setAddingSpace(false);
+  async function addSpace(kind: SpaceKind) {
+    const name = (newNames[kind] || '').trim();
+    if (!user || !name) return;
+    setAddingKind(kind); setError('');
+    const { error: e } = await supabase.from('spaces').insert({ kind, name, created_by: user.id });
+    setAddingKind(null);
     if (e) { setError(e.message); return; }
-    setNewName('');
+    setNewNames((m) => ({ ...m, [kind]: '' }));
     loadAll();
   }
 
@@ -233,46 +235,48 @@ export default function Profile() {
         )}
       </section>
 
-      <section className="prof__section">
-        <h2 className="prof__h2">Your spaces</h2>
-        {spaces.length === 0 && <p className="prof__empty">You don't run or belong to any spaces yet.</p>}
-        <div className="prof__spaces">
-          {spaces.map((s) => {
-            const canEdit = s.role === 'admin' || s.role === 'super_admin';
-            return (
-              <div className="prof__space" key={s.id}>
-                <span className="prof__space-kind">{s.kind}</span>
-                <input
-                  className="prof__space-name"
-                  value={s.name}
-                  readOnly={!canEdit}
-                  onChange={(e) => editLocalName(s.id, e.target.value)}
-                  onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
-                />
-                <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="prof__add">
-          <div className="prof__add-seg">
-            {KINDS.map((k) => (
-              <button key={k.id} type="button"
-                className={newKind === k.id ? 'is-on' : ''}
-                onClick={() => setNewKind(k.id)}>
-                {k.label}
+      {SPACE_SECTIONS.map((sec) => {
+        const mine = spaces.filter((s) => s.kind === sec.kind);
+        const article = /^[aeiou]/i.test(sec.one) ? 'an' : 'a';
+        return (
+          <section className="prof__section" key={sec.kind}>
+            <h2 className="prof__h2">{sec.title}</h2>
+            {mine.length === 0 && <p className="prof__empty">None yet.</p>}
+            <div className="prof__spaces">
+              {mine.map((s) => {
+                const canEdit = s.role === 'admin' || s.role === 'super_admin';
+                return (
+                  <div className="prof__space" key={s.id}>
+                    <input
+                      className="prof__space-name"
+                      value={s.name}
+                      readOnly={!canEdit}
+                      onChange={(e) => editLocalName(s.id, e.target.value)}
+                      onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
+                    />
+                    <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="prof__add-row">
+              <input
+                className="prof__input"
+                value={newNames[sec.kind]}
+                onChange={(e) => setNewNames((m) => ({ ...m, [sec.kind]: e.target.value }))}
+                placeholder={'Name your ' + sec.one}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => addSpace(sec.kind)}
+                disabled={addingKind === sec.kind || !newNames[sec.kind].trim()}
+              >
+                {addingKind === sec.kind ? 'Adding...' : `Add ${article} ${sec.one}`}
               </button>
-            ))}
-          </div>
-          <div className="prof__add-row">
-            <input className="prof__input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={'Name your ' + newKind} />
-            <button className="btn btn-primary" onClick={addSpace} disabled={addingSpace || !newName.trim()}>
-              {addingSpace ? 'Adding...' : 'Add'}
-            </button>
-          </div>
-        </div>
-      </section>
+            </div>
+          </section>
+        );
+      })}
 
       <div className="prof__signout">
         <button className="btn btn-ghost" onClick={signOut}>Sign out</button>
