@@ -10,7 +10,7 @@ type Row = {
   tier: Tier;
   source: 'gift' | 'stripe';
   status: string;
-  profiles: { full_name: string | null; email: string | null } | null;
+  member: { full_name: string | null; email: string | null } | null;
 };
 
 const TIERS: { id: Tier; label: string; price: string }[] = [
@@ -31,7 +31,7 @@ export default function AdminSupporters() {
   const load = useCallback(async () => {
     const { data, error: e } = await supabase
       .from('subscriptions')
-      .select('profile_id, tier, source, status, profiles(full_name, email)')
+      .select('profile_id, tier, source, status, member:profiles!subscriptions_profile_id_fkey(full_name, email)')
       .order('granted_at', { ascending: false });
     if (e) setError(e.message);
     else setRows((data as unknown as Row[]) ?? []);
@@ -108,11 +108,11 @@ export default function AdminSupporters() {
               <span className={'adminc__badge adminc__badge--' + (r.tier === 'concierge' ? 'good' : 'service')}>
                 {r.tier}
               </span>
-              <span className="adminc__name">{r.profiles?.full_name || r.profiles?.email || 'Member'}</span>
+              <span className="adminc__name">{r.member?.full_name || r.member?.email || 'Member'}</span>
               <span className="adminc__by">{r.source === 'gift' ? 'gifted' : 'paid'} · {r.status}</span>
             </div>
             <div className="adminc__actions">
-              <button className="adminc__btn adminc__btn--reject" onClick={() => revoke(r.profiles?.email ?? null)}>
+              <button className="adminc__btn adminc__btn--reject" onClick={() => revoke(r.member?.email ?? null)}>
                 Revoke
               </button>
             </div>
