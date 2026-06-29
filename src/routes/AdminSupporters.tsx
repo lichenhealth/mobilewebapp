@@ -13,6 +13,16 @@ type Row = {
   member: { full_name: string | null; email: string | null } | null;
 };
 
+// Flat shape returned by the admin_list_supporters() RPC.
+type SupporterRow = {
+  profile_id: string;
+  tier: string;
+  source: string;
+  status: string;
+  full_name: string | null;
+  email: string | null;
+};
+
 const TIERS: { id: Tier; label: string; price: string }[] = [
   { id: 'community', label: 'Community', price: '$29/mo' },
   { id: 'concierge', label: 'Concierge', price: '$99/mo' },
@@ -29,12 +39,17 @@ export default function AdminSupporters() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    const { data, error: e } = await supabase
-      .from('subscriptions')
-      .select('profile_id, tier, source, status, member:profiles!subscriptions_profile_id_fkey(full_name, email)')
-      .order('granted_at', { ascending: false });
+    // Admin-only RPC: returns supporters with member name + email. Regular
+    // members can no longer read emails via a direct table query.
+    const { data, error: e } = await supabase.rpc('admin_list_supporters');
     if (e) setError(e.message);
-    else setRows((data as unknown as Row[]) ?? []);
+    else setRows(((data as SupporterRow[] | null) ?? []).map((d) => ({
+      profile_id: d.profile_id,
+      tier: d.tier as Tier,
+      source: d.source as 'gift' | 'stripe',
+      status: d.status,
+      member: { full_name: d.full_name, email: d.email },
+    })));
     setLoaded(true);
   }, []);
 
