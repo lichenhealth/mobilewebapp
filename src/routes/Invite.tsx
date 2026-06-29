@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
-import { Icon } from '../components/Icon';
 import './Invite.css';
 
 export default function Invite() {
@@ -26,6 +25,13 @@ export default function Invite() {
     const to = email.trim();
     if (!to) return;
     setBusy(true); setMsg(''); setError('');
+    // Don't send a "join Lichen" invite to someone who's already a member.
+    const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: to });
+    if (((existing as unknown[] | null) ?? []).length > 0) {
+      setBusy(false);
+      setMsg(`${to} is already on Lichen 🌿 — no invite needed.`);
+      return;
+    }
     const { error: e } = await supabase.functions.invoke('send-invite', {
       body: { email: to, inviterName: fullName, note: note.trim() },
     });
@@ -44,7 +50,6 @@ export default function Invite() {
   return (
     <div className="invite">
       <header className="invite__head">
-        <Icon name="user-multiple" size={26} />
         <h1 className="invite__title">Invite to Lichen</h1>
         <p className="invite__sub">
           Know someone who belongs here? Send them an invitation to join Lichen.
