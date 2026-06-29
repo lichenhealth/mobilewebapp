@@ -83,3 +83,6 @@
 .prof__care-btn--ok { color: #fff; background: var(--peach); border-color: var(--peach); }
 .prof__care-btn--ok:hover { background: var(--peach-deep); }
 .prof__care-msg { font-size: var(--t-sm); color: var(--peach-deep); margin-top: var(--s-2); }
+
+/* invited-but-not-yet-a-member rows */
+.prof__care-row--invite { border-style: dashed; background: var(--bone); }

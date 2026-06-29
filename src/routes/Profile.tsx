@@ -59,6 +59,7 @@ export default function Profile() {
   const [error, setError] = useState('');
 
   const [care, setCare] = useState<CareRow[]>([]);
+  const [invites, setInvites] = useState<{ id: string; email: string; role: 'caregiver' | 'patient' }[]>([]);
   const [caregiverEmail, setCaregiverEmail] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
   const [careMsg, setCareMsg] = useState('');
@@ -98,10 +99,18 @@ export default function Profile() {
 
   const loadCare = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('care_team_members')
-      .select('id, patient_id, caregiver_id, status, initiated_by, patient:profiles!care_team_members_patient_id_fkey(full_name), caregiver:profiles!care_team_members_caregiver_id_fkey(full_name)');
-    const rows = ((data as unknown as {
+    // turn any invitations addressed to my email into pending care connections
+    await supabase.rpc('claim_care_invitations');
+    const [careRes, invRes] = await Promise.all([
+      supabase
+        .from('care_team_members')
+        .select('id, patient_id, caregiver_id, status, initiated_by, patient:profiles!care_team_members_patient_id_fkey(full_name), caregiver:profiles!care_team_members_caregiver_id_fkey(full_name)'),
+      supabase
+        .from('care_invitations')
+        .select('id, invitee_email, role')
+        .eq('status', 'pending'),
+    ]);
+    const rows = ((careRes.data as unknown as {
       id: string; patient_id: string; caregiver_id: string; status: CareStatus; initiated_by: string;
       patient: { full_name: string | null } | null; caregiver: { full_name: string | null } | null;
     }[]) ?? []).map((r) => ({
@@ -111,6 +120,8 @@ export default function Profile() {
       caregiverName: r.caregiver?.full_name ?? 'Member',
     }));
     setCare(rows);
+    setInvites(((invRes.data as { id: string; invitee_email: string; role: 'caregiver' | 'patient' }[] | null) ?? [])
+      .map((i) => ({ id: i.id, email: i.invitee_email, role: i.role })));
   }, [user]);
 
   useEffect(() => {
@@ -125,7 +136,20 @@ export default function Profile() {
     if (!em) { setCareBusy(false); return; }
     const { data: found } = await supabase
       .from('profiles').select('id, full_name').ilike('email', em).maybeSingle();
-    if (!found) { setCareBusy(false); setCareMsg('No member found with that email.'); return; }
+    if (!found) {
+      // Not a member yet → create a standing invitation tied to their email.
+      const { error: invErr } = await supabase.from('care_invitations')
+        .insert({ inviter_id: user.id, invitee_email: em.toLowerCase(), role });
+      setCareBusy(false);
+      if (invErr) {
+        setCareMsg(/duplicate|unique/i.test(invErr.message) ? 'You already invited that email.' : invErr.message);
+        return;
+      }
+      if (role === 'caregiver') setCaregiverEmail(''); else setPatientEmail('');
+      setCareMsg(`Invited ${em} to Lichen — they'll join your care circle when they sign up. Use “Copy invite” to send them the link.`);
+      loadCare();
+      return;
+    }
     const f = found as { id: string; full_name: string | null };
     if (f.id === user.id) { setCareBusy(false); setCareMsg('That email is you!'); return; }
     const row = role === 'caregiver'
@@ -151,6 +175,20 @@ export default function Profile() {
     setError('');
     const { error: e } = await supabase.from('care_team_members').delete().eq('id', id);
     if (e) setError(e.message); else loadCare();
+  }
+  async function cancelInvite(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('care_invitations').delete().eq('id', id);
+    if (e) setError(e.message); else loadCare();
+  }
+  async function copyInvite(email: string) {
+    const msg = `Join me on Lichen — sign up with this email (${email}) and we'll be connected: https://lichen.healthcare/signup`;
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCareMsg('Invite link copied — paste it into a text or email to them.');
+    } catch {
+      setCareMsg(`Copy this and send it to them: ${msg}`);
+    }
   }
 
   async function saveProfile() {
@@ -329,6 +367,18 @@ export default function Profile() {
             );
           })}
         </div>
+        {invites.filter((i) => i.role === 'caregiver').map((i) => (
+          <div className="prof__care-row prof__care-row--invite" key={i.id}>
+            <div className="prof__care-id">
+              <span className="prof__care-name">{i.email}</span>
+              <span className="prof__care-tag">invited to Lichen</span>
+            </div>
+            <div className="prof__care-actions">
+              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy invite</button>
+              <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
+            </div>
+          </div>
+        ))}
         <div className="prof__add-row">
           <input className="prof__input" type="email" value={caregiverEmail}
             onChange={(e) => { setCaregiverEmail(e.target.value); setCareMsg(''); }}
@@ -361,6 +411,18 @@ export default function Profile() {
             );
           })}
         </div>
+        {invites.filter((i) => i.role === 'patient').map((i) => (
+          <div className="prof__care-row prof__care-row--invite" key={i.id}>
+            <div className="prof__care-id">
+              <span className="prof__care-name">{i.email}</span>
+              <span className="prof__care-tag">invited to Lichen</span>
+            </div>
+            <div className="prof__care-actions">
+              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy invite</button>
+              <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
+            </div>
+          </div>
+        ))}
         <div className="prof__add-row">
           <input className="prof__input" type="email" value={patientEmail}
             onChange={(e) => { setPatientEmail(e.target.value); setCareMsg(''); }}
