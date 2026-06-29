@@ -29,3 +29,25 @@
 .adminc__btn--approve:hover:not(:disabled) { background: var(--peach-deep); }
 .adminc__btn--reject { color: var(--ink-soft); background: var(--bone); border: 1px solid var(--bone-edge); }
 .adminc__btn:disabled { opacity: 0.5; }
+
+/* gift-access form */
+.adminc__gift {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-3); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm); margin-bottom: var(--s-3);
+}
+.adminc__gift-email {
+  padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-sm);
+  background: var(--bone); font-size: var(--t-base); color: var(--ink);
+}
+.adminc__gift-email:focus { outline: none; border-color: var(--peach); }
+.adminc__gift-tiers { display: flex; gap: var(--s-2); }
+.adminc__tier-btn {
+  flex: 1; padding: 10px; border: 1px solid var(--bone-edge); border-radius: var(--r-sm);
+  background: var(--bone); font-size: var(--t-sm); font-weight: 600; color: var(--ink-soft);
+  transition: all var(--d-fast) var(--ease-out);
+}
+.adminc__tier-btn.is-on { background: var(--peach); color: #fff; border-color: var(--peach); }
+.adminc__tier-price { font-weight: 400; opacity: 0.8; }
+.adminc__msg { font-size: var(--t-sm); color: var(--peach-deep); margin-bottom: var(--s-3); }
+.adminc__subhead { font-family: var(--font-display); font-size: var(--t-lg); color: var(--ink); margin: var(--s-3) 0 var(--s-2); }

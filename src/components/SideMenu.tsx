@@ -142,6 +142,18 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <span>Review categories</span>
               </NavLink>
             )}
+            {isAdmin && (
+              <NavLink
+                to="/admin/supporters"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
+                }
+              >
+                <Icon name="sparkle" size={20} />
+                <span>Gift access</span>
+              </NavLink>
+            )}
           </div>
 
           {SECTIONS.map((s) => (

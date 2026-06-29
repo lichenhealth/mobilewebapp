@@ -86,3 +86,12 @@
 
 /* invited-but-not-yet-a-member rows */
 .prof__care-row--invite { border-style: dashed; background: var(--bone); }
+
+/* supporter tier badge */
+.prof__tier {
+  display: inline-block; margin-top: var(--s-2);
+  font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.02em;
+  color: var(--peach-deep); background: var(--peach-tint);
+  border: 1px solid var(--peach-light); border-radius: var(--r-full);
+  padding: 4px 12px;
+}

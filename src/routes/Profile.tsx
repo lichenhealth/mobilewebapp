@@ -48,6 +48,7 @@ export default function Profile() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceCats, setServiceCats] = useState<string[]>([]);
   const [goodCats, setGoodCats] = useState<string[]>([]);
+  const [tier, setTier] = useState<{ tier: string; source: string } | null>(null);
 
   const [loadingData, setLoadingData] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -68,12 +69,13 @@ export default function Profile() {
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoadingData(true);
-    const [pRes, cRes, mRes, catRes, pcRes] = await Promise.all([
+    const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
       supabase.from('profiles').select('email,created_at,full_name,headline,bio').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
       supabase.from('profile_categories').select('category_id, categories(domain)').eq('profile_id', user.id),
+      supabase.from('subscriptions').select('tier, source').eq('profile_id', user.id).maybeSingle(),
     ]);
     const p = pRes.data as ProfileRow | null;
     if (p) {
@@ -94,6 +96,7 @@ export default function Profile() {
     const pcRows = (pcRes.data as { category_id: string; categories: { domain: 'good' | 'service' } | null }[] | null) ?? [];
     setServiceCats(pcRows.filter((r) => r.categories?.domain === 'service').map((r) => r.category_id));
     setGoodCats(pcRows.filter((r) => r.categories?.domain === 'good').map((r) => r.category_id));
+    setTier((subRes.data as { tier: string; source: string } | null) ?? null);
     setLoadingData(false);
   }, [user]);
 
@@ -190,6 +193,14 @@ export default function Profile() {
       setCareMsg(`Copy this and send it to them: ${msg}`);
     }
   }
+  async function sendInviteEmail(email: string, role: 'caregiver' | 'patient') {
+    setCareMsg('Sending…');
+    const { error: e } = await supabase.functions.invoke('send-care-invite', {
+      body: { email, role, inviterName: fullName || 'A Lichen member' },
+    });
+    if (e) { setCareMsg('Couldn’t send automatically yet — use Copy invite to share the link.'); return; }
+    setCareMsg(`Invite emailed to ${email}.`);
+  }
 
   async function saveProfile() {
     if (!user) return;
@@ -280,6 +291,12 @@ export default function Profile() {
       <div className="prof__head">
         <h1 className="prof__name">{fullName || 'Your profile'}</h1>
         <p className="prof__email">{email}</p>
+        {tier && (
+          <span className="prof__tier">
+            {tier.tier === 'concierge' ? 'Concierge' : 'Community'} member
+            {tier.source === 'gift' ? ' · gifted' : ''}
+          </span>
+        )}
       </div>
 
       {error && <p className="prof__error">{error}</p>}
@@ -374,7 +391,8 @@ export default function Profile() {
               <span className="prof__care-tag">invited to Lichen</span>
             </div>
             <div className="prof__care-actions">
-              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy invite</button>
+              <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email, 'caregiver')}>Send email</button>
+              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy</button>
               <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
             </div>
           </div>
@@ -418,7 +436,8 @@ export default function Profile() {
               <span className="prof__care-tag">invited to Lichen</span>
             </div>
             <div className="prof__care-actions">
-              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy invite</button>
+              <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email, 'patient')}>Send email</button>
+              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy</button>
               <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
             </div>
           </div>
