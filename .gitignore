@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Local env / secrets
+.env
+.env.local
+.env.*.local
+
+# This project intentionally has no lockfile — Vercel runs `npm install`.
+package-lock.json
+
+# macOS
+.DS_Store

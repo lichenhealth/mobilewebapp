@@ -8,7 +8,7 @@ import './Profile.css';
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
-type ProfileRow = { email: string | null; created_at: string; full_name: string | null; headline: string | null; bio: string | null };
+type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
 type CareRow = {
@@ -70,7 +70,7 @@ export default function Profile() {
     if (!user) return;
     setLoadingData(true);
     const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
-      supabase.from('profiles').select('email,created_at,full_name,headline,bio').eq('id', user.id).single(),
+      supabase.from('profiles').select('created_at,full_name,headline,bio').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
@@ -78,13 +78,13 @@ export default function Profile() {
       supabase.from('subscriptions').select('tier, source').eq('profile_id', user.id).maybeSingle(),
     ]);
     const p = pRes.data as ProfileRow | null;
+    // Own email comes from the auth session, not the profiles table — so it stays
+    // available here even though the email column is locked from member reads.
+    setEmail(user.email ?? '');
     if (p) {
-      setEmail(p.email ?? user.email ?? '');
       setFullName(p.full_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
-    } else {
-      setEmail(user.email ?? '');
     }
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
     setCaps(cRows.map((r) => r.capability));
@@ -137,8 +137,11 @@ export default function Profile() {
     setCareMsg(''); setCareBusy(true);
     const em = emailRaw.trim();
     if (!em) { setCareBusy(false); return; }
-    const { data: found } = await supabase
-      .from('profiles').select('id, full_name').ilike('email', em).maybeSingle();
+    // Look up a member by exact email via a SECURITY DEFINER function. Members
+    // can't read the email column directly anymore, so this returns id + name
+    // for a match (and nothing for a non-match) without exposing emails.
+    const { data: foundRows } = await supabase.rpc('find_member_by_email', { p_email: em });
+    const found = (foundRows as { id: string; full_name: string | null }[] | null)?.[0] ?? null;
     if (!found) {
       // Not a member yet → create a standing invitation tied to their email.
       const { error: invErr } = await supabase.from('care_invitations')
