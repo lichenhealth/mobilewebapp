@@ -70,18 +70,9 @@ Deno.serve(async (req) => {
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        if (session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
-          // Carry the profile_id from the session in case it's not on the sub yet.
-          if (!sub.metadata?.profile_id && session.metadata?.profile_id) {
-            sub.metadata = { ...sub.metadata, profile_id: session.metadata.profile_id };
-          }
-          await upsert(sub);
-        }
-        break;
-      }
+      // The subscription is recorded straight from these events — each carries
+      // the full Subscription object plus our metadata.profile_id — so no extra
+      // Stripe API call is needed (checkout.session.completed is ignored).
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
