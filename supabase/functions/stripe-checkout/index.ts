@@ -11,7 +11,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').trim(); // trim stray newline/space from paste
 const TIER_PRODUCT: Record<string, string> = {
   community: Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_UngbnXiInVtv7V',
   concierge: Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_UngciE2auur5PE',

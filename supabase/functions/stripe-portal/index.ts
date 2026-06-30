@@ -11,7 +11,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').trim(); // trim stray newline/space from paste
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 
