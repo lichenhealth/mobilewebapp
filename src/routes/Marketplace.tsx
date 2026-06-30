@@ -7,7 +7,6 @@ import {
   KIND_LABELS,
   ListingKind,
   ListingMode,
-  MODE_LABELS,
 } from '../data/marketplace';
 import { parseScope, handlesInScope } from '../data/network';
 import './Marketplace.css';
@@ -45,7 +44,7 @@ export default function Marketplace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const scope = useMemo(() => parseScope(searchParams.get('from')), [searchParams]);
 
-  const [activeMode, setActiveMode] = useState<ListingMode | null>(null);
+  const [activeModes, setActiveModes] = useState<ListingMode[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [postNote, setPostNote] = useState(false);
@@ -58,8 +57,8 @@ export default function Marketplace() {
       const allowed = handlesInScope(scope);
       list = list.filter((l) => allowed.has(l.handle));
     }
-    if (activeMode) {
-      list = list.filter((l) => l.mode === activeMode);
+    if (activeModes.length) {
+      list = list.filter((l) => activeModes.includes(l.mode));
     }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
@@ -71,7 +70,7 @@ export default function Marketplace() {
       );
     }
     return list;
-  }, [activeKind, activeMode, query, scope]);
+  }, [activeKind, activeModes, query, scope]);
 
   const clearScope = () => {
     const next = new URLSearchParams(searchParams);
@@ -87,7 +86,8 @@ export default function Marketplace() {
       setPostNote(true);
       setTimeout(() => setPostNote(false), 2400);
     } else if (action.kind === 'mode-filter' && action.mode) {
-      setActiveMode((m) => (m === action.mode ? null : action.mode!));
+      const mode = action.mode;
+      setActiveModes((modes) => modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode]);
     }
   };
 
@@ -150,7 +150,7 @@ export default function Marketplace() {
         {ACTIONS.flatMap((a, i) => {
           const active =
             (a.kind === 'search' && showSearch) ||
-            (a.kind === 'mode-filter' && activeMode === a.mode);
+            (a.kind === 'mode-filter' && !!a.mode && activeModes.includes(a.mode));
           const nodes = [];
           // Insert a visual gap when transitioning from action buttons to mode filters
           if (a.kind === 'mode-filter' && i > 0 && ACTIONS[i - 1].kind !== 'mode-filter') {
@@ -193,14 +193,6 @@ export default function Marketplace() {
             </button>
           )}
         </div>
-      )}
-
-      {/* Active filter notice */}
-      {activeMode && (
-        <p className="mkt__filter-notice">
-          Filtering by <strong>{MODE_LABELS[activeMode]}</strong>
-          <button onClick={() => setActiveMode(null)}>clear</button>
-        </p>
       )}
 
       {/* Result count */}
