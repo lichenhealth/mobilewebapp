@@ -14,7 +14,10 @@
 import Stripe from 'npm:stripe@^17';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', { apiVersion: '2024-12-18.acacia' });
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
+  apiVersion: '2024-12-18.acacia',
+  httpClient: Stripe.createFetchHttpClient(), // required in the Deno edge runtime
+});
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 

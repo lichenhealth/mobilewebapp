@@ -17,6 +17,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2024-12-18.acacia',
+  httpClient: Stripe.createFetchHttpClient(), // required in the Deno edge runtime
 });
 
 const TIER_PRODUCT: Record<string, string> = {
