@@ -24,6 +24,8 @@ export interface FeedCardProps {
   recommended?: boolean;
   saved?: boolean;
   availability?: ActionAvailability;
+  onTrust?: (active: boolean) => void;
+  onRecommend?: (active: boolean) => void;
   // Eyebrow tag (optional)
   eyebrow?: string;
   // Inline media (photos / videos / audio uploaded with a post)
@@ -43,6 +45,8 @@ export default function FeedCard({
   recommended,
   saved,
   availability,
+  onTrust,
+  onRecommend,
   eyebrow,
   media,
 }: FeedCardProps) {
@@ -113,6 +117,8 @@ export default function FeedCard({
         recommended={recommended}
         saved={saved}
         availability={availability}
+        onTrust={onTrust}
+        onRecommend={onRecommend}
       />
     </article>
   );
