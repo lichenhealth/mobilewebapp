@@ -17,3 +17,6 @@ package-lock.json
 
 # macOS
 .DS_Store
+
+# Local Claude Code preview config (machine-specific paths)
+.claude/launch.json

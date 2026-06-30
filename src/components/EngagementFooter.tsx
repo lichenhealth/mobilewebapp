@@ -35,10 +35,10 @@ interface Props {
   saved?: boolean;
   /** Per-action availability (see ActionAvailability) */
   availability?: ActionAvailability;
-  onTrust?: () => void;
-  onRecommend?: () => void;
+  onTrust?: (active: boolean) => void;
+  onRecommend?: (active: boolean) => void;
   onShare?: () => void;
-  onSave?: () => void;
+  onSave?: (active: boolean) => void;
   onChat?: () => void;
 }
 
@@ -89,20 +89,23 @@ export default function EngagementFooter({
   const handleTrust = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!can.trust) return;
-    setMyTrust((v) => !v);
-    onTrust?.();
+    const next = !myTrust;
+    setMyTrust(next);
+    onTrust?.(next);
   };
   const handleRec = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!can.recommend) return;
-    setMyRec((v) => !v);
-    onRecommend?.();
+    const next = !myRec;
+    setMyRec(next);
+    onRecommend?.(next);
   };
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!can.save) return;
-    setMySaved((v) => !v);
-    onSave?.();
+    const next = !mySaved;
+    setMySaved(next);
+    onSave?.(next);
   };
 
   return (

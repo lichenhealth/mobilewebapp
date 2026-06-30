@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
-import FeedCard, { FeedCardProps } from '../components/FeedCard';
+import FeedCard from '../components/FeedCard';
+import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
 import { FEED } from '../data/feed';
-import { loadFeed, serviceAreaIcon, type FeedPost } from '../lib/postsApi';
+import { loadFeed, type FeedPost } from '../lib/postsApi';
+import { postToCard } from '../lib/feedMapping';
+import {
+  loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+} from '../lib/myceliumApi';
+import { useAuth } from '../auth/AuthProvider';
 import './Home.css';
 
 const FILTERS = ['All', 'Social', 'Creative', 'Educational', 'Actionable', 'Q&A'];
@@ -22,28 +28,22 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'book',           label: 'Library',     to: '/library'       },
 ];
 
-// Map a real DB post into the existing FeedCard shape.
-function postToCard(p: FeedPost): FeedCardProps {
-  const name = p.author?.full_name || 'Member';
-  const icon = serviceAreaIcon(p.service_area);
-  const title = p.title || (p.body.length > 64 ? p.body.slice(0, 61) + '…' : p.body);
-  const media = Array.isArray(p.details?.media)
-    ? (p.details.media as FeedCardProps['media'])
-    : undefined;
-  return {
-    title,
-    handle: '@' + (p.author?.handle || name.toLowerCase().replace(/\s+/g, '-')),
-    avatarMonogram: name.charAt(0).toUpperCase(),
-    body: p.body,
-    categoryIcons: icon ? [icon] : [],
-    eyebrow: p.visibility === 'mycelium' ? 'Mycelium' : undefined,
-    media,
-  };
-}
-
 export default function Home() {
+  const { user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  useEffect(() => { loadFeed().then(setPosts); }, []);
+  const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
+  const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
+
+  useEffect(() => {
+    (async () => {
+      const feed = await loadFeed();
+      const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
+      const ov = await loadEndorsements(feed, myc);
+      // Set posts last so cards mount once, with engagement state already in hand.
+      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed);
+    })();
+  }, []);
 
   return (
     <div className="home">
@@ -61,7 +61,18 @@ export default function Home() {
 
       <section className="home__feed">
         {/* Real posts first, then the demo feed below (until the platform fills in). */}
-        {posts.map((p) => <FeedCard key={p.id} {...postToCard(p)} />)}
+        {posts.map((p) => (
+          <FeedCard
+            key={p.id}
+            {...postToCard(p)}
+            trusted={myMyc.has('profile:' + p.author_id)}
+            recommended={myRecs.has(p.id)}
+            mycelium={overlays[p.id]}
+            availability={{ trust: p.author_id !== user?.id }}
+            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+            onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
+          />
+        ))}
         {FEED.map((card, i) => (
           <FeedCard key={i} {...card} />
         ))}
