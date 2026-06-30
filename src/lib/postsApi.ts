@@ -37,8 +37,19 @@ export type NewPost = {
   visibility: Visibility;
   space_id?: string | null;
   service_area?: ServiceArea | null;
+  image_url?: string | null;
   details?: Record<string, unknown>;
 };
+
+// Upload a file (or recorded blob) into the post-media bucket; returns a public URL.
+export async function uploadMedia(file: Blob, ext: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from('post-media').upload(path, file);
+  if (error) throw error;
+  return supabase.storage.from('post-media').getPublicUrl(path).data.publicUrl;
+}
 
 export async function createPost(input: NewPost) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -51,6 +62,7 @@ export async function createPost(input: NewPost) {
     visibility: input.visibility,
     space_id: input.space_id ?? null,
     service_area: input.service_area ?? null,
+    image_url: input.image_url ?? null,
     details: input.details ?? {},
   }).select('id').single();
   if (error) throw error;
@@ -65,6 +77,7 @@ export type FeedPost = {
   content_type: ContentType;
   service_area: ServiceArea | null;
   visibility: Visibility;
+  image_url: string | null;
   details: Record<string, unknown>;
   created_at: string;
   author: { full_name: string | null; handle: string | null } | null;
@@ -74,7 +87,7 @@ export type FeedPost = {
 export async function loadFeed(): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')
-    .select('id, author_id, title, body, content_type, service_area, visibility, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle)')
+    .select('id, author_id, title, body, content_type, service_area, visibility, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle)')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { console.error('loadFeed', error); return []; }

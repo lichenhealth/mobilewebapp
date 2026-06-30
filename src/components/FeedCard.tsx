@@ -26,6 +26,8 @@ export interface FeedCardProps {
   availability?: ActionAvailability;
   // Eyebrow tag (optional)
   eyebrow?: string;
+  // Inline media (photos / videos / audio uploaded with a post)
+  media?: { type: 'photo' | 'video' | 'audio'; url: string }[];
 }
 
 export default function FeedCard({
@@ -42,6 +44,7 @@ export default function FeedCard({
   saved,
   availability,
   eyebrow,
+  media,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -87,6 +90,21 @@ export default function FeedCard({
           />
         )}
       </div>
+
+      {/* INLINE MEDIA */}
+      {media && media.length > 0 && (
+        <div className="feed-card__media">
+          {media.map((m, i) =>
+            m.type === 'photo' ? (
+              <img key={i} src={m.url} alt="" />
+            ) : m.type === 'video' ? (
+              <video key={i} src={m.url} controls playsInline />
+            ) : (
+              <audio key={i} src={m.url} controls />
+            )
+          )}
+        </div>
+      )}
 
       {/* ENGAGEMENT */}
       <EngagementFooter
