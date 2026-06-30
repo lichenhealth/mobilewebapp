@@ -63,15 +63,17 @@ const SECTIONS: NavSection[] = [
     defaultExpanded: false,
   },
   {
-    key: 'marketplace',
-    title: 'Marketplace',
-    href: '/market',
-    items: [
-      { label: 'Goods',    href: '/market/goods'    },
-      { label: 'Services', href: '/market/services' },
-      { label: 'Spaces',   href: '/market/spaces'   },
-      { label: 'ISO',      href: '/market/iso'      },
-    ],
+    key: 'organizations',
+    title: 'Organizations',
+    href: '/organizations',
+    items: [],
+    defaultExpanded: false,
+  },
+  {
+    key: 'places',
+    title: 'Places',
+    href: '/places',
+    items: [],
     defaultExpanded: false,
   },
 ];
@@ -167,13 +169,15 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 aria-expanded={expanded[s.key]}
               >
                 <span className="side-menu__header-label">{s.title}</span>
-                <span
-                  className={
-                    'side-menu__chevron' +
-                    (expanded[s.key] ? ' is-open' : '')
-                  }
-                  aria-hidden="true"
-                />
+                {s.items.length > 0 && (
+                  <span
+                    className={
+                      'side-menu__chevron' +
+                      (expanded[s.key] ? ' is-open' : '')
+                    }
+                    aria-hidden="true"
+                  />
+                )}
               </button>
               {expanded[s.key] && s.items.length > 0 && (
                 <ul className="side-menu__sub-list">
