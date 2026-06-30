@@ -11,7 +11,9 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').trim(); // trim stray newline/space from paste
+// Keep only visible ASCII — strips any stray newline/space/invisible char from
+// the pasted secret, anywhere in it (Stripe keys are [A-Za-z0-9_] only).
+const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const TIER_PRODUCT: Record<string, string> = {
   community: Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_UngbnXiInVtv7V',
   concierge: Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_UngciE2auur5PE',
