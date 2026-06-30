@@ -1,0 +1,34 @@
+.cmp { max-width: var(--app-max); margin: 0 auto; padding: var(--s-5) var(--s-5) var(--s-8); }
+.cmp__muted { color: var(--ink-muted); font-size: var(--t-sm); text-align: center; padding: var(--s-7) 0; }
+
+.cmp__head { text-align: center; margin-bottom: var(--s-5); }
+.cmp__title { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 600; color: var(--ink); line-height: var(--lh-tight); }
+.cmp__sub { font-size: var(--t-sm); color: var(--ink-muted); margin-top: var(--s-2); }
+
+.cmp__error { font-size: var(--t-sm); color: var(--rust); background: var(--peach-tint); border-radius: var(--r-sm); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-4); }
+
+.cmp__label { display: block; font-size: var(--t-xs); color: var(--ink-muted); font-weight: 500; margin: var(--s-4) 0 var(--s-2); }
+
+.cmp__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.cmp__chip {
+  padding: 6px 14px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); font-size: var(--t-sm); color: var(--ink-soft);
+  transition: all var(--d-fast) var(--ease-out);
+}
+.cmp__chip.is-on { background: var(--peach); color: var(--bone-warm); border-color: var(--peach); }
+
+.cmp__input {
+  padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); font-size: var(--t-base); color: var(--ink); width: 100%; font-family: inherit;
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.cmp__input::placeholder { color: var(--ink-faint); }
+.cmp__input:focus { outline: none; border-color: var(--peach); }
+.cmp__textarea { resize: vertical; min-height: 110px; line-height: var(--lh-normal); }
+
+.cmp__market { margin-top: var(--s-4); padding: var(--s-4); border: 1px dashed var(--bone-edge); border-radius: var(--r-lg); }
+.cmp__market-head { font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: var(--s-3); }
+.cmp__row { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
+.cmp__row .cmp__input { flex: 1; }
+
+.cmp__post { margin-top: var(--s-5); width: 100%; }
