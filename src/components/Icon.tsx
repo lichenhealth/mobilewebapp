@@ -57,6 +57,7 @@ export type IconName =
   | 'shield-user'
   | 'smile'
   | 'sparkle'
+  | 'sliders'
   | 'store'
   | 'thumbs-up'
   | 'trade'
@@ -269,6 +270,11 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.5 5.5l3 3M15.5 15.5l3 3M5.5 18.5l3-3M15.5 8.5l3-3" /></>,
+  },
+  'sliders': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M4 8.5h8M16 8.5h4M4 15.5h3M11 15.5h9" stroke="currentColor" strokeLinecap="round"/><circle cx="14" cy="8.5" r="2" stroke="currentColor"/><circle cx="9" cy="15.5" r="2" stroke="currentColor"/></>,
   },
   'store': {
     viewBox: '147 217 17 17',
