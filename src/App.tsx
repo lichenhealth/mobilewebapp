@@ -95,6 +95,7 @@ export default function App() {
           <Route path="/donate" element={<Donate />} />
 
           {/* Side-menu passages — placeholders */}
+          <Route path="/organizations" element={<Placeholder title="Organizations" icon="user-multiple" intro="Practices, nonprofits, and businesses rooted in the network." hint="Coming soon" />} />
           <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
           <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
           <Route path="/events"   element={<Placeholder title="Events"   icon="sparkle"        intro="Mostly in-person. Workshops, suppers, gatherings on the land." hint="Coming soon" />} />
