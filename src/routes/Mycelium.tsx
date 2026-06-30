@@ -1,65 +1,117 @@
-import { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
+import FeedCard, { FeedCardProps } from '../components/FeedCard';
+import FilterRow from '../components/FilterRow';
+import type { MyceliumSignals } from '../components/EngagementFooter';
+import { FEED } from '../data/feed';
 import {
-  NETWORK_MEMBERS,
-  NETWORK_LABELS,
-  NetworkType,
-  NetworkMember,
-} from '../data/network';
+  loadFeed, CONTENT_TYPES, SERVICE_AREAS,
+  type FeedPost, type ServiceArea,
+} from '../lib/postsApi';
+import { postToCard } from '../lib/feedMapping';
+import {
+  loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+} from '../lib/myceliumApi';
+import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
 
-// URL slug → NetworkType (or 'all')
-const URL_TO_TYPE: Record<string, NetworkType | 'all'> = {
-  '': 'all',
-  people: 'person',
-  providers: 'provider',
-  organizations: 'organization',
-  places: 'place',
+// Entity kinds — multi-select, like the marketplace mode filters.
+type Kind = 'person' | 'provider' | 'organization' | 'place';
+const KINDS: { type: Kind; label: string; icon: IconName }[] = [
+  { type: 'person',       label: 'People',    icon: 'profile' },
+  { type: 'provider',     label: 'Providers', icon: 'store' },
+  { type: 'organization', label: 'Orgs',      icon: 'user-multiple' },
+  { type: 'place',        label: 'Places',    icon: 'location' },
+];
+const URL_TO_KIND: Record<string, Kind | undefined> = {
+  people: 'person', providers: 'provider', organizations: 'organization', places: 'place',
 };
 
-const TYPE_ICON: Record<NetworkType, IconName> = {
-  person: 'profile',
-  provider: 'store',
-  organization: 'user-multiple',
-  place: 'location',
+const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
+const CT_LABEL: Record<string, string> = Object.fromEntries(CONTENT_TYPES.map((c) => [c.value, c.label]));
+
+type Item = {
+  key: string;
+  card: FeedCardProps;
+  kind: Kind;
+  contentLabel: string;       // matches a CONTENT_FILTERS entry
+  area: ServiceArea | null;
 };
+
+// Demo cards (until your web fills with real posts), tagged so the filters bite.
+const MOCK_META: { kind: Kind; contentLabel: string; area: ServiceArea | null }[] = [
+  { kind: 'provider',     contentLabel: 'Social',      area: 'marketplace' },
+  { kind: 'organization', contentLabel: 'Educational', area: 'courses' },
+  { kind: 'provider',     contentLabel: 'Social',      area: 'people' },
+  { kind: 'place',        contentLabel: 'Actionable',  area: 'food' },
+];
 
 export default function Mycelium() {
   const { type: urlSlug = '' } = useParams();
-  const filterType = URL_TO_TYPE[urlSlug] ?? 'all';
-  const [query, setQuery] = useState('');
+  const { user } = useAuth();
 
-  const members = useMemo<NetworkMember[]>(() => {
-    let list = filterType === 'all'
-      ? NETWORK_MEMBERS
-      : NETWORK_MEMBERS.filter((m) => m.type === filterType);
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.handle.toLowerCase().includes(q) ||
-          m.blurb.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [filterType, query]);
+  const [content, setContent] = useState('All');
+  const [kinds, setKinds] = useState<Kind[]>(() => {
+    const k = URL_TO_KIND[urlSlug];
+    return k ? [k] : [];
+  });
+  const [areas, setAreas] = useState<ServiceArea[]>([]);
 
-  const heading =
-    filterType === 'all'
-      ? 'Your Mycelium'
-      : `Your ${NETWORK_LABELS[filterType]}`;
-  const blurb =
-    filterType === 'all'
-      ? 'Everyone you\u2019re connected to \u2014 people, providers, organizations, places.'
-      : filterType === 'person'
-      ? 'Individuals in your trusted network.'
-      : filterType === 'provider'
-      ? 'People who make or grow or build something you can buy from or barter with.'
-      : filterType === 'organization'
-      ? 'Collectives, nonprofits, and groups operating in your network.'
-      : 'Physical places members open up \u2014 gardens, studios, kitchens, fields.';
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
+  const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
+
+  useEffect(() => {
+    (async () => {
+      const feed = await loadFeed();
+      const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
+      const ov = await loadEndorsements(feed, myc);
+      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed);
+    })();
+  }, []);
+
+  // Build the combined feed: real posts from entities in your mycelium, then demo cards.
+  const items = useMemo<Item[]>(() => {
+    const real: Item[] = posts
+      .filter((p) => myMyc.has('profile:' + p.author_id))
+      .map((p) => ({
+        key: p.id,
+        kind: 'person', // real author kinds light up once entities generalize
+        contentLabel: CT_LABEL[p.content_type] ?? 'Social',
+        area: p.service_area,
+        card: {
+          ...postToCard(p),
+          trusted: myMyc.has('profile:' + p.author_id),
+          recommended: myRecs.has(p.id),
+          mycelium: overlays[p.id],
+          availability: { trust: p.author_id !== user?.id },
+          onTrust: (on: boolean) => { void setTrust('profile', p.author_id, on).catch(console.error); },
+          onRecommend: (on: boolean) => { void setRecommend(p.id, on).catch(console.error); },
+        },
+      }));
+    const mock: Item[] = FEED.map((card, i) => ({
+      key: 'mock-' + i,
+      card,
+      ...MOCK_META[i % MOCK_META.length],
+    }));
+    return [...real, ...mock];
+  }, [posts, myMyc, myRecs, overlays, user]);
+
+  const visible = useMemo(
+    () => items.filter((it) =>
+      (content === 'All' || it.contentLabel === content) &&
+      (kinds.length === 0 || kinds.includes(it.kind)) &&
+      (areas.length === 0 || (it.area != null && areas.includes(it.area)))
+    ),
+    [items, content, kinds, areas]
+  );
+
+  const toggleKind = (k: Kind) =>
+    setKinds((cur) => cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]);
+  const toggleArea = (a: ServiceArea) =>
+    setAreas((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
 
   return (
     <div className="myc">
@@ -68,61 +120,66 @@ export default function Mycelium() {
           <Icon name="sparkle" size={11} />
           <span>Mycelium</span>
         </p>
-        <h1 className="myc__title">{heading}</h1>
-        <p className="myc__sub">{blurb}</p>
-        <p className="myc__count">
-          <span className="myc__count-n">{members.length}</span>{' '}
-          {members.length === 1 ? 'connection' : 'connections'}
+        <h1 className="myc__title">Your Mycelium</h1>
+        <p className="myc__sub">
+          What your trusted web is sharing — filter by kind, area, or content.
         </p>
       </header>
 
-      <nav className="myc__tabs">
-        <Link to="/mycelium" className={'myc__tab' + (filterType === 'all' ? ' is-active' : '')}>All</Link>
-        <Link to="/mycelium/people" className={'myc__tab' + (filterType === 'person' ? ' is-active' : '')}>People</Link>
-        <Link to="/mycelium/providers" className={'myc__tab' + (filterType === 'provider' ? ' is-active' : '')}>Providers</Link>
-        <Link to="/mycelium/organizations" className={'myc__tab' + (filterType === 'organization' ? ' is-active' : '')}>Orgs</Link>
-        <Link to="/mycelium/places" className={'myc__tab' + (filterType === 'place' ? ' is-active' : '')}>Places</Link>
-      </nav>
+      {/* Content-type (single-select) */}
+      <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />
 
-      <div className="myc__search">
-        <Icon name="search" size={14} />
-        <input
-          className="myc__search-input"
-          placeholder="Search by name, handle, or note"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      {/* Entity kind (multi-select) */}
+      <div className="myc__kinds h-scroll">
+        {KINDS.map((k) => {
+          const on = kinds.includes(k.type);
+          return (
+            <button
+              key={k.type}
+              className={'myc__kind' + (on ? ' is-on' : '')}
+              onClick={() => toggleKind(k.type)}
+              aria-pressed={on}
+            >
+              <span className="myc__kind-circle"><Icon name={k.icon} size={13} /></span>
+              <span className="myc__kind-label">{k.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <ul className="myc__list">
-        {members.map((m) => (
-          <li key={m.id} className="myc__member">
-            <div
-              className="myc__avatar"
-              style={{ background: m.color ?? 'var(--ink-soft)' }}
+      {/* Service-area lens (multi-select) */}
+      <div className="myc__areas h-scroll" role="toolbar" aria-label="Service areas">
+        {SERVICE_AREAS.map((a) => {
+          const on = areas.includes(a.value);
+          return (
+            <button
+              key={a.value}
+              className={'myc__area' + (on ? ' is-on' : '')}
+              onClick={() => toggleArea(a.value)}
+              aria-pressed={on}
+              aria-label={a.label}
+              title={a.label}
             >
-              {m.monogram}
-            </div>
-            <div className="myc__body">
-              <div className="myc__name-row">
-                <h3 className="myc__name">{m.name}</h3>
-                <span className="myc__type">
-                  <Icon name={TYPE_ICON[m.type]} size={10} />
-                  <span>{m.type}</span>
-                </span>
-              </div>
-              <p className="myc__handle">{m.handle}</p>
-              <p className="myc__blurb">{m.blurb}</p>
-            </div>
-          </li>
-        ))}
-        {members.length === 0 && (
-          <li className="myc__empty">
-            <span className="display-italic">No matches.</span>
-            <p>Try a different word, or clear the filter.</p>
-          </li>
+              <Icon name={a.icon} size={18} />
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="myc__count">
+        <span className="myc__count-n">{visible.length}</span>{' '}
+        {visible.length === 1 ? 'post' : 'posts'}
+      </p>
+
+      <section className="myc__feed">
+        {visible.map((it) => <FeedCard key={it.key} {...it.card} />)}
+        {visible.length === 0 && (
+          <div className="myc__empty">
+            <span className="display-italic">Nothing matches.</span>
+            <p>Clear a filter, or trust more entities to grow your web.</p>
+          </div>
         )}
-      </ul>
+      </section>
     </div>
   );
 }

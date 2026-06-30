@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
-import FeedCard, { FeedCardProps } from '../components/FeedCard';
+import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
 import { FEED } from '../data/feed';
-import { loadFeed, serviceAreaIcon, type FeedPost } from '../lib/postsApi';
+import { loadFeed, type FeedPost } from '../lib/postsApi';
+import { postToCard } from '../lib/feedMapping';
 import {
   loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -26,25 +27,6 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'health',         label: 'Health'      },
   { icon: 'book',           label: 'Library',     to: '/library'       },
 ];
-
-// Map a real DB post into the existing FeedCard shape.
-function postToCard(p: FeedPost): FeedCardProps {
-  const name = p.author?.full_name || 'Member';
-  const icon = serviceAreaIcon(p.service_area);
-  const title = p.title || (p.body.length > 64 ? p.body.slice(0, 61) + '…' : p.body);
-  const media = Array.isArray(p.details?.media)
-    ? (p.details.media as FeedCardProps['media'])
-    : undefined;
-  return {
-    title,
-    handle: '@' + (p.author?.handle || name.toLowerCase().replace(/\s+/g, '-')),
-    avatarMonogram: name.charAt(0).toUpperCase(),
-    body: p.body,
-    categoryIcons: icon ? [icon] : [],
-    eyebrow: p.visibility === 'mycelium' ? 'Mycelium' : undefined,
-    media,
-  };
-}
 
 export default function Home() {
   const { user } = useAuth();
