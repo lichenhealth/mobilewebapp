@@ -15,8 +15,8 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 // the pasted secret, anywhere in it (Stripe keys are [A-Za-z0-9_] only).
 const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const TIER_PRODUCT: Record<string, string> = {
-  community: Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_UngbnXiInVtv7V',
-  concierge: Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_UngciE2auur5PE',
+  community: Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_SHphERWwRzXVak',
+  concierge: Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_SHpjCV2Jcfkeuo',
 };
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';

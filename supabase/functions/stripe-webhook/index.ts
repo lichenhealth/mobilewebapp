@@ -23,8 +23,8 @@ const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUP
 
 // Map a Stripe product back to our tier. Mirrors stripe-checkout.
 const PRODUCT_TIER: Record<string, 'community' | 'concierge'> = {
-  [Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_UngbnXiInVtv7V']: 'community',
-  [Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_UngciE2auur5PE']: 'concierge',
+  [Deno.env.get('STRIPE_PRODUCT_COMMUNITY') ?? 'prod_SHphERWwRzXVak']: 'community',
+  [Deno.env.get('STRIPE_PRODUCT_CONCIERGE') ?? 'prod_SHpjCV2Jcfkeuo']: 'concierge',
 };
 
 // Collapse Stripe's many statuses into our CHECK-constrained set.
