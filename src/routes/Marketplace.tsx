@@ -35,7 +35,7 @@ const ACTIONS: ActionItem[] = [
   { icon: 'trade',          label: 'Trade',   kind: 'mode-filter', mode: 'trade'    },
   { icon: 'rent',           label: 'Rent',    kind: 'mode-filter', mode: 'rent'     },
   { icon: 'lend',           label: 'Lend',    kind: 'mode-filter', mode: 'lend'     },
-  { icon: 'sparkle',        label: 'Sliding', kind: 'mode-filter', mode: 'sliding'  },
+  { icon: 'sliders',        label: 'Sliding', kind: 'mode-filter', mode: 'sliding'  },
   { icon: 'store',          label: 'Sale',    kind: 'mode-filter', mode: 'sale'     },
 ];
 
