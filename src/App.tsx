@@ -20,6 +20,7 @@ import AdminCategories from './routes/AdminCategories';
 import AdminSupporters from './routes/AdminSupporters';
 import Invite from './routes/Invite';
 import Membership from './routes/Membership';
+import Compose from './routes/Compose';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/profile"   element={<Profile />} />
           <Route path="/invite"    element={<Invite />} />
           <Route path="/membership" element={<Membership />} />
+          <Route path="/compose"   element={<Compose />} />
           <Route path="/login"     element={<Login />} />
           <Route path="/signup"    element={<SignUp />} />
           <Route path="/onboarding" element={<Onboarding />} />
