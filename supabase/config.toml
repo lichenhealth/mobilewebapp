@@ -4,3 +4,9 @@
 #
 # project_id is the project ref (from the dashboard URL / Project Settings).
 project_id = "mjqnaevertyzgjlpwynr"
+
+# Stripe webhook is called by Stripe (not a logged-in user), so it can't carry a
+# Supabase JWT — it authenticates via the Stripe signature instead. Deploy it
+# without JWT verification.
+[functions.stripe-webhook]
+verify_jwt = false

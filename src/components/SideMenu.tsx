@@ -32,6 +32,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
+  { to: '/membership', label: 'Membership', icon: 'dollar' },
 ];
 
 const SECTIONS: NavSection[] = [
