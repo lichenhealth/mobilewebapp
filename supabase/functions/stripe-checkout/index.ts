@@ -54,29 +54,37 @@ Deno.serve(async (req) => {
   const tier = body.tier === 'concierge' ? 'concierge' : 'community';
   const productId = TIER_PRODUCT[tier];
 
-  // Resolve the active recurring price for the product (so we never hardcode price IDs).
-  const prices = await stripe.prices.list({ product: productId, active: true, type: 'recurring', limit: 1 });
-  const price = prices.data[0];
-  if (!price) return json({ error: `No active price found for the ${tier} plan.` }, 500);
+  try {
+    // Resolve the active recurring price for the product (so we never hardcode price IDs).
+    const prices = await stripe.prices.list({ product: productId, active: true, type: 'recurring', limit: 1 });
+    const price = prices.data[0];
+    if (!price) {
+      console.error('stripe-checkout: no active price', { tier, productId });
+      return json({ error: `No active price found for ${tier} (product ${productId}). Likely a test/live mismatch.` }, 500);
+    }
 
-  // Reuse an existing Stripe customer if this member already has one.
-  const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-  const { data: existing } = await admin
-    .from('subscriptions').select('stripe_customer_id').eq('profile_id', user.id).maybeSingle();
-  const customerId = (existing as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? null;
+    // Reuse an existing Stripe customer if this member already has one.
+    const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const { data: existing } = await admin
+      .from('subscriptions').select('stripe_customer_id').eq('profile_id', user.id).maybeSingle();
+    const customerId = (existing as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? null;
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    line_items: [{ price: price.id, quantity: 1 }],
-    customer: customerId ?? undefined,
-    customer_email: customerId ? undefined : (user.email ?? undefined),
-    client_reference_id: user.id,
-    metadata: { profile_id: user.id, tier },
-    subscription_data: { metadata: { profile_id: user.id, tier } },
-    allow_promotion_codes: true,
-    success_url: `${APP_URL}/membership?status=success`,
-    cancel_url: `${APP_URL}/membership?status=cancel`,
-  });
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: price.id, quantity: 1 }],
+      customer: customerId ?? undefined,
+      customer_email: customerId ? undefined : (user.email ?? undefined),
+      client_reference_id: user.id,
+      metadata: { profile_id: user.id, tier },
+      subscription_data: { metadata: { profile_id: user.id, tier } },
+      allow_promotion_codes: true,
+      success_url: `${APP_URL}/membership?status=success`,
+      cancel_url: `${APP_URL}/membership?status=cancel`,
+    });
 
-  return json({ url: session.url });
+    return json({ url: session.url });
+  } catch (err) {
+    console.error('stripe-checkout error:', err);
+    return json({ error: 'Checkout failed', detail: String((err as Error)?.message ?? err) }, 500);
+  }
 });

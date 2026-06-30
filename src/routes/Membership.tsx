@@ -49,7 +49,20 @@ export default function Membership() {
     setBusy(tier); setError('');
     const { data, error: e } = await supabase.functions.invoke('stripe-checkout', { body: { tier } });
     const url = (data as { url?: string } | null)?.url;
-    if (e || !url) { setBusy(''); setError('Couldn’t start checkout. Please try again in a moment.'); return; }
+    if (e || !url) {
+      // Surface the function's actual reason (temporary, to debug the Stripe setup).
+      let detail = '';
+      try {
+        const ctx = (e as { context?: Response } | null)?.context;
+        if (ctx && typeof ctx.json === 'function') {
+          const b = await ctx.json();
+          detail = b?.detail || b?.error || '';
+        }
+      } catch { /* ignore */ }
+      setBusy('');
+      setError(detail ? `Checkout error: ${detail}` : 'Couldn’t start checkout. Please try again in a moment.');
+      return;
+    }
     window.location.href = url;
   }
 
