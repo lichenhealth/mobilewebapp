@@ -1,23 +1,8 @@
--- =============================================================================
--- Lichen — backend schema baseline (public schema)
---
--- This is a version-controlled snapshot of the live Supabase database
--- (project mjqnaevertyzgjlpwynr) as of 2026-06-29, captured with:
---   pg_dump --schema-only --schema=public
--- It is a RECORD / BACKUP of schema built directly in the Supabase dashboard,
--- not a migration meant to be replayed onto a fresh project as-is (Supabase
--- provides the auth/storage schemas; this file only covers `public`).
---
--- One object lives outside `public` and was appended manually at the bottom of
--- this file: the trigger on auth.users that runs public.handle_new_user() on
--- signup. See the "MANUAL ADDITION" section at the end.
--- =============================================================================
-
 --
 -- PostgreSQL database dump
 --
 
-\restrict jopIbX0sEbjeif6PCcuLgHfV4EvwnhdfUmaXIzzajXZVrBM4AxOqRaikl6S5dMm
+\restrict xsIOUEMnFLXII45YZ6Vs6lTKFBPp68QrV3bCDWg6s1LNvBycx95OkKQginCYwhQ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -88,6 +73,29 @@ CREATE TYPE public.space_member_role AS ENUM (
 
 
 ALTER TYPE public.space_member_role OWNER TO postgres;
+
+--
+-- Name: admin_list_supporters(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.admin_list_supporters() RETURNS TABLE(profile_id uuid, tier text, source text, status text, full_name text, email text)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin) then
+    raise exception 'not authorized';
+  end if;
+  return query
+    select s.profile_id, s.tier, s.source, s.status, p.full_name, p.email
+    from public.subscriptions s
+    left join public.profiles p on p.id = s.profile_id
+    order by s.granted_at desc nulls last;
+end;
+$$;
+
+
+ALTER FUNCTION public.admin_list_supporters() OWNER TO postgres;
 
 --
 -- Name: approve_category_suggestion(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -217,6 +225,68 @@ end; $$;
 
 
 ALTER FUNCTION public.ensure_care_chat(p_patient uuid) OWNER TO postgres;
+
+--
+-- Name: ensure_direct_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_direct_chat(p_other uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_me   uuid := auth.uid();
+  v_key  text;
+  v_chat uuid;
+begin
+  if v_me is null then raise exception 'Not signed in'; end if;
+  if p_other is null or p_other = v_me then raise exception 'Invalid recipient'; end if;
+  if not exists (select 1 from public.profiles where id = p_other) then
+    raise exception 'No such member';
+  end if;
+
+  v_key := case when v_me < p_other
+                then v_me::text || ':' || p_other::text
+                else p_other::text || ':' || v_me::text end;
+
+  select id into v_chat from public.chats where direct_key = v_key;
+  if v_chat is null then
+    insert into public.chats (kind, direct_key, title)
+    values ('direct', v_key, null)
+    on conflict (direct_key) where direct_key is not null do nothing
+    returning id into v_chat;
+
+    if v_chat is null then
+      select id into v_chat from public.chats where direct_key = v_key;
+    end if;
+
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me)    on conflict do nothing;
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, p_other) on conflict do nothing;
+  end if;
+
+  return v_chat;
+end;
+$$;
+
+
+ALTER FUNCTION public.ensure_direct_chat(p_other uuid) OWNER TO postgres;
+
+--
+-- Name: find_member_by_email(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.find_member_by_email(p_email text) RETURNS TABLE(id uuid, full_name text)
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select p.id, p.full_name
+  from public.profiles p
+  where lower(p.email) = lower(trim(p_email))
+  limit 1;
+$$;
+
+
+ALTER FUNCTION public.find_member_by_email(p_email text) OWNER TO postgres;
 
 --
 -- Name: gift_subscription(text, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -552,6 +622,23 @@ CREATE TABLE public.chat_members (
 ALTER TABLE public.chat_members OWNER TO postgres;
 
 --
+-- Name: chat_message_reactions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.chat_message_reactions (
+    message_id uuid NOT NULL,
+    chat_id uuid NOT NULL,
+    profile_id uuid NOT NULL,
+    emoji text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.chat_message_reactions REPLICA IDENTITY FULL;
+
+
+ALTER TABLE public.chat_message_reactions OWNER TO postgres;
+
+--
 -- Name: chat_messages; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -559,8 +646,11 @@ CREATE TABLE public.chat_messages (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     chat_id uuid NOT NULL,
     sender_id uuid NOT NULL,
-    body text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    body text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    attachments jsonb,
+    reply_to uuid,
+    CONSTRAINT chat_messages_content_chk CHECK ((((body IS NOT NULL) AND (length(btrim(body)) > 0)) OR ((attachments IS NOT NULL) AND (jsonb_array_length(attachments) > 0))))
 );
 
 
@@ -577,11 +667,53 @@ CREATE TABLE public.chats (
     patient_id uuid,
     title text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text])))
+    direct_key text,
+    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text])))
 );
 
 
 ALTER TABLE public.chats OWNER TO postgres;
+
+--
+-- Name: mycelium; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mycelium (
+    truster_id uuid NOT NULL,
+    target_type text NOT NULL,
+    target_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT mycelium_target_type_check CHECK ((target_type = ANY (ARRAY['profile'::text, 'space'::text, 'post'::text])))
+);
+
+
+ALTER TABLE public.mycelium OWNER TO postgres;
+
+--
+-- Name: posts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.posts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_id uuid NOT NULL,
+    space_id uuid,
+    visibility text DEFAULT 'public'::text NOT NULL,
+    content_type text NOT NULL,
+    service_area text,
+    title text,
+    body text NOT NULL,
+    image_url text,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT posts_content_type_check CHECK ((content_type = ANY (ARRAY['social'::text, 'creative'::text, 'educational'::text, 'actionable'::text, 'qa'::text]))),
+    CONSTRAINT posts_service_area_check CHECK ((service_area = ANY (ARRAY['marketplace'::text, 'work'::text, 'courses'::text, 'food'::text, 'art'::text, 'events'::text, 'places'::text, 'library'::text, 'people'::text]))),
+    CONSTRAINT posts_space_required CHECK (((visibility <> 'space'::text) OR (space_id IS NOT NULL))),
+    CONSTRAINT posts_visibility_check CHECK ((visibility = ANY (ARRAY['public'::text, 'mycelium'::text, 'space'::text])))
+);
+
+
+ALTER TABLE public.posts OWNER TO postgres;
 
 --
 -- Name: profile_capabilities; Type: TABLE; Schema: public; Owner: postgres
@@ -630,6 +762,19 @@ CREATE TABLE public.profiles (
 
 
 ALTER TABLE public.profiles OWNER TO postgres;
+
+--
+-- Name: recommendations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.recommendations (
+    recommender_id uuid NOT NULL,
+    post_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.recommendations OWNER TO postgres;
 
 --
 -- Name: space_members; Type: TABLE; Schema: public; Owner: postgres
@@ -737,6 +882,14 @@ ALTER TABLE ONLY public.chat_members
 
 
 --
+-- Name: chat_message_reactions chat_message_reactions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT chat_message_reactions_pkey PRIMARY KEY (message_id, profile_id, emoji);
+
+
+--
 -- Name: chat_messages chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -750,6 +903,22 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mycelium mycelium_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mycelium
+    ADD CONSTRAINT mycelium_pkey PRIMARY KEY (truster_id, target_type, target_id);
+
+
+--
+-- Name: posts posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
 
 
 --
@@ -785,6 +954,14 @@ ALTER TABLE ONLY public.profiles
 
 
 --
+-- Name: recommendations recommendations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.recommendations
+    ADD CONSTRAINT recommendations_pkey PRIMARY KEY (recommender_id, post_id);
+
+
+--
 -- Name: space_members space_members_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -817,6 +994,13 @@ ALTER TABLE ONLY public.subscriptions
 
 
 --
+-- Name: chats_direct_uidx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX chats_direct_uidx ON public.chats USING btree (direct_key) WHERE (direct_key IS NOT NULL);
+
+
+--
 -- Name: chats_patient_uidx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -828,6 +1012,41 @@ CREATE UNIQUE INDEX chats_patient_uidx ON public.chats USING btree (patient_id) 
 --
 
 CREATE UNIQUE INDEX chats_space_uidx ON public.chats USING btree (space_id) WHERE (space_id IS NOT NULL);
+
+
+--
+-- Name: mycelium_target_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX mycelium_target_idx ON public.mycelium USING btree (target_type, target_id);
+
+
+--
+-- Name: posts_author_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_author_idx ON public.posts USING btree (author_id);
+
+
+--
+-- Name: posts_service_area_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_service_area_idx ON public.posts USING btree (service_area);
+
+
+--
+-- Name: posts_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_space_idx ON public.posts USING btree (space_id);
+
+
+--
+-- Name: recommendations_post_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX recommendations_post_idx ON public.recommendations USING btree (post_id);
 
 
 --
@@ -953,11 +1172,43 @@ ALTER TABLE ONLY public.chat_members
 
 
 --
+-- Name: chat_message_reactions chat_message_reactions_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT chat_message_reactions_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_message_reactions chat_message_reactions_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT chat_message_reactions_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.chat_messages(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_message_reactions chat_message_reactions_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_message_reactions
+    ADD CONSTRAINT chat_message_reactions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: chat_messages chat_messages_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.chat_messages
     ADD CONSTRAINT chat_messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chat_messages chat_messages_reply_to_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_messages
+    ADD CONSTRAINT chat_messages_reply_to_fkey FOREIGN KEY (reply_to) REFERENCES public.chat_messages(id) ON DELETE SET NULL;
 
 
 --
@@ -982,6 +1233,30 @@ ALTER TABLE ONLY public.chats
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: mycelium mycelium_truster_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mycelium
+    ADD CONSTRAINT mycelium_truster_id_fkey FOREIGN KEY (truster_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: posts posts_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: posts posts_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
 
 
 --
@@ -1014,6 +1289,22 @@ ALTER TABLE ONLY public.profile_categories
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: recommendations recommendations_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.recommendations
+    ADD CONSTRAINT recommendations_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: recommendations recommendations_recommender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.recommendations
+    ADD CONSTRAINT recommendations_recommender_id_fkey FOREIGN KEY (recommender_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -1259,6 +1550,12 @@ CREATE POLICY "chat_members read" ON public.chat_members FOR SELECT TO authentic
 
 
 --
+-- Name: chat_message_reactions; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.chat_message_reactions ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: chat_messages; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -1306,6 +1603,73 @@ CREATE POLICY "messages send" ON public.chat_messages FOR INSERT TO authenticate
 
 
 --
+-- Name: mycelium; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.mycelium ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: mycelium mycelium: add own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "mycelium: add own" ON public.mycelium FOR INSERT TO authenticated WITH CHECK ((truster_id = auth.uid()));
+
+
+--
+-- Name: mycelium mycelium: drop own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "mycelium: drop own" ON public.mycelium FOR DELETE TO authenticated USING ((truster_id = auth.uid()));
+
+
+--
+-- Name: mycelium mycelium: read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "mycelium: read" ON public.mycelium FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: posts; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: posts posts: delete own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "posts: delete own" ON public.posts FOR DELETE TO authenticated USING ((author_id = auth.uid()));
+
+
+--
+-- Name: posts posts: insert own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "posts: insert own" ON public.posts FOR INSERT TO authenticated WITH CHECK (((author_id = auth.uid()) AND ((visibility <> 'space'::text) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = posts.space_id) AND (m.profile_id = auth.uid())))))));
+
+
+--
+-- Name: posts posts: read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "posts: read" ON public.posts FOR SELECT TO authenticated USING (((visibility = 'public'::text) OR (author_id = auth.uid()) OR ((visibility = 'space'::text) AND (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = posts.space_id) AND (m.profile_id = auth.uid()))))) OR ((visibility = 'mycelium'::text) AND (EXISTS ( SELECT 1
+   FROM public.mycelium my
+  WHERE ((my.truster_id = auth.uid()) AND (my.target_type = 'profile'::text) AND (my.target_id = posts.author_id)))))));
+
+
+--
+-- Name: posts posts: update own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "posts: update own" ON public.posts FOR UPDATE TO authenticated USING ((author_id = auth.uid())) WITH CHECK ((author_id = auth.uid()));
+
+
+--
 -- Name: profile_capabilities; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -1322,6 +1686,54 @@ ALTER TABLE public.profile_categories ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: chat_message_reactions reactions add; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reactions add" ON public.chat_message_reactions FOR INSERT TO authenticated WITH CHECK (((profile_id = auth.uid()) AND public.is_chat_member(chat_id, auth.uid())));
+
+
+--
+-- Name: chat_message_reactions reactions read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reactions read" ON public.chat_message_reactions FOR SELECT TO authenticated USING (public.is_chat_member(chat_id, auth.uid()));
+
+
+--
+-- Name: chat_message_reactions reactions remove; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reactions remove" ON public.chat_message_reactions FOR DELETE TO authenticated USING (((profile_id = auth.uid()) AND public.is_chat_member(chat_id, auth.uid())));
+
+
+--
+-- Name: recommendations; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.recommendations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recommendations recs: add own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "recs: add own" ON public.recommendations FOR INSERT TO authenticated WITH CHECK ((recommender_id = auth.uid()));
+
+
+--
+-- Name: recommendations recs: drop own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "recs: drop own" ON public.recommendations FOR DELETE TO authenticated USING ((recommender_id = auth.uid()));
+
+
+--
+-- Name: recommendations recs: read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "recs: read" ON public.recommendations FOR SELECT TO authenticated USING (true);
+
 
 --
 -- Name: space_members; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -1368,6 +1780,15 @@ GRANT USAGE ON SCHEMA public TO service_role;
 
 
 --
+-- Name: FUNCTION admin_list_supporters(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.admin_list_supporters() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.admin_list_supporters() TO authenticated;
+GRANT ALL ON FUNCTION public.admin_list_supporters() TO service_role;
+
+
+--
 -- Name: FUNCTION approve_category_suggestion(p_suggestion_id uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -1401,6 +1822,24 @@ GRANT ALL ON FUNCTION public.create_space_chat() TO service_role;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO anon;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION ensure_direct_chat(p_other uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION find_member_by_email(p_email text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.find_member_by_email(p_email text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.find_member_by_email(p_email text) TO authenticated;
+GRANT ALL ON FUNCTION public.find_member_by_email(p_email text) TO service_role;
 
 
 --
@@ -1548,6 +1987,15 @@ GRANT ALL ON TABLE public.chat_members TO service_role;
 
 
 --
+-- Name: TABLE chat_message_reactions; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.chat_message_reactions TO anon;
+GRANT ALL ON TABLE public.chat_message_reactions TO authenticated;
+GRANT ALL ON TABLE public.chat_message_reactions TO service_role;
+
+
+--
 -- Name: TABLE chat_messages; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -1563,6 +2011,24 @@ GRANT ALL ON TABLE public.chat_messages TO service_role;
 GRANT ALL ON TABLE public.chats TO anon;
 GRANT ALL ON TABLE public.chats TO authenticated;
 GRANT ALL ON TABLE public.chats TO service_role;
+
+
+--
+-- Name: TABLE mycelium; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.mycelium TO anon;
+GRANT ALL ON TABLE public.mycelium TO authenticated;
+GRANT ALL ON TABLE public.mycelium TO service_role;
+
+
+--
+-- Name: TABLE posts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.posts TO anon;
+GRANT ALL ON TABLE public.posts TO authenticated;
+GRANT ALL ON TABLE public.posts TO service_role;
 
 
 --
@@ -1587,9 +2053,95 @@ GRANT ALL ON TABLE public.profile_categories TO service_role;
 -- Name: TABLE profiles; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.profiles TO anon;
-GRANT ALL ON TABLE public.profiles TO authenticated;
+GRANT INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE public.profiles TO anon;
+GRANT INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE public.profiles TO authenticated;
 GRANT ALL ON TABLE public.profiles TO service_role;
+
+
+--
+-- Name: COLUMN profiles.id; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(id) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.full_name; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(full_name) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.handle; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(handle) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.headline; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(headline) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.bio; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(bio) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.avatar_url; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(avatar_url) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.location; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(location) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.created_at; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(created_at) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.updated_at; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(updated_at) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.onboarded; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(onboarded) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.is_admin; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(is_admin) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: TABLE recommendations; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.recommendations TO anon;
+GRANT ALL ON TABLE public.recommendations TO authenticated;
+GRANT ALL ON TABLE public.recommendations TO service_role;
 
 
 --
@@ -1683,7 +2235,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jopIbX0sEbjeif6PCcuLgHfV4EvwnhdfUmaXIzzajXZVrBM4AxOqRaikl6S5dMm
+\unrestrict xsIOUEMnFLXII45YZ6Vs6lTKFBPp68QrV3bCDWg6s1LNvBycx95OkKQginCYwhQ
+
 
 --
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
@@ -1699,4 +2252,3 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
