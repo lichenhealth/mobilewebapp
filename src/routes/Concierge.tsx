@@ -5,8 +5,9 @@ import HexagonRadar from '../components/HexagonRadar';
 import ChatConversation from '../components/ChatConversation';
 import { supabase } from '../lib/supabase';
 import { loadConciergeAccess } from '../lib/chatApi';
+import { loadLatestSnapshot, loadCurrentCarePlan } from '../lib/conciergeApi';
 import { useAuth } from '../auth/AuthProvider';
-import { TODAY_SNAPSHOT, WEEK_CARE_PLAN, ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
+import { ON_CALL_NOW, BACKUP_PRACTITIONERS, type HealthSnapshot, type CarePlan } from '../data/concierge';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
@@ -266,6 +267,20 @@ function UrgentCare() {
   );
 }
 
+/** Empty-state card for WOW/KOC — doubles as the caregiver's "author the first one" entry. */
+function ConciergeEmpty({ icon, title, sub, action }: {
+  icon: IconName; title: string; sub: string; action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="conc__care-gate">
+      <Icon name={icon} size={22} />
+      <h3 className="conc__care-gate-title">{title}</h3>
+      <p className="conc__care-gate-sub">{sub}</p>
+      {action && <button className="btn btn-primary" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  );
+}
+
 export default function Concierge() {
   const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
   const navigate = useNavigate();
@@ -292,6 +307,11 @@ export default function Concierge() {
   const [clientAuthorized, setClientAuthorized] = useState(true); // am I a caregiver of this patient?
   const careAnchor = useRef<HTMLDivElement>(null);
   const [careTop, setCareTop] = useState(0);
+
+  // Real WOW / KOC data for whoever we're viewing (RLS scopes to care-team reads).
+  const [snap, setSnap] = useState<HealthSnapshot | null>(null);
+  const [plan, setPlan] = useState<CarePlan | null>(null);
+  const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => {
     if (!me) return;
@@ -334,6 +354,21 @@ export default function Concierge() {
     return () => window.removeEventListener('resize', measure);
   }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName]);
 
+  // Load the subject's latest snapshot + current care plan.
+  useEffect(() => {
+    if (!me) return;
+    let active = true;
+    setDataReady(false);
+    (async () => {
+      const [s, p] = await Promise.all([loadLatestSnapshot(subjectId), loadCurrentCarePlan(subjectId)]);
+      if (!active) return;
+      setSnap(s?.vm ?? null);
+      setPlan(p?.vm ?? null);
+      setDataReady(true);
+    })();
+    return () => { active = false; };
+  }, [me, subjectId]);
+
   // Default scope follows the active tab: Day for WOW, Week for KOC
   useEffect(() => {
     if (activeTab === 'koc') setScope('Week');
@@ -346,7 +381,8 @@ export default function Concierge() {
     navigate(target === 'wow' ? basePath : `${basePath}/${target}`);
   };
 
-  const snap = TODAY_SNAPSHOT;
+  // Caregivers author their client's snapshots/plans; the patient's self view is read-only.
+  const canAuthor = isClientView && clientAuthorized;
 
   // In client view, gate the WHOLE page behind access + caregiver relationship.
   if (isClientView && careReady && (careAllowed === false || !clientAuthorized)) {
@@ -496,77 +532,115 @@ export default function Concierge() {
 
       {/* Active tab content */}
       {activeTab === 'wow' && (
-        <article className="snap">
-          <header className="snap__head">
-            <div className="snap__avatar" style={{ background: snap.patient.color }}>
-              {snap.patient.monogram}
-            </div>
-            <span className="snap__name">{snap.patient.name}</span>
-            <span className="snap__date">{snap.date}</span>
-          </header>
+        <>
+          {!dataReady && <p className="conc__care-hint">Loading snapshot…</p>}
+          {dataReady && snap && (
+            <article className="snap">
+              <header className="snap__head">
+                <div className="snap__avatar" style={{ background: snap.patient.color }}>
+                  {snap.patient.monogram}
+                </div>
+                <span className="snap__name">{snap.patient.name}</span>
+                <span className="snap__date">{snap.date}</span>
+                {canAuthor && (
+                  <button className="snap__edit" onClick={() => navigate(`${basePath}/wow/edit`)}>
+                    <Icon name="settings" size={13} /> Edit
+                  </button>
+                )}
+              </header>
 
-          <section className="snap__summary">
-            <div className="snap__summary-text">
-              <h3 className="snap__h3">Summary</h3>
-              <p className="snap__body-text">{snap.summary}</p>
-            </div>
-            <HexagonRadar axes={snap.axes} size={200} />
-          </section>
+              <section className="snap__summary">
+                <div className="snap__summary-text">
+                  <h3 className="snap__h3">Summary</h3>
+                  <p className="snap__body-text">{snap.summary}</p>
+                </div>
+                <HexagonRadar axes={snap.axes} size={200} />
+              </section>
 
-          {snap.sections.map((s) => (
-            <section className="snap__section" key={s.title}>
-              <h3 className="snap__h3 snap__h3--center">{s.title}</h3>
-              <ol className="snap__list">
-                {s.items.map((it, i) => (
-                  <li key={i} className="snap__list-item">
-                    {it}
-                  </li>
-                ))}
-              </ol>
-              <BodyWithAI text={s.body} aiOn={aiOn} />
-            </section>
-          ))}
+              {snap.sections.map((s) => (
+                <section className="snap__section" key={s.title}>
+                  <h3 className="snap__h3 snap__h3--center">{s.title}</h3>
+                  <ol className="snap__list">
+                    {s.items.map((it, i) => (
+                      <li key={i} className="snap__list-item">{it}</li>
+                    ))}
+                  </ol>
+                  <BodyWithAI text={s.body} aiOn={aiOn} />
+                </section>
+              ))}
 
-          <footer className="conc__end">
-            <span className="eyebrow">End of snapshot</span>
-            <Icon name="sparkle" size={14} />
-          </footer>
-        </article>
+              <footer className="conc__end">
+                <span className="eyebrow">End of snapshot</span>
+                <Icon name="sparkle" size={14} />
+              </footer>
+            </article>
+          )}
+          {dataReady && !snap && (
+            <ConciergeEmpty
+              icon="health"
+              title="No snapshot yet"
+              sub={canAuthor
+                ? "Capture where this member is across the six wellness dimensions."
+                : "Your care team hasn't shared a wellness snapshot yet."}
+              action={canAuthor ? { label: 'Create snapshot', onClick: () => navigate(`${basePath}/wow/edit`) } : undefined}
+            />
+          )}
+        </>
       )}
 
       {activeTab === 'koc' && (
-        <article className="snap koc">
-          <header className="snap__head">
-            <div className="snap__avatar" style={{ background: WEEK_CARE_PLAN.patient.color }}>
-              {WEEK_CARE_PLAN.patient.monogram}
-            </div>
-            <span className="snap__name">{WEEK_CARE_PLAN.patient.name}</span>
-            <span className="snap__date">{WEEK_CARE_PLAN.dateRange}</span>
-          </header>
-
-          {WEEK_CARE_PLAN.days.map((day) => (
-            <section className="koc__day" key={day.label}>
-              <h3 className="koc__day-label">{day.label}</h3>
-              {day.providers.map((p) => (
-                <div className="koc__provider-block" key={p.handle}>
-                  <p className="koc__handle">{p.handle}:</p>
-                  <ul className="koc__items">
-                    {p.items.map((item, i) => (
-                      <li key={i} className="koc__item">
-                        <CareItemText text={item.text} />
-                      </li>
-                    ))}
-                  </ul>
+        <>
+          {!dataReady && <p className="conc__care-hint">Loading care plan…</p>}
+          {dataReady && plan && (
+            <article className="snap koc">
+              <header className="snap__head">
+                <div className="snap__avatar" style={{ background: plan.patient.color }}>
+                  {plan.patient.monogram}
                 </div>
-              ))}
-            </section>
-          ))}
+                <span className="snap__name">{plan.patient.name}</span>
+                <span className="snap__date">{plan.dateRange}</span>
+                {canAuthor && (
+                  <button className="snap__edit" onClick={() => navigate(`${basePath}/koc/edit`)}>
+                    <Icon name="settings" size={13} /> Edit
+                  </button>
+                )}
+              </header>
 
-          <footer className="conc__end">
-            <span className="eyebrow">End of week</span>
-            <Icon name="sparkle" size={14} />
-          </footer>
-        </article>
+              {plan.days.map((day) => (
+                <section className="koc__day" key={day.label}>
+                  <h3 className="koc__day-label">{day.label}</h3>
+                  {day.providers.map((p) => (
+                    <div className="koc__provider-block" key={p.handle}>
+                      <p className="koc__handle">{p.handle}:</p>
+                      <ul className="koc__items">
+                        {p.items.map((item, i) => (
+                          <li key={i} className="koc__item">
+                            <CareItemText text={item.text} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </section>
+              ))}
+
+              <footer className="conc__end">
+                <span className="eyebrow">End of week</span>
+                <Icon name="sparkle" size={14} />
+              </footer>
+            </article>
+          )}
+          {dataReady && !plan && (
+            <ConciergeEmpty
+              icon="calendar"
+              title="No care plan yet"
+              sub={canAuthor
+                ? "Lay out this week's care across the team, day by day."
+                : "Your care team hasn't shared this week's plan yet."}
+              action={canAuthor ? { label: "Build this week's plan", onClick: () => navigate(`${basePath}/koc/edit`) } : undefined}
+            />
+          )}
+        </>
       )}
 
       {activeTab === 'chat' && (
