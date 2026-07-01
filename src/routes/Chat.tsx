@@ -110,6 +110,7 @@ export default function Chat() {
               navigate(`/chat/${chatId}`);
             } catch (e) {
               console.error(e);
+              alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e)));
             }
           }}
         />

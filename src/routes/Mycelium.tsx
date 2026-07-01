@@ -55,7 +55,7 @@ export default function Mycelium() {
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
-    catch (e) { console.error(e); }
+    catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
   const [content, setContent] = useState('All');

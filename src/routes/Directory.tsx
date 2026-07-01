@@ -46,8 +46,13 @@ export default function Directory() {
 
   async function message(id: string) {
     setOpening(id);
-    try { navigate(`/chat/${await ensureDirectChat(id)}`); }
-    catch (e) { console.error(e); setOpening(null); }
+    try {
+      navigate(`/chat/${await ensureDirectChat(id)}`);
+    } catch (e) {
+      console.error(e);
+      setOpening(null);
+      alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   return (

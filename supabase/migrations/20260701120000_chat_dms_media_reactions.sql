@@ -57,7 +57,7 @@ begin
   if v_chat is null then
     insert into public.chats (kind, direct_key, title)
     values ('direct', v_key, null)
-    on conflict (direct_key) do nothing
+    on conflict (direct_key) where direct_key is not null do nothing
     returning id into v_chat;
 
     if v_chat is null then                      -- lost the race; fetch the winner
