@@ -1,14 +1,26 @@
 import { supabase } from './supabase';
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct';
+
+export type MediaType = 'photo' | 'video' | 'audio';
+/** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
+export interface Attachment { type: MediaType; url: string; }
 
 export interface MemberInfo { profile_id: string; name: string; }
 export interface MessageRow {
   id: string;
   chat_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
   created_at: string;
+  attachments?: Attachment[] | null;
+  reply_to?: string | null;
+}
+export interface ReactionRow {
+  message_id: string;
+  chat_id: string;
+  profile_id: string;
+  emoji: string;
 }
 export interface ChatVM {
   id: string;
@@ -18,12 +30,16 @@ export interface ChatVM {
   last?: MessageRow;
 }
 
+/** Columns to fetch for a message everywhere (list + thread + realtime re-fetch). */
+export const MESSAGE_COLS = 'id, chat_id, sender_id, body, created_at, attachments, reply_to';
+
 export const KIND_LABEL: Record<ChatKind, string> = {
   organization: 'Organization',
   community: 'Community',
   group: 'Group',
   place: 'Place',
   care_team: 'Care team',
+  direct: 'Direct',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
@@ -60,14 +76,49 @@ export function formatTime(iso: string): string {
 
 interface MemberRowRaw { chat_id: string; profile_id: string; profiles: { full_name: string | null } | null }
 
-/** Load all chats the current member belongs to (RLS scopes this), with
- *  their members and most-recent message, assembled into view models. */
-export async function loadChatList(): Promise<ChatVM[]> {
+/** Title for a chat: for a direct chat, the OTHER member's name (title is null in
+ *  the DB); otherwise the stored title, falling back to the kind label. */
+export function chatTitle(
+  kind: ChatKind,
+  storedTitle: string | null,
+  members: MemberInfo[],
+  me: string,
+): string {
+  if (kind === 'direct') {
+    const other = members.find((m) => m.profile_id !== me) ?? members[0];
+    return other?.name ?? 'Direct message';
+  }
+  return storedTitle ?? KIND_LABEL[kind];
+}
+
+/** The other participant in a direct chat (used for avatar monogram/color). */
+export function otherMember(members: MemberInfo[], me: string): MemberInfo | undefined {
+  return members.find((m) => m.profile_id !== me) ?? members[0];
+}
+
+/** One-line preview of a message for the chat list — falls back to an attachment
+ *  label when the message is media-only. */
+export function messagePreview(msg: MessageRow): string {
+  if (msg.body && msg.body.trim()) return msg.body;
+  const a = msg.attachments;
+  if (a && a.length) {
+    const t = a[0].type;
+    const label = t === 'photo' ? 'Photo' : t === 'video' ? 'Video' : 'Audio';
+    return `📎 ${label}${a.length > 1 ? ` +${a.length - 1}` : ''}`;
+  }
+  return '';
+}
+
+/** Load the chats the current member belongs to for the Signal-style Messages
+ *  list (RLS scopes this): communities, groups, places, organizations, and 1:1
+ *  direct chats. Care-team chats are intentionally EXCLUDED — they live in the
+ *  Concierge screen, not the general inbox. */
+export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
-    supabase.from('chats').select('id, kind, title, created_at'),
+    supabase.from('chats').select('id, kind, title, created_at').neq('kind', 'care_team'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name)'),
     supabase.from('chat_messages')
-      .select('id, chat_id, sender_id, body, created_at')
+      .select(MESSAGE_COLS)
       .order('created_at', { ascending: false })
       .limit(1000),
   ]);
@@ -84,13 +135,16 @@ export async function loadChatList(): Promise<ChatVM[]> {
     if (!lastByChat.has(m.chat_id)) lastByChat.set(m.chat_id, m); // desc → first is latest
   }
 
-  const vms: ChatVM[] = ((cRes.data as { id: string; kind: ChatKind; title: string | null }[] | null) ?? []).map((c) => ({
-    id: c.id,
-    kind: c.kind,
-    title: c.title ?? KIND_LABEL[c.kind],
-    members: membersByChat.get(c.id) ?? [],
-    last: lastByChat.get(c.id),
-  }));
+  const vms: ChatVM[] = ((cRes.data as { id: string; kind: ChatKind; title: string | null }[] | null) ?? []).map((c) => {
+    const members = membersByChat.get(c.id) ?? [];
+    return {
+      id: c.id,
+      kind: c.kind,
+      title: chatTitle(c.kind, c.title, members, me),
+      members,
+      last: lastByChat.get(c.id),
+    };
+  });
 
   vms.sort((a, b) => {
     const la = a.last ? new Date(a.last.created_at).getTime() : 0;
@@ -98,4 +152,137 @@ export async function loadChatList(): Promise<ChatVM[]> {
     return lb - la;
   });
   return vms;
+}
+
+/** Find-or-create the 1:1 direct chat with another member; returns its id. */
+export async function ensureDirectChat(otherId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_direct_chat', { p_other: otherId });
+  if (error) throw error;
+  return data as string;
+}
+
+// ─── Concierge access ────────────────────────────────────────────────────────
+
+/** Whether the member may use Concierge features (care-team chat, caregiver
+ *  dashboard): an active Concierge subscription, or an admin. */
+export async function loadConciergeAccess(me: string): Promise<boolean> {
+  const [subRes, profRes] = await Promise.all([
+    supabase.from('subscriptions').select('tier, status').eq('profile_id', me).maybeSingle(),
+    supabase.from('profiles').select('is_admin').eq('id', me).maybeSingle(),
+  ]);
+  const sub = subRes.data as { tier: string; status: string } | null;
+  const isAdmin = (profRes.data as { is_admin: boolean } | null)?.is_admin ?? false;
+  return isAdmin || (sub?.tier === 'concierge' && sub?.status === 'active');
+}
+
+// ─── Caregiver dashboard ─────────────────────────────────────────────────────
+
+export interface CareClient {
+  patient_id: string;
+  name: string;
+  chatId: string | null;
+  last?: MessageRow;
+}
+
+/** The patients the current member actively cares for, each with their care-team
+ *  chat + most-recent message, ordered by last engagement (most recent first).
+ *  Powers the caregiver dashboard. */
+export async function loadCareClients(me: string): Promise<CareClient[]> {
+  const { data: links } = await supabase
+    .from('care_team_members')
+    .select('patient_id, patient:profiles!care_team_members_patient_id_fkey(full_name)')
+    .eq('caregiver_id', me)
+    .eq('status', 'active');
+
+  const rows = (links as { patient_id: string; patient: { full_name: string | null } | null }[] | null) ?? [];
+  if (rows.length === 0) return [];
+
+  const patientIds = rows.map((r) => r.patient_id);
+  const chatRes = await supabase
+    .from('chats').select('id, patient_id').eq('kind', 'care_team').in('patient_id', patientIds);
+
+  const chatByPatient = new Map<string, string>();
+  const chatIds: string[] = [];
+  for (const c of (chatRes.data as { id: string; patient_id: string }[] | null) ?? []) {
+    chatByPatient.set(c.patient_id, c.id);
+    chatIds.push(c.id);
+  }
+
+  const lastByChat = new Map<string, MessageRow>();
+  if (chatIds.length) {
+    const { data: msgs } = await supabase
+      .from('chat_messages')
+      .select(MESSAGE_COLS)
+      .in('chat_id', chatIds)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    for (const m of (msgs as MessageRow[] | null) ?? []) {
+      if (!lastByChat.has(m.chat_id)) lastByChat.set(m.chat_id, m); // desc → first is latest
+    }
+  }
+
+  const clients: CareClient[] = rows.map((r) => {
+    const chatId = chatByPatient.get(r.patient_id) ?? null;
+    return {
+      patient_id: r.patient_id,
+      name: r.patient?.full_name ?? 'Member',
+      chatId,
+      last: chatId ? lastByChat.get(chatId) : undefined,
+    };
+  });
+
+  clients.sort((a, b) => {
+    const la = a.last ? new Date(a.last.created_at).getTime() : 0;
+    const lb = b.last ? new Date(b.last.created_at).getTime() : 0;
+    return lb - la;
+  });
+  return clients;
+}
+
+// ─── Chat media (private bucket — paths stored, signed at render) ────────────
+
+/** Upload a chat attachment into `chat-media/<chatId>/…`; returns the storage PATH. */
+export async function uploadChatMedia(chatId: string, file: Blob, ext: string): Promise<string> {
+  const path = `${chatId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from('chat-media').upload(path, file);
+  if (error) throw error;
+  return path;
+}
+
+/** Batch-sign storage paths (1h TTL) → map of path → signed URL. */
+export async function signChatMedia(paths: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(paths)].filter(Boolean);
+  if (unique.length === 0) return {};
+  const { data, error } = await supabase.storage.from('chat-media').createSignedUrls(unique, 3600);
+  if (error || !data) return {};
+  const map: Record<string, string> = {};
+  for (const r of data) if (r.path && r.signedUrl) map[r.path] = r.signedUrl;
+  return map;
+}
+
+// ─── Reactions ──────────────────────────────────────────────────────────────
+
+export const REACTION_EMOJI = ['❤️', '👍', '🙏', '😊', '🌱'];
+
+/** Load all reactions for a chat's messages. */
+export async function loadReactions(chatId: string): Promise<ReactionRow[]> {
+  const { data } = await supabase
+    .from('chat_message_reactions')
+    .select('message_id, chat_id, profile_id, emoji')
+    .eq('chat_id', chatId);
+  return (data as ReactionRow[] | null) ?? [];
+}
+
+/** Add or remove one of the caller's reactions on a message. */
+export async function toggleReaction(
+  chatId: string, messageId: string, emoji: string, me: string, on: boolean,
+): Promise<void> {
+  if (on) {
+    await supabase.from('chat_message_reactions')
+      .insert({ message_id: messageId, chat_id: chatId, profile_id: me, emoji });
+  } else {
+    await supabase.from('chat_message_reactions')
+      .delete()
+      .eq('message_id', messageId).eq('profile_id', me).eq('emoji', emoji);
+  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
@@ -10,6 +10,7 @@ import {
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
+import { ensureDirectChat } from '../lib/chatApi';
 import {
   loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -50,6 +51,12 @@ const MOCK_META: { kind: Kind; contentLabel: string; area: ServiceArea | null }[
 export default function Mycelium() {
   const { type: urlSlug = '' } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  async function messageAuthor(authorId: string) {
+    try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
+    catch (e) { console.error(e); }
+  }
 
   const [content, setContent] = useState('All');
   const [kinds, setKinds] = useState<Kind[]>(() => {
@@ -89,6 +96,7 @@ export default function Mycelium() {
           availability: { trust: p.author_id !== user?.id },
           onTrust: (on: boolean) => { void setTrust('profile', p.author_id, on).catch(console.error); },
           onRecommend: (on: boolean) => { void setRecommend(p.id, on).catch(console.error); },
+          onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));
     const mock: Item[] = FEED.map((card, i) => ({

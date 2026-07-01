@@ -17,6 +17,23 @@
   z-index: 40;
 }
 
+/* Reusable conversation (header + scroll + composer) — fills its parent, which
+   controls the bounding box (.thread for full-screen, .conc__care in Concierge). */
+.conv {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bone);
+}
+.conv--missing {
+  padding: var(--s-9) var(--s-5);
+  align-items: center;
+  text-align: center;
+  gap: var(--s-4);
+}
+.thread__icon-spacer { width: 36px; height: 36px; }
+
 /* ─── Header ──────────────────────────────────────────────────────── */
 .thread__head {
   flex: 0 0 auto;
@@ -290,6 +307,29 @@
   white-space: pre-wrap;
 }
 
+/* Inline media in a bubble */
+.bubble__media {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.bubble__media-img,
+.bubble__media-vid {
+  max-width: 220px;
+  max-height: 280px;
+  width: auto;
+  border-radius: 10px;
+  display: block;
+}
+.bubble__media-aud { width: 220px; max-width: 100%; }
+.bubble__media-loading {
+  width: 180px;
+  height: 120px;
+  border-radius: 10px;
+  background: var(--bone-deep);
+}
+
 .bubble__time {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -498,6 +538,45 @@
 }
 .thread__reply-close:hover { color: var(--ink); }
 
+/* Attachment tray (pending uploads) */
+.thread__attach-tray {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--bone-edge);
+}
+.thread__attach {
+  position: relative;
+  width: 56px; height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bone-deep);
+  border: 1px solid var(--bone-edge);
+  flex-shrink: 0;
+}
+.thread__attach img,
+.thread__attach video { width: 100%; height: 100%; object-fit: cover; }
+.thread__attach-aud {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-muted);
+}
+.thread__attach-remove {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px;
+  border-radius: var(--r-full);
+  background: rgba(30, 26, 22, 0.6);
+  color: #fff;
+  font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.thread__attach-uploading {
+  font-size: 11px; font-weight: 300; color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
 .thread__input {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -505,6 +584,39 @@
   align-items: end;
   padding: var(--s-3) var(--s-4);
 }
+
+/* Attach button + its popover menu */
+.thread__attach-wrap { position: relative; }
+.thread__attach-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-pop);
+  padding: var(--s-2);
+  min-width: 150px;
+  animation: menu-rise 160ms var(--ease-out);
+}
+.thread__attach-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--ink);
+  text-align: left;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.thread__attach-menu button:hover { background: var(--bone); }
+.thread__attach-menu button svg { color: var(--ink-muted); }
+.thread__attach-menu button.is-recording { color: var(--peach-deep); }
+.thread__attach-menu button.is-recording svg { color: var(--peach-deep); }
 
 .thread__input-icon {
   width: 36px;

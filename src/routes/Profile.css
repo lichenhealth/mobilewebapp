@@ -61,6 +61,16 @@
 
 /* care team */
 .prof__care-lead { font-size: var(--t-sm); color: var(--ink-soft); margin-bottom: var(--s-2); }
+.prof__care-dash {
+  align-self: flex-start;
+  margin-bottom: var(--s-3);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--peach-deep);
+  background: transparent;
+  padding: 0;
+}
+.prof__care-dash:hover { text-decoration: underline; }
 .prof__care-list { display: flex; flex-direction: column; gap: var(--s-2); }
 .prof__care-row {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
