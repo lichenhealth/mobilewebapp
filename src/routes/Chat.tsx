@@ -46,7 +46,9 @@ export default function Chat() {
             </h1>
           </div>
           <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
-            <Icon name="plus" size={18} />
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
       </header>
