@@ -35,7 +35,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   transition: transform var(--d-base) var(--ease-out);
+}
+
+/* Shared unread badge (bottom nav = floats over the icon; side menu overrides to sit inline) */
+.nav-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--peach);
+  color: var(--bone-warm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bottom-nav__label {

@@ -190,6 +190,8 @@
 }
 .side-menu__primary-item:hover { color: var(--ink-soft); transform: translateX(2px); }
 .side-menu__primary-item.is-active { color: var(--peach-deep); }
+/* Inline badge (override the floating bottom-nav positioning) */
+.side-menu__badge { position: static; top: auto; right: auto; margin-left: 4px; }
 
 /* Hide on mobile/tablet — the bottom nav covers these there */
 @media (max-width: 1023px) {

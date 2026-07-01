@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
+import { useNotifications } from '../notifications/NotificationsProvider';
+import { sectionForRoute } from '../lib/sections';
 import './BottomNav.css';
 
 interface NavItem {
@@ -19,24 +21,32 @@ const ITEMS: NavItem[] = [
 ];
 
 export default function BottomNav() {
+  const { countsBySection, totalUnread } = useNotifications();
+  const countFor = (to: string) =>
+    to === '/home' ? totalUnread : (countsBySection[sectionForRoute(to) ?? ''] ?? 0);
+
   return (
     <nav className="bottom-nav" aria-label="Primary">
       <ul className="bottom-nav__list">
-        {ITEMS.map((item) => (
-          <li key={item.to}>
-            <NavLink
-              to={item.to}
-              className={({ isActive }) =>
-                'bottom-nav__item' + (isActive ? ' is-active' : '')
-              }
-            >
-              <span className="bottom-nav__icon">
-                <Icon name={item.icon} size={20} />
-              </span>
-              <span className="bottom-nav__label">{item.label}</span>
-            </NavLink>
-          </li>
-        ))}
+        {ITEMS.map((item) => {
+          const count = countFor(item.to);
+          return (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                className={({ isActive }) =>
+                  'bottom-nav__item' + (isActive ? ' is-active' : '')
+                }
+              >
+                <span className="bottom-nav__icon">
+                  <Icon name={item.icon} size={20} />
+                  {count > 0 && <span className="nav-badge">{count > 9 ? '9+' : count}</span>}
+                </span>
+                <span className="bottom-nav__label">{item.label}</span>
+              </NavLink>
+            </li>
+          );
+        })}
       </ul>
       <div className="bottom-nav__indicator" aria-hidden="true" />
     </nav>
