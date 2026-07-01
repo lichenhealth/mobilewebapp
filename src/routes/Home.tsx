@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
@@ -10,6 +11,7 @@ import { postToCard } from '../lib/feedMapping';
 import {
   loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
+import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Home.css';
 
@@ -24,12 +26,18 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'fork-spoon',     label: 'Food'        },
   { icon: 'palette',        label: 'Creative'    },
   { icon: 'location',       label: 'Places',      to: '/places'        },
-  { icon: 'health',         label: 'Health'      },
+  { icon: 'health',         label: 'Directory',   to: '/directory'     },
   { icon: 'book',           label: 'Library',     to: '/library'       },
 ];
 
 export default function Home() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  async function messageAuthor(authorId: string) {
+    try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
+    catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
+  }
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
@@ -71,6 +79,7 @@ export default function Home() {
             availability={{ trust: p.author_id !== user?.id }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
+            onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}
         {FEED.map((card, i) => (

@@ -8,6 +8,8 @@ import GroupList from './routes/GroupList';
 import Mycelium from './routes/Mycelium';
 import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
+import Caregiver from './routes/Caregiver';
+import Directory from './routes/Directory';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
@@ -59,7 +61,11 @@ export default function App() {
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />
+          <Route path="/concierge/client/:patientId"      element={<Concierge />} />
+          <Route path="/concierge/client/:patientId/:tab" element={<Concierge />} />
           <Route path="/concierge/:tab" element={<Concierge />} />
+          <Route path="/caregiver"      element={<Caregiver />} />
+          <Route path="/directory"      element={<Directory />} />
           <Route path="/chat"      element={<Chat />} />
           <Route path="/chat/:id"  element={<ChatThread />} />
           <Route path="/calendar"  element={<Calendar />} />

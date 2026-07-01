@@ -30,6 +30,8 @@ export interface FeedCardProps {
   eyebrow?: string;
   // Inline media (photos / videos / audio uploaded with a post)
   media?: { type: 'photo' | 'video' | 'audio'; url: string }[];
+  // Message the author (omit / undefined hides the button — e.g. your own post)
+  onMessage?: () => void;
 }
 
 export default function FeedCard({
@@ -49,6 +51,7 @@ export default function FeedCard({
   onRecommend,
   eyebrow,
   media,
+  onMessage,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -70,13 +73,26 @@ export default function FeedCard({
             {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
           </div>
         </div>
-        {categoryIcons.length > 0 && (
-          <div className="feed-card__cat-icons">
-            {categoryIcons.map((n) => (
-              <span key={n} className="feed-card__cat-icon">
-                <Icon name={n} size={14} />
-              </span>
-            ))}
+        {(categoryIcons.length > 0 || onMessage) && (
+          <div className="feed-card__head-actions">
+            {categoryIcons.length > 0 && (
+              <div className="feed-card__cat-icons">
+                {categoryIcons.map((n) => (
+                  <span key={n} className="feed-card__cat-icon">
+                    <Icon name={n} size={14} />
+                  </span>
+                ))}
+              </div>
+            )}
+            {onMessage && (
+              <button
+                className="feed-card__message"
+                onClick={onMessage}
+                aria-label={`Message ${title}`}
+              >
+                <Icon name="message" size={16} />
+              </button>
+            )}
           </div>
         )}
       </header>

@@ -1,27 +1,36 @@
 import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { loadChatList, colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM } from '../lib/chatApi';
+import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../lib/supabase';
+import {
+  loadChatList, ensureDirectChat, messagePreview,
+  colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM,
+} from '../lib/chatApi';
 import './Chat.css';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
   const [chats, setChats] = useState<ChatVM[]>([]);
   const [loading, setLoading] = useState(true);
+  const [picking, setPicking] = useState(false);
+  const { user } = useAuth();
+  const me = user?.id ?? '';
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!me) return;
     let active = true;
-    loadChatList().then((vms) => { if (active) { setChats(vms); setLoading(false); } });
+    loadChatList(me).then((vms) => { if (active) { setChats(vms); setLoading(false); } });
     return () => { active = false; };
-  }, []);
+  }, [me]);
 
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return chats;
     return chats.filter((c) =>
       c.title.toLowerCase().includes(q) ||
-      (c.last?.body.toLowerCase().includes(q) ?? false) ||
+      (c.last?.body?.toLowerCase().includes(q) ?? false) ||
       c.members.some((m) => m.name.toLowerCase().includes(q)),
     );
   }, [query, chats]);
@@ -29,10 +38,19 @@ export default function Chat() {
   return (
     <div className="chat">
       <header className="chat__head">
-        <span className="eyebrow">Chat · {chats.length} {chats.length === 1 ? 'thread' : 'threads'}</span>
-        <h1 className="chat__title">
-          <span className="display-italic">Messages</span>
-        </h1>
+        <div className="chat__head-row">
+          <div>
+            <span className="eyebrow">Chat · {chats.length} {chats.length === 1 ? 'thread' : 'threads'}</span>
+            <h1 className="chat__title">
+              <span className="display-italic">Messages</span>
+            </h1>
+          </div>
+          <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <div className="chat__search">
@@ -58,7 +76,8 @@ export default function Chat() {
             <Icon name="message" size={20} />
             <p>No chats yet</p>
             <p className="chat__empty-sub">
-              Chats appear here automatically for your communities, groups, places, organizations, and care team.
+              Start a direct message with the button up top, or chats appear here
+              automatically for your communities, groups, places, organizations, and care team.
             </p>
           </div>
         )}
@@ -75,38 +94,58 @@ export default function Chat() {
           <ConversationRow
             key={c.id}
             chat={c}
+            me={me}
             highlight={query}
             onClick={() => navigate(`/chat/${c.id}`)}
           />
         ))}
       </div>
+
+      {picking && (
+        <NewMessage
+          me={me}
+          onClose={() => setPicking(false)}
+          onPick={async (otherId) => {
+            try {
+              const chatId = await ensureDirectChat(otherId);
+              setPicking(false);
+              navigate(`/chat/${chatId}`);
+            } catch (e) {
+              console.error(e);
+              alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e)));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ConversationRow({ chat, highlight, onClick }: { chat: ChatVM; highlight?: string; onClick: () => void }) {
+function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: string; highlight?: string; onClick: () => void }) {
   const last = chat.last;
+  const isDirect = chat.kind === 'direct';
   const senderName = last
     ? chat.members.find((m) => m.profile_id === last.sender_id)?.name.split(' ')[0]
     : undefined;
+  const showSender = last && !isDirect;
 
   return (
     <button className="conv-row" onClick={onClick}>
       <div className="conv-row__avatar-stack">
-        <GroupAvatar chat={chat} />
+        <GroupAvatar chat={chat} me={me} />
       </div>
       <div className="conv-row__body">
         <div className="conv-row__top">
           <span className="conv-row__name">
             {highlightText(chat.title, highlight)}
-            <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>
+            {!isDirect && <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>}
           </span>
           <span className="conv-row__time">{last ? formatRelative(last.created_at) : ''}</span>
         </div>
         <div className="conv-row__bottom">
           <span className="conv-row__preview">
             {last
-              ? <>{senderName && <span className="conv-row__sender">{senderName}: </span>}{highlightText(last.body, highlight)}</>
+              ? <>{showSender && senderName && <span className="conv-row__sender">{senderName}: </span>}{highlightText(messagePreview(last), highlight)}</>
               : <em>No messages yet</em>}
           </span>
         </div>
@@ -115,15 +154,25 @@ function ConversationRow({ chat, highlight, onClick }: { chat: ChatVM; highlight
   );
 }
 
-function GroupAvatar({ chat }: { chat: ChatVM }) {
-  const sample = chat.members.slice(0, 3);
-  if (sample.length <= 1) {
+function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
+  // Direct + solo chats show a single monogram; for direct, key it off the OTHER member.
+  const single =
+    chat.kind === 'direct'
+      ? (chat.members.find((m) => m.profile_id !== me) ?? chat.members[0])
+      : chat.members.length <= 1
+        ? chat.members[0]
+        : null;
+
+  if (chat.kind === 'direct' || chat.members.length <= 1) {
+    const color = single ? colorFor(single.profile_id) : undefined;
     return (
-      <div className="conv-row__avatar">
-        <span>{monogramFor(chat.title)}</span>
+      <div className="conv-row__avatar" style={color ? { background: color, color: 'var(--bone-warm)' } : undefined}>
+        <span>{monogramFor(single?.name ?? chat.title)}</span>
       </div>
     );
   }
+
+  const sample = chat.members.slice(0, 3);
   return (
     <div className="conv-row__group">
       {sample.map((mem, i) => (
@@ -135,6 +184,67 @@ function GroupAvatar({ chat }: { chat: ChatVM }) {
           {monogramFor(mem.name)}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── New-message people picker ───────────────────────────────────────────────
+
+interface PickRow { id: string; full_name: string | null; headline: string | null; }
+
+function NewMessage({ me, onClose, onPick }: { me: string; onClose: () => void; onPick: (id: string) => void }) {
+  const [q, setQ] = useState('');
+  const [rows, setRows] = useState<PickRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      let req = supabase.from('profiles').select('id, full_name, headline').neq('id', me).limit(30);
+      const term = q.trim();
+      if (term) req = req.ilike('full_name', `%${term}%`);
+      const { data } = await req;
+      if (active) { setRows((data as PickRow[] | null) ?? []); setLoading(false); }
+    }, 200);
+    return () => { active = false; clearTimeout(t); };
+  }, [q, me]);
+
+  return (
+    <div className="picker" role="dialog" aria-modal="true">
+      <div className="picker__backdrop" onClick={onClose} />
+      <div className="picker__sheet">
+        <div className="picker__head">
+          <h2 className="picker__title">New message</h2>
+          <button className="picker__close" onClick={onClose} aria-label="Close"><Icon name="close" size={18} /></button>
+        </div>
+        <div className="picker__search">
+          <Icon name="search" size={16} />
+          <input
+            className="picker__search-input"
+            placeholder="Search people by name"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="picker__list">
+          {loading && <p className="picker__hint">Searching…</p>}
+          {!loading && rows.length === 0 && <p className="picker__hint">No members found.</p>}
+          {rows.map((r) => {
+            const name = r.full_name ?? 'Member';
+            return (
+              <button key={r.id} className="picker__row" onClick={() => onPick(r.id)}>
+                <span className="picker__avatar" style={{ background: colorFor(r.id) }}>{monogramFor(name)}</span>
+                <span className="picker__row-text">
+                  <span className="picker__row-name">{name}</span>
+                  {r.headline && <span className="picker__row-sub">{r.headline}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
@@ -278,6 +279,11 @@ export default function Profile() {
     navigate('/login', { replace: true });
   }
 
+  async function messageMember(otherId: string) {
+    try { navigate(`/chat/${await ensureDirectChat(otherId)}`); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not open chat'); }
+  }
+
   if (loading || (user && loadingData)) {
     return <div className="prof"><p className="prof__muted">Loading...</p></div>;
   }
@@ -381,6 +387,7 @@ export default function Profile() {
                 </div>
                 <div className="prof__care-actions">
                   {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
+                  {c.status === 'active' && <button className="prof__care-btn" onClick={() => messageMember(c.caregiver_id)}>Message</button>}
                   <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Remove' : incoming ? 'Decline' : 'Cancel'}</button>
                 </div>
               </div>
@@ -412,6 +419,10 @@ export default function Profile() {
       <section className="prof__section">
         <h2 className="prof__h2">People you care for</h2>
         <p className="prof__care-lead">Members who’ve added you as a caregiver, or whom you’ve offered to help.</p>
+        <button className="prof__care-dash" onClick={() => navigate('/caregiver')}>
+          Open caregiver dashboard
+          <span aria-hidden="true"> →</span>
+        </button>
         {iCareFor.length === 0 && <p className="prof__empty">You’re not on anyone’s care team yet.</p>}
         <div className="prof__care-list">
           {iCareFor.map((c) => {
@@ -426,6 +437,7 @@ export default function Profile() {
                 </div>
                 <div className="prof__care-actions">
                   {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
+                  {c.status === 'active' && <button className="prof__care-btn" onClick={() => messageMember(c.patient_id)}>Message</button>}
                   <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Leave' : incoming ? 'Decline' : 'Cancel'}</button>
                 </div>
               </div>

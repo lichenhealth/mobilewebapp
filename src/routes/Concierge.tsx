@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
-import { TODAY_SNAPSHOT, WEEK_CARE_PLAN, CONCIERGE_CHAT, ChatMessage, ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
+import ChatConversation from '../components/ChatConversation';
+import { supabase } from '../lib/supabase';
+import { loadConciergeAccess } from '../lib/chatApi';
+import { useAuth } from '../auth/AuthProvider';
+import { TODAY_SNAPSHOT, WEEK_CARE_PLAN, ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
@@ -55,69 +59,6 @@ function CareItemText({ text }: { text: string }) {
         return <span key={i}>{tok}</span>;
       })}
     </>
-  );
-}
-
-/** Renders chat message text with @mentions (peach) and [links] (peach
- *  underlined), preserving \n\n paragraph breaks. */
-function ChatText({ text }: { text: string }) {
-  const renderInline = (s: string) => {
-    const tokens = s.split(/(@[a-zA-Z0-9_]+\.?|\[[^\]]+\])/g);
-    return tokens.map((tok, i) => {
-      if (/^@[a-zA-Z0-9_]+\.?$/.test(tok)) {
-        return <span key={i} className="cmsg__mention">{tok}</span>;
-      }
-      const linkMatch = tok.match(/^\[([^\]]+)\]$/);
-      if (linkMatch) {
-        return <span key={i} className="cmsg__link">{linkMatch[1]}</span>;
-      }
-      return <span key={i}>{tok}</span>;
-    });
-  };
-  const paragraphs = text.split('\n\n');
-  return (
-    <>
-      {paragraphs.map((p, i) => (
-        <p key={i} className="cmsg__para">{renderInline(p)}</p>
-      ))}
-    </>
-  );
-}
-
-/** Single chat message bubble. Visual style varies by sender. */
-function ChatBubble({ msg }: { msg: ChatMessage }) {
-  const isAi = msg.sender === 'ai';
-  const isSelf = msg.sender === 'self';
-  const isProvider = msg.sender === 'provider';
-  return (
-    <div className={'cmsg cmsg--' + msg.sender}>
-      {/* Avatar (self: top-left; provider: top-right; ai: no avatar) */}
-      {(isSelf || isProvider) && (
-        <div
-          className="cmsg__avatar"
-          style={{ background: msg.authorColor }}
-          aria-hidden="true"
-        >
-          {msg.authorMonogram}
-        </div>
-      )}
-      {isAi && (
-        <div className="cmsg__brain" aria-hidden="true">
-          <Icon name="brain" size={18} />
-        </div>
-      )}
-      <div className="cmsg__bubble">
-        <header className="cmsg__head">
-          <span className={'cmsg__name' + (isAi ? ' cmsg__name--ai' : '')}>
-            {msg.authorName}
-          </span>
-        </header>
-        <div className="cmsg__body">
-          <ChatText text={msg.text} />
-        </div>
-        <span className="cmsg__time">{msg.time}</span>
-      </div>
-    </div>
   );
 }
 
@@ -326,14 +267,72 @@ function UrgentCare() {
 }
 
 export default function Concierge() {
-  const { tab } = useParams<{ tab?: ConciergeTab }>();
+  const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const me = user?.id ?? '';
   const activeTab: ConciergeTab = (tab as ConciergeTab) ?? 'wow';
+
+  // Client view: a caregiver viewing one of their clients' Concierge page.
+  // Self view (no patientId): the member's own Concierge. The "subject" is whose
+  // care data we show.
+  const isClientView = !!patientId;
+  const subjectId = patientId ?? me;
 
   const [aiOn, setAiOn] = useState(true);
   const [scope, setScope] = useState<'Day' | 'Week' | 'Month'>('Day');
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
+
+  // Concierge access (care-team chat, client view): active Concierge tier, or admin.
+  const [careAllowed, setCareAllowed] = useState<boolean | null>(null);
+  const [careChatId, setCareChatId] = useState<string | null>(null);
+  const [careReady, setCareReady] = useState(false);
+  const [clientName, setClientName] = useState<string | null>(null);
+  const [clientAuthorized, setClientAuthorized] = useState(true); // am I a caregiver of this patient?
+  const careAnchor = useRef<HTMLDivElement>(null);
+  const [careTop, setCareTop] = useState(0);
+
+  useEffect(() => {
+    if (!me) return;
+    let active = true;
+    (async () => {
+      const allowed = await loadConciergeAccess(me);
+      // The care-team chat for whoever we're viewing (self or a client).
+      const chatRes = await supabase
+        .from('chats').select('id').eq('patient_id', subjectId).eq('kind', 'care_team').maybeSingle();
+      let name: string | null = null;
+      let authorized = true;
+      if (isClientView) {
+        // Confirm I actually care for this patient, and grab their name for the header.
+        const linkRes = await supabase
+          .from('care_team_members')
+          .select('patient:profiles!care_team_members_patient_id_fkey(full_name)')
+          .eq('caregiver_id', me).eq('patient_id', subjectId).eq('status', 'active')
+          .maybeSingle();
+        const link = linkRes.data as { patient: { full_name: string | null } | null } | null;
+        authorized = !!link;
+        name = link?.patient?.full_name ?? 'Client';
+      }
+      if (!active) return;
+      setCareAllowed(allowed);
+      setCareChatId((chatRes.data as { id: string } | null)?.id ?? null);
+      setClientName(name);
+      setClientAuthorized(authorized);
+      setCareReady(true);
+    })();
+    return () => { active = false; };
+  }, [me, subjectId, isClientView]);
+
+  // The care chat is a fixed panel filling from below the tabs to above the nav;
+  // measure where it should start so it tracks the (variable) top chrome height.
+  useLayoutEffect(() => {
+    if (activeTab !== 'chat') return;
+    const measure = () => { const el = careAnchor.current; if (el) setCareTop(el.getBoundingClientRect().top); };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName]);
 
   // Default scope follows the active tab: Day for WOW, Week for KOC
   useEffect(() => {
@@ -341,18 +340,54 @@ export default function Concierge() {
     else if (activeTab === 'wow') setScope('Day');
   }, [activeTab]);
 
-  // Tab routing — all tabs now render inline (chat used to redirect to /chat
-  // but is now a dedicated care-team thread inside the Concierge)
+  // Tab routing — patient-aware so client view stays within /concierge/client/:id.
+  const basePath = isClientView ? `/concierge/client/${patientId}` : '/concierge';
   const handleTabClick = (target: ConciergeTab) => {
-    navigate(target === 'wow' ? '/concierge' : `/concierge/${target}`);
+    navigate(target === 'wow' ? basePath : `${basePath}/${target}`);
   };
 
   const snap = TODAY_SNAPSHOT;
 
+  // In client view, gate the WHOLE page behind access + caregiver relationship.
+  if (isClientView && careReady && (careAllowed === false || !clientAuthorized)) {
+    return (
+      <div className="conc">
+        <header className="conc__head conc__head--client">
+          <button className="conc__back" onClick={() => navigate('/caregiver')} aria-label="Back">
+            <Icon name="arrow-left" size={18} />
+          </button>
+          <h1 className="conc__title">Concierge</h1>
+        </header>
+        <div className="conc__care-gate">
+          <Icon name="shield-user" size={22} />
+          <h3 className="conc__care-gate-title">
+            {careAllowed === false ? 'Concierge access required' : 'Not your client'}
+          </h3>
+          <p className="conc__care-gate-sub">
+            {careAllowed === false
+              ? 'The caregiver dashboard is part of Concierge membership.'
+              : 'You don’t have an active care connection with this member.'}
+          </p>
+          <button className="btn btn-primary" onClick={() => navigate(careAllowed === false ? '/membership' : '/caregiver')}>
+            {careAllowed === false ? 'See Concierge' : 'Back to clients'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="conc">
-      <header className="conc__head">
-        <h1 className="conc__title">Concierge</h1>
+      <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
+        {isClientView && (
+          <button className="conc__back" onClick={() => navigate('/caregiver')} aria-label="Back to clients">
+            <Icon name="arrow-left" size={18} />
+          </button>
+        )}
+        <h1 className="conc__title">
+          {isClientView ? (clientName ?? 'Client') : 'Concierge'}
+        </h1>
+        {isClientView && <span className="conc__client-tag">Client view</span>}
       </header>
 
       {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
@@ -535,16 +570,44 @@ export default function Concierge() {
       )}
 
       {activeTab === 'chat' && (
-        <div className="cchat">
-          {CONCIERGE_CHAT.map((day) => (
-            <section className="cchat__day" key={day.label}>
-              <p className="cchat__day-label">{day.label}</p>
-              {day.messages.map((m) => (
-                <ChatBubble key={m.id} msg={m} />
-              ))}
-            </section>
-          ))}
-        </div>
+        <>
+          <div ref={careAnchor} className="conc__care-anchor" aria-hidden="true" />
+
+          {!careReady && <p className="conc__care-hint">Loading your care team…</p>}
+
+          {careReady && careAllowed === false && (
+            <div className="conc__care-gate">
+              <Icon name="shield-user" size={22} />
+              <h3 className="conc__care-gate-title">Your care team, in one place</h3>
+              <p className="conc__care-gate-sub">
+                The care-team chat — where your practitioners coordinate with you — is part of
+                Concierge membership.
+              </p>
+              <button className="btn btn-primary" onClick={() => navigate('/membership')}>
+                See Concierge
+              </button>
+            </div>
+          )}
+
+          {careReady && careAllowed && !careChatId && (
+            <div className="conc__care-gate">
+              <Icon name="heart-line" size={22} />
+              <h3 className="conc__care-gate-title">No care team yet</h3>
+              <p className="conc__care-gate-sub">
+                Add caregivers from your profile. Once someone joins, your care-team chat opens here.
+              </p>
+              <button className="btn btn-primary" onClick={() => navigate('/profile')}>
+                Manage care team
+              </button>
+            </div>
+          )}
+
+          {careReady && careAllowed && careChatId && (
+            <div className="conc__care" style={{ top: careTop }}>
+              <ChatConversation chatId={careChatId} me={me} showIntro={false} />
+            </div>
+          )}
+        </>
       )}
 
       {activeTab === 'urgent' && <UrgentCare />}

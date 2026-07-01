@@ -8,6 +8,40 @@
   text-align: center;
 }
 
+/* Client view header: back arrow + client name + tag */
+.conc__head--client {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: var(--s-2);
+  text-align: left;
+  padding: var(--s-4) var(--s-4) var(--s-2);
+}
+.conc__back {
+  width: 36px; height: 36px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.conc__back:hover { border-color: var(--ink); }
+.conc__head--client .conc__title {
+  font-size: var(--t-lg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.conc__client-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--peach);
+  border: 1px solid var(--peach);
+  border-radius: var(--r-full);
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
 .conc__title {
   font-family: var(--font-body);
   font-weight: 100;
@@ -385,7 +419,60 @@
   color: var(--peach);
 }
 
-/* ─── Concierge Chat (care team + AI thread) ───────────────────────── */
+/* ─── Concierge care-team chat (real thread, gated to Concierge tier) ── */
+.conc__care-anchor { height: 0; }
+
+/* Fixed panel: fills from below the tabs (top set inline) to above the nav. */
+.conc__care {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--app-max);
+  bottom: calc(var(--nav-h) + var(--safe-bot));
+  display: flex;
+  flex-direction: column;
+  background: var(--bone);
+  z-index: 30;
+}
+
+.conc__care-hint {
+  padding: var(--s-6) var(--s-5);
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 13px;
+  font-weight: 300;
+}
+
+.conc__care-gate {
+  margin: var(--s-5);
+  padding: var(--s-7) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+  color: var(--ink-muted);
+}
+.conc__care-gate-title {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.conc__care-gate-sub {
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.5;
+  max-width: 34ch;
+}
+.conc__care-gate .btn { margin-top: var(--s-2); }
+
+/* ─── Concierge Chat (legacy mock styling — kept for reference) ─────── */
 .cchat {
   display: flex;
   flex-direction: column;

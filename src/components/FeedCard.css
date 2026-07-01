@@ -62,6 +62,31 @@
   color: var(--ink-faint);
 }
 
+.feed-card__head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  align-self: start;
+  padding-top: 2px;
+}
+
+.feed-card__message {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  color: var(--ink-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color var(--d-fast) var(--ease-out),
+              border-color var(--d-fast) var(--ease-out);
+}
+.feed-card__message:hover { color: var(--peach); border-color: var(--peach); }
+.feed-card__message:active { transform: scale(0.94); }
+
 .feed-card__cat-icons {
   display: flex;
   gap: 4px;
