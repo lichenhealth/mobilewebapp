@@ -26,7 +26,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'fork-spoon',     label: 'Food'        },
   { icon: 'palette',        label: 'Creative'    },
   { icon: 'location',       label: 'Places',      to: '/places'        },
-  { icon: 'health',         label: 'Health'      },
+  { icon: 'health',         label: 'Directory',   to: '/directory'     },
   { icon: 'book',           label: 'Library',     to: '/library'       },
 ];
 
