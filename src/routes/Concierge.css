@@ -419,6 +419,82 @@
   color: var(--peach);
 }
 
+/* ─── Concierge authoring editors (SnapshotEditor / CarePlanEditor) ──── */
+.cedit { display: flex; flex-direction: column; padding-bottom: var(--s-9); }
+.cedit__head {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  background: var(--bone);
+  border-bottom: 1px solid var(--bone-edge);
+}
+.cedit__title { font-family: var(--font-display); font-size: var(--t-lg); font-weight: 400; letter-spacing: -0.02em; }
+.cedit__save { padding: 8px 18px; }
+.cedit__error {
+  margin: var(--s-3) var(--s-4) 0; padding: 8px 12px; border-radius: var(--r-md);
+  background: #F6E0DA; color: #7C3F4F; font-size: 12px;
+}
+.cedit__body { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-4); }
+.cedit__field { display: flex; flex-direction: column; gap: var(--s-2); }
+.cedit__label { font-size: 12px; font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em; }
+.cedit__hint { font-size: 11px; font-weight: 300; color: var(--ink-faint); }
+.cedit__hint code { font-family: var(--font-mono); font-size: 10px; background: var(--bone-warm); padding: 1px 4px; border-radius: 3px; }
+.cedit__input, .cedit__textarea, .cedit__select {
+  font-family: inherit; font-size: var(--t-base); font-weight: 300; color: var(--ink);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  padding: 9px 12px; outline: 0; width: 100%;
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.cedit__input:focus, .cedit__textarea:focus, .cedit__select:focus { border-color: var(--peach); }
+.cedit__textarea { resize: vertical; line-height: 1.45; }
+
+.cedit__scores { display: flex; flex-direction: column; gap: var(--s-2); }
+.cedit__score { display: grid; grid-template-columns: 110px 1fr 34px; align-items: center; gap: var(--s-3); }
+.cedit__score-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); }
+.cedit__score input[type=range] { width: 100%; accent-color: var(--peach); }
+.cedit__score-val { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); text-align: right; }
+
+.cedit__row-head { display: flex; align-items: center; justify-content: space-between; }
+.cedit__add {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;
+  border-radius: var(--r-full); border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  color: var(--ink-soft); font-size: 11px;
+}
+.cedit__add:hover { border-color: var(--peach); color: var(--peach-deep); }
+.cedit__add--sm { font-size: 10px; padding: 4px 8px; }
+.cedit__remove {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-muted);
+}
+.cedit__remove:hover { color: var(--ink); background: var(--bone-deep); }
+
+.cedit__section, .cedit__plan-row {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-3); border: 1px solid var(--bone-edge-soft); border-radius: var(--r-md); background: var(--bone);
+}
+.cedit__section-head { display: flex; gap: var(--s-2); align-items: center; }
+.cedit__items { display: flex; flex-direction: column; gap: 6px; }
+.cedit__item-row { display: flex; gap: var(--s-2); align-items: center; }
+.cedit__plan-selects { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
+.cedit__select { width: auto; flex: 1; min-width: 120px; }
+
+/* Edit affordance in a WOW/KOC header (caregiver, client view) */
+.snap__edit {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  transition: border-color var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.snap__edit:hover { border-color: var(--peach); color: var(--peach-deep); }
+
 /* ─── Concierge care-team chat (real thread, gated to Concierge tier) ── */
 .conc__care-anchor { height: 0; }
 
