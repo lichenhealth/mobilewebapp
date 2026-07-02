@@ -4,7 +4,7 @@ import './HexagonRadar.css';
 export interface RadarAxis {
   label: string;
   icon: IconName;
-  value: number; // 0-100
+  value: number | null; // 0-100, or null = no data yet
 }
 
 interface Props {
@@ -27,11 +27,16 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
 
   // Outer hex vertices (the boundary)
   const outerPts = angles.map((a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-  // Inner polygon vertices (scaled by value/100)
-  const innerPts = angles.map((a, i) => {
-    const v = (axes[i]?.value ?? 0) / 100;
-    return [cx + r * v * Math.cos(a), cy + r * v * Math.sin(a)];
-  });
+  // Value vertices — only for axes WITH data, so empty dimensions don't dent the
+  // shape to the center (they read as "no data", not 0%).
+  const dataPts = angles
+    .map((a, i) => {
+      const val = axes[i]?.value;
+      if (val == null) return null;
+      const v = val / 100;
+      return [cx + r * v * Math.cos(a), cy + r * v * Math.sin(a)];
+    })
+    .filter((p): p is number[] => p !== null);
   // Concentric rings for the grid (25%, 50%, 75%, 100%)
   const rings = [0.25, 0.5, 0.75, 1].map((s) =>
     angles.map((a) => [cx + r * s * Math.cos(a), cy + r * s * Math.sin(a)])
@@ -90,14 +95,20 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
             opacity={0.2}
           />
         ))}
-        {/* Filled value polygon */}
-        <path
-          d={toPath(innerPts)}
-          fill="var(--peach)"
-          fillOpacity={0.85}
-          stroke="var(--peach-deep)"
-          strokeWidth="1"
-        />
+        {/* Filled value polygon over the axes that have data (≥3 → area; ≤2 → line) */}
+        {dataPts.length >= 3 && (
+          <path d={toPath(dataPts)} fill="var(--peach)" fillOpacity={0.85} stroke="var(--peach-deep)" strokeWidth="1" />
+        )}
+        {dataPts.length > 0 && dataPts.length < 3 && (
+          <path
+            d={dataPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')}
+            fill="none" stroke="var(--peach-deep)" strokeWidth="1.5"
+          />
+        )}
+        {/* Dot at each data vertex (so 1–2 entries still show) */}
+        {dataPts.map((p, i) => (
+          <circle key={`dot-${i}`} cx={p[0]} cy={p[1]} r={2.5} fill="var(--peach-deep)" />
+        ))}
       </svg>
 
       {/* Icons at each vertex */}
@@ -112,16 +123,19 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
         </div>
       ))}
 
-      {/* % labels just outside each vertex */}
-      {labelPts.map(([x, y], i) => (
-        <div
-          key={`label-${i}`}
-          className="hex-radar__label"
-          style={{ left: x, top: y }}
-        >
-          {axes[i]?.value ?? 0}%
-        </div>
-      ))}
+      {/* % labels just outside each vertex ("—" when the dimension has no entries) */}
+      {labelPts.map(([x, y], i) => {
+        const v = axes[i]?.value;
+        return (
+          <div
+            key={`label-${i}`}
+            className={'hex-radar__label' + (v == null ? ' hex-radar__label--empty' : '')}
+            style={{ left: x, top: y }}
+          >
+            {v == null ? '—' : `${v}%`}
+          </div>
+        );
+      })}
     </div>
   );
 }

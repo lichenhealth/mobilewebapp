@@ -119,9 +119,9 @@ export function computeWowScores(posts: CarePostRow[]): WowScores {
   return { byDimension, overall: oCnt ? Math.round(oSum / oCnt) : null };
 }
 
-/** Build HexagonRadar axes from derived scores (null category → 0, muted spoke). */
+/** Build HexagonRadar axes from derived scores (null = no entries yet → "—"). */
 export function wowAxes(byDimension: Record<Dimension, number | null>): RadarAxis[] {
-  return WOW_DIMENSIONS.map((d) => ({ label: d, icon: DIMENSION_META[d], value: byDimension[d] ?? 0 }));
+  return WOW_DIMENSIONS.map((d) => ({ label: d, icon: DIMENSION_META[d], value: byDimension[d] }));
 }
 
 // ─── Create / delete ─────────────────────────────────────────────────────────

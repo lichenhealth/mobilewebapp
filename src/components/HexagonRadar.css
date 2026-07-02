@@ -34,3 +34,6 @@
   pointer-events: none;
   white-space: nowrap;
 }
+
+/* No-data dimension: muted "—" instead of a 0% */
+.hex-radar__label--empty { color: var(--ink-faint); opacity: 0.7; }
