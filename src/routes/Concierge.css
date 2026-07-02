@@ -1084,3 +1084,48 @@
   font-weight: 600;
   text-decoration: underline;
 }
+
+/* ─── Care-post composer + WOW/KOC board ──────────────────────────────── */
+.cpost-compose__media-btns { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
+.cedit__add.is-on { border-color: var(--peach); color: var(--peach-deep); }
+.cpost-compose__tray { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: var(--s-2); }
+.cpost-compose__thumb {
+  position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden;
+  background: var(--bone-deep); border: 1px solid var(--bone-edge); flex-shrink: 0;
+}
+.cpost-compose__thumb img, .cpost-compose__thumb video { width: 100%; height: 100%; object-fit: cover; }
+.cpost-compose__aud { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--ink-muted); }
+.cpost-compose__thumb button {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: var(--r-full);
+  background: rgba(30,26,22,0.6); color: #fff; font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cpost-compose__link { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: var(--s-2); align-items: center; }
+.cpost-compose__dims { display: flex; flex-wrap: wrap; gap: 6px; }
+.cpost-compose__dim {
+  padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); color: var(--ink-soft); font-size: 12px; font-weight: 400;
+}
+.cpost-compose__dim.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+
+/* Board: overall score + dimension filter chips */
+.wow__overall { text-align: center; padding: var(--s-2) var(--s-5) 0; }
+.wow__overall-num { font-family: var(--font-display); font-size: var(--t-2xl); color: var(--peach-deep); font-variation-settings: '"opsz" 144'; }
+.wow__overall-lbl { display: block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.wow__radar { display: flex; justify-content: center; padding: var(--s-2) 0; }
+.wow__chips { display: flex; gap: 6px; overflow-x: auto; padding: var(--s-2) var(--s-5); scrollbar-width: none; }
+.wow__chips::-webkit-scrollbar { display: none; }
+.wow__chip {
+  flex: 0 0 auto; padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); color: var(--ink-soft); font-size: 12px; white-space: nowrap;
+}
+.wow__chip.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.board__post-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin: var(--s-2) var(--s-5) var(--s-3);
+  padding: 8px 16px; border-radius: var(--r-full); background: var(--peach); color: var(--bone-warm); font-weight: 500; font-size: 13px;
+}
+.koc__daysec { margin-bottom: var(--s-2); }
+.koc__daylbl { font-size: 12px; font-weight: 600; color: var(--ink); padding: var(--s-2) var(--s-5) 4px; }
+.koc__dayempty { font-size: 12px; font-weight: 300; color: var(--ink-faint); padding: 0 var(--s-5) var(--s-2); }
+.koc__weeknav { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-3) var(--s-5) 0; }
+.koc__weeklbl { font-family: var(--font-mono); font-size: 13px; color: var(--ink); min-width: 96px; text-align: center; }
