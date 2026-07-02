@@ -31,6 +31,34 @@
 .cpost__del:hover { color: var(--ink); background: var(--bone-deep); }
 
 .cpost__body { font-size: 13px; font-weight: 300; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+.cpost__inlink { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
+.cpost__inlink:hover { color: var(--peach); }
+
+/* Rich previews of links pasted in the body (YouTube embed / OG card). */
+.cpost__previews { display: flex; flex-direction: column; gap: var(--s-2); margin-top: 6px; }
+.cpost__yt {
+  position: relative; width: 100%; max-width: 480px;
+  aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--bone-deep);
+}
+.cpost__yt iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.cpost__ogcard {
+  display: flex; align-items: stretch; gap: 10px; max-width: 480px;
+  border: 1px solid var(--bone-edge); border-radius: 10px; overflow: hidden;
+  background: var(--bone); text-decoration: none; color: inherit;
+}
+.cpost__ogcard:hover { border-color: var(--peach); }
+.cpost__ogimg { width: 96px; min-height: 72px; object-fit: cover; flex-shrink: 0; background: var(--bone-deep); }
+.cpost__ogmeta { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; min-width: 0; }
+.cpost__ogtitle {
+  font-size: 13px; font-weight: 500; color: var(--ink); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cpost__ogdesc {
+  font-size: 11px; font-weight: 300; color: var(--ink-soft); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cpost__ogsite { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
 
 /* Adaptive layout: default stacks text above media; a single TALL photo lays
    text beside it (image on the right). Images never stretch (width/height auto). */
