@@ -20,7 +20,7 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
   if (axes.length !== 6) console.warn('HexagonRadar expects exactly 6 axes');
   const cx = size / 2;
   const cy = size / 2;
-  const r = size * 0.30; // leaves room for the outside icons + labels
+  const r = size * 0.34; // leaves room for the % labels outside the hexagon
   const rad = (d: number) => (d * Math.PI) / 180;
   const pt = (a: number, radius: number): [number, number] => [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
 
@@ -47,8 +47,11 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
     return `M ${cx} ${cy} L ${a[0].toFixed(1)} ${a[1].toFixed(1)} L ${b[0].toFixed(1)} ${b[1].toFixed(1)} Z`;
   };
 
-  const iconPts = dirAngles.map((a) => pt(a, r * 1.2));
-  const labelPts = dirAngles.map((a) => pt(a, r * 1.5));
+  // Icons centered on each wedge's outer edge (the edge midpoint = cos30·r);
+  // % labels sit just beyond, outside the hexagon.
+  const edgeMid = Math.cos(Math.PI / 6); // ≈ 0.866
+  const iconPts = dirAngles.map((a) => pt(a, r * edgeMid));
+  const labelPts = dirAngles.map((a) => pt(a, r * 1.18));
 
   return (
     <div className="hex-radar" style={{ width: size, height: size }} role="img" aria-label="Web of Wellbeing">
