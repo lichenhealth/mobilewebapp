@@ -9,7 +9,8 @@ import './Profile.css';
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
-type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; email_notifications?: boolean };
+type NotifPref = 'off' | 'in_app' | 'both';
+type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
 type CareRow = {
@@ -44,7 +45,7 @@ export default function Profile() {
   const [fullName, setFullName] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
-  const [emailNotif, setEmailNotif] = useState(false);
+  const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<MySpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,7 +73,7 @@ export default function Profile() {
     if (!user) return;
     setLoadingData(true);
     const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
-      supabase.from('profiles').select('created_at,full_name,headline,bio,email_notifications').eq('id', user.id).single(),
+      supabase.from('profiles').select('created_at,full_name,headline,bio,notification_pref').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
@@ -87,7 +88,7 @@ export default function Profile() {
       setFullName(p.full_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
-      setEmailNotif(Boolean(p.email_notifications));
+      setNotifPref(p.notification_pref ?? 'in_app');
     }
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
     setCaps(cRows.map((r) => r.capability));
@@ -220,11 +221,12 @@ export default function Profile() {
     setTimeout(() => setProfileMsg(''), 2000);
   }
 
-  async function setEmailNotifications(on: boolean) {
+  async function updateNotifPref(pref: NotifPref) {
     if (!user) return;
-    setEmailNotif(on);
-    const { error: e } = await supabase.from('profiles').update({ email_notifications: on }).eq('id', user.id);
-    if (e) { setError(e.message); setEmailNotif(!on); }
+    const prev = notifPref;
+    setNotifPref(pref);
+    const { error: e } = await supabase.from('profiles').update({ notification_pref: pref }).eq('id', user.id);
+    if (e) { setError(e.message); setNotifPref(prev); }
   }
 
   async function toggleCap(cap: string) {
@@ -343,22 +345,22 @@ export default function Profile() {
 
       <section className="prof__section">
         <h2 className="prof__h2">Notifications</h2>
-        <p className="prof__care-lead">In-app notifications are always on. Choose whether to also get them by email.</p>
+        <p className="prof__care-lead">How would you like to get notified?</p>
         <div className="prof__notif-opts">
-          <button
-            type="button"
-            className={'prof__notif-opt' + (!emailNotif ? ' is-on' : '')}
-            onClick={() => setEmailNotifications(false)}
-          >
-            In-app only
-          </button>
-          <button
-            type="button"
-            className={'prof__notif-opt' + (emailNotif ? ' is-on' : '')}
-            onClick={() => setEmailNotifications(true)}
-          >
-            In-app + email
-          </button>
+          {([
+            ['off', "Don't Notify Me"],
+            ['in_app', 'In App'],
+            ['both', 'In App + Email'],
+          ] as [NotifPref, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={'prof__notif-opt' + (notifPref === value ? ' is-on' : '')}
+              onClick={() => updateNotifPref(value)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </section>
 
