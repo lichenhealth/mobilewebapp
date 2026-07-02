@@ -132,8 +132,9 @@ export default function Profile() {
     const rows = raw.map((r) => ({
       id: r.id, patient_id: r.patient_id, caregiver_id: r.caregiver_id,
       status: r.status, initiated_by: r.initiated_by,
-      patientName: nameMap.get(r.patient_id) ?? r.patient?.full_name ?? 'Member',
-      caregiverName: nameMap.get(r.caregiver_id) ?? r.caregiver?.full_name ?? 'Member',
+      // || (not ??) so a blank-string name also falls through to "Member".
+      patientName: nameMap.get(r.patient_id) || r.patient?.full_name || 'Member',
+      caregiverName: nameMap.get(r.caregiver_id) || r.caregiver?.full_name || 'Member',
     }));
     setCare(rows);
     setInvites(((invRes.data as { id: string; invitee_email: string; role: 'caregiver' | 'patient' }[] | null) ?? [])
