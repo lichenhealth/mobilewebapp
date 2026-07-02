@@ -525,7 +525,7 @@ export default function Concierge() {
                   <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
                   <span className="wow__overall-lbl">Overall wellbeing</span>
                 </div>
-                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={200} /></div>
+                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={240} /></div>
                 <div className="wow__chips">
                   {(['All', ...WOW_DIMENSIONS] as const).map((c) => (
                     <button key={c} className={'wow__chip' + (wowFilter === c ? ' is-on' : '')} onClick={() => setWowFilter(c)}>{c}</button>
