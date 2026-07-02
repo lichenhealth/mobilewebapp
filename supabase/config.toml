@@ -10,3 +10,8 @@ project_id = "mjqnaevertyzgjlpwynr"
 # without JWT verification.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Invoked by a Database Webhook on notifications INSERT. Authenticates via a
+# shared secret header (NOTIFICATION_WEBHOOK_SECRET), not a Supabase JWT.
+[functions.send-notification-email]
+verify_jwt = false
