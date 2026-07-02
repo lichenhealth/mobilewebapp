@@ -1,12 +1,13 @@
+import { useState, SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { colorFor, monogramFor, formatRelative } from '../lib/chatApi';
 import { CarePostRow, CareAttachment, CareLink, rangeLabel } from '../lib/conciergeApi';
 import './CarePostCard.css';
 
-function CareMedia({ a, url }: { a: CareAttachment; url?: string }) {
+function CareMedia({ a, url, onLoad }: { a: CareAttachment; url?: string; onLoad?: (e: SyntheticEvent<HTMLImageElement>) => void }) {
   if (!url) return <div className="cpost__media-loading" aria-hidden="true" />;
-  if (a.type === 'photo') return <img className="cpost__media-img" src={url} alt="" />;
+  if (a.type === 'photo') return <img className="cpost__media-img" src={url} alt="" onLoad={onLoad} />;
   if (a.type === 'video') return <video className="cpost__media-vid" src={url} controls playsInline />;
   return <audio className="cpost__media-aud" src={url} controls />;
 }
@@ -35,17 +36,25 @@ export default function CarePostCard({
   onDelete: (id: string) => void;
 }) {
   const name = post.author?.full_name ?? 'Care team';
+  const [portrait, setPortrait] = useState(false);
+
+  // A single tall photo → lay text beside it; otherwise stack (text above media).
+  const onImgLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    const el = e.currentTarget;
+    setPortrait(el.naturalHeight > el.naturalWidth * 1.2);
+  };
+  const single = post.attachments.length === 1 && post.attachments[0].type === 'photo';
+  const side = single && portrait;
+
   return (
-    <article className="cpost">
+    <article className={'cpost' + (side ? ' cpost--side' : '')}>
       <header className="cpost__head">
         <span className="cpost__avatar" style={{ background: colorFor(post.author_id) }}>{monogramFor(name)}</span>
         <span className="cpost__head-text">
           <span className="cpost__author">{name}</span>
           <span className="cpost__time">{formatRelative(post.created_at)}</span>
         </span>
-        {post.kind === 'wow' && post.score != null && (
-          <span className="cpost__score">{post.score}%</span>
-        )}
+        {post.kind === 'wow' && post.score != null && <span className="cpost__score">{post.score}%</span>}
         {canDelete && (
           <button className="cpost__del" onClick={() => onDelete(post.id)} aria-label="Delete post">
             <Icon name="close" size={14} />
@@ -53,19 +62,23 @@ export default function CarePostCard({
         )}
       </header>
 
-      {post.body && <p className="cpost__body">{post.body}</p>}
-
-      {post.attachments.length > 0 && (
-        <div className="cpost__media">
-          {post.attachments.map((a, i) => <CareMedia key={i} a={a} url={mediaUrls[a.path]} />)}
+      <div className="cpost__content">
+        <div className="cpost__text">
+          {post.body && <p className="cpost__body">{post.body}</p>}
+          {post.links.length > 0 && (
+            <div className="cpost__links">
+              {post.links.map((l, i) => <CareLinkChip key={i} link={l} />)}
+            </div>
+          )}
         </div>
-      )}
-
-      {post.links.length > 0 && (
-        <div className="cpost__links">
-          {post.links.map((l, i) => <CareLinkChip key={i} link={l} />)}
-        </div>
-      )}
+        {post.attachments.length > 0 && (
+          <div className="cpost__media">
+            {post.attachments.map((a, i) => (
+              <CareMedia key={i} a={a} url={mediaUrls[a.path]} onLoad={a.type === 'photo' ? onImgLoad : undefined} />
+            ))}
+          </div>
+        )}
+      </div>
 
       <footer className="cpost__foot">
         {post.kind === 'wow' && (
