@@ -117,14 +117,24 @@ export default function Profile() {
         .select('id, invitee_email, role')
         .eq('status', 'pending'),
     ]);
-    const rows = ((careRes.data as unknown as {
+    const raw = (careRes.data as unknown as {
       id: string; patient_id: string; caregiver_id: string; status: CareStatus; initiated_by: string;
       patient: { full_name: string | null } | null; caregiver: { full_name: string | null } | null;
-    }[]) ?? []).map((r) => ({
+    }[]) ?? [];
+    // Resolve display names server-side so members with no full_name fall back to
+    // their email (revealed only for our own care-team counterparties).
+    const ids = [...new Set(raw.flatMap((r) => [r.patient_id, r.caregiver_id]))];
+    const nameMap = new Map<string, string>();
+    if (ids.length) {
+      const { data: disp } = await supabase.rpc('care_member_display', { p_ids: ids });
+      for (const d of (disp as { id: string; display: string }[] | null) ?? []) nameMap.set(d.id, d.display);
+    }
+    const rows = raw.map((r) => ({
       id: r.id, patient_id: r.patient_id, caregiver_id: r.caregiver_id,
       status: r.status, initiated_by: r.initiated_by,
-      patientName: r.patient?.full_name ?? 'Member',
-      caregiverName: r.caregiver?.full_name ?? 'Member',
+      // || (not ??) so a blank-string name also falls through to "Member".
+      patientName: nameMap.get(r.patient_id) || r.patient?.full_name || 'Member',
+      caregiverName: nameMap.get(r.caregiver_id) || r.caregiver?.full_name || 'Member',
     }));
     setCare(rows);
     setInvites(((invRes.data as { id: string; invitee_email: string; role: 'caregiver' | 'patient' }[] | null) ?? [])
