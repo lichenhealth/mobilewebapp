@@ -1,7 +1,10 @@
 .hex-radar {
   position: relative;
   flex-shrink: 0;
-  padding: 8px 28px;
+  /* No padding: the icon/label layer is position:absolute and would NOT inherit
+     the padding offset, while the SVG (a block) would — shifting the hexagon away
+     from the icons. Keeping them at a shared origin is what centers icons on the
+     outer-edge midpoints. Add breathing room on the parent, not here. */
 }
 
 .hex-radar__svg {
