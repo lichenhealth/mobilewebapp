@@ -534,8 +534,10 @@ export default function Concierge() {
               </>
             )}
             {canAuthor && (
-              <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)}>
-                <Icon name="plus" size={14} /> Post to Web of Wellbeing
+              <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)} aria-label="Post to Web of Wellbeing">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
               </button>
             )}
             {dataReady && wowPosts.length === 0 && (
@@ -560,8 +562,10 @@ export default function Concierge() {
             <button className="conc__tool-circle" onClick={() => shiftWeek(7)} aria-label="Next week"><Icon name="chevron-right" size={14} /></button>
           </div>
           {canAuthor && (
-            <button className="board__post-btn" onClick={() => navigate(`${basePath}/koc/edit`)}>
-              <Icon name="plus" size={14} /> Post to care plan
+            <button className="board__post-btn" onClick={() => navigate(`${basePath}/koc/edit`)} aria-label="Post to care plan">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
             </button>
           )}
           {!dataReady && <p className="conc__care-hint">Loading…</p>}

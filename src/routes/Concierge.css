@@ -1121,9 +1121,14 @@
 }
 .wow__chip.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
 .board__post-btn {
-  display: inline-flex; align-items: center; gap: 6px; margin: var(--s-2) var(--s-5) var(--s-3);
-  padding: 8px 16px; border-radius: var(--r-full); background: var(--peach); color: var(--bone-warm); font-weight: 500; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: var(--r-full);
+  background: var(--peach); color: var(--bone-warm);
+  margin: var(--s-2) var(--s-5) var(--s-3) auto;   /* right-aligned */
+  transition: filter var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
+.board__post-btn:hover { filter: brightness(1.05); }
+.board__post-btn:active { transform: scale(0.94); }
 .koc__daysec { margin-bottom: var(--s-2); }
 .koc__daylbl { font-size: 12px; font-weight: 600; color: var(--ink); padding: var(--s-2) var(--s-5) 4px; }
 .koc__dayempty { font-size: 12px; font-weight: 300; color: var(--ink-faint); padding: 0 var(--s-5) var(--s-2); }
