@@ -42,13 +42,14 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
     angles.map((a) => [cx + r * s * Math.cos(a), cy + r * s * Math.sin(a)])
   );
   // Label position: slightly outside the vertex
-  const labelOffset = 1.22;
+  const labelOffset = 1.34;
   const labelPts = angles.map((a) => [
     cx + r * labelOffset * Math.cos(a),
     cy + r * labelOffset * Math.sin(a),
   ]);
   // Icon position: just inside the vertex
-  const iconOffset = 0.72;
+  // Icons centered on the outer hexagon vertices; % labels sit just beyond them.
+  const iconOffset = 1.0;
   const iconPts = angles.map((a) => [
     cx + r * iconOffset * Math.cos(a),
     cy + r * iconOffset * Math.sin(a),
