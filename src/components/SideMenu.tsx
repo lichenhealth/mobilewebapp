@@ -3,6 +3,8 @@ import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { COMMUNITIES, GROUPS, NETWORK_LABELS } from '../data/network';
 import { useAuth } from '../auth/AuthProvider';
+import { useNotifications } from '../notifications/NotificationsProvider';
+import { sectionForRoute } from '../lib/sections';
 import './SideMenu.css';
 
 interface SideMenuProps {
@@ -81,6 +83,7 @@ const SECTIONS: NavSection[] = [
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const { countsBySection, totalUnread } = useNotifications();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
@@ -121,19 +124,25 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
         <nav className="side-menu__nav">
           <div className="side-menu__primary">
-            {PRIMARY.map((p) => (
-              <NavLink
-                key={p.to}
-                to={p.to}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
-                }
-              >
-                <Icon name={p.icon} size={20} />
-                <span>{p.label}</span>
-              </NavLink>
-            ))}
+            {PRIMARY.map((p) => {
+              const count = p.to === '/home'
+                ? totalUnread
+                : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
+              return (
+                <NavLink
+                  key={p.to}
+                  to={p.to}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    'side-menu__primary-item' + (isActive ? ' is-active' : '')
+                  }
+                >
+                  <Icon name={p.icon} size={20} />
+                  <span>{p.label}</span>
+                  {count > 0 && <span className="nav-badge side-menu__badge">{count > 9 ? '9+' : count}</span>}
+                </NavLink>
+              );
+            })}
           </div>
 
           {isAdmin && (

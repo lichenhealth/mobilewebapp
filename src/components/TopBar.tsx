@@ -1,13 +1,15 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
+import { useNotifications } from '../notifications/NotificationsProvider';
+import { scopeForPath } from '../lib/sections';
+import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
 
 interface TopBarProps {
-  notificationCount?: number;
   onMenu?: () => void;
-  onNotifications?: () => void;
 }
 
 /** Section identity: when on these route prefixes, show a section-specific
@@ -45,14 +47,17 @@ const SECTION_LOGOS: SectionLogo[] = [
 const SETTINGS_PREFIXES = ['/concierge'];
 
 export default function TopBar({
-  notificationCount = 12,
   onMenu,
-  onNotifications,
 }: TopBarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const section = SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
   const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
+
+  const { unreadForScope } = useNotifications();
+  const scope = scopeForPath(pathname);
+  const notificationCount = unreadForScope(scope);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   return (
     <header className="top-bar">
@@ -102,7 +107,7 @@ export default function TopBar({
         )}
         <button
           className="top-bar__icon top-bar__bell"
-          onClick={onNotifications}
+          onClick={() => setPanelOpen((o) => !o)}
           aria-label={`Notifications (${notificationCount})`}
         >
           <Icon name="bell" size={18} />
@@ -113,6 +118,8 @@ export default function TopBar({
           )}
         </button>
       </div>
+
+      {panelOpen && <NotificationPanel scope={scope} onClose={() => setPanelOpen(false)} />}
     </header>
   );
 }

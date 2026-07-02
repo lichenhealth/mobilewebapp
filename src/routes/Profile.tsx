@@ -9,7 +9,7 @@ import './Profile.css';
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
-type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null };
+type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; email_notifications?: boolean };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
 type CareRow = {
@@ -44,6 +44,7 @@ export default function Profile() {
   const [fullName, setFullName] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
+  const [emailNotif, setEmailNotif] = useState(false);
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<MySpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -71,7 +72,7 @@ export default function Profile() {
     if (!user) return;
     setLoadingData(true);
     const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
-      supabase.from('profiles').select('created_at,full_name,headline,bio').eq('id', user.id).single(),
+      supabase.from('profiles').select('created_at,full_name,headline,bio,email_notifications').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
@@ -86,6 +87,7 @@ export default function Profile() {
       setFullName(p.full_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
+      setEmailNotif(Boolean(p.email_notifications));
     }
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
     setCaps(cRows.map((r) => r.capability));
@@ -218,6 +220,13 @@ export default function Profile() {
     setTimeout(() => setProfileMsg(''), 2000);
   }
 
+  async function setEmailNotifications(on: boolean) {
+    if (!user) return;
+    setEmailNotif(on);
+    const { error: e } = await supabase.from('profiles').update({ email_notifications: on }).eq('id', user.id);
+    if (e) { setError(e.message); setEmailNotif(!on); }
+  }
+
   async function toggleCap(cap: string) {
     if (!user) return;
     setError('');
@@ -329,6 +338,27 @@ export default function Profile() {
             {savingProfile ? 'Saving...' : 'Save'}
           </button>
           {profileMsg && <span className="prof__msg">{profileMsg}</span>}
+        </div>
+      </section>
+
+      <section className="prof__section">
+        <h2 className="prof__h2">Notifications</h2>
+        <p className="prof__care-lead">In-app notifications are always on. Choose whether to also get them by email.</p>
+        <div className="prof__notif-opts">
+          <button
+            type="button"
+            className={'prof__notif-opt' + (!emailNotif ? ' is-on' : '')}
+            onClick={() => setEmailNotifications(false)}
+          >
+            In-app only
+          </button>
+          <button
+            type="button"
+            className={'prof__notif-opt' + (emailNotif ? ' is-on' : '')}
+            onClick={() => setEmailNotifications(true)}
+          >
+            In-app + email
+          </button>
         </div>
       </section>
 
