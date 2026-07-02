@@ -3,65 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
 import ChatConversation from '../components/ChatConversation';
+import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
 import { loadConciergeAccess } from '../lib/chatApi';
-import { loadLatestSnapshot, loadCurrentCarePlan } from '../lib/conciergeApi';
+import {
+  loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
+  WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
+  type CarePostRow, type Dimension,
+} from '../lib/conciergeApi';
 import { useAuth } from '../auth/AuthProvider';
-import { ON_CALL_NOW, BACKUP_PRACTITIONERS, type HealthSnapshot, type CarePlan } from '../data/concierge';
+import { ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
-
-/** Renders body text with {{ai:phrase}} markers transformed into <span>s
- *  that get peach color when AI is on, muted gray when AI is off. */
-function BodyWithAI({ text, aiOn }: { text: string; aiOn: boolean }) {
-  const parts = text.split(/(\{\{ai:[^}]+\}\})/g);
-  return (
-    <p className="snap__body-text">
-      {parts.map((p, i) => {
-        const m = p.match(/^\{\{ai:([^}]+)\}\}$/);
-        if (m) {
-          return (
-            <span
-              key={i}
-              className={'snap__ai-ref' + (aiOn ? '' : ' is-off')}
-            >
-              {m[1]}
-            </span>
-          );
-        }
-        return <span key={i}>{p}</span>;
-      })}
-    </p>
-  );
-}
-
-/** Renders KOC care item text with two markers:
- *    [phrase]       → peach-underlined intervention link
- *    {icon-name}    → small inline icon */
-function CareItemText({ text }: { text: string }) {
-  // Tokenize: match either [phrase], {icon}, or plain text
-  const tokens = text.split(/(\[[^\]]+\]|\{[^}]+\})/g);
-  return (
-    <>
-      {tokens.map((tok, i) => {
-        const linkMatch = tok.match(/^\[([^\]]+)\]$/);
-        if (linkMatch) {
-          return <span key={i} className="koc__link">{linkMatch[1]}</span>;
-        }
-        const iconMatch = tok.match(/^\{([^}]+)\}$/);
-        if (iconMatch) {
-          return (
-            <span key={i} className="koc__inline-icon">
-              <Icon name={iconMatch[1] as IconName} size={12} />
-            </span>
-          );
-        }
-        return <span key={i}>{tok}</span>;
-      })}
-    </>
-  );
-}
 
 /** Urgent Care: connect with the on-call practitioner now (text or call),
  *  with optional context (message + photo/video/voice). If the on-call
@@ -308,9 +262,12 @@ export default function Concierge() {
   const careAnchor = useRef<HTMLDivElement>(null);
   const [careTop, setCareTop] = useState(0);
 
-  // Real WOW / KOC data for whoever we're viewing (RLS scopes to care-team reads).
-  const [snap, setSnap] = useState<HealthSnapshot | null>(null);
-  const [plan, setPlan] = useState<CarePlan | null>(null);
+  // WOW/KOC care-post board for whoever we're viewing (RLS scopes to care-team reads).
+  const [wowPosts, setWowPosts] = useState<CarePostRow[]>([]);
+  const [kocPosts, setKocPosts] = useState<CarePostRow[]>([]);
+  const [wowFilter, setWowFilter] = useState<Dimension | 'All'>('All');
+  const [weekStart, setWeekStart] = useState<string>(mondayOfWeek(todayISO()));
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => {
@@ -354,20 +311,45 @@ export default function Concierge() {
     return () => window.removeEventListener('resize', measure);
   }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName]);
 
-  // Load the subject's latest snapshot + current care plan.
+  // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
+  const weekEnd = weekDays(weekStart)[6].iso;
   useEffect(() => {
     if (!me) return;
     let active = true;
     setDataReady(false);
     (async () => {
-      const [s, p] = await Promise.all([loadLatestSnapshot(subjectId), loadCurrentCarePlan(subjectId)]);
+      const [wow, koc] = await Promise.all([
+        loadCarePosts(subjectId, 'wow'),
+        loadCarePosts(subjectId, 'koc', { from: weekStart, to: weekEnd }),
+      ]);
       if (!active) return;
-      setSnap(s?.vm ?? null);
-      setPlan(p?.vm ?? null);
+      setWowPosts(wow);
+      setKocPosts(koc);
       setDataReady(true);
     })();
     return () => { active = false; };
-  }, [me, subjectId]);
+  }, [me, subjectId, weekStart, weekEnd]);
+
+  // Sign any attachment paths we haven't signed yet.
+  useEffect(() => {
+    const need = new Set<string>();
+    for (const p of [...wowPosts, ...kocPosts]) for (const a of p.attachments) if (!mediaUrls[a.path]) need.add(a.path);
+    if (need.size === 0) return;
+    let active = true;
+    signCareMedia([...need]).then((m) => { if (active) setMediaUrls((cur) => ({ ...cur, ...m })); });
+    return () => { active = false; };
+  }, [wowPosts, kocPosts, mediaUrls]);
+
+  async function removePost(id: string) {
+    try {
+      await deleteCarePost(id);
+      setWowPosts((cur) => cur.filter((p) => p.id !== id));
+      setKocPosts((cur) => cur.filter((p) => p.id !== id));
+    } catch (e) { console.error(e); }
+  }
+  function shiftWeek(days: number) {
+    const d = localDate(weekStart); d.setDate(d.getDate() + days); setWeekStart(toISO(d));
+  }
 
   // Default scope follows the active tab: Day for WOW, Week for KOC
   useEffect(() => {
@@ -531,115 +513,72 @@ export default function Concierge() {
       )}
 
       {/* Active tab content */}
-      {activeTab === 'wow' && (
-        <>
-          {!dataReady && <p className="conc__care-hint">Loading snapshot…</p>}
-          {dataReady && snap && (
-            <article className="snap">
-              <header className="snap__head">
-                <div className="snap__avatar" style={{ background: snap.patient.color }}>
-                  {snap.patient.monogram}
+      {activeTab === 'wow' && (() => {
+        const scores = computeWowScores(wowPosts);
+        const feed = wowFilter === 'All' ? wowPosts : wowPosts.filter((p) => p.dimensions.includes(wowFilter));
+        return (
+          <>
+            {!dataReady && <p className="conc__care-hint">Loading…</p>}
+            {dataReady && wowPosts.length > 0 && (
+              <>
+                <div className="wow__overall">
+                  <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
+                  <span className="wow__overall-lbl">Overall wellbeing</span>
                 </div>
-                <span className="snap__name">{snap.patient.name}</span>
-                <span className="snap__date">{snap.date}</span>
-                {canAuthor && (
-                  <button className="snap__edit" onClick={() => navigate(`${basePath}/wow/edit`)}>
-                    <Icon name="settings" size={13} /> Edit
-                  </button>
-                )}
-              </header>
-
-              <section className="snap__summary">
-                <div className="snap__summary-text">
-                  <h3 className="snap__h3">Summary</h3>
-                  <p className="snap__body-text">{snap.summary}</p>
+                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={200} /></div>
+                <div className="wow__chips">
+                  {(['All', ...WOW_DIMENSIONS] as const).map((c) => (
+                    <button key={c} className={'wow__chip' + (wowFilter === c ? ' is-on' : '')} onClick={() => setWowFilter(c)}>{c}</button>
+                  ))}
                 </div>
-                <HexagonRadar axes={snap.axes} size={200} />
-              </section>
-
-              {snap.sections.map((s) => (
-                <section className="snap__section" key={s.title}>
-                  <h3 className="snap__h3 snap__h3--center">{s.title}</h3>
-                  <ol className="snap__list">
-                    {s.items.map((it, i) => (
-                      <li key={i} className="snap__list-item">{it}</li>
-                    ))}
-                  </ol>
-                  <BodyWithAI text={s.body} aiOn={aiOn} />
-                </section>
-              ))}
-
-              <footer className="conc__end">
-                <span className="eyebrow">End of snapshot</span>
-                <Icon name="sparkle" size={14} />
-              </footer>
-            </article>
-          )}
-          {dataReady && !snap && (
-            <ConciergeEmpty
-              icon="health"
-              title="No snapshot yet"
-              sub={canAuthor
-                ? "Capture where this member is across the six wellness dimensions."
-                : "Your care team hasn't shared a wellness snapshot yet."}
-              action={canAuthor ? { label: 'Create snapshot', onClick: () => navigate(`${basePath}/wow/edit`) } : undefined}
-            />
-          )}
-        </>
-      )}
+              </>
+            )}
+            {canAuthor && (
+              <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)}>
+                <Icon name="plus" size={14} /> Post to Web of Wellbeing
+              </button>
+            )}
+            {dataReady && wowPosts.length === 0 && (
+              <ConciergeEmpty icon="health" title="Web of Wellbeing"
+                sub={canAuthor
+                  ? 'Post the first entry — add content, tag a dimension, and give it a wellbeing score.'
+                  : "Your care team hasn't posted here yet."} />
+            )}
+            {feed.map((p) => (
+              <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
+                canDelete={canAuthor && p.author_id === me} onDelete={removePost} />
+            ))}
+          </>
+        );
+      })()}
 
       {activeTab === 'koc' && (
         <>
-          {!dataReady && <p className="conc__care-hint">Loading care plan…</p>}
-          {dataReady && plan && (
-            <article className="snap koc">
-              <header className="snap__head">
-                <div className="snap__avatar" style={{ background: plan.patient.color }}>
-                  {plan.patient.monogram}
-                </div>
-                <span className="snap__name">{plan.patient.name}</span>
-                <span className="snap__date">{plan.dateRange}</span>
-                {canAuthor && (
-                  <button className="snap__edit" onClick={() => navigate(`${basePath}/koc/edit`)}>
-                    <Icon name="settings" size={13} /> Edit
-                  </button>
-                )}
-              </header>
-
-              {plan.days.map((day) => (
-                <section className="koc__day" key={day.label}>
-                  <h3 className="koc__day-label">{day.label}</h3>
-                  {day.providers.map((p) => (
-                    <div className="koc__provider-block" key={p.handle}>
-                      <p className="koc__handle">{p.handle}:</p>
-                      <ul className="koc__items">
-                        {p.items.map((item, i) => (
-                          <li key={i} className="koc__item">
-                            <CareItemText text={item.text} />
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+          <div className="koc__weeknav">
+            <button className="conc__tool-circle" onClick={() => shiftWeek(-7)} aria-label="Previous week"><Icon name="chevron-left" size={14} /></button>
+            <span className="koc__weeklbl">{formatWeekRange(weekStart)}</span>
+            <button className="conc__tool-circle" onClick={() => shiftWeek(7)} aria-label="Next week"><Icon name="chevron-right" size={14} /></button>
+          </div>
+          {canAuthor && (
+            <button className="board__post-btn" onClick={() => navigate(`${basePath}/koc/edit`)}>
+              <Icon name="plus" size={14} /> Post to care plan
+            </button>
+          )}
+          {!dataReady && <p className="conc__care-hint">Loading…</p>}
+          {dataReady && weekDays(weekStart).map((day) => {
+            const posts = kocPosts.filter((p) => p.start_date! <= day.iso && p.end_date! >= day.iso);
+            return (
+              <section className="koc__daysec" key={day.iso}>
+                <h3 className="koc__daylbl">{day.label}</h3>
+                {posts.length === 0
+                  ? <p className="koc__dayempty">Nothing scheduled</p>
+                  : posts.map((p) => (
+                    <CarePostCard key={p.id + day.iso} post={p} mediaUrls={mediaUrls}
+                      canDelete={canAuthor && p.author_id === me} onDelete={removePost} />
                   ))}
-                </section>
-              ))}
-
-              <footer className="conc__end">
-                <span className="eyebrow">End of week</span>
-                <Icon name="sparkle" size={14} />
-              </footer>
-            </article>
-          )}
-          {dataReady && !plan && (
-            <ConciergeEmpty
-              icon="calendar"
-              title="No care plan yet"
-              sub={canAuthor
-                ? "Lay out this week's care across the team, day by day."
-                : "Your care team hasn't shared this week's plan yet."}
-              action={canAuthor ? { label: "Build this week's plan", onClick: () => navigate(`${basePath}/koc/edit`) } : undefined}
-            />
-          )}
+              </section>
+            );
+          })}
         </>
       )}
 
