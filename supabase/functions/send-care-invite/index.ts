@@ -14,6 +14,9 @@
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('INVITE_FROM') ?? 'Lichen <care@lichen.healthcare>';
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
+// A real, monitored inbox (lichen.healthcare is send-only, so replies must land on
+// lichen.health). Replies + an unsubscribe header both improve deliverability.
+const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -87,7 +90,10 @@ Deno.serve(async (req) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to: [email], subject, text, html }),
+    body: JSON.stringify({
+      from: FROM, to: [email], reply_to: REPLY_TO, subject, text, html,
+      headers: { 'List-Unsubscribe': `<mailto:${REPLY_TO}?subject=unsubscribe>` },
+    }),
   });
 
   if (!res.ok) {
