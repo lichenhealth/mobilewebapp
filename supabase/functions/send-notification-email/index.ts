@@ -60,12 +60,12 @@ Deno.serve(async (req) => {
   // Look up the recipient's email + preference with the service role (bypasses the
   // email column lock). Skip silently if they haven't opted in.
   const profRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${n.recipient_id}&select=email,email_notifications`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${n.recipient_id}&select=email,notification_pref`,
     { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
   );
   const profs = await profRes.json().catch(() => []);
   const prof = Array.isArray(profs) ? profs[0] : null;
-  if (!prof?.email || !prof.email_notifications) return json({ ok: true, skipped: 'opted-out' });
+  if (!prof?.email || prof.notification_pref !== 'both') return json({ ok: true, skipped: 'opted-out' });
 
   const url = `${APP_URL}${n.link ?? ''}`;
   const line = `${n.title}${n.body ? ` ${n.body}` : ''}`;

@@ -6,13 +6,15 @@
 .prof__notif-opts { display: flex; gap: var(--s-2); }
 .prof__notif-opt {
   flex: 1;
-  padding: 10px 14px;
+  padding: 9px 6px;
   border-radius: var(--r-md);
   border: 1px solid var(--bone-edge);
   background: var(--bone-warm);
   color: var(--ink-soft);
-  font-size: var(--t-sm);
-  font-weight: 400;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
   transition: border-color var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
 }
 .prof__notif-opt.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
