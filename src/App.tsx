@@ -14,7 +14,9 @@ import Directory from './routes/Directory';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
-import { Calendar, Saved, Maps } from './routes/Stubs';
+import { Saved, Maps } from './routes/Stubs';
+import Calendar from './routes/Calendar';
+import EventComposer from './routes/EventComposer';
 import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
@@ -72,6 +74,8 @@ export default function App() {
           <Route path="/chat"      element={<Chat />} />
           <Route path="/chat/:id"  element={<ChatThread />} />
           <Route path="/calendar"  element={<Calendar />} />
+          <Route path="/calendar/new" element={<EventComposer />} />
+          <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/maps"      element={<Maps />} />
           <Route path="/profile"   element={<Profile />} />
