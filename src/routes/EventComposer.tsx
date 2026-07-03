@@ -1,0 +1,190 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Icon } from '../components/Icon';
+import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
+import RecurrenceSelect from '../components/RecurrenceSelect';
+import TimeField from '../components/TimeField';
+import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../lib/supabase';
+import { colorFor, monogramFor } from '../lib/chatApi';
+import { todayISO } from '../lib/conciergeApi';
+import { Recurrence, recurrenceLabel } from '../lib/recurrence';
+import { createEvent } from '../lib/calendarApi';
+import './Concierge.css';
+import './Calendar.css';
+
+interface SpaceOpt { id: string; name: string }
+interface MemberOpt { id: string; full_name: string | null }
+
+/** Compose a calendar event: title, which calendar, when (date/times/recurrence),
+ *  invitees, location + notes. */
+export default function EventComposer() {
+  const { user } = useAuth();
+  const me = user?.id ?? '';
+  const navigate = useNavigate();
+  const back = () => navigate('/calendar');
+
+  const [title, setTitle] = useState('');
+  const [calendar, setCalendar] = useState('me');            // 'me' | space id
+  const [spaces, setSpaces] = useState<SpaceOpt[]>([]);
+  const [range, setRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
+  const [allDay, setAllDay] = useState(false);
+  const [startMin, setStartMin] = useState(9 * 60);
+  const [endMin, setEndMin] = useState(10 * 60);
+  const [recurrence, setRecurrence] = useState<Recurrence | null>(null);
+  const [members, setMembers] = useState<MemberOpt[]>([]);
+  const [query, setQuery] = useState('');
+  const [invitees, setInvitees] = useState<MemberOpt[]>([]);
+  const [location, setLocation] = useState('');
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const anchor = range.start ?? todayISO();
+
+  useEffect(() => {
+    if (!me) return;
+    (async () => {
+      const [spRes, memRes] = await Promise.all([
+        supabase.from('space_members').select('spaces(id, name)').eq('profile_id', me),
+        supabase.from('profiles').select('id, full_name').neq('id', me).order('full_name').limit(500),
+      ]);
+      const sp = ((spRes.data as unknown as { spaces: SpaceOpt | null }[] | null) ?? [])
+        .map((r) => r.spaces).filter((s): s is SpaceOpt => !!s);
+      setSpaces(sp);
+      setMembers((memRes.data as MemberOpt[] | null) ?? []);
+    })();
+  }, [me]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return members
+      .filter((m) => !invitees.some((i) => i.id === m.id))
+      .filter((m) => (m.full_name ?? '').toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [query, members, invitees]);
+
+  async function save() {
+    if (!me) return;
+    if (!title.trim()) { setError('Give the event a title.'); return; }
+    if (!range.start) { setError('Pick a day.'); return; }
+    if (!allDay && endMin <= startMin && range.start === (range.end ?? range.start)) {
+      setError('End time must be after the start.'); return;
+    }
+    setSaving(true); setError('');
+    try {
+      await createEvent(me, {
+        ownerProfileId: calendar === 'me' ? me : undefined,
+        ownerSpaceId: calendar === 'me' ? undefined : calendar,
+        title: title.trim(),
+        description: description.trim(),
+        location: location.trim(),
+        startDate: range.start,
+        endDate: range.end ?? range.start,
+        allDay,
+        startMin, endMin,
+        recurrence,
+        inviteeIds: invitees.map((i) => i.id),
+      });
+      back();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="cedit">
+      <header className="cedit__head">
+        <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+        <h1 className="cedit__title">New event</h1>
+        <button className="btn btn-primary cedit__save" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </header>
+
+      {error && <p className="cedit__error">{error}</p>}
+
+      <div className="cedit__body">
+        <input
+          className="cedit__input" placeholder="Event title"
+          value={title} onChange={(e) => setTitle(e.target.value)}
+        />
+
+        {/* Which calendar */}
+        <div className="cedit__field">
+          <span className="cedit__label">Calendar</span>
+          <select className="rec__select" value={calendar} onChange={(e) => setCalendar(e.target.value)}>
+            <option value="me">My calendar</option>
+            {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        {/* When */}
+        <div className="cedit__field">
+          <span className="cedit__label">When</span>
+          <label className="rec__radio">
+            <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
+          </label>
+          {!allDay && (
+            <div className="rec__row">
+              <TimeField value={startMin} onChange={(m) => { setStartMin(m); if (endMin <= m) setEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
+              <span className="rec__lbl">to</span>
+              <TimeField value={endMin} onChange={setEndMin} min={range.start === (range.end ?? range.start) ? startMin : undefined} ariaLabel="End time" />
+            </div>
+          )}
+          <RecurrenceSelect
+            anchor={anchor} recurrence={recurrence}
+            onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
+          />
+          <DateRangeCalendar
+            value={recurrence ? { start: range.start, end: range.start } : range}
+            onChange={(r) => setRange(recurrence ? { start: r.start, end: r.start } : r)}
+          />
+          <p className="rec__summary">
+            {recurrence ? recurrenceLabel(recurrence, anchor) : range.start === (range.end ?? range.start) ? 'One day' : 'Multi-day'}
+          </p>
+        </div>
+
+        {/* Invitees */}
+        <div className="cedit__field">
+          <span className="cedit__label">Invite people</span>
+          {invitees.length > 0 && (
+            <div className="calp__invitees">
+              {invitees.map((m) => (
+                <button className="calp__invitee" key={m.id} onClick={() => setInvitees((cur) => cur.filter((x) => x.id !== m.id))}>
+                  <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
+                  {m.full_name ?? 'Member'} ×
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            className="cedit__input" placeholder="Search members…"
+            value={query} onChange={(e) => setQuery(e.target.value)}
+          />
+          {matches.map((m) => (
+            <button
+              className="calp__match" key={m.id}
+              onClick={() => { setInvitees((cur) => [...cur, m]); setQuery(''); }}
+            >
+              <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
+              {m.full_name ?? 'Member'}
+            </button>
+          ))}
+        </div>
+
+        {/* Location + notes */}
+        <div className="cedit__field">
+          <span className="cedit__label">Location</span>
+          <input className="cedit__input" placeholder="Where (optional)" value={location} onChange={(e) => setLocation(e.target.value)} />
+        </div>
+        <div className="cedit__field">
+          <span className="cedit__label">Notes</span>
+          <textarea className="cedit__textarea" rows={3} placeholder="Details (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+      </div>
+    </div>
+  );
+}

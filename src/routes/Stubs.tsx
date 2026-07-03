@@ -1,16 +1,5 @@
 import Placeholder from './Placeholder';
 
-export function Calendar() {
-  return (
-    <Placeholder
-      title="Calendar"
-      icon="calendar"
-      intro="A shared sense of the season — workshops, suppers, swaps. Only events from members you trust appear by default."
-      hint="Coming in pass two"
-    />
-  );
-}
-
 export function Saved() {
   return (
     <Placeholder
