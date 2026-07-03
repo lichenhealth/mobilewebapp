@@ -67,13 +67,30 @@
   display: grid; grid-template-columns: 44px repeat(7, 1fr);
   border-bottom: 1px solid var(--bone-edge);
 }
-/* Frozen day-header row (spreadsheet-style) — sticks below the fixed TopBar. */
-.calp__days {
+
+/* Frozen unit (à la Google Cal): toolbar + day header pinned below the fixed
+   TopBar; the hour grid slides beneath it. Bone background so scrolled content
+   disappears under the pin, not through it. */
+.calp__pin {
   position: sticky; top: calc(var(--top-h) + var(--safe-top, 0px)); z-index: 10;
-  background: var(--bone-warm); border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--bone);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: 0 var(--s-5) 0;
+  margin-bottom: var(--s-2);
 }
 @media (min-width: 1024px) {
-  .calp__days { top: 0; }
+  .calp__pin { top: 0; padding-top: var(--s-2); }
+}
+/* Inside the pin, the day header reads as the top edge of the grid card. */
+.calp__pin .calp__days {
+  margin: 0 calc(var(--s-3) - var(--s-5));           /* align with the card below */
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); border-bottom: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+/* Card continues seamlessly under the pinned day header. */
+.calp__card--flush {
+  border-top: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); margin-top: calc(-1 * var(--s-2));
 }
 .calp__day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; }
 .calp__day-name { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }

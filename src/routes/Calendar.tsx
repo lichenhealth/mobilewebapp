@@ -74,7 +74,8 @@ export default function Calendar() {
     if (view === 'month') return;
     const el = gridRef.current;
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 170;
+    // Land 7am just below the pinned toolbar+day-header stack.
+    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 230;
     if (y > 0) window.scrollTo({ top: y });
   }, [view]);
 
@@ -129,6 +130,11 @@ export default function Calendar() {
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
+          hour grid slides up and hides beneath them. */}
+      <div className="calp__pin">
         <div className="calp__toolbar">
           <button
             className={'calp__tool' + (searchOpen ? ' is-on' : '')}
@@ -164,6 +170,17 @@ export default function Calendar() {
             {query.trim() && results.length === 0 && <p className="calp__result-none">No matching events.</p>}
           </div>
         )}
+        {view !== 'month' && (
+          <div className="calp__days" style={gridCols}>
+            <span className="calp__gutter-head" />
+            {days.map((iso) => (
+              <div className="calp__day" key={iso}>
+                <span className="calp__day-name">{DAY_LABELS[localDate(iso).getDay()]}</span>
+                <span className={'calp__day-num' + (iso === today ? ' is-today' : '')}>{localDate(iso).getDate()}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {view === 'month' ? (
@@ -192,18 +209,8 @@ export default function Calendar() {
           </div>
         </div>
       ) : (
-        /* ── Time grid (Day / 3 Days / Week) ── */
-        <div className="calp__card">
-          <div className="calp__days" style={gridCols}>
-            <span className="calp__gutter-head" />
-            {days.map((iso) => (
-              <div className="calp__day" key={iso}>
-                <span className="calp__day-name">{DAY_LABELS[localDate(iso).getDay()]}</span>
-                <span className={'calp__day-num' + (iso === today ? ' is-today' : '')}>{localDate(iso).getDate()}</span>
-              </div>
-            ))}
-          </div>
-
+        /* ── Time grid (Day / 3 Days / Week) — day header lives in the pin ── */
+        <div className="calp__card calp__card--flush">
           {hasAllDayRow && (
             <div className="calp__alldays" style={gridCols}>
               <span className="calp__gutter-head" />
