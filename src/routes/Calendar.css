@@ -23,15 +23,25 @@
 }
 .calp__month { font-family: var(--font-mono); font-size: 13px; color: var(--ink); padding: 4px 8px; }
 
-/* Grid card */
+/* Grid card — the PAGE scrolls (not the card), so the day header can stick.
+   No overflow:hidden here: it would become the sticky containing block and
+   the header would never freeze. */
 .calp__card {
   margin: 0 var(--s-3) var(--s-3); background: var(--bone-warm);
   border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
-  display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: hidden;
+  display: flex; flex-direction: column;
 }
 .calp__days, .calp__alldays {
   display: grid; grid-template-columns: 44px repeat(7, 1fr);
   border-bottom: 1px solid var(--bone-edge);
+}
+/* Frozen day-header row (spreadsheet-style) — sticks below the fixed TopBar. */
+.calp__days {
+  position: sticky; top: calc(var(--top-h) + var(--safe-top, 0px)); z-index: 10;
+  background: var(--bone-warm); border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+@media (min-width: 1024px) {
+  .calp__days { top: 0; }
 }
 .calp__day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; }
 .calp__day-name { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
@@ -48,7 +58,7 @@
   padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
 }
 
-.calp__grid { overflow-y: auto; flex: 1; min-height: 0; }
+.calp__grid { position: relative; }
 .calp__grid-inner { display: grid; grid-template-columns: 44px repeat(7, 1fr); position: relative; }
 .calp__gutter { position: relative; }
 .calp__hour {
@@ -76,11 +86,11 @@
 .calp__loading { font-size: 12px; color: var(--ink-faint); text-align: center; padding: var(--s-2); }
 
 /* Detail sheet */
-.calp__scrim { position: fixed; inset: 0; background: rgba(18, 24, 28, 0.35); z-index: 40; }
+.calp__scrim { position: fixed; inset: 0; background: rgba(18, 24, 28, 0.35); z-index: 59; }
 .calp__sheet {
-  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);
-  width: min(100%, var(--app-max)); max-height: 70dvh; overflow-y: auto; z-index: 41;
-  background: var(--bone-warm); border-radius: var(--r-lg) var(--r-lg) 0 0;
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 400px); max-height: 80dvh; overflow-y: auto; z-index: 60; /* above the fixed TopBar (50) */
+  background: var(--bone-warm); border-radius: var(--r-lg);
   padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-2);
   box-shadow: var(--sh-pop);
 }

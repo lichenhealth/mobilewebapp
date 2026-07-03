@@ -8,7 +8,7 @@ import { occursOn } from '../lib/recurrence';
 import { EventRow, loadMyEvents, deleteEvent, rsvp, minToLabel } from '../lib/calendarApi';
 import './Calendar.css';
 
-const HOUR_PX = 48;
+const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Sunday that starts the week containing iso (mock's grid is Sunday-first). */
@@ -46,8 +46,14 @@ export default function Calendar() {
   }, [me, weekStart, weekEnd]);
   useEffect(() => { load(); }, [load]);
 
-  // Open the grid around the working morning.
-  useEffect(() => { gridRef.current?.scrollTo({ top: 7 * HOUR_PX }); }, []);
+  // Open the page scrolled to the working morning (the PAGE scrolls, not the
+  // grid — the sticky day header needs the outer scroll context).
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 170;
+    if (y > 0) window.scrollTo({ top: y });
+  }, []);
 
   const timedOn = (iso: string) =>
     events
@@ -130,7 +136,7 @@ export default function Calendar() {
                 ))}
                 {timedOn(iso).map((e) => {
                   const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
-                  const height = Math.max(22, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
+                  const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
                   return (
                     <button
                       className={blockClass(e, 'calp__event')} key={e.id + iso}
