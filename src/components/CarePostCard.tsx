@@ -4,6 +4,7 @@ import { Icon } from './Icon';
 import { colorFor, monogramFor, formatRelative } from '../lib/chatApi';
 import { CarePostRow, CareAttachment, CareLink, CarePostPreview, rangeLabel } from '../lib/conciergeApi';
 import { linkify, hrefFor } from '../lib/linkify';
+import { recurrenceLabel } from '../lib/recurrence';
 import './CarePostCard.css';
 
 /** Render body text with pasted URLs turned into clickable links. */
@@ -137,8 +138,13 @@ export default function CarePostCard({
               : post.dimensions.map((d) => <span key={d} className="cpost__tag">{d}</span>)}
           </div>
         )}
-        {post.kind === 'koc' && post.start_date && post.end_date && (
-          <span className="cpost__range"><Icon name="calendar" size={12} /> {rangeLabel(post.start_date, post.end_date)}</span>
+        {post.kind === 'koc' && post.start_date && (
+          <span className="cpost__range">
+            <Icon name={post.recurrence ? 'repeat' : 'calendar'} size={12} />{' '}
+            {post.recurrence
+              ? recurrenceLabel(post.recurrence, post.start_date)
+              : rangeLabel(post.start_date, post.end_date ?? post.start_date)}
+          </span>
         )}
       </footer>
     </article>

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { IconName } from '../components/Icon';
 import type { RadarAxis } from '../components/HexagonRadar';
+import type { Recurrence } from './recurrence';
 import { youtubeId } from './linkify';
 
 // ─── Wellbeing dimensions — single source of truth (HexagonRadar order) ──────
@@ -35,6 +36,7 @@ export interface CarePostRow {
   score: number | null;
   start_date: string | null;
   end_date: string | null;
+  recurrence: Recurrence | null;
   attachments: CareAttachment[];
   links: CareLink[];
   previews: CarePostPreview[];
@@ -43,7 +45,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, attachments, links, previews, created_at, updated_at';
+  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -96,8 +98,12 @@ export async function loadCarePosts(patientId: string, kind: CareKind, opts: Loa
     .eq('patient_id', patientId)
     .eq('kind', kind);
   if (kind === 'koc' && opts.from && opts.to) {
-    // Overlap: a post is visible in the window if its span intersects it.
-    q = q.lte('start_date', opts.to).gte('end_date', opts.from).order('start_date').order('created_at');
+    // A post is a candidate for the window if it starts on/before it AND either
+    // ends on/after it OR is open-ended (recurring). The client then decides each
+    // day precisely via occursOn() (recurrence.ts).
+    q = q.lte('start_date', opts.to)
+      .or(`end_date.gte.${opts.from},end_date.is.null`)
+      .order('start_date').order('created_at');
   } else {
     if (kind === 'wow' && opts.dimension && opts.dimension !== 'All') q = q.contains('dimensions', [opts.dimension]);
     q = q.order('created_at', { ascending: false });
@@ -140,15 +146,19 @@ export interface CarePostInput {
   patientId: string; kind: CareKind; body: string;
   dimensions?: Dimension[]; score?: number;      // wow
   startDate?: string; endDate?: string;          // koc
+  recurrence?: Recurrence | null;                // koc (null = plain day/range)
   attachments: CareAttachment[]; links: CareLink[]; previews: CarePostPreview[];
 }
 export async function createCarePost(me: string, input: CarePostInput): Promise<string> {
+  const recurring = input.kind === 'koc' && !!input.recurrence;
   const row = {
     patient_id: input.patientId, author_id: me, kind: input.kind, body: input.body,
     dimensions: input.kind === 'wow' ? (input.dimensions ?? []) : [],
     score: input.kind === 'wow' ? input.score : null,
     start_date: input.kind === 'koc' ? input.startDate : null,
-    end_date: input.kind === 'koc' ? input.endDate : null,
+    // A recurring post's end lives in the recurrence spec, so end_date is null.
+    end_date: input.kind === 'koc' && !recurring ? input.endDate : null,
+    recurrence: input.kind === 'koc' ? (input.recurrence ?? null) : null,
     attachments: input.attachments, links: input.links, previews: input.previews,
   };
   const { data, error } = await supabase.from('care_posts').insert(row).select('id').single();

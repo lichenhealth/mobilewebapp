@@ -1134,3 +1134,41 @@
 .koc__dayempty { font-size: 12px; font-weight: 300; color: var(--ink-faint); padding: 0 var(--s-5) var(--s-2); }
 .koc__weeknav { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-3) var(--s-5) 0; }
 .koc__weeklbl { font-family: var(--font-mono); font-size: 13px; color: var(--ink); min-width: 96px; text-align: center; }
+
+/* ── KOC recurrence picker ─────────────────────────────────────────────────── */
+.rec { display: flex; flex-direction: column; gap: var(--s-2); }
+.rec__controls { display: flex; align-items: center; gap: var(--s-2); }
+.rec__daily {
+  padding: 7px 14px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone); color: var(--ink); font-size: 13px; font-weight: 500; flex-shrink: 0;
+}
+.rec__daily.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.rec__select {
+  flex: 1; min-width: 0; padding: 8px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink);
+  font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.rec__custom {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-3); border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: var(--bone);
+}
+.rec__row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.rec__row--wrap { gap: var(--s-3); }
+.rec__lbl { font-size: 13px; color: var(--ink-soft); }
+.rec__num { width: 54px; padding: 6px 8px; border-radius: var(--r-sm); border: 1px solid var(--bone-edge); background: var(--bone-warm); font-size: 13px; font-family: inherit; }
+.rec__num:disabled { opacity: 0.45; }
+.rec__freq, .rec__date {
+  padding: 6px 8px; border-radius: var(--r-sm); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); font-size: 13px; font-family: inherit;
+}
+.rec__date:disabled { opacity: 0.45; }
+.rec__days { display: flex; gap: 5px; flex-wrap: wrap; }
+.rec__day {
+  width: 30px; height: 30px; border-radius: var(--r-full); flex-shrink: 0;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink);
+  font-size: 12px; font-weight: 600;
+}
+.rec__day.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.rec__ends { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.rec__radio { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+.rec__summary { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); margin: 2px 0 0; }

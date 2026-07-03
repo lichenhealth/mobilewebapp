@@ -11,6 +11,7 @@ import {
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
   type CarePostRow, type Dimension,
 } from '../lib/conciergeApi';
+import { occursOn } from '../lib/recurrence';
 import { useAuth } from '../auth/AuthProvider';
 import { ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
 import './Concierge.css';
@@ -570,7 +571,7 @@ export default function Concierge() {
           )}
           {!dataReady && <p className="conc__care-hint">Loading…</p>}
           {dataReady && weekDays(weekStart).map((day) => {
-            const posts = kocPosts.filter((p) => p.start_date! <= day.iso && p.end_date! >= day.iso);
+            const posts = kocPosts.filter((p) => occursOn(p, day.iso));
             return (
               <section className="koc__daysec" key={day.iso}>
                 <h3 className="koc__daylbl">{day.label}</h3>

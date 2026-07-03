@@ -49,6 +49,7 @@ export type IconName =
   | 'plus'
   | 'profile'
   | 'reply'
+  | 'repeat'
   | 'rent'
   | 'saved'
   | 'search'
@@ -240,6 +241,11 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M9 17 4 12l5-5M4 12h11a5 5 0 0 1 5 5v3" /></>,
+  },
+  'repeat': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M17 2l4 4-4 4M3 11V10a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" /></>,
   },
   'saved': {
     viewBox: '264 838 29 26',
