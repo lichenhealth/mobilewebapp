@@ -89,7 +89,9 @@ export default function EventComposer() {
       });
       back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.');
+      // Supabase errors are plain objects, not Error instances — read .message either way.
+      const msg = (e as { message?: string } | null)?.message;
+      setError(msg || 'Could not save.');
       setSaving(false);
     }
   }
