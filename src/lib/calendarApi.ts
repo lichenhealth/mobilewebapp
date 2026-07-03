@@ -137,6 +137,55 @@ export async function deleteEvent(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** One event with attendees (for the edit screen). */
+export async function loadEvent(id: string): Promise<EventRow | null> {
+  const { data, error } = await supabase
+    .from('events')
+    .select(`${EVENT_COLS}, ${ATTENDEE_EMBED}`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) console.warn('loadEvent:', error.message);
+  return (data as unknown as EventRow | null) ?? null;
+}
+
+/** Update an event in place and sync invitees: newly added people are invited
+ *  (their notification fires via the DB trigger), removed people are uninvited,
+ *  everyone kept keeps their RSVP status. */
+export async function updateEvent(me: string, id: string, input: EventInput): Promise<void> {
+  const recurring = !!input.recurrence;
+  const { error } = await supabase.from('events').update({
+    owner_profile_id: input.ownerProfileId ?? null,
+    owner_space_id: input.ownerSpaceId ?? null,
+    title: input.title,
+    description: input.description,
+    location: input.location,
+    start_date: input.startDate,
+    end_date: recurring ? input.startDate : input.endDate,
+    all_day: input.allDay,
+    start_min: input.allDay ? null : input.startMin,
+    end_min: input.allDay ? null : input.endMin,
+    recurrence: input.recurrence ?? null,
+  }).eq('id', id);
+  if (error) throw error;
+
+  const { data: curRows } = await supabase
+    .from('event_attendees').select('profile_id').eq('event_id', id);
+  const current = new Set(((curRows as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id));
+  const wanted = new Set(input.inviteeIds);
+  const toAdd = input.inviteeIds.filter((p) => !current.has(p));
+  const toRemove = [...current].filter((p) => !wanted.has(p));
+  if (toAdd.length) {
+    const { error: aErr } = await supabase.from('event_attendees')
+      .insert(toAdd.map((profile_id) => ({ event_id: id, profile_id, invited_by: me })));
+    if (aErr) throw aErr;
+  }
+  if (toRemove.length) {
+    const { error: rErr } = await supabase.from('event_attendees')
+      .delete().eq('event_id', id).in('profile_id', toRemove);
+    if (rErr) throw rErr;
+  }
+}
+
 export async function rsvp(eventId: string, me: string, status: Exclude<RsvpStatus, 'invited'>): Promise<void> {
   const { error } = await supabase
     .from('event_attendees')

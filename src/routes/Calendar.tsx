@@ -190,7 +190,10 @@ export default function Calendar() {
                 </>
               )}
               {selected.creator_id === me && (
-                <button className="btn calp__sheet-btn calp__sheet-btn--del" onClick={() => onDelete(selected)}>Delete</button>
+                <>
+                  <button className="btn btn-primary calp__sheet-btn" onClick={() => navigate(`/calendar/edit/${selected.id}`)}>Edit</button>
+                  <button className="btn calp__sheet-btn calp__sheet-btn--del" onClick={() => onDelete(selected)}>Delete</button>
+                </>
               )}
             </div>
           </div>

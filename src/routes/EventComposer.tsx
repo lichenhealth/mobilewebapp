@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
 import RecurrenceSelect from '../components/RecurrenceSelect';
@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel } from '../lib/recurrence';
-import { createEvent } from '../lib/calendarApi';
+import { createEvent, updateEvent, loadEvent } from '../lib/calendarApi';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -17,10 +17,11 @@ interface SpaceOpt { id: string; name: string }
 interface MemberOpt { id: string; full_name: string | null }
 
 /** Compose a calendar event: title, which calendar, when (date/times/recurrence),
- *  invitees, location + notes. */
+ *  invitees, location + notes. With an :eventId param it edits in place. */
 export default function EventComposer() {
   const { user } = useAuth();
   const me = user?.id ?? '';
+  const { eventId } = useParams();
   const navigate = useNavigate();
   const back = () => navigate('/calendar');
 
@@ -56,6 +57,25 @@ export default function EventComposer() {
     })();
   }, [me]);
 
+  // Edit mode: prefill from the existing event.
+  useEffect(() => {
+    if (!eventId) return;
+    (async () => {
+      const ev = await loadEvent(eventId);
+      if (!ev) { setError('Event not found.'); return; }
+      setTitle(ev.title);
+      setCalendar(ev.owner_space_id ?? 'me');
+      setRange({ start: ev.start_date, end: ev.end_date });
+      setAllDay(ev.all_day);
+      if (ev.start_min != null) setStartMin(ev.start_min);
+      if (ev.end_min != null) setEndMin(ev.end_min);
+      setRecurrence(ev.recurrence);
+      setLocation(ev.location);
+      setDescription(ev.description);
+      setInvitees((ev.attendees ?? []).map((a) => ({ id: a.profile_id, full_name: a.profile?.full_name ?? null })));
+    })();
+  }, [eventId]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -74,7 +94,7 @@ export default function EventComposer() {
     }
     setSaving(true); setError('');
     try {
-      await createEvent(me, {
+      const input = {
         ownerProfileId: calendar === 'me' ? me : undefined,
         ownerSpaceId: calendar === 'me' ? undefined : calendar,
         title: title.trim(),
@@ -86,7 +106,9 @@ export default function EventComposer() {
         startMin, endMin,
         recurrence,
         inviteeIds: invitees.map((i) => i.id),
-      });
+      };
+      if (eventId) await updateEvent(me, eventId, input);
+      else await createEvent(me, input);
       back();
     } catch (e) {
       // Supabase errors are plain objects, not Error instances — read .message either way.
@@ -100,7 +122,7 @@ export default function EventComposer() {
     <div className="cedit">
       <header className="cedit__head">
         <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
-        <h1 className="cedit__title">New event</h1>
+        <h1 className="cedit__title">{eventId ? 'Edit event' : 'New event'}</h1>
         <button className="btn btn-primary cedit__save" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>

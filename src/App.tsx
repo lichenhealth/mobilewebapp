@@ -75,6 +75,7 @@ export default function App() {
           <Route path="/chat/:id"  element={<ChatThread />} />
           <Route path="/calendar"  element={<Calendar />} />
           <Route path="/calendar/new" element={<EventComposer />} />
+          <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/maps"      element={<Maps />} />
           <Route path="/profile"   element={<Profile />} />
