@@ -31,7 +31,10 @@ export interface EventRow {
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, ' +
   'start_date, end_date, all_day, start_min, end_min, recurrence, created_at';
-const ATTENDEE_EMBED = 'attendees:event_attendees(profile_id, status, profile:profiles(full_name))';
+// event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
+// embed must name the one it means (house rule; see CLAUDE.md).
+const ATTENDEE_EMBED =
+  'attendees:event_attendees(profile_id, status, profile:profiles!event_attendees_profile_id_fkey(full_name))';
 
 // ─── Time helpers (minutes since midnight ↔ labels) ──────────────────────────
 export function minToLabel(min: number): string {
@@ -64,6 +67,8 @@ export async function loadMyEvents(me: string, from: string, to: string): Promis
       .lte('start_date', to)
       .or(WINDOW_OR(from)),
   ]);
+  if (mineRes.error) console.warn('loadMyEvents (mine):', mineRes.error.message);
+  if (attendingRes.error) console.warn('loadMyEvents (attending):', attendingRes.error.message);
   const byId = new Map<string, EventRow>();
   for (const row of [...((mineRes.data as unknown as EventRow[] | null) ?? []),
                      ...((attendingRes.data as unknown as EventRow[] | null) ?? [])]) {
@@ -74,13 +79,14 @@ export async function loadMyEvents(me: string, from: string, to: string): Promis
 
 /** A space calendar's events in a window (member-only via RLS). */
 export async function loadSpaceEvents(spaceId: string, from: string, to: string): Promise<EventRow[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('events')
     .select(`${EVENT_COLS}, ${ATTENDEE_EMBED}`)
     .eq('owner_space_id', spaceId)
     .lte('start_date', to)
     .or(WINDOW_OR(from))
     .order('start_date');
+  if (error) console.warn('loadSpaceEvents:', error.message);
   return (data as unknown as EventRow[] | null) ?? [];
 }
 
