@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ch853nyRnzeGazERVHhuMSk5sldsx75vpeDhED9gLl9LmFSJ4M9zUb9Ooxyc3ki
+\restrict 2urJwDxlGUEuRLgj0PlHd5SsAmuWar9PNEWD8zmUZ6G70WsTXjpVsAOaAVt07zx
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -146,6 +146,31 @@ $$;
 
 
 ALTER FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
+
+--
+-- Name: care_member_display(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.care_member_display(p_ids uuid[]) RETURNS TABLE(id uuid, display text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select p.id,
+    case
+      when p.id <> auth.uid() and exists (
+        select 1 from public.care_team_members ct
+        where (ct.patient_id = auth.uid() and ct.caregiver_id = p.id)
+           or (ct.caregiver_id = auth.uid() and ct.patient_id = p.id)
+      )
+      then coalesce(nullif(p.full_name, ''), p.email, 'Member')
+      else coalesce(nullif(p.full_name, ''), 'Member')
+    end
+  from public.profiles p
+  where p.id = any(p_ids);
+$$;
+
+
+ALTER FUNCTION public.care_member_display(p_ids uuid[]) OWNER TO postgres;
 
 --
 -- Name: claim_care_invitations(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -406,8 +431,11 @@ CREATE FUNCTION public.notify(p_recipient uuid, p_section text, p_space uuid, p_
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
+declare v_pref text;
 begin
   if p_recipient is null or p_recipient = p_actor then return; end if;
+  select notification_pref into v_pref from public.profiles where id = p_recipient;
+  if coalesce(v_pref, 'in_app') = 'off' then return; end if;
   insert into public.notifications (recipient_id, section, space_id, type, title, body, link, actor_id)
   values (p_recipient, p_section, p_space, p_type, p_title, p_body, p_link, p_actor);
 end; $$;
@@ -445,8 +473,10 @@ CREATE FUNCTION public.on_care_plan_notify() RETURNS trigger
     AS $$
 declare v_name text;
 begin
-  select coalesce(full_name,'Your care team') into v_name from public.profiles where id = new.author_id;
-  perform public.notify(new.patient_id,'concierge',null,'plan_shared',v_name,'shared a new care plan','/concierge',new.author_id);
+  select coalesce(nullif(full_name, ''), email, 'Your care team')
+    into v_name from public.profiles where id = new.author_id;
+  perform public.notify(new.patient_id, 'concierge', null, 'plan_shared',
+    v_name, 'shared a new care plan', '/concierge', new.author_id);
   return new;
 end; $$;
 
@@ -484,9 +514,12 @@ CREATE FUNCTION public.on_care_request_notify() RETURNS trigger
 declare v_recipient uuid; v_name text;
 begin
   if new.status <> 'pending' then return new; end if;
-  v_recipient := case when new.initiated_by = new.patient_id then new.caregiver_id else new.patient_id end;
-  select coalesce(full_name,'A member') into v_name from public.profiles where id = new.initiated_by;
-  perform public.notify(v_recipient,'profile',null,'care_request',v_name,'wants to connect on your care team','/profile',new.initiated_by);
+  v_recipient := case when new.initiated_by = new.patient_id
+                      then new.caregiver_id else new.patient_id end;
+  select coalesce(nullif(full_name, ''), email, 'A member')
+    into v_name from public.profiles where id = new.initiated_by;
+  perform public.notify(v_recipient, 'profile', null, 'care_request',
+    v_name, 'wants to connect on your care team', '/profile', new.initiated_by);
   return new;
 end; $$;
 
@@ -504,11 +537,13 @@ CREATE FUNCTION public.on_message_notify() RETURNS trigger
 declare v_kind text; v_name text;
 begin
   select kind into v_kind from public.chats where id = new.chat_id;
-  if v_kind not in ('direct','care_team') then return new; end if;
-  select coalesce(full_name,'A member') into v_name from public.profiles where id = new.sender_id;
+  if v_kind not in ('direct', 'care_team') then return new; end if;
+  select coalesce(nullif(full_name, ''), email, 'A member')
+    into v_name from public.profiles where id = new.sender_id;
   insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
-  select m.profile_id, 'chat', 'dm_message', v_name,
-         left(coalesce(new.body,'Sent an attachment'),140), '/chat/'||new.chat_id, new.sender_id
+  select m.profile_id, 'chat', 'dm_message',
+         v_name, left(coalesce(new.body, 'Sent an attachment'), 140),
+         '/chat/' || new.chat_id, new.sender_id
   from public.chat_members m
   where m.chat_id = new.chat_id and m.profile_id <> new.sender_id;
   return new;
@@ -527,8 +562,10 @@ CREATE FUNCTION public.on_snapshot_notify() RETURNS trigger
     AS $$
 declare v_name text;
 begin
-  select coalesce(full_name,'Your care team') into v_name from public.profiles where id = new.author_id;
-  perform public.notify(new.patient_id,'concierge',null,'snapshot_shared',v_name,'shared a new wellness snapshot','/concierge',new.author_id);
+  select coalesce(nullif(full_name, ''), email, 'Your care team')
+    into v_name from public.profiles where id = new.author_id;
+  perform public.notify(new.patient_id, 'concierge', null, 'snapshot_shared',
+    v_name, 'shared a new wellness snapshot', '/concierge', new.author_id);
   return new;
 end; $$;
 
@@ -717,6 +754,36 @@ CREATE TABLE public.care_plans (
 
 
 ALTER TABLE public.care_plans OWNER TO postgres;
+
+--
+-- Name: care_posts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.care_posts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    patient_id uuid NOT NULL,
+    author_id uuid NOT NULL,
+    kind text NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    dimensions text[] DEFAULT '{}'::text[] NOT NULL,
+    score smallint,
+    start_date date,
+    end_date date,
+    attachments jsonb DEFAULT '[]'::jsonb NOT NULL,
+    links jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    previews jsonb DEFAULT '[]'::jsonb NOT NULL,
+    recurrence jsonb,
+    CONSTRAINT care_posts_dims_valid CHECK ((dimensions <@ ARRAY['Mental'::text, 'Physical'::text, 'Spiritual'::text, 'Social'::text, 'Environmental'::text, 'Economic'::text])),
+    CONSTRAINT care_posts_kind_check CHECK ((kind = ANY (ARRAY['wow'::text, 'koc'::text]))),
+    CONSTRAINT care_posts_kind_shape CHECK ((((kind = 'wow'::text) AND (score IS NOT NULL) AND (start_date IS NULL) AND (end_date IS NULL) AND (recurrence IS NULL)) OR ((kind = 'koc'::text) AND (score IS NULL) AND (start_date IS NOT NULL) AND (cardinality(dimensions) = 0) AND (((recurrence IS NULL) AND (end_date IS NOT NULL) AND (end_date >= start_date)) OR ((recurrence IS NOT NULL) AND ((end_date IS NULL) OR (end_date >= start_date))))))),
+    CONSTRAINT care_posts_nonempty CHECK (((length(btrim(body)) > 0) OR (jsonb_array_length(attachments) > 0) OR (jsonb_array_length(links) > 0))),
+    CONSTRAINT care_posts_score_check CHECK (((score >= 0) AND (score <= 100)))
+);
+
+
+ALTER TABLE public.care_posts OWNER TO postgres;
 
 --
 -- Name: care_team_members; Type: TABLE; Schema: public; Owner: postgres
@@ -974,7 +1041,9 @@ CREATE TABLE public.profiles (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     onboarded boolean DEFAULT false NOT NULL,
     is_admin boolean DEFAULT false NOT NULL,
-    email_notifications boolean DEFAULT false NOT NULL
+    email_notifications boolean DEFAULT false NOT NULL,
+    notification_pref text DEFAULT 'in_app'::text NOT NULL,
+    CONSTRAINT profiles_notification_pref_check CHECK ((notification_pref = ANY (ARRAY['off'::text, 'in_app'::text, 'both'::text])))
 );
 
 
@@ -1080,6 +1149,14 @@ ALTER TABLE ONLY public.care_plans
 
 ALTER TABLE ONLY public.care_plans
     ADD CONSTRAINT care_plans_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: care_posts care_posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.care_posts
+    ADD CONSTRAINT care_posts_pkey PRIMARY KEY (id);
 
 
 --
@@ -1273,6 +1350,27 @@ CREATE INDEX care_plans_patient_week_idx ON public.care_plans USING btree (patie
 
 
 --
+-- Name: care_posts_dims_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX care_posts_dims_gin ON public.care_posts USING gin (dimensions) WHERE (kind = 'wow'::text);
+
+
+--
+-- Name: care_posts_koc_range_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX care_posts_koc_range_idx ON public.care_posts USING btree (patient_id, start_date, end_date) WHERE (kind = 'koc'::text);
+
+
+--
+-- Name: care_posts_wow_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX care_posts_wow_idx ON public.care_posts USING btree (patient_id, created_at DESC) WHERE (kind = 'wow'::text);
+
+
+--
 -- Name: chats_direct_uidx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1371,10 +1469,24 @@ CREATE TRIGGER care_plans_touch BEFORE UPDATE ON public.care_plans FOR EACH ROW 
 
 
 --
+-- Name: care_posts care_posts_touch; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER care_posts_touch BEFORE UPDATE ON public.care_posts FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
 -- Name: health_snapshots health_snapshots_touch; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER health_snapshots_touch BEFORE UPDATE ON public.health_snapshots FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: notifications notification-email; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER "notification-email" AFTER INSERT ON public.notifications FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/send-notification-email', 'POST', '{"Content-type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcW5hZXZlcnR5emdqbHB3eW5yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTExNzM5NCwiZXhwIjoyMDk2NjkzMzk0fQ.9rmFsLYywpgMXwvGMBj45wHKKbjKmGn2WP48X931vH0","x-webhook-secret":"a36ae5c10a370a51335c92203c57356ff4865c9746c5ab8e"}', '{}', '5000');
 
 
 --
@@ -1486,6 +1598,22 @@ ALTER TABLE ONLY public.care_plans
 
 ALTER TABLE ONLY public.care_plans
     ADD CONSTRAINT care_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: care_posts care_posts_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.care_posts
+    ADD CONSTRAINT care_posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: care_posts care_posts_patient_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.care_posts
+    ADD CONSTRAINT care_posts_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -1945,6 +2073,40 @@ ALTER TABLE public.care_plan_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.care_plans ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: care_posts; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.care_posts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: care_posts care_posts delete; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_posts delete" ON public.care_posts FOR DELETE TO authenticated USING (public.is_active_caregiver(patient_id, auth.uid()));
+
+
+--
+-- Name: care_posts care_posts insert; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_posts insert" ON public.care_posts FOR INSERT TO authenticated WITH CHECK (((author_id = auth.uid()) AND public.is_active_caregiver(patient_id, auth.uid())));
+
+
+--
+-- Name: care_posts care_posts read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_posts read" ON public.care_posts FOR SELECT TO authenticated USING (public.is_on_care_team(patient_id, auth.uid()));
+
+
+--
+-- Name: care_posts care_posts update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_posts update" ON public.care_posts FOR UPDATE TO authenticated USING (public.is_active_caregiver(patient_id, auth.uid())) WITH CHECK (((author_id = auth.uid()) AND public.is_active_caregiver(patient_id, auth.uid())));
+
+
+--
 -- Name: care_team_members; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -2340,6 +2502,15 @@ GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) T
 
 
 --
+-- Name: FUNCTION care_member_display(p_ids uuid[]); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.care_member_display(p_ids uuid[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.care_member_display(p_ids uuid[]) TO authenticated;
+GRANT ALL ON FUNCTION public.care_member_display(p_ids uuid[]) TO service_role;
+
+
+--
 -- Name: FUNCTION claim_care_invitations(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2574,6 +2745,15 @@ GRANT ALL ON TABLE public.care_plans TO service_role;
 
 
 --
+-- Name: TABLE care_posts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.care_posts TO anon;
+GRANT ALL ON TABLE public.care_posts TO authenticated;
+GRANT ALL ON TABLE public.care_posts TO service_role;
+
+
+--
 -- Name: TABLE care_team_members; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2777,6 +2957,13 @@ GRANT SELECT(is_admin) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.notification_pref; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(notification_pref) ON TABLE public.profiles TO authenticated;
+
+
+--
 -- Name: TABLE recommendations; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2876,7 +3063,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ch853nyRnzeGazERVHhuMSk5sldsx75vpeDhED9gLl9LmFSJ4M9zUb9Ooxyc3ki
+\unrestrict 2urJwDxlGUEuRLgj0PlHd5SsAmuWar9PNEWD8zmUZ6G70WsTXjpVsAOaAVt07zx
+
 
 
 --

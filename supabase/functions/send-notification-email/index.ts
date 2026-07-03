@@ -1,7 +1,7 @@
 // Supabase Edge Function: send-notification-email
 //
 // Invoked by a Database Webhook on INSERT into public.notifications. For each new
-// notification, if the recipient opted into email (profiles.email_notifications),
+// notification, if the recipient opted into email (profiles.notification_pref = 'both'),
 // it sends a copy via Resend. In-app notifications are unaffected — this is only
 // the optional email channel.
 //
