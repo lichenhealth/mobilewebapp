@@ -1,12 +1,14 @@
 import { useRef, useState, ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
+import { DateRange } from '../components/DateRangeCalendar';
+import RecurrencePicker from '../components/RecurrencePicker';
 import { useAuth } from '../auth/AuthProvider';
 import {
   CareKind, MediaKind, Dimension, WOW_DIMENSIONS,
   createCarePost, uploadCareMedia, isInternalUrl, resolvePreviews,
 } from '../lib/conciergeApi';
+import type { Recurrence } from '../lib/recurrence';
 import { parseBodyUrls } from '../lib/linkify';
 import './Concierge.css';
 
@@ -29,6 +31,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const [dims, setDims] = useState<Set<Dimension>>(new Set());   // wow; empty = All
   const [score, setScore] = useState(70);                        // wow
   const [range, setRange] = useState<DateRange>({ start: null, end: null }); // koc
+  const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -70,7 +73,10 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     const cleanedLinks = links.filter((l) => l.url.trim())
       .map((l) => ({ label: l.label.trim() || l.url.trim(), url: l.url.trim(), internal: isInternalUrl(l.url.trim()) }));
     if (!body.trim() && pending.length === 0 && cleanedLinks.length === 0) { setError('Add some text, media, or a link.'); return; }
-    if (kind === 'koc' && (!range.start || !range.end)) { setError('Pick a day or a date range.'); return; }
+    if (kind === 'koc') {
+      if (!range.start) { setError('Pick a start day.'); return; }
+      if (!recurrence && !range.end) { setError('Pick a day or a date range.'); return; }
+    }
     if (uploading) return;
     setSaving(true); setError('');
     try {
@@ -79,7 +85,9 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
       await createCarePost(me, {
         patientId, kind, body: body.trim(),
         dimensions: [...dims], score,
-        startDate: range.start ?? undefined, endDate: range.end ?? undefined,
+        startDate: range.start ?? undefined,
+        endDate: recurrence ? undefined : (range.end ?? undefined),
+        recurrence: kind === 'koc' ? recurrence : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
         links: cleanedLinks, previews,
       });
@@ -165,15 +173,14 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
           </>
         )}
 
-        {/* KOC: date range */}
+        {/* KOC: schedule + recurrence */}
         {kind === 'koc' && (
           <div className="cedit__field">
-            <span className="cedit__label">
-              {range.start && range.end
-                ? (range.start === range.end ? 'One day' : 'Date range')
-                : 'Pick a day, or a start and end'}
-            </span>
-            <DateRangeCalendar value={range} onChange={setRange} />
+            <span className="cedit__label">Schedule</span>
+            <RecurrencePicker
+              range={range} recurrence={recurrence}
+              onRangeChange={setRange} onRecurrenceChange={setRecurrence}
+            />
           </div>
         )}
       </div>

@@ -84,8 +84,7 @@ Deno.serve(async (req) => {
     const title =
       meta(html, 'og:title') ??
       meta(html, 'twitter:title') ??
-      decode((html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '')) ||
-      undefined;
+      (decode(html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '') || undefined);
     const description = meta(html, 'og:description') ?? meta(html, 'twitter:description') ?? meta(html, 'description');
     const image = absolute(meta(html, 'og:image') ?? meta(html, 'twitter:image'), res.url || url);
     const siteName = meta(html, 'og:site_name') ?? new URL(res.url || url).hostname.replace(/^www\./, '');
