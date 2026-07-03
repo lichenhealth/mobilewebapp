@@ -2,8 +2,51 @@ import { useState, SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { colorFor, monogramFor, formatRelative } from '../lib/chatApi';
-import { CarePostRow, CareAttachment, CareLink, rangeLabel } from '../lib/conciergeApi';
+import { CarePostRow, CareAttachment, CareLink, CarePostPreview, rangeLabel } from '../lib/conciergeApi';
+import { linkify, hrefFor } from '../lib/linkify';
 import './CarePostCard.css';
+
+/** Render body text with pasted URLs turned into clickable links. */
+function LinkifiedText({ text }: { text: string }) {
+  return (
+    <>
+      {linkify(text).map((s, i) =>
+        'url' in s ? (
+          <a key={i} className="cpost__inlink" href={hrefFor(s.url)} target="_blank" rel="noopener noreferrer">{s.url}</a>
+        ) : (
+          <span key={i}>{s.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+/** Rich preview of a link pasted in the body: inline YouTube, or an OG card. */
+function CarePreview({ p }: { p: CarePostPreview }) {
+  if (p.kind === 'youtube' && p.videoId) {
+    return (
+      <div className="cpost__yt">
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${p.videoId}`}
+          title={p.title || 'YouTube video'} loading="lazy" allowFullScreen
+          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        />
+      </div>
+    );
+  }
+  // Only worth a card if we resolved something; otherwise the body link suffices.
+  if (!p.title && !p.image) return null;
+  return (
+    <a className="cpost__ogcard" href={p.url} target="_blank" rel="noopener noreferrer">
+      {p.image && <img className="cpost__ogimg" src={p.image} alt="" loading="lazy" />}
+      <span className="cpost__ogmeta">
+        <span className="cpost__ogtitle">{p.title || p.url}</span>
+        {p.description && <span className="cpost__ogdesc">{p.description}</span>}
+        {p.siteName && <span className="cpost__ogsite">{p.siteName}</span>}
+      </span>
+    </a>
+  );
+}
 
 function CareMedia({ a, url, onLoad }: { a: CareAttachment; url?: string; onLoad?: (e: SyntheticEvent<HTMLImageElement>) => void }) {
   if (!url) return <div className="cpost__media-loading" aria-hidden="true" />;
@@ -64,7 +107,7 @@ export default function CarePostCard({
 
       <div className="cpost__content">
         <div className="cpost__text">
-          {post.body && <p className="cpost__body">{post.body}</p>}
+          {post.body && <p className="cpost__body"><LinkifiedText text={post.body} /></p>}
           {post.links.length > 0 && (
             <div className="cpost__links">
               {post.links.map((l, i) => <CareLinkChip key={i} link={l} />)}
@@ -79,6 +122,12 @@ export default function CarePostCard({
           </div>
         )}
       </div>
+
+      {post.previews?.length > 0 && (
+        <div className="cpost__previews">
+          {post.previews.map((p, i) => <CarePreview key={i} p={p} />)}
+        </div>
+      )}
 
       <footer className="cpost__foot">
         {post.kind === 'wow' && (

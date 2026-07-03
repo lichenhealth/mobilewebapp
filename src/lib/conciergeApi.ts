@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { IconName } from '../components/Icon';
 import type { RadarAxis } from '../components/HexagonRadar';
+import { youtubeId } from './linkify';
 
 // ─── Wellbeing dimensions — single source of truth (HexagonRadar order) ──────
 export const WOW_DIMENSIONS = ['Mental', 'Physical', 'Social', 'Spiritual', 'Economic', 'Environmental'] as const;
@@ -14,6 +15,15 @@ export type CareKind = 'wow' | 'koc';
 export type MediaKind = 'photo' | 'video' | 'audio';
 export interface CareAttachment { type: MediaKind; path: string }
 export interface CareLink { label: string; url: string; internal: boolean }
+export interface CarePostPreview {
+  url: string;
+  kind: 'youtube' | 'link';
+  videoId?: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+}
 
 export interface CarePostRow {
   id: string;
@@ -27,12 +37,13 @@ export interface CarePostRow {
   end_date: string | null;
   attachments: CareAttachment[];
   links: CareLink[];
+  previews: CarePostPreview[];
   created_at: string;
   updated_at: string;
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, attachments, links, created_at, updated_at';
+  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, attachments, links, previews, created_at, updated_at';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -129,7 +140,7 @@ export interface CarePostInput {
   patientId: string; kind: CareKind; body: string;
   dimensions?: Dimension[]; score?: number;      // wow
   startDate?: string; endDate?: string;          // koc
-  attachments: CareAttachment[]; links: CareLink[];
+  attachments: CareAttachment[]; links: CareLink[]; previews: CarePostPreview[];
 }
 export async function createCarePost(me: string, input: CarePostInput): Promise<string> {
   const row = {
@@ -138,7 +149,7 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     score: input.kind === 'wow' ? input.score : null,
     start_date: input.kind === 'koc' ? input.startDate : null,
     end_date: input.kind === 'koc' ? input.endDate : null,
-    attachments: input.attachments, links: input.links,
+    attachments: input.attachments, links: input.links, previews: input.previews,
   };
   const { data, error } = await supabase.from('care_posts').insert(row).select('id').single();
   if (error) throw error;
@@ -169,4 +180,23 @@ export async function signCareMedia(paths: string[]): Promise<Record<string, str
 /** internal iff an in-app path ("/…") but not protocol-relative ("//host"). */
 export function isInternalUrl(url: string): boolean {
   return url.startsWith('/') && !url.startsWith('//');
+}
+
+/** Resolve body URLs to rich previews at compose time (YouTube parsed locally;
+ *  others via the link-preview edge function). Capped; failures degrade to a
+ *  bare { url } so the body's inline link still works. */
+export async function resolvePreviews(urls: string[]): Promise<CarePostPreview[]> {
+  const out: CarePostPreview[] = [];
+  for (const url of urls.slice(0, 3)) {
+    const vid = youtubeId(url);
+    if (vid) { out.push({ url, kind: 'youtube', videoId: vid }); continue; }
+    try {
+      const { data } = await supabase.functions.invoke('link-preview', { body: { url } });
+      const d = (data ?? {}) as Partial<CarePostPreview>;
+      out.push({ url, kind: 'link', title: d.title, description: d.description, image: d.image, siteName: d.siteName });
+    } catch {
+      out.push({ url, kind: 'link' });
+    }
+  }
+  return out;
 }

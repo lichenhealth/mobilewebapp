@@ -5,8 +5,9 @@ import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
 import { useAuth } from '../auth/AuthProvider';
 import {
   CareKind, MediaKind, Dimension, WOW_DIMENSIONS,
-  createCarePost, uploadCareMedia, isInternalUrl,
+  createCarePost, uploadCareMedia, isInternalUrl, resolvePreviews,
 } from '../lib/conciergeApi';
+import { parseBodyUrls } from '../lib/linkify';
 import './Concierge.css';
 
 interface Pending { type: MediaKind; path: string; localUrl: string }
@@ -73,12 +74,14 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     if (uploading) return;
     setSaving(true); setError('');
     try {
+      // Read links out of the body (Facebook-style) → rich previews stored on the post.
+      const previews = await resolvePreviews(parseBodyUrls(body));
       await createCarePost(me, {
         patientId, kind, body: body.trim(),
         dimensions: [...dims], score,
         startDate: range.start ?? undefined, endDate: range.end ?? undefined,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
-        links: cleanedLinks,
+        links: cleanedLinks, previews,
       });
       back();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); setSaving(false); }
