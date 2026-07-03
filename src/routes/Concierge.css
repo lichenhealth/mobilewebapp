@@ -1137,14 +1137,8 @@
 
 /* ── KOC recurrence picker ─────────────────────────────────────────────────── */
 .rec { display: flex; flex-direction: column; gap: var(--s-2); }
-.rec__controls { display: flex; align-items: center; gap: var(--s-2); }
-.rec__daily {
-  padding: 7px 14px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
-  background: var(--bone); color: var(--ink); font-size: 13px; font-weight: 500; flex-shrink: 0;
-}
-.rec__daily.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
 .rec__select {
-  flex: 1; min-width: 0; padding: 8px 12px; border-radius: var(--r-md);
+  width: 100%; padding: 8px 12px; border-radius: var(--r-md);
   border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink);
   font-size: 13px; font-family: inherit; cursor: pointer;
 }

@@ -64,18 +64,9 @@ export default function RecurrencePicker({ range, recurrence, onRangeChange, onR
 
   return (
     <div className="rec">
-      <div className="rec__controls">
-        <button
-          className={'rec__daily' + (currentLabel === 'Daily' ? ' is-on' : '')}
-          onClick={() => choosePreset(currentLabel === 'Daily' ? 'Does not repeat' : 'Daily')}
-          type="button"
-        >
-          Daily
-        </button>
-        <select className="rec__select" value={currentLabel} onChange={(e) => choosePreset(e.target.value)}>
-          {presets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
-        </select>
-      </div>
+      <select className="rec__select" value={currentLabel} onChange={(e) => choosePreset(e.target.value)}>
+        {presets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+      </select>
 
       {showCustom && recurrence && (
         <div className="rec__custom">
