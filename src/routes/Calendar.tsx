@@ -65,6 +65,11 @@ export default function Calendar() {
 
   const monthLabel = localDate(days[3]).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const myAttend = (ev: EventRow) => ev.attendees?.find((a) => a.profile_id === me);
+  // Google-style block state: pending invite = white w/ peach outline; declined = faded.
+  const blockClass = (ev: EventRow, base: string) => {
+    const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
+    return base + (st === 'invited' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
+  };
 
   return (
     <div className="calp">
@@ -103,7 +108,7 @@ export default function Calendar() {
             {days.map((iso) => (
               <div className="calp__allday-col" key={iso}>
                 {allDayOn(iso).map((e) => (
-                  <button className="calp__chip" key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
+                  <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
                 ))}
               </div>
             ))}
@@ -128,7 +133,7 @@ export default function Calendar() {
                   const height = Math.max(22, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
                   return (
                     <button
-                      className="calp__event" key={e.id + iso}
+                      className={blockClass(e, 'calp__event')} key={e.id + iso}
                       style={{ top, height }}
                       onClick={() => setSelected(e)}
                     >

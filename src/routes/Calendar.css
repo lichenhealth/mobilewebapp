@@ -64,6 +64,15 @@
   text-align: left; overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.35);
 }
+/* Invited but not yet answered → white with a peach outline (à la Google Cal);
+   declined → faded + struck through. */
+.calp__event--pending, .calp__chip--pending {
+  background: var(--bone-warm); color: var(--peach-deep); border: 1.5px solid var(--peach);
+}
+.calp__event--declined, .calp__chip--declined {
+  background: var(--bone-warm); color: var(--ink-faint); border: 1px solid var(--bone-edge);
+  text-decoration: line-through;
+}
 .calp__loading { font-size: 12px; color: var(--ink-faint); text-align: center; padding: var(--s-2); }
 
 /* Detail sheet */
