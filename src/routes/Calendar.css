@@ -15,6 +15,38 @@
 }
 .calp__new:active { transform: scale(0.94); }
 
+/* Toolbar: search · ‹ month › · view switcher (per the Figma mock) */
+.calp__toolbar { display: flex; align-items: center; gap: var(--s-2); }
+.calp__tool {
+  width: 28px; height: 28px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); border: 1px solid var(--bone-edge); background: var(--bone-warm);
+}
+.calp__tool.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.calp__vselect {
+  margin-left: auto; padding: 5px 8px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
+}
+
+/* Search */
+.calp__search { display: flex; flex-direction: column; gap: 4px; }
+.calp__search-input {
+  width: 100%; padding: 8px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; font-family: inherit;
+}
+.calp__search-input:focus { outline: none; border-color: var(--peach); }
+.calp__result {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2);
+  padding: 7px 10px; border-radius: var(--r-md); background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); text-align: left;
+}
+.calp__result:hover { border-color: var(--peach); }
+.calp__result-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calp__result-when { font-family: var(--font-mono); font-size: 10px; color: var(--peach-deep); flex-shrink: 0; }
+.calp__result-none { font-size: 12px; color: var(--ink-faint); padding: 2px 4px; }
+
 .calp__nav { display: flex; align-items: center; gap: var(--s-2); }
 .calp__navbtn {
   width: 28px; height: 28px; border-radius: var(--r-full);
@@ -84,6 +116,31 @@
   text-decoration: line-through;
 }
 .calp__loading { font-size: 12px; color: var(--ink-faint); text-align: center; padding: var(--s-2); }
+
+/* ── Month overview ── */
+.calp__mweek {
+  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+  padding: 8px 0 6px; border-bottom: 1px solid var(--bone-edge);
+}
+.calp__mgrid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.calp__mcell {
+  min-height: 64px; padding: 5px 3px; border-bottom: 1px solid var(--bone-edge);
+  border-left: 1px solid var(--bone-edge);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.calp__mcell:nth-child(7n + 1) { border-left: 0; }
+.calp__mcell.is-out { opacity: 0.35; }
+.calp__mcell:hover { background: var(--bone); }
+.calp__mnum {
+  width: 22px; height: 22px; border-radius: var(--r-full); font-size: 12px; color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.calp__mnum.is-today { background: var(--peach); color: #fff; font-weight: 600; }
+.calp__mdots { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.calp__mdot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--peach); }
+.calp__mdot--pending { background: var(--bone-warm); border: 1.5px solid var(--peach); }
+.calp__mdot--declined { background: var(--bone-edge); }
+.calp__mmore { font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint); }
 
 /* Detail sheet */
 .calp__scrim { position: fixed; inset: 0; background: rgba(18, 24, 28, 0.35); z-index: 59; }
