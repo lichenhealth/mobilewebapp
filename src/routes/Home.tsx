@@ -21,6 +21,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search'      },
   { icon: 'plus',           label: 'Post',        to: '/compose' },
   { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
+  { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
   { icon: 'graduation-cap', label: 'Education'   },
   { icon: 'fork-spoon',     label: 'Food'        },

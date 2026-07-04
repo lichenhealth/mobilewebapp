@@ -57,6 +57,7 @@ export type IconName =
   | 'settings'
   | 'shield-user'
   | 'smile'
+  | 'rsvp'
   | 'sparkle'
   | 'sliders'
   | 'store'
@@ -271,6 +272,17 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.6" fill="currentColor" /><circle cx="15" cy="10" r="0.6" fill="currentColor" /><path d="M8.5 14.5c.8 1.5 2 2.3 3.5 2.3s2.7-.8 3.5-2.3" /></>,
+  },
+  'rsvp': {
+    viewBox: '14 12 43 44',
+    strokeWidth: 2.6,
+    content: <>
+      {/* Events mark — RSVP envelope, exported from the founder's Figma */}
+      <path d="M51.1558 24.2881H20.5484C19.0116 24.2881 17.7659 25.5339 17.7659 27.0706V50.7224C17.7659 52.2592 19.0116 53.505 20.5484 53.505H51.1558C52.6925 53.505 53.9383 52.2592 53.9383 50.7224V27.0706C53.9383 25.5339 52.6925 24.2881 51.1558 24.2881Z" />
+      <path d="M17.9971 26.5371L34.1742 36.0302C34.6454 36.3088 35.2391 36.4614 35.8523 36.4614C36.4654 36.4614 37.0592 36.3088 37.5303 36.0302L53.6757 26.5371" />
+      <path d="M23.3098 29.0881V15.375C23.3098 14.8227 23.7575 14.375 24.3098 14.375H46.4834C47.0357 14.375 47.4834 14.8227 47.4834 15.375V29.7814" />
+      <text x="35.8" y="46.8" textAnchor="middle" fill="currentColor" stroke="none" fontSize="6.4" fontFamily="Archivo, sans-serif" fontWeight="600" letterSpacing="0.06em">RSVP</text>
+    </>,
   },
   'sparkle': {
     viewBox: '0 0 24 24',

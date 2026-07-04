@@ -20,7 +20,7 @@ export const SERVICE_AREAS: { value: ServiceArea; label: string; icon: IconName 
   { value: 'courses', label: 'Courses', icon: 'graduation-cap' },
   { value: 'food', label: 'Food & Nutrition', icon: 'fork-spoon' },
   { value: 'art', label: 'Art', icon: 'palette' },
-  { value: 'events', label: 'Events', icon: 'calendar' },
+  { value: 'events', label: 'Events', icon: 'rsvp' },
   { value: 'places', label: 'Places', icon: 'location' },
   { value: 'library', label: 'Library', icon: 'book' },
   { value: 'people', label: 'People', icon: 'user-multiple' },
