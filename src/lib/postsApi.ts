@@ -99,7 +99,7 @@ export type FeedPost = {
   image_url: string | null;
   details: Record<string, unknown>;
   created_at: string;
-  author: { full_name: string | null; handle: string | null } | null;
+  author: { full_name: string | null; handle: string | null; avatar_url: string | null } | null;
   author_space: { name: string; kind: string } | null;
 };
 
@@ -113,7 +113,7 @@ export function postAreas(p: Pick<FeedPost, 'service_area' | 'service_areas'>): 
 export async function loadFeed(): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')
-    .select('id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle), author_space:spaces!posts_author_space_id_fkey(name, kind)')
+    .select('id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind)')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { console.error('loadFeed', error); return []; }

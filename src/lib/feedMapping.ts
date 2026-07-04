@@ -20,6 +20,9 @@ export function postToCard(p: FeedPost): FeedCardProps {
   return {
     title,
     handle,
+    // Personal posts show the author's photo when they have one; space-authored
+    // posts keep the monogram until spaces get their own images.
+    avatar: p.author_space ? undefined : (p.author?.avatar_url ?? undefined),
     avatarMonogram: name.charAt(0).toUpperCase(),
     body: p.body,
     categoryIcons: icons,
