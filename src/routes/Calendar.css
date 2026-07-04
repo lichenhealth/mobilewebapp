@@ -25,6 +25,9 @@
   color: var(--ink-muted); border: 1px solid var(--bone-edge); background: var(--bone-warm);
 }
 .calp__tool.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+/* Always-reachable + in the pinned toolbar (the title-row one scrolls away) */
+.calp__tool--new { background: var(--peach); border-color: var(--peach); color: #fff; }
+.calp__tool--new:active { transform: scale(0.94); }
 .calp__vselect {
   margin-left: auto; padding: 5px 8px; border-radius: var(--r-full);
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
@@ -146,7 +149,7 @@
   position: absolute; right: 6px; transform: translateY(-50%);
   font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint);
 }
-.calp__col { position: relative; border-left: 1px solid var(--bone-edge); min-width: 0; }
+.calp__col { position: relative; border-left: 1px solid var(--bone-edge); min-width: 0; cursor: pointer; }
 .calp__line { position: absolute; left: 0; right: 0; height: 1px; background: var(--bone-edge); opacity: 0.6; }
 .calp__event {
   position: absolute; left: 2px; right: 2px; z-index: 1;

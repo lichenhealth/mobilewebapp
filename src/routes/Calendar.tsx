@@ -292,6 +292,15 @@ export default function Calendar() {
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
             <Icon name="settings" size={15} />
           </button>
+          <button
+            className="calp__tool calp__tool--new"
+            onClick={() => navigate('/calendar/new' + (selectedCal !== 'me' ? `?space=${selectedCal}` : ''))}
+            aria-label="New event"
+          >
+            <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
 
         {/* Calendar chips: mine + my spaces (+ find-a-time toggle on a space) */}
@@ -427,7 +436,16 @@ export default function Calendar() {
                 ))}
               </div>
               {days.map((iso) => (
-                <div className="calp__col" key={iso}>
+                <div
+                  className="calp__col" key={iso}
+                  onClick={(e) => {
+                    // Click an empty slot → composer prefilled with that day +
+                    // half-hour (à la Google Cal). Blocks stop propagation.
+                    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+                    const slot = Math.max(0, Math.min(1410, Math.floor(y / (HOUR_PX / 2)) * 30));
+                    navigate(`/calendar/new?date=${iso}&start=${slot}${selectedCal !== 'me' ? `&space=${selectedCal}` : ''}`);
+                  }}
+                >
                   {Array.from({ length: 23 }, (_, h) => (
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
@@ -443,9 +461,10 @@ export default function Calendar() {
                           className={'calp__slot calp__slot--free' + (strong ? ' is-strong' : '')}
                           style={{ top: (slot / 60) * HOUR_PX, height: HOUR_PX / 2 }}
                           title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
-                          onClick={() => navigate(
-                            `/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`,
-                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
+                          }}
                         />
                       );
                     })}
@@ -472,7 +491,7 @@ export default function Calendar() {
                       <button
                         className={blockClass(e, 'calp__event')} key={e.id + iso}
                         style={{ top, height }}
-                        onClick={() => setSelected(e)}
+                        onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >
                         {e.title}
                       </button>
