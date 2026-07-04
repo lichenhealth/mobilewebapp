@@ -26,7 +26,14 @@
 .cmp__input:focus { outline: none; border-color: var(--peach); }
 .cmp__textarea { resize: vertical; min-height: 110px; line-height: var(--lh-normal); }
 
-.cmp__market { margin-top: var(--s-4); padding: var(--s-4); border: 1px dashed var(--bone-edge); border-radius: var(--r-lg); }
+.cmp__market {
+  margin-top: var(--s-4); padding: var(--s-4);
+  border: 1px dashed var(--bone-edge); border-radius: var(--r-lg);
+  /* Consistent vertical rhythm so rows never crowd the chips above them. */
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.cmp__market .cmp__label { margin-top: var(--s-1); }
+.cmp__market .cmp__row { margin-bottom: 0; }
 .cmp__market-head { font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: var(--s-3); }
 .cmp__row { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
 .cmp__row .cmp__input { flex: 1; }
