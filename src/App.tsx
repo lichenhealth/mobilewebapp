@@ -17,6 +17,7 @@ import Donate from './routes/Donate';
 import { Saved, Maps } from './routes/Stubs';
 import Calendar from './routes/Calendar';
 import EventComposer from './routes/EventComposer';
+import CalendarSettings from './routes/CalendarSettings';
 import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/calendar"  element={<Calendar />} />
           <Route path="/calendar/new" element={<EventComposer />} />
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
+          <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/maps"      element={<Maps />} />
           <Route path="/profile"   element={<Profile />} />

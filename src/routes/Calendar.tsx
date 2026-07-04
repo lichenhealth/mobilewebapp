@@ -3,9 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import { LinkifiedText } from '../components/CarePostCard';
+import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
-import { occursOn, recurrenceLabel } from '../lib/recurrence';
-import { EventRow, loadMyEvents, deleteEvent, rsvp, minToLabel } from '../lib/calendarApi';
+import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
+import {
+  EventRow, FreeBusyRow, MemberWindow,
+  loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
+} from '../lib/calendarApi';
 import './Calendar.css';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
@@ -53,6 +58,21 @@ export default function Calendar() {
   const [searchPool, setSearchPool] = useState<EventRow[]>([]);
   const gridRef = useRef<HTMLDivElement>(null);
 
+  // Which calendar: mine, or a space's (with the find-a-time overlay).
+  const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCal, setSelectedCal] = useState('me');
+  const [overlayOn, setOverlayOn] = useState(false);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
+  const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
+
+  // Searched-calendar overlays: ephemeral side-by-side schedules (person or
+  // space), each a dismissible chip. Re-search to bring one back — no saving.
+  interface CalOverlay { kind: 'profile' | 'space'; id: string; name: string }
+  const [overlays, setOverlays] = useState<CalOverlay[]>([]);
+  const [overlayRows, setOverlayRows] = useState<Record<string, FreeBusyRow[]>>({});
+  const [calResults, setCalResults] = useState<CalOverlay[]>([]);
+
   // Visible days per view; month uses its own cell range.
   const days = useMemo(() => {
     if (view === 'month') return monthCells(anchor);
@@ -64,10 +84,53 @@ export default function Calendar() {
   const load = useCallback(async () => {
     if (!me) return;
     setLoading(true);
-    setEvents(await loadMyEvents(me, from, to));
+    setEvents(selectedCal === 'me'
+      ? await loadMyEvents(me, from, to)
+      : await loadSpaceEvents(selectedCal, from, to));
     setLoading(false);
-  }, [me, from, to]);
+  }, [me, from, to, selectedCal]);
   useEffect(() => { load(); }, [load]);
+
+  // My spaces → calendar chips.
+  useEffect(() => {
+    if (!me) return;
+    (async () => {
+      const { data } = await supabase.from('space_members').select('spaces(id, name)').eq('profile_id', me);
+      setCalendars(((data as unknown as { spaces: { id: string; name: string } | null }[] | null) ?? [])
+        .map((r) => r.spaces).filter((s): s is { id: string; name: string } => !!s));
+    })();
+  }, [me]);
+
+  // Find-a-time overlay data: the space's members' busy fragments + declared hours.
+  useEffect(() => {
+    if (!overlayOn || selectedCal === 'me' || view === 'month') { setFbRows([]); setMemberWindows([]); return; }
+    (async () => {
+      const { data } = await supabase.from('space_members').select('profile_id').eq('space_id', selectedCal);
+      const ids = ((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id);
+      setMemberIds(ids);
+      const [fb, wins] = await Promise.all([freeBusy(ids, from, to), availabilityOf(ids)]);
+      setFbRows(fb); setMemberWindows(wins);
+    })();
+  }, [overlayOn, selectedCal, view, from, to]);
+
+  /** Free members for a 30-min slot: not busy, and (if they declared hours)
+   *  inside a declared window. Members with no declared hours count as free
+   *  whenever they're not busy. */
+  const freeMembersAt = (iso: string, slotStart: number): string[] => {
+    const slotEnd = slotStart + 30;
+    const wd = weekdayMon0(iso);
+    return memberIds.filter((pid) => {
+      const busy = fbRows.some((r) =>
+        r.profile_id === pid && occursOn(r, iso)
+        && (r.all_day || ((r.start_min ?? 0) < slotEnd && (r.end_min ?? 1440) > slotStart)));
+      if (busy) return false;
+      const wins = memberWindows.filter((w) =>
+        w.profile_id === pid && w.kind === 'available'
+        && (!w.valid_from || w.valid_from <= iso) && (!w.valid_to || w.valid_to >= iso));
+      if (wins.length === 0) return true;
+      return wins.some((w) => w.weekday === wd && w.start_min < slotEnd && w.end_min > slotStart);
+    });
+  };
 
   // Open time views scrolled to the working morning (the PAGE scrolls).
   useEffect(() => {
@@ -91,6 +154,54 @@ export default function Calendar() {
       .filter((e) => e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q))
       .slice(0, 12);
   }, [query, searchPool]);
+
+  // Search CALENDARS too: members by name, spaces by name.
+  useEffect(() => {
+    const q = query.trim();
+    if (!searchOpen || q.length < 2) { setCalResults([]); return; }
+    let live = true;
+    (async () => {
+      const [pRes, sRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${q}%`).neq('id', me).limit(5),
+        supabase.from('spaces').select('id, name').ilike('name', `%${q}%`).limit(5),
+      ]);
+      if (!live) return;
+      setCalResults([
+        ...(((pRes.data as { id: string; full_name: string | null }[] | null) ?? [])
+          .map((p) => ({ kind: 'profile' as const, id: p.id, name: p.full_name || 'Member' }))),
+        ...(((sRes.data as { id: string; name: string }[] | null) ?? [])
+          .map((s) => ({ kind: 'space' as const, id: s.id, name: s.name }))),
+      ]);
+    })();
+    return () => { live = false; };
+  }, [query, searchOpen, me]);
+
+  // Fetch each overlay's schedule for the visible window. A person's calendar
+  // comes through free_busy (their visibility rules applied — busy blocks, or
+  // titles if they've granted details); a space's is its own events.
+  useEffect(() => {
+    if (overlays.length === 0) { setOverlayRows({}); return; }
+    let live = true;
+    (async () => {
+      const entries = await Promise.all(overlays.map(async (o): Promise<[string, FreeBusyRow[]]> => {
+        if (o.kind === 'profile') return [o.id, await freeBusy([o.id], from, to)];
+        const evs = await loadSpaceEvents(o.id, from, to);
+        return [o.id, evs.map((e) => ({
+          profile_id: o.id, level: 'details' as const,
+          start_date: e.start_date, end_date: e.end_date, all_day: e.all_day,
+          start_min: e.start_min, end_min: e.end_min, recurrence: e.recurrence, title: e.title,
+        }))];
+      }));
+      if (live) setOverlayRows(Object.fromEntries(entries));
+    })();
+    return () => { live = false; };
+  }, [overlays, from, to]);
+
+  const addOverlay = (o: CalOverlay) => {
+    setOverlays((cur) => (cur.some((x) => x.id === o.id) ? cur : [...cur, o]));
+    setSearchOpen(false); setQuery('');
+  };
+  const removeOverlay = (id: string) => setOverlays((cur) => cur.filter((o) => o.id !== id));
 
   const page = (dir: 1 | -1) => {
     if (view === 'month') setAnchor(addMonths(anchor, dir));
@@ -151,13 +262,55 @@ export default function Calendar() {
           <select className="calp__vselect" value={view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
             {(Object.keys(VIEW_LABELS) as View[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
+          <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
+            <Icon name="settings" size={15} />
+          </button>
+        </div>
+
+        {/* Calendar chips: mine + my spaces (+ find-a-time toggle on a space) */}
+        <div className="calp__chips">
+          <button
+            className={'calp__calchip' + (selectedCal === 'me' ? ' is-on' : '')}
+            onClick={() => { setSelectedCal('me'); setOverlayOn(false); }}
+          >
+            Mine
+          </button>
+          {calendars.map((c) => (
+            <button
+              key={c.id}
+              className={'calp__calchip' + (selectedCal === c.id ? ' is-on' : '')}
+              onClick={() => { setSelectedCal(c.id); setOverlayOn(false); }}
+            >
+              {c.name}
+            </button>
+          ))}
+          {selectedCal !== 'me' && view !== 'month' && (
+            <button
+              className={'calp__calchip calp__calchip--overlay' + (overlayOn ? ' is-on' : '')}
+              onClick={() => setOverlayOn((o) => !o)}
+              title="Shade times when members are free"
+            >
+              Everyone free?
+            </button>
+          )}
         </div>
         {searchOpen && (
           <div className="calp__search">
             <input
-              className="calp__search-input" placeholder="Search events…" autoFocus
+              className="calp__search-input" placeholder="Search events & calendars…" autoFocus
               value={query} onChange={(e) => setQuery(e.target.value)}
             />
+            {calResults.length > 0 && <p className="calp__result-head">Calendars</p>}
+            {calResults.map((c) => (
+              <button className="calp__result" key={c.kind + c.id} onClick={() => addOverlay(c)}>
+                <span className="calp__result-title">
+                  <span className="calp__ovdot" style={{ background: colorFor(c.id) }} />
+                  {c.name}
+                </span>
+                <span className="calp__result-when">{c.kind === 'profile' ? 'member' : 'space'} · overlay</span>
+              </button>
+            ))}
+            {calResults.length > 0 && results.length > 0 && <p className="calp__result-head">Events</p>}
             {results.map((e) => (
               <button className="calp__result" key={e.id} onClick={() => { setSearchOpen(false); setQuery(''); jumpToDay(e.start_date); }}>
                 <span className="calp__result-title">{e.title}</span>
@@ -167,7 +320,22 @@ export default function Calendar() {
                 </span>
               </button>
             ))}
-            {query.trim() && results.length === 0 && <p className="calp__result-none">No matching events.</p>}
+            {query.trim() && results.length === 0 && calResults.length === 0 && (
+              <p className="calp__result-none">No matching events or calendars.</p>
+            )}
+          </div>
+        )}
+
+        {/* Overlaid calendars (from search) — dismissible, never saved */}
+        {overlays.length > 0 && (
+          <div className="calp__ovchips">
+            {overlays.map((o) => (
+              <span className="calp__ovchip" key={o.id} style={{ borderColor: colorFor(o.id) }}>
+                <span className="calp__ovdot" style={{ background: colorFor(o.id) }} />
+                {o.name}
+                <button className="calp__ovx" onClick={() => removeOverlay(o.id)} aria-label={`Remove ${o.name}`}>×</button>
+              </span>
+            ))}
           </div>
         )}
         {view !== 'month' && (
@@ -236,6 +404,40 @@ export default function Calendar() {
                   {Array.from({ length: 23 }, (_, h) => (
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
+                  {/* Find-a-time shading: greener = more members free; tap to book */}
+                  {overlayOn && selectedCal !== 'me' && memberIds.length > 0 &&
+                    Array.from({ length: 48 }, (_, s) => s * 30).map((slot) => {
+                      const free = freeMembersAt(iso, slot);
+                      if (free.length === 0) return null;
+                      const strong = free.length === memberIds.length;
+                      return (
+                        <button
+                          key={`fa-${slot}`}
+                          className={'calp__slot calp__slot--free' + (strong ? ' is-strong' : '')}
+                          style={{ top: (slot / 60) * HOUR_PX, height: HOUR_PX / 2 }}
+                          title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
+                          onClick={() => navigate(
+                            `/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`,
+                          )}
+                        />
+                      );
+                    })}
+                  {/* Searched-calendar overlays: their schedule beside yours */}
+                  {overlays.map((o) =>
+                    (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r, i) => {
+                      const c = colorFor(o.id);
+                      const top = r.all_day ? 0 : (((r.start_min ?? 0) / 60) * HOUR_PX);
+                      const height = r.all_day ? 24 * HOUR_PX : Math.max(17, (((r.end_min ?? 60) - (r.start_min ?? 0)) / 60) * HOUR_PX);
+                      return (
+                        <span
+                          className="calp__ovblock" key={`${o.id}-${i}-${iso}`}
+                          style={{ top, height, borderColor: c, background: `color-mix(in srgb, ${c} 16%, transparent)` }}
+                          title={`${o.name}: ${r.title ?? 'busy'}`}
+                        >
+                          {r.title ?? `${o.name} · busy`}
+                        </span>
+                      );
+                    }))}
                   {timedOn(iso).map((e) => {
                     const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
                     const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
@@ -271,7 +473,7 @@ export default function Calendar() {
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
             {selected.location && <p className="calp__sheet-loc"><Icon name="location" size={13} /> {selected.location}</p>}
-            {selected.description && <p className="calp__sheet-desc">{selected.description}</p>}
+            {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
 
             {(selected.attendees?.length ?? 0) > 0 && (
               <div className="calp__sheet-people">

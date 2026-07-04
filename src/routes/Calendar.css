@@ -48,6 +48,32 @@
 .calp__result-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calp__result-when { font-family: var(--font-mono); font-size: 10px; color: var(--peach-deep); flex-shrink: 0; }
 .calp__result-none { font-size: 12px; color: var(--ink-faint); padding: 2px 4px; }
+.calp__result-head {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); padding: 4px 4px 0;
+}
+
+/* Searched-calendar overlays: chips above the grid + tinted blocks within it */
+.calp__ovchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.calp__ovchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 10px; border-radius: var(--r-full);
+  border: 1.5px solid; background: var(--bone-warm);
+  font-size: 12px; color: var(--ink);
+}
+.calp__ovdot { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; display: inline-block; margin-right: 4px; }
+.calp__ovx {
+  width: 18px; height: 18px; border-radius: var(--r-full); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); font-size: 13px;
+}
+.calp__ovx:hover { background: var(--bone-deep); color: var(--ink); }
+.calp__ovblock {
+  position: absolute; left: 2px; right: 2px; z-index: 0; pointer-events: none;
+  border: 1.5px solid; border-radius: 7px;
+  font-size: 9px; font-weight: 500; line-height: 1.25; padding: 2px 4px;
+  color: var(--ink-soft); overflow: hidden;
+}
 
 .calp__nav { display: flex; align-items: center; gap: var(--s-2); }
 .calp__navbtn {
@@ -178,6 +204,10 @@
 .calp__sheet-when { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); }
 .calp__sheet-loc { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-soft); }
 .calp__sheet-desc { font-size: 13px; font-weight: 300; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+/* Links pasted in Notes are clickable (LinkifiedText) — style them here since
+   CarePostCard.css isn't loaded on this route. */
+.calp__sheet-desc a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
+.calp__sheet-desc a:hover { color: var(--peach); }
 .calp__sheet-people { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .calp__person { display: flex; align-items: center; gap: 8px; }
 .calp__person-avatar {
@@ -193,6 +223,56 @@
 .calp__sheet-btn { flex: 1; }
 .calp__sheet-btn.is-current { outline: 2px solid var(--peach-deep); }
 .calp__sheet-btn--del { color: #c0564f; }
+
+/* ── Calendar settings (hours + visibility rules) ── */
+.cset__row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 7px 10px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+}
+.cset__day { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); width: 34px; flex-shrink: 0; }
+.cset__time { font-family: var(--font-mono); font-size: 12px; color: var(--ink); margin-right: auto; }
+.cset__aud { font-size: 13px; color: var(--ink); margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cset__kind {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-soft); background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full); padding: 2px 7px;
+}
+.cset__kind.is-oncall { color: var(--peach-deep); border-color: var(--peach); }
+.cset__add { display: flex; align-items: center; gap: 6px; }
+.cset__add--wrap { flex-wrap: wrap; }
+.cset__select {
+  padding: 6px 8px; border-radius: var(--r-md); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); font-size: 12px; font-family: inherit; color: var(--ink);
+}
+.cset__select--grow, .cset__grow { flex: 1; min-width: 0; }
+.timefield {
+  padding: 6px 8px; border-radius: var(--r-md); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); font-size: 12px; font-family: inherit; color: var(--ink);
+}
+
+/* Custom select chevron — inset from the edge instead of browser-flush-right. */
+.calp__vselect, .cset__select, .timefield {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236B7479' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 30px;
+}
+
+
+/* Calendar chips (Mine + spaces) + availability overlay */
+.calp__chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.calp__chips::-webkit-scrollbar { display: none; }
+.calp__calchip {
+  flex-shrink: 0; padding: 5px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; color: var(--ink);
+}
+.calp__calchip.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.calp__calchip--overlay.is-on { background: #4c9a63; border-color: #4c9a63; }
+.calp__slot { position: absolute; left: 0; right: 0; pointer-events: auto; }
+.calp__slot--free { background: rgba(76, 154, 99, 0.14); }
+.calp__slot--free.is-strong { background: rgba(76, 154, 99, 0.3); }
 
 /* Composer invitee picker */
 .calp__invitees { display: flex; flex-wrap: wrap; gap: 6px; }

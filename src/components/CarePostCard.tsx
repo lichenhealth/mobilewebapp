@@ -8,7 +8,7 @@ import { recurrenceLabel } from '../lib/recurrence';
 import './CarePostCard.css';
 
 /** Render body text with pasted URLs turned into clickable links. */
-function LinkifiedText({ text }: { text: string }) {
+export function LinkifiedText({ text }: { text: string }) {
   return (
     <>
       {linkify(text).map((s, i) =>

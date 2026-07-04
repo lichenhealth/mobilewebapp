@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
 import RecurrenceSelect from '../components/RecurrenceSelect';
@@ -22,6 +22,7 @@ export default function EventComposer() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { eventId } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const back = () => navigate('/calendar');
 
@@ -53,9 +54,25 @@ export default function EventComposer() {
       const sp = ((spRes.data as unknown as { spaces: SpaceOpt | null }[] | null) ?? [])
         .map((r) => r.spaces).filter((s): s is SpaceOpt => !!s);
       setSpaces(sp);
-      setMembers((memRes.data as MemberOpt[] | null) ?? []);
+      const mem = (memRes.data as MemberOpt[] | null) ?? [];
+      setMembers(mem);
+
+      // Prefill from a find-a-time slot link (?space&date&start&inv=…).
+      if (!eventId) {
+        const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qInv = params.get('inv');
+        if (qSpace) setCalendar(qSpace);
+        if (qDate) setRange({ start: qDate, end: qDate });
+        if (qStart) {
+          const s = Number(qStart);
+          if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
+        }
+        if (qInv) {
+          const ids = qInv.split(',').filter(Boolean);
+          setInvitees(ids.map((id) => mem.find((m) => m.id === id) ?? { id, full_name: null }));
+        }
+      }
     })();
-  }, [me]);
+  }, [me, eventId, params]);
 
   // Edit mode: prefill from the existing event.
   useEffect(() => {
