@@ -32,6 +32,8 @@ export interface FeedCardProps {
   media?: { type: 'photo' | 'video' | 'audio'; url: string }[];
   // Message the author (omit / undefined hides the button — e.g. your own post)
   onMessage?: () => void;
+  /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
+  onBadgeAction?: () => void;
 }
 
 export default function FeedCard({
@@ -52,6 +54,7 @@ export default function FeedCard({
   eyebrow,
   media,
   onMessage,
+  onBadgeAction,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -107,6 +110,7 @@ export default function FeedCard({
             topLabel={image.topLabel}
             bottomLabel={image.bottomLabel}
             tone={image.tone ?? 'peach'}
+            onAction={onBadgeAction}
           />
         )}
       </div>
@@ -147,9 +151,10 @@ interface ImageBadgeProps {
   topLabel: string;
   bottomLabel: string;
   tone: 'peach' | 'moss' | 'ink';
+  onAction?: () => void;
 }
 
-function ImageBadge({ src, pattern, topLabel, bottomLabel, tone }: ImageBadgeProps) {
+function ImageBadge({ src, pattern, topLabel, bottomLabel, tone, onAction }: ImageBadgeProps) {
   return (
     <div className={`badge badge--${tone}`}>
       <div className="badge__top">{topLabel}</div>
@@ -160,7 +165,7 @@ function ImageBadge({ src, pattern, topLabel, bottomLabel, tone }: ImageBadgePro
           <PatternArt name={pattern ?? 'sky'} />
         )}
       </div>
-      <button className="badge__bottom">{bottomLabel}</button>
+      <button className="badge__bottom" onClick={onAction}>{bottomLabel}</button>
     </div>
   );
 }

@@ -7,9 +7,13 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
-  createPost, uploadMedia, CONTENT_TYPES, SERVICE_AREAS,
-  type ContentType, type ServiceArea,
+  createPost, uploadMedia, CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
+  type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
+import { createEvent, deleteEvent } from '../lib/calendarApi';
+import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
+import TimeField from '../components/TimeField';
+import { todayISO } from '../lib/conciergeApi';
 import './Compose.css';
 
 const MARKET_MODES = ['gift', 'trade', 'rent', 'lend', 'sliding', 'sale'] as const;
@@ -35,6 +39,17 @@ export default function Compose() {
     return new Set(a ? [a] : []);
   });
   const [whereOpen, setWhereOpen] = useState(false);
+
+  // Event details (when Where includes 'events'): the post gets a REAL
+  // calendar event behind it — the RSVP container.
+  const [evCategory, setEvCategory] = useState<EventCategory>('experiences');
+  const [evMode, setEvMode] = useState<EventMode>('free');
+  const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
+  const [evAllDay, setEvAllDay] = useState(false);
+  const [evStartMin, setEvStartMin] = useState(18 * 60);
+  const [evEndMin, setEvEndMin] = useState(20 * 60);
+  const [bookingUrl, setBookingUrl] = useState('');
+  const [tradeFor, setTradeFor] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
@@ -78,6 +93,7 @@ export default function Compose() {
   const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
 
   const isMarket = areas.has('marketplace');
+  const isEvent = areas.has('events');
 
   async function addMedia(file: Blob, ext: string, type: MediaType) {
     setUploading(true); setError('');
@@ -126,6 +142,7 @@ export default function Compose() {
   async function submit() {
     if (!body.trim()) { setError('Add a few words first.'); return; }
     if (!hasAudience) { setError('Pick at least one audience.'); return; }
+    if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
       const details: Record<string, unknown> = {};
@@ -134,16 +151,51 @@ export default function Compose() {
         details.mode = mode;
         if (location.trim()) details.location = location.trim();
       }
+      if (isEvent) {
+        if (evMode === 'paid') {
+          if (price.trim()) details.price = price.trim();
+          if (bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
+        }
+        if (evMode === 'trade' && tradeFor.trim()) details.trade = tradeFor.trim();
+        if (location.trim()) details.location = location.trim();
+      }
       if (media.length) details.media = media;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
-      await createPost({
-        body, title, content_type: contentType,
-        isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
-        serviceAreas: [...areas],
-        authorSpaceId: actor.type === 'space' ? actor.id : null,
-        image_url: firstPhoto, details,
-      });
-      navigate('/home');
+
+      // Events first create their calendar event (the RSVP container); if the
+      // post insert then fails, the orphan event is cleaned up below.
+      let linkedEventId: string | null = null;
+      if (isEvent && evRange.start) {
+        linkedEventId = await createEvent(user!.id, {
+          ownerProfileId: actor.type === 'space' ? undefined : user!.id,
+          ownerSpaceId: actor.type === 'space' ? actor.id : undefined,
+          title: title.trim() || body.trim().slice(0, 60) || 'Event',
+          description: body.trim(),
+          location: location.trim(),
+          startDate: evRange.start,
+          endDate: evRange.end ?? evRange.start,
+          allDay: evAllDay,
+          startMin: evStartMin, endMin: evEndMin,
+          recurrence: null,
+          inviteeIds: [],
+        });
+      }
+      try {
+        await createPost({
+          body, title, content_type: contentType,
+          isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
+          serviceAreas: [...areas],
+          authorSpaceId: actor.type === 'space' ? actor.id : null,
+          eventCategory: isEvent ? evCategory : null,
+          eventMode: isEvent ? evMode : null,
+          linkedEventId,
+          image_url: firstPhoto, details,
+        });
+      } catch (postErr) {
+        if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
+        throw postErr;
+      }
+      navigate(isEvent ? '/events' : '/home');
     } catch (e) {
       setBusy(false);
       setError((e as Error)?.message || 'Couldn’t post. Please try again.');
@@ -256,6 +308,47 @@ export default function Compose() {
             </select>
           </div>
           <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (e.g. Wallowa, OR)" />
+        </div>
+      )}
+
+      {isEvent && (
+        <div className="cmp__market">
+          <p className="cmp__market-head">Event details</p>
+          <label className="cmp__label">Category</label>
+          <div className="cmp__chips">
+            {EVENT_CATEGORIES.map((c) => (
+              <button key={c.value} className={'cmp__chip' + (evCategory === c.value ? ' is-on' : '')}
+                onClick={() => setEvCategory(c.value)}>{c.label}</button>
+            ))}
+          </div>
+          <label className="cmp__label">Free, trade, or paid?</label>
+          <div className="cmp__chips">
+            {EVENT_MODES.map((m) => (
+              <button key={m.value} className={'cmp__chip' + (evMode === m.value ? ' is-on' : '')}
+                onClick={() => setEvMode(m.value)}>{m.label}</button>
+            ))}
+          </div>
+          {evMode === 'paid' && (
+            <div className="cmp__row">
+              <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45, sliding $20–60)" />
+              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
+            </div>
+          )}
+          {evMode === 'trade' && (
+            <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
+          )}
+          <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (address or video link)" />
+          <label className="cmp__label">When</label>
+          <label className="cmp__evrow"><input type="checkbox" checked={evAllDay} onChange={(e) => setEvAllDay(e.target.checked)} /> All day</label>
+          {!evAllDay && (
+            <div className="cmp__row cmp__row--times">
+              <TimeField value={evStartMin} onChange={(m) => { setEvStartMin(m); if (evEndMin <= m) setEvEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
+              <span className="cmp__to">to</span>
+              <TimeField value={evEndMin} onChange={setEvEndMin} min={evRange.start === (evRange.end ?? evRange.start) ? evStartMin : undefined} ariaLabel="End time" />
+            </div>
+          )}
+          <DateRangeCalendar value={evRange} onChange={setEvRange} />
+          <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
         </div>
       )}
 

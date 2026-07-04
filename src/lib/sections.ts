@@ -3,7 +3,7 @@
 // Home is the GLOBAL view (total across everything).
 
 export type Section =
-  | 'concierge' | 'chat' | 'calendar' | 'saved' | 'maps'
+  | 'concierge' | 'chat' | 'calendar' | 'events' | 'saved' | 'maps'
   | 'profile' | 'mycelium' | 'communities' | 'groups' | 'market'
   | 'invite' | 'membership';
 
@@ -17,6 +17,7 @@ const PREFIX_SECTIONS: { prefix: string; section: Section }[] = [
   { prefix: '/concierge', section: 'concierge' },
   { prefix: '/chat', section: 'chat' },
   { prefix: '/calendar', section: 'calendar' },
+  { prefix: '/events', section: 'events' },
   { prefix: '/saved', section: 'saved' },
   { prefix: '/maps', section: 'maps' },
   { prefix: '/profile', section: 'profile' },

@@ -99,3 +99,9 @@
 }
 .cmp__where-row:hover { background: var(--bone); }
 .cmp__where-row input { accent-color: var(--peach); }
+
+/* Event details */
+.cmp__evrow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+.cmp__row--times { align-items: center; }
+.cmp__to { font-size: 13px; color: var(--ink-soft); }
+.cmp__hint-ev { font-size: 11px; color: var(--ink-faint); line-height: 1.4; }
