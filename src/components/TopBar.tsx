@@ -78,7 +78,12 @@ export default function TopBar({
 
       <div className="top-bar__logo">
         {section ? (
-          section.custom && section.prefix === '/mycelium' ? (
+          section.prefix === '/profile' ? (
+            /* On Profile the section mark IS you — your photo, not a generic icon. */
+            <div className="top-bar__section-mark top-bar__section-mark--self" role="img" aria-label="Profile" title="Profile">
+              <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={64} />
+            </div>
+          ) : section.custom && section.prefix === '/mycelium' ? (
             <div
               className="top-bar__section-mark top-bar__section-mark--custom"
               role="img"

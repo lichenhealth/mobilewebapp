@@ -377,10 +377,7 @@ export default function Profile() {
       {actingOptions.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Acting as</h2>
-          <p className="prof__care-lead">
-            Choose who you're acting as. Events you create (and posts, when they arrive) are
-            attributed to this identity. A peach ring up top reminds you when you're not yourself.
-          </p>
+          <p className="prof__care-lead">Choose who you're acting as.</p>
           <div className="prof__acting-list">
             <button
               className={'prof__acting-row' + (actor.type === 'self' ? ' is-on' : '')}

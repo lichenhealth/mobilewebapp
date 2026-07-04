@@ -124,3 +124,6 @@
   display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-style: italic; font-size: 13px; color: var(--bone-warm);
 }
+
+.top-bar__section-mark--self { border: 0; }
+.top-bar__section-mark--self .avatar { border: 1px solid var(--ink); }
