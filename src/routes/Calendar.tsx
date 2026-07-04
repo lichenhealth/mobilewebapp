@@ -165,7 +165,7 @@ export default function Calendar() {
     const el = gridRef.current;
     if (!el) return;
     // Land 7am just below the pinned toolbar+day-header stack.
-    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 230;
+    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 210;
     if (y > 0) window.scrollTo({ top: y });
   }, [view]);
 
@@ -255,23 +255,47 @@ export default function Calendar() {
   };
   const jumpToDay = (iso: string) => { setAnchor(iso); setView('day'); };
 
+  // Drag-to-create (mouse): press on an empty slot and drag — an orange box
+  // grows with the selection; release opens the composer with that span.
+  // A plain click/tap creates at the slot with the default duration. Touch
+  // drags stay reserved for scrolling (the browser fires pointercancel).
+  const dragRef = useRef<{ iso: string; anchor: number; moved: boolean } | null>(null);
+  const [drag, setDrag] = useState<{ iso: string; start: number; end: number } | null>(null);
+  const slotAt = (e: React.PointerEvent, el: HTMLElement) =>
+    Math.max(0, Math.min(1410, Math.floor((e.clientY - el.getBoundingClientRect().top) / (HOUR_PX / 2)) * 30));
+
+  const onColDown = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return; // blocks/slots own their clicks
+    const s = slotAt(e, e.currentTarget);
+    dragRef.current = { iso, anchor: s, moved: false };
+    setDrag({ iso, start: s, end: s + 30 });
+    if (e.pointerType === 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onColMove = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d || d.iso !== iso || e.pointerType !== 'mouse') return;
+    const s = slotAt(e, e.currentTarget);
+    if (s !== d.anchor) d.moved = true;
+    setDrag({ iso, start: Math.min(d.anchor, s), end: Math.max(d.anchor + 30, s + 30) });
+  };
+  const onColUp = (iso: string) => () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d || d.iso !== iso) { setDrag(null); return; }
+    const span = drag && d.moved ? `&end=${drag.end}` : '';
+    const start = drag?.start ?? d.anchor;
+    setDrag(null);
+    navigate(`/calendar/new?date=${iso}&start=${start}${span}${selectedCal !== 'me' ? `&space=${selectedCal}` : ''}`);
+  };
+  const onColCancel = () => { dragRef.current = null; setDrag(null); };
+
   const gridCols = { gridTemplateColumns: `44px repeat(${days.length}, 1fr)` };
 
   return (
     <div className="calp">
-      <div className="calp__head">
-        <div className="calp__head-row">
-          <h1 className="calp__title">Calendar</h1>
-          <button className="calp__new" onClick={() => navigate('/calendar/new')} aria-label="New event">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
       {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
-          hour grid slides up and hides beneath them. */}
+          hour grid slides up and hides beneath them. The + lives here too, so
+          nothing above the pin matters — no title row, grid starts high. */}
       <div className="calp__pin">
         <div className="calp__toolbar">
           <button
@@ -438,13 +462,10 @@ export default function Calendar() {
               {days.map((iso) => (
                 <div
                   className="calp__col" key={iso}
-                  onClick={(e) => {
-                    // Click an empty slot → composer prefilled with that day +
-                    // half-hour (à la Google Cal). Blocks stop propagation.
-                    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-                    const slot = Math.max(0, Math.min(1410, Math.floor(y / (HOUR_PX / 2)) * 30));
-                    navigate(`/calendar/new?date=${iso}&start=${slot}${selectedCal !== 'me' ? `&space=${selectedCal}` : ''}`);
-                  }}
+                  onPointerDown={onColDown(iso)}
+                  onPointerMove={onColMove(iso)}
+                  onPointerUp={onColUp(iso)}
+                  onPointerCancel={onColCancel}
                 >
                   {Array.from({ length: 23 }, (_, h) => (
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
@@ -468,6 +489,15 @@ export default function Calendar() {
                         />
                       );
                     })}
+                  {/* Live drag-to-create selection box */}
+                  {drag && drag.iso === iso && (
+                    <span
+                      className="calp__dragbox"
+                      style={{ top: (drag.start / 60) * HOUR_PX, height: ((drag.end - drag.start) / 60) * HOUR_PX }}
+                    >
+                      {minToLabel(drag.start)} – {minToLabel(drag.end)}
+                    </span>
+                  )}
                   {/* Searched-calendar overlays: their schedule beside yours */}
                   {overlays.map((o) =>
                     (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r, i) => {

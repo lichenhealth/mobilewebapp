@@ -68,6 +68,11 @@ export default function EventComposer() {
           const s = Number(qStart);
           if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
         }
+        const qEnd = params.get('end');
+        if (qEnd) {
+          const en = Number(qEnd);
+          if (Number.isFinite(en) && en > 0) setEndMin(Math.min(en, 1440));
+        }
         if (qInv) {
           const ids = qInv.split(',').filter(Boolean);
           setInvitees(ids.map((id) => mem.find((m) => m.id === id) ?? { id, full_name: null }));
@@ -137,6 +142,27 @@ export default function EventComposer() {
     }
   }
 
+  // Time + repeat controls: rendered in-flow on mobile, in the right column on
+  // desktop (per the founder's layout sketch). Same state either way.
+  const whenControls = (
+    <>
+      <label className="rec__radio">
+        <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
+      </label>
+      {!allDay && (
+        <div className="rec__row">
+          <TimeField value={startMin} onChange={(m) => { setStartMin(m); if (endMin <= m) setEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
+          <span className="rec__lbl">to</span>
+          <TimeField value={endMin} onChange={setEndMin} min={range.start === (range.end ?? range.start) ? startMin : undefined} ariaLabel="End time" />
+        </div>
+      )}
+      <RecurrenceSelect
+        anchor={anchor} recurrence={recurrence}
+        onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
+      />
+    </>
+  );
+
   return (
     <div className="cedit">
       <header className="cedit__head">
@@ -165,23 +191,14 @@ export default function EventComposer() {
           </select>
         </div>
 
-        {/* When */}
-        <div className="cedit__field">
+        {/* When (times + repeat) — on desktop this block renders in the right
+            column instead (see whenControls below); the DATE picker stays here. */}
+        <div className="cedit__field only-mobile">
           <span className="cedit__label">When</span>
-          <label className="rec__radio">
-            <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
-          </label>
-          {!allDay && (
-            <div className="rec__row">
-              <TimeField value={startMin} onChange={(m) => { setStartMin(m); if (endMin <= m) setEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
-              <span className="rec__lbl">to</span>
-              <TimeField value={endMin} onChange={setEndMin} min={range.start === (range.end ?? range.start) ? startMin : undefined} ariaLabel="End time" />
-            </div>
-          )}
-          <RecurrenceSelect
-            anchor={anchor} recurrence={recurrence}
-            onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
-          />
+          {whenControls}
+        </div>
+        <div className="cedit__field">
+          <span className="cedit__label">Date</span>
           <DateRangeCalendar
             value={recurrence ? { start: range.start, end: range.start } : range}
             onChange={(r) => setRange(recurrence ? { start: r.start, end: r.start } : r)}
@@ -230,8 +247,12 @@ export default function EventComposer() {
         </div>
       </div>
 
-      {/* Live invite preview (desktop): what every participant will see */}
+      {/* Right column (desktop): time controls + live invite preview */}
       <aside className="evprev" aria-label="Invite preview">
+        <div className="cedit__field only-desktop evprev__when">
+          <span className="cedit__label">When</span>
+          {whenControls}
+        </div>
         <p className="evprev__eyebrow">Invite preview</p>
         <div className="evprev__card">
           <h2 className="calp__sheet-title">{title.trim() || 'Untitled event'}</h2>
