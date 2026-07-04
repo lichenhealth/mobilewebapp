@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Wehfop9QtUSSreN5p0UgZy7nq9q8M3UClTiOSTynzJsWaSTK7Y19JmegT9ICxrm
+\restrict eXkeVhffgIcAjZClPdRYIySE69uEwdAdsGKfFuVgUrzzP1lNytNfc3Osh2vYr4F
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -537,6 +537,22 @@ $$;
 ALTER FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) OWNER TO postgres;
 
 --
+-- Name: is_space_admin(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.is_space_admin(p_space uuid, p_uid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from public.space_members m
+                 where m.space_id = p_space and m.profile_id = p_uid
+                   and m.role in ('admin', 'super_admin'));
+$$;
+
+
+ALTER FUNCTION public.is_space_admin(p_space uuid, p_uid uuid) OWNER TO postgres;
+
+--
 -- Name: is_space_member(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -662,13 +678,20 @@ CREATE FUNCTION public.on_event_invite_notify() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_name text; v_title text;
+declare v_name text; v_title text; v_creator uuid;
 begin
   select coalesce(nullif(full_name, ''), email, 'A member')
     into v_name from public.profiles where id = new.invited_by;
-  select title into v_title from public.events where id = new.event_id;
-  perform public.notify(new.profile_id, 'calendar', null, 'event_invite',
-    v_name, 'invited you: ' || coalesce(v_title, 'an event'), '/calendar', new.invited_by);
+  select title, creator_id into v_title, v_creator from public.events where id = new.event_id;
+  if new.invited_by = new.profile_id then
+    -- self-RSVP (Book on an event post) → tell the host
+    perform public.notify(v_creator, 'calendar', null, 'event_rsvp',
+      v_name, 'is going: ' || coalesce(v_title, 'your event'), '/calendar', new.profile_id);
+  else
+    -- classic invite → tell the invitee
+    perform public.notify(new.profile_id, 'calendar', null, 'event_invite',
+      v_name, 'invited you: ' || coalesce(v_title, 'an event'), '/calendar', new.invited_by);
+  end if;
   return new;
 end; $$;
 
@@ -744,6 +767,41 @@ end; $$;
 
 
 ALTER FUNCTION public.on_snapshot_notify() OWNER TO postgres;
+
+--
+-- Name: posts_audience_sync(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.posts_audience_sync() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if new.is_public = false and new.to_mycelium = false and new.audience_space_ids = '{}'::uuid[] then
+    -- Old frontend: only `visibility` set → derive the new columns.
+    new.is_public := (new.visibility = 'public');
+    new.to_mycelium := (new.visibility = 'mycelium');
+    if new.visibility = 'space' and new.space_id is not null then
+      new.audience_space_ids := array[new.space_id];
+    end if;
+  else
+    -- New frontend → keep legacy columns coherent (and their CHECKs satisfied).
+    new.visibility := case when new.is_public then 'public'
+                           when new.to_mycelium then 'mycelium'
+                           else 'space' end;
+    if new.visibility = 'space' and new.space_id is null then
+      new.space_id := new.audience_space_ids[1];
+    end if;
+  end if;
+  if new.service_areas = '{}' and new.service_area is not null then
+    new.service_areas := array[new.service_area];
+  elsif new.service_area is null and cardinality(new.service_areas) > 0 then
+    new.service_area := new.service_areas[1];
+  end if;
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.posts_audience_sync() OWNER TO postgres;
 
 --
 -- Name: reject_category_suggestion(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1255,8 +1313,19 @@ CREATE TABLE public.posts (
     details jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    service_areas text[] DEFAULT '{}'::text[] NOT NULL,
+    is_public boolean DEFAULT false NOT NULL,
+    to_mycelium boolean DEFAULT false NOT NULL,
+    audience_space_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    author_space_id uuid,
+    linked_event_id uuid,
+    event_category text,
+    event_mode text,
     CONSTRAINT posts_content_type_check CHECK ((content_type = ANY (ARRAY['social'::text, 'creative'::text, 'educational'::text, 'actionable'::text, 'qa'::text]))),
+    CONSTRAINT posts_event_category_check CHECK (((event_category IS NULL) OR (event_category = ANY (ARRAY['social'::text, 'work_charity'::text, 'learning'::text, 'experiences'::text])))),
+    CONSTRAINT posts_event_mode_check CHECK (((event_mode IS NULL) OR (event_mode = ANY (ARRAY['free'::text, 'trade'::text, 'paid'::text])))),
     CONSTRAINT posts_service_area_check CHECK ((service_area = ANY (ARRAY['marketplace'::text, 'work'::text, 'courses'::text, 'food'::text, 'art'::text, 'events'::text, 'places'::text, 'library'::text, 'people'::text]))),
+    CONSTRAINT posts_service_areas_valid CHECK ((service_areas <@ ARRAY['marketplace'::text, 'work'::text, 'courses'::text, 'food'::text, 'art'::text, 'events'::text, 'places'::text, 'library'::text, 'people'::text])),
     CONSTRAINT posts_space_required CHECK (((visibility <> 'space'::text) OR (space_id IS NOT NULL))),
     CONSTRAINT posts_visibility_check CHECK ((visibility = ANY (ARRAY['public'::text, 'mycelium'::text, 'space'::text])))
 );
@@ -1767,6 +1836,13 @@ CREATE INDEX notifications_recipient_space_unread_idx ON public.notifications US
 
 
 --
+-- Name: posts_audience_spaces_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_audience_spaces_gin ON public.posts USING gin (audience_space_ids);
+
+
+--
 -- Name: posts_author_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1774,10 +1850,38 @@ CREATE INDEX posts_author_idx ON public.posts USING btree (author_id);
 
 
 --
+-- Name: posts_author_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_author_space_idx ON public.posts USING btree (author_space_id) WHERE (author_space_id IS NOT NULL);
+
+
+--
+-- Name: posts_event_category_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_event_category_idx ON public.posts USING btree (event_category) WHERE (event_category IS NOT NULL);
+
+
+--
+-- Name: posts_linked_event_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_linked_event_idx ON public.posts USING btree (linked_event_id) WHERE (linked_event_id IS NOT NULL);
+
+
+--
 -- Name: posts_service_area_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX posts_service_area_idx ON public.posts USING btree (service_area);
+
+
+--
+-- Name: posts_service_areas_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX posts_service_areas_gin ON public.posts USING gin (service_areas);
 
 
 --
@@ -1904,6 +2008,13 @@ CREATE TRIGGER on_snapshot_notify_trg AFTER INSERT ON public.health_snapshots FO
 --
 
 CREATE TRIGGER on_space_created AFTER INSERT ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.handle_new_space();
+
+
+--
+-- Name: posts posts_audience_sync_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER posts_audience_sync_trg BEFORE INSERT ON public.posts FOR EACH ROW EXECUTE FUNCTION public.posts_audience_sync();
 
 
 --
@@ -2239,6 +2350,22 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.posts
     ADD CONSTRAINT posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: posts posts_author_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_author_space_id_fkey FOREIGN KEY (author_space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: posts posts_linked_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_linked_event_id_fkey FOREIGN KEY (linked_event_id) REFERENCES public.events(id) ON DELETE SET NULL;
 
 
 --
@@ -2661,6 +2788,24 @@ CREATE POLICY "event_attendees read" ON public.event_attendees FOR SELECT TO aut
 
 
 --
+-- Name: event_attendees event_attendees read via post; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees read via post" ON public.event_attendees FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.posts p
+  WHERE (p.linked_event_id = event_attendees.event_id))));
+
+
+--
+-- Name: event_attendees event_attendees self rsvp; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees self rsvp" ON public.event_attendees FOR INSERT TO authenticated WITH CHECK (((profile_id = auth.uid()) AND (invited_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.posts p
+  WHERE (p.linked_event_id = event_attendees.event_id)))));
+
+
+--
 -- Name: event_attendees event_attendees update; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -2693,7 +2838,9 @@ CREATE POLICY "events insert" ON public.events FOR INSERT TO authenticated WITH 
 
 CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR (EXISTS ( SELECT 1
    FROM public.event_attendees a
-  WHERE ((a.event_id = events.id) AND (a.profile_id = auth.uid()))))));
+  WHERE ((a.event_id = events.id) AND (a.profile_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM public.posts p
+  WHERE (p.linked_event_id = p.id)))));
 
 
 --
@@ -2863,20 +3010,22 @@ CREATE POLICY "posts: delete own" ON public.posts FOR DELETE TO authenticated US
 -- Name: posts posts: insert own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "posts: insert own" ON public.posts FOR INSERT TO authenticated WITH CHECK (((author_id = auth.uid()) AND ((visibility <> 'space'::text) OR (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = posts.space_id) AND (m.profile_id = auth.uid())))))));
+CREATE POLICY "posts: insert own" ON public.posts FOR INSERT TO authenticated WITH CHECK (((author_id = auth.uid()) AND (is_public OR to_mycelium OR (cardinality(audience_space_ids) > 0)) AND (NOT (EXISTS ( SELECT 1
+   FROM unnest(posts.audience_space_ids) a(sid)
+  WHERE (NOT (EXISTS ( SELECT 1
+           FROM public.space_members m
+          WHERE ((m.space_id = a.sid) AND (m.profile_id = auth.uid())))))))) AND ((author_space_id IS NULL) OR public.is_space_admin(author_space_id, auth.uid()))));
 
 
 --
 -- Name: posts posts: read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "posts: read" ON public.posts FOR SELECT TO authenticated USING (((visibility = 'public'::text) OR (author_id = auth.uid()) OR ((visibility = 'space'::text) AND (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = posts.space_id) AND (m.profile_id = auth.uid()))))) OR ((visibility = 'mycelium'::text) AND (EXISTS ( SELECT 1
+CREATE POLICY "posts: read" ON public.posts FOR SELECT TO authenticated USING ((is_public OR (author_id = auth.uid()) OR (to_mycelium AND (EXISTS ( SELECT 1
    FROM public.mycelium my
-  WHERE ((my.truster_id = auth.uid()) AND (my.target_type = 'profile'::text) AND (my.target_id = posts.author_id)))))));
+  WHERE ((my.truster_id = auth.uid()) AND (((my.target_type = 'profile'::text) AND (my.target_id = posts.author_id)) OR ((my.target_type = 'space'::text) AND (my.target_id = posts.author_space_id))))))) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.profile_id = auth.uid()) AND (m.space_id = ANY (posts.audience_space_ids)))))));
 
 
 --
@@ -3187,6 +3336,15 @@ GRANT ALL ON FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) TO serv
 
 
 --
+-- Name: FUNCTION is_space_admin(p_space uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.is_space_admin(p_space uuid, p_uid uuid) TO anon;
+GRANT ALL ON FUNCTION public.is_space_admin(p_space uuid, p_uid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_space_admin(p_space uuid, p_uid uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION is_space_member(p_space uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3274,6 +3432,15 @@ GRANT ALL ON FUNCTION public.on_message_notify() TO service_role;
 GRANT ALL ON FUNCTION public.on_snapshot_notify() TO anon;
 GRANT ALL ON FUNCTION public.on_snapshot_notify() TO authenticated;
 GRANT ALL ON FUNCTION public.on_snapshot_notify() TO service_role;
+
+
+--
+-- Name: FUNCTION posts_audience_sync(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.posts_audience_sync() TO anon;
+GRANT ALL ON FUNCTION public.posts_audience_sync() TO authenticated;
+GRANT ALL ON FUNCTION public.posts_audience_sync() TO service_role;
 
 
 --
@@ -3703,7 +3870,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Wehfop9QtUSSreN5p0UgZy7nq9q8M3UClTiOSTynzJsWaSTK7Y19JmegT9ICxrm
+\unrestrict eXkeVhffgIcAjZClPdRYIySE69uEwdAdsGKfFuVgUrzzP1lNytNfc3Osh2vYr4F
 
 
 
