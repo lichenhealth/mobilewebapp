@@ -145,3 +145,17 @@
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
   color: #fff; background: var(--peach); border-radius: var(--r-full); padding: 3px 8px; flex-shrink: 0;
 }
+
+/* Profile picture (header) */
+.prof__avatar-btn {
+  position: relative; margin: 0 auto var(--s-3); display: block;
+  border-radius: var(--r-full); cursor: pointer; background: none; border: 0; padding: 0;
+}
+.prof__avatar-btn:disabled { opacity: 0.6; }
+.prof__avatar-edit {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 24px; height: 24px; border-radius: var(--r-full);
+  background: var(--peach); color: #fff; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--bone);
+}

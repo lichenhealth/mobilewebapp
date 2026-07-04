@@ -5,7 +5,9 @@ import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { useActing } from '../acting/ActingProvider';
+import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import Avatar from './Avatar';
 import { scopeForPath } from '../lib/sections';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
@@ -57,7 +59,9 @@ export default function TopBar({
   const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
 
   const { unreadForScope } = useNotifications();
-  const { actor } = useActing();
+  const { actor, self } = useActing();
+  const { user } = useAuth();
+  const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -99,18 +103,20 @@ export default function TopBar({
       </div>
 
       <div className="top-bar__right">
-        {actor.type === 'space' && (
-          <button
-            className="top-bar__acting"
-            onClick={() => navigate('/profile')}
-            title={`Acting as ${actor.name} — tap to switch`}
-            aria-label={`Acting as ${actor.name}. Open profile switcher.`}
-          >
+        <button
+          className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
+          onClick={() => navigate('/profile')}
+          title={actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
+          aria-label={actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
+        >
+          {actor.type === 'space' ? (
             <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
               {monogramFor(actor.name)}
             </span>
-          </button>
-        )}
+          ) : (
+            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={30} />
+          )}
+        </button>
         {showSettings && (
           <button
             className="top-bar__icon top-bar__settings"

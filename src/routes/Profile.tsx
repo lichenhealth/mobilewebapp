@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import Avatar from '../components/Avatar';
+import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
 
@@ -17,7 +19,7 @@ const ACTING_KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
 };
 
-type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref };
+type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref; avatar_url: string | null };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
 type CareRow = {
@@ -46,7 +48,7 @@ const ROLE_LABEL: Record<SpaceRole, string> = {
 
 export default function Profile() {
   const { user, loading } = useAuth();
-  const { actor, setActor, options: actingOptions } = useActing();
+  const { actor, setActor, options: actingOptions, refreshSelf } = useActing();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -76,12 +78,28 @@ export default function Profile() {
   const [patientEmail, setPatientEmail] = useState('');
   const [careMsg, setCareMsg] = useState('');
   const [careBusy, setCareBusy] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  async function onAvatarFile(file: File | undefined) {
+    if (!file || !user) return;
+    setAvatarBusy(true); setError('');
+    try {
+      const url = await uploadAvatar(user.id, file);
+      setAvatarUrl(url);
+      refreshSelf();                     // updates the top-bar chip immediately
+    } catch (e) {
+      setError((e as { message?: string } | null)?.message || 'Could not upload that photo.');
+    }
+    setAvatarBusy(false);
+  }
 
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoadingData(true);
     const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
-      supabase.from('profiles').select('created_at,full_name,headline,bio,notification_pref').eq('id', user.id).single(),
+      supabase.from('profiles').select('created_at,full_name,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
@@ -93,6 +111,7 @@ export default function Profile() {
     // available here even though the email column is locked from member reads.
     setEmail(user.email ?? '');
     if (p) {
+      setAvatarUrl(p.avatar_url ?? null);
       setFullName(p.full_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
@@ -327,6 +346,20 @@ export default function Profile() {
   return (
     <div className="prof">
       <div className="prof__head">
+        <button
+          className="prof__avatar-btn"
+          onClick={() => avatarInputRef.current?.click()}
+          disabled={avatarBusy}
+          aria-label={avatarUrl ? 'Change profile picture' : 'Add profile picture'}
+          title={avatarUrl ? 'Change profile picture' : 'Add profile picture'}
+        >
+          <Avatar id={user?.id ?? 'me'} name={fullName || 'Me'} url={avatarUrl} size={72} />
+          <span className="prof__avatar-edit">{avatarBusy ? '…' : '✎'}</span>
+        </button>
+        <input
+          ref={avatarInputRef} type="file" accept="image/*" hidden
+          onChange={(e) => { onAvatarFile(e.target.files?.[0]); e.target.value = ''; }}
+        />
         <h1 className="prof__name">{fullName || 'Your profile'}</h1>
         <p className="prof__email">{email}</p>
         {tier && (
@@ -353,9 +386,7 @@ export default function Profile() {
               className={'prof__acting-row' + (actor.type === 'self' ? ' is-on' : '')}
               onClick={() => setActor({ type: 'self' })}
             >
-              <span className="prof__acting-avatar" style={{ background: colorFor(user?.id ?? 'me') }}>
-                {monogramFor(fullName || 'Me')}
-              </span>
+              <Avatar id={user?.id ?? 'me'} name={fullName || 'Me'} url={avatarUrl} size={34} />
               <span className="prof__acting-name">{fullName || 'Yourself'}</span>
               <span className="prof__acting-kind">You</span>
               {actor.type === 'self' && <span className="prof__acting-on">Acting</span>}

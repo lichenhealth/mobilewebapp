@@ -12,13 +12,20 @@ export type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 export interface ActingSpace { id: string; name: string; kind: SpaceKind }
 export type Actor = { type: 'self' } | ({ type: 'space' } & ActingSpace);
 
+export interface SelfIdentity { name: string; avatarUrl: string | null }
+
 interface ActingCtx {
   actor: Actor;
   setActor: (a: Actor) => void;
   options: ActingSpace[];          // spaces I can act as (admin/super_admin)
+  self: SelfIdentity;              // my own display identity (for the chip)
+  refreshSelf: () => void;         // call after changing name/avatar
 }
 
-const Ctx = createContext<ActingCtx>({ actor: { type: 'self' }, setActor: () => {}, options: [] });
+const Ctx = createContext<ActingCtx>({
+  actor: { type: 'self' }, setActor: () => {}, options: [],
+  self: { name: '', avatarUrl: null }, refreshSelf: () => {},
+});
 export const useActing = () => useContext(Ctx);
 
 const storageKey = (uid: string) => `lichen.actingAs.${uid}`;
@@ -27,6 +34,22 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [options, setOptions] = useState<ActingSpace[]>([]);
   const [actor, setActorState] = useState<Actor>({ type: 'self' });
+  const [self, setSelf] = useState<SelfIdentity>({ name: '', avatarUrl: null });
+  const [selfBump, setSelfBump] = useState(0);
+  const refreshSelf = () => setSelfBump((n) => n + 1);
+
+  // My own display identity (name + avatar) for the always-on chip.
+  useEffect(() => {
+    if (!user) { setSelf({ name: '', avatarUrl: null }); return; }
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+      if (!live) return;
+      const p = data as { full_name: string | null; avatar_url: string | null } | null;
+      setSelf({ name: p?.full_name || 'Me', avatarUrl: p?.avatar_url ?? null });
+    })();
+    return () => { live = false; };
+  }, [user, selfBump]);
 
   useEffect(() => {
     if (!user) { setOptions([]); setActorState({ type: 'self' }); return; }
@@ -62,6 +85,7 @@ export function ActingProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   };
 
-  const value = useMemo(() => ({ actor, setActor, options }), [actor, options]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const value = useMemo(() => ({ actor, setActor, options, self, refreshSelf }), [actor, options, self]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
