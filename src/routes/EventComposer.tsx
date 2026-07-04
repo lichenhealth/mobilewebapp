@@ -5,6 +5,7 @@ import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
 import RecurrenceSelect from '../components/RecurrenceSelect';
 import TimeField from '../components/TimeField';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO, formatDateShort } from '../lib/conciergeApi';
@@ -65,10 +66,13 @@ export default function EventComposer() {
 
   // Prefill from a slot click/drag or find-a-time link (?date&start&end&space&inv).
   // Synchronous on mount — must never wait on (or be skipped by) network calls.
+  const { actor } = useActing();
   useEffect(() => {
     if (eventId) return;
     const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qEnd = params.get('end'), qInv = params.get('inv');
+    // Explicit link target wins; otherwise default to whoever you're acting as.
     if (qSpace) setCalendar(qSpace);
+    else if (actor.type === 'space') setCalendar(actor.id);
     if (qDate) setRange({ start: qDate, end: qDate });
     if (qStart) {
       const s = Number(qStart);
@@ -85,7 +89,7 @@ export default function EventComposer() {
         return [...cur, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, full_name: null }))];
       });
     }
-  }, [eventId, params]);
+  }, [eventId, params, actor]);
 
   // Edit mode: prefill from the existing event.
   useEffect(() => {

@@ -4,6 +4,8 @@ import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
 import { useNotifications } from '../notifications/NotificationsProvider';
+import { useActing } from '../acting/ActingProvider';
+import { colorFor, monogramFor } from '../lib/chatApi';
 import { scopeForPath } from '../lib/sections';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
@@ -55,6 +57,7 @@ export default function TopBar({
   const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
 
   const { unreadForScope } = useNotifications();
+  const { actor } = useActing();
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -96,6 +99,18 @@ export default function TopBar({
       </div>
 
       <div className="top-bar__right">
+        {actor.type === 'space' && (
+          <button
+            className="top-bar__acting"
+            onClick={() => navigate('/profile')}
+            title={`Acting as ${actor.name} — tap to switch`}
+            aria-label={`Acting as ${actor.name}. Open profile switcher.`}
+          >
+            <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
+              {monogramFor(actor.name)}
+            </span>
+          </button>
+        )}
         {showSettings && (
           <button
             className="top-bar__icon top-bar__settings"

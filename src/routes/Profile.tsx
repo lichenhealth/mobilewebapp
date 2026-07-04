@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
+import { colorFor, monogramFor } from '../lib/chatApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
 
@@ -10,6 +12,11 @@ type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
 type NotifPref = 'off' | 'in_app' | 'both';
+
+const ACTING_KIND_LABEL: Record<SpaceKind, string> = {
+  organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
+};
+
 type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
@@ -39,6 +46,7 @@ const ROLE_LABEL: Record<SpaceRole, string> = {
 
 export default function Profile() {
   const { user, loading } = useAuth();
+  const { actor, setActor, options: actingOptions } = useActing();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -330,6 +338,48 @@ export default function Profile() {
       </div>
 
       {error && <p className="prof__error">{error}</p>}
+
+
+      {/* ── Acting as: post & create as yourself or a space you admin ── */}
+      {actingOptions.length > 0 && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Acting as</h2>
+          <p className="prof__care-lead">
+            Choose who you're acting as. Events you create (and posts, when they arrive) are
+            attributed to this identity. A peach ring up top reminds you when you're not yourself.
+          </p>
+          <div className="prof__acting-list">
+            <button
+              className={'prof__acting-row' + (actor.type === 'self' ? ' is-on' : '')}
+              onClick={() => setActor({ type: 'self' })}
+            >
+              <span className="prof__acting-avatar" style={{ background: colorFor(user?.id ?? 'me') }}>
+                {monogramFor(fullName || 'Me')}
+              </span>
+              <span className="prof__acting-name">{fullName || 'Yourself'}</span>
+              <span className="prof__acting-kind">You</span>
+              {actor.type === 'self' && <span className="prof__acting-on">Acting</span>}
+            </button>
+            {actingOptions.map((o) => {
+              const on = actor.type === 'space' && actor.id === o.id;
+              return (
+                <button
+                  key={o.id}
+                  className={'prof__acting-row' + (on ? ' is-on' : '')}
+                  onClick={() => setActor({ type: 'space', ...o })}
+                >
+                  <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
+                    {monogramFor(o.name)}
+                  </span>
+                  <span className="prof__acting-name">{o.name}</span>
+                  <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
+                  {on && <span className="prof__acting-on">Acting</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="prof__section">
         <h2 className="prof__h2">About you</h2>
