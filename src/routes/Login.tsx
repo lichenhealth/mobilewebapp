@@ -54,6 +54,9 @@ export default function Login() {
           </button>
         </form>
         <p className="auth__switch">
+          <Link to="/reset-password">Forgot your password?</Link>
+        </p>
+        <p className="auth__switch">
           New here? <Link to="/signup">Create an account</Link>
         </p>
       </div>
