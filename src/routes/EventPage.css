@@ -62,3 +62,12 @@
 .evp__person-name { font-size: 14px; color: var(--ink); margin-right: auto; }
 .evp__person-status { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--ink-faint); }
 .evp__price { font-family: var(--font-display); font-style: italic; font-size: 26px; color: var(--ink); text-align: center; }
+
+/* Event room: bounded height so ChatConversation can fill it */
+.evp__chat {
+  height: calc(100dvh - var(--top-h) - 210px);
+  min-height: 320px;
+  max-width: 640px; width: 100%; margin: 0 auto;
+  padding: 0 var(--s-5) var(--s-4);
+  display: flex; flex-direction: column;
+}

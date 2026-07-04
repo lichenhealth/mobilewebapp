@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
+import ChatConversation from '../components/ChatConversation';
+import { supabase } from '../lib/supabase';
 import FeedCard from '../components/FeedCard';
 import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
@@ -32,6 +34,9 @@ export default function EventPage() {
   const [updates, setUpdates] = useState<FeedPost[]>([]);
   const [tab, setTab] = useState<Tab>('About');
   const [loading, setLoading] = useState(true);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatErr, setChatErr] = useState(false);
+  const chatAsked = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +89,19 @@ export default function EventPage() {
   }
 
   const TABS: Tab[] = ['About', 'Updates', 'Chat', 'RSVP', 'Book'];
+  const isHost = post.author_id === me;
+
+  // Open (or lazily create) the event room — host or anyone going.
+  useEffect(() => {
+    if (tab !== 'Chat' || chatId || chatAsked.current) return;
+    if (!me || !post?.linked_event_id || !(going || isHost)) return;
+    chatAsked.current = true;
+    (async () => {
+      const { data, error } = await supabase.rpc('ensure_event_chat', { p_event: post.linked_event_id });
+      if (error) { console.warn('ensure_event_chat', error.message); setChatErr(true); return; }
+      setChatId(data as string);
+    })();
+  }, [tab, chatId, me, post, going, isHost]);
 
   return (
     <div className="evp">
@@ -154,9 +172,24 @@ export default function EventPage() {
       )}
 
       {tab === 'Chat' && (
-        <div className="evp__body">
-          <p className="evp__muted">Event chat is coming in the next update — a room for everyone who's going.</p>
-        </div>
+        (going || isHost) ? (
+          chatId ? (
+            <div className="evp__chat">
+              <ChatConversation chatId={chatId} me={me} showIntro={false} />
+            </div>
+          ) : (
+            <div className="evp__body">
+              <p className="evp__muted">{chatErr ? "The room couldn't open — run the event-chat migration, or try again." : 'Opening the room…'}</p>
+            </div>
+          )
+        ) : (
+          <div className="evp__body">
+            <p className="evp__muted">The chat is for everyone who's going.</p>
+            <button className="btn btn-primary evp__rsvp-btn" onClick={toggleRsvp} disabled={!post.linked_event_id}>
+              RSVP to join the room
+            </button>
+          </div>
+        )
       )}
 
       {tab === 'RSVP' && (
