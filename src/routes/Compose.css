@@ -105,3 +105,10 @@
 .cmp__row--times { align-items: center; }
 .cmp__to { font-size: 13px; color: var(--ink-soft); }
 .cmp__hint-ev { font-size: 11px; color: var(--ink-faint); line-height: 1.4; }
+
+.cmp__chips--modes { align-items: center; }
+.cmp__sliding {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink-soft); margin-left: 4px; cursor: pointer;
+}
+.cmp__sliding input { accent-color: var(--peach); }

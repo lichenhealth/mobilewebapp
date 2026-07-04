@@ -50,6 +50,9 @@ export default function Compose() {
   const [evEndMin, setEvEndMin] = useState(20 * 60);
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
+  const [sliding, setSliding] = useState(false);
+  const [slideLow, setSlideLow] = useState('');
+  const [slideHigh, setSlideHigh] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
@@ -153,7 +156,12 @@ export default function Compose() {
       }
       if (isEvent) {
         if (evMode === 'paid') {
-          if (price.trim()) details.price = price.trim();
+          if (sliding && (slideLow.trim() || slideHigh.trim())) {
+            details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
+            details.sliding = true;
+          } else if (price.trim()) {
+            details.price = price.trim();
+          }
           if (bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (evMode === 'trade' && tradeFor.trim()) details.trade = tradeFor.trim();
@@ -328,22 +336,39 @@ export default function Compose() {
             ))}
           </div>
           <label className="cmp__label">Free, trade, or paid?</label>
-          <div className="cmp__chips">
+          <div className="cmp__chips cmp__chips--modes">
             {EVENT_MODES.map((m) => (
               <button key={m.value} className={'cmp__chip' + (evMode === m.value ? ' is-on' : '')}
                 onClick={() => setEvMode(m.value)}>{m.label}</button>
             ))}
+            {evMode === 'paid' && (
+              <label className="cmp__sliding">
+                <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
+              </label>
+            )}
           </div>
-          {evMode === 'paid' && (
+          {evMode === 'paid' && !sliding && (
             <div className="cmp__row">
-              <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45, sliding $20–60)" />
+              <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45)" />
               <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
             </div>
+          )}
+          {evMode === 'paid' && sliding && (
+            <>
+              <div className="cmp__row">
+                <input className="cmp__input" value={slideLow} onChange={(e) => setSlideLow(e.target.value)} placeholder="From (e.g. $20)" />
+                <input className="cmp__input" value={slideHigh} onChange={(e) => setSlideHigh(e.target.value)} placeholder="To (e.g. $60)" />
+              </div>
+              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
+            </>
           )}
           {evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
-          <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (address or video link)" />
+
+          <label className="cmp__label">Location</label>
+          <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Address, place, or video link" />
+
           <label className="cmp__label">When</label>
           <label className="cmp__evrow"><input type="checkbox" checked={evAllDay} onChange={(e) => setEvAllDay(e.target.checked)} /> All day</label>
           {!evAllDay && (
