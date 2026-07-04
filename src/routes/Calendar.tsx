@@ -4,6 +4,33 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { LinkifiedText } from '../components/CarePostCard';
+import { locationInfo } from '../lib/linkify';
+
+/** Location line: video links say "Join Zoom/Meet…", other URLs are plain
+ *  links, physical addresses tap out to Google Maps directions. */
+export function SmartLocation({ loc, className }: { loc: string; className: string }) {
+  const info = locationInfo(loc);
+  if (!info) return null;
+  if (info.type === 'video') {
+    return (
+      <a className={className} href={info.url} target="_blank" rel="noopener noreferrer">
+        <Icon name="video" size={13} /> Join {info.service}
+      </a>
+    );
+  }
+  if (info.type === 'link') {
+    return (
+      <a className={className} href={info.url} target="_blank" rel="noopener noreferrer">
+        <Icon name="globe" size={13} /> {loc}
+      </a>
+    );
+  }
+  return (
+    <a className={className} href={info.mapsUrl} target="_blank" rel="noopener noreferrer">
+      <Icon name="location" size={13} /> {loc}
+    </a>
+  );
+}
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
@@ -472,7 +499,7 @@ export default function Calendar() {
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
-            {selected.location && <p className="calp__sheet-loc"><Icon name="location" size={13} /> {selected.location}</p>}
+            {selected.location && <SmartLocation loc={selected.location} className="calp__sheet-loc" />}
             {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
 
             {(selected.attendees?.length ?? 0) > 0 && (

@@ -274,6 +274,31 @@
 .calp__slot--free { background: rgba(76, 154, 99, 0.14); }
 .calp__slot--free.is-strong { background: rgba(76, 154, 99, 0.3); }
 
+/* ── Composer: two columns on desktop, live invite preview on the right ── */
+.cedit__cols { display: flex; flex-direction: column; }
+.evprev { display: none; }
+@media (min-width: 1024px) {
+  .cedit__cols {
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--s-5); align-items: start; padding-right: var(--s-5);
+  }
+  .evprev { display: block; position: sticky; top: var(--s-5); }
+}
+.evprev__eyebrow {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px;
+}
+.evprev__card {
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); padding: var(--s-4);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  box-shadow: var(--sh-card);
+}
+.evprev__from {
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint);
+  border-top: 1px solid var(--bone-edge); padding-top: var(--s-2); margin-top: 2px;
+}
+
 /* Composer invitee picker */
 .calp__invitees { display: flex; flex-wrap: wrap; gap: 6px; }
 .calp__invitee, .calp__match {

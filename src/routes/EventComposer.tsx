@@ -7,9 +7,11 @@ import TimeField from '../components/TimeField';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
-import { todayISO } from '../lib/conciergeApi';
+import { todayISO, formatDateShort } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel } from '../lib/recurrence';
-import { createEvent, updateEvent, loadEvent } from '../lib/calendarApi';
+import { createEvent, updateEvent, loadEvent, minToLabel } from '../lib/calendarApi';
+import { LinkifiedText } from '../components/CarePostCard';
+import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -147,6 +149,7 @@ export default function EventComposer() {
 
       {error && <p className="cedit__error">{error}</p>}
 
+      <div className="cedit__cols">
       <div className="cedit__body">
         <input
           className="cedit__input" placeholder="Event title"
@@ -225,6 +228,37 @@ export default function EventComposer() {
           <span className="cedit__label">Notes</span>
           <textarea className="cedit__textarea" rows={3} placeholder="Details (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
+      </div>
+
+      {/* Live invite preview (desktop): what every participant will see */}
+      <aside className="evprev" aria-label="Invite preview">
+        <p className="evprev__eyebrow">Invite preview</p>
+        <div className="evprev__card">
+          <h2 className="calp__sheet-title">{title.trim() || 'Untitled event'}</h2>
+          <p className="calp__sheet-when">
+            {range.start ? formatDateShort(range.start) : '—'}
+            {!recurrence && range.end && range.end !== range.start ? ` – ${formatDateShort(range.end)}` : ''}
+            {allDay ? ' · All day' : ` · ${minToLabel(startMin)} – ${minToLabel(endMin)}`}
+            {recurrence && range.start && ` · ${recurrenceLabel(recurrence, range.start)}`}
+          </p>
+          {location.trim() && <SmartLocation loc={location.trim()} className="calp__sheet-loc" />}
+          {description.trim() && <p className="calp__sheet-desc"><LinkifiedText text={description} /></p>}
+          {invitees.length > 0 && (
+            <div className="calp__sheet-people">
+              {invitees.map((m) => (
+                <span className="calp__person" key={m.id}>
+                  <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
+                  <span className="calp__person-name">{m.full_name ?? 'Member'}</span>
+                  <span className="calp__person-status">?</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="evprev__from">
+            {calendar === 'me' ? 'On your calendar' : `On ${spaces.find((s) => s.id === calendar)?.name ?? 'a space calendar'}`}
+          </p>
+        </div>
+      </aside>
       </div>
     </div>
   );
