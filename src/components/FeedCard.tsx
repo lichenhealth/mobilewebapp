@@ -174,13 +174,11 @@ function ImageBadge({ src, pattern, topLabel, bottomLabel, tone, onAction }: Ima
   return (
     <div className={`badge badge--${tone}`}>
       <div className="badge__top">{topLabel}</div>
-      <div className="badge__image">
-        {src ? (
-          <img src={src} alt="" />
-        ) : (
-          <PatternArt name={pattern ?? 'sky'} />
-        )}
-      </div>
+      {(src || pattern) && (
+        <div className="badge__image">
+          {src ? <img src={src} alt="" /> : <PatternArt name={pattern!} />}
+        </div>
+      )}
       <button className="badge__bottom" onClick={onAction}>{bottomLabel}</button>
     </div>
   );
