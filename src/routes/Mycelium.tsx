@@ -94,7 +94,7 @@ export default function Mycelium() {
         contentLabel: CT_LABEL[p.content_type] ?? 'Social',
         areas: postAreas(p),
         card: {
-          ...postToCard(p),
+          ...postToCard(p, user?.id),
           trusted: myMyc.has('profile:' + p.author_id),
           recommended: myRecs.has(p.id),
           mycelium: overlays[p.id],

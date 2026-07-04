@@ -3,9 +3,11 @@ import { serviceAreaIcon, postAreas, type FeedPost } from './postsApi';
 import type { IconName } from '../components/Icon';
 
 // Map a real DB post into the existing FeedCard shape. Shared by Home + Mycelium.
-export function postToCard(p: FeedPost): FeedCardProps {
+export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   // Attribution: a space-authored post ("acting as") displays as the entity.
-  const name = p.author_space?.name || p.author?.full_name || 'Member';
+  // Your own nameless posts read "Me", never the anonymous "Member".
+  const isMine = !p.author_space && viewerId != null && p.author_id === viewerId;
+  const name = p.author_space?.name || p.author?.full_name || (isMine ? 'Me' : 'Member');
   const handle = p.author_space
     ? '@' + p.author_space.name.toLowerCase().replace(/\s+/g, '-')
     : '@' + (p.author?.handle || name.toLowerCase().replace(/\s+/g, '-'));
