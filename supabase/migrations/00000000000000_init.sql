@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2urJwDxlGUEuRLgj0PlHd5SsAmuWar9PNEWD8zmUZ6G70WsTXjpVsAOaAVt07zx
+\restrict Wehfop9QtUSSreN5p0UgZy7nq9q8M3UClTiOSTynzJsWaSTK7Y19JmegT9ICxrm
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -146,6 +146,81 @@ $$;
 
 
 ALTER FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
+
+--
+-- Name: availability_of(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.availability_of(p_profiles uuid[]) RETURNS TABLE(profile_id uuid, weekday smallint, start_min smallint, end_min smallint, kind text, valid_from date, valid_to date)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select w.profile_id, w.weekday, w.start_min, w.end_min, w.kind, w.valid_from, w.valid_to
+  from public.availability_windows w
+  where w.profile_id = any(p_profiles)
+    and public.calendar_level(w.profile_id, auth.uid()) <> 'hidden';
+$$;
+
+
+ALTER FUNCTION public.availability_of(p_profiles uuid[]) OWNER TO postgres;
+
+--
+-- Name: calendar_level(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.calendar_level(p_owner uuid, p_viewer uuid) RETURNS text
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v text;
+begin
+  if p_owner = p_viewer then return 'details'; end if;
+
+  -- 1. explicit person rule
+  select level into v from public.calendar_shares
+   where owner_id = p_owner and audience_type = 'profile' and audience_profile_id = p_viewer;
+  if v is not null then return v; end if;
+
+  -- 2. space rules over spaces BOTH belong to — most permissive wins
+  select level into v
+  from public.calendar_shares s
+  where s.owner_id = p_owner and s.audience_type = 'space'
+    and public.is_space_member(s.audience_space_id, p_owner)
+    and public.is_space_member(s.audience_space_id, p_viewer)
+  order by case s.level when 'details' then 2 when 'busy' then 1 else 0 end desc
+  limit 1;
+  if v is not null then return v; end if;
+
+  -- 3. everyone rule, else default busy
+  select level into v from public.calendar_shares
+   where owner_id = p_owner and audience_type = 'everyone';
+  return coalesce(v, 'busy');
+end; $$;
+
+
+ALTER FUNCTION public.calendar_level(p_owner uuid, p_viewer uuid) OWNER TO postgres;
+
+--
+-- Name: can_read_event(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.can_read_event(p_event uuid, p_uid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from public.events e
+    where e.id = p_event
+      and (e.creator_id = p_uid
+        or e.owner_profile_id = p_uid
+        or (e.owner_space_id is not null and public.is_space_member(e.owner_space_id, p_uid))
+        or exists (select 1 from public.event_attendees a
+                   where a.event_id = e.id and a.profile_id = p_uid))
+  );
+$$;
+
+
+ALTER FUNCTION public.can_read_event(p_event uuid, p_uid uuid) OWNER TO postgres;
 
 --
 -- Name: care_member_display(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
@@ -314,6 +389,44 @@ $$;
 ALTER FUNCTION public.find_member_by_email(p_email text) OWNER TO postgres;
 
 --
+-- Name: free_busy(uuid[], date, date); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) RETURNS TABLE(profile_id uuid, level text, start_date date, end_date date, all_day boolean, start_min smallint, end_min smallint, recurrence jsonb, title text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with lv as (
+    select p as owner, public.calendar_level(p, auth.uid()) as level
+    from unnest(p_profiles) as p
+  ),
+  owned as (
+    select l.owner, l.level, e.*
+    from lv l join public.events e on e.owner_profile_id = l.owner
+    where l.level <> 'hidden'
+  ),
+  attending as (
+    select l.owner, l.level, e.*
+    from lv l
+    join public.event_attendees a on a.profile_id = l.owner and a.status <> 'declined'
+    join public.events e on e.id = a.event_id
+    where l.level <> 'hidden'
+  ),
+  all_evts as (
+    select distinct on (owner, id) * from (
+      select * from owned union all select * from attending
+    ) u
+  )
+  select owner, level, start_date, end_date, all_day, start_min, end_min, recurrence,
+         case when level = 'details' then title else null end
+  from all_evts
+  where start_date <= p_to and (end_date >= p_from or recurrence is not null);
+$$;
+
+
+ALTER FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) OWNER TO postgres;
+
+--
 -- Name: gift_subscription(text, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -424,6 +537,21 @@ $$;
 ALTER FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) OWNER TO postgres;
 
 --
+-- Name: is_space_member(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.is_space_member(p_space uuid, p_uid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from public.space_members m
+                 where m.space_id = p_space and m.profile_id = p_uid);
+$$;
+
+
+ALTER FUNCTION public.is_space_member(p_space uuid, p_uid uuid) OWNER TO postgres;
+
+--
 -- Name: notify(uuid, text, uuid, text, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -525,6 +653,51 @@ end; $$;
 
 
 ALTER FUNCTION public.on_care_request_notify() OWNER TO postgres;
+
+--
+-- Name: on_event_invite_notify(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.on_event_invite_notify() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_name text; v_title text;
+begin
+  select coalesce(nullif(full_name, ''), email, 'A member')
+    into v_name from public.profiles where id = new.invited_by;
+  select title into v_title from public.events where id = new.event_id;
+  perform public.notify(new.profile_id, 'calendar', null, 'event_invite',
+    v_name, 'invited you: ' || coalesce(v_title, 'an event'), '/calendar', new.invited_by);
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.on_event_invite_notify() OWNER TO postgres;
+
+--
+-- Name: on_event_rsvp_notify(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.on_event_rsvp_notify() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_name text; v_title text; v_creator uuid;
+begin
+  if new.status = old.status or new.status = 'invited' then return new; end if;
+  select coalesce(nullif(full_name, ''), email, 'A member')
+    into v_name from public.profiles where id = new.profile_id;
+  select title, creator_id into v_title, v_creator from public.events where id = new.event_id;
+  perform public.notify(v_creator, 'calendar', null, 'event_rsvp',
+    v_name,
+    (case when new.status = 'going' then 'is going: ' else 'can''t make it: ' end) || coalesce(v_title, 'your event'),
+    '/calendar', new.profile_id);
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.on_event_rsvp_notify() OWNER TO postgres;
 
 --
 -- Name: on_message_notify(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -697,6 +870,51 @@ ALTER FUNCTION public.touch_updated_at() OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: availability_windows; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.availability_windows (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    profile_id uuid NOT NULL,
+    weekday smallint NOT NULL,
+    start_min smallint NOT NULL,
+    end_min smallint NOT NULL,
+    kind text DEFAULT 'available'::text NOT NULL,
+    valid_from date,
+    valid_to date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT availability_windows_end_min_check CHECK (((end_min >= 1) AND (end_min <= 1440))),
+    CONSTRAINT availability_windows_kind_check CHECK ((kind = ANY (ARRAY['available'::text, 'on_call'::text]))),
+    CONSTRAINT availability_windows_span CHECK ((end_min > start_min)),
+    CONSTRAINT availability_windows_start_min_check CHECK (((start_min >= 0) AND (start_min <= 1439))),
+    CONSTRAINT availability_windows_validity CHECK (((valid_from IS NULL) OR (valid_to IS NULL) OR (valid_to >= valid_from))),
+    CONSTRAINT availability_windows_weekday_check CHECK (((weekday >= 0) AND (weekday <= 6)))
+);
+
+
+ALTER TABLE public.availability_windows OWNER TO postgres;
+
+--
+-- Name: calendar_shares; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.calendar_shares (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id uuid NOT NULL,
+    audience_type text NOT NULL,
+    audience_space_id uuid,
+    audience_profile_id uuid,
+    level text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT calendar_shares_audience_shape CHECK ((((audience_type = 'everyone'::text) AND (audience_space_id IS NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'space'::text) AND (audience_space_id IS NOT NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'profile'::text) AND (audience_profile_id IS NOT NULL) AND (audience_space_id IS NULL)))),
+    CONSTRAINT calendar_shares_audience_type_check CHECK ((audience_type = ANY (ARRAY['everyone'::text, 'space'::text, 'profile'::text]))),
+    CONSTRAINT calendar_shares_level_check CHECK ((level = ANY (ARRAY['hidden'::text, 'busy'::text, 'details'::text])))
+);
+
+
+ALTER TABLE public.calendar_shares OWNER TO postgres;
 
 --
 -- Name: care_invitations; Type: TABLE; Schema: public; Owner: postgres
@@ -905,6 +1123,54 @@ CREATE TABLE public.chats (
 
 
 ALTER TABLE public.chats OWNER TO postgres;
+
+--
+-- Name: event_attendees; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.event_attendees (
+    event_id uuid NOT NULL,
+    profile_id uuid NOT NULL,
+    status text DEFAULT 'invited'::text NOT NULL,
+    invited_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT event_attendees_status_check CHECK ((status = ANY (ARRAY['invited'::text, 'going'::text, 'declined'::text])))
+);
+
+
+ALTER TABLE public.event_attendees OWNER TO postgres;
+
+--
+-- Name: events; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    creator_id uuid NOT NULL,
+    owner_profile_id uuid,
+    owner_space_id uuid,
+    title text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    location text DEFAULT ''::text NOT NULL,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    all_day boolean DEFAULT false NOT NULL,
+    start_min smallint,
+    end_min smallint,
+    recurrence jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT events_end_min_check CHECK (((end_min >= 1) AND (end_min <= 1440))),
+    CONSTRAINT events_one_owner CHECK (((((owner_profile_id IS NOT NULL))::integer + ((owner_space_id IS NOT NULL))::integer) = 1)),
+    CONSTRAINT events_recur_single_day CHECK (((recurrence IS NULL) OR (start_date = end_date))),
+    CONSTRAINT events_span CHECK ((end_date >= start_date)),
+    CONSTRAINT events_start_min_check CHECK (((start_min >= 0) AND (start_min <= 1439))),
+    CONSTRAINT events_times CHECK (((all_day AND (start_min IS NULL) AND (end_min IS NULL)) OR ((NOT all_day) AND (start_min IS NOT NULL) AND (end_min IS NOT NULL) AND ((start_date <> end_date) OR (end_min > start_min))))),
+    CONSTRAINT events_title_check CHECK ((length(btrim(title)) > 0))
+);
+
+
+ALTER TABLE public.events OWNER TO postgres;
 
 --
 -- Name: health_snapshots; Type: TABLE; Schema: public; Owner: postgres
@@ -1120,6 +1386,22 @@ CREATE TABLE public.subscriptions (
 ALTER TABLE public.subscriptions OWNER TO postgres;
 
 --
+-- Name: availability_windows availability_windows_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.availability_windows
+    ADD CONSTRAINT availability_windows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: calendar_shares calendar_shares_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calendar_shares
+    ADD CONSTRAINT calendar_shares_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: care_invitations care_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1221,6 +1503,22 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: event_attendees event_attendees_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.event_attendees
+    ADD CONSTRAINT event_attendees_pkey PRIMARY KEY (event_id, profile_id);
+
+
+--
+-- Name: events events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.events
+    ADD CONSTRAINT events_pkey PRIMARY KEY (id);
 
 
 --
@@ -1336,6 +1634,20 @@ ALTER TABLE ONLY public.subscriptions
 
 
 --
+-- Name: availability_windows_profile_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX availability_windows_profile_idx ON public.availability_windows USING btree (profile_id);
+
+
+--
+-- Name: calendar_shares_audience_uniq; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX calendar_shares_audience_uniq ON public.calendar_shares USING btree (owner_id, audience_type, COALESCE(audience_space_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(audience_profile_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
 -- Name: care_plan_items_plan_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1389,6 +1701,34 @@ CREATE UNIQUE INDEX chats_patient_uidx ON public.chats USING btree (patient_id) 
 --
 
 CREATE UNIQUE INDEX chats_space_uidx ON public.chats USING btree (space_id) WHERE (space_id IS NOT NULL);
+
+
+--
+-- Name: event_attendees_profile_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX event_attendees_profile_idx ON public.event_attendees USING btree (profile_id);
+
+
+--
+-- Name: events_creator_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX events_creator_idx ON public.events USING btree (creator_id, start_date);
+
+
+--
+-- Name: events_owner_profile_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX events_owner_profile_idx ON public.events USING btree (owner_profile_id, start_date) WHERE (owner_profile_id IS NOT NULL);
+
+
+--
+-- Name: events_owner_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX events_owner_space_idx ON public.events USING btree (owner_space_id, start_date) WHERE (owner_space_id IS NOT NULL);
 
 
 --
@@ -1476,6 +1816,13 @@ CREATE TRIGGER care_posts_touch BEFORE UPDATE ON public.care_posts FOR EACH ROW 
 
 
 --
+-- Name: events events_touch; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER events_touch BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
 -- Name: health_snapshots health_snapshots_touch; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1518,6 +1865,20 @@ CREATE TRIGGER on_care_request_notify_trg AFTER INSERT ON public.care_team_membe
 
 
 --
+-- Name: event_attendees on_event_invite_notify_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_event_invite_notify_trg AFTER INSERT ON public.event_attendees FOR EACH ROW EXECUTE FUNCTION public.on_event_invite_notify();
+
+
+--
+-- Name: event_attendees on_event_rsvp_notify_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_event_rsvp_notify_trg AFTER UPDATE ON public.event_attendees FOR EACH ROW EXECUTE FUNCTION public.on_event_rsvp_notify();
+
+
+--
 -- Name: space_members on_member_sync_chat; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1550,6 +1911,38 @@ CREATE TRIGGER on_space_created AFTER INSERT ON public.spaces FOR EACH ROW EXECU
 --
 
 CREATE TRIGGER profiles_touch_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: availability_windows availability_windows_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.availability_windows
+    ADD CONSTRAINT availability_windows_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: calendar_shares calendar_shares_audience_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calendar_shares
+    ADD CONSTRAINT calendar_shares_audience_profile_id_fkey FOREIGN KEY (audience_profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: calendar_shares calendar_shares_audience_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calendar_shares
+    ADD CONSTRAINT calendar_shares_audience_space_id_fkey FOREIGN KEY (audience_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: calendar_shares calendar_shares_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calendar_shares
+    ADD CONSTRAINT calendar_shares_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -1742,6 +2135,54 @@ ALTER TABLE ONLY public.chats
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: event_attendees event_attendees_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.event_attendees
+    ADD CONSTRAINT event_attendees_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: event_attendees event_attendees_invited_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.event_attendees
+    ADD CONSTRAINT event_attendees_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: event_attendees event_attendees_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.event_attendees
+    ADD CONSTRAINT event_attendees_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: events events_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.events
+    ADD CONSTRAINT events_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: events events_owner_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.events
+    ADD CONSTRAINT events_owner_profile_id_fkey FOREIGN KEY (owner_profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: events events_owner_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.events
+    ADD CONSTRAINT events_owner_space_id_fkey FOREIGN KEY (owner_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
 
 
 --
@@ -2027,6 +2468,32 @@ CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE TO authen
 
 
 --
+-- Name: availability_windows availability owner all; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "availability owner all" ON public.availability_windows TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+
+
+--
+-- Name: availability_windows; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.availability_windows ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: calendar_shares; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.calendar_shares ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: calendar_shares calendar_shares owner all; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "calendar_shares owner all" ON public.calendar_shares TO authenticated USING ((owner_id = auth.uid())) WITH CHECK ((owner_id = auth.uid()));
+
+
+--
 -- Name: care_team_members care approve; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -2161,6 +2628,80 @@ ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: event_attendees; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.event_attendees ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: event_attendees event_attendees delete; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees delete" ON public.event_attendees FOR DELETE TO authenticated USING (((profile_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM public.events e
+  WHERE ((e.id = event_attendees.event_id) AND (e.creator_id = auth.uid()))))));
+
+
+--
+-- Name: event_attendees event_attendees insert; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees insert" ON public.event_attendees FOR INSERT TO authenticated WITH CHECK (((invited_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.events e
+  WHERE ((e.id = event_attendees.event_id) AND (e.creator_id = auth.uid()))))));
+
+
+--
+-- Name: event_attendees event_attendees read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees read" ON public.event_attendees FOR SELECT TO authenticated USING (public.can_read_event(event_id, auth.uid()));
+
+
+--
+-- Name: event_attendees event_attendees update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "event_attendees update" ON public.event_attendees FOR UPDATE TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+
+
+--
+-- Name: events; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: events events delete; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "events delete" ON public.events FOR DELETE TO authenticated USING ((creator_id = auth.uid()));
+
+
+--
+-- Name: events events insert; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "events insert" ON public.events FOR INSERT TO authenticated WITH CHECK (((creator_id = auth.uid()) AND ((owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())))));
+
+
+--
+-- Name: events events read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR (EXISTS ( SELECT 1
+   FROM public.event_attendees a
+  WHERE ((a.event_id = events.id) AND (a.profile_id = auth.uid()))))));
+
+
+--
+-- Name: events events update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "events update" ON public.events FOR UPDATE TO authenticated USING ((creator_id = auth.uid())) WITH CHECK ((creator_id = auth.uid()));
+
 
 --
 -- Name: health_snapshots; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -2502,6 +3043,33 @@ GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) T
 
 
 --
+-- Name: FUNCTION availability_of(p_profiles uuid[]); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.availability_of(p_profiles uuid[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.availability_of(p_profiles uuid[]) TO authenticated;
+GRANT ALL ON FUNCTION public.availability_of(p_profiles uuid[]) TO service_role;
+
+
+--
+-- Name: FUNCTION calendar_level(p_owner uuid, p_viewer uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.calendar_level(p_owner uuid, p_viewer uuid) TO anon;
+GRANT ALL ON FUNCTION public.calendar_level(p_owner uuid, p_viewer uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.calendar_level(p_owner uuid, p_viewer uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION can_read_event(p_event uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.can_read_event(p_event uuid, p_uid uuid) TO anon;
+GRANT ALL ON FUNCTION public.can_read_event(p_event uuid, p_uid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.can_read_event(p_event uuid, p_uid uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION care_member_display(p_ids uuid[]); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2553,6 +3121,15 @@ GRANT ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.find_member_by_email(p_email text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.find_member_by_email(p_email text) TO authenticated;
 GRANT ALL ON FUNCTION public.find_member_by_email(p_email text) TO service_role;
+
+
+--
+-- Name: FUNCTION free_busy(p_profiles uuid[], p_from date, p_to date); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) TO authenticated;
+GRANT ALL ON FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) TO service_role;
 
 
 --
@@ -2610,6 +3187,15 @@ GRANT ALL ON FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) TO serv
 
 
 --
+-- Name: FUNCTION is_space_member(p_space uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO anon;
+GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -2652,6 +3238,24 @@ GRANT ALL ON FUNCTION public.on_care_remove() TO service_role;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO anon;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO authenticated;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO service_role;
+
+
+--
+-- Name: FUNCTION on_event_invite_notify(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.on_event_invite_notify() TO anon;
+GRANT ALL ON FUNCTION public.on_event_invite_notify() TO authenticated;
+GRANT ALL ON FUNCTION public.on_event_invite_notify() TO service_role;
+
+
+--
+-- Name: FUNCTION on_event_rsvp_notify(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.on_event_rsvp_notify() TO anon;
+GRANT ALL ON FUNCTION public.on_event_rsvp_notify() TO authenticated;
+GRANT ALL ON FUNCTION public.on_event_rsvp_notify() TO service_role;
 
 
 --
@@ -2715,6 +3319,24 @@ GRANT ALL ON FUNCTION public.sync_member_to_chat() TO service_role;
 GRANT ALL ON FUNCTION public.touch_updated_at() TO anon;
 GRANT ALL ON FUNCTION public.touch_updated_at() TO authenticated;
 GRANT ALL ON FUNCTION public.touch_updated_at() TO service_role;
+
+
+--
+-- Name: TABLE availability_windows; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.availability_windows TO anon;
+GRANT ALL ON TABLE public.availability_windows TO authenticated;
+GRANT ALL ON TABLE public.availability_windows TO service_role;
+
+
+--
+-- Name: TABLE calendar_shares; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.calendar_shares TO anon;
+GRANT ALL ON TABLE public.calendar_shares TO authenticated;
+GRANT ALL ON TABLE public.calendar_shares TO service_role;
 
 
 --
@@ -2814,6 +3436,24 @@ GRANT ALL ON TABLE public.chat_messages TO service_role;
 GRANT ALL ON TABLE public.chats TO anon;
 GRANT ALL ON TABLE public.chats TO authenticated;
 GRANT ALL ON TABLE public.chats TO service_role;
+
+
+--
+-- Name: TABLE event_attendees; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.event_attendees TO anon;
+GRANT ALL ON TABLE public.event_attendees TO authenticated;
+GRANT ALL ON TABLE public.event_attendees TO service_role;
+
+
+--
+-- Name: TABLE events; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.events TO anon;
+GRANT ALL ON TABLE public.events TO authenticated;
+GRANT ALL ON TABLE public.events TO service_role;
 
 
 --
@@ -3063,7 +3703,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2urJwDxlGUEuRLgj0PlHd5SsAmuWar9PNEWD8zmUZ6G70WsTXjpVsAOaAVt07zx
+\unrestrict Wehfop9QtUSSreN5p0UgZy7nq9q8M3UClTiOSTynzJsWaSTK7Y19JmegT9ICxrm
 
 
 
