@@ -34,6 +34,8 @@ export interface FeedCardProps {
   onMessage?: () => void;
   /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
   onBadgeAction?: () => void;
+  /** Open the full page for this card (event page etc.) — title/body become links. */
+  onOpen?: () => void;
 }
 
 export default function FeedCard({
@@ -55,6 +57,7 @@ export default function FeedCard({
   media,
   onMessage,
   onBadgeAction,
+  onOpen,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -102,7 +105,9 @@ export default function FeedCard({
 
       {/* BODY */}
       <div className="feed-card__body">
-        <p className="feed-card__text">{body}</p>
+        {onOpen
+          ? <p className="feed-card__text feed-card__text--link" onClick={onOpen} role="link" tabIndex={0}>{body}</p>
+          : <p className="feed-card__text">{body}</p>}
         {image && (
           <ImageBadge
             pattern={image.pattern}

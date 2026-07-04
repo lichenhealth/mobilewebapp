@@ -19,6 +19,7 @@ import Calendar from './routes/Calendar';
 import EventComposer from './routes/EventComposer';
 import CalendarSettings from './routes/CalendarSettings';
 import Events from './routes/Events';
+import EventPage from './routes/EventPage';
 import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
           <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
           <Route path="/events"   element={<Events />} />
+          <Route path="/events/:postId" element={<EventPage />} />
           <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming soon" />} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

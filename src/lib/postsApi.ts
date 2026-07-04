@@ -158,11 +158,30 @@ export async function loadMyRsvps(eventIds: string[], me: string): Promise<Set<s
   return new Set(((data as { event_id: string }[] | null) ?? []).map((r) => r.event_id));
 }
 
+const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence)';
+
+/** One post (the event page's About). RLS applies. */
+export async function loadPost(id: string): Promise<FeedPost | null> {
+  const { data, error } = await supabase.from('posts').select(FEED_SELECT).eq('id', id).maybeSingle();
+  if (error) { console.warn('loadPost', error.message); return null; }
+  return (data as unknown as FeedPost | null) ?? null;
+}
+
+/** Host updates: later posts linked to the same calendar event. */
+export async function loadEventUpdates(eventId: string, excludePostId: string): Promise<FeedPost[]> {
+  const { data, error } = await supabase
+    .from('posts').select(FEED_SELECT)
+    .eq('linked_event_id', eventId).neq('id', excludePostId)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('loadEventUpdates', error.message); return []; }
+  return (data as unknown as FeedPost[] | null) ?? [];
+}
+
 // RLS scopes this to what the viewer may see: public + their spaces + mycelium + own.
 export async function loadFeed(): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')
-    .select('id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence)')
+    .select(FEED_SELECT)
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { console.error('loadFeed', error); return []; }

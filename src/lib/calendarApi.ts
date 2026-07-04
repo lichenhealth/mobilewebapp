@@ -7,7 +7,7 @@ export type RsvpStatus = 'invited' | 'going' | 'declined';
 export interface EventAttendee {
   profile_id: string;
   status: RsvpStatus;
-  profile?: { full_name: string | null } | null;
+  profile?: { full_name: string | null; avatar_url?: string | null } | null;
 }
 
 export interface EventRow {
@@ -34,7 +34,7 @@ const EVENT_COLS =
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
-  'attendees:event_attendees(profile_id, status, profile:profiles!event_attendees_profile_id_fkey(full_name))';
+  'attendees:event_attendees(profile_id, status, profile:profiles!event_attendees_profile_id_fkey(full_name, avatar_url))';
 
 // ─── Time helpers (minutes since midnight ↔ labels) ──────────────────────────
 export function minToLabel(min: number): string {

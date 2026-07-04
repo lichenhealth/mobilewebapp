@@ -48,6 +48,13 @@ create policy "events read" on public.events for select to authenticated
     or exists (select 1 from public.posts p where p.linked_event_id = id)
   );
 
+-- ── event_attendees: the guest list is visible to whoever can see the post ───
+-- (Policy expression, NOT the SECURITY DEFINER helper — so posts RLS applies
+-- and private events never leak their attendee lists.)
+drop policy if exists "event_attendees read via post" on public.event_attendees;
+create policy "event_attendees read via post" on public.event_attendees for select to authenticated
+  using (exists (select 1 from public.posts p where p.linked_event_id = event_attendees.event_id));
+
 -- ── event_attendees: self-RSVP to any event whose post you can see ───────────
 drop policy if exists "event_attendees self rsvp" on public.event_attendees;
 create policy "event_attendees self rsvp" on public.event_attendees for insert to authenticated

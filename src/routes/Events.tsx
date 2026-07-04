@@ -147,6 +147,7 @@ export default function Events() {
             eyebrow={whenLabel(p) ?? postToCard(p, me).eyebrow}
             image={badgeFor(p)}
             onBadgeAction={() => onBadge(p)}
+            onOpen={() => navigate(`/events/${p.id}`)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has(p.id)}
             mycelium={overlays[p.id]}

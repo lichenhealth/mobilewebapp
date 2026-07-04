@@ -80,6 +80,7 @@ export default function Home() {
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
             onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
+            onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
           />
         ))}
         {FEED.map((card, i) => (

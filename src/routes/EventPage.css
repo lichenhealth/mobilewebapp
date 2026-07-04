@@ -1,0 +1,64 @@
+/* Event page — sticky title+tabs, About/Updates/Chat/RSVP/Book (Figma 286:18855). */
+.evp { display: flex; flex-direction: column; }
+.evp__muted { color: var(--ink-muted); font-size: var(--t-sm); text-align: center; padding: var(--s-7) var(--s-5); }
+
+/* Sticky unit below the fixed TopBar (same mechanics as the calendar pin). */
+.evp__pin {
+  position: sticky; top: calc(var(--top-h) + var(--safe-top, 0px)); z-index: 10;
+  background: var(--bone); box-shadow: 0 -36px 0 0 var(--bone);
+  padding: var(--s-2) var(--s-5) 0;
+  display: flex; flex-direction: column; gap: var(--s-2);
+}
+.evp__titlerow { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.evp__title {
+  font-family: var(--font-body); font-weight: 200; font-size: var(--t-xl);
+  letter-spacing: -0.02em; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1;
+}
+.evp__host { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); white-space: nowrap; }
+
+.evp__tabs { display: flex; gap: var(--s-4); border-bottom: 1px solid var(--bone-edge); overflow-x: auto; }
+.evp__tabs::-webkit-scrollbar { display: none; }
+.evp__tab {
+  padding: 6px 2px 10px; font-size: 14px; font-weight: 300; color: var(--ink-muted);
+  position: relative; flex-shrink: 0;
+}
+.evp__tab.is-active { color: var(--peach); font-weight: 500; }
+.evp__tab.is-active::after {
+  content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px;
+  background: var(--peach); border-radius: var(--r-full);
+}
+
+.evp__body { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-4) var(--s-5) var(--s-8); max-width: 640px; width: 100%; margin: 0 auto; }
+.evp__hero { width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--r-lg); border: 1px solid var(--bone-edge); }
+
+.evp__cards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.evp__infocard {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  padding: var(--s-4) var(--s-3); border: 1px solid var(--peach); border-radius: var(--r-md);
+  background: var(--bone-warm); color: var(--peach-deep); cursor: pointer;
+}
+.evp__infocard:disabled { opacity: 0.6; cursor: default; }
+.evp__infocard--empty { border-color: var(--bone-edge); color: var(--ink-faint); cursor: default; }
+.evp__infocard-cta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+.evp__infocard-line { font-size: 13px; color: var(--ink); }
+.evp__infocard-loc { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--peach-deep); text-decoration: none; }
+.evp__infocard-loc:hover { text-decoration: underline; }
+
+.evp__desc {
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
+  padding: var(--s-4); font-size: 14px; font-weight: 300; line-height: 1.6; color: var(--ink);
+  white-space: pre-wrap;
+}
+.evp__desc a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
+
+.evp__rsvp-btn { width: 100%; text-align: center; }
+.evp__count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); text-align: center; }
+.evp__people { display: flex; flex-direction: column; gap: var(--s-2); }
+.evp__person {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: 8px 12px; background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+}
+.evp__person-name { font-size: 14px; color: var(--ink); margin-right: auto; }
+.evp__person-status { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--ink-faint); }
+.evp__price { font-family: var(--font-display); font-style: italic; font-size: 26px; color: var(--ink); text-align: center; }
