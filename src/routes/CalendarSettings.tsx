@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import TimeField from '../components/TimeField';
@@ -13,7 +13,6 @@ import {
 import './Concierge.css';
 import './Calendar.css';
 
-interface SpaceOpt { id: string; name: string }
 interface MemberOpt { id: string; full_name: string | null }
 
 const LEVEL_LABELS: Record<ShareLevel, string> = {
@@ -29,7 +28,6 @@ export default function CalendarSettings() {
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [rules, setRules] = useState<ShareRule[]>([]);
-  const [spaces, setSpaces] = useState<SpaceOpt[]>([]);
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [error, setError] = useState('');
 
@@ -39,24 +37,22 @@ export default function CalendarSettings() {
   const [wEnd, setWEnd] = useState(17 * 60);
   const [wKind, setWKind] = useState<AvailabilityKind>('available');
 
-  // add-rule form
-  const [rType, setRType] = useState<'profile' | 'space'>('profile');
-  const [rSpace, setRSpace] = useState('');
+  // add-rule form: one smart search across members AND spaces (groups,
+  // communities, organizations, places) — no audience-type dropdown.
+  interface RulePick { type: 'profile' | 'space'; id: string; name: string; label: string }
   const [rQuery, setRQuery] = useState('');
-  const [rPerson, setRPerson] = useState<MemberOpt | null>(null);
+  const [rPick, setRPick] = useState<RulePick | null>(null);
+  const [rResults, setRResults] = useState<RulePick[]>([]);
   const [rLevel, setRLevel] = useState<ShareLevel>('details');
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [w, r, spRes, memRes] = await Promise.all([
+    const [w, r, memRes] = await Promise.all([
       loadMyAvailability(me),
       loadMyShares(me),
-      supabase.from('space_members').select('spaces(id, name)').eq('profile_id', me),
       supabase.from('profiles').select('id, full_name').neq('id', me).order('full_name').limit(500),
     ]);
     setWindows(w); setRules(r);
-    setSpaces(((spRes.data as unknown as { spaces: SpaceOpt | null }[] | null) ?? [])
-      .map((x) => x.spaces).filter((s): s is SpaceOpt => !!s));
     setMembers((memRes.data as MemberOpt[] | null) ?? []);
   }, [me]);
   useEffect(() => { load(); }, [load]);
@@ -65,11 +61,28 @@ export default function CalendarSettings() {
     (rules.find((r) => r.audience_type === 'everyone')?.level) ?? 'busy';
   const specificRules = rules.filter((r) => r.audience_type !== 'everyone');
 
-  const matches = useMemo(() => {
-    const q = rQuery.trim().toLowerCase();
-    if (!q || rPerson) return [];
-    return members.filter((m) => (m.full_name ?? '').toLowerCase().includes(q)).slice(0, 6);
-  }, [rQuery, members, rPerson]);
+  // Smart audience search: members client-side + all spaces by name, labeled
+  // by what they are (Member / Group / Community / Organization / Place).
+  useEffect(() => {
+    const q = rQuery.trim();
+    if (q.length < 2 || rPick) { setRResults([]); return; }
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('spaces').select('id, name, kind').ilike('name', `%${q}%`).limit(5);
+      if (!live) return;
+      const spaceHits = ((data as { id: string; name: string; kind: string }[] | null) ?? [])
+        .map((s) => ({
+          type: 'space' as const, id: s.id, name: s.name,
+          label: s.kind === 'community' ? 'Community' : s.kind === 'organization' ? 'Organization' : s.kind === 'place' ? 'Place' : 'Group',
+        }));
+      const memberHits = members
+        .filter((m) => (m.full_name ?? '').toLowerCase().includes(q.toLowerCase()))
+        .slice(0, 5)
+        .map((m) => ({ type: 'profile' as const, id: m.id, name: m.full_name || 'Member', label: 'Member' }));
+      setRResults([...memberHits, ...spaceHits]);
+    })();
+    return () => { live = false; };
+  }, [rQuery, rPick, members]);
 
   const act = async (fn: () => Promise<void>) => {
     if (!me) return; // session still resolving — never write with an empty id
@@ -186,21 +199,16 @@ export default function CalendarSettings() {
           ))}
 
           <div className="cset__add cset__add--wrap">
-            <select className="cset__select" value={rType} onChange={(e) => { setRType(e.target.value as 'profile' | 'space'); setRPerson(null); setRQuery(''); }} aria-label="Rule for">
-              <option value="profile">Person</option>
-              <option value="space">Group / community</option>
-            </select>
-            {rType === 'space' ? (
-              <select className="cset__select cset__select--grow" value={rSpace} onChange={(e) => setRSpace(e.target.value)} aria-label="Which space">
-                <option value="">Choose…</option>
-                {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            ) : rPerson ? (
-              <button className="calp__invitee" onClick={() => { setRPerson(null); setRQuery(''); }}>
-                {rPerson.full_name ?? 'Member'} ×
+            {rPick ? (
+              <button className="calp__invitee" onClick={() => { setRPick(null); setRQuery(''); }}>
+                {rPick.name} <span className="cset__kind">{rPick.label}</span> ×
               </button>
             ) : (
-              <input className="cedit__input cset__grow" placeholder="Search members…" value={rQuery} onChange={(e) => setRQuery(e.target.value)} />
+              <input
+                className="cedit__input cset__grow"
+                placeholder="Search Members, Groups/Communities, Organizations and/or Places…"
+                value={rQuery} onChange={(e) => setRQuery(e.target.value)}
+              />
             )}
             <select className="cset__select" value={rLevel} onChange={(e) => setRLevel(e.target.value as ShareLevel)} aria-label="Level">
               {(Object.keys(LEVEL_LABELS) as ShareLevel[]).map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
@@ -208,17 +216,21 @@ export default function CalendarSettings() {
             <button
               className="cedit__add cedit__add--sm"
               onClick={() => act(async () => {
-                if (rType === 'space' && rSpace) await upsertShare(me, { type: 'space', spaceId: rSpace }, rLevel);
-                else if (rType === 'profile' && rPerson) await upsertShare(me, { type: 'profile', profileId: rPerson.id }, rLevel);
-                setRSpace(''); setRPerson(null); setRQuery('');
+                if (!rPick) return;
+                await upsertShare(
+                  me,
+                  rPick.type === 'space' ? { type: 'space', spaceId: rPick.id } : { type: 'profile', profileId: rPick.id },
+                  rLevel,
+                );
+                setRPick(null); setRQuery('');
               })}
             >
               <Icon name="plus" size={12} /> Add rule
             </button>
           </div>
-          {matches.map((m) => (
-            <button className="calp__match" key={m.id} onClick={() => { setRPerson(m); setRQuery(''); }}>
-              {m.full_name ?? 'Member'}
+          {rResults.map((r) => (
+            <button className="calp__match" key={r.type + r.id} onClick={() => { setRPick(r); setRQuery(''); }}>
+              {r.name} <span className="cset__kind">{r.label}</span>
             </button>
           ))}
         </div>
