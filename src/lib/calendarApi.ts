@@ -194,3 +194,118 @@ export async function rsvp(eventId: string, me: string, status: Exclude<RsvpStat
     .eq('profile_id', me);
   if (error) throw error;
 }
+
+// ─── Availability windows (declared hours; kind 'on_call' feeds Concierge) ───
+export type AvailabilityKind = 'available' | 'on_call';
+export interface AvailabilityWindow {
+  id: string;
+  profile_id: string;
+  weekday: number;          // 0=Mon … 6=Sun (matches recurrence.ts)
+  start_min: number;
+  end_min: number;
+  kind: AvailabilityKind;
+  valid_from: string | null;
+  valid_to: string | null;
+}
+
+export async function loadMyAvailability(me: string): Promise<AvailabilityWindow[]> {
+  const { data, error } = await supabase
+    .from('availability_windows')
+    .select('id, profile_id, weekday, start_min, end_min, kind, valid_from, valid_to')
+    .eq('profile_id', me)
+    .order('weekday').order('start_min');
+  if (error) console.warn('loadMyAvailability:', error.message);
+  return (data as AvailabilityWindow[] | null) ?? [];
+}
+
+export async function addAvailability(me: string, w: { weekday: number; startMin: number; endMin: number; kind: AvailabilityKind }): Promise<void> {
+  const { error } = await supabase.from('availability_windows')
+    .insert({ profile_id: me, weekday: w.weekday, start_min: w.startMin, end_min: w.endMin, kind: w.kind });
+  if (error) throw error;
+}
+
+export async function deleteAvailability(id: string): Promise<void> {
+  const { error } = await supabase.from('availability_windows').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Visibility rules (who sees my calendar; most-specific wins) ─────────────
+export type ShareLevel = 'hidden' | 'busy' | 'details';
+export interface ShareRule {
+  id: string;
+  audience_type: 'everyone' | 'space' | 'profile';
+  audience_space_id: string | null;
+  audience_profile_id: string | null;
+  level: ShareLevel;
+  space?: { name: string } | null;
+  profile?: { full_name: string | null } | null;
+}
+
+export async function loadMyShares(me: string): Promise<ShareRule[]> {
+  const { data, error } = await supabase
+    .from('calendar_shares')
+    .select('id, audience_type, audience_space_id, audience_profile_id, level, space:spaces(name), profile:profiles!calendar_shares_audience_profile_id_fkey(full_name)')
+    .eq('owner_id', me)
+    .order('created_at');
+  if (error) console.warn('loadMyShares:', error.message);
+  return (data as unknown as ShareRule[] | null) ?? [];
+}
+
+export async function upsertShare(
+  me: string,
+  audience: { type: 'everyone' } | { type: 'space'; spaceId: string } | { type: 'profile'; profileId: string },
+  level: ShareLevel,
+): Promise<void> {
+  const row = {
+    owner_id: me,
+    audience_type: audience.type,
+    audience_space_id: audience.type === 'space' ? audience.spaceId : null,
+    audience_profile_id: audience.type === 'profile' ? audience.profileId : null,
+    level,
+  };
+  // Delete-then-insert keeps the "one rule per audience" unique index simple.
+  let del = supabase.from('calendar_shares').delete().eq('owner_id', me).eq('audience_type', audience.type);
+  if (audience.type === 'space') del = del.eq('audience_space_id', audience.spaceId);
+  if (audience.type === 'profile') del = del.eq('audience_profile_id', audience.profileId);
+  await del;
+  const { error } = await supabase.from('calendar_shares').insert(row);
+  if (error) throw error;
+}
+
+export async function deleteShare(id: string): Promise<void> {
+  const { error } = await supabase.from('calendar_shares').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Group availability (find-a-time) ─────────────────────────────────────────
+/** Sanitized event fragment from the free_busy RPC — satisfies Schedulable, so
+ *  the client expands recurrence with occursOn(). */
+export interface FreeBusyRow {
+  profile_id: string;
+  level: Exclude<ShareLevel, 'hidden'>;
+  start_date: string;
+  end_date: string;
+  all_day: boolean;
+  start_min: number | null;
+  end_min: number | null;
+  recurrence: import('./recurrence').Recurrence | null;
+  title: string | null;   // only at 'details'
+}
+
+export async function freeBusy(profileIds: string[], from: string, to: string): Promise<FreeBusyRow[]> {
+  if (profileIds.length === 0) return [];
+  const { data, error } = await supabase.rpc('free_busy', { p_profiles: profileIds, p_from: from, p_to: to });
+  if (error) console.warn('freeBusy:', error.message);
+  return (data as FreeBusyRow[] | null) ?? [];
+}
+
+export interface MemberWindow {
+  profile_id: string; weekday: number; start_min: number; end_min: number;
+  kind: AvailabilityKind; valid_from: string | null; valid_to: string | null;
+}
+export async function availabilityOf(profileIds: string[]): Promise<MemberWindow[]> {
+  if (profileIds.length === 0) return [];
+  const { data, error } = await supabase.rpc('availability_of', { p_profiles: profileIds });
+  if (error) console.warn('availabilityOf:', error.message);
+  return (data as MemberWindow[] | null) ?? [];
+}
