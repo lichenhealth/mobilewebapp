@@ -23,6 +23,7 @@ import EventPage from './routes/EventPage';
 import Profile from './routes/Profile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
+import ResetPassword from './routes/ResetPassword';
 import Onboarding from './routes/Onboarding';
 import AdminCategories from './routes/AdminCategories';
 import AdminSupporters from './routes/AdminSupporters';
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/membership" element={<Membership />} />
           <Route path="/compose"   element={<Compose />} />
           <Route path="/login"     element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup"    element={<SignUp />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
