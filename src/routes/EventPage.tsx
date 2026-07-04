@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import FeedCard from '../components/FeedCard';
-import { LinkifiedText } from '../components/CarePostCard';
+import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
 import { loadEvent, minToLabel, type EventRow } from '../lib/calendarApi';
@@ -136,6 +136,13 @@ export default function EventPage() {
           <div className="evp__desc">
             <LinkifiedText text={post.body} />
           </div>
+          {Array.isArray(post.details?.previews) && (post.details.previews as { url: string }[]).length > 0 && (
+            <div className="cpost__previews">
+              {(post.details.previews as Parameters<typeof CarePreview>[0]['p'][]).map((pv, i) => (
+                <CarePreview key={i} p={pv} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

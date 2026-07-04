@@ -1,5 +1,6 @@
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
+import { LinkifiedText, CarePreview } from './CarePostCard';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -36,6 +37,8 @@ export interface FeedCardProps {
   onBadgeAction?: () => void;
   /** Open the full page for this card (event page etc.) — title/body become links. */
   onOpen?: () => void;
+  /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
+  previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
 }
 
 export default function FeedCard({
@@ -58,6 +61,7 @@ export default function FeedCard({
   onMessage,
   onBadgeAction,
   onOpen,
+  previews,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -106,8 +110,8 @@ export default function FeedCard({
       {/* BODY */}
       <div className="feed-card__body">
         {onOpen
-          ? <p className="feed-card__text feed-card__text--link" onClick={onOpen} role="link" tabIndex={0}>{body}</p>
-          : <p className="feed-card__text">{body}</p>}
+          ? <p className="feed-card__text feed-card__text--link" onClick={onOpen} role="link" tabIndex={0}><LinkifiedText text={body} /></p>
+          : <p className="feed-card__text"><LinkifiedText text={body} /></p>}
         {image && (
           <ImageBadge
             pattern={image.pattern}
@@ -119,6 +123,13 @@ export default function FeedCard({
           />
         )}
       </div>
+
+      {/* LINK PREVIEWS (YouTube inline, OG cards) */}
+      {previews && previews.length > 0 && (
+        <div className="cpost__previews" onClick={(e) => e.stopPropagation()}>
+          {previews.map((pv, i) => <CarePreview key={i} p={pv} />)}
+        </div>
+      )}
 
       {/* INLINE MEDIA */}
       {media && media.length > 0 && (

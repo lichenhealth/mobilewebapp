@@ -11,6 +11,8 @@ import {
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
 import { createEvent, deleteEvent } from '../lib/calendarApi';
+import { resolvePreviews } from '../lib/conciergeApi';
+import { parseBodyUrls } from '../lib/linkify';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
 import TimeField from '../components/TimeField';
 import { todayISO } from '../lib/conciergeApi';
@@ -174,6 +176,10 @@ export default function Compose() {
         }
       }
       if (media.length) details.media = media;
+      // Rich previews for any pasted links, resolved once at compose time
+      // (YouTube parsed locally; other links via the link-preview function).
+      const previews = await resolvePreviews(parseBodyUrls(body));
+      if (previews.length) details.previews = previews;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
 
       // Events first create their calendar event (the RSVP container); if the
