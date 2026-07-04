@@ -4,14 +4,17 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
-import { occursOn } from '../lib/recurrence';
+import { occursOn, recurrenceLabel } from '../lib/recurrence';
 import { EventRow, loadMyEvents, deleteEvent, rsvp, minToLabel } from '../lib/calendarApi';
 import './Calendar.css';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** Sunday that starts the week containing iso (mock's grid is Sunday-first). */
+type View = 'day' | '3day' | 'week' | 'month';
+const VIEW_LABELS: Record<View, string> = { day: 'Day', '3day': '3 Days', week: 'Week', month: 'Month' };
+
+/** Sunday that starts the week containing iso (grids are Sunday-first). */
 export function sundayOfWeek(iso: string): string {
   const d = localDate(iso);
   d.setDate(d.getDate() - d.getDay());
@@ -20,62 +23,101 @@ export function sundayOfWeek(iso: string): string {
 function addDays(iso: string, n: number): string {
   const d = localDate(iso); d.setDate(d.getDate() + n); return toISO(d);
 }
+function addMonths(iso: string, n: number): string {
+  const d = localDate(iso); return toISO(new Date(d.getFullYear(), d.getMonth() + n, 1));
+}
+/** Full Sun-first cell range covering iso's month. */
+function monthCells(iso: string): string[] {
+  const d = localDate(iso);
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const start = addDays(toISO(first), -first.getDay());
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const rows = Math.ceil((first.getDay() + daysInMonth) / 7);
+  return Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));
+}
 
-/** My calendar — week grid per the Figma mock: Sunday-first columns, hour rows,
- *  peach event blocks, all-day chips above the grid. */
+/** My calendar — Day / 3 Days / Week time grids + Month overview + search. */
 export default function Calendar() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
   const today = todayISO();
 
-  const [weekStart, setWeekStart] = useState(() => sundayOfWeek(todayISO()));
+  const [view, setView] = useState<View>('week');
+  const [anchor, setAnchor] = useState(todayISO());
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EventRow | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [searchPool, setSearchPool] = useState<EventRow[]>([]);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const weekEnd = days[6];
+  // Visible days per view; month uses its own cell range.
+  const days = useMemo(() => {
+    if (view === 'month') return monthCells(anchor);
+    if (view === 'week') return Array.from({ length: 7 }, (_, i) => addDays(sundayOfWeek(anchor), i));
+    return Array.from({ length: view === 'day' ? 1 : 3 }, (_, i) => addDays(anchor, i));
+  }, [view, anchor]);
+  const from = days[0], to = days[days.length - 1];
 
   const load = useCallback(async () => {
     if (!me) return;
     setLoading(true);
-    setEvents(await loadMyEvents(me, weekStart, weekEnd));
+    setEvents(await loadMyEvents(me, from, to));
     setLoading(false);
-  }, [me, weekStart, weekEnd]);
+  }, [me, from, to]);
   useEffect(() => { load(); }, [load]);
 
-  // Open the page scrolled to the working morning (the PAGE scrolls, not the
-  // grid — the sticky day header needs the outer scroll context).
+  // Open time views scrolled to the working morning (the PAGE scrolls).
   useEffect(() => {
+    if (view === 'month') return;
     const el = gridRef.current;
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 170;
+    // Land 7am just below the pinned toolbar+day-header stack.
+    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 230;
     if (y > 0) window.scrollTo({ top: y });
-  }, []);
+  }, [view]);
+
+  // Search pulls a wide window once, then filters live.
+  useEffect(() => {
+    if (!searchOpen || !me) return;
+    (async () => setSearchPool(await loadMyEvents(me, addDays(today, -60), addDays(today, 180))))();
+  }, [searchOpen, me, today]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return searchPool
+      .filter((e) => e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q))
+      .slice(0, 12);
+  }, [query, searchPool]);
+
+  const page = (dir: 1 | -1) => {
+    if (view === 'month') setAnchor(addMonths(anchor, dir));
+    else if (view === 'week') setAnchor(addDays(anchor, 7 * dir));
+    else setAnchor(addDays(anchor, (view === 'day' ? 1 : 3) * dir));
+  };
 
   const timedOn = (iso: string) =>
-    events
-      .filter((e) => !e.all_day && occursOn(e, iso))
-      .sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
+    events.filter((e) => !e.all_day && occursOn(e, iso)).sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
   const allDayOn = (iso: string) => events.filter((e) => e.all_day && occursOn(e, iso));
+  const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
   const hasAllDayRow = days.some((d) => allDayOn(d).length > 0);
 
-  async function onDelete(ev: EventRow) {
-    await deleteEvent(ev.id); setSelected(null); load();
-  }
-  async function onRsvp(ev: EventRow, status: 'going' | 'declined') {
-    await rsvp(ev.id, me, status); setSelected(null); load();
-  }
+  async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
+  async function onRsvp(ev: EventRow, status: 'going' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
 
-  const monthLabel = localDate(days[3]).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const headerLabel = localDate(view === 'month' ? anchor : days[Math.floor(days.length / 2)])
+    .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const myAttend = (ev: EventRow) => ev.attendees?.find((a) => a.profile_id === me);
   // Google-style block state: pending invite = white w/ peach outline; declined = faded.
   const blockClass = (ev: EventRow, base: string) => {
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
     return base + (st === 'invited' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
   };
+  const jumpToDay = (iso: string) => { setAnchor(iso); setView('day'); };
+
+  const gridCols = { gridTemplateColumns: `44px repeat(${days.length}, 1fr)` };
 
   return (
     <div className="calp">
@@ -88,73 +130,134 @@ export default function Calendar() {
             </svg>
           </button>
         </div>
-        <div className="calp__nav">
-          <button className="calp__navbtn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><Icon name="chevron-left" size={16} /></button>
-          <button className="calp__month" onClick={() => setWeekStart(sundayOfWeek(todayISO()))}>{monthLabel}</button>
-          <button className="calp__navbtn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><Icon name="chevron-right" size={16} /></button>
-        </div>
       </div>
 
-      <div className="calp__card">
-        {/* Day headers */}
-        <div className="calp__days">
-          <span className="calp__gutter-head" />
-          {days.map((iso, i) => (
-            <div className="calp__day" key={iso}>
-              <span className="calp__day-name">{DAY_LABELS[i]}</span>
-              <span className={'calp__day-num' + (iso === today ? ' is-today' : '')}>{localDate(iso).getDate()}</span>
-            </div>
-          ))}
+      {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
+          hour grid slides up and hides beneath them. */}
+      <div className="calp__pin">
+        <div className="calp__toolbar">
+          <button
+            className={'calp__tool' + (searchOpen ? ' is-on' : '')}
+            onClick={() => { setSearchOpen((s) => !s); setQuery(''); }}
+            aria-label="Search events"
+          >
+            <Icon name="search" size={15} />
+          </button>
+          <div className="calp__nav">
+            <button className="calp__navbtn" onClick={() => page(-1)} aria-label="Previous"><Icon name="chevron-left" size={16} /></button>
+            <button className="calp__month" onClick={() => setAnchor(todayISO())}>{headerLabel}</button>
+            <button className="calp__navbtn" onClick={() => page(1)} aria-label="Next"><Icon name="chevron-right" size={16} /></button>
+          </div>
+          <select className="calp__vselect" value={view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
+            {(Object.keys(VIEW_LABELS) as View[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
+          </select>
         </div>
-
-        {/* All-day chips */}
-        {hasAllDayRow && (
-          <div className="calp__alldays">
+        {searchOpen && (
+          <div className="calp__search">
+            <input
+              className="calp__search-input" placeholder="Search events…" autoFocus
+              value={query} onChange={(e) => setQuery(e.target.value)}
+            />
+            {results.map((e) => (
+              <button className="calp__result" key={e.id} onClick={() => { setSearchOpen(false); setQuery(''); jumpToDay(e.start_date); }}>
+                <span className="calp__result-title">{e.title}</span>
+                <span className="calp__result-when">
+                  {e.recurrence ? recurrenceLabel(e.recurrence, e.start_date) : formatDateShort(e.start_date)}
+                  {!e.all_day && e.start_min != null && ` · ${minToLabel(e.start_min)}`}
+                </span>
+              </button>
+            ))}
+            {query.trim() && results.length === 0 && <p className="calp__result-none">No matching events.</p>}
+          </div>
+        )}
+        {view !== 'month' && (
+          <div className="calp__days" style={gridCols}>
             <span className="calp__gutter-head" />
             {days.map((iso) => (
-              <div className="calp__allday-col" key={iso}>
-                {allDayOn(iso).map((e) => (
-                  <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
-                ))}
+              <div className="calp__day" key={iso}>
+                <span className="calp__day-name">{DAY_LABELS[localDate(iso).getDay()]}</span>
+                <span className={'calp__day-num' + (iso === today ? ' is-today' : '')}>{localDate(iso).getDate()}</span>
               </div>
             ))}
           </div>
         )}
-
-        {/* Hour grid */}
-        <div className="calp__grid" ref={gridRef}>
-          <div className="calp__grid-inner" style={{ height: 24 * HOUR_PX }}>
-            <div className="calp__gutter">
-              {Array.from({ length: 23 }, (_, h) => (
-                <span className="calp__hour" key={h + 1} style={{ top: (h + 1) * HOUR_PX }}>{minToLabel((h + 1) * 60)}</span>
-              ))}
-            </div>
-            {days.map((iso) => (
-              <div className="calp__col" key={iso}>
-                {Array.from({ length: 23 }, (_, h) => (
-                  <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
-                ))}
-                {timedOn(iso).map((e) => {
-                  const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
-                  const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
-                  return (
-                    <button
-                      className={blockClass(e, 'calp__event')} key={e.id + iso}
-                      style={{ top, height }}
-                      onClick={() => setSelected(e)}
-                    >
-                      {e.title}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-        {loading && <p className="calp__loading">Loading…</p>}
       </div>
 
-      {/* Event detail sheet */}
+      {view === 'month' ? (
+        /* ── Month overview ── */
+        <div className="calp__card">
+          <div className="calp__mweek">
+            {DAY_LABELS.map((d) => <span className="calp__day-name" key={d}>{d}</span>)}
+          </div>
+          <div className="calp__mgrid">
+            {days.map((iso) => {
+              const inMonth = localDate(iso).getMonth() === localDate(anchor).getMonth();
+              const evs = anyOn(iso);
+              return (
+                <button
+                  className={'calp__mcell' + (inMonth ? '' : ' is-out') + (iso === today ? ' is-today' : '')}
+                  key={iso} onClick={() => jumpToDay(iso)}
+                >
+                  <span className={'calp__mnum' + (iso === today ? ' is-today' : '')}>{localDate(iso).getDate()}</span>
+                  <span className="calp__mdots">
+                    {evs.slice(0, 3).map((e) => <span className={blockClass(e, 'calp__mdot')} key={e.id} />)}
+                    {evs.length > 3 && <span className="calp__mmore">+{evs.length - 3}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* ── Time grid (Day / 3 Days / Week) — day header lives in the pin ── */
+        <div className="calp__card calp__card--flush">
+          {hasAllDayRow && (
+            <div className="calp__alldays" style={gridCols}>
+              <span className="calp__gutter-head" />
+              {days.map((iso) => (
+                <div className="calp__allday-col" key={iso}>
+                  {allDayOn(iso).map((e) => (
+                    <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="calp__grid" ref={gridRef}>
+            <div className="calp__grid-inner" style={{ height: 24 * HOUR_PX, ...gridCols }}>
+              <div className="calp__gutter">
+                {Array.from({ length: 23 }, (_, h) => (
+                  <span className="calp__hour" key={h + 1} style={{ top: (h + 1) * HOUR_PX }}>{minToLabel((h + 1) * 60)}</span>
+                ))}
+              </div>
+              {days.map((iso) => (
+                <div className="calp__col" key={iso}>
+                  {Array.from({ length: 23 }, (_, h) => (
+                    <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
+                  ))}
+                  {timedOn(iso).map((e) => {
+                    const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
+                    const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
+                    return (
+                      <button
+                        className={blockClass(e, 'calp__event')} key={e.id + iso}
+                        style={{ top, height }}
+                        onClick={() => setSelected(e)}
+                      >
+                        {e.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          {loading && <p className="calp__loading">Loading…</p>}
+        </div>
+      )}
+
+      {/* Event detail modal */}
       {selected && (
         <>
           <div className="calp__scrim" onClick={() => setSelected(null)} />
@@ -165,6 +268,7 @@ export default function Calendar() {
               {selected.end_date !== selected.start_date && !selected.recurrence ? ` – ${formatDateShort(selected.end_date)}` : ''}
               {!selected.all_day && selected.start_min != null && ` · ${minToLabel(selected.start_min)} – ${minToLabel(selected.end_min ?? selected.start_min)}`}
               {selected.all_day && ' · All day'}
+              {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
             {selected.location && <p className="calp__sheet-loc"><Icon name="location" size={13} /> {selected.location}</p>}
             {selected.description && <p className="calp__sheet-desc">{selected.description}</p>}

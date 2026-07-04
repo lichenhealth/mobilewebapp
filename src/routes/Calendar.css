@@ -1,7 +1,9 @@
 /* Calendar page — week grid per the Figma mock (hour rows, peach blocks). */
 .calp { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 
-.calp__head { padding: var(--s-5) var(--s-5) var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); }
+/* Extra bottom padding: the pin's upward bone extension (see .calp__pin
+   box-shadow) needs clear bone beneath the title at rest. */
+.calp__head { padding: var(--s-5) var(--s-5) 40px; display: flex; flex-direction: column; gap: var(--s-2); }
 .calp__head-row { display: flex; align-items: center; justify-content: space-between; }
 .calp__title {
   font-family: var(--font-display); font-style: italic; font-size: var(--t-xl);
@@ -14,6 +16,38 @@
   transition: transform 120ms ease, background 120ms ease;
 }
 .calp__new:active { transform: scale(0.94); }
+
+/* Toolbar: search · ‹ month › · view switcher (per the Figma mock) */
+.calp__toolbar { display: flex; align-items: center; gap: var(--s-2); }
+.calp__tool {
+  width: 28px; height: 28px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); border: 1px solid var(--bone-edge); background: var(--bone-warm);
+}
+.calp__tool.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.calp__vselect {
+  margin-left: auto; padding: 5px 8px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
+}
+
+/* Search */
+.calp__search { display: flex; flex-direction: column; gap: 4px; }
+.calp__search-input {
+  width: 100%; padding: 8px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; font-family: inherit;
+}
+.calp__search-input:focus { outline: none; border-color: var(--peach); }
+.calp__result {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2);
+  padding: 7px 10px; border-radius: var(--r-md); background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); text-align: left;
+}
+.calp__result:hover { border-color: var(--peach); }
+.calp__result-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calp__result-when { font-family: var(--font-mono); font-size: 10px; color: var(--peach-deep); flex-shrink: 0; }
+.calp__result-none { font-size: 12px; color: var(--ink-faint); padding: 2px 4px; }
 
 .calp__nav { display: flex; align-items: center; gap: var(--s-2); }
 .calp__navbtn {
@@ -35,13 +69,34 @@
   display: grid; grid-template-columns: 44px repeat(7, 1fr);
   border-bottom: 1px solid var(--bone-edge);
 }
-/* Frozen day-header row (spreadsheet-style) — sticks below the fixed TopBar. */
-.calp__days {
+
+/* Frozen unit (à la Google Cal): toolbar + day header pinned below the fixed
+   TopBar; the hour grid slides beneath it. Bone background so scrolled content
+   disappears under the pin, not through it. */
+.calp__pin {
+  /* Stick BELOW the fixed TopBar on every viewport — at top:0 the day row
+     lands behind the TopBar's translucent bone gradient and reads "clouded". */
   position: sticky; top: calc(var(--top-h) + var(--safe-top, 0px)); z-index: 10;
-  background: var(--bone-warm); border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--bone);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: 0 var(--s-5) 0;
+  margin-bottom: var(--s-2);
+  /* Solid bone extension ABOVE the pin: the TopBar's gradient goes transparent
+     in its last ~33px, so scrolled grid rows would peek through the gap between
+     the bar and the pinned panel. The shadow plugs it (the head's 40px bottom
+     padding keeps this from covering the title at rest). */
+  box-shadow: 0 -36px 0 0 var(--bone);
 }
-@media (min-width: 1024px) {
-  .calp__days { top: 0; }
+/* Inside the pin, the day header reads as the top edge of the grid card. */
+.calp__pin .calp__days {
+  margin: 0 calc(var(--s-3) - var(--s-5));           /* align with the card below */
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); border-bottom: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+/* Card continues seamlessly under the pinned day header. */
+.calp__card--flush {
+  border-top: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); margin-top: calc(-1 * var(--s-2));
 }
 .calp__day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; }
 .calp__day-name { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
@@ -84,6 +139,31 @@
   text-decoration: line-through;
 }
 .calp__loading { font-size: 12px; color: var(--ink-faint); text-align: center; padding: var(--s-2); }
+
+/* ── Month overview ── */
+.calp__mweek {
+  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+  padding: 8px 0 6px; border-bottom: 1px solid var(--bone-edge);
+}
+.calp__mgrid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.calp__mcell {
+  min-height: 64px; padding: 5px 3px; border-bottom: 1px solid var(--bone-edge);
+  border-left: 1px solid var(--bone-edge);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.calp__mcell:nth-child(7n + 1) { border-left: 0; }
+.calp__mcell.is-out { opacity: 0.35; }
+.calp__mcell:hover { background: var(--bone); }
+.calp__mnum {
+  width: 22px; height: 22px; border-radius: var(--r-full); font-size: 12px; color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.calp__mnum.is-today { background: var(--peach); color: #fff; font-weight: 600; }
+.calp__mdots { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.calp__mdot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--peach); }
+.calp__mdot--pending { background: var(--bone-warm); border: 1.5px solid var(--peach); }
+.calp__mdot--declined { background: var(--bone-edge); }
+.calp__mmore { font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint); }
 
 /* Detail sheet */
 .calp__scrim { position: fixed; inset: 0; background: rgba(18, 24, 28, 0.35); z-index: 59; }

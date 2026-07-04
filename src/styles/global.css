@@ -92,7 +92,11 @@ input, textarea, select { font: inherit; color: inherit; }
   box-shadow:
     0 0 0 1px var(--bone-edge),
     0 24px 60px rgb(var(--shadow-color) / 0.08);
-  overflow-x: hidden;
+  /* clip, NOT hidden: overflow-x hidden makes this element the scroll context
+     and silently disables position:sticky for every descendant (the calendar's
+     pinned header, the desktop sidebar). clip trims sideways overflow without
+     creating a scroll container. */
+  overflow-x: clip;
 }
 
 @media (max-width: 460px) {
