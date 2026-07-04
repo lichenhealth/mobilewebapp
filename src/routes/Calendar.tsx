@@ -259,15 +259,25 @@ export default function Calendar() {
   // grows with the selection; release opens the composer with that span.
   // A plain click/tap creates at the slot with the default duration. Touch
   // drags stay reserved for scrolling (the browser fires pointercancel).
-  const dragRef = useRef<{ iso: string; anchor: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ iso: string; anchor: number; start: number; end: number; moved: boolean } | null>(null);
   const [drag, setDrag] = useState<{ iso: string; start: number; end: number } | null>(null);
   const slotAt = (e: React.PointerEvent, el: HTMLElement) =>
     Math.max(0, Math.min(1410, Math.floor((e.clientY - el.getBoundingClientRect().top) / (HOUR_PX / 2)) * 30));
 
+  /** Query string for the composer: overlaid people come along as invitees
+   *  ("Blair's calendar is on my screen → she's who I'm scheduling with"). */
+  const composerQS = (extra: string[] = []) => {
+    const parts = [...extra];
+    if (selectedCal !== 'me') parts.push(`space=${selectedCal}`);
+    const ids = overlays.filter((o) => o.kind === 'profile').map((o) => o.id);
+    if (ids.length) parts.push(`inv=${ids.join(',')}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+  };
+
   const onColDown = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return; // blocks/slots own their clicks
     const s = slotAt(e, e.currentTarget);
-    dragRef.current = { iso, anchor: s, moved: false };
+    dragRef.current = { iso, anchor: s, start: s, end: s + 30, moved: false };
     setDrag({ iso, start: s, end: s + 30 });
     if (e.pointerType === 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -276,16 +286,20 @@ export default function Calendar() {
     if (!d || d.iso !== iso || e.pointerType !== 'mouse') return;
     const s = slotAt(e, e.currentTarget);
     if (s !== d.anchor) d.moved = true;
-    setDrag({ iso, start: Math.min(d.anchor, s), end: Math.max(d.anchor + 30, s + 30) });
+    d.start = Math.min(d.anchor, s);
+    d.end = Math.max(d.anchor + 30, s + 30);
+    setDrag({ iso, start: d.start, end: d.end });
   };
   const onColUp = (iso: string) => () => {
+    // Everything read from the ref — immune to state/render timing.
     const d = dragRef.current;
     dragRef.current = null;
-    if (!d || d.iso !== iso) { setDrag(null); return; }
-    const span = drag && d.moved ? `&end=${drag.end}` : '';
-    const start = drag?.start ?? d.anchor;
     setDrag(null);
-    navigate(`/calendar/new?date=${iso}&start=${start}${span}${selectedCal !== 'me' ? `&space=${selectedCal}` : ''}`);
+    if (!d || d.iso !== iso) return;
+    navigate('/calendar/new' + composerQS([
+      `date=${iso}`, `start=${d.start}`,
+      ...(d.moved ? [`end=${d.end}`] : []),
+    ]));
   };
   const onColCancel = () => { dragRef.current = null; setDrag(null); };
 
@@ -318,7 +332,7 @@ export default function Calendar() {
           </button>
           <button
             className="calp__tool calp__tool--new"
-            onClick={() => navigate('/calendar/new' + (selectedCal !== 'me' ? `?space=${selectedCal}` : ''))}
+            onClick={() => navigate('/calendar/new' + composerQS())}
             aria-label="New event"
           >
             <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">

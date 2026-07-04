@@ -58,28 +58,34 @@ export default function EventComposer() {
       setSpaces(sp);
       const mem = (memRes.data as MemberOpt[] | null) ?? [];
       setMembers(mem);
-
-      // Prefill from a find-a-time slot link (?space&date&start&inv=…).
-      if (!eventId) {
-        const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qInv = params.get('inv');
-        if (qSpace) setCalendar(qSpace);
-        if (qDate) setRange({ start: qDate, end: qDate });
-        if (qStart) {
-          const s = Number(qStart);
-          if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
-        }
-        const qEnd = params.get('end');
-        if (qEnd) {
-          const en = Number(qEnd);
-          if (Number.isFinite(en) && en > 0) setEndMin(Math.min(en, 1440));
-        }
-        if (qInv) {
-          const ids = qInv.split(',').filter(Boolean);
-          setInvitees(ids.map((id) => mem.find((m) => m.id === id) ?? { id, full_name: null }));
-        }
-      }
+      // Hydrate names of any query-prefilled invitees now that we know members.
+      setInvitees((cur) => cur.map((i) => i.full_name ? i : (mem.find((m) => m.id === i.id) ?? i)));
     })();
-  }, [me, eventId, params]);
+  }, [me, eventId]);
+
+  // Prefill from a slot click/drag or find-a-time link (?date&start&end&space&inv).
+  // Synchronous on mount — must never wait on (or be skipped by) network calls.
+  useEffect(() => {
+    if (eventId) return;
+    const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qEnd = params.get('end'), qInv = params.get('inv');
+    if (qSpace) setCalendar(qSpace);
+    if (qDate) setRange({ start: qDate, end: qDate });
+    if (qStart) {
+      const s = Number(qStart);
+      if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
+    }
+    if (qEnd) {
+      const en = Number(qEnd);
+      if (Number.isFinite(en) && en > 0) setEndMin(Math.min(en, 1440));
+    }
+    if (qInv) {
+      const ids = [...new Set(qInv.split(',').filter(Boolean))];
+      setInvitees((cur) => {
+        const have = new Set(cur.map((i) => i.id));
+        return [...cur, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, full_name: null }))];
+      });
+    }
+  }, [eventId, params]);
 
   // Edit mode: prefill from the existing event.
   useEffect(() => {
@@ -210,7 +216,7 @@ export default function EventComposer() {
 
         {/* Invitees */}
         <div className="cedit__field">
-          <span className="cedit__label">Invite people</span>
+          <span className="cedit__label">Invite People, Groups, Communities, Organizations, and/or Places</span>
           {invitees.length > 0 && (
             <div className="calp__invitees">
               {invitees.map((m) => (
