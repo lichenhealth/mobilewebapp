@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import { LinkifiedText } from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
@@ -472,7 +473,7 @@ export default function Calendar() {
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
             {selected.location && <p className="calp__sheet-loc"><Icon name="location" size={13} /> {selected.location}</p>}
-            {selected.description && <p className="calp__sheet-desc">{selected.description}</p>}
+            {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
 
             {(selected.attendees?.length ?? 0) > 0 && (
               <div className="calp__sheet-people">
