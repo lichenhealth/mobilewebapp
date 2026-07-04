@@ -26,7 +26,14 @@
 .cmp__input:focus { outline: none; border-color: var(--peach); }
 .cmp__textarea { resize: vertical; min-height: 110px; line-height: var(--lh-normal); }
 
-.cmp__market { margin-top: var(--s-4); padding: var(--s-4); border: 1px dashed var(--bone-edge); border-radius: var(--r-lg); }
+.cmp__market {
+  margin-top: var(--s-4); padding: var(--s-4);
+  border: 1px dashed var(--bone-edge); border-radius: var(--r-lg);
+  /* Consistent vertical rhythm so rows never crowd the chips above them. */
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.cmp__market .cmp__label { margin-top: var(--s-1); }
+.cmp__market .cmp__row { margin-bottom: 0; }
 .cmp__market-head { font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: var(--s-3); }
 .cmp__row { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
 .cmp__row .cmp__input { flex: 1; }
@@ -99,3 +106,16 @@
 }
 .cmp__where-row:hover { background: var(--bone); }
 .cmp__where-row input { accent-color: var(--peach); }
+
+/* Event details */
+.cmp__evrow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+.cmp__row--times { align-items: center; }
+.cmp__to { font-size: 13px; color: var(--ink-soft); }
+.cmp__hint-ev { font-size: 11px; color: var(--ink-faint); line-height: 1.4; }
+
+.cmp__sliding {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink-soft); cursor: pointer;
+  margin: 10px 0 4px;   /* own row, clear of the mode chips above */
+}
+.cmp__sliding input { accent-color: var(--peach); }

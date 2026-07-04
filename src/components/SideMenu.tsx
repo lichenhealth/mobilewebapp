@@ -30,6 +30,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/concierge', label: 'Concierge', icon: 'concierge' },
   { to: '/chat',      label: 'Chat',      icon: 'chat' },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
+  { to: '/events',    label: 'Events',    icon: 'rsvp' },
   { to: '/saved',     label: 'Saved',     icon: 'saved' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },

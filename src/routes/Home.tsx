@@ -21,6 +21,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search'      },
   { icon: 'plus',           label: 'Post',        to: '/compose' },
   { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
+  { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
   { icon: 'graduation-cap', label: 'Education'   },
   { icon: 'fork-spoon',     label: 'Food'        },
@@ -80,6 +81,7 @@ export default function Home() {
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
             onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
+            onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
           />
         ))}
         {FEED.map((card, i) => (

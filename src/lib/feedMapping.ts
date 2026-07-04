@@ -19,6 +19,9 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   const media = Array.isArray(p.details?.media)
     ? (p.details.media as FeedCardProps['media'])
     : undefined;
+  const previews = Array.isArray(p.details?.previews)
+    ? (p.details.previews as FeedCardProps['previews'])
+    : undefined;
   return {
     title,
     handle,
@@ -30,5 +33,6 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     categoryIcons: icons,
     eyebrow: (p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined,
     media,
+    previews,
   };
 }

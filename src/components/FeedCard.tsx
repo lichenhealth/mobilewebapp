@@ -1,5 +1,6 @@
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
+import { LinkifiedText, CarePreview } from './CarePostCard';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -32,6 +33,12 @@ export interface FeedCardProps {
   media?: { type: 'photo' | 'video' | 'audio'; url: string }[];
   // Message the author (omit / undefined hides the button — e.g. your own post)
   onMessage?: () => void;
+  /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
+  onBadgeAction?: () => void;
+  /** Open the full page for this card (event page etc.) — title/body become links. */
+  onOpen?: () => void;
+  /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
+  previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
 }
 
 export default function FeedCard({
@@ -52,6 +59,9 @@ export default function FeedCard({
   eyebrow,
   media,
   onMessage,
+  onBadgeAction,
+  onOpen,
+  previews,
 }: FeedCardProps) {
   return (
     <article className="feed-card">
@@ -99,7 +109,9 @@ export default function FeedCard({
 
       {/* BODY */}
       <div className="feed-card__body">
-        <p className="feed-card__text">{body}</p>
+        {onOpen
+          ? <p className="feed-card__text feed-card__text--link" onClick={onOpen} role="link" tabIndex={0}><LinkifiedText text={body} /></p>
+          : <p className="feed-card__text"><LinkifiedText text={body} /></p>}
         {image && (
           <ImageBadge
             pattern={image.pattern}
@@ -107,9 +119,17 @@ export default function FeedCard({
             topLabel={image.topLabel}
             bottomLabel={image.bottomLabel}
             tone={image.tone ?? 'peach'}
+            onAction={onBadgeAction}
           />
         )}
       </div>
+
+      {/* LINK PREVIEWS (YouTube inline, OG cards) */}
+      {previews && previews.length > 0 && (
+        <div className="cpost__previews" onClick={(e) => e.stopPropagation()}>
+          {previews.map((pv, i) => <CarePreview key={i} p={pv} />)}
+        </div>
+      )}
 
       {/* INLINE MEDIA */}
       {media && media.length > 0 && (
@@ -147,20 +167,19 @@ interface ImageBadgeProps {
   topLabel: string;
   bottomLabel: string;
   tone: 'peach' | 'moss' | 'ink';
+  onAction?: () => void;
 }
 
-function ImageBadge({ src, pattern, topLabel, bottomLabel, tone }: ImageBadgeProps) {
+function ImageBadge({ src, pattern, topLabel, bottomLabel, tone, onAction }: ImageBadgeProps) {
   return (
     <div className={`badge badge--${tone}`}>
       <div className="badge__top">{topLabel}</div>
-      <div className="badge__image">
-        {src ? (
-          <img src={src} alt="" />
-        ) : (
-          <PatternArt name={pattern ?? 'sky'} />
-        )}
-      </div>
-      <button className="badge__bottom">{bottomLabel}</button>
+      {(src || pattern) && (
+        <div className="badge__image">
+          {src ? <img src={src} alt="" /> : <PatternArt name={pattern!} />}
+        </div>
+      )}
+      <button className="badge__bottom" onClick={onAction}>{bottomLabel}</button>
     </div>
   );
 }

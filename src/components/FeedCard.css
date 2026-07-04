@@ -253,3 +253,6 @@
   color: var(--ink);
 }
 .eng-btn.is-active .eng-btn__count { color: var(--peach); }
+
+.feed-card__text--link { cursor: pointer; }
+.feed-card__text--link:hover { color: var(--peach-deep); }

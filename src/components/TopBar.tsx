@@ -39,6 +39,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/calendar',    label: 'Calendar',    icon: 'calendar'      },
   { prefix: '/saved',       label: 'Saved',       icon: 'bookmark'      },
   { prefix: '/maps',        label: 'Maps',        icon: 'globe'         },
+  { prefix: '/events',      label: 'Events',      icon: 'rsvp'          },
   { prefix: '/profile',     label: 'Profile',     icon: 'profile'       },
   { prefix: '/work',        label: 'Work',        icon: 'briefcase'     },
   { prefix: '/events',      label: 'Events',      icon: 'sparkle'       },
@@ -118,7 +119,7 @@ export default function TopBar({
               {monogramFor(actor.name)}
             </span>
           ) : (
-            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={30} />
+            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={36} />
           )}
         </button>
         {showSettings && (

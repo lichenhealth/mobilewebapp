@@ -13,7 +13,7 @@ export function LinkifiedText({ text }: { text: string }) {
     <>
       {linkify(text).map((s, i) =>
         'url' in s ? (
-          <a key={i} className="cpost__inlink" href={hrefFor(s.url)} target="_blank" rel="noopener noreferrer">{s.url}</a>
+          <a key={i} className="cpost__inlink" href={hrefFor(s.url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>{s.url}</a>
         ) : (
           <span key={i}>{s.text}</span>
         ),
@@ -23,7 +23,7 @@ export function LinkifiedText({ text }: { text: string }) {
 }
 
 /** Rich preview of a link pasted in the body: inline YouTube, or an OG card. */
-function CarePreview({ p }: { p: CarePostPreview }) {
+export function CarePreview({ p }: { p: CarePostPreview }) {
   if (p.kind === 'youtube' && p.videoId) {
     return (
       <div className="cpost__yt">
