@@ -182,7 +182,7 @@ export default function Compose() {
       }
       try {
         await createPost({
-          body, title, content_type: contentType,
+          body, title, content_type: isEvent ? 'actionable' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...areas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
@@ -230,13 +230,19 @@ export default function Compose() {
         ))}
       </div>
 
-      <label className="cmp__label">Type</label>
-      <div className="cmp__chips">
-        {CONTENT_TYPES.map((t) => (
-          <button key={t.value} className={'cmp__chip' + (contentType === t.value ? ' is-on' : '')}
-            onClick={() => setContentType(t.value)}>{t.label}</button>
-        ))}
-      </div>
+      {/* Type is a posts concept — an event's type IS its category (and an
+          event post files as 'actionable' automatically). */}
+      {!isEvent && (
+        <>
+          <label className="cmp__label">Type</label>
+          <div className="cmp__chips">
+            {CONTENT_TYPES.map((t) => (
+              <button key={t.value} className={'cmp__chip' + (contentType === t.value ? ' is-on' : '')}
+                onClick={() => setContentType(t.value)}>{t.label}</button>
+            ))}
+          </div>
+        </>
+      )}
 
       <label className="cmp__label">Where (optional)</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
