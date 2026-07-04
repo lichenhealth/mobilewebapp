@@ -4,6 +4,10 @@ import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
 import { useNotifications } from '../notifications/NotificationsProvider';
+import { useActing } from '../acting/ActingProvider';
+import { useAuth } from '../auth/AuthProvider';
+import { colorFor, monogramFor } from '../lib/chatApi';
+import Avatar from './Avatar';
 import { scopeForPath } from '../lib/sections';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
@@ -55,6 +59,9 @@ export default function TopBar({
   const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
 
   const { unreadForScope } = useNotifications();
+  const { actor, self } = useActing();
+  const { user } = useAuth();
+  const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -71,7 +78,12 @@ export default function TopBar({
 
       <div className="top-bar__logo">
         {section ? (
-          section.custom && section.prefix === '/mycelium' ? (
+          section.prefix === '/profile' ? (
+            /* On Profile the section mark IS you — your photo, not a generic icon. */
+            <div className="top-bar__section-mark top-bar__section-mark--self" role="img" aria-label="Profile" title="Profile">
+              <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={64} />
+            </div>
+          ) : section.custom && section.prefix === '/mycelium' ? (
             <div
               className="top-bar__section-mark top-bar__section-mark--custom"
               role="img"
@@ -96,6 +108,20 @@ export default function TopBar({
       </div>
 
       <div className="top-bar__right">
+        <button
+          className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
+          onClick={() => navigate('/profile')}
+          title={actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
+          aria-label={actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
+        >
+          {actor.type === 'space' ? (
+            <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
+              {monogramFor(actor.name)}
+            </span>
+          ) : (
+            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={30} />
+          )}
+        </button>
         {showSettings && (
           <button
             className="top-bar__icon top-bar__settings"

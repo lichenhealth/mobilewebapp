@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
+import { supabase } from '../lib/supabase';
+import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
   createPost, uploadMedia, CONTENT_TYPES, SERVICE_AREAS,
-  type ContentType, type ServiceArea, type Visibility,
+  type ContentType, type ServiceArea,
 } from '../lib/postsApi';
 import './Compose.css';
 
@@ -16,14 +19,22 @@ type Attached = { type: MediaType; url: string };
 
 export default function Compose() {
   const { loading, user } = useAuth();
+  const { actor } = useActing();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
-  const [visibility, setVisibility] = useState<Visibility>('public');
+  // Audiences: Everyone is exclusive; Mycelium + spaces combine freely.
+  const [isPublic, setIsPublic] = useState(true);
+  const [toMycelium, setToMycelium] = useState(false);
+  const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(new Set());
+  const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
   const [contentType, setContentType] = useState<ContentType>('social');
-  const [serviceArea, setServiceArea] = useState<ServiceArea | ''>(
-    (params.get('area') as ServiceArea) || ''
-  );
+  // "Where": a post can live in several areas at once.
+  const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
+    const a = params.get('area') as ServiceArea | null;
+    return new Set(a ? [a] : []);
+  });
+  const [whereOpen, setWhereOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
@@ -46,7 +57,27 @@ export default function Compose() {
     if (!loading && !user) navigate('/login', { replace: true });
   }, [loading, user, navigate]);
 
-  const isMarket = serviceArea === 'marketplace';
+  // Every space I belong to (any role) is an audience option.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.from('space_members').select('spaces(id, name)').eq('profile_id', user.id);
+      setMySpaces(((data as unknown as { spaces: { id: string; name: string } | null }[] | null) ?? [])
+        .map((r) => r.spaces).filter((s): s is { id: string; name: string } => !!s));
+    })();
+  }, [user]);
+
+  const pickEveryone = () => { setIsPublic(true); setToMycelium(false); setAudienceSpaces(new Set()); };
+  const toggleMycelium = () => { setIsPublic(false); setToMycelium((v) => !v); };
+  const toggleSpace = (id: string) => {
+    setIsPublic(false);
+    setAudienceSpaces((cur) => { const n = new Set(cur); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleArea = (a: ServiceArea) =>
+    setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
+  const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
+
+  const isMarket = areas.has('marketplace');
 
   async function addMedia(file: Blob, ext: string, type: MediaType) {
     setUploading(true); setError('');
@@ -94,6 +125,7 @@ export default function Compose() {
 
   async function submit() {
     if (!body.trim()) { setError('Add a few words first.'); return; }
+    if (!hasAudience) { setError('Pick at least one audience.'); return; }
     setBusy(true); setError('');
     try {
       const details: Record<string, unknown> = {};
@@ -105,8 +137,11 @@ export default function Compose() {
       if (media.length) details.media = media;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
       await createPost({
-        body, title, content_type: contentType, visibility,
-        service_area: serviceArea || null, image_url: firstPhoto, details,
+        body, title, content_type: contentType,
+        isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
+        serviceAreas: [...areas],
+        authorSpaceId: actor.type === 'space' ? actor.id : null,
+        image_url: firstPhoto, details,
       });
       navigate('/home');
     } catch (e) {
@@ -126,11 +161,20 @@ export default function Compose() {
 
       {error && <p className="cmp__error">{error}</p>}
 
+      {actor.type === 'space' && (
+        <p className="cmp__acting">
+          <span className="cmp__acting-avatar" style={{ background: colorFor(actor.id) }}>{monogramFor(actor.name)}</span>
+          Posting as <strong>{actor.name}</strong>
+        </p>
+      )}
+
       <label className="cmp__label">Audience</label>
       <div className="cmp__chips">
-        {([['public', 'Everyone'], ['mycelium', 'My Mycelium']] as const).map(([v, label]) => (
-          <button key={v} className={'cmp__chip' + (visibility === v ? ' is-on' : '')}
-            onClick={() => setVisibility(v)}>{label}</button>
+        <button className={'cmp__chip' + (isPublic ? ' is-on' : '')} onClick={pickEveryone}>Everyone</button>
+        <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')} onClick={toggleMycelium}>My Mycelium</button>
+        {mySpaces.map((sp) => (
+          <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
+            onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
         ))}
       </div>
 
@@ -142,12 +186,27 @@ export default function Compose() {
         ))}
       </div>
 
-      <label className="cmp__label" htmlFor="cmp-area">Area (optional)</label>
-      <select id="cmp-area" className="cmp__input" value={serviceArea}
-        onChange={(e) => setServiceArea(e.target.value as ServiceArea | '')}>
-        <option value="">— None (just a post) —</option>
-        {SERVICE_AREAS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-      </select>
+      <label className="cmp__label">Where (optional)</label>
+      <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
+        {areas.size === 0 ? <span className="cmp__where-none">— Anywhere (just a post) —</span> : (
+          <span className="cmp__where-sel">
+            {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
+              <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
+            ))}
+          </span>
+        )}
+        <span className={'cmp__where-caret' + (whereOpen ? ' is-open' : '')}><Icon name="chevron-right" size={14} /></span>
+      </button>
+      {whereOpen && (
+        <div className="cmp__where-list">
+          {SERVICE_AREAS.map((a) => (
+            <label key={a.value} className="cmp__where-row">
+              <input type="checkbox" checked={areas.has(a.value)} onChange={() => toggleArea(a.value)} />
+              <Icon name={a.icon} size={14} /> {a.label}
+            </label>
+          ))}
+        </div>
+      )}
 
       <label className="cmp__label" htmlFor="cmp-title">Title (optional)</label>
       <input id="cmp-title" className="cmp__input" value={title}

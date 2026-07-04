@@ -34,9 +34,14 @@ export type NewPost = {
   body: string;
   title?: string;
   content_type: ContentType;
-  visibility: Visibility;
-  space_id?: string | null;
-  service_area?: ServiceArea | null;
+  // v2 audiences: any combination (Everyone is UI-exclusive).
+  isPublic: boolean;
+  toMycelium: boolean;
+  audienceSpaceIds: string[];
+  // v2: a post can live in several areas at once (Courses AND Marketplace).
+  serviceAreas: ServiceArea[];
+  // v2: posted as a space you admin ("acting as"); null = personal.
+  authorSpaceId?: string | null;
   image_url?: string | null;
   details?: Record<string, unknown>;
 };
@@ -54,14 +59,23 @@ export async function uploadMedia(file: Blob, ext: string): Promise<string> {
 export async function createPost(input: NewPost) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
+  // Legacy columns still written (visibility / space_id / service_area) so any
+  // not-yet-refreshed client keeps rendering new posts during the transition;
+  // the DB bridge trigger backstops both directions.
+  const visibility: Visibility = input.isPublic ? 'public' : input.toMycelium ? 'mycelium' : 'space';
   const { data, error } = await supabase.from('posts').insert({
     author_id: user.id,
+    author_space_id: input.authorSpaceId ?? null,
     body: input.body.trim(),
     title: input.title?.trim() || null,
     content_type: input.content_type,
-    visibility: input.visibility,
-    space_id: input.space_id ?? null,
-    service_area: input.service_area ?? null,
+    is_public: input.isPublic,
+    to_mycelium: input.toMycelium,
+    audience_space_ids: input.audienceSpaceIds,
+    visibility,
+    space_id: visibility === 'space' ? (input.audienceSpaceIds[0] ?? null) : null,
+    service_areas: input.serviceAreas,
+    service_area: input.serviceAreas[0] ?? null,
     image_url: input.image_url ?? null,
     details: input.details ?? {},
   }).select('id').single();
@@ -72,22 +86,34 @@ export async function createPost(input: NewPost) {
 export type FeedPost = {
   id: string;
   author_id: string;
+  author_space_id: string | null;
   title: string | null;
   body: string;
   content_type: ContentType;
-  service_area: ServiceArea | null;
-  visibility: Visibility;
+  service_area: ServiceArea | null;      // legacy single (kept during transition)
+  service_areas: ServiceArea[];
+  visibility: Visibility;                // legacy (kept during transition)
+  is_public: boolean;
+  to_mycelium: boolean;
+  audience_space_ids: string[];
   image_url: string | null;
   details: Record<string, unknown>;
   created_at: string;
-  author: { full_name: string | null; handle: string | null } | null;
+  author: { full_name: string | null; handle: string | null; avatar_url: string | null } | null;
+  author_space: { name: string; kind: string } | null;
 };
+
+/** Every area a post lives in (new array first, legacy single as fallback). */
+export function postAreas(p: Pick<FeedPost, 'service_area' | 'service_areas'>): ServiceArea[] {
+  if (p.service_areas?.length) return p.service_areas;
+  return p.service_area ? [p.service_area] : [];
+}
 
 // RLS scopes this to what the viewer may see: public + their spaces + mycelium + own.
 export async function loadFeed(): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')
-    .select('id, author_id, title, body, content_type, service_area, visibility, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle)')
+    .select('id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind)')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { console.error('loadFeed', error); return []; }

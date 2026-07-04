@@ -6,7 +6,7 @@ import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { FEED } from '../data/feed';
 import {
-  loadFeed, CONTENT_TYPES, SERVICE_AREAS,
+  loadFeed, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
@@ -37,7 +37,7 @@ type Item = {
   card: FeedCardProps;
   kind: Kind;
   contentLabel: string;       // matches a CONTENT_FILTERS entry
-  area: ServiceArea | null;
+  areas: ServiceArea[];       // a post can live in several areas
 };
 
 // Demo cards (until your web fills with real posts), tagged so the filters bite.
@@ -82,14 +82,19 @@ export default function Mycelium() {
   // Build the combined feed: real posts from entities in your mycelium, then demo cards.
   const items = useMemo<Item[]>(() => {
     const real: Item[] = posts
-      .filter((p) => myMyc.has('profile:' + p.author_id))
+      // Trusted authors (person or the space they posted as) — and always your
+      // own posts, so what you share to your mycelium shows in your own web.
+      .filter((p) =>
+        myMyc.has('profile:' + p.author_id)
+        || (p.author_space_id != null && myMyc.has('space:' + p.author_space_id))
+        || p.author_id === user?.id)
       .map((p) => ({
         key: p.id,
         kind: 'person', // real author kinds light up once entities generalize
         contentLabel: CT_LABEL[p.content_type] ?? 'Social',
-        area: p.service_area,
+        areas: postAreas(p),
         card: {
-          ...postToCard(p),
+          ...postToCard(p, user?.id),
           trusted: myMyc.has('profile:' + p.author_id),
           recommended: myRecs.has(p.id),
           mycelium: overlays[p.id],
@@ -99,11 +104,16 @@ export default function Mycelium() {
           onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));
-    const mock: Item[] = FEED.map((card, i) => ({
-      key: 'mock-' + i,
-      card,
-      ...MOCK_META[i % MOCK_META.length],
-    }));
+    const mock: Item[] = FEED.map((card, i) => {
+      const meta = MOCK_META[i % MOCK_META.length];
+      return {
+        key: 'mock-' + i,
+        card,
+        kind: meta.kind,
+        contentLabel: meta.contentLabel,
+        areas: meta.area ? [meta.area] : [],
+      };
+    });
     return [...real, ...mock];
   }, [posts, myMyc, myRecs, overlays, user]);
 
@@ -111,7 +121,7 @@ export default function Mycelium() {
     () => items.filter((it) =>
       (content === 'All' || it.contentLabel === content) &&
       (kinds.length === 0 || kinds.includes(it.kind)) &&
-      (areas.length === 0 || (it.area != null && areas.includes(it.area)))
+      (areas.length === 0 || it.areas.some((a) => areas.includes(a)))
     ),
     [items, content, kinds, areas]
   );

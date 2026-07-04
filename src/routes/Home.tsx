@@ -72,7 +72,7 @@ export default function Home() {
         {posts.map((p) => (
           <FeedCard
             key={p.id}
-            {...postToCard(p)}
+            {...postToCard(p, user?.id)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has(p.id)}
             mycelium={overlays[p.id]}

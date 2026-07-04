@@ -120,3 +120,42 @@
   border: 1px solid var(--peach-light); border-radius: var(--r-full);
   padding: 4px 12px;
 }
+
+/* ── Acting-as switcher ── */
+.prof__acting-list { display: flex; flex-direction: column; gap: 6px; }
+.prof__acting-row {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: 8px 12px; border-radius: var(--r-md); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); cursor: pointer;
+}
+.prof__acting-row:hover { border-color: var(--ink-muted); }
+.prof__acting-row.is-on { border-color: var(--peach); box-shadow: 0 0 0 1px var(--peach); }
+.prof__acting-avatar {
+  width: 34px; height: 34px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-style: italic; font-size: 14px; color: var(--bone-warm);
+}
+.prof__acting-name { font-size: 14px; color: var(--ink); margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prof__acting-kind {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-soft); background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full); padding: 2px 7px; flex-shrink: 0;
+}
+.prof__acting-on {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fff; background: var(--peach); border-radius: var(--r-full); padding: 3px 8px; flex-shrink: 0;
+}
+
+/* Profile picture (header) */
+.prof__avatar-btn {
+  position: relative; margin: 0 auto var(--s-3); display: block;
+  border-radius: var(--r-full); cursor: pointer; background: none; border: 0; padding: 0;
+}
+.prof__avatar-btn:disabled { opacity: 0.6; }
+.prof__avatar-edit {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 24px; height: 24px; border-radius: var(--r-full);
+  background: var(--peach); color: #fff; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--bone);
+}

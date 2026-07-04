@@ -1,0 +1,5 @@
+.avatar { border-radius: var(--r-full); object-fit: cover; flex-shrink: 0; display: inline-block; }
+.avatar--mono {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-style: italic; color: var(--bone-warm);
+}
