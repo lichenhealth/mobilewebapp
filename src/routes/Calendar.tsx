@@ -65,6 +65,13 @@ export default function Calendar() {
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
 
+  // Searched-calendar overlays: ephemeral side-by-side schedules (person or
+  // space), each a dismissible chip. Re-search to bring one back — no saving.
+  interface CalOverlay { kind: 'profile' | 'space'; id: string; name: string }
+  const [overlays, setOverlays] = useState<CalOverlay[]>([]);
+  const [overlayRows, setOverlayRows] = useState<Record<string, FreeBusyRow[]>>({});
+  const [calResults, setCalResults] = useState<CalOverlay[]>([]);
+
   // Visible days per view; month uses its own cell range.
   const days = useMemo(() => {
     if (view === 'month') return monthCells(anchor);
@@ -146,6 +153,54 @@ export default function Calendar() {
       .filter((e) => e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q))
       .slice(0, 12);
   }, [query, searchPool]);
+
+  // Search CALENDARS too: members by name, spaces by name.
+  useEffect(() => {
+    const q = query.trim();
+    if (!searchOpen || q.length < 2) { setCalResults([]); return; }
+    let live = true;
+    (async () => {
+      const [pRes, sRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${q}%`).neq('id', me).limit(5),
+        supabase.from('spaces').select('id, name').ilike('name', `%${q}%`).limit(5),
+      ]);
+      if (!live) return;
+      setCalResults([
+        ...(((pRes.data as { id: string; full_name: string | null }[] | null) ?? [])
+          .map((p) => ({ kind: 'profile' as const, id: p.id, name: p.full_name || 'Member' }))),
+        ...(((sRes.data as { id: string; name: string }[] | null) ?? [])
+          .map((s) => ({ kind: 'space' as const, id: s.id, name: s.name }))),
+      ]);
+    })();
+    return () => { live = false; };
+  }, [query, searchOpen, me]);
+
+  // Fetch each overlay's schedule for the visible window. A person's calendar
+  // comes through free_busy (their visibility rules applied — busy blocks, or
+  // titles if they've granted details); a space's is its own events.
+  useEffect(() => {
+    if (overlays.length === 0) { setOverlayRows({}); return; }
+    let live = true;
+    (async () => {
+      const entries = await Promise.all(overlays.map(async (o): Promise<[string, FreeBusyRow[]]> => {
+        if (o.kind === 'profile') return [o.id, await freeBusy([o.id], from, to)];
+        const evs = await loadSpaceEvents(o.id, from, to);
+        return [o.id, evs.map((e) => ({
+          profile_id: o.id, level: 'details' as const,
+          start_date: e.start_date, end_date: e.end_date, all_day: e.all_day,
+          start_min: e.start_min, end_min: e.end_min, recurrence: e.recurrence, title: e.title,
+        }))];
+      }));
+      if (live) setOverlayRows(Object.fromEntries(entries));
+    })();
+    return () => { live = false; };
+  }, [overlays, from, to]);
+
+  const addOverlay = (o: CalOverlay) => {
+    setOverlays((cur) => (cur.some((x) => x.id === o.id) ? cur : [...cur, o]));
+    setSearchOpen(false); setQuery('');
+  };
+  const removeOverlay = (id: string) => setOverlays((cur) => cur.filter((o) => o.id !== id));
 
   const page = (dir: 1 | -1) => {
     if (view === 'month') setAnchor(addMonths(anchor, dir));
@@ -241,9 +296,20 @@ export default function Calendar() {
         {searchOpen && (
           <div className="calp__search">
             <input
-              className="calp__search-input" placeholder="Search events…" autoFocus
+              className="calp__search-input" placeholder="Search events & calendars…" autoFocus
               value={query} onChange={(e) => setQuery(e.target.value)}
             />
+            {calResults.length > 0 && <p className="calp__result-head">Calendars</p>}
+            {calResults.map((c) => (
+              <button className="calp__result" key={c.kind + c.id} onClick={() => addOverlay(c)}>
+                <span className="calp__result-title">
+                  <span className="calp__ovdot" style={{ background: colorFor(c.id) }} />
+                  {c.name}
+                </span>
+                <span className="calp__result-when">{c.kind === 'profile' ? 'member' : 'space'} · overlay</span>
+              </button>
+            ))}
+            {calResults.length > 0 && results.length > 0 && <p className="calp__result-head">Events</p>}
             {results.map((e) => (
               <button className="calp__result" key={e.id} onClick={() => { setSearchOpen(false); setQuery(''); jumpToDay(e.start_date); }}>
                 <span className="calp__result-title">{e.title}</span>
@@ -253,7 +319,22 @@ export default function Calendar() {
                 </span>
               </button>
             ))}
-            {query.trim() && results.length === 0 && <p className="calp__result-none">No matching events.</p>}
+            {query.trim() && results.length === 0 && calResults.length === 0 && (
+              <p className="calp__result-none">No matching events or calendars.</p>
+            )}
+          </div>
+        )}
+
+        {/* Overlaid calendars (from search) — dismissible, never saved */}
+        {overlays.length > 0 && (
+          <div className="calp__ovchips">
+            {overlays.map((o) => (
+              <span className="calp__ovchip" key={o.id} style={{ borderColor: colorFor(o.id) }}>
+                <span className="calp__ovdot" style={{ background: colorFor(o.id) }} />
+                {o.name}
+                <button className="calp__ovx" onClick={() => removeOverlay(o.id)} aria-label={`Remove ${o.name}`}>×</button>
+              </span>
+            ))}
           </div>
         )}
         {view !== 'month' && (
@@ -340,6 +421,22 @@ export default function Calendar() {
                         />
                       );
                     })}
+                  {/* Searched-calendar overlays: their schedule beside yours */}
+                  {overlays.map((o) =>
+                    (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r, i) => {
+                      const c = colorFor(o.id);
+                      const top = r.all_day ? 0 : (((r.start_min ?? 0) / 60) * HOUR_PX);
+                      const height = r.all_day ? 24 * HOUR_PX : Math.max(17, (((r.end_min ?? 60) - (r.start_min ?? 0)) / 60) * HOUR_PX);
+                      return (
+                        <span
+                          className="calp__ovblock" key={`${o.id}-${i}-${iso}`}
+                          style={{ top, height, borderColor: c, background: `color-mix(in srgb, ${c} 16%, transparent)` }}
+                          title={`${o.name}: ${r.title ?? 'busy'}`}
+                        >
+                          {r.title ?? `${o.name} · busy`}
+                        </span>
+                      );
+                    }))}
                   {timedOn(iso).map((e) => {
                     const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
                     const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);

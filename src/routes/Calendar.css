@@ -48,6 +48,32 @@
 .calp__result-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calp__result-when { font-family: var(--font-mono); font-size: 10px; color: var(--peach-deep); flex-shrink: 0; }
 .calp__result-none { font-size: 12px; color: var(--ink-faint); padding: 2px 4px; }
+.calp__result-head {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); padding: 4px 4px 0;
+}
+
+/* Searched-calendar overlays: chips above the grid + tinted blocks within it */
+.calp__ovchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.calp__ovchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 10px; border-radius: var(--r-full);
+  border: 1.5px solid; background: var(--bone-warm);
+  font-size: 12px; color: var(--ink);
+}
+.calp__ovdot { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; display: inline-block; margin-right: 4px; }
+.calp__ovx {
+  width: 18px; height: 18px; border-radius: var(--r-full); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); font-size: 13px;
+}
+.calp__ovx:hover { background: var(--bone-deep); color: var(--ink); }
+.calp__ovblock {
+  position: absolute; left: 2px; right: 2px; z-index: 0; pointer-events: none;
+  border: 1.5px solid; border-radius: 7px;
+  font-size: 9px; font-weight: 500; line-height: 1.25; padding: 2px 4px;
+  color: var(--ink-soft); overflow: hidden;
+}
 
 .calp__nav { display: flex; align-items: center; gap: var(--s-2); }
 .calp__navbtn {
