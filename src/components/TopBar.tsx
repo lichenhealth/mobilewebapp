@@ -119,7 +119,7 @@ export default function TopBar({
               {monogramFor(actor.name)}
             </span>
           ) : (
-            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={30} />
+            <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={36} />
           )}
         </button>
         {showSettings && (

@@ -114,10 +114,12 @@
 /* "Acting as" chip: visible whenever you're not yourself, so you never post
    as the org by accident. Peach ring = switched identity. */
 .top-bar__acting {
+  /* Same footprint as the bell: 38px circle, photo fills it edge to edge. */
   width: 38px; height: 38px; border-radius: var(--r-full); flex-shrink: 0;
-  border: 1px solid var(--bone-edge); background: transparent; padding: 2px;
+  border: 1px solid var(--ink); background: transparent; padding: 0; overflow: hidden;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
+.top-bar__acting .avatar { width: 100% !important; height: 100% !important; }
 .top-bar__acting.is-entity { border: 2px solid var(--peach); }
 .top-bar__acting-avatar {
   width: 100%; height: 100%; border-radius: var(--r-full);
