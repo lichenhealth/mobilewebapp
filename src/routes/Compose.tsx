@@ -16,7 +16,6 @@ import TimeField from '../components/TimeField';
 import { todayISO } from '../lib/conciergeApi';
 import './Compose.css';
 
-const MARKET_MODES = ['gift', 'trade', 'rent', 'lend', 'sliding', 'sale'] as const;
 
 type MediaType = 'photo' | 'video' | 'audio';
 type Attached = { type: MediaType; url: string };
@@ -43,7 +42,10 @@ export default function Compose() {
   // Event details (when Where includes 'events'): the post gets a REAL
   // calendar event behind it — the RSVP container.
   const [evCategory, setEvCategory] = useState<EventCategory>('experiences');
-  const [evMode, setEvMode] = useState<EventMode>('free');
+  // Unified offer mode: events use free|trade|paid; marketplace-only listings
+  // additionally get lend|rent (you can't rent someone an event).
+  type OfferMode = EventMode | 'lend' | 'rent';
+  const [evMode, setEvMode] = useState<OfferMode>('free');
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
   const [evStartMin, setEvStartMin] = useState(18 * 60);
@@ -56,7 +58,6 @@ export default function Compose() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
-  const [mode, setMode] = useState<typeof MARKET_MODES[number]>('sale');
   const [location, setLocation] = useState('');
 
   // media
@@ -97,6 +98,10 @@ export default function Compose() {
 
   const isMarket = areas.has('marketplace');
   const isEvent = areas.has('events');
+  // Events narrow the mode set — clamp lend/rent if events joins the areas.
+  useEffect(() => {
+    if (isEvent && (evMode === 'lend' || evMode === 'rent')) setEvMode('paid');
+  }, [isEvent, evMode]);
 
   async function addMedia(file: Blob, ext: string, type: MediaType) {
     setUploading(true); setError('');
@@ -149,12 +154,7 @@ export default function Compose() {
     setBusy(true); setError('');
     try {
       const details: Record<string, unknown> = {};
-      if (isMarket) {
-        if (price.trim()) details.price = price.trim();
-        details.mode = mode;
-        if (location.trim()) details.location = location.trim();
-      }
-      if (isEvent) {
+      if (isMarket || isEvent) {
         if (evMode === 'paid') {
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
             details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
@@ -162,10 +162,16 @@ export default function Compose() {
           } else if (price.trim()) {
             details.price = price.trim();
           }
-          if (bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
+          if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (evMode === 'trade' && tradeFor.trim()) details.trade = tradeFor.trim();
         if (location.trim()) details.location = location.trim();
+        if (isMarket) {
+          // Marketplace-compatible mode vocabulary.
+          details.mode = evMode === 'free' ? 'gift'
+            : evMode === 'paid' ? (sliding ? 'sliding' : 'sale')
+            : evMode;
+        }
       }
       if (media.length) details.media = media;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
@@ -195,7 +201,7 @@ export default function Compose() {
           serviceAreas: [...areas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
           eventCategory: isEvent ? evCategory : null,
-          eventMode: isEvent ? evMode : null,
+          eventMode: isEvent ? (evMode as EventMode) : null,
           linkedEventId,
           image_url: firstPhoto, details,
         });
@@ -312,45 +318,41 @@ export default function Compose() {
         </div>
       )}
 
-      {isMarket && (
+      {(isEvent || isMarket) && (
         <div className="cmp__market">
-          <p className="cmp__market-head">Marketplace details</p>
-          <div className="cmp__row">
-            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $425)" />
-            <select className="cmp__input" value={mode} onChange={(e) => setMode(e.target.value as typeof MARKET_MODES[number])}>
-              {MARKET_MODES.map((m) => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
-            </select>
-          </div>
-          <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (e.g. Wallowa, OR)" />
-        </div>
-      )}
-
-      {isEvent && (
-        <div className="cmp__market">
-          <p className="cmp__market-head">Event details</p>
-          <label className="cmp__label">Category</label>
+          <p className="cmp__market-head">{isEvent ? 'Event details' : 'Marketplace details'}</p>
+          {isEvent && (
+            <>
+              <label className="cmp__label">Category</label>
+              <div className="cmp__chips">
+                {EVENT_CATEGORIES.map((c) => (
+                  <button key={c.value} className={'cmp__chip' + (evCategory === c.value ? ' is-on' : '')}
+                    onClick={() => setEvCategory(c.value)}>{c.label}</button>
+                ))}
+              </div>
+            </>
+          )}
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Gift, trade, lend, rent, or paid?'}</label>
           <div className="cmp__chips">
-            {EVENT_CATEGORIES.map((c) => (
-              <button key={c.value} className={'cmp__chip' + (evCategory === c.value ? ' is-on' : '')}
-                onClick={() => setEvCategory(c.value)}>{c.label}</button>
-            ))}
-          </div>
-          <label className="cmp__label">Free, trade, or paid?</label>
-          <div className="cmp__chips cmp__chips--modes">
-            {EVENT_MODES.map((m) => (
-              <button key={m.value} className={'cmp__chip' + (evMode === m.value ? ' is-on' : '')}
-                onClick={() => setEvMode(m.value)}>{m.label}</button>
-            ))}
-            {evMode === 'paid' && (
-              <label className="cmp__sliding">
-                <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
-              </label>
+            <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
+            <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
+            {!isEvent && (
+              <>
+                <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => setEvMode('lend')}>Lend</button>
+                <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>
+              </>
             )}
+            <button className={'cmp__chip' + (evMode === 'paid' ? ' is-on' : '')} onClick={() => setEvMode('paid')}>Paid</button>
           </div>
+          {evMode === 'paid' && (
+            <label className="cmp__sliding">
+              <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
+            </label>
+          )}
           {evMode === 'paid' && !sliding && (
             <div className="cmp__row">
               <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45)" />
-              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
+              {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
             </div>
           )}
           {evMode === 'paid' && sliding && (
@@ -359,8 +361,11 @@ export default function Compose() {
                 <input className="cmp__input" value={slideLow} onChange={(e) => setSlideLow(e.target.value)} placeholder="From (e.g. $20)" />
                 <input className="cmp__input" value={slideHigh} onChange={(e) => setSlideHigh(e.target.value)} placeholder="To (e.g. $60)" />
               </div>
-              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
+              {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
             </>
+          )}
+          {(evMode === 'lend' || evMode === 'rent') && (
+            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={evMode === 'rent' ? 'Rate (e.g. $20/day)' : 'Terms (e.g. return within a week)'} />
           )}
           {evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
@@ -369,17 +374,21 @@ export default function Compose() {
           <label className="cmp__label">Location</label>
           <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Address, place, or video link" />
 
-          <label className="cmp__label">When</label>
-          <label className="cmp__evrow"><input type="checkbox" checked={evAllDay} onChange={(e) => setEvAllDay(e.target.checked)} /> All day</label>
-          {!evAllDay && (
-            <div className="cmp__row cmp__row--times">
-              <TimeField value={evStartMin} onChange={(m) => { setEvStartMin(m); if (evEndMin <= m) setEvEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
-              <span className="cmp__to">to</span>
-              <TimeField value={evEndMin} onChange={setEvEndMin} min={evRange.start === (evRange.end ?? evRange.start) ? evStartMin : undefined} ariaLabel="End time" />
-            </div>
+          {isEvent && (
+            <>
+              <label className="cmp__label">When</label>
+              <label className="cmp__evrow"><input type="checkbox" checked={evAllDay} onChange={(e) => setEvAllDay(e.target.checked)} /> All day</label>
+              {!evAllDay && (
+                <div className="cmp__row cmp__row--times">
+                  <TimeField value={evStartMin} onChange={(m) => { setEvStartMin(m); if (evEndMin <= m) setEvEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
+                  <span className="cmp__to">to</span>
+                  <TimeField value={evEndMin} onChange={setEvEndMin} min={evRange.start === (evRange.end ?? evRange.start) ? evStartMin : undefined} ariaLabel="End time" />
+                </div>
+              )}
+              <DateRangeCalendar value={evRange} onChange={setEvRange} />
+              <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
+            </>
           )}
-          <DateRangeCalendar value={evRange} onChange={setEvRange} />
-          <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
         </div>
       )}
 
