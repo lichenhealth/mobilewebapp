@@ -31,6 +31,35 @@ export function parseBodyUrls(text: string): string[] {
   return [...new Set(urls)];
 }
 
+/** What kind of place is an event's location? A video-call link (Zoom, Meet…),
+ *  some other URL, or a physical address (→ Google Maps directions). */
+export type LocationInfo =
+  | { type: 'video'; service: string; url: string }
+  | { type: 'link'; url: string }
+  | { type: 'address'; mapsUrl: string };
+
+const VIDEO_HOSTS: [RegExp, string][] = [
+  [/(^|\.)zoom\.us$/, 'Zoom'],
+  [/^meet\.google\.com$/, 'Google Meet'],
+  [/(^|\.)teams\.microsoft\.com$/, 'Microsoft Teams'],
+  [/(^|\.)whereby\.com$/, 'Whereby'],
+  [/(^|\.)webex\.com$/, 'Webex'],
+];
+
+export function locationInfo(loc: string): LocationInfo | null {
+  const t = loc.trim();
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) {
+    const url = hrefFor(t);
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      for (const [re, service] of VIDEO_HOSTS) if (re.test(host)) return { type: 'video', service, url };
+    } catch { /* not parseable — treat as plain link */ }
+    return { type: 'link', url };
+  }
+  return { type: 'address', mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t)}` };
+}
+
 /** YouTube video id from watch / youtu.be / shorts / embed / live URLs, else null. */
 export function youtubeId(url: string): string | null {
   try {

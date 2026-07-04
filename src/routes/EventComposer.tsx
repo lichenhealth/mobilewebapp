@@ -7,9 +7,11 @@ import TimeField from '../components/TimeField';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
-import { todayISO } from '../lib/conciergeApi';
+import { todayISO, formatDateShort } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel } from '../lib/recurrence';
-import { createEvent, updateEvent, loadEvent } from '../lib/calendarApi';
+import { createEvent, updateEvent, loadEvent, minToLabel } from '../lib/calendarApi';
+import { LinkifiedText } from '../components/CarePostCard';
+import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -56,23 +58,34 @@ export default function EventComposer() {
       setSpaces(sp);
       const mem = (memRes.data as MemberOpt[] | null) ?? [];
       setMembers(mem);
-
-      // Prefill from a find-a-time slot link (?space&date&start&inv=…).
-      if (!eventId) {
-        const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qInv = params.get('inv');
-        if (qSpace) setCalendar(qSpace);
-        if (qDate) setRange({ start: qDate, end: qDate });
-        if (qStart) {
-          const s = Number(qStart);
-          if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
-        }
-        if (qInv) {
-          const ids = qInv.split(',').filter(Boolean);
-          setInvitees(ids.map((id) => mem.find((m) => m.id === id) ?? { id, full_name: null }));
-        }
-      }
+      // Hydrate names of any query-prefilled invitees now that we know members.
+      setInvitees((cur) => cur.map((i) => i.full_name ? i : (mem.find((m) => m.id === i.id) ?? i)));
     })();
-  }, [me, eventId, params]);
+  }, [me, eventId]);
+
+  // Prefill from a slot click/drag or find-a-time link (?date&start&end&space&inv).
+  // Synchronous on mount — must never wait on (or be skipped by) network calls.
+  useEffect(() => {
+    if (eventId) return;
+    const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qEnd = params.get('end'), qInv = params.get('inv');
+    if (qSpace) setCalendar(qSpace);
+    if (qDate) setRange({ start: qDate, end: qDate });
+    if (qStart) {
+      const s = Number(qStart);
+      if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
+    }
+    if (qEnd) {
+      const en = Number(qEnd);
+      if (Number.isFinite(en) && en > 0) setEndMin(Math.min(en, 1440));
+    }
+    if (qInv) {
+      const ids = [...new Set(qInv.split(',').filter(Boolean))];
+      setInvitees((cur) => {
+        const have = new Set(cur.map((i) => i.id));
+        return [...cur, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, full_name: null }))];
+      });
+    }
+  }, [eventId, params]);
 
   // Edit mode: prefill from the existing event.
   useEffect(() => {
@@ -135,6 +148,27 @@ export default function EventComposer() {
     }
   }
 
+  // Time + repeat controls: rendered in-flow on mobile, in the right column on
+  // desktop (per the founder's layout sketch). Same state either way.
+  const whenControls = (
+    <>
+      <label className="rec__radio">
+        <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
+      </label>
+      {!allDay && (
+        <div className="rec__row">
+          <TimeField value={startMin} onChange={(m) => { setStartMin(m); if (endMin <= m) setEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
+          <span className="rec__lbl">to</span>
+          <TimeField value={endMin} onChange={setEndMin} min={range.start === (range.end ?? range.start) ? startMin : undefined} ariaLabel="End time" />
+        </div>
+      )}
+      <RecurrenceSelect
+        anchor={anchor} recurrence={recurrence}
+        onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
+      />
+    </>
+  );
+
   return (
     <div className="cedit">
       <header className="cedit__head">
@@ -147,6 +181,7 @@ export default function EventComposer() {
 
       {error && <p className="cedit__error">{error}</p>}
 
+      <div className="cedit__cols">
       <div className="cedit__body">
         <input
           className="cedit__input" placeholder="Event title"
@@ -162,23 +197,14 @@ export default function EventComposer() {
           </select>
         </div>
 
-        {/* When */}
-        <div className="cedit__field">
+        {/* When (times + repeat) — on desktop this block renders in the right
+            column instead (see whenControls below); the DATE picker stays here. */}
+        <div className="cedit__field only-mobile">
           <span className="cedit__label">When</span>
-          <label className="rec__radio">
-            <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
-          </label>
-          {!allDay && (
-            <div className="rec__row">
-              <TimeField value={startMin} onChange={(m) => { setStartMin(m); if (endMin <= m) setEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
-              <span className="rec__lbl">to</span>
-              <TimeField value={endMin} onChange={setEndMin} min={range.start === (range.end ?? range.start) ? startMin : undefined} ariaLabel="End time" />
-            </div>
-          )}
-          <RecurrenceSelect
-            anchor={anchor} recurrence={recurrence}
-            onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
-          />
+          {whenControls}
+        </div>
+        <div className="cedit__field">
+          <span className="cedit__label">Date</span>
           <DateRangeCalendar
             value={recurrence ? { start: range.start, end: range.start } : range}
             onChange={(r) => setRange(recurrence ? { start: r.start, end: r.start } : r)}
@@ -190,7 +216,7 @@ export default function EventComposer() {
 
         {/* Invitees */}
         <div className="cedit__field">
-          <span className="cedit__label">Invite people</span>
+          <span className="cedit__label">Invite People, Groups, Communities, Organizations, and/or Places</span>
           {invitees.length > 0 && (
             <div className="calp__invitees">
               {invitees.map((m) => (
@@ -225,6 +251,41 @@ export default function EventComposer() {
           <span className="cedit__label">Notes</span>
           <textarea className="cedit__textarea" rows={3} placeholder="Details (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
+      </div>
+
+      {/* Right column (desktop): time controls + live invite preview */}
+      <aside className="evprev" aria-label="Invite preview">
+        <div className="cedit__field only-desktop evprev__when">
+          <span className="cedit__label">When</span>
+          {whenControls}
+        </div>
+        <p className="evprev__eyebrow">Invite preview</p>
+        <div className="evprev__card">
+          <h2 className="calp__sheet-title">{title.trim() || 'Untitled event'}</h2>
+          <p className="calp__sheet-when">
+            {range.start ? formatDateShort(range.start) : '—'}
+            {!recurrence && range.end && range.end !== range.start ? ` – ${formatDateShort(range.end)}` : ''}
+            {allDay ? ' · All day' : ` · ${minToLabel(startMin)} – ${minToLabel(endMin)}`}
+            {recurrence && range.start && ` · ${recurrenceLabel(recurrence, range.start)}`}
+          </p>
+          {location.trim() && <SmartLocation loc={location.trim()} className="calp__sheet-loc" />}
+          {description.trim() && <p className="calp__sheet-desc"><LinkifiedText text={description} /></p>}
+          {invitees.length > 0 && (
+            <div className="calp__sheet-people">
+              {invitees.map((m) => (
+                <span className="calp__person" key={m.id}>
+                  <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
+                  <span className="calp__person-name">{m.full_name ?? 'Member'}</span>
+                  <span className="calp__person-status">?</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="evprev__from">
+            {calendar === 'me' ? 'On your calendar' : `On ${spaces.find((s) => s.id === calendar)?.name ?? 'a space calendar'}`}
+          </p>
+        </div>
+      </aside>
       </div>
     </div>
   );

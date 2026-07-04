@@ -4,6 +4,33 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { LinkifiedText } from '../components/CarePostCard';
+import { locationInfo } from '../lib/linkify';
+
+/** Location line: video links say "Join Zoom/Meet…", other URLs are plain
+ *  links, physical addresses tap out to Google Maps directions. */
+export function SmartLocation({ loc, className }: { loc: string; className: string }) {
+  const info = locationInfo(loc);
+  if (!info) return null;
+  if (info.type === 'video') {
+    return (
+      <a className={className} href={info.url} target="_blank" rel="noopener noreferrer">
+        <Icon name="video" size={13} /> Join {info.service}
+      </a>
+    );
+  }
+  if (info.type === 'link') {
+    return (
+      <a className={className} href={info.url} target="_blank" rel="noopener noreferrer">
+        <Icon name="globe" size={13} /> {loc}
+      </a>
+    );
+  }
+  return (
+    <a className={className} href={info.mapsUrl} target="_blank" rel="noopener noreferrer">
+      <Icon name="location" size={13} /> {loc}
+    </a>
+  );
+}
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
@@ -138,7 +165,7 @@ export default function Calendar() {
     const el = gridRef.current;
     if (!el) return;
     // Land 7am just below the pinned toolbar+day-header stack.
-    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 230;
+    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 210;
     if (y > 0) window.scrollTo({ top: y });
   }, [view]);
 
@@ -228,23 +255,61 @@ export default function Calendar() {
   };
   const jumpToDay = (iso: string) => { setAnchor(iso); setView('day'); };
 
+  // Drag-to-create (mouse): press on an empty slot and drag — an orange box
+  // grows with the selection; release opens the composer with that span.
+  // A plain click/tap creates at the slot with the default duration. Touch
+  // drags stay reserved for scrolling (the browser fires pointercancel).
+  const dragRef = useRef<{ iso: string; anchor: number; start: number; end: number; moved: boolean } | null>(null);
+  const [drag, setDrag] = useState<{ iso: string; start: number; end: number } | null>(null);
+  const slotAt = (e: React.PointerEvent, el: HTMLElement) =>
+    Math.max(0, Math.min(1410, Math.floor((e.clientY - el.getBoundingClientRect().top) / (HOUR_PX / 2)) * 30));
+
+  /** Query string for the composer: overlaid people come along as invitees
+   *  ("Blair's calendar is on my screen → she's who I'm scheduling with"). */
+  const composerQS = (extra: string[] = []) => {
+    const parts = [...extra];
+    if (selectedCal !== 'me') parts.push(`space=${selectedCal}`);
+    const ids = overlays.filter((o) => o.kind === 'profile').map((o) => o.id);
+    if (ids.length) parts.push(`inv=${ids.join(',')}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+  };
+
+  const onColDown = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return; // blocks/slots own their clicks
+    const s = slotAt(e, e.currentTarget);
+    dragRef.current = { iso, anchor: s, start: s, end: s + 30, moved: false };
+    setDrag({ iso, start: s, end: s + 30 });
+    if (e.pointerType === 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onColMove = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d || d.iso !== iso || e.pointerType !== 'mouse') return;
+    const s = slotAt(e, e.currentTarget);
+    if (s !== d.anchor) d.moved = true;
+    d.start = Math.min(d.anchor, s);
+    d.end = Math.max(d.anchor + 30, s + 30);
+    setDrag({ iso, start: d.start, end: d.end });
+  };
+  const onColUp = (iso: string) => () => {
+    // Everything read from the ref — immune to state/render timing.
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDrag(null);
+    if (!d || d.iso !== iso) return;
+    navigate('/calendar/new' + composerQS([
+      `date=${iso}`, `start=${d.start}`,
+      ...(d.moved ? [`end=${d.end}`] : []),
+    ]));
+  };
+  const onColCancel = () => { dragRef.current = null; setDrag(null); };
+
   const gridCols = { gridTemplateColumns: `44px repeat(${days.length}, 1fr)` };
 
   return (
     <div className="calp">
-      <div className="calp__head">
-        <div className="calp__head-row">
-          <h1 className="calp__title">Calendar</h1>
-          <button className="calp__new" onClick={() => navigate('/calendar/new')} aria-label="New event">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
       {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
-          hour grid slides up and hides beneath them. */}
+          hour grid slides up and hides beneath them. The + lives here too, so
+          nothing above the pin matters — no title row, grid starts high. */}
       <div className="calp__pin">
         <div className="calp__toolbar">
           <button
@@ -264,6 +329,15 @@ export default function Calendar() {
           </select>
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
             <Icon name="settings" size={15} />
+          </button>
+          <button
+            className="calp__tool calp__tool--new"
+            onClick={() => navigate('/calendar/new' + composerQS())}
+            aria-label="New event"
+          >
+            <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
 
@@ -400,7 +474,13 @@ export default function Calendar() {
                 ))}
               </div>
               {days.map((iso) => (
-                <div className="calp__col" key={iso}>
+                <div
+                  className="calp__col" key={iso}
+                  onPointerDown={onColDown(iso)}
+                  onPointerMove={onColMove(iso)}
+                  onPointerUp={onColUp(iso)}
+                  onPointerCancel={onColCancel}
+                >
                   {Array.from({ length: 23 }, (_, h) => (
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
@@ -416,12 +496,22 @@ export default function Calendar() {
                           className={'calp__slot calp__slot--free' + (strong ? ' is-strong' : '')}
                           style={{ top: (slot / 60) * HOUR_PX, height: HOUR_PX / 2 }}
                           title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
-                          onClick={() => navigate(
-                            `/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`,
-                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
+                          }}
                         />
                       );
                     })}
+                  {/* Live drag-to-create selection box */}
+                  {drag && drag.iso === iso && (
+                    <span
+                      className="calp__dragbox"
+                      style={{ top: (drag.start / 60) * HOUR_PX, height: ((drag.end - drag.start) / 60) * HOUR_PX }}
+                    >
+                      {minToLabel(drag.start)} – {minToLabel(drag.end)}
+                    </span>
+                  )}
                   {/* Searched-calendar overlays: their schedule beside yours */}
                   {overlays.map((o) =>
                     (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r, i) => {
@@ -445,7 +535,7 @@ export default function Calendar() {
                       <button
                         className={blockClass(e, 'calp__event')} key={e.id + iso}
                         style={{ top, height }}
-                        onClick={() => setSelected(e)}
+                        onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >
                         {e.title}
                       </button>
@@ -472,7 +562,7 @@ export default function Calendar() {
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
-            {selected.location && <p className="calp__sheet-loc"><Icon name="location" size={13} /> {selected.location}</p>}
+            {selected.location && <SmartLocation loc={selected.location} className="calp__sheet-loc" />}
             {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
 
             {(selected.attendees?.length ?? 0) > 0 && (
