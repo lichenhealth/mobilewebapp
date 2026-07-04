@@ -72,10 +72,26 @@ export default function CalendarSettings() {
   }, [rQuery, members, rPerson]);
 
   const act = async (fn: () => Promise<void>) => {
+    if (!me) return; // session still resolving — never write with an empty id
     setError('');
     try { await fn(); await load(); }
     catch (e) { setError((e as { message?: string } | null)?.message || 'Something went wrong.'); }
   };
+
+  // Don't render interactive controls until the session (and data) are ready —
+  // acting before `me` resolves produced uuid "" errors.
+  if (!me) {
+    return (
+      <div className="cedit">
+        <header className="cedit__head">
+          <button className="conc__back" onClick={() => navigate('/calendar')} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+          <h1 className="cedit__title">Calendar settings</h1>
+          <span />
+        </header>
+        <p className="cedit__hint" style={{ padding: 'var(--s-4)' }}>Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="cedit">
