@@ -35,8 +35,12 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
+  { to: '/help',      label: 'Help',      icon: 'info' },
   { to: '/membership', label: 'Membership', icon: 'dollar' },
 ];
+
+/** The Lichen support account answers help chats — it doesn't open one with itself. */
+const SUPPORT_EMAIL = 'connect@lichen.health';
 
 const SECTIONS: NavSection[] = [
   {
@@ -83,7 +87,10 @@ const SECTIONS: NavSection[] = [
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const primary = PRIMARY.filter(
+    (p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL,
+  );
   const { countsBySection, totalUnread } = useNotifications();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
@@ -125,7 +132,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
         <nav className="side-menu__nav">
           <div className="side-menu__primary">
-            {PRIMARY.map((p) => {
+            {primary.map((p) => {
               const count = p.to === '/home'
                 ? totalUnread
                 : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);

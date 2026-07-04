@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help';
 
 export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
@@ -40,6 +40,7 @@ export const KIND_LABEL: Record<ChatKind, string> = {
   place: 'Place',
   care_team: 'Care team',
   direct: 'Direct',
+  help: 'Help',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
@@ -76,15 +77,17 @@ export function formatTime(iso: string): string {
 
 interface MemberRowRaw { chat_id: string; profile_id: string; profiles: { full_name: string | null } | null }
 
-/** Title for a chat: for a direct chat, the OTHER member's name (title is null in
- *  the DB); otherwise the stored title, falling back to the kind label. */
+/** Title for a chat: for a direct or help chat, the OTHER member's name (title
+ *  is null in the DB); otherwise the stored title, falling back to the kind
+ *  label. In a help room the "other" is the Lichen support account for the
+ *  member, and the member for support — exactly the DM behavior. */
 export function chatTitle(
   kind: ChatKind,
   storedTitle: string | null,
   members: MemberInfo[],
   me: string,
 ): string {
-  if (kind === 'direct') {
+  if (kind === 'direct' || kind === 'help') {
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
   }
@@ -157,6 +160,13 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
 /** Find-or-create the 1:1 direct chat with another member; returns its id. */
 export async function ensureDirectChat(otherId: string): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_direct_chat', { p_other: otherId });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Find-or-create my Help room with the Lichen support account; returns its id. */
+export async function ensureHelpChat(): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_help_chat');
   if (error) throw error;
   return data as string;
 }
