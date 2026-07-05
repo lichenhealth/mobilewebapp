@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eXkeVhffgIcAjZClPdRYIySE69uEwdAdsGKfFuVgUrzzP1lNytNfc3Osh2vYr4F
+\restrict Q8c7tUKuFJqdckRqc7Z3PFvtvVTE0JCLQWf3zVbEjrymIKWiB3V46mTJdvmjWKS
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -289,6 +289,25 @@ end; $$;
 ALTER FUNCTION public.claim_care_invitations() OWNER TO postgres;
 
 --
+-- Name: compose_full_name(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.compose_full_name() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  -- Conditional on purpose: signup inserts rows with first/last null and
+  -- full_name from auth metadata — those must pass through unchanged.
+  if new.first_name is not null or new.last_name is not null then
+    new.full_name := btrim(concat_ws(' ', new.first_name, new.last_name));
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.compose_full_name() OWNER TO postgres;
+
+--
 -- Name: create_space_chat(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -370,6 +389,84 @@ $$;
 
 
 ALTER FUNCTION public.ensure_direct_chat(p_other uuid) OWNER TO postgres;
+
+--
+-- Name: ensure_event_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_event_chat(p_event uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_chat uuid; v_creator uuid; v_title text; v_uid uuid := auth.uid();
+begin
+  select creator_id, title into v_creator, v_title from public.events where id = p_event;
+  if v_creator is null then raise exception 'event not found'; end if;
+  if v_uid <> v_creator and not exists (
+    select 1 from public.event_attendees a
+    where a.event_id = p_event and a.profile_id = v_uid
+      and a.status in ('going', 'tentative')
+  ) then
+    raise exception 'not a member of this event';
+  end if;
+
+  select id into v_chat from public.chats where event_id = p_event and kind = 'event';
+  if v_chat is null then
+    insert into public.chats (kind, event_id, title)
+    values ('event', p_event, coalesce(v_title, 'Event chat'))
+    returning id into v_chat;
+  end if;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_creator) on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_uid) on conflict do nothing;
+  return v_chat;
+end; $$;
+
+
+ALTER FUNCTION public.ensure_event_chat(p_event uuid) OWNER TO postgres;
+
+--
+-- Name: ensure_help_chat(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_help_chat() RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_me      uuid := auth.uid();
+  v_support uuid;
+  v_key     text;
+  v_chat    uuid;
+begin
+  if v_me is null then raise exception 'Not signed in'; end if;
+
+  select id into v_support from public.profiles
+  where lower(email) = 'connect@lichen.health' limit 1;
+  if v_support is null then raise exception 'Help is not available yet'; end if;
+  if v_support = v_me then raise exception 'This is the help account'; end if;
+
+  v_key := 'help:' || v_me::text;
+
+  select id into v_chat from public.chats where direct_key = v_key;
+  if v_chat is null then
+    insert into public.chats (kind, direct_key, title)
+    values ('help', v_key, null)
+    on conflict (direct_key) where direct_key is not null do nothing
+    returning id into v_chat;
+
+    if v_chat is null then
+      select id into v_chat from public.chats where direct_key = v_key;
+    end if;
+
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me)      on conflict do nothing;
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_support) on conflict do nothing;
+  end if;
+
+  return v_chat;
+end; $$;
+
+
+ALTER FUNCTION public.ensure_help_chat() OWNER TO postgres;
 
 --
 -- Name: find_member_by_email(text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -521,6 +618,23 @@ $$;
 ALTER FUNCTION public.is_chat_member(p_chat uuid, p_uid uuid) OWNER TO postgres;
 
 --
+-- Name: is_event_attendee(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.is_event_attendee(p_event uuid, p_uid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from public.event_attendees a
+    where a.event_id = p_event and a.profile_id = p_uid
+  );
+$$;
+
+
+ALTER FUNCTION public.is_event_attendee(p_event uuid, p_uid uuid) OWNER TO postgres;
+
+--
 -- Name: is_on_care_team(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -568,6 +682,18 @@ $$;
 ALTER FUNCTION public.is_space_member(p_space uuid, p_uid uuid) OWNER TO postgres;
 
 --
+-- Name: my_phone(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.my_phone() RETURNS text
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$ select phone from public.profiles where id = auth.uid() $$;
+
+
+ALTER FUNCTION public.my_phone() OWNER TO postgres;
+
+--
 -- Name: notify(uuid, text, uuid, text, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -586,6 +712,36 @@ end; $$;
 
 
 ALTER FUNCTION public.notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid) OWNER TO postgres;
+
+--
+-- Name: on_call_roster(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.on_call_roster(p_patient uuid) RETURNS TABLE(caregiver_id uuid, full_name text, headline text, avatar_url text, phone text, window_id uuid, weekday smallint, start_min smallint, end_min smallint, valid_from date, valid_to date)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select ct.caregiver_id, p.full_name, p.headline, p.avatar_url, p.phone,
+         w.id, w.weekday, w.start_min, w.end_min, w.valid_from, w.valid_to
+  from public.care_team_members ct
+  join public.profiles p on p.id = ct.caregiver_id
+  left join public.availability_windows w
+    on w.profile_id = ct.caregiver_id and w.kind = 'on_call'
+  where ct.patient_id = p_patient
+    and ct.status = 'active'
+    and (
+      auth.uid() = p_patient
+      or exists (
+        select 1 from public.care_team_members me
+        where me.patient_id = p_patient
+          and me.caregiver_id = auth.uid()
+          and me.status = 'active'
+      )
+    );
+$$;
+
+
+ALTER FUNCTION public.on_call_roster(p_patient uuid) OWNER TO postgres;
 
 --
 -- Name: on_care_active(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -714,7 +870,11 @@ begin
   select title, creator_id into v_title, v_creator from public.events where id = new.event_id;
   perform public.notify(v_creator, 'calendar', null, 'event_rsvp',
     v_name,
-    (case when new.status = 'going' then 'is going: ' else 'can''t make it: ' end) || coalesce(v_title, 'your event'),
+    (case new.status
+       when 'going' then 'is going: '
+       when 'tentative' then 'might come: '
+       else 'can''t make it: '
+     end) || coalesce(v_title, 'your event'),
     '/calendar', new.profile_id);
   return new;
 end; $$;
@@ -733,7 +893,7 @@ CREATE FUNCTION public.on_message_notify() RETURNS trigger
 declare v_kind text; v_name text;
 begin
   select kind into v_kind from public.chats where id = new.chat_id;
-  if v_kind not in ('direct', 'care_team') then return new; end if;
+  if v_kind not in ('direct', 'care_team', 'help') then return new; end if;
   select coalesce(nullif(full_name, ''), email, 'A member')
     into v_name from public.profiles where id = new.sender_id;
   insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
@@ -878,6 +1038,45 @@ $$;
 
 
 ALTER FUNCTION public.rls_auto_enable() OWNER TO postgres;
+
+--
+-- Name: sync_attendee_to_event_chat(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sync_attendee_to_event_chat() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_chat uuid; v_creator uuid;
+declare v_event uuid; v_profile uuid; v_status text;
+begin
+  if tg_op = 'DELETE' then
+    v_event := old.event_id; v_profile := old.profile_id; v_status := 'declined';
+  else
+    v_event := new.event_id; v_profile := new.profile_id; v_status := new.status;
+  end if;
+
+  select id into v_chat from public.chats where event_id = v_event and kind = 'event';
+  select creator_id into v_creator from public.events where id = v_event;
+
+  if v_status in ('going', 'tentative') then
+    if v_chat is null then
+      insert into public.chats (kind, event_id, title)
+      select 'event', e.id, coalesce(e.title, 'Event chat') from public.events e where e.id = v_event
+      returning id into v_chat;
+      insert into public.chat_members (chat_id, profile_id) values (v_chat, v_creator) on conflict do nothing;
+    end if;
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_profile) on conflict do nothing;
+  elsif v_chat is not null and v_profile <> v_creator then
+    delete from public.chat_members where chat_id = v_chat and profile_id = v_profile;
+  end if;
+
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.sync_attendee_to_event_chat() OWNER TO postgres;
 
 --
 -- Name: sync_member_to_chat(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1176,7 +1375,8 @@ CREATE TABLE public.chats (
     title text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     direct_key text,
-    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text])))
+    event_id uuid,
+    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text, 'event'::text, 'help'::text])))
 );
 
 
@@ -1192,7 +1392,7 @@ CREATE TABLE public.event_attendees (
     status text DEFAULT 'invited'::text NOT NULL,
     invited_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT event_attendees_status_check CHECK ((status = ANY (ARRAY['invited'::text, 'going'::text, 'declined'::text])))
+    CONSTRAINT event_attendees_status_check CHECK ((status = ANY (ARRAY['invited'::text, 'going'::text, 'declined'::text, 'tentative'::text])))
 );
 
 
@@ -1378,6 +1578,9 @@ CREATE TABLE public.profiles (
     is_admin boolean DEFAULT false NOT NULL,
     email_notifications boolean DEFAULT false NOT NULL,
     notification_pref text DEFAULT 'in_app'::text NOT NULL,
+    first_name text,
+    last_name text,
+    phone text,
     CONSTRAINT profiles_notification_pref_check CHECK ((notification_pref = ANY (ARRAY['off'::text, 'in_app'::text, 'both'::text])))
 );
 
@@ -1759,6 +1962,13 @@ CREATE UNIQUE INDEX chats_direct_uidx ON public.chats USING btree (direct_key) W
 
 
 --
+-- Name: chats_event_uniq; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX chats_event_uniq ON public.chats USING btree (event_id) WHERE (kind = 'event'::text);
+
+
+--
 -- Name: chats_patient_uidx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2018,10 +2228,24 @@ CREATE TRIGGER posts_audience_sync_trg BEFORE INSERT ON public.posts FOR EACH RO
 
 
 --
+-- Name: profiles profiles_compose_full_name; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER profiles_compose_full_name BEFORE INSERT OR UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.compose_full_name();
+
+
+--
 -- Name: profiles profiles_touch_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER profiles_touch_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: event_attendees sync_attendee_event_chat_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER sync_attendee_event_chat_trg AFTER INSERT OR DELETE OR UPDATE ON public.event_attendees FOR EACH ROW EXECUTE FUNCTION public.sync_attendee_to_event_chat();
 
 
 --
@@ -2230,6 +2454,14 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chat_messages
     ADD CONSTRAINT chat_messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chats chats_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chats
+    ADD CONSTRAINT chats_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE;
 
 
 --
@@ -2836,9 +3068,7 @@ CREATE POLICY "events insert" ON public.events FOR INSERT TO authenticated WITH 
 -- Name: events events read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR (EXISTS ( SELECT 1
-   FROM public.event_attendees a
-  WHERE ((a.event_id = events.id) AND (a.profile_id = auth.uid())))) OR (EXISTS ( SELECT 1
+CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR public.is_event_attendee(id, auth.uid()) OR (EXISTS ( SELECT 1
    FROM public.posts p
   WHERE (p.linked_event_id = p.id)))));
 
@@ -3237,6 +3467,15 @@ GRANT ALL ON FUNCTION public.claim_care_invitations() TO service_role;
 
 
 --
+-- Name: FUNCTION compose_full_name(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.compose_full_name() TO anon;
+GRANT ALL ON FUNCTION public.compose_full_name() TO authenticated;
+GRANT ALL ON FUNCTION public.compose_full_name() TO service_role;
+
+
+--
 -- Name: FUNCTION create_space_chat(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3261,6 +3500,24 @@ GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.ensure_direct_chat(p_other uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION ensure_event_chat(p_event uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.ensure_event_chat(p_event uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.ensure_event_chat(p_event uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_event_chat(p_event uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION ensure_help_chat(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.ensure_help_chat() TO anon;
+GRANT ALL ON FUNCTION public.ensure_help_chat() TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_help_chat() TO service_role;
 
 
 --
@@ -3327,6 +3584,15 @@ GRANT ALL ON FUNCTION public.is_chat_member(p_chat uuid, p_uid uuid) TO service_
 
 
 --
+-- Name: FUNCTION is_event_attendee(p_event uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.is_event_attendee(p_event uuid, p_uid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.is_event_attendee(p_event uuid, p_uid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_event_attendee(p_event uuid, p_uid uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION is_on_care_team(p_patient uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3354,12 +3620,30 @@ GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO servic
 
 
 --
+-- Name: FUNCTION my_phone(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.my_phone() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.my_phone() TO authenticated;
+GRANT ALL ON FUNCTION public.my_phone() TO service_role;
+
+
+--
 -- Name: FUNCTION notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON FUNCTION public.notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid) TO anon;
 GRANT ALL ON FUNCTION public.notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.notify(p_recipient uuid, p_section text, p_space uuid, p_type text, p_title text, p_body text, p_link text, p_actor uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION on_call_roster(p_patient uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.on_call_roster(p_patient uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.on_call_roster(p_patient uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.on_call_roster(p_patient uuid) TO service_role;
 
 
 --
@@ -3468,6 +3752,15 @@ GRANT ALL ON FUNCTION public.revoke_subscription(p_email text) TO service_role;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO anon;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO authenticated;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO service_role;
+
+
+--
+-- Name: FUNCTION sync_attendee_to_event_chat(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.sync_attendee_to_event_chat() TO anon;
+GRANT ALL ON FUNCTION public.sync_attendee_to_event_chat() TO authenticated;
+GRANT ALL ON FUNCTION public.sync_attendee_to_event_chat() TO service_role;
 
 
 --
@@ -3771,6 +4064,20 @@ GRANT SELECT(notification_pref) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.first_name; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(first_name) ON TABLE public.profiles TO authenticated;
+
+
+--
+-- Name: COLUMN profiles.last_name; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(last_name) ON TABLE public.profiles TO authenticated;
+
+
+--
 -- Name: TABLE recommendations; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3870,7 +4177,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eXkeVhffgIcAjZClPdRYIySE69uEwdAdsGKfFuVgUrzzP1lNytNfc3Osh2vYr4F
+\unrestrict Q8c7tUKuFJqdckRqc7Z3PFvtvVTE0JCLQWf3zVbEjrymIKWiB3V46mTJdvmjWKS
+
 
 
 
