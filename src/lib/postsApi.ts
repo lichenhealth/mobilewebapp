@@ -105,6 +105,37 @@ export async function createPost(input: NewPost) {
   return data;
 }
 
+/** Author edits their post in place. Recomputes the SAME legacy bridge
+ *  columns createPost writes (visibility / space_id / service_area) so the
+ *  v1↔v2 sync trigger never sees them drift. */
+export async function updatePost(id: string, input: NewPost): Promise<void> {
+  const visibility: Visibility = input.isPublic ? 'public' : input.toMycelium ? 'mycelium' : 'space';
+  const { error } = await supabase.from('posts').update({
+    author_space_id: input.authorSpaceId ?? null,
+    event_category: input.eventCategory ?? null,
+    event_mode: input.eventMode ?? null,
+    linked_event_id: input.linkedEventId ?? null,
+    body: input.body.trim(),
+    title: input.title?.trim() || null,
+    content_type: input.content_type,
+    is_public: input.isPublic,
+    to_mycelium: input.toMycelium,
+    audience_space_ids: input.audienceSpaceIds,
+    visibility,
+    space_id: visibility === 'space' ? (input.audienceSpaceIds[0] ?? null) : null,
+    service_areas: input.serviceAreas,
+    service_area: input.serviceAreas[0] ?? null,
+    image_url: input.image_url ?? null,
+    details: input.details ?? {},
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePost(id: string): Promise<void> {
+  const { error } = await supabase.from('posts').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export type FeedPost = {
   id: string;
   author_id: string;
