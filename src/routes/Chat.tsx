@@ -124,10 +124,11 @@ export default function Chat() {
 function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: string; highlight?: string; onClick: () => void }) {
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
+  const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
   const senderName = last
     ? chat.members.find((m) => m.profile_id === last.sender_id)?.name.split(' ')[0]
     : undefined;
-  const showSender = last && !isDirect;
+  const showSender = last && !isDM;
 
   return (
     <button className="conv-row" onClick={onClick}>
@@ -155,15 +156,16 @@ function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: s
 }
 
 function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
-  // Direct + solo chats show a single monogram; for direct, key it off the OTHER member.
+  // Direct/help + solo chats show a single monogram, keyed off the OTHER member.
+  const dmLike = chat.kind === 'direct' || chat.kind === 'help';
   const single =
-    chat.kind === 'direct'
+    dmLike
       ? (chat.members.find((m) => m.profile_id !== me) ?? chat.members[0])
       : chat.members.length <= 1
         ? chat.members[0]
         : null;
 
-  if (chat.kind === 'direct' || chat.members.length <= 1) {
+  if (dmLike || chat.members.length <= 1) {
     const color = single ? colorFor(single.profile_id) : undefined;
     return (
       <div className="conv-row__avatar" style={color ? { background: color, color: 'var(--bone-warm)' } : undefined}>

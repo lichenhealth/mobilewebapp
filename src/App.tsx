@@ -28,6 +28,7 @@ import Onboarding from './routes/Onboarding';
 import AdminCategories from './routes/AdminCategories';
 import AdminSupporters from './routes/AdminSupporters';
 import Invite from './routes/Invite';
+import Help from './routes/Help';
 import Membership from './routes/Membership';
 import Compose from './routes/Compose';
 import Placeholder from './routes/Placeholder';
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/maps"      element={<Maps />} />
           <Route path="/profile"   element={<Profile />} />
           <Route path="/invite"    element={<Invite />} />
+          <Route path="/help"      element={<Help />} />
           <Route path="/membership" element={<Membership />} />
           <Route path="/compose"   element={<Compose />} />
           <Route path="/login"     element={<Login />} />

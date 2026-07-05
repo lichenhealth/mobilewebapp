@@ -234,7 +234,7 @@ export default function ChatConversation({
 }
 
 function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void }) {
-  const isDirect = chat.kind === 'direct';
+  const isDirect = chat.kind === 'direct' || chat.kind === 'help';
   const other = otherMember(members, me);
   return (
     <header className="thread__head">
@@ -266,7 +266,7 @@ function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; titl
         <div className="thread__head-text">
           <h2 className="thread__head-name">{title}</h2>
           <p className="thread__head-sub">
-            {isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+            {chat.kind === 'help' ? 'Lichen help' : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </p>
         </div>
       </div>
@@ -278,7 +278,7 @@ function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; titl
 }
 
 function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string }) {
-  const isDirect = chat.kind === 'direct';
+  const isDirect = chat.kind === 'direct' || chat.kind === 'help';
   const other = otherMember(members, me);
   return (
     <div className="thread__intro">
