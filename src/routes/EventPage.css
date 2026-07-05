@@ -53,6 +53,14 @@
 .evp__desc a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
 
 .evp__rsvp-btn { width: 100%; text-align: center; }
+.evp__rsvp-row { display: flex; gap: var(--s-2); }
+.evp__rsvp-btn--maybe {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  color: var(--ink);
+}
+.evp__rsvp-btn--maybe:hover { border-color: var(--peach); }
+.evp__rsvp-btn--maybe.is-on { border-color: var(--peach); color: var(--peach-deep); }
 .evp__count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); text-align: center; }
 .evp__people { display: flex; flex-direction: column; gap: var(--s-2); }
 .evp__person {
@@ -62,3 +70,12 @@
 .evp__person-name { font-size: 14px; color: var(--ink); margin-right: auto; }
 .evp__person-status { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--ink-faint); }
 .evp__price { font-family: var(--font-display); font-style: italic; font-size: 26px; color: var(--ink); text-align: center; }
+
+/* Event room: bounded height so ChatConversation can fill it */
+.evp__chat {
+  height: calc(100dvh - var(--top-h) - 210px);
+  min-height: 320px;
+  max-width: 640px; width: 100%; margin: 0 auto;
+  padding: 0 var(--s-5) var(--s-4);
+  display: flex; flex-direction: column;
+}

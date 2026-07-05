@@ -140,10 +140,11 @@ export function postAreas(p: Pick<FeedPost, 'service_area' | 'service_areas'>): 
 }
 
 // ─── RSVP (Book on Free/Trade event posts; the calendar event is the container)
-export async function rsvpToEvent(eventId: string, me: string): Promise<void> {
+// Upsert so switching Going ↔ Maybe (or re-RSVPing after an invite) just works.
+export async function rsvpToEvent(eventId: string, me: string, status: 'going' | 'tentative' = 'going'): Promise<void> {
   const { error } = await supabase.from('event_attendees')
-    .insert({ event_id: eventId, profile_id: me, invited_by: me, status: 'going' });
-  if (error && !/duplicate|unique/i.test(error.message)) throw error;
+    .upsert({ event_id: eventId, profile_id: me, invited_by: me, status }, { onConflict: 'event_id,profile_id' });
+  if (error) throw error;
 }
 export async function unRsvp(eventId: string, me: string): Promise<void> {
   const { error } = await supabase.from('event_attendees')

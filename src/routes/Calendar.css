@@ -213,6 +213,7 @@
 .calp__person-name { font-size: 13px; color: var(--ink); margin-right: auto; }
 .calp__person-status { font-size: 12px; color: var(--ink-faint); }
 .calp__person-status.is-going { color: #4c9a63; }
+.calp__person-status.is-tentative { color: var(--peach-deep); }
 .calp__person-status.is-declined { color: #c0564f; }
 .calp__sheet-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
 .calp__sheet-btn { flex: 1; }

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
+import ChatConversation from '../components/ChatConversation';
+import { supabase } from '../lib/supabase';
 import FeedCard from '../components/FeedCard';
 import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
@@ -32,6 +34,9 @@ export default function EventPage() {
   const [updates, setUpdates] = useState<FeedPost[]>([]);
   const [tab, setTab] = useState<Tab>('About');
   const [loading, setLoading] = useState(true);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatErr, setChatErr] = useState(false);
+  const chatAsked = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,8 +62,11 @@ export default function EventPage() {
     ?? (Array.isArray(post.details?.media)
       ? (post.details.media as { type: string; url: string }[]).find((m) => m.type === 'photo')?.url
       : undefined);
-  const going = !!calEvent?.attendees?.some((a) => a.profile_id === me && a.status !== 'declined');
+  const myStatus = calEvent?.attendees?.find((a) => a.profile_id === me)?.status ?? null;
+  const going = !!myStatus && myStatus !== 'declined';
   const attendees = (calEvent?.attendees ?? []).filter((a) => a.status !== 'declined');
+  const goingCount = attendees.filter((a) => a.status === 'going').length;
+  const maybeCount = attendees.filter((a) => a.status === 'tentative').length;
   const price = typeof post.details?.price === 'string' ? post.details.price : null;
   const bookingUrl = typeof post.details?.bookingUrl === 'string' ? post.details.bookingUrl : null;
   const location = typeof post.details?.location === 'string' ? post.details.location : '';
@@ -83,7 +91,32 @@ export default function EventPage() {
     } catch (e) { console.error('rsvp', e); }
   }
 
+  // Going / Maybe buttons: tap your current answer again to cancel.
+  async function setRsvp(status: 'going' | 'tentative') {
+    if (!me || !post?.linked_event_id) return;
+    try {
+      if (myStatus === status) await unRsvp(post.linked_event_id, me);
+      else await rsvpToEvent(post.linked_event_id, me, status);
+      await load();
+    } catch (e) { console.error('rsvp', e); }
+  }
+
   const TABS: Tab[] = ['About', 'Updates', 'Chat', 'RSVP', 'Book'];
+  const isHost = post.author_id === me;
+  // Room membership = host + going + maybes (invited-but-unanswered isn't in yet).
+  const inRoom = isHost || myStatus === 'going' || myStatus === 'tentative';
+
+  // Open (or lazily create) the event room — host or anyone going/maybe.
+  useEffect(() => {
+    if (tab !== 'Chat' || chatId || chatAsked.current) return;
+    if (!me || !post?.linked_event_id || !inRoom) return;
+    chatAsked.current = true;
+    (async () => {
+      const { data, error } = await supabase.rpc('ensure_event_chat', { p_event: post.linked_event_id });
+      if (error) { console.warn('ensure_event_chat', error.message); setChatErr(true); return; }
+      setChatId(data as string);
+    })();
+  }, [tab, chatId, me, post, inRoom]);
 
   return (
     <div className="evp">
@@ -154,23 +187,50 @@ export default function EventPage() {
       )}
 
       {tab === 'Chat' && (
-        <div className="evp__body">
-          <p className="evp__muted">Event chat is coming in the next update — a room for everyone who's going.</p>
-        </div>
+        inRoom ? (
+          chatId ? (
+            <div className="evp__chat">
+              <ChatConversation chatId={chatId} me={me} showIntro={false} />
+            </div>
+          ) : (
+            <div className="evp__body">
+              <p className="evp__muted">{chatErr ? "The room couldn't open — run the event-chat migration, or try again." : 'Opening the room…'}</p>
+            </div>
+          )
+        ) : (
+          <div className="evp__body">
+            <p className="evp__muted">The chat is for everyone who's going — or might be.</p>
+            <button className="btn btn-primary evp__rsvp-btn" onClick={() => setRsvp('going')} disabled={!post.linked_event_id}>
+              RSVP to join the room
+            </button>
+          </div>
+        )
       )}
 
       {tab === 'RSVP' && (
         <div className="evp__body">
-          <button className="btn btn-primary evp__rsvp-btn" onClick={toggleRsvp} disabled={!post.linked_event_id}>
-            {going ? 'Going ✓ — tap to cancel' : "RSVP — I'll be there"}
-          </button>
-          <p className="evp__count">{attendees.length} going</p>
+          <div className="evp__rsvp-row">
+            <button className="btn btn-primary evp__rsvp-btn" onClick={() => setRsvp('going')} disabled={!post.linked_event_id}>
+              {myStatus === 'going' ? 'Going ✓ — tap to cancel' : "Going — I'll be there"}
+            </button>
+            <button
+              className={'btn evp__rsvp-btn evp__rsvp-btn--maybe' + (myStatus === 'tentative' ? ' is-on' : '')}
+              onClick={() => setRsvp('tentative')}
+              disabled={!post.linked_event_id}
+            >
+              {myStatus === 'tentative' ? 'Maybe ✓ — tap to cancel' : 'Maybe'}
+            </button>
+          </div>
+          <p className="evp__count">
+            {goingCount} going{maybeCount > 0 ? ` · ${maybeCount} maybe` : ''}
+          </p>
           <div className="evp__people">
             {attendees.map((a) => (
               <div className="evp__person" key={a.profile_id}>
                 <Avatar id={a.profile_id} name={a.profile?.full_name ?? 'Member'} url={a.profile?.avatar_url} size={34} />
                 <span className="evp__person-name">{a.profile?.full_name ?? 'Member'}</span>
                 {a.status === 'invited' && <span className="evp__person-status">invited</span>}
+                {a.status === 'tentative' && <span className="evp__person-status">maybe</span>}
               </div>
             ))}
           </div>

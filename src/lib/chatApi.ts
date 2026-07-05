@@ -115,7 +115,8 @@ export function messagePreview(msg: MessageRow): string {
  *  Concierge screen, not the general inbox. */
 export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
-    supabase.from('chats').select('id, kind, title, created_at').neq('kind', 'care_team'),
+    // care-team rooms live in Concierge; event rooms live on their event page
+    supabase.from('chats').select('id, kind, title, created_at').not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name)'),
     supabase.from('chat_messages')
       .select(MESSAGE_COLS)
