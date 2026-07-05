@@ -151,12 +151,17 @@ export async function unRsvp(eventId: string, me: string): Promise<void> {
     .delete().eq('event_id', eventId).eq('profile_id', me);
   if (error) throw error;
 }
-/** Which of these linked events am I already going to? */
-export async function loadMyRsvps(eventIds: string[], me: string): Promise<Set<string>> {
-  if (eventIds.length === 0) return new Set();
+/** My RSVP status per linked event (absent = no attendee row). */
+export type MyRsvpStatus = 'invited' | 'going' | 'tentative' | 'declined';
+export async function loadMyRsvpStatuses(eventIds: string[], me: string): Promise<Map<string, MyRsvpStatus>> {
+  if (eventIds.length === 0) return new Map();
   const { data } = await supabase.from('event_attendees')
-    .select('event_id').eq('profile_id', me).in('event_id', eventIds).neq('status', 'declined');
-  return new Set(((data as { event_id: string }[] | null) ?? []).map((r) => r.event_id));
+    .select('event_id, status').eq('profile_id', me).in('event_id', eventIds);
+  const map = new Map<string, MyRsvpStatus>();
+  for (const r of (data as { event_id: string; status: MyRsvpStatus }[] | null) ?? []) {
+    map.set(r.event_id, r.status);
+  }
+  return map;
 }
 
 const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence)';
