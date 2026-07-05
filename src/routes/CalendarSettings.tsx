@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import TimeField from '../components/TimeField';
 import { useAuth } from '../auth/AuthProvider';
@@ -10,6 +10,7 @@ import {
   loadMyAvailability, addAvailability, deleteAvailability,
   loadMyShares, upsertShare, deleteShare,
 } from '../lib/calendarApi';
+import { loadMyPhone } from '../lib/conciergeApi';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -29,6 +30,7 @@ export default function CalendarSettings() {
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [rules, setRules] = useState<ShareRule[]>([]);
   const [members, setMembers] = useState<MemberOpt[]>([]);
+  const [myPhone, setMyPhone] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   // add-hours form
@@ -47,13 +49,15 @@ export default function CalendarSettings() {
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [w, r, memRes] = await Promise.all([
+    const [w, r, memRes, phone] = await Promise.all([
       loadMyAvailability(me),
       loadMyShares(me),
       supabase.from('profiles').select('id, full_name').neq('id', me).order('full_name').limit(500),
+      loadMyPhone(),
     ]);
     setWindows(w); setRules(r);
     setMembers((memRes.data as MemberOpt[] | null) ?? []);
+    setMyPhone(phone);
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -152,6 +156,12 @@ export default function CalendarSettings() {
               <Icon name="plus" size={12} /> Add
             </button>
           </div>
+          {myPhone !== null && !myPhone && windows.some((w) => w.kind === 'on_call') && (
+            <p className="cedit__hint">
+              You have on-call hours but no phone number — add one in your{' '}
+              <Link to="/profile">Profile</Link> so clients can call you when you&rsquo;re on call.
+            </p>
+          )}
         </div>
 
         {/* ── Who sees my calendar ── */}
