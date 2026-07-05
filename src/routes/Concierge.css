@@ -997,6 +997,12 @@
 }
 .urgent__attach-btn svg { color: var(--ink-soft); }
 .urgent__attach-btn:hover svg { color: var(--peach); }
+.urgent__attach-btn.is-recording {
+  border-color: var(--peach);
+  color: var(--ink);
+  background: var(--peach-tint, var(--bone));
+}
+.urgent__attach-btn.is-recording svg { color: var(--peach-deep); }
 
 .urgent__send {
   display: inline-flex;

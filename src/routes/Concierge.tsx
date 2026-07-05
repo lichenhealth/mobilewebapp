@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
-import { loadConciergeAccess, ensureDirectChat, monogramFor, colorFor } from '../lib/chatApi';
+import {
+  loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia,
+  type MediaType, type Attachment,
+} from '../lib/chatApi';
 import {
   loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
@@ -32,6 +36,16 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
   const [errNote, setErrNote] = useState('');
   // Re-render each minute so the card flips when a shift starts or ends.
   const [, setTick] = useState(0);
+  // Media context — uploads go straight into the DM with the on-call caregiver
+  // (the chat is found-or-created on first attach), so Send just references them.
+  const [pending, setPending] = useState<{ type: MediaType; path: string; localUrl: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const dmRef = useRef<{ otherId: string; chatId: string } | null>(null);
 
   useEffect(() => {
     if (!subjectId) return;              // auth still resolving
@@ -71,16 +85,26 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
   ];
   const firstName = (c: OnCallCaregiver) => c.name.split(' ')[0];
 
-  async function openDM(caregiverId: string, body?: string) {
+  async function ensureDM(otherId: string): Promise<string> {
+    if (dmRef.current?.otherId === otherId) return dmRef.current.chatId;
+    const chatId = await ensureDirectChat(otherId);
+    dmRef.current = { otherId, chatId };
+    return chatId;
+  }
+
+  async function openDM(caregiverId: string, body?: string, attachments?: Attachment[]) {
     if (sending) return;
     setSending(true);
     try {
-      const chatId = await ensureDirectChat(caregiverId);
+      const chatId = await ensureDM(caregiverId);
       const text = body?.trim();
-      if (text) {
+      if (text || attachments?.length) {
         const { error } = await supabase
           .from('chat_messages')
-          .insert({ chat_id: chatId, sender_id: me, body: text });
+          .insert({
+            chat_id: chatId, sender_id: me, body: text || null,
+            attachments: attachments?.length ? attachments : null,
+          });
         if (error) throw error;
       }
       navigate(`/chat/${chatId}`);
@@ -88,6 +112,52 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
       setErrNote('Could not open the chat. Please try again.');
       setTimeout(() => setErrNote(''), 3000);
       setSending(false);
+    }
+  }
+
+  async function addPending(file: Blob, ext: string, type: MediaType) {
+    if (!primary) return;
+    setUploading(true);
+    try {
+      const chatId = await ensureDM(primary.c.id);
+      const path = await uploadChatMedia(chatId, file, ext);
+      setPending((p) => [...p, { type, path, localUrl: URL.createObjectURL(file) }]);
+    } catch {
+      setErrNote('Could not attach that. Please try again.');
+      setTimeout(() => setErrNote(''), 3000);
+    }
+    setUploading(false);
+  }
+
+  function onFile(e: ChangeEvent<HTMLInputElement>, type: MediaType) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const ext = file.name.split('.').pop() || (type === 'photo' ? 'jpg' : 'mp4');
+    addPending(file, ext, type);
+  }
+
+  async function toggleRecord() {
+    if (recording) {
+      recRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (ev) => { if (ev.data.size) chunksRef.current.push(ev.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        addPending(new Blob(chunksRef.current, { type: 'audio/webm' }), 'webm', 'audio');
+      };
+      rec.start();
+      recRef.current = rec;
+      setRecording(true);
+    } catch {
+      setErrNote('Microphone unavailable.');
+      setTimeout(() => setErrNote(''), 3000);
     }
   }
 
@@ -207,10 +277,55 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
           />
+
+          {/* Attached media chips */}
+          {(pending.length > 0 || uploading) && (
+            <ul className="urgent__attachments">
+              {pending.map((p, i) => (
+                <li key={i} className="urgent__chip">
+                  <Icon name={p.type === 'photo' ? 'image' : p.type === 'video' ? 'video' : 'mic'} size={12} />
+                  <span>{p.type === 'photo' ? 'Photo' : p.type === 'video' ? 'Video' : 'Voice note'}</span>
+                  <button
+                    className="urgent__chip-x"
+                    onClick={() => setPending((cur) => cur.filter((_, idx) => idx !== i))}
+                    aria-label="Remove attachment"
+                  >
+                    <Icon name="close" size={10} />
+                  </button>
+                </li>
+              ))}
+              {uploading && <li className="urgent__chip">Uploading…</li>}
+            </ul>
+          )}
+
+          {/* Attachment row */}
+          <div className="urgent__attach-row">
+            <p className="urgent__attach-label">Add context</p>
+            <div className="urgent__attach-buttons">
+              <button className="urgent__attach-btn" onClick={() => photoRef.current?.click()}>
+                <Icon name="image" size={16} />
+                <span>Photo</span>
+              </button>
+              <button className="urgent__attach-btn" onClick={() => videoRef.current?.click()}>
+                <Icon name="video" size={16} />
+                <span>Video</span>
+              </button>
+              <button
+                className={'urgent__attach-btn' + (recording ? ' is-recording' : '')}
+                onClick={toggleRecord}
+              >
+                <Icon name="mic" size={16} />
+                <span>{recording ? 'Stop' : 'Voice'}</span>
+              </button>
+            </div>
+          </div>
+          <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
+          <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
+
           <button
             className="urgent__send"
-            onClick={() => openDM(primary.c.id, message)}
-            disabled={sending}
+            onClick={() => openDM(primary.c.id, message, pending.map((p) => ({ type: p.type, url: p.path })))}
+            disabled={sending || uploading || recording || (!message.trim() && pending.length === 0)}
           >
             <Icon name="send" size={14} />
             <span>{sending ? 'Opening chat…' : `Send to ${firstName(primary.c)}`}</span>
