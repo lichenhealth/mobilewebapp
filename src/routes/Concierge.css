@@ -781,6 +781,19 @@
   width: 36px; height: 36px;
   font-size: 15px;
 }
+.urgent__avatar img {
+  width: 100%; height: 100%;
+  border-radius: var(--r-full);
+  object-fit: cover;
+}
+
+/* Nobody-on-call variant: same card, muted (no peach ring, gray dot) */
+.urgent__oncall--none { border-color: var(--bone-edge); }
+.urgent__oncall--none .urgent__avatar { color: var(--ink-faint); }
+.urgent__status--off .urgent__status-dot {
+  background: var(--ink-faint);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 0.06);
+}
 
 .urgent__oncall-name {
   font-size: 16px;
@@ -984,6 +997,12 @@
 }
 .urgent__attach-btn svg { color: var(--ink-soft); }
 .urgent__attach-btn:hover svg { color: var(--peach); }
+.urgent__attach-btn.is-recording {
+  border-color: var(--peach);
+  color: var(--ink);
+  background: var(--peach-tint, var(--bone));
+}
+.urgent__attach-btn.is-recording svg { color: var(--peach-deep); }
 
 .urgent__send {
   display: inline-flex;
@@ -1037,7 +1056,14 @@
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
   border-radius: var(--r-sm);
+  /* rows are buttons now (tap → DM) */
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
 }
+.urgent__backup-item:hover { border-color: var(--peach); }
+.urgent__backup-item:disabled { cursor: default; opacity: 0.7; }
 
 .urgent__backup-row {
   display: flex;

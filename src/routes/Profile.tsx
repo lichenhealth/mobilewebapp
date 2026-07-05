@@ -5,6 +5,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import { loadMyPhone } from '../lib/conciergeApi';
 import Avatar from '../components/Avatar';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -19,7 +20,7 @@ const ACTING_KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
 };
 
-type ProfileRow = { created_at: string; full_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref; avatar_url: string | null };
+type ProfileRow = { created_at: string; full_name: string | null; first_name: string | null; last_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref; avatar_url: string | null };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareStatus = 'pending' | 'active';
 type CareRow = {
@@ -53,6 +54,9 @@ export default function Profile() {
 
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
   const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
@@ -98,13 +102,14 @@ export default function Profile() {
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoadingData(true);
-    const [pRes, cRes, mRes, catRes, pcRes, subRes] = await Promise.all([
-      supabase.from('profiles').select('created_at,full_name,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
+    const [pRes, cRes, mRes, catRes, pcRes, subRes, myPhone] = await Promise.all([
+      supabase.from('profiles').select('created_at,full_name,first_name,last_name,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
       supabase.from('profile_categories').select('category_id, categories(domain)').eq('profile_id', user.id),
       supabase.from('subscriptions').select('tier, source').eq('profile_id', user.id).maybeSingle(),
+      loadMyPhone(),
     ]);
     const p = pRes.data as ProfileRow | null;
     // Own email comes from the auth session, not the profiles table — so it stays
@@ -113,10 +118,13 @@ export default function Profile() {
     if (p) {
       setAvatarUrl(p.avatar_url ?? null);
       setFullName(p.full_name ?? '');
+      setFirstName(p.first_name ?? '');
+      setLastName(p.last_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
       setNotifPref(p.notification_pref ?? 'in_app');
     }
+    setPhone(myPhone);
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
     setCaps(cRows.map((r) => r.capability));
     const mRows = (mRes.data as MemberRow[] | null) ?? [];
@@ -249,11 +257,20 @@ export default function Profile() {
   async function saveProfile() {
     if (!user) return;
     setSavingProfile(true); setProfileMsg(''); setError('');
+    // full_name is composed from first/last by a DB trigger — don't write it here.
     const { error: e } = await supabase.from('profiles')
-      .update({ full_name: fullName.trim(), headline: headline.trim() || null, bio: bio.trim() || null })
+      .update({
+        first_name: firstName.trim() || null,
+        last_name: lastName.trim() || null,
+        phone: phone.trim() || null,
+        headline: headline.trim() || null,
+        bio: bio.trim() || null,
+      })
       .eq('id', user.id);
     setSavingProfile(false);
     if (e) { setError(e.message); return; }
+    setFullName(`${firstName.trim()} ${lastName.trim()}`.trim());
+    refreshSelf();                       // header/acting chip picks up the new name
     setProfileMsg('Saved');
     setTimeout(() => setProfileMsg(''), 2000);
   }
@@ -412,8 +429,17 @@ export default function Profile() {
       <section className="prof__section">
         <h2 className="prof__h2">About you</h2>
         <div className="prof__field">
-          <label className="prof__label">Name</label>
-          <input className="prof__input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+          <label className="prof__label">First name</label>
+          <input className="prof__input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Last name</label>
+          <input className="prof__input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Phone</label>
+          <input className="prof__input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
+          <p className="prof__hint">So your care team can reach you when someone&rsquo;s on call. Only your care team can see it.</p>
         </div>
         <div className="prof__field">
           <label className="prof__label">Headline</label>

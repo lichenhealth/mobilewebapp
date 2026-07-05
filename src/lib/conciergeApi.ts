@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { IconName } from '../components/Icon';
 import type { RadarAxis } from '../components/HexagonRadar';
 import type { Recurrence } from './recurrence';
+import { minToLabel } from './calendarApi';
 import { youtubeId } from './linkify';
 
 // ─── Wellbeing dimensions — single source of truth (HexagonRadar order) ──────
@@ -190,6 +191,109 @@ export async function signCareMedia(paths: string[]): Promise<Record<string, str
 /** internal iff an in-app path ("/…") but not protocol-relative ("//host"). */
 export function isInternalUrl(url: string): boolean {
   return url.startsWith('/') && !url.startsWith('//');
+}
+
+// ─── On-call roster (Urgent tab) ──────────────────────────────────────────────
+// Windows are weekly on-call hours (kind='on_call' in availability_windows),
+// interpreted in the VIEWER's local clock — same convention as the whole
+// calendar (start_min/end_min carry no timezone).
+export interface OnCallWindow {
+  id: string;
+  weekday: number;              // 0=Mon … 6=Sun (recurrence.ts convention)
+  start_min: number;
+  end_min: number;
+  valid_from: string | null;
+  valid_to: string | null;
+}
+export interface OnCallCaregiver {
+  id: string;
+  name: string;
+  headline: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  windows: OnCallWindow[];
+}
+
+interface RosterRow {
+  caregiver_id: string; full_name: string | null; headline: string | null;
+  avatar_url: string | null; phone: string | null;
+  window_id: string | null; weekday: number | null; start_min: number | null;
+  end_min: number | null; valid_from: string | null; valid_to: string | null;
+}
+
+/** The patient's active caregivers + their on-call windows (on_call_roster RPC;
+ *  callable by the patient or any of their active caregivers). */
+export async function loadOnCallRoster(patientId: string): Promise<OnCallCaregiver[]> {
+  const { data, error } = await supabase.rpc('on_call_roster', { p_patient: patientId });
+  if (error) { console.warn('on_call_roster:', error.message); return []; }
+  const byId = new Map<string, OnCallCaregiver>();
+  for (const r of (data as RosterRow[] | null) ?? []) {
+    let c = byId.get(r.caregiver_id);
+    if (!c) {
+      c = {
+        id: r.caregiver_id, name: r.full_name || 'Member', headline: r.headline,
+        avatarUrl: r.avatar_url, phone: r.phone, windows: [],
+      };
+      byId.set(r.caregiver_id, c);
+    }
+    if (r.window_id != null) {
+      c.windows.push({
+        id: r.window_id, weekday: r.weekday!, start_min: r.start_min!, end_min: r.end_min!,
+        valid_from: r.valid_from, valid_to: r.valid_to,
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
+function weekdayMon0(iso: string): number { return (localDate(iso).getDay() + 6) % 7; }
+function coversDate(w: OnCallWindow, iso: string): boolean {
+  return weekdayMon0(iso) === w.weekday
+    && (w.valid_from == null || iso >= w.valid_from)
+    && (w.valid_to == null || iso <= w.valid_to);
+}
+
+/** The window covering `nowMin` on `iso`, if any (latest-ending wins so the
+ *  primary pick is deterministic when shifts overlap). */
+export function onCallNow(windows: OnCallWindow[], iso: string, nowMin: number): OnCallWindow | null {
+  let best: OnCallWindow | null = null;
+  for (const w of windows) {
+    if (!coversDate(w, iso) || w.start_min > nowMin || nowMin >= w.end_min) continue;
+    if (!best || w.end_min > best.end_min) best = w;
+  }
+  return best;
+}
+
+/** The next upcoming on-call start within 14 days (later today counts). */
+export function nextOnCall(
+  windows: OnCallWindow[], fromIso: string, nowMin: number,
+): { iso: string; startMin: number } | null {
+  const start = localDate(fromIso);
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const iso = toISO(d);
+    const starts = windows
+      .filter((w) => coversDate(w, iso) && (i > 0 || w.start_min > nowMin))
+      .map((w) => w.start_min);
+    if (starts.length) return { iso, startMin: Math.min(...starts) };
+  }
+  return null;
+}
+
+/** "On call today 3pm" / "On call Tue 9am" / "No on-call hours set". */
+export function nextOnCallLabel(next: { iso: string; startMin: number } | null): string {
+  if (!next) return 'No on-call hours set';
+  const day = next.iso === todayISO()
+    ? 'today'
+    : localDate(next.iso).toLocaleDateString(undefined, { weekday: 'short' });
+  return `On call ${day} ${minToLabel(next.startMin)}`;
+}
+
+/** Own phone number (profiles.phone has no SELECT grant — read via RPC). */
+export async function loadMyPhone(): Promise<string> {
+  const { data, error } = await supabase.rpc('my_phone');
+  if (error) { console.warn('my_phone:', error.message); return ''; }
+  return (data as string | null) ?? '';
 }
 
 /** Resolve body URLs to rich previews at compose time (YouTube parsed locally;

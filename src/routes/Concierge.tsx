@@ -1,208 +1,375 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
-import { loadConciergeAccess } from '../lib/chatApi';
+import {
+  loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia,
+  type MediaType, type Attachment,
+} from '../lib/chatApi';
 import {
   loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
-  type CarePostRow, type Dimension,
+  loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel,
+  type CarePostRow, type Dimension, type OnCallCaregiver,
 } from '../lib/conciergeApi';
+import { minToLabel } from '../lib/calendarApi';
 import { occursOn } from '../lib/recurrence';
 import { useAuth } from '../auth/AuthProvider';
-import { ON_CALL_NOW, BACKUP_PRACTITIONERS } from '../data/concierge';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
 
-/** Urgent Care: connect with the on-call practitioner now (text or call),
- *  with optional context (message + photo/video/voice). If the on-call
- *  practitioner is on the user's care team, they get a peach priority badge. */
-function UrgentCare() {
+/** Urgent Care: who on the subject's care team is on call RIGHT NOW
+ *  (availability_windows kind='on_call' via the on_call_roster RPC), with real
+ *  Call (tel:) and Text (DM) actions. The rest of the team lists as backups
+ *  with their next on-call times. Windows are viewer-local, like the calendar. */
+function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
+  const navigate = useNavigate();
+  const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
+  const [ready, setReady] = useState(false);
   const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState<{ kind: 'photo' | 'video' | 'voice'; label: string }[]>([]);
-  const [sentNote, setSentNote] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [errNote, setErrNote] = useState('');
+  // Re-render each minute so the card flips when a shift starts or ends.
+  const [, setTick] = useState(0);
+  // Media context — uploads go straight into the DM with the on-call caregiver
+  // (the chat is found-or-created on first attach), so Send just references them.
+  const [pending, setPending] = useState<{ type: MediaType; path: string; localUrl: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const dmRef = useRef<{ otherId: string; chatId: string } | null>(null);
 
-  const addAttachment = (kind: 'photo' | 'video' | 'voice') => {
-    const labels = {
-      photo: `Photo ${attachments.filter(a => a.kind === 'photo').length + 1}`,
-      video: `Video ${attachments.filter(a => a.kind === 'video').length + 1}`,
-      voice: `Voice ${attachments.filter(a => a.kind === 'voice').length + 1}`,
-    };
-    setAttachments((a) => [...a, { kind, label: labels[kind] }]);
-  };
+  useEffect(() => {
+    if (!subjectId) return;              // auth still resolving
+    let cancelled = false;
+    setReady(false);
+    loadOnCallRoster(subjectId).then((r) => {
+      if (!cancelled) { setRoster(r); setReady(true); }
+    });
+    return () => { cancelled = true; };
+  }, [subjectId]);
 
-  const removeAttachment = (i: number) => {
-    setAttachments((a) => a.filter((_, idx) => idx !== i));
-  };
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
-  const handleSend = () => {
-    if (!message.trim() && attachments.length === 0) return;
-    setSentNote(true);
-    setMessage('');
-    setAttachments([]);
-    setTimeout(() => setSentNote(false), 3000);
-  };
+  const today = todayISO();
+  const nowD = new Date();
+  const nowMin = nowD.getHours() * 60 + nowD.getMinutes();
 
-  const handleCall = () => {
-    // In production: window.location.href = `tel:${ON_CALL_NOW.phone}`;
-    setSentNote(true);
-    setTimeout(() => setSentNote(false), 2400);
-  };
+  const active = roster
+    .map((c) => ({ c, win: onCallNow(c.windows, today, nowMin)! }))
+    .filter((x) => x.win)
+    .sort((a, b) => b.win.end_min - a.win.end_min || a.c.name.localeCompare(b.c.name));
+  const primary = active[0];
+  const backups: { c: OnCallCaregiver; label: string }[] = [
+    ...active.slice(1).map(({ c, win }) => ({ c, label: `On call until ${minToLabel(win.end_min)}` })),
+    ...roster
+      .filter((c) => !active.some((a) => a.c.id === c.id))
+      .map((c) => ({ c, next: nextOnCall(c.windows, today, nowMin) }))
+      .sort((a, b) => {
+        if (!a.next) return b.next ? 1 : a.c.name.localeCompare(b.c.name);
+        if (!b.next) return -1;
+        return a.next.iso.localeCompare(b.next.iso) || a.next.startMin - b.next.startMin;
+      })
+      .map(({ c, next }) => ({ c, label: nextOnCallLabel(next) })),
+  ];
+  const firstName = (c: OnCallCaregiver) => c.name.split(' ')[0];
+
+  async function ensureDM(otherId: string): Promise<string> {
+    if (dmRef.current?.otherId === otherId) return dmRef.current.chatId;
+    const chatId = await ensureDirectChat(otherId);
+    dmRef.current = { otherId, chatId };
+    return chatId;
+  }
+
+  async function openDM(caregiverId: string, body?: string, attachments?: Attachment[]) {
+    if (sending) return;
+    setSending(true);
+    try {
+      const chatId = await ensureDM(caregiverId);
+      const text = body?.trim();
+      if (text || attachments?.length) {
+        const { error } = await supabase
+          .from('chat_messages')
+          .insert({
+            chat_id: chatId, sender_id: me, body: text || null,
+            attachments: attachments?.length ? attachments : null,
+          });
+        if (error) throw error;
+      }
+      navigate(`/chat/${chatId}`);
+    } catch {
+      setErrNote('Could not open the chat. Please try again.');
+      setTimeout(() => setErrNote(''), 3000);
+      setSending(false);
+    }
+  }
+
+  async function addPending(file: Blob, ext: string, type: MediaType) {
+    if (!primary) return;
+    setUploading(true);
+    try {
+      const chatId = await ensureDM(primary.c.id);
+      const path = await uploadChatMedia(chatId, file, ext);
+      setPending((p) => [...p, { type, path, localUrl: URL.createObjectURL(file) }]);
+    } catch {
+      setErrNote('Could not attach that. Please try again.');
+      setTimeout(() => setErrNote(''), 3000);
+    }
+    setUploading(false);
+  }
+
+  function onFile(e: ChangeEvent<HTMLInputElement>, type: MediaType) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const ext = file.name.split('.').pop() || (type === 'photo' ? 'jpg' : 'mp4');
+    addPending(file, ext, type);
+  }
+
+  async function toggleRecord() {
+    if (recording) {
+      recRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (ev) => { if (ev.data.size) chunksRef.current.push(ev.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        addPending(new Blob(chunksRef.current, { type: 'audio/webm' }), 'webm', 'audio');
+      };
+      rec.start();
+      recRef.current = rec;
+      setRecording(true);
+    } catch {
+      setErrNote('Microphone unavailable.');
+      setTimeout(() => setErrNote(''), 3000);
+    }
+  }
+
+  const avatar = (c: OnCallCaregiver, small?: boolean) => (
+    <div
+      className={'urgent__avatar' + (small ? ' urgent__avatar--sm' : '')}
+      style={c.avatarUrl ? undefined : { background: colorFor(c.id) }}
+    >
+      {c.avatarUrl ? <img src={c.avatarUrl} alt="" /> : monogramFor(c.name)}
+    </div>
+  );
+
+  if (!ready) {
+    return <div className="urgent"><p className="conc__care-hint">Loading…</p></div>;
+  }
+
+  if (roster.length === 0) {
+    return (
+      <div className="urgent">
+        <ConciergeEmpty
+          icon="shield-user"
+          title="No care team yet"
+          sub="Urgent care connects you with your own caregivers when they're on call. Build your care team from your Profile."
+          action={subjectId === me ? { label: 'Go to Profile', onClick: () => navigate('/profile') } : undefined}
+        />
+        <aside className="urgent__emergency">
+          <Icon name="info" size={14} />
+          <p>
+            <strong>If this is a life-threatening emergency,</strong> call <a href="tel:911">911</a> immediately. Lichen urgent care is not a substitute for emergency services.
+          </p>
+        </aside>
+      </div>
+    );
+  }
 
   return (
     <div className="urgent">
       <header className="urgent__head">
         <p className="urgent__eyebrow">Get help now</p>
         <h2 className="urgent__title">
-          Reach the practitioner <span className="display-italic">on call.</span>
+          Reach the caregiver <span className="display-italic">on call.</span>
         </h2>
         <p className="urgent__sub">
-          For non-life-threatening urgent care from a Lichen practitioner. Typical
-          response time is under 10 minutes.
+          For non-life-threatening urgent care from your own care team.
         </p>
       </header>
 
-      {/* On-call practitioner card */}
-      <article className="urgent__oncall">
-        {ON_CALL_NOW.isOnUserTeam && (
+      {primary ? (
+        <article className="urgent__oncall">
           <div className="urgent__priority-badge">
             <Icon name="shield-user" size={11} />
-            <span>Priority routed &mdash; on your care team</span>
+            <span>On your care team</span>
           </div>
-        )}
-        <header className="urgent__oncall-head">
-          <div
-            className="urgent__avatar"
-            style={{ background: ON_CALL_NOW.color }}
-          >
-            {ON_CALL_NOW.monogram}
-          </div>
-          <div className="urgent__oncall-id">
-            <h3 className="urgent__oncall-name">{ON_CALL_NOW.name}</h3>
-            <p className="urgent__oncall-role">{ON_CALL_NOW.role}</p>
-          </div>
-          <div className="urgent__status">
-            <span className="urgent__status-dot" />
-            <span>Available</span>
-          </div>
-        </header>
-        <p className="urgent__oncall-blurb">{ON_CALL_NOW.blurb}</p>
-        <p className="urgent__response">
-          <Icon name="sparkle" size={11} />
-          <span>Responds in <strong>{ON_CALL_NOW.responseTime}</strong></span>
-        </p>
+          <header className="urgent__oncall-head">
+            {avatar(primary.c)}
+            <div className="urgent__oncall-id">
+              <h3 className="urgent__oncall-name">{primary.c.name}</h3>
+              <p className="urgent__oncall-role">{primary.c.headline ?? 'Care team'}</p>
+            </div>
+            <div className="urgent__status">
+              <span className="urgent__status-dot" />
+              <span>On call</span>
+            </div>
+          </header>
+          <p className="urgent__oncall-blurb">
+            On call until {minToLabel(primary.win.end_min)}.
+          </p>
 
-        {/* Primary actions: Call (peach) + Text (outline) */}
-        <div className="urgent__actions">
-          <button className="urgent__call" onClick={handleCall}>
-            <Icon name="phone" size={16} />
-            <span>Call {ON_CALL_NOW.name.split(' ')[0]}</span>
+          {/* Primary actions: Call + Text open the phone's own dialer/SMS app
+              (prefilled with the typed context); in-app delivery is the Send
+              button below. */}
+          <div className="urgent__actions">
+            {primary.c.phone && (
+              <a className="urgent__call" href={`tel:${primary.c.phone}`}>
+                <Icon name="phone" size={16} />
+                <span>Call {firstName(primary.c)}</span>
+              </a>
+            )}
+            {primary.c.phone ? (
+              <a
+                className="urgent__text-btn"
+                href={`sms:${primary.c.phone}?&body=${encodeURIComponent(message.trim())}`}
+              >
+                <Icon name="message" size={16} />
+                <span>Text</span>
+              </a>
+            ) : (
+              <a
+                href="#urgent-text"
+                className="urgent__text-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('urgent-text')?.focus();
+                }}
+              >
+                <Icon name="message" size={16} />
+                <span>Message</span>
+              </a>
+            )}
+          </div>
+        </article>
+      ) : (
+        <article className="urgent__oncall urgent__oncall--none">
+          <header className="urgent__oncall-head">
+            <div className="urgent__avatar" style={{ background: 'var(--bone-edge)' }}>
+              <Icon name="phone" size={18} />
+            </div>
+            <div className="urgent__oncall-id">
+              <h3 className="urgent__oncall-name">No one is on call right now</h3>
+              <p className="urgent__oncall-role">Your care team's next times are below</p>
+            </div>
+            <div className="urgent__status urgent__status--off">
+              <span className="urgent__status-dot" />
+              <span>Off call</span>
+            </div>
+          </header>
+        </article>
+      )}
+
+      {/* Context message → first DM message to the on-call caregiver */}
+      {primary && (
+        <section className="urgent__context">
+          <h3 className="urgent__h3">What&rsquo;s going on?</h3>
+          <textarea
+            id="urgent-text"
+            className="urgent__textarea"
+            placeholder="Describe what you&rsquo;re experiencing. Symptoms, timing, anything that might help them help you faster."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+          />
+
+          {/* Attached media chips */}
+          {(pending.length > 0 || uploading) && (
+            <ul className="urgent__attachments">
+              {pending.map((p, i) => (
+                <li key={i} className="urgent__chip">
+                  <Icon name={p.type === 'photo' ? 'image' : p.type === 'video' ? 'video' : 'mic'} size={12} />
+                  <span>{p.type === 'photo' ? 'Photo' : p.type === 'video' ? 'Video' : 'Voice note'}</span>
+                  <button
+                    className="urgent__chip-x"
+                    onClick={() => setPending((cur) => cur.filter((_, idx) => idx !== i))}
+                    aria-label="Remove attachment"
+                  >
+                    <Icon name="close" size={10} />
+                  </button>
+                </li>
+              ))}
+              {uploading && <li className="urgent__chip">Uploading…</li>}
+            </ul>
+          )}
+
+          {/* Attachment row */}
+          <div className="urgent__attach-row">
+            <p className="urgent__attach-label">Add context</p>
+            <div className="urgent__attach-buttons">
+              <button className="urgent__attach-btn" onClick={() => photoRef.current?.click()}>
+                <Icon name="image" size={16} />
+                <span>Photo</span>
+              </button>
+              <button className="urgent__attach-btn" onClick={() => videoRef.current?.click()}>
+                <Icon name="video" size={16} />
+                <span>Video</span>
+              </button>
+              <button
+                className={'urgent__attach-btn' + (recording ? ' is-recording' : '')}
+                onClick={toggleRecord}
+              >
+                <Icon name="mic" size={16} />
+                <span>{recording ? 'Stop' : 'Voice'}</span>
+              </button>
+            </div>
+          </div>
+          <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
+          <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
+
+          <button
+            className="urgent__send"
+            onClick={() => openDM(primary.c.id, message, pending.map((p) => ({ type: p.type, url: p.path })))}
+            disabled={sending || uploading || recording || (!message.trim() && pending.length === 0)}
+          >
+            <Icon name="send" size={14} />
+            <span>{sending ? 'Opening chat…' : `Send to ${firstName(primary.c)}`}</span>
           </button>
-          <a
-            href="#urgent-text"
-            className="urgent__text-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById('urgent-text')?.focus();
-            }}
-          >
-            <Icon name="message" size={16} />
-            <span>Text</span>
-          </a>
-        </div>
-      </article>
+        </section>
+      )}
 
-      {/* Context section: message + media attachments */}
-      <section className="urgent__context">
-        <h3 className="urgent__h3">What&rsquo;s going on?</h3>
-        <textarea
-          id="urgent-text"
-          className="urgent__textarea"
-          placeholder="Describe what you&rsquo;re experiencing. Symptoms, timing, anything that might help them help you faster."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={4}
-        />
-
-        {/* Attachment chips */}
-        {attachments.length > 0 && (
-          <ul className="urgent__attachments">
-            {attachments.map((a, i) => (
-              <li key={i} className="urgent__chip">
-                <Icon name={a.kind === 'photo' ? 'image' : a.kind === 'video' ? 'video' : 'mic'} size={12} />
-                <span>{a.label}</span>
-                <button
-                  className="urgent__chip-x"
-                  onClick={() => removeAttachment(i)}
-                  aria-label={`Remove ${a.label}`}
-                >
-                  <Icon name="close" size={10} />
+      {/* The rest of the team, soonest on-call first */}
+      {backups.length > 0 && (
+        <section className="urgent__backup">
+          <h3 className="urgent__h3">{primary ? 'If they don’t pick up' : 'Your care team'}</h3>
+          <p className="urgent__sub urgent__sub--tight">
+            {primary ? 'The rest of your care team.' : 'Tap anyone to message them.'}
+          </p>
+          <ul className="urgent__backup-list">
+            {backups.map(({ c, label }) => (
+              <li key={c.id}>
+                <button className="urgent__backup-item" onClick={() => openDM(c.id)} disabled={sending}>
+                  {avatar(c, true)}
+                  <div className="urgent__backup-body">
+                    <div className="urgent__backup-row">
+                      <span className="urgent__backup-name">{c.name}</span>
+                      <span className="urgent__backup-rt">{label}</span>
+                    </div>
+                    <span className="urgent__backup-role">{c.headline ?? 'Care team'}</span>
+                  </div>
                 </button>
               </li>
             ))}
           </ul>
-        )}
-
-        {/* Attachment row */}
-        <div className="urgent__attach-row">
-          <p className="urgent__attach-label">Add context</p>
-          <div className="urgent__attach-buttons">
-            <button className="urgent__attach-btn" onClick={() => addAttachment('photo')}>
-              <Icon name="image" size={16} />
-              <span>Photo</span>
-            </button>
-            <button className="urgent__attach-btn" onClick={() => addAttachment('video')}>
-              <Icon name="video" size={16} />
-              <span>Video</span>
-            </button>
-            <button className="urgent__attach-btn" onClick={() => addAttachment('voice')}>
-              <Icon name="mic" size={16} />
-              <span>Voice</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Send button */}
-        <button
-          className="urgent__send"
-          onClick={handleSend}
-          disabled={!message.trim() && attachments.length === 0}
-        >
-          <Icon name="send" size={14} />
-          <span>Send to {ON_CALL_NOW.name.split(' ')[0]}</span>
-        </button>
-      </section>
-
-      {/* Backup options */}
-      <section className="urgent__backup">
-        <h3 className="urgent__h3">If they don&rsquo;t pick up</h3>
-        <p className="urgent__sub urgent__sub--tight">
-          These Lichen practitioners are also on call right now.
-        </p>
-        <ul className="urgent__backup-list">
-          {BACKUP_PRACTITIONERS.map((p) => (
-            <li key={p.id} className="urgent__backup-item">
-              <div
-                className="urgent__avatar urgent__avatar--sm"
-                style={{ background: p.color }}
-              >
-                {p.monogram}
-              </div>
-              <div className="urgent__backup-body">
-                <div className="urgent__backup-row">
-                  <span className="urgent__backup-name">{p.name}</span>
-                  <span className="urgent__backup-rt">{p.responseTime}</span>
-                </div>
-                <span className="urgent__backup-role">{p.role} &middot; {p.blurb}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+        </section>
+      )}
 
       {/* Emergency disclaimer */}
       <aside className="urgent__emergency">
@@ -212,12 +379,7 @@ function UrgentCare() {
         </p>
       </aside>
 
-      {/* Toast for send/call (placeholder for now — wire to real services later) */}
-      {sentNote && (
-        <div className="mkt__toast">
-          Connecting you with {ON_CALL_NOW.name.split(' ')[0]}&hellip;
-        </div>
-      )}
+      {errNote && <div className="mkt__toast">{errNote}</div>}
     </div>
   );
 }
@@ -628,7 +790,7 @@ export default function Concierge() {
         </>
       )}
 
-      {activeTab === 'urgent' && <UrgentCare />}
+      {activeTab === 'urgent' && <UrgentCare subjectId={subjectId} me={me} />}
     </div>
   );
 }

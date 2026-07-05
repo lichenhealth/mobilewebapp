@@ -24,6 +24,9 @@ const SPACE_SECTIONS: { kind: SpaceKind; q: string; desc: string; one: string }[
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user, loading, markOnboarded } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -49,6 +52,32 @@ export default function Onboarding() {
     return () => { active = false; };
   }, []);
 
+  // Prefill first/last from the name collected at signup (splittable full_name).
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    supabase.from('profiles').select('full_name').eq('id', user.id).single()
+      .then(({ data }) => {
+        if (!active) return;
+        const full = ((data as { full_name: string | null } | null)?.full_name ?? '').trim();
+        if (!full) return;
+        const sp = full.indexOf(' ');
+        setFirstName((cur) => cur || (sp > 0 ? full.slice(0, sp) : full));
+        if (sp > 0) setLastName((cur) => cur || full.slice(sp + 1).trim());
+      });
+    return () => { active = false; };
+  }, [user]);
+
+  /** The required basics; both Enter Lichen and "later" gate on these. */
+  function basicsError(): string {
+    return firstName.trim() && lastName.trim() && phone.trim()
+      ? ''
+      : 'Please add your first name, last name, and phone number.';
+  }
+  function basicsPatch() {
+    return { first_name: firstName.trim(), last_name: lastName.trim(), phone: phone.trim() };
+  }
+
   function toggleCap(id: string) {
     setCaps((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   }
@@ -65,6 +94,8 @@ export default function Onboarding() {
   async function finish() {
     if (!user) return;
     setError('');
+    const basicsErr = basicsError();
+    if (basicsErr) { setError(basicsErr); return; }
     const named = spaces.filter((s) => s.name.trim());
     if (spaces.length !== named.length) {
       setError('Please name each one, or remove the blank ones.');
@@ -98,7 +129,7 @@ export default function Onboarding() {
         if (spaceErr) throw spaceErr;
       }
       const { error: onbErr } = await supabase
-        .from('profiles').update({ onboarded: true }).eq('id', user.id);
+        .from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
       if (onbErr) throw onbErr;
       markOnboarded();
       navigate('/home', { replace: true });
@@ -112,11 +143,14 @@ export default function Onboarding() {
   }
 
   async function skip() {
-    if (user) {
-      setSaving(true);
-      await supabase.from('profiles').update({ onboarded: true }).eq('id', user.id);
-      markOnboarded();
-    }
+    if (!user) { navigate('/home', { replace: true }); return; }
+    // "Later" still marks the profile onboarded, so the basics can't be skipped.
+    setError('');
+    const basicsErr = basicsError();
+    if (basicsErr) { setError(basicsErr); return; }
+    setSaving(true);
+    await supabase.from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
+    markOnboarded();
     navigate('/home', { replace: true });
   }
 
@@ -134,9 +168,43 @@ export default function Onboarding() {
           <div className="onb__logo"><LichenMark size={60} /></div>
           <h1 className="onb__title">Welcome to Lichen</h1>
           <p className="onb__sub">
-            You’re a member now. Tell us how you’ll show up — all optional, and you can change it anytime.
+            You’re a member now. Start with the basics, then tell us how you’ll show up —
+            the rest is optional, and you can change it anytime.
           </p>
         </header>
+
+        <section className="onb__section">
+          <h2 className="onb__h2">First, the basics</h2>
+          <div className="onb__basics">
+            <input
+              className="onb__input"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="First name"
+              autoComplete="given-name"
+            />
+            <input
+              className="onb__input"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Last name"
+              autoComplete="family-name"
+            />
+            <input
+              className="onb__input"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone number"
+              autoComplete="tel"
+            />
+          </div>
+          <p className="onb__lead" style={{ marginBottom: 0 }}>
+            Your care team uses your phone to reach you — and to call you if you’re ever on call for someone.
+          </p>
+        </section>
 
         <section className="onb__section">
           <h2 className="onb__h2">Do you offer any goods or services?</h2>
