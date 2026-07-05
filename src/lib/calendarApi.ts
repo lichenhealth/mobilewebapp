@@ -148,6 +148,26 @@ export async function loadEvent(id: string): Promise<EventRow | null> {
   return (data as unknown as EventRow | null) ?? null;
 }
 
+/** Update ONLY the event's own fields — attendees and owner untouched.
+ *  (updateEvent below syncs invitees, so handing it an empty list would wipe
+ *  the guest list and everyone's RSVPs; Compose's event editing must not.) */
+export async function updateEventDetails(
+  id: string,
+  input: Pick<EventInput, 'title' | 'description' | 'location' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin'>,
+): Promise<void> {
+  const { error } = await supabase.from('events').update({
+    title: input.title,
+    description: input.description,
+    location: input.location,
+    start_date: input.startDate,
+    end_date: input.endDate,
+    all_day: input.allDay,
+    start_min: input.allDay ? null : input.startMin,
+    end_min: input.allDay ? null : input.endMin,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
 /** Update an event in place and sync invitees: newly added people are invited
  *  (their notification fires via the DB trigger), removed people are uninvited,
  *  everyone kept keeps their RSVP status. */

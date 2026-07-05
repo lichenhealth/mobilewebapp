@@ -8,11 +8,11 @@ import FeedCard from '../components/FeedCard';
 import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
-import { loadEvent, minToLabel, type EventRow } from '../lib/calendarApi';
+import { loadEvent, deleteEvent, minToLabel, type EventRow } from '../lib/calendarApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import {
-  loadPost, loadEventUpdates, rsvpToEvent, unRsvp,
+  loadPost, loadEventUpdates, rsvpToEvent, unRsvp, deletePost,
   type FeedPost,
 } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
@@ -103,6 +103,23 @@ export default function EventPage() {
 
   const TABS: Tab[] = ['About', 'Updates', 'Chat', 'RSVP', 'Book'];
   const isHost = post.author_id === me;
+
+  /** Host cancels: the calendar event goes first (cascades guests' calendar
+   *  entries and the event chat room), then the post itself. */
+  async function cancelEvent() {
+    if (!post || !isHost) return;
+    const ok = window.confirm(
+      "Cancel this event? Guests' calendars and the event chat will be removed too.",
+    );
+    if (!ok) return;
+    try {
+      if (post.linked_event_id) await deleteEvent(post.linked_event_id);
+      await deletePost(post.id);
+      navigate('/events');
+    } catch (e) {
+      console.error('cancel event', e);
+    }
+  }
   // Room membership = host + going + maybes (invited-but-unanswered isn't in yet).
   const inRoom = isHost || myStatus === 'going' || myStatus === 'tentative';
 
@@ -140,6 +157,19 @@ export default function EventPage() {
             </button>
           ))}
         </div>
+        {isHost && (
+          <div className="evp__manage">
+            <button
+              className="evp__manage-btn"
+              onClick={() => navigate(`/compose?area=events&post=${post.id}`)}
+            >
+              Edit event
+            </button>
+            <button className="evp__manage-btn evp__manage-btn--danger" onClick={cancelEvent}>
+              Cancel event
+            </button>
+          </div>
+        )}
       </div>
 
       {tab === 'About' && (

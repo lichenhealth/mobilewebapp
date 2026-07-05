@@ -7,10 +7,11 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
-  createPost, uploadMedia, CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
+  createPost, updatePost, loadPost, postAreas, uploadMedia,
+  CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
-import { createEvent, deleteEvent } from '../lib/calendarApi';
+import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
 import { resolvePreviews } from '../lib/conciergeApi';
 import { parseBodyUrls } from '../lib/linkify';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
@@ -74,9 +75,61 @@ export default function Compose() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // Edit mode: ?post=<id> loads an existing post (author only) and submit
+  // updates in place instead of creating.
+  const editPostId = params.get('post');
+  const editing = !!editPostId;
+  const [editReady, setEditReady] = useState(!editing);
+  const editLinkedEvent = useRef<string | null>(null);
+
   useEffect(() => {
     if (!loading && !user) navigate('/login', { replace: true });
   }, [loading, user, navigate]);
+
+  useEffect(() => {
+    if (!editPostId || !user) return;
+    let live = true;
+    (async () => {
+      const p = await loadPost(editPostId);
+      if (!live) return;
+      if (!p || p.author_id !== user.id) { navigate('/events', { replace: true }); return; }
+      editLinkedEvent.current = p.linked_event_id;
+      setIsPublic(p.is_public);
+      setToMycelium(p.to_mycelium);
+      setAudienceSpaces(new Set(p.audience_space_ids ?? []));
+      setContentType(p.content_type);
+      setAreas(new Set(postAreas(p)));
+      setTitle(p.title ?? '');
+      setBody(p.body ?? '');
+      if (p.event_category) setEvCategory(p.event_category);
+      if (p.event_mode) setEvMode(p.event_mode);
+      const ev = p.linked_event;
+      if (ev) {
+        setEvRange({ start: ev.start_date, end: ev.end_date });
+        setEvAllDay(ev.all_day);
+        if (ev.start_min != null) setEvStartMin(ev.start_min);
+        if (ev.end_min != null) setEvEndMin(ev.end_min);
+      }
+      const d = p.details ?? {};
+      if (typeof d.location === 'string') setLocation(d.location);
+      if (typeof d.bookingUrl === 'string') setBookingUrl(d.bookingUrl);
+      if (typeof d.trade === 'string') setTradeFor(d.trade);
+      if (typeof d.price === 'string') {
+        // "Sliding scale $20–$60" round-trips back into the two fields.
+        const m = d.price.match(/^Sliding scale (.*)–(.*)$/);
+        if (d.sliding === true && m) {
+          setSliding(true);
+          setSlideLow(m[1] === '?' ? '' : m[1]);
+          setSlideHigh(m[2] === '?' ? '' : m[2]);
+        } else {
+          setPrice(d.price);
+        }
+      }
+      if (Array.isArray(d.media)) setMedia(d.media as Attached[]);
+      setEditReady(true);
+    })();
+    return () => { live = false; };
+  }, [editPostId, user, navigate]);
 
   // Every space I belong to (any role) is an audience option.
   useEffect(() => {
@@ -94,8 +147,12 @@ export default function Compose() {
     setIsPublic(false);
     setAudienceSpaces((cur) => { const n = new Set(cur); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
-  const toggleArea = (a: ServiceArea) =>
+  const toggleArea = (a: ServiceArea) => {
+    // Editing an event post: it's anchored to a real calendar event, so
+    // 'events' can't be unchecked (cancel the event instead).
+    if (editing && a === 'events' && areas.has('events') && editLinkedEvent.current) return;
     setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
+  };
   const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
 
   const isMarket = areas.has('marketplace');
@@ -182,6 +239,44 @@ export default function Compose() {
       if (previews.length) details.previews = previews;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
 
+      if (editing && editPostId) {
+        // Edit in place. The event's own fields update via updateEventDetails
+        // (NOT updateEvent — its invitee sync would wipe the guest list).
+        let linkedEventId = editLinkedEvent.current;
+        if (isEvent && evRange.start) {
+          const evFields = {
+            title: title.trim() || body.trim().slice(0, 60) || 'Event',
+            description: body.trim(),
+            location: location.trim(),
+            startDate: evRange.start,
+            endDate: evRange.end ?? evRange.start,
+            allDay: evAllDay,
+            startMin: evStartMin, endMin: evEndMin,
+          };
+          if (linkedEventId) {
+            await updateEventDetails(linkedEventId, evFields);
+          } else {
+            linkedEventId = await createEvent(user!.id, {
+              ownerProfileId: actor.type === 'space' ? undefined : user!.id,
+              ownerSpaceId: actor.type === 'space' ? actor.id : undefined,
+              ...evFields, recurrence: null, inviteeIds: [],
+            });
+          }
+        }
+        await updatePost(editPostId, {
+          body, title, content_type: isEvent ? 'actionable' : contentType,
+          isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
+          serviceAreas: [...areas],
+          authorSpaceId: actor.type === 'space' ? actor.id : null,
+          eventCategory: isEvent ? evCategory : null,
+          eventMode: isEvent ? (evMode as EventMode) : null,
+          linkedEventId,
+          image_url: firstPhoto, details,
+        });
+        navigate(isEvent ? `/events/${editPostId}` : '/home');
+        return;
+      }
+
       // Events first create their calendar event (the RSVP container); if the
       // post insert then fails, the orphan event is cleaned up below.
       let linkedEventId: string | null = null;
@@ -222,13 +317,17 @@ export default function Compose() {
     }
   }
 
-  if (loading) return <div className="cmp"><p className="cmp__muted">Loading…</p></div>;
+  if (loading || !editReady) return <div className="cmp"><p className="cmp__muted">Loading…</p></div>;
 
   return (
     <div className="cmp">
       <header className="cmp__head">
-        <h1 className="cmp__title">New post</h1>
-        <p className="cmp__sub">Share with the whole network, or just your mycelium.</p>
+        <h1 className="cmp__title">{editing ? (isEvent ? 'Edit event' : 'Edit post') : 'New post'}</h1>
+        <p className="cmp__sub">
+          {editing
+            ? 'Changes save in place — guests keep their RSVPs.'
+            : 'Share with the whole network, or just your mycelium.'}
+        </p>
       </header>
 
       {error && <p className="cmp__error">{error}</p>}
@@ -279,7 +378,12 @@ export default function Compose() {
         <div className="cmp__where-list">
           {SERVICE_AREAS.map((a) => (
             <label key={a.value} className="cmp__where-row">
-              <input type="checkbox" checked={areas.has(a.value)} onChange={() => toggleArea(a.value)} />
+              <input
+                type="checkbox"
+                checked={areas.has(a.value)}
+                onChange={() => toggleArea(a.value)}
+                disabled={editing && a.value === 'events' && areas.has('events') && !!editLinkedEvent.current}
+              />
               <Icon name={a.icon} size={14} /> {a.label}
             </label>
           ))}
@@ -399,7 +503,7 @@ export default function Compose() {
       )}
 
       <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !body.trim()}>
-        {busy ? 'Posting…' : 'Post'}
+        {busy ? (editing ? 'Saving…' : 'Posting…') : (editing ? 'Save changes' : 'Post')}
       </button>
     </div>
   );
