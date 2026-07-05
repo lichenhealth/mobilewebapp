@@ -19,6 +19,7 @@ reviewable changes. Keep Plan Mode on for anything touching the database or auth
 - Logo: `src/components/LichenMark.tsx`. Icons: `src/components/Icon.tsx` (`<Icon name=... size=... />`).
 - Avoid the word "spaces" in member-facing UI — say organizations / communities / groups / places.
 - Supabase embeds: when a table has >1 FK to another, disambiguate with the explicit hint, e.g. `profiles!subscriptions_profile_id_fkey(full_name)`.
+- React hooks must ALL sit above any early return (`if (loading) return …`). A hook added below one crashes the whole app to a blank page when the data arrives ("Rendered more hooks…") — this took out every event page in prod until PR #46 (2026-07-05).
 - New enum values can't be USED in the same migration that adds them — add in a separate step that's committed first.
 - Only 3 columns use real Postgres enums (`account_capability`, `space_kind`, `space_member_role`). The other "enum-like" fields below (care `status`, subscription `tier`/`source`, category `domain`, suggestion `status`) are actually `text` columns with CHECK constraints — to add a value, change the CHECK, not an enum type.
 
