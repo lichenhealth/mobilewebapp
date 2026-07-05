@@ -53,6 +53,14 @@
 .evp__desc a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
 
 .evp__rsvp-btn { width: 100%; text-align: center; }
+.evp__rsvp-row { display: flex; gap: var(--s-2); }
+.evp__rsvp-btn--maybe {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  color: var(--ink);
+}
+.evp__rsvp-btn--maybe:hover { border-color: var(--peach); }
+.evp__rsvp-btn--maybe.is-on { border-color: var(--peach); color: var(--peach-deep); }
 .evp__count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); text-align: center; }
 .evp__people { display: flex; flex-direction: column; gap: var(--s-2); }
 .evp__person {

@@ -243,15 +243,16 @@ export default function Calendar() {
   const hasAllDayRow = days.some((d) => allDayOn(d).length > 0);
 
   async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
-  async function onRsvp(ev: EventRow, status: 'going' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
+  async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
 
   const headerLabel = localDate(view === 'month' ? anchor : days[Math.floor(days.length / 2)])
     .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const myAttend = (ev: EventRow) => ev.attendees?.find((a) => a.profile_id === me);
-  // Google-style block state: pending invite = white w/ peach outline; declined = faded.
+  // Google-style block state: pending invite / tentative = white w/ peach
+  // outline; declined = faded.
   const blockClass = (ev: EventRow, base: string) => {
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
-    return base + (st === 'invited' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
+    return base + (st === 'invited' || st === 'tentative' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
   };
   const jumpToDay = (iso: string) => { setAnchor(iso); setView('day'); };
 
@@ -573,7 +574,9 @@ export default function Calendar() {
                       {monogramFor(a.profile?.full_name ?? 'Member')}
                     </span>
                     <span className="calp__person-name">{a.profile?.full_name ?? 'Member'}</span>
-                    <span className={'calp__person-status is-' + a.status}>{a.status === 'invited' ? '?' : a.status === 'going' ? '✓' : '✕'}</span>
+                    <span className={'calp__person-status is-' + a.status}>
+                      {a.status === 'invited' ? '?' : a.status === 'going' ? '✓' : a.status === 'tentative' ? '~' : '✕'}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -587,6 +590,12 @@ export default function Calendar() {
                     onClick={() => onRsvp(selected, 'going')}
                   >
                     Going
+                  </button>
+                  <button
+                    className={'btn calp__sheet-btn' + (myAttend(selected)?.status === 'tentative' ? ' is-current' : '')}
+                    onClick={() => onRsvp(selected, 'tentative')}
+                  >
+                    Maybe
                   </button>
                   <button
                     className={'btn calp__sheet-btn' + (myAttend(selected)?.status === 'declined' ? ' is-current' : '')}

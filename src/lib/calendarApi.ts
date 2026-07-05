@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type { Recurrence } from './recurrence';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export type RsvpStatus = 'invited' | 'going' | 'declined';
+export type RsvpStatus = 'invited' | 'going' | 'tentative' | 'declined';
 
 export interface EventAttendee {
   profile_id: string;
