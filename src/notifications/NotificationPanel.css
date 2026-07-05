@@ -34,7 +34,15 @@
 }
 .notif-panel__mark:hover { text-decoration: underline; }
 
-.notif-panel__list { overflow-y: auto; }
+.notif-panel__list {
+  overflow-y: auto;
+  /* flex children default to min-height:auto and refuse to shrink — without
+     this the list never scrolls and the wheel moves the page behind it */
+  min-height: 0;
+  flex: 1 1 auto;
+  /* reaching the top/bottom shouldn't hand the scroll to the app behind */
+  overscroll-behavior: contain;
+}
 .notif-panel__empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
   padding: var(--s-7) var(--s-5); color: var(--ink-faint);
