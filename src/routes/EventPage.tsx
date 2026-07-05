@@ -53,6 +53,28 @@ export default function EventPage() {
   }, [postId]);
   useEffect(() => { load(); }, [load]);
 
+  // Everything hook-shaped must live ABOVE the early returns — React requires
+  // the same hook sequence on every render. (A trailing effect below the
+  // loading return crashed the whole app to a blank page the moment a real
+  // event finished loading: "Rendered more hooks than during the previous
+  // render".)
+  const myStatus = calEvent?.attendees?.find((a) => a.profile_id === me)?.status ?? null;
+  const isHost = !!post && post.author_id === me;
+  // Room membership = host + going + maybes (invited-but-unanswered isn't in yet).
+  const inRoom = isHost || myStatus === 'going' || myStatus === 'tentative';
+
+  // Open (or lazily create) the event room — host or anyone going/maybe.
+  useEffect(() => {
+    if (tab !== 'Chat' || chatId || chatAsked.current) return;
+    if (!me || !post?.linked_event_id || !inRoom) return;
+    chatAsked.current = true;
+    (async () => {
+      const { data, error } = await supabase.rpc('ensure_event_chat', { p_event: post.linked_event_id });
+      if (error) { console.warn('ensure_event_chat', error.message); setChatErr(true); return; }
+      setChatId(data as string);
+    })();
+  }, [tab, chatId, me, post, inRoom]);
+
   if (loading) return <div className="evp"><p className="evp__muted">Loading…</p></div>;
   if (!post) return <div className="evp"><p className="evp__muted">This event isn't available.</p></div>;
 
@@ -62,7 +84,6 @@ export default function EventPage() {
     ?? (Array.isArray(post.details?.media)
       ? (post.details.media as { type: string; url: string }[]).find((m) => m.type === 'photo')?.url
       : undefined);
-  const myStatus = calEvent?.attendees?.find((a) => a.profile_id === me)?.status ?? null;
   const going = !!myStatus && myStatus !== 'declined';
   const attendees = (calEvent?.attendees ?? []).filter((a) => a.status !== 'declined');
   const goingCount = attendees.filter((a) => a.status === 'going').length;
@@ -102,7 +123,6 @@ export default function EventPage() {
   }
 
   const TABS: Tab[] = ['About', 'Updates', 'Chat', 'RSVP', 'Book'];
-  const isHost = post.author_id === me;
 
   /** Host cancels: the calendar event goes first (cascades guests' calendar
    *  entries and the event chat room), then the post itself. */
@@ -120,21 +140,6 @@ export default function EventPage() {
       console.error('cancel event', e);
     }
   }
-  // Room membership = host + going + maybes (invited-but-unanswered isn't in yet).
-  const inRoom = isHost || myStatus === 'going' || myStatus === 'tentative';
-
-  // Open (or lazily create) the event room — host or anyone going/maybe.
-  useEffect(() => {
-    if (tab !== 'Chat' || chatId || chatAsked.current) return;
-    if (!me || !post?.linked_event_id || !inRoom) return;
-    chatAsked.current = true;
-    (async () => {
-      const { data, error } = await supabase.rpc('ensure_event_chat', { p_event: post.linked_event_id });
-      if (error) { console.warn('ensure_event_chat', error.message); setChatErr(true); return; }
-      setChatId(data as string);
-    })();
-  }, [tab, chatId, me, post, inRoom]);
-
   return (
     <div className="evp">
       {/* Sticky title + tabs (à la the calendar pin) */}
