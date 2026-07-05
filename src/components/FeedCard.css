@@ -10,6 +10,10 @@
 }
 .feed-card:hover { box-shadow: var(--sh-card); }
 
+/* Whole card opens the post/event page (inner buttons/links keep their jobs) */
+.feed-card--clickable { cursor: pointer; }
+.feed-card--clickable:hover { border-color: var(--peach); }
+
 .feed-card__head {
   display: grid;
   grid-template-columns: 40px 1fr auto;
