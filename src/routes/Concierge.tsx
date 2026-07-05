@@ -226,7 +226,9 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
             On call until {minToLabel(primary.win.end_min)}.
           </p>
 
-          {/* Primary actions: Call (peach) + Text (outline) */}
+          {/* Primary actions: Call + Text open the phone's own dialer/SMS app
+              (prefilled with the typed context); in-app delivery is the Send
+              button below. */}
           <div className="urgent__actions">
             {primary.c.phone && (
               <a className="urgent__call" href={`tel:${primary.c.phone}`}>
@@ -234,17 +236,27 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
                 <span>Call {firstName(primary.c)}</span>
               </a>
             )}
-            <a
-              href="#urgent-text"
-              className="urgent__text-btn"
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById('urgent-text')?.focus();
-              }}
-            >
-              <Icon name="message" size={16} />
-              <span>Text</span>
-            </a>
+            {primary.c.phone ? (
+              <a
+                className="urgent__text-btn"
+                href={`sms:${primary.c.phone}?&body=${encodeURIComponent(message.trim())}`}
+              >
+                <Icon name="message" size={16} />
+                <span>Text</span>
+              </a>
+            ) : (
+              <a
+                href="#urgent-text"
+                className="urgent__text-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('urgent-text')?.focus();
+                }}
+              >
+                <Icon name="message" size={16} />
+                <span>Message</span>
+              </a>
+            )}
           </div>
         </article>
       ) : (
