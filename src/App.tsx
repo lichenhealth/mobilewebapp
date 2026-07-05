@@ -122,6 +122,8 @@ export default function App() {
           <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
           <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
           <Route path="/events"   element={<Events />} />
+          {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
+          <Route path="/events/mine" element={<Events />} />
           <Route path="/events/:postId" element={<EventPage />} />
           <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming soon" />} />
 
