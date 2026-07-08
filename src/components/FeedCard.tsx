@@ -1,3 +1,4 @@
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import { LinkifiedText, CarePreview } from './CarePostCard';
@@ -63,8 +64,18 @@ export default function FeedCard({
   onOpen,
   previews,
 }: FeedCardProps) {
+  // Whole-card click-through: anywhere that isn't itself interactive opens
+  // the post/event page. Inner buttons, links, and media keep their own
+  // behavior via the closest() guard.
+  const onCardClick = onOpen
+    ? (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('a, button, input, textarea, video, audio')) return;
+        onOpen();
+      }
+    : undefined;
+
   return (
-    <article className="feed-card">
+    <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '')} onClick={onCardClick}>
       {/* HEADER */}
       <header className="feed-card__head">
         <div className="feed-card__avatar" aria-hidden="true">
@@ -110,7 +121,18 @@ export default function FeedCard({
       {/* BODY */}
       <div className="feed-card__body">
         {onOpen
-          ? <p className="feed-card__text feed-card__text--link" onClick={onOpen} role="link" tabIndex={0}><LinkifiedText text={body} /></p>
+          ? (
+            // Mouse clicks are handled by the card itself; this keeps the
+            // page reachable by keyboard (Tab + Enter).
+            <p
+              className="feed-card__text feed-card__text--link"
+              role="link"
+              tabIndex={0}
+              onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter') onOpen(); }}
+            >
+              <LinkifiedText text={body} />
+            </p>
+          )
           : <p className="feed-card__text"><LinkifiedText text={body} /></p>}
         {image && (
           <ImageBadge
