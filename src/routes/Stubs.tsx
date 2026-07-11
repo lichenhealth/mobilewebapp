@@ -11,16 +11,7 @@ export function Saved() {
   );
 }
 
-export function Maps() {
-  return (
-    <Placeholder
-      title="Maps"
-      icon="maps"
-      intro="A bioregional view of your network. Find a builder, a kitchen table, a quiet place to write within a day's drive."
-      hint="Coming in pass two"
-    />
-  );
-}
+// Maps graduated to a real screen (src/routes/MapView.tsx, 2026-07-05).
 
 export function Profile() {
   return (

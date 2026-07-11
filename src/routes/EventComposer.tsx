@@ -11,6 +11,8 @@ import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO, formatDateShort } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel } from '../lib/recurrence';
 import { createEvent, updateEvent, loadEvent, minToLabel } from '../lib/calendarApi';
+import LocationField from '../components/LocationField';
+import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
 import './Concierge.css';
@@ -41,6 +43,8 @@ export default function EventComposer() {
   const [query, setQuery] = useState('');
   const [invitees, setInvitees] = useState<MemberOpt[]>([]);
   const [location, setLocation] = useState('');
+  // Coordinates from a picked LocationField suggestion (null = text-only).
+  const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +109,7 @@ export default function EventComposer() {
       if (ev.end_min != null) setEndMin(ev.end_min);
       setRecurrence(ev.recurrence);
       setLocation(ev.location);
+      setLocGeo(ev.lat != null && ev.lng != null ? { lat: ev.lat, lng: ev.lng } : null);
       setDescription(ev.description);
       setInvitees((ev.attendees ?? []).map((a) => ({ id: a.profile_id, full_name: a.profile?.full_name ?? null })));
     })();
@@ -134,6 +139,8 @@ export default function EventComposer() {
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
+        lat: locGeo?.lat ?? null,
+        lng: locGeo?.lng ?? null,
         startDate: range.start,
         endDate: range.end ?? range.start,
         allDay,
@@ -249,7 +256,13 @@ export default function EventComposer() {
         {/* Location + notes */}
         <div className="cedit__field">
           <span className="cedit__label">Location</span>
-          <input className="cedit__input" placeholder="Where (optional)" value={location} onChange={(e) => setLocation(e.target.value)} />
+          <LocationField
+            className="cedit__input"
+            value={location}
+            geo={locGeo}
+            onChange={(text, g) => { setLocation(text); setLocGeo(g); }}
+            placeholder="Where (optional)"
+          />
         </div>
         <div className="cedit__field">
           <span className="cedit__label">Notes</span>

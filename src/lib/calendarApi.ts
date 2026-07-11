@@ -18,6 +18,8 @@ export interface EventRow {
   title: string;
   description: string;
   location: string;
+  lat: number | null;              // set when the composer's autocomplete was picked
+  lng: number | null;
   start_date: string;              // yyyy-mm-dd, local
   end_date: string;
   all_day: boolean;
@@ -29,7 +31,7 @@ export interface EventRow {
 }
 
 const EVENT_COLS =
-  'id, creator_id, owner_profile_id, owner_space_id, title, description, location, ' +
+  'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
   'start_date, end_date, all_day, start_min, end_min, recurrence, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
@@ -97,6 +99,8 @@ export interface EventInput {
   title: string;
   description: string;
   location: string;
+  lat?: number | null;             // from a picked LocationField suggestion
+  lng?: number | null;
   startDate: string;
   endDate: string;
   allDay: boolean;
@@ -115,6 +119,8 @@ export async function createEvent(me: string, input: EventInput): Promise<string
     title: input.title,
     description: input.description,
     location: input.location,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     start_date: input.startDate,
     end_date: recurring ? input.startDate : input.endDate,
     all_day: input.allDay,
@@ -153,12 +159,14 @@ export async function loadEvent(id: string): Promise<EventRow | null> {
  *  the guest list and everyone's RSVPs; Compose's event editing must not.) */
 export async function updateEventDetails(
   id: string,
-  input: Pick<EventInput, 'title' | 'description' | 'location' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin'>,
+  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin'>,
 ): Promise<void> {
   const { error } = await supabase.from('events').update({
     title: input.title,
     description: input.description,
     location: input.location,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     start_date: input.startDate,
     end_date: input.endDate,
     all_day: input.allDay,
@@ -179,6 +187,8 @@ export async function updateEvent(me: string, id: string, input: EventInput): Pr
     title: input.title,
     description: input.description,
     location: input.location,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     start_date: input.startDate,
     end_date: recurring ? input.startDate : input.endDate,
     all_day: input.allDay,

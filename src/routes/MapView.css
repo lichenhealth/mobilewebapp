@@ -1,0 +1,69 @@
+/* Maps — full-bleed between TopBar and BottomNav (App.tsx zeroes .scroll-view
+   padding for /maps, like ChatThread). */
+.mapv {
+  position: relative;
+  height: calc(100dvh - var(--top-h) - var(--safe-top) - var(--nav-h) - var(--safe-bot));
+  margin-top: calc(var(--top-h) + var(--safe-top));
+}
+.mapv__map { position: absolute; inset: 0; }
+
+/* Filter chips floating over the map */
+.mapv__filters {
+  position: absolute; top: var(--s-3); left: 0; right: 0; z-index: 5;
+  padding: 0 var(--s-4);
+  pointer-events: none;
+}
+.mapv__tabs { display: flex; gap: var(--s-2); overflow-x: auto; pointer-events: auto; padding-bottom: 4px; }
+.mapv__tabs::-webkit-scrollbar { display: none; }
+.mapv__chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border-radius: var(--r-full); flex-shrink: 0;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  box-shadow: var(--sh-soft);
+  font-size: 12px; font-weight: 400; color: var(--ink-muted); cursor: pointer;
+}
+.mapv__chip.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); font-weight: 500; }
+.mapv__chip-gap { width: var(--s-2); flex-shrink: 0; }
+
+/* Event pin: peach teardrop dot */
+.mapv__pin {
+  width: 26px; height: 26px; border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  background: var(--peach);
+  border: 2px solid var(--bone-warm);
+  box-shadow: var(--sh-pop);
+  cursor: pointer;
+}
+.mapv__pin:hover { background: var(--peach-deep, var(--peach)); }
+
+/* Popup card (inside mapbox popup) */
+.mapboxgl-popup-content {
+  background: var(--bone) !important;
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md) !important;
+  box-shadow: var(--sh-pop) !important;
+  padding: var(--s-3) !important;
+  font-family: inherit;
+}
+.mapv__popup { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+.mapv__popup-title { font-size: 14px; font-weight: 500; color: var(--ink); }
+.mapv__popup-when { font-family: var(--font-mono); font-size: 10px; color: var(--peach-deep); letter-spacing: 0.03em; }
+.mapv__popup-loc { font-size: 11px; font-weight: 300; color: var(--ink-muted); }
+.mapv__popup-open {
+  margin-top: 6px; padding: 7px 12px; border-radius: var(--r-full);
+  background: var(--peach); color: var(--bone-warm);
+  font-size: 12px; font-weight: 600; border: 0; cursor: pointer;
+}
+.mapv__popup-open:hover { filter: brightness(0.96); }
+
+/* Empty state overlay */
+.mapv__empty {
+  position: absolute; left: 50%; bottom: var(--s-6); transform: translateX(-50%);
+  z-index: 5; width: min(320px, calc(100vw - var(--s-8)));
+  display: flex; align-items: flex-start; gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop);
+  font-size: 12px; font-weight: 300; color: var(--ink-muted); line-height: 1.5;
+}
+.mapv__empty svg { color: var(--peach-deep); flex-shrink: 0; margin-top: 1px; }
