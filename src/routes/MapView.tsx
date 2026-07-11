@@ -1,28 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MAPBOX_TOKEN } from '../lib/geoApi';
+import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { Icon } from '../components/Icon';
+import LocationField from '../components/LocationField';
+import { useAuth } from '../auth/AuthProvider';
+import { colorFor, monogramFor } from '../lib/chatApi';
 import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
 import { minToLabel } from '../lib/calendarApi';
 import { recurrenceLabel } from '../lib/recurrence';
+import { loadFeed, postAreas, type FeedPost } from '../lib/postsApi';
 import {
-  loadFeed, postAreas, EVENT_CATEGORIES, EVENT_MODES,
-  type FeedPost, type EventCategory, type EventMode,
-} from '../lib/postsApi';
+  loadMappableSpaces, listMyAdminSpaces, setSpaceLocation, createSpaceWithLocation,
+  type MappableSpace, type SpaceKind,
+} from '../lib/spacesApi';
 import './MapView.css';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
-/** A mappable pin: an upcoming in-person event whose composer autocomplete
- *  was picked (linked event carries lat/lng). Video-link and free-typed
- *  locations never reach the map — that's deliberate, not a gap. */
-interface Pin {
-  post: FeedPost;
-  lat: number;
-  lng: number;
-}
+interface EventPin { post: FeedPost; lat: number; lng: number }
 
 function whenLabel(p: FeedPost): string {
   const ev = p.linked_event;
@@ -36,42 +33,58 @@ function whenLabel(p: FeedPost): string {
   return `${date} · ${minToLabel(ev.start_min)}`;
 }
 
-const TABS = ['All', ...EVENT_CATEGORIES.map((c) => c.label)];
+const KIND_LABEL: Record<SpaceKind, string> = {
+  place: 'Place', organization: 'Organization', community: 'Community', group: 'Group',
+};
+
+type LayerKey = 'events' | 'places' | 'orgs';
+const LAYERS: { key: LayerKey; label: string }[] = [
+  { key: 'events', label: 'Events' },
+  { key: 'places', label: 'Places' },
+  { key: 'orgs', label: 'Orgs' },
+];
 
 export default function MapView() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const me = user?.id ?? '';
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const [pins, setPins] = useState<Pin[]>([]);
+  const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const [eventPins, setEventPins] = useState<EventPin[]>([]);
+  const [spacePins, setSpacePins] = useState<MappableSpace[]>([]);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState('All');
-  const [modes, setModes] = useState<EventMode[]>([]);
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ events: true, places: true, orgs: true });
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  // ── data: upcoming in-person events with coordinates ──────────────────────
+  const reloadSpaces = useCallback(async () => {
+    setSpacePins(await loadMappableSpaces());
+  }, []);
+
+  // ── data: upcoming in-person events + pinned places/orgs ──────────────────
   useEffect(() => {
     let live = true;
     (async () => {
       const today = todayISO();
-      const feed = (await loadFeed()).filter((p) => postAreas(p).includes('events'));
+      const [feed, spaces] = await Promise.all([loadFeed(), loadMappableSpaces()]);
       const mappable = feed
+        .filter((p) => postAreas(p).includes('events'))
         .filter((p) => {
           const ev = p.linked_event;
           if (!ev || ev.lat == null || ev.lng == null) return false;
           return !!ev.recurrence || (ev.end_date ?? ev.start_date) >= today;
         })
         .map((p) => ({ post: p, lat: p.linked_event!.lat!, lng: p.linked_event!.lng! }));
-      if (live) { setPins(mappable); setReady(true); }
+      if (live) { setEventPins(mappable); setSpacePins(spaces); setReady(true); }
     })();
     return () => { live = false; };
   }, []);
 
-  const visible = useMemo(() => {
-    const cat = EVENT_CATEGORIES.find((c) => c.label === tab)?.value as EventCategory | undefined;
-    return pins
-      .filter((x) => tab === 'All' || x.post.event_category === cat)
-      .filter((x) => modes.length === 0 || (x.post.event_mode != null && modes.includes(x.post.event_mode)));
-  }, [pins, tab, modes]);
+  const visibleEvents = useMemo(() => (layers.events ? eventPins : []), [eventPins, layers]);
+  const visibleSpaces = useMemo(() => spacePins.filter((s) =>
+    (s.kind === 'place' && layers.places) || (s.kind === 'organization' && layers.orgs)),
+  [spacePins, layers]);
 
   // ── map init (once) ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,79 +105,372 @@ export default function MapView() {
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
-  // ── markers follow the filtered pin set ────────────────────────────────────
+  const flyTo = useCallback((lng: number, lat: number, zoom = 13, markerKey?: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo({ center: [lng, lat], zoom, duration: 900 });
+    if (markerKey) {
+      const marker = markersRef.current.get(markerKey);
+      if (marker && !marker.getPopup()?.isOpen()) marker.togglePopup();
+    }
+  }, []);
+
+  // ── markers follow the visible pin sets ────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
-    markersRef.current = visible.map(({ post, lat, lng }) => {
+    const next = new Map<string, mapboxgl.Marker>();
+
+    const makePopup = (rows: { cls: string; text: string }[], action?: { label: string; onClick: () => void }) => {
+      const el = document.createElement('div');
+      el.className = 'mapv__popup';
+      rows.filter((r) => r.text).forEach((r) => {
+        const p = document.createElement('p');
+        p.className = r.cls;
+        p.textContent = r.text;
+        el.appendChild(p);
+      });
+      if (action) {
+        const btn = document.createElement('button');
+        btn.className = 'mapv__popup-open';
+        btn.textContent = action.label;
+        btn.addEventListener('click', action.onClick);
+        el.appendChild(btn);
+      }
+      return new mapboxgl.Popup({ offset: 26, closeButton: false, maxWidth: '260px' }).setDOMContent(el);
+    };
+
+    visibleEvents.forEach(({ post, lat, lng }) => {
       const el = document.createElement('button');
       el.className = 'mapv__pin';
       el.setAttribute('aria-label', post.title ?? 'Event');
-
-      const popupEl = document.createElement('div');
-      popupEl.className = 'mapv__popup';
-      popupEl.innerHTML =
-        `<p class="mapv__popup-title"></p>` +
-        `<p class="mapv__popup-when"></p>` +
-        `<p class="mapv__popup-loc"></p>` +
-        `<button class="mapv__popup-open">Open event</button>`;
-      (popupEl.querySelector('.mapv__popup-title') as HTMLElement).textContent =
-        post.title || 'Event';
-      (popupEl.querySelector('.mapv__popup-when') as HTMLElement).textContent = whenLabel(post);
-      (popupEl.querySelector('.mapv__popup-loc') as HTMLElement).textContent =
-        typeof post.details?.location === 'string' ? post.details.location : '';
-      (popupEl.querySelector('.mapv__popup-open') as HTMLElement)
-        .addEventListener('click', () => navigate(`/events/${post.id}`));
-
-      return new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([lng, lat])
-        .setPopup(new mapboxgl.Popup({ offset: 26, closeButton: false, maxWidth: '260px' }).setDOMContent(popupEl))
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: post.title || 'Event' },
+            { cls: 'mapv__popup-when', text: whenLabel(post) },
+            { cls: 'mapv__popup-loc', text: typeof post.details?.location === 'string' ? post.details.location : '' },
+          ],
+          { label: 'Open event', onClick: () => navigate(`/events/${post.id}`) },
+        ))
         .addTo(map);
+      next.set(`evt:${post.id}`, marker);
     });
 
-    // First pins → frame them (one-time-ish; refitting on every filter is jarring)
-    if (visible.length > 0) {
+    visibleSpaces.forEach((s) => {
+      const el = document.createElement('button');
+      el.className = 'mapv__pin mapv__pin--space';
+      el.setAttribute('aria-label', s.name);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([s.lng!, s.lat!])
+        .setPopup(makePopup([
+          { cls: 'mapv__popup-title', text: s.name },
+          { cls: 'mapv__popup-when', text: KIND_LABEL[s.kind] },
+          { cls: 'mapv__popup-loc', text: s.location ?? '' },
+        ]))
+        .addTo(map);
+      next.set(`spc:${s.id}`, marker);
+    });
+
+    markersRef.current = next;
+
+    if (next.size > 0) {
       const bounds = new mapboxgl.LngLatBounds();
-      visible.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
+      visibleEvents.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
+      visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
-  }, [visible, navigate]);
+  }, [visibleEvents, visibleSpaces, navigate]);
 
-  const toggleMode = (m: EventMode) =>
-    setModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+  const totalPins = eventPins.length + spacePins.length;
 
   return (
     <div className="mapv">
-      {/* Filters float above the map, matching the Events feed vocabulary */}
-      <div className="mapv__filters">
-        <div className="mapv__tabs h-scroll">
-          {TABS.map((t) => (
-            <button key={t} className={'mapv__chip' + (tab === t ? ' is-on' : '')} onClick={() => setTab(t)}>
-              {t}
-            </button>
-          ))}
-          <span className="mapv__chip-gap" />
-          {EVENT_MODES.map((m) => (
-            <button
-              key={m.value}
-              className={'mapv__chip' + (modes.includes(m.value) ? ' is-on' : '')}
-              onClick={() => toggleMode(m.value)}
-            >
-              <Icon name={m.icon} size={11} /> {m.label}
-            </button>
-          ))}
-        </div>
+      {/* Controls live ABOVE the map (founder mockup): + · search · layer pills */}
+      <div className="mapv__bar">
+        <button className="mapv__bar-btn" onClick={() => { setSheetOpen(true); setSearchOpen(false); }} aria-label="Add a place">
+          <Icon name="plus" size={16} />
+        </button>
+        <button
+          className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
+          onClick={() => setSearchOpen((o) => !o)}
+          aria-label="Search the map"
+        >
+          <Icon name="search" size={16} />
+        </button>
+        <span className="mapv__bar-spring" />
+        {LAYERS.map((l) => (
+          <button
+            key={l.key}
+            className={'mapv__layer' + (layers[l.key] ? ' is-on' : '')}
+            onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
+          >
+            {l.label}
+          </button>
+        ))}
       </div>
 
-      <div ref={mapEl} className="mapv__map" />
+      {searchOpen && (
+        <MapSearch
+          events={eventPins}
+          spaces={spacePins}
+          onFly={flyTo}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
 
-      {ready && pins.length === 0 && (
-        <div className="mapv__empty">
-          <Icon name="maps" size={20} />
-          <p>No mappable events yet — pick a real address when you post one, and it lands here.</p>
-        </div>
+      <div className="mapv__frame">
+        <div ref={mapEl} className="mapv__map" />
+        {ready && totalPins === 0 && (
+          <div className="mapv__empty">
+            <Icon name="maps" size={20} />
+            <p>Nothing on the map yet — add a place with the + button, or pick a real address when you post an event.</p>
+          </div>
+        )}
+      </div>
+
+      {sheetOpen && (
+        <AddPlaceSheet
+          me={me}
+          onClose={() => setSheetOpen(false)}
+          onSaved={async (geo) => {
+            await reloadSpaces();
+            if (geo) flyTo(geo.lng, geo.lat, 13);
+          }}
+        />
       )}
     </div>
+  );
+}
+
+/** Search v1 — finds what's mappable: pins by name, anywhere via geocoding.
+ *  This overlay is where the two full search modes mount later (freeform
+ *  smart queries + the Advanced Search criteria panel — CLAUDE.md thread #4). */
+function MapSearch({ events, spaces, onFly, onClose }: {
+  events: EventPin[];
+  spaces: MappableSpace[];
+  onFly: (lng: number, lat: number, zoom?: number, markerKey?: string) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const [geoRows, setGeoRows] = useState<GeoSuggestion[]>([]);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    const t = q.trim();
+    if (t.length < 3) { setGeoRows([]); return; }
+    debounceRef.current = window.setTimeout(async () => {
+      setGeoRows(await geocodeSuggest(t));
+    }, 300);
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
+  }, [q]);
+
+  const needle = q.trim().toLowerCase();
+  const eventHits = needle.length < 2 ? [] : events.filter(({ post }) =>
+    (post.title ?? '').toLowerCase().includes(needle) || post.body.toLowerCase().includes(needle)).slice(0, 5);
+  const spaceHits = needle.length < 2 ? [] : spaces.filter((s) =>
+    s.name.toLowerCase().includes(needle)).slice(0, 5);
+
+  return (
+    <div className="mapv__search">
+      <div className="mapv__search-row">
+        <Icon name="search" size={15} />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search events, places, or anywhere…"
+          onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        />
+        <button className="mapv__search-x" onClick={onClose} aria-label="Close search">
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+      {(eventHits.length > 0 || spaceHits.length > 0 || geoRows.length > 0) && (
+        <ul className="mapv__search-list">
+          {eventHits.map(({ post, lat, lng }) => (
+            <li key={'e' + post.id}>
+              <button onClick={() => { onFly(lng, lat, 13, `evt:${post.id}`); onClose(); }}>
+                <Icon name="rsvp" size={14} /> <span>{post.title || 'Event'}</span>
+                <em>{whenLabel(post)}</em>
+              </button>
+            </li>
+          ))}
+          {spaceHits.map((s) => (
+            <li key={'s' + s.id}>
+              <button onClick={() => { onFly(s.lng!, s.lat!, 13, `spc:${s.id}`); onClose(); }}>
+                <Icon name={s.kind === 'organization' ? 'store' : 'location'} size={14} /> <span>{s.name}</span>
+                <em>{KIND_LABEL[s.kind]}</em>
+              </button>
+            </li>
+          ))}
+          {geoRows.map((g, i) => (
+            <li key={'g' + i}>
+              <button onClick={() => { onFly(g.lng, g.lat, 12); onClose(); }}>
+                <Icon name="globe" size={14} /> <span>Go to {g.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Add-a-Place sheet: give any space you administer a real address (picked
+ *  suggestions pin it), or create a new place/organization right here. */
+function AddPlaceSheet({ me, onClose, onSaved }: {
+  me: string;
+  onClose: () => void;
+  onSaved: (geo: GeoPoint | null) => void;
+}) {
+  type View = 'list' | 'edit' | 'create';
+  const [view, setView] = useState<View>('list');
+  const [mine, setMine] = useState<MappableSpace[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<MappableSpace | null>(null);
+  const [locText, setLocText] = useState('');
+  const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
+  const [newName, setNewName] = useState('');
+  const [newKind, setNewKind] = useState<SpaceKind>('place');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!me) { setLoaded(true); return; }
+    let live = true;
+    (async () => {
+      const rows = await listMyAdminSpaces(me);
+      if (live) { setMine(rows); setLoaded(true); }
+    })();
+    return () => { live = false; };
+  }, [me]);
+
+  function startEdit(s: MappableSpace) {
+    setEditing(s);
+    setLocText(s.location ?? '');
+    setLocGeo(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
+    setView('edit');
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true); setError('');
+    try {
+      await setSpaceLocation(editing.id, locText, locGeo);
+      onSaved(locGeo);
+      onClose();
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not save. Please try again.');
+      setBusy(false);
+    }
+  }
+
+  async function saveNew() {
+    if (!me || !newName.trim()) { setError('Give it a name first.'); return; }
+    setBusy(true); setError('');
+    try {
+      await createSpaceWithLocation(me, newName, newKind, locText, locGeo);
+      onSaved(locGeo);
+      onClose();
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not create it. Please try again.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="mapv__scrim" onClick={onClose} />
+      <div className="mapv__sheet" role="dialog" aria-label="Add a place">
+        <div className="mapv__sheet-head">
+          <h3>
+            {view === 'list' && 'Put a place on the map'}
+            {view === 'edit' && editing?.name}
+            {view === 'create' && 'New place'}
+          </h3>
+          <button className="mapv__search-x" onClick={onClose} aria-label="Close"><Icon name="close" size={14} /></button>
+        </div>
+
+        {error && <p className="mapv__sheet-err">{error}</p>}
+
+        {view === 'list' && (
+          <>
+            {!loaded && <p className="mapv__sheet-muted">Loading…</p>}
+            {loaded && mine.length === 0 && (
+              <p className="mapv__sheet-muted">
+                You don&rsquo;t run any organizations, communities, groups, or places yet — create your first place below.
+              </p>
+            )}
+            {mine.map((s) => (
+              <button key={s.id} className="mapv__sheet-row" onClick={() => startEdit(s)}>
+                <span className="mapv__sheet-avatar" style={{ background: colorFor(s.id) }}>{monogramFor(s.name)}</span>
+                <span className="mapv__sheet-body">
+                  <span className="mapv__sheet-name">{s.name}</span>
+                  <span className="mapv__sheet-sub">
+                    {KIND_LABEL[s.kind]} · {s.lat != null ? (s.location ?? 'Pinned') : (s.location ? `${s.location} (not pinned)` : 'No location yet')}
+                  </span>
+                </span>
+                <Icon name="chevron-right" size={14} />
+              </button>
+            ))}
+            <button className="mapv__sheet-new" onClick={() => { setLocText(''); setLocGeo(null); setView('create'); }}>
+              <Icon name="plus" size={14} /> New place
+            </button>
+          </>
+        )}
+
+        {view === 'edit' && (
+          <>
+            <label className="mapv__sheet-label">Location</label>
+            <LocationField
+              className="cmp__input"
+              value={locText}
+              geo={locGeo}
+              onChange={(t, g) => { setLocText(t); setLocGeo(g); }}
+            />
+            <p className="mapv__sheet-hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
+            <div className="mapv__sheet-actions">
+              <button className="btn btn-primary" onClick={saveEdit} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+              <button className="btn" onClick={() => setView('list')} disabled={busy}>Back</button>
+            </div>
+          </>
+        )}
+
+        {view === 'create' && (
+          <>
+            <label className="mapv__sheet-label">Name</label>
+            <input className="cmp__input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name your place" />
+            <label className="mapv__sheet-label">What is it?</label>
+            <div className="mapv__sheet-kinds">
+              {(['place', 'organization'] as SpaceKind[]).map((k) => (
+                <button
+                  key={k}
+                  className={'mapv__layer' + (newKind === k ? ' is-on' : '')}
+                  onClick={() => setNewKind(k)}
+                >
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
+            <label className="mapv__sheet-label">Location</label>
+            <LocationField
+              className="cmp__input"
+              value={locText}
+              geo={locGeo}
+              onChange={(t, g) => { setLocText(t); setLocGeo(g); }}
+            />
+            <p className="mapv__sheet-hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
+            <div className="mapv__sheet-actions">
+              <button className="btn btn-primary" onClick={saveNew} disabled={busy || !me}>{busy ? 'Creating…' : 'Create'}</button>
+              <button className="btn" onClick={() => setView('list')} disabled={busy}>Back</button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
