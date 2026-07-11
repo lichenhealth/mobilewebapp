@@ -12,6 +12,8 @@ import {
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
+import LocationField from '../components/LocationField';
+import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
 import { parseBodyUrls } from '../lib/linkify';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
@@ -62,6 +64,8 @@ export default function Compose() {
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
+  // Coordinates from a picked LocationField suggestion (null = text-only).
+  const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
 
   // media
   const [media, setMedia] = useState<Attached[]>([]);
@@ -112,6 +116,8 @@ export default function Compose() {
       }
       const d = p.details ?? {};
       if (typeof d.location === 'string') setLocation(d.location);
+      const g = d.geo as { lat?: number; lng?: number } | undefined;
+      if (g && typeof g.lat === 'number' && typeof g.lng === 'number') setLocGeo({ lat: g.lat, lng: g.lng });
       if (typeof d.bookingUrl === 'string') setBookingUrl(d.bookingUrl);
       if (typeof d.trade === 'string') setTradeFor(d.trade);
       if (typeof d.price === 'string') {
@@ -224,7 +230,10 @@ export default function Compose() {
           if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (evMode === 'trade' && tradeFor.trim()) details.trade = tradeFor.trim();
-        if (location.trim()) details.location = location.trim();
+        if (location.trim()) {
+          details.location = location.trim();
+          if (locGeo) details.geo = locGeo;
+        }
         if (isMarket) {
           // Marketplace-compatible mode vocabulary.
           details.mode = evMode === 'free' ? 'gift'
@@ -248,6 +257,8 @@ export default function Compose() {
             title: title.trim() || body.trim().slice(0, 60) || 'Event',
             description: body.trim(),
             location: location.trim(),
+            lat: locGeo?.lat ?? null,
+            lng: locGeo?.lng ?? null,
             startDate: evRange.start,
             endDate: evRange.end ?? evRange.start,
             allDay: evAllDay,
@@ -287,6 +298,8 @@ export default function Compose() {
           title: title.trim() || body.trim().slice(0, 60) || 'Event',
           description: body.trim(),
           location: location.trim(),
+          lat: locGeo?.lat ?? null,
+          lng: locGeo?.lng ?? null,
           startDate: evRange.start,
           endDate: evRange.end ?? evRange.start,
           allDay: evAllDay,
@@ -482,7 +495,12 @@ export default function Compose() {
           )}
 
           <label className="cmp__label">Location</label>
-          <input className="cmp__input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Address, place, or video link" />
+          <LocationField
+            className="cmp__input"
+            value={location}
+            geo={locGeo}
+            onChange={(text, g) => { setLocation(text); setLocGeo(g); }}
+          />
 
           {isEvent && (
             <>

@@ -1,0 +1,28 @@
+/* Composer location input + Mapbox suggestion dropdown */
+.locfield { position: relative; }
+.locfield input { width: 100%; }
+
+.locfield__pinned {
+  position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--peach-deep);
+  pointer-events: none;
+}
+
+.locfield__list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop);
+  max-height: 240px; overflow-y: auto; overscroll-behavior: contain;
+}
+.locfield__option {
+  display: flex; align-items: center; gap: var(--s-2);
+  width: 100%; padding: 8px 10px; border-radius: var(--r-sm);
+  font-size: 13px; color: var(--ink); text-align: left;
+  background: transparent; border: 0; cursor: pointer;
+}
+.locfield__option:hover { background: var(--bone-warm); }
+.locfield__option svg { color: var(--peach-deep); flex-shrink: 0; }
+.locfield__option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

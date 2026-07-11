@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './routes/Home';
 import Community from './routes/Community';
@@ -14,7 +14,10 @@ import Directory from './routes/Directory';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
-import { Saved, Maps } from './routes/Stubs';
+import { Saved } from './routes/Stubs';
+
+// mapbox-gl is heavy — the Maps screen loads as its own chunk on first visit.
+const MapView = lazy(() => import('./routes/MapView'));
 import Calendar from './routes/Calendar';
 import EventComposer from './routes/EventComposer';
 import CalendarSettings from './routes/CalendarSettings';
@@ -51,6 +54,7 @@ export default function App() {
   const { pathname } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
+  const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
   const { user, loading, onboarded } = useAuth();
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function App() {
     <div className="app-shell">
       <ScrollToTop />
       {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
-      <main className="scroll-view" style={isChatThread || isAuth ? { padding: 0, minHeight: 0 } : undefined}>
+      <main className="scroll-view" style={isChatThread || isAuth || isMaps ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
@@ -83,7 +87,11 @@ export default function App() {
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/saved"     element={<Saved />} />
-          <Route path="/maps"      element={<Maps />} />
+          <Route path="/maps"      element={
+            <Suspense fallback={<div className="scroll-view"><p style={{ padding: 'var(--s-6)', color: 'var(--ink-muted)' }}>Loading map…</p></div>}>
+              <MapView />
+            </Suspense>
+          } />
           <Route path="/profile"   element={<Profile />} />
           <Route path="/invite"    element={<Invite />} />
           <Route path="/help"      element={<Help />} />
