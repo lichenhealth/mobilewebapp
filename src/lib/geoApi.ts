@@ -2,7 +2,7 @@
 // see CLAUDE.md thread #9). Like the Supabase anon key, the default PUBLIC
 // token is safe to ship in the client — it can only do what public tokens do.
 // Never put a secret (sk.*) token here.
-export const MAPBOX_TOKEN = 'MAPBOX_TOKEN_PLACEHOLDER'; // ← founder's pk.* token
+export const MAPBOX_TOKEN = 'pk.eyJ1IjoibGljaGVuaGVhbHRoIiwiYSI6ImNtcmNmcmZndjAzaXMyem9rcWk3MXE2dzgifQ.sV8h6aqBw8HeCTTfBOVblQ';
 
 export interface GeoPoint { lat: number; lng: number }
 
