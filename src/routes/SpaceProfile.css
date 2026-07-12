@@ -41,8 +41,12 @@
 }
 .sprof__onmap:hover { text-decoration: underline; }
 
-/* View-first: admins opt into editing */
-.sprof__manage { padding: 0 var(--s-5) var(--s-2); }
+/* View-first: admins opt into editing (or preview the public face) */
+.sprof__manage { display: flex; gap: var(--s-2); padding: 0 var(--s-5) var(--s-2); }
+.sprof__edit-btn--on {
+  border-color: var(--peach); color: var(--peach-deep);
+  background: var(--peach-tint, var(--bone));
+}
 .sprof__edit-btn {
   padding: 5px 14px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);

@@ -44,8 +44,10 @@ export default function SpaceProfile() {
   const [error, setError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
   // View-first: everyone (admins included) lands on the public presentation;
-  // editing is an explicit step.
+  // editing is an explicit step. publicView lets admins preview the page
+  // exactly as non-admins see it (no admin affordances at all).
   const [editOpen, setEditOpen] = useState(false);
+  const [publicView, setPublicView] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -65,6 +67,7 @@ export default function SpaceProfile() {
 
   const myRole = members.find((m) => m.profile_id === me)?.role;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
+  const adminTools = isAdmin && !publicView;
 
   async function onAvatarFile(file: File | undefined) {
     if (!file || !me || !space) return;
@@ -122,7 +125,7 @@ export default function SpaceProfile() {
               {monogramFor(space.name)}
             </span>
           )}
-          {isAdmin && editOpen && (
+          {adminTools && editOpen && (
             <button
               className="sprof__avatar-edit"
               onClick={() => avatarInputRef.current?.click()}
@@ -155,15 +158,32 @@ export default function SpaceProfile() {
 
       {error && <p className="prof__error">{error}</p>}
 
-      {isAdmin && (
+      {isAdmin && publicView && (
         <div className="sprof__manage">
-          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
-            {editOpen ? 'Done' : 'Edit profile'}
+          <button
+            className="sprof__edit-btn sprof__edit-btn--on"
+            onClick={() => setPublicView(false)}
+          >
+            Viewing as public — tap to exit
           </button>
         </div>
       )}
 
-      {isAdmin && editOpen && (
+      {adminTools && (
+        <div className="sprof__manage">
+          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
+            {editOpen ? 'Done' : 'Edit profile'}
+          </button>
+          <button
+            className="sprof__edit-btn"
+            onClick={() => { setPublicView(true); setEditOpen(false); }}
+          >
+            View as public
+          </button>
+        </div>
+      )}
+
+      {adminTools && editOpen && (
         <section className="prof__section">
           <h2 className="prof__h2">About this {kindLabel.toLowerCase()}</h2>
           <div className="prof__field">
