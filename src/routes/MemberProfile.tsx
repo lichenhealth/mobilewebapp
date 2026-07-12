@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyMycelium, setTrust } from '../lib/myceliumApi';
+import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
 import './Profile.css';
 import './MemberProfile.css';
@@ -92,30 +93,20 @@ export default function MemberProfile() {
         )}
       </div>
 
-      {member.bio && (
-        <section className="prof__section">
-          <h2 className="prof__h2">About</h2>
-          <p className="mprof__bio">{member.bio}</p>
-        </section>
+      {(member.bio || offerings.services.length > 0 || offerings.goods.length > 0) && (
+        <div className="mprof__about">
+          {member.bio && <p className="mprof__bio mprof__bio--clamp">{member.bio}</p>}
+          {(offerings.services.length > 0 || offerings.goods.length > 0) && (
+            <div className="mprof__chips">
+              {offerings.services.map((s) => <span key={'s' + s} className="mprof__chip">{s}</span>)}
+              {offerings.goods.map((g) => <span key={'g' + g} className="mprof__chip mprof__chip--good">{g}</span>)}
+            </div>
+          )}
+        </div>
       )}
 
-      {offerings.services.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Services offered</h2>
-          <div className="mprof__chips">
-            {offerings.services.map((s) => <span key={s} className="mprof__chip">{s}</span>)}
-          </div>
-        </section>
-      )}
-
-      {offerings.goods.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Goods offered</h2>
-          <div className="mprof__chips">
-            {offerings.goods.map((g) => <span key={g} className="mprof__chip">{g}</span>)}
-          </div>
-        </section>
-      )}
+      {/* The profile IS a feed — their contributions, standard lenses. */}
+      <ContributionsFeed profileId={member.id} me={me} />
     </div>
   );
 }

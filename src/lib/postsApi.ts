@@ -216,6 +216,20 @@ export async function loadEventUpdates(eventId: string, excludePostId: string): 
 }
 
 // RLS scopes this to what the viewer may see: public + their spaces + mycelium + own.
+/** An entity's contributions, newest first (profile feeds — Figma 286-16377).
+ *  Personal scope excludes space-authored posts: author_id stays the human
+ *  even when acting as a space, so "their" profile shows what they posted as
+ *  THEMSELVES and the space's profile shows what was posted AS the space. */
+export async function loadAuthorFeed(by: { profileId?: string; spaceId?: string }): Promise<FeedPost[]> {
+  let q = supabase.from('posts').select(FEED_SELECT);
+  if (by.spaceId) q = q.eq('author_space_id', by.spaceId);
+  else if (by.profileId) q = q.eq('author_id', by.profileId).is('author_space_id', null);
+  else return [];
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
+  if (error) { console.warn('loadAuthorFeed:', error.message); return []; }
+  return (data as unknown as FeedPost[]) ?? [];
+}
+
 export async function loadFeed(): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')

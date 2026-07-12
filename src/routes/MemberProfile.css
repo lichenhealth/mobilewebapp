@@ -20,6 +20,16 @@
 }
 
 .mprof__bio { font-size: 13px; font-weight: 300; color: var(--ink); line-height: 1.6; white-space: pre-wrap; }
+/* Compact about block above the contributions feed */
+.mprof__about {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-3) var(--s-5) 0;
+}
+.mprof__bio--clamp {
+  overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.mprof__chip--good { border-style: dashed; }
 
 .mprof__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .mprof__chip {

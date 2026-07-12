@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
+import ContributionsFeed from '../components/ContributionsFeed';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
@@ -217,6 +218,9 @@ export default function SpaceProfile() {
           </div>
         </section>
       )}
+
+      {/* The profile IS a feed — everything posted AS this space. */}
+      <ContributionsFeed spaceId={space.id} me={me} />
 
       <section className="prof__section">
         <h2 className="prof__h2">Members</h2>
