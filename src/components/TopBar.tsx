@@ -60,12 +60,25 @@ export default function TopBar({
   const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
 
   const { unreadForScope } = useNotifications();
-  const { actor, self } = useActing();
+  const { actor, setActor, options, self } = useActing();
   const { user } = useAuth();
   const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
+
+  /** Pick an identity: act as it AND land on its profile. */
+  function pickIdentity(target: 'self' | (typeof options)[number]) {
+    if (target === 'self') {
+      setActor({ type: 'self' });
+      navigate('/profile');
+    } else {
+      setActor({ type: 'space', ...target });
+      navigate(`/spaces/${target.id}`);
+    }
+    setSwitchOpen(false);
+  }
 
   return (
     <header className="top-bar">
@@ -110,7 +123,7 @@ export default function TopBar({
       <div className="top-bar__right">
         <button
           className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
-          onClick={() => navigate('/profile')}
+          onClick={() => (options.length > 0 ? setSwitchOpen((o) => !o) : navigate('/profile'))}
           title={actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
           aria-label={actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
@@ -122,6 +135,36 @@ export default function TopBar({
             <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={36} />
           )}
         </button>
+        {switchOpen && (
+          <>
+            <div className="top-bar__switch-scrim" onClick={() => setSwitchOpen(false)} />
+            <div className="top-bar__switch" role="menu" aria-label="Switch profile">
+              <button
+                className={'top-bar__switch-row' + (actor.type === 'self' ? ' is-on' : '')}
+                onClick={() => pickIdentity('self')}
+                role="menuitem"
+              >
+                <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={30} />
+                <span className="top-bar__switch-name">{self.name || 'You'}</span>
+                <span className="top-bar__switch-kind">You</span>
+              </button>
+              {options.map((o) => (
+                <button
+                  key={o.id}
+                  className={'top-bar__switch-row' + (actor.type === 'space' && actor.id === o.id ? ' is-on' : '')}
+                  onClick={() => pickIdentity(o)}
+                  role="menuitem"
+                >
+                  <span className="top-bar__switch-avatar" style={{ background: colorFor(o.id) }}>
+                    {monogramFor(o.name)}
+                  </span>
+                  <span className="top-bar__switch-name">{o.name}</span>
+                  <span className="top-bar__switch-kind">{o.kind}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         {showSettings && (
           <button
             className="top-bar__icon top-bar__settings"

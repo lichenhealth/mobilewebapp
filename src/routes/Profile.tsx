@@ -7,7 +7,6 @@ import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { loadMyPhone } from '../lib/conciergeApi';
 import Avatar from '../components/Avatar';
-import ProfileSwitch from '../components/ProfileSwitch';
 import { Icon } from '../components/Icon';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -389,7 +388,6 @@ export default function Profile() {
         )}
       </div>
 
-      <ProfileSwitch active="self" />
 
       {error && <p className="prof__error">{error}</p>}
 

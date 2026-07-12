@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
-import ProfileSwitch from '../components/ProfileSwitch';
 import LocationField from '../components/LocationField';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
@@ -111,8 +110,6 @@ export default function SpaceProfile() {
 
   return (
     <div className="prof">
-      <ProfileSwitch active={isAdmin ? space.id : 'self'} />
-
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
           {space.avatar_url ? (
