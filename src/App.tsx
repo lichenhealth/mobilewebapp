@@ -25,6 +25,7 @@ import Events from './routes/Events';
 import EventPage from './routes/EventPage';
 import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
+import MemberProfile from './routes/MemberProfile';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
 import ResetPassword from './routes/ResetPassword';
@@ -95,6 +96,7 @@ export default function App() {
           } />
           <Route path="/profile"   element={<Profile />} />
           <Route path="/spaces/:id" element={<SpaceProfile />} />
+          <Route path="/members/:id" element={<MemberProfile />} />
           <Route path="/invite"    element={<Invite />} />
           <Route path="/help"      element={<Help />} />
           <Route path="/membership" element={<Membership />} />

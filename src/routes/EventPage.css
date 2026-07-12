@@ -63,6 +63,9 @@
 .evp__manage-btn:hover { border-color: var(--peach); color: var(--ink); }
 .evp__manage-btn--danger:hover { border-color: #c0564f; color: #c0564f; }
 
+.evp__host--link { background: transparent; border: 0; cursor: pointer; font: inherit; color: inherit; padding: 0; }
+.evp__host--link:hover { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
+
 .evp__rsvp-btn { width: 100%; text-align: center; }
 .evp__rsvp-row { display: flex; gap: var(--s-2); }
 .evp__rsvp-btn--maybe {

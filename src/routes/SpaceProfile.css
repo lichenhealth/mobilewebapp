@@ -41,12 +41,24 @@
 }
 .sprof__onmap:hover { text-decoration: underline; }
 
+/* View-first: admins opt into editing */
+.sprof__manage { padding: 0 var(--s-5) var(--s-2); }
+.sprof__edit-btn {
+  padding: 5px 14px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-muted); cursor: pointer;
+}
+.sprof__edit-btn:hover { border-color: var(--peach); color: var(--ink); }
+
 .sprof__members { display: flex; flex-direction: column; gap: var(--s-2); }
 .sprof__member {
   display: flex; align-items: center; gap: var(--s-3);
-  padding: 8px 12px;
+  padding: 8px 12px; width: 100%;
   background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  font: inherit; text-align: left; cursor: pointer;
 }
+.sprof__member:hover { border-color: var(--peach); }
 .sprof__member-name { flex: 1; font-size: 13px; font-weight: 400; color: var(--ink); }
 .sprof__member-role {
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;

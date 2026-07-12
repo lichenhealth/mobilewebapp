@@ -43,6 +43,9 @@ export default function SpaceProfile() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  // View-first: everyone (admins included) lands on the public presentation;
+  // editing is an explicit step.
+  const [editOpen, setEditOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -119,7 +122,7 @@ export default function SpaceProfile() {
               {monogramFor(space.name)}
             </span>
           )}
-          {isAdmin && (
+          {isAdmin && editOpen && (
             <button
               className="sprof__avatar-edit"
               onClick={() => avatarInputRef.current?.click()}
@@ -153,6 +156,14 @@ export default function SpaceProfile() {
       {error && <p className="prof__error">{error}</p>}
 
       {isAdmin && (
+        <div className="sprof__manage">
+          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
+            {editOpen ? 'Done' : 'Edit profile'}
+          </button>
+        </div>
+      )}
+
+      {isAdmin && editOpen && (
         <section className="prof__section">
           <h2 className="prof__h2">About this {kindLabel.toLowerCase()}</h2>
           <div className="prof__field">
@@ -192,7 +203,11 @@ export default function SpaceProfile() {
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
           {members.map((m) => (
-            <div className="sprof__member" key={m.profile_id}>
+            <button
+              className="sprof__member"
+              key={m.profile_id}
+              onClick={() => navigate(`/members/${m.profile_id}`)}
+            >
               <Avatar
                 id={m.profile_id}
                 name={m.profile?.full_name ?? 'Member'}
@@ -201,7 +216,7 @@ export default function SpaceProfile() {
               />
               <span className="sprof__member-name">{m.profile?.full_name ?? 'Member'}</span>
               <span className="sprof__member-role">{ROLE_LABEL[m.role] ?? m.role}</span>
-            </div>
+            </button>
           ))}
         </div>
       </section>
