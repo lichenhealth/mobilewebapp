@@ -121,6 +121,7 @@ export default function TopBar({
       </div>
 
       <div className="top-bar__right">
+        <div className="top-bar__switch-wrap">
         <button
           className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
           onClick={() => (options.length > 0 ? setSwitchOpen((o) => !o) : navigate('/profile'))}
@@ -165,6 +166,7 @@ export default function TopBar({
             </div>
           </>
         )}
+        </div>
         {showSettings && (
           <button
             className="top-bar__icon top-bar__settings"
