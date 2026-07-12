@@ -7,6 +7,8 @@ import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { loadMyPhone } from '../lib/conciergeApi';
 import Avatar from '../components/Avatar';
+import ProfileSwitch from '../components/ProfileSwitch';
+import { Icon } from '../components/Icon';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
@@ -387,6 +389,8 @@ export default function Profile() {
         )}
       </div>
 
+      <ProfileSwitch active="self" />
+
       {error && <p className="prof__error">{error}</p>}
 
 
@@ -633,6 +637,13 @@ export default function Profile() {
                       onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
                     />
                     <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
+                    <button
+                      className="prof__space-open"
+                      onClick={() => navigate(`/spaces/${s.id}`)}
+                      aria-label={`Open ${s.name}'s profile`}
+                    >
+                      <Icon name="chevron-right" size={14} />
+                    </button>
                   </div>
                 );
               })}

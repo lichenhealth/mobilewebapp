@@ -165,11 +165,14 @@ export default function MapView() {
       el.setAttribute('aria-label', s.name);
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([s.lng!, s.lat!])
-        .setPopup(makePopup([
-          { cls: 'mapv__popup-title', text: s.name },
-          { cls: 'mapv__popup-when', text: KIND_LABEL[s.kind] },
-          { cls: 'mapv__popup-loc', text: s.location ?? '' },
-        ]))
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: s.name },
+            { cls: 'mapv__popup-when', text: KIND_LABEL[s.kind] },
+            { cls: 'mapv__popup-loc', text: s.location ?? '' },
+          ],
+          { label: 'View profile', onClick: () => navigate(`/spaces/${s.id}`) },
+        ))
         .addTo(map);
       next.set(`spc:${s.id}`, marker);
     });
@@ -328,6 +331,7 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
   onSaved: (geo: GeoPoint | null) => void;
 }) {
   type View = 'list' | 'edit' | 'create';
+  const navigate = useNavigate();
   const [view, setView] = useState<View>('list');
   const [mine, setMine] = useState<MappableSpace[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -437,6 +441,11 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
               <button className="btn btn-primary" onClick={saveEdit} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
               <button className="btn" onClick={() => setView('list')} disabled={busy}>Back</button>
             </div>
+            {editing && (
+              <button className="mapv__sheet-profile" onClick={() => navigate(`/spaces/${editing.id}`)}>
+                Open full profile <Icon name="chevron-right" size={13} />
+              </button>
+            )}
           </>
         )}
 

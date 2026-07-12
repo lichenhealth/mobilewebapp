@@ -174,3 +174,10 @@
 .mapv__sheet-kinds { display: flex; gap: var(--s-2); }
 .mapv__sheet-hint { font-size: 11px; color: var(--ink-faint); margin-top: var(--s-1); }
 .mapv__sheet-actions { display: flex; gap: var(--s-2); margin-top: var(--s-4); }
+.mapv__sheet-profile {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: var(--s-3); padding: 0;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--peach-deep);
+}
+.mapv__sheet-profile:hover { text-decoration: underline; }

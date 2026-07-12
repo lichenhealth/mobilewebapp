@@ -27,6 +27,11 @@
 .prof__field { display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-3); }
 .prof__label { font-size: var(--t-xs); color: var(--ink-muted); font-weight: 500; }
 .prof__hint { font-size: var(--t-xs); color: var(--ink-faint); }
+.prof__space-open {
+  display: inline-flex; padding: 6px; border-radius: var(--r-full);
+  background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
+}
+.prof__space-open:hover { color: var(--peach-deep); }
 .prof__input, .prof__textarea {
   padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
   background: var(--bone-warm); font-size: var(--t-base); color: var(--ink); width: 100%; font-family: inherit;
