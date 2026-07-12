@@ -119,20 +119,21 @@
 }
 .mapv__empty svg { color: var(--peach-deep); flex-shrink: 0; margin-top: 1px; }
 
-/* ── Add-a-Place sheet ── */
-.mapv__scrim { position: fixed; inset: 0; z-index: 70; background: rgb(18 24 28 / 0.4); }
+/* ── Add-a-Place panel: drops under the + button (profile-switcher pattern) ── */
+.mapv__add-wrap { position: relative; display: inline-flex; }
+.mapv__scrim { position: fixed; inset: 0; z-index: 70; }
 .mapv__sheet {
-  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);
-  z-index: 71; width: min(480px, 100vw);
-  max-height: 78dvh; overflow-y: auto; overscroll-behavior: contain;
+  position: absolute; top: calc(100% + 8px); left: 0;
+  z-index: 71; width: min(440px, calc(100vw - var(--s-6)));
+  max-height: 70dvh; overflow-y: auto; overscroll-behavior: contain;
   background: var(--bone); border: 1px solid var(--bone-edge);
-  border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--sh-pop);
-  padding: var(--s-4) var(--s-4) calc(var(--s-5) + var(--safe-bot));
-  animation: mapv-rise 180ms var(--ease-out);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+  padding: var(--s-4);
+  animation: mapv-drop 160ms var(--ease-out);
 }
-@keyframes mapv-rise {
-  from { opacity: 0; transform: translateX(-50%) translateY(14px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+@keyframes mapv-drop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .mapv__sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-3); }
 .mapv__sheet-head h3 {

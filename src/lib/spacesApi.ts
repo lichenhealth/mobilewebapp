@@ -18,12 +18,12 @@ export interface MappableSpace {
   lng: number | null;
 }
 
-/** Pinnable spaces: place/organization with coordinates. */
+/** Pinnable spaces: any kind whose admins set a picked-suggestion address.
+ *  (Finer per-kind visibility rules arrive with the location-shares phase.) */
 export async function loadMappableSpaces(): Promise<MappableSpace[]> {
   const { data, error } = await supabase
     .from('spaces')
     .select('id, name, kind, location, lat, lng')
-    .in('kind', ['place', 'organization'])
     .not('lat', 'is', null);
   if (error) { console.warn('loadMappableSpaces:', error.message); return []; }
   return (data as MappableSpace[] | null) ?? [];

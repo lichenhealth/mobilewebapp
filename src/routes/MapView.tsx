@@ -37,12 +37,17 @@ const KIND_LABEL: Record<SpaceKind, string> = {
   place: 'Place', organization: 'Organization', community: 'Community', group: 'Group',
 };
 
-type LayerKey = 'events' | 'places' | 'orgs';
+type LayerKey = 'events' | 'places' | 'orgs' | 'communities' | 'groups';
 const LAYERS: { key: LayerKey; label: string }[] = [
   { key: 'events', label: 'Events' },
   { key: 'places', label: 'Places' },
   { key: 'orgs', label: 'Orgs' },
+  { key: 'communities', label: 'Communities' },
+  { key: 'groups', label: 'Groups' },
 ];
+const KIND_LAYER: Record<SpaceKind, LayerKey> = {
+  place: 'places', organization: 'orgs', community: 'communities', group: 'groups',
+};
 
 export default function MapView() {
   const navigate = useNavigate();
@@ -54,7 +59,9 @@ export default function MapView() {
   const [eventPins, setEventPins] = useState<EventPin[]>([]);
   const [spacePins, setSpacePins] = useState<MappableSpace[]>([]);
   const [ready, setReady] = useState(false);
-  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ events: true, places: true, orgs: true });
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
+    events: true, places: true, orgs: true, communities: true, groups: true,
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -82,9 +89,10 @@ export default function MapView() {
   }, []);
 
   const visibleEvents = useMemo(() => (layers.events ? eventPins : []), [eventPins, layers]);
-  const visibleSpaces = useMemo(() => spacePins.filter((s) =>
-    (s.kind === 'place' && layers.places) || (s.kind === 'organization' && layers.orgs)),
-  [spacePins, layers]);
+  const visibleSpaces = useMemo(
+    () => spacePins.filter((s) => layers[KIND_LAYER[s.kind]]),
+    [spacePins, layers],
+  );
 
   // ── map init (once) ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -193,9 +201,25 @@ export default function MapView() {
     <div className="mapv">
       {/* Controls live ABOVE the map (founder mockup): + · search · layer pills */}
       <div className="mapv__bar">
-        <button className="mapv__bar-btn" onClick={() => { setSheetOpen(true); setSearchOpen(false); }} aria-label="Add a place">
-          <Icon name="plus" size={16} />
-        </button>
+        <div className="mapv__add-wrap">
+          <button
+            className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
+            onClick={() => { setSheetOpen((o) => !o); setSearchOpen(false); }}
+            aria-label="Add a place"
+          >
+            <Icon name="plus" size={16} />
+          </button>
+          {sheetOpen && (
+            <AddPlaceSheet
+              me={me}
+              onClose={() => setSheetOpen(false)}
+              onSaved={async (geo) => {
+                await reloadSpaces();
+                if (geo) flyTo(geo.lng, geo.lat, 13);
+              }}
+            />
+          )}
+        </div>
         <button
           className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
           onClick={() => setSearchOpen((o) => !o)}
@@ -234,16 +258,6 @@ export default function MapView() {
         )}
       </div>
 
-      {sheetOpen && (
-        <AddPlaceSheet
-          me={me}
-          onClose={() => setSheetOpen(false)}
-          onSaved={async (geo) => {
-            await reloadSpaces();
-            if (geo) flyTo(geo.lng, geo.lat, 13);
-          }}
-        />
-      )}
     </div>
   );
 }
