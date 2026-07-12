@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
@@ -43,8 +43,7 @@ export default function MemberProfile() {
     return () => { live = false; };
   }, [id, me]);
 
-  // Your own public page is just your Profile.
-  if (me && id === me) return <Navigate to="/profile" replace />;
+  const isSelf = !!me && id === me;
 
   if (loading) return <div className="prof"><p className="mprof__muted">Loading…</p></div>;
   if (!member) {
@@ -70,6 +69,14 @@ export default function MemberProfile() {
 
   return (
     <div className="prof">
+      {isSelf && (
+        <div className="mprof__selfbar">
+          <span>This is your public profile — how other members see you.</span>
+          <button className="mprof__selfbar-edit" onClick={() => navigate('/profile')}>
+            Edit profile <Icon name="chevron-right" size={12} />
+          </button>
+        </div>
+      )}
       <div className="prof__head">
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
@@ -77,7 +84,7 @@ export default function MemberProfile() {
         {member.location && (
           <p className="mprof__loc"><Icon name="location" size={12} /> {member.location}</p>
         )}
-        {me && (
+        {me && !isSelf && (
           <div className="mprof__actions">
             <button className="btn btn-primary mprof__btn" onClick={message} disabled={busy}>
               <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}

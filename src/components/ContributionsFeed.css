@@ -21,6 +21,7 @@
 .cfeed__area.is-active .cfeed__area-circle {
   background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
 }
+.cfeed__area-gap { width: 1px; align-self: stretch; background: var(--bone-edge); flex-shrink: 0; margin: 2px var(--s-1); }
 .cfeed__area-label {
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em;
   text-transform: uppercase; color: var(--ink-muted); max-width: 64px;

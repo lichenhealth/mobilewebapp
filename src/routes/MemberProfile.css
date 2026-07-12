@@ -1,4 +1,20 @@
 /* Public member profile — the Provider face of a person */
+.mprof__selfbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  margin: 0 var(--s-5) var(--s-3);
+  padding: 8px 12px;
+  background: var(--peach-tint, var(--bone-warm));
+  border: 1px solid var(--peach);
+  border-radius: var(--r-md);
+  font-size: 12px; font-weight: 300; color: var(--ink);
+}
+.mprof__selfbar-edit {
+  display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--peach-deep);
+}
+.mprof__selfbar-edit:hover { text-decoration: underline; }
+
 .mprof__muted { padding: var(--s-6) var(--s-5); font-size: 13px; font-weight: 300; color: var(--ink-muted); }
 
 .mprof__headline { font-size: 13px; font-weight: 300; color: var(--ink-soft); margin-top: 2px; }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FilterRow from './FilterRow';
 import FeedCard from './FeedCard';
-import { Icon } from './Icon';
+import { Icon, IconName } from './Icon';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
@@ -31,14 +31,16 @@ function whenLabel(p: FeedPost): string | undefined {
   return `${date} · ${minToLabel(ev.start_min)} – ${minToLabel(ev.end_min ?? ev.start_min)}`;
 }
 
-/** A profile IS a feed (Figma 286-16377): the entity's contributions under
- *  the standard content-type tabs, plus service-area icon toggles that only
- *  appear for areas this entity has actually posted in. Works for people
- *  (profileId) and for spaces posting as themselves (spaceId). */
-export default function ContributionsFeed({ profileId, spaceId, me }: {
+/** A profile IS a feed (Figma 286-16377 / 286-11770): the entity's stream
+ *  under the standard content-type tabs, plus service-area icon toggles that
+ *  only appear for areas present in the stream. People (profileId) show what
+ *  they authored; spaces (spaceId) show their wall. `leading` prepends
+ *  space-anatomy action circles (Chat, Members) to the icon row. */
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [] }: {
   profileId?: string;
   spaceId?: string;
   me: string;
+  leading?: { icon: IconName; label: string; onClick: () => void }[];
 }) {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -84,14 +86,24 @@ export default function ContributionsFeed({ profileId, spaceId, me }: {
   }
 
   if (!ready) return <p className="cfeed__empty">Loading…</p>;
-  if (posts.length === 0) return <p className="cfeed__empty">No contributions yet.</p>;
+  // Space anatomy (Chat/Members) stays visible even before the first post.
+  if (posts.length === 0 && leading.length === 0) {
+    return <p className="cfeed__empty">No contributions yet.</p>;
+  }
 
   return (
     <div className="cfeed">
-      <FilterRow options={TABS} value={tab} onChange={setTab} />
+      {posts.length > 0 && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
-      {areasPresent.length > 0 && (
+      {(leading.length > 0 || areasPresent.length > 0) && (
         <div className="cfeed__areas h-scroll">
+          {leading.map((l) => (
+            <button key={l.label} className="cfeed__area" onClick={l.onClick}>
+              <span className="cfeed__area-circle"><Icon name={l.icon} size={14} /></span>
+              <span className="cfeed__area-label">{l.label}</span>
+            </button>
+          ))}
+          {leading.length > 0 && areasPresent.length > 0 && <span className="cfeed__area-gap" />}
           {areasPresent.map((a) => (
             <button
               key={a.value}
@@ -106,7 +118,8 @@ export default function ContributionsFeed({ profileId, spaceId, me }: {
       )}
 
       <div className="cfeed__list">
-        {visible.length === 0 && <p className="cfeed__empty">Nothing here under these filters.</p>}
+        {posts.length === 0 && <p className="cfeed__empty">No contributions yet.</p>}
+        {posts.length > 0 && visible.length === 0 && <p className="cfeed__empty">Nothing here under these filters.</p>}
         {visible.map((p) => (
           <FeedCard
             key={p.id}

@@ -9,7 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import type { GeoPoint } from '../lib/geoApi';
 import {
-  loadSpaceProfile, loadSpaceMembers, updateSpaceProfile, uploadSpaceAvatar,
+  loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
 } from '../lib/spacesApi';
 import './Profile.css';
@@ -33,7 +33,9 @@ export default function SpaceProfile() {
 
   const [space, setSpace] = useState<SpaceProfileRow | null>(null);
   const [members, setMembers] = useState<SpaceMemberRow[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const membersRef = useRef<HTMLElement>(null);
 
   // edit state (admins)
   const [name, setName] = useState('');
@@ -53,9 +55,10 @@ export default function SpaceProfile() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, m] = await Promise.all([loadSpaceProfile(id), loadSpaceMembers(id)]);
+    const [s, m, c] = await Promise.all([loadSpaceProfile(id), loadSpaceMembers(id), loadSpaceChatId(id)]);
     setSpace(s);
     setMembers(m);
+    setChatId(c);
     if (s) {
       setName(s.name);
       setDescription(s.description ?? '');
@@ -219,10 +222,19 @@ export default function SpaceProfile() {
         </section>
       )}
 
-      {/* The profile IS a feed — everything posted AS this space. */}
-      <ContributionsFeed spaceId={space.id} me={me} />
+      {/* The profile IS a feed — the space's wall (posted AS it or TO it),
+          with the space-anatomy circles (Chat for members, Members) leading
+          the icon row. Identical for all four kinds. */}
+      <ContributionsFeed
+        spaceId={space.id}
+        me={me}
+        leading={[
+          ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
+          { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+        ]}
+      />
 
-      <section className="prof__section">
+      <section className="prof__section" ref={membersRef}>
         <h2 className="prof__h2">Members</h2>
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
