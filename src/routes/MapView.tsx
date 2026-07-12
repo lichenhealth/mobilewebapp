@@ -319,7 +319,7 @@ function MapSearch({ events, spaces, onFly, onClose }: {
           {spaceHits.map((s) => (
             <li key={'s' + s.id}>
               <button onClick={() => { onFly(s.lng!, s.lat!, 13, `spc:${s.id}`); onClose(); }}>
-                <Icon name={s.kind === 'organization' ? 'store' : 'location'} size={14} /> <span>{s.name}</span>
+                <Icon name="location" size={14} /> <span>{s.name}</span>
                 <em>{KIND_LABEL[s.kind]}</em>
               </button>
             </li>
