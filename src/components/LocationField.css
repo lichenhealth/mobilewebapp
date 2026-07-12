@@ -2,13 +2,19 @@
 .locfield { position: relative; }
 .locfield input { width: 100%; }
 
+/* Reserve room for the tag so long addresses never sit under it */
+.locfield.has-pin input { padding-right: 70px; }
+
 .locfield__pinned {
   position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
   display: inline-flex; align-items: center; gap: 3px;
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--peach-deep);
   pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease-out);
 }
+/* The tag steps aside while you're in the field (typing clears it anyway) */
+.locfield:focus-within .locfield__pinned { opacity: 0; }
 
 .locfield__list {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;

@@ -7,6 +7,7 @@ import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { loadMyPhone } from '../lib/conciergeApi';
 import Avatar from '../components/Avatar';
+import { Icon } from '../components/Icon';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
@@ -387,6 +388,7 @@ export default function Profile() {
         )}
       </div>
 
+
       {error && <p className="prof__error">{error}</p>}
 
 
@@ -408,18 +410,29 @@ export default function Profile() {
             {actingOptions.map((o) => {
               const on = actor.type === 'space' && actor.id === o.id;
               return (
-                <button
-                  key={o.id}
-                  className={'prof__acting-row' + (on ? ' is-on' : '')}
-                  onClick={() => setActor({ type: 'space', ...o })}
-                >
-                  <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
-                    {monogramFor(o.name)}
-                  </span>
-                  <span className="prof__acting-name">{o.name}</span>
-                  <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
-                  {on && <span className="prof__acting-on">Acting</span>}
-                </button>
+                // Row switches acting identity; the chevron opens the space's
+                // own profile (two buttons — nesting them is invalid HTML).
+                <div className="prof__acting-pair" key={o.id}>
+                  <button
+                    className={'prof__acting-row' + (on ? ' is-on' : '')}
+                    onClick={() => setActor({ type: 'space', ...o })}
+                  >
+                    <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
+                      {monogramFor(o.name)}
+                    </span>
+                    <span className="prof__acting-name">{o.name}</span>
+                    <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
+                    {on && <span className="prof__acting-on">Acting</span>}
+                  </button>
+                  <button
+                    className="prof__acting-open"
+                    onClick={() => navigate(`/spaces/${o.id}`)}
+                    aria-label={`Open ${o.name}'s profile`}
+                    title="Open profile"
+                  >
+                    <Icon name="chevron-right" size={15} />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -633,6 +646,13 @@ export default function Profile() {
                       onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
                     />
                     <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
+                    <button
+                      className="prof__space-open"
+                      onClick={() => navigate(`/spaces/${s.id}`)}
+                      aria-label={`Open ${s.name}'s profile`}
+                    >
+                      <Icon name="chevron-right" size={14} />
+                    </button>
                   </div>
                 );
               })}

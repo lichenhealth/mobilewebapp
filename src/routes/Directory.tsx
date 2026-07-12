@@ -99,7 +99,15 @@ export default function Directory() {
         {hits.map((m) => {
           const name = m.full_name ?? 'Member';
           return (
-            <div className="dir__row" key={m.id}>
+            // Row opens the member's public profile; Message stays a shortcut.
+            <div
+              className="dir__row dir__row--link"
+              key={m.id}
+              onClick={() => navigate(`/members/${m.id}`)}
+              role="link"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/members/${m.id}`); }}
+            >
               <span className="dir__avatar" style={{ background: colorFor(m.id) }}>{monogramFor(name)}</span>
               <span className="dir__row-body">
                 <span className="dir__row-name">{name}</span>
@@ -107,7 +115,7 @@ export default function Directory() {
               </span>
               <button
                 className="dir__msg"
-                onClick={() => message(m.id)}
+                onClick={(e) => { e.stopPropagation(); message(m.id); }}
                 disabled={opening === m.id}
               >
                 <Icon name="message" size={15} />

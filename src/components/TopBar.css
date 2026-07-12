@@ -130,3 +130,42 @@
 
 .top-bar__section-mark--self { border: 0; }
 .top-bar__section-mark--self .avatar { border: 1px solid var(--ink); }
+
+/* Profile switcher dropdown — pick who you're being; lands on that profile */
+.top-bar__switch-scrim { position: fixed; inset: 0; z-index: 70; }
+/* Anchored to the avatar chip itself (wrapper is position:relative) so it
+   drops directly under the button on every layout width. */
+.top-bar__switch-wrap { position: relative; display: inline-flex; }
+.top-bar__switch {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 71;
+  width: min(300px, calc(100vw - var(--s-6)));
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+  padding: var(--s-2);
+  animation: notif-rise 160ms var(--ease-out);
+}
+.top-bar__switch-row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 7px 10px; border-radius: var(--r-md);
+  background: transparent; border: 1px solid transparent;
+  text-align: left; cursor: pointer;
+}
+.top-bar__switch-row:hover { background: var(--bone-warm); }
+.top-bar__switch-row.is-on { border-color: var(--peach); background: var(--peach-tint, var(--bone-warm)); }
+.top-bar__switch-avatar {
+  width: 30px; height: 30px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-style: italic; font-size: 12px; color: var(--bone-warm);
+}
+.top-bar__switch-name {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.top-bar__switch-kind {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-faint); flex-shrink: 0;
+}

@@ -27,6 +27,11 @@
 .prof__field { display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-3); }
 .prof__label { font-size: var(--t-xs); color: var(--ink-muted); font-weight: 500; }
 .prof__hint { font-size: var(--t-xs); color: var(--ink-faint); }
+.prof__space-open {
+  display: inline-flex; padding: 6px; border-radius: var(--r-full);
+  background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
+}
+.prof__space-open:hover { color: var(--peach-deep); }
 .prof__input, .prof__textarea {
   padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
   background: var(--bone-warm); font-size: var(--t-base); color: var(--ink); width: 100%; font-family: inherit;
@@ -125,6 +130,16 @@
 
 /* ── Acting-as switcher ── */
 .prof__acting-list { display: flex; flex-direction: column; gap: 6px; }
+.prof__acting-pair { display: flex; align-items: stretch; gap: 6px; }
+.prof__acting-pair .prof__acting-row { flex: 1; min-width: 0; }
+.prof__acting-open {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; border-radius: var(--r-md); flex-shrink: 0;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-faint); cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.prof__acting-open:hover { border-color: var(--peach); color: var(--peach-deep); }
 .prof__acting-row {
   display: flex; align-items: center; gap: var(--s-3);
   padding: 8px 12px; border-radius: var(--r-md); text-align: left;

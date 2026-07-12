@@ -149,7 +149,12 @@ export default function EventPage() {
             <Icon name="arrow-left" size={18} />
           </button>
           <h1 className="evp__title">{title}</h1>
-          <span className="evp__host">by {hostName}</span>
+          <button
+            className="evp__host evp__host--link"
+            onClick={() => navigate(post.author_space_id ? `/spaces/${post.author_space_id}` : `/members/${post.author_id}`)}
+          >
+            by {hostName}
+          </button>
         </div>
         <div className="evp__tabs">
           {TABS.map((t) => (

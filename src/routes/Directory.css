@@ -48,6 +48,8 @@
 /* ─── Rows ────────────────────────────────────────────────────────── */
 .dir__list { display: flex; flex-direction: column; }
 
+.dir__row--link { cursor: pointer; }
+.dir__row--link:hover { border-color: var(--peach); }
 .dir__row {
   display: grid;
   grid-template-columns: 44px 1fr auto;

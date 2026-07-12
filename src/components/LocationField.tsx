@@ -21,6 +21,9 @@ export default function LocationField({
 }) {
   const [suggestions, setSuggestions] = useState<GeoSuggestion[]>([]);
   const [open, setOpen] = useState(false);
+  // Only user typing opens suggestions — prefilled values (edit screens)
+  // must not pop the dropdown on their own.
+  const [dirty, setDirty] = useState(false);
   const debounceRef = useRef<number | null>(null);
   const skipNextLookup = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -28,6 +31,7 @@ export default function LocationField({
   // Debounced lookup — skipped for URLs (video links stay first-class) and
   // right after a pick (the input change a pick causes isn't a new query).
   useEffect(() => {
+    if (!dirty) return;
     if (skipNextLookup.current) { skipNextLookup.current = false; return; }
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     const t = value.trim();
@@ -60,11 +64,11 @@ export default function LocationField({
   }
 
   return (
-    <div className="locfield" ref={wrapRef}>
+    <div className={'locfield' + (geo ? ' has-pin' : '')} ref={wrapRef}>
       <input
         className={className}
         value={value}
-        onChange={(e) => onChange(e.target.value, null)}   // edits always clear geo
+        onChange={(e) => { setDirty(true); onChange(e.target.value, null); }}   // edits always clear geo
         onFocus={() => { if (suggestions.length) setOpen(true); }}
         placeholder={placeholder ?? 'Address, place, or video link'}
         autoComplete="off"
