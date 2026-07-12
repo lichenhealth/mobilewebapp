@@ -82,6 +82,7 @@ export default function Home() {
             onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
             onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
         {FEED.map((card, i) => (

@@ -388,6 +388,11 @@ export default function Profile() {
         )}
       </div>
 
+      <div className="prof__public-row">
+        <button className="prof__public-btn" onClick={() => navigate(`/members/${user?.id}`)}>
+          View public profile <Icon name="chevron-right" size={12} />
+        </button>
+      </div>
 
       {error && <p className="prof__error">{error}</p>}
 

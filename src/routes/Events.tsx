@@ -158,6 +158,7 @@ export default function Events() {
       image={badgeFor(p)}
       onBadgeAction={() => onBadge(p)}
       onOpen={() => navigate(`/events/${p.id}`)}
+      onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
       trusted={myMyc.has('profile:' + p.author_id)}
       recommended={myRecs.has(p.id)}
       mycelium={overlays[p.id]}

@@ -126,6 +126,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             {...postToCard(p, me)}
             eyebrow={whenLabel(p) ?? postToCard(p, me).eyebrow}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has(p.id)}
             mycelium={overlays[p.id]}
