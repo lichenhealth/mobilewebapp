@@ -412,18 +412,29 @@ export default function Profile() {
             {actingOptions.map((o) => {
               const on = actor.type === 'space' && actor.id === o.id;
               return (
-                <button
-                  key={o.id}
-                  className={'prof__acting-row' + (on ? ' is-on' : '')}
-                  onClick={() => setActor({ type: 'space', ...o })}
-                >
-                  <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
-                    {monogramFor(o.name)}
-                  </span>
-                  <span className="prof__acting-name">{o.name}</span>
-                  <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
-                  {on && <span className="prof__acting-on">Acting</span>}
-                </button>
+                // Row switches acting identity; the chevron opens the space's
+                // own profile (two buttons — nesting them is invalid HTML).
+                <div className="prof__acting-pair" key={o.id}>
+                  <button
+                    className={'prof__acting-row' + (on ? ' is-on' : '')}
+                    onClick={() => setActor({ type: 'space', ...o })}
+                  >
+                    <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
+                      {monogramFor(o.name)}
+                    </span>
+                    <span className="prof__acting-name">{o.name}</span>
+                    <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
+                    {on && <span className="prof__acting-on">Acting</span>}
+                  </button>
+                  <button
+                    className="prof__acting-open"
+                    onClick={() => navigate(`/spaces/${o.id}`)}
+                    aria-label={`Open ${o.name}'s profile`}
+                    title="Open profile"
+                  >
+                    <Icon name="chevron-right" size={15} />
+                  </button>
+                </div>
               );
             })}
           </div>
