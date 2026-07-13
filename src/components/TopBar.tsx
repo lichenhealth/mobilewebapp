@@ -6,6 +6,7 @@ import { MyceliumMark } from './MyceliumMark';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { useActing } from '../acting/ActingProvider';
 import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import Avatar from './Avatar';
 import { scopeForPath } from '../lib/sections';
@@ -68,6 +69,12 @@ export default function TopBar({
   const [panelOpen, setPanelOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
 
+  async function signOut() {
+    setSwitchOpen(false);
+    await supabase.auth.signOut();
+    navigate('/login', { replace: true });
+  }
+
   /** Pick an identity: act as it AND land on its profile. */
   function pickIdentity(target: 'self' | (typeof options)[number]) {
     if (target === 'self') {
@@ -124,7 +131,7 @@ export default function TopBar({
         <div className="top-bar__switch-wrap">
         <button
           className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
-          onClick={() => (options.length > 0 ? setSwitchOpen((o) => !o) : navigate('/profile'))}
+          onClick={() => setSwitchOpen((o) => !o)}
           title={actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
           aria-label={actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
@@ -163,6 +170,9 @@ export default function TopBar({
                   <span className="top-bar__switch-kind">{o.kind}</span>
                 </button>
               ))}
+              <button className="top-bar__switch-row top-bar__switch-signout" onClick={signOut} role="menuitem">
+                <span className="top-bar__switch-name">Sign out</span>
+              </button>
             </div>
           </>
         )}

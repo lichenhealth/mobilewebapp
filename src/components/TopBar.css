@@ -169,3 +169,11 @@
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-faint); flex-shrink: 0;
 }
+.top-bar__switch-signout {
+  margin-top: 4px;
+  border-top: 1px solid var(--bone-edge);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  padding-top: 10px;
+}
+.top-bar__switch-signout .top-bar__switch-name { color: var(--ink-soft); }
+.top-bar__switch-signout:hover .top-bar__switch-name { color: #c0564f; }
