@@ -267,6 +267,7 @@ export default function MapView() {
         <MapSearch
           events={eventPins}
           spaces={spacePins}
+          people={peoplePins}
           onFly={flyTo}
           onClose={() => setSearchOpen(false)}
         />
@@ -289,9 +290,10 @@ export default function MapView() {
 /** Search v1 — finds what's mappable: pins by name, anywhere via geocoding.
  *  This overlay is where the two full search modes mount later (freeform
  *  smart queries + the Advanced Search criteria panel — CLAUDE.md thread #4). */
-function MapSearch({ events, spaces, onFly, onClose }: {
+function MapSearch({ events, spaces, people, onFly, onClose }: {
   events: EventPin[];
   spaces: MappableSpace[];
+  people: MappableMember[];
   onFly: (lng: number, lat: number, zoom?: number, markerKey?: string) => void;
   onClose: () => void;
 }) {
@@ -314,6 +316,10 @@ function MapSearch({ events, spaces, onFly, onClose }: {
     (post.title ?? '').toLowerCase().includes(needle) || post.body.toLowerCase().includes(needle)).slice(0, 5);
   const spaceHits = needle.length < 2 ? [] : spaces.filter((s) =>
     s.name.toLowerCase().includes(needle)).slice(0, 5);
+  // People are pre-filtered by the privacy rules (mappable_members only
+  // returns members visible to THIS viewer) — search can't leak anyone.
+  const peopleHits = needle.length < 2 ? [] : people.filter((m) =>
+    (m.full_name ?? '').toLowerCase().includes(needle)).slice(0, 5);
 
   return (
     <div className="mapv__search">
@@ -323,14 +329,14 @@ function MapSearch({ events, spaces, onFly, onClose }: {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search events, places, or anywhere…"
+          placeholder="Search events, places, people, or anywhere…"
           onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         />
         <button className="mapv__search-x" onClick={onClose} aria-label="Close search">
           <Icon name="close" size={14} />
         </button>
       </div>
-      {(eventHits.length > 0 || spaceHits.length > 0 || geoRows.length > 0) && (
+      {(eventHits.length > 0 || spaceHits.length > 0 || peopleHits.length > 0 || geoRows.length > 0) && (
         <ul className="mapv__search-list">
           {eventHits.map(({ post, lat, lng }) => (
             <li key={'e' + post.id}>
@@ -345,6 +351,14 @@ function MapSearch({ events, spaces, onFly, onClose }: {
               <button onClick={() => { onFly(s.lng!, s.lat!, 13, `spc:${s.id}`); onClose(); }}>
                 <Icon name="location" size={14} /> <span>{s.name}</span>
                 <em>{KIND_LABEL[s.kind]}</em>
+              </button>
+            </li>
+          ))}
+          {peopleHits.map((m) => (
+            <li key={'p' + m.id}>
+              <button onClick={() => { onFly(m.lng, m.lat, m.level === 'area' ? 11 : 13, `usr:${m.id}`); onClose(); }}>
+                <Icon name="profile" size={14} /> <span>{m.full_name ?? 'Member'}</span>
+                <em>{m.place ? (m.level === 'area' ? `Near ${m.place}` : m.place) : 'Member'}</em>
               </button>
             </li>
           ))}
