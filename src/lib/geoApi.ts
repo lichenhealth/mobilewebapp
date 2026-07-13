@@ -7,9 +7,10 @@ export const MAPBOX_TOKEN = 'pk.eyJ1IjoibGljaGVuaGVhbHRoIiwiYSI6ImNtcmNmcmZndjAz
 export interface GeoPoint { lat: number; lng: number }
 
 export interface GeoSuggestion {
-  label: string;   // human-readable place name ("Conifer, Colorado, United States")
+  label: string;       // full place name ("320 Rustlers Rd, Bailey, Colorado 80421, United States")
   lat: number;
   lng: number;
+  areaLabel?: string;  // town-level part ("Bailey, Colorado 80421, United States") — the 'area' privacy tier
 }
 
 /** Forward-geocode with autocomplete (Mapbox Geocoding v6). Returns [] on any
@@ -31,11 +32,13 @@ export async function geocodeSuggest(q: string): Promise<GeoSuggestion[]> {
       }[];
     };
     return (json.features ?? [])
-      .map((f) => {
+      .map((f): GeoSuggestion | null => {
         const [lng, lat] = f.geometry?.coordinates ?? [];
         const name = f.properties?.full_address
           ?? [f.properties?.name, f.properties?.place_formatted].filter(Boolean).join(', ');
-        return lat != null && lng != null && name ? { label: name, lat, lng } : null;
+        return lat != null && lng != null && name
+          ? { label: name, lat, lng, areaLabel: f.properties?.place_formatted }
+          : null;
       })
       .filter((s): s is GeoSuggestion => !!s);
   } catch (e) {

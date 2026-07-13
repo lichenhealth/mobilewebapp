@@ -15,6 +15,7 @@ import {
   loadMappableSpaces, listMyAdminSpaces, setSpaceLocation, createSpaceWithLocation,
   type MappableSpace, type SpaceKind,
 } from '../lib/spacesApi';
+import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
 import './MapView.css';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -37,13 +38,14 @@ const KIND_LABEL: Record<SpaceKind, string> = {
   place: 'Place', organization: 'Organization', community: 'Community', group: 'Group',
 };
 
-type LayerKey = 'events' | 'places' | 'orgs' | 'communities' | 'groups';
+type LayerKey = 'events' | 'places' | 'orgs' | 'communities' | 'groups' | 'people';
 const LAYERS: { key: LayerKey; label: string }[] = [
   { key: 'events', label: 'Events' },
   { key: 'places', label: 'Places' },
   { key: 'orgs', label: 'Orgs' },
   { key: 'communities', label: 'Communities' },
   { key: 'groups', label: 'Groups' },
+  { key: 'people', label: 'People' },
 ];
 const KIND_LAYER: Record<SpaceKind, LayerKey> = {
   place: 'places', organization: 'orgs', community: 'communities', group: 'groups',
@@ -60,8 +62,9 @@ export default function MapView() {
   const [spacePins, setSpacePins] = useState<MappableSpace[]>([]);
   const [ready, setReady] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
-    events: true, places: true, orgs: true, communities: true, groups: true,
+    events: true, places: true, orgs: true, communities: true, groups: true, people: true,
   });
+  const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -74,7 +77,7 @@ export default function MapView() {
     let live = true;
     (async () => {
       const today = todayISO();
-      const [feed, spaces] = await Promise.all([loadFeed(), loadMappableSpaces()]);
+      const [feed, spaces, people] = await Promise.all([loadFeed(), loadMappableSpaces(), loadMappableMembers()]);
       const mappable = feed
         .filter((p) => postAreas(p).includes('events'))
         .filter((p) => {
@@ -83,7 +86,7 @@ export default function MapView() {
           return !!ev.recurrence || (ev.end_date ?? ev.start_date) >= today;
         })
         .map((p) => ({ post: p, lat: p.linked_event!.lat!, lng: p.linked_event!.lng! }));
-      if (live) { setEventPins(mappable); setSpacePins(spaces); setReady(true); }
+      if (live) { setEventPins(mappable); setSpacePins(spaces); setPeoplePins(people); setReady(true); }
     })();
     return () => { live = false; };
   }, []);
@@ -93,6 +96,7 @@ export default function MapView() {
     () => spacePins.filter((s) => layers[KIND_LAYER[s.kind]]),
     [spacePins, layers],
   );
+  const visiblePeople = useMemo(() => (layers.people ? peoplePins : []), [peoplePins, layers]);
 
   // ── map init (once) ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -185,17 +189,37 @@ export default function MapView() {
       next.set(`spc:${s.id}`, marker);
     });
 
+    visiblePeople.forEach((m) => {
+      const name = m.full_name ?? 'Member';
+      const el = document.createElement('button');
+      el.className = 'mapv__pin mapv__pin--person';
+      el.setAttribute('aria-label', name);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([m.lng, m.lat])
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: name },
+            { cls: 'mapv__popup-when', text: m.level === 'area' ? 'Member · approximate' : 'Member' },
+            { cls: 'mapv__popup-loc', text: m.place ? (m.level === 'area' ? `Near ${m.place}` : m.place) : '' },
+          ],
+          { label: 'View profile', onClick: () => navigate(`/members/${m.id}`) },
+        ))
+        .addTo(map);
+      next.set(`usr:${m.id}`, marker);
+    });
+
     markersRef.current = next;
 
     if (next.size > 0) {
       const bounds = new mapboxgl.LngLatBounds();
       visibleEvents.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
       visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
+      visiblePeople.forEach((m) => bounds.extend([m.lng, m.lat]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
-  }, [visibleEvents, visibleSpaces, navigate]);
+  }, [visibleEvents, visibleSpaces, visiblePeople, navigate]);
 
-  const totalPins = eventPins.length + spacePins.length;
+  const totalPins = eventPins.length + spacePins.length + peoplePins.length;
 
   return (
     <div className="mapv">
@@ -243,6 +267,7 @@ export default function MapView() {
         <MapSearch
           events={eventPins}
           spaces={spacePins}
+          people={peoplePins}
           onFly={flyTo}
           onClose={() => setSearchOpen(false)}
         />
@@ -265,9 +290,10 @@ export default function MapView() {
 /** Search v1 — finds what's mappable: pins by name, anywhere via geocoding.
  *  This overlay is where the two full search modes mount later (freeform
  *  smart queries + the Advanced Search criteria panel — CLAUDE.md thread #4). */
-function MapSearch({ events, spaces, onFly, onClose }: {
+function MapSearch({ events, spaces, people, onFly, onClose }: {
   events: EventPin[];
   spaces: MappableSpace[];
+  people: MappableMember[];
   onFly: (lng: number, lat: number, zoom?: number, markerKey?: string) => void;
   onClose: () => void;
 }) {
@@ -290,6 +316,10 @@ function MapSearch({ events, spaces, onFly, onClose }: {
     (post.title ?? '').toLowerCase().includes(needle) || post.body.toLowerCase().includes(needle)).slice(0, 5);
   const spaceHits = needle.length < 2 ? [] : spaces.filter((s) =>
     s.name.toLowerCase().includes(needle)).slice(0, 5);
+  // People are pre-filtered by the privacy rules (mappable_members only
+  // returns members visible to THIS viewer) — search can't leak anyone.
+  const peopleHits = needle.length < 2 ? [] : people.filter((m) =>
+    (m.full_name ?? '').toLowerCase().includes(needle)).slice(0, 5);
 
   return (
     <div className="mapv__search">
@@ -299,14 +329,14 @@ function MapSearch({ events, spaces, onFly, onClose }: {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search events, places, or anywhere…"
+          placeholder="Search events, places, people, or anywhere…"
           onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         />
         <button className="mapv__search-x" onClick={onClose} aria-label="Close search">
           <Icon name="close" size={14} />
         </button>
       </div>
-      {(eventHits.length > 0 || spaceHits.length > 0 || geoRows.length > 0) && (
+      {(eventHits.length > 0 || spaceHits.length > 0 || peopleHits.length > 0 || geoRows.length > 0) && (
         <ul className="mapv__search-list">
           {eventHits.map(({ post, lat, lng }) => (
             <li key={'e' + post.id}>
@@ -321,6 +351,14 @@ function MapSearch({ events, spaces, onFly, onClose }: {
               <button onClick={() => { onFly(s.lng!, s.lat!, 13, `spc:${s.id}`); onClose(); }}>
                 <Icon name="location" size={14} /> <span>{s.name}</span>
                 <em>{KIND_LABEL[s.kind]}</em>
+              </button>
+            </li>
+          ))}
+          {peopleHits.map((m) => (
+            <li key={'p' + m.id}>
+              <button onClick={() => { onFly(m.lng, m.lat, m.level === 'area' ? 11 : 13, `usr:${m.id}`); onClose(); }}>
+                <Icon name="profile" size={14} /> <span>{m.full_name ?? 'Member'}</span>
+                <em>{m.place ? (m.level === 'area' ? `Near ${m.place}` : m.place) : 'Member'}</em>
               </button>
             </li>
           ))}

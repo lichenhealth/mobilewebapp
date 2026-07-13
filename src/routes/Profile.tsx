@@ -8,6 +8,7 @@ import { colorFor, monogramFor } from '../lib/chatApi';
 import { loadMyPhone } from '../lib/conciergeApi';
 import Avatar from '../components/Avatar';
 import { Icon } from '../components/Icon';
+import HomeLocationSection from '../components/HomeLocationSection';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
@@ -474,6 +475,8 @@ export default function Profile() {
           {profileMsg && <span className="prof__msg">{profileMsg}</span>}
         </div>
       </section>
+
+      {user && <HomeLocationSection me={user.id} />}
 
       <section className="prof__section">
         <h2 className="prof__h2">Notifications</h2>

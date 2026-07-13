@@ -86,6 +86,7 @@
 }
 .mapv__pin:hover { filter: brightness(0.95); }
 .mapv__pin--space { background: #7C8A6D; }
+.mapv__pin--person { background: #9C7355; }   /* tan = member home */
 
 /* Popup card (inside mapbox popup) */
 .mapboxgl-popup-content {

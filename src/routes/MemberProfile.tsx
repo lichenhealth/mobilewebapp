@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyMycelium, loadMyRecommendations, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
 import './Profile.css';
@@ -24,23 +25,27 @@ export default function MemberProfile() {
   const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
   const [trusted, setTrusted] = useState(false);
   const [recommended, setRecommended] = useState(false);
+  const [homeSpot, setHomeSpot] = useState<MappableMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let live = true;
     (async () => {
-      const [m, off, myc, recs] = await Promise.all([
+      const [m, off, myc, recs, mappable] = await Promise.all([
         loadMemberProfile(id),
         loadMemberOfferings(id),
         me ? loadMyMycelium() : Promise.resolve(new Set<string>()),
         me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
+        me ? loadMappableMembers() : Promise.resolve([] as MappableMember[]),
       ]);
       if (!live) return;
       setMember(m);
       setOfferings(off);
       setTrusted(myc.has(`profile:${id}`));
       setRecommended(recs.has(`profile:${id}`));
+      // What THIS viewer is allowed to see of their home (hidden → absent).
+      setHomeSpot(mappable.find((x) => x.id === id) ?? null);
       setLoading(false);
     })();
     return () => { live = false; };
@@ -91,8 +96,11 @@ export default function MemberProfile() {
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
-        {member.location && (
-          <p className="mprof__loc"><Icon name="location" size={12} /> {member.location}</p>
+        {homeSpot?.place && (
+          <p className="mprof__loc">
+            <Icon name="location" size={12} />{' '}
+            {homeSpot.level === 'area' ? `Near ${homeSpot.place}` : homeSpot.place}
+          </p>
         )}
         {me && !isSelf && (
           <div className="mprof__actions">
