@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XSjgGN9eHdBICUuTF4DLQTCSWuVCwE6RCOupCQA0EUHfWwUf04L8iAg6TVv1b9e
+\restrict xjeOThdlbCrWRHhefNlF5eDgtxGMwM7zsR2AU8f70d6WSwHWanVE7hPHUdH9bNg
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -680,6 +680,76 @@ $$;
 
 
 ALTER FUNCTION public.is_space_member(p_space uuid, p_uid uuid) OWNER TO postgres;
+
+--
+-- Name: location_level(uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.location_level(p_owner uuid, p_viewer uuid, p_kind text DEFAULT 'home'::text) RETURNS text
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v text;
+begin
+  if p_owner = p_viewer then return 'exact'; end if;
+  if p_viewer is null then return 'hidden'; end if;
+
+  select level into v from public.location_shares
+   where owner_id = p_owner and kind = p_kind
+     and audience_type = 'profile' and audience_profile_id = p_viewer;
+  if v is not null then return v; end if;
+
+  select level into v
+  from public.location_shares s
+  where s.owner_id = p_owner and s.kind = p_kind and s.audience_type = 'space'
+    and public.is_space_member(s.audience_space_id, p_owner)
+    and public.is_space_member(s.audience_space_id, p_viewer)
+  order by case s.level when 'hidden' then 0 when 'area' then 1 else 2 end asc
+  limit 1;
+  if v is not null then return v; end if;
+
+  select level into v from public.location_shares
+   where owner_id = p_owner and kind = p_kind and audience_type = 'everyone';
+  return coalesce(v, 'hidden');
+end; $$;
+
+
+ALTER FUNCTION public.location_level(p_owner uuid, p_viewer uuid, p_kind text) OWNER TO postgres;
+
+--
+-- Name: mappable_members(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.mappable_members() RETURNS TABLE(id uuid, full_name text, avatar_url text, level text, lat double precision, lng double precision, place text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select p.id, p.full_name, p.avatar_url, lv.level,
+         case when lv.level = 'exact' then p.home_lat
+              else round((p.home_lat / 0.05)::numeric) * 0.05 end as lat,
+         case when lv.level = 'exact' then p.home_lng
+              else round((p.home_lng / 0.05)::numeric) * 0.05 end as lng,
+         case when lv.level = 'exact' then p.home_location else p.home_area end as place
+  from public.profiles p
+  cross join lateral (select public.location_level(p.id, auth.uid()) as level) lv
+  where p.home_lat is not null and p.home_lng is not null
+    and lv.level <> 'hidden';
+$$;
+
+
+ALTER FUNCTION public.mappable_members() OWNER TO postgres;
+
+--
+-- Name: my_home(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.my_home() RETURNS TABLE(home_location text, home_lat double precision, home_lng double precision, home_area text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$ select home_location, home_lat, home_lng, home_area from public.profiles where id = auth.uid() $$;
+
+
+ALTER FUNCTION public.my_home() OWNER TO postgres;
 
 --
 -- Name: my_phone(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1463,6 +1533,28 @@ CREATE TABLE public.health_snapshots (
 ALTER TABLE public.health_snapshots OWNER TO postgres;
 
 --
+-- Name: location_shares; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.location_shares (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id uuid NOT NULL,
+    kind text DEFAULT 'home'::text NOT NULL,
+    audience_type text NOT NULL,
+    audience_space_id uuid,
+    audience_profile_id uuid,
+    level text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT location_shares_audience_shape CHECK ((((audience_type = 'everyone'::text) AND (audience_space_id IS NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'space'::text) AND (audience_space_id IS NOT NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'profile'::text) AND (audience_profile_id IS NOT NULL) AND (audience_space_id IS NULL)))),
+    CONSTRAINT location_shares_audience_type_check CHECK ((audience_type = ANY (ARRAY['everyone'::text, 'space'::text, 'profile'::text]))),
+    CONSTRAINT location_shares_kind_check CHECK ((kind = 'home'::text)),
+    CONSTRAINT location_shares_level_check CHECK ((level = ANY (ARRAY['hidden'::text, 'area'::text, 'exact'::text])))
+);
+
+
+ALTER TABLE public.location_shares OWNER TO postgres;
+
+--
 -- Name: mycelium; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1583,6 +1675,10 @@ CREATE TABLE public.profiles (
     first_name text,
     last_name text,
     phone text,
+    home_location text,
+    home_lat double precision,
+    home_lng double precision,
+    home_area text,
     CONSTRAINT profiles_notification_pref_check CHECK ((notification_pref = ANY (ARRAY['off'::text, 'in_app'::text, 'both'::text])))
 );
 
@@ -1816,6 +1912,14 @@ ALTER TABLE ONLY public.health_snapshots
 
 
 --
+-- Name: location_shares location_shares_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.location_shares
+    ADD CONSTRAINT location_shares_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mycelium mycelium_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2021,6 +2125,13 @@ CREATE INDEX events_owner_space_idx ON public.events USING btree (owner_space_id
 --
 
 CREATE INDEX health_snapshots_patient_date_idx ON public.health_snapshots USING btree (patient_id, snapshot_date DESC, created_at DESC);
+
+
+--
+-- Name: location_shares_audience_uniq; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX location_shares_audience_uniq ON public.location_shares USING btree (owner_id, kind, audience_type, COALESCE(audience_space_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(audience_profile_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 
 --
@@ -2548,6 +2659,30 @@ ALTER TABLE ONLY public.health_snapshots
 
 ALTER TABLE ONLY public.health_snapshots
     ADD CONSTRAINT health_snapshots_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: location_shares location_shares_audience_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.location_shares
+    ADD CONSTRAINT location_shares_audience_profile_id_fkey FOREIGN KEY (audience_profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: location_shares location_shares_audience_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.location_shares
+    ADD CONSTRAINT location_shares_audience_space_id_fkey FOREIGN KEY (audience_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: location_shares location_shares_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.location_shares
+    ADD CONSTRAINT location_shares_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -3156,6 +3291,19 @@ CREATE POLICY "koc plan update" ON public.care_plans FOR UPDATE TO authenticated
 
 
 --
+-- Name: location_shares; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.location_shares ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: location_shares location_shares owner all; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "location_shares owner all" ON public.location_shares TO authenticated USING ((owner_id = auth.uid())) WITH CHECK ((owner_id = auth.uid()));
+
+
+--
 -- Name: chat_messages messages read; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -3620,6 +3768,33 @@ GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO servic
 
 
 --
+-- Name: FUNCTION location_level(p_owner uuid, p_viewer uuid, p_kind text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.location_level(p_owner uuid, p_viewer uuid, p_kind text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.location_level(p_owner uuid, p_viewer uuid, p_kind text) TO authenticated;
+GRANT ALL ON FUNCTION public.location_level(p_owner uuid, p_viewer uuid, p_kind text) TO service_role;
+
+
+--
+-- Name: FUNCTION mappable_members(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.mappable_members() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.mappable_members() TO authenticated;
+GRANT ALL ON FUNCTION public.mappable_members() TO service_role;
+
+
+--
+-- Name: FUNCTION my_home(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.my_home() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.my_home() TO authenticated;
+GRANT ALL ON FUNCTION public.my_home() TO service_role;
+
+
+--
 -- Name: FUNCTION my_phone(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3926,6 +4101,15 @@ GRANT ALL ON TABLE public.health_snapshots TO service_role;
 
 
 --
+-- Name: TABLE location_shares; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.location_shares TO anon;
+GRANT ALL ON TABLE public.location_shares TO authenticated;
+GRANT ALL ON TABLE public.location_shares TO service_role;
+
+
+--
 -- Name: TABLE mycelium; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4177,12 +4361,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XSjgGN9eHdBICUuTF4DLQTCSWuVCwE6RCOupCQA0EUHfWwUf04L8iAg6TVv1b9e
+\unrestrict xjeOThdlbCrWRHhefNlF5eDgtxGMwM7zsR2AU8f70d6WSwHWanVE7hPHUdH9bNg
 
-
-
-
---
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
 -- pg_dump --schema=public captures the public.handle_new_user() function
