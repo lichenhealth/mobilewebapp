@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Q8c7tUKuFJqdckRqc7Z3PFvtvVTE0JCLQWf3zVbEjrymIKWiB3V46mTJdvmjWKS
+\restrict XSjgGN9eHdBICUuTF4DLQTCSWuVCwE6RCOupCQA0EUHfWwUf04L8iAg6TVv1b9e
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1418,6 +1418,8 @@ CREATE TABLE public.events (
     recurrence jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    lat double precision,
+    lng double precision,
     CONSTRAINT events_end_min_check CHECK (((end_min >= 1) AND (end_min <= 1440))),
     CONSTRAINT events_one_owner CHECK (((((owner_profile_id IS NOT NULL))::integer + ((owner_space_id IS NOT NULL))::integer) = 1)),
     CONSTRAINT events_recur_single_day CHECK (((recurrence IS NULL) OR (start_date = end_date))),
@@ -1593,8 +1595,10 @@ ALTER TABLE public.profiles OWNER TO postgres;
 
 CREATE TABLE public.recommendations (
     recommender_id uuid NOT NULL,
-    post_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    target_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    target_type text DEFAULT 'post'::text NOT NULL,
+    CONSTRAINT recommendations_target_type_check CHECK ((target_type = ANY (ARRAY['post'::text, 'profile'::text, 'space'::text])))
 );
 
 
@@ -1627,7 +1631,9 @@ CREATE TABLE public.spaces (
     avatar_url text,
     location text,
     created_by uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    lat double precision,
+    lng double precision
 );
 
 
@@ -1870,7 +1876,7 @@ ALTER TABLE ONLY public.profiles
 --
 
 ALTER TABLE ONLY public.recommendations
-    ADD CONSTRAINT recommendations_pkey PRIMARY KEY (recommender_id, post_id);
+    ADD CONSTRAINT recommendations_pkey PRIMARY KEY (recommender_id, target_type, target_id);
 
 
 --
@@ -2102,10 +2108,10 @@ CREATE INDEX posts_space_idx ON public.posts USING btree (space_id);
 
 
 --
--- Name: recommendations_post_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: recommendations_target_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX recommendations_post_idx ON public.recommendations USING btree (post_id);
+CREATE INDEX recommendations_target_idx ON public.recommendations USING btree (target_type, target_id);
 
 
 --
@@ -2641,14 +2647,6 @@ ALTER TABLE ONLY public.profiles
 
 
 --
--- Name: recommendations recommendations_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.recommendations
-    ADD CONSTRAINT recommendations_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE;
-
-
---
 -- Name: recommendations recommendations_recommender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2711,7 +2709,9 @@ CREATE POLICY "Admins read all suggestions" ON public.category_suggestions FOR S
 
 CREATE POLICY "Admins update their space" ON public.spaces FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.space_members m
-  WHERE ((m.space_id = spaces.id) AND (m.profile_id = auth.uid()) AND (m.role = 'admin'::public.space_member_role)))));
+  WHERE ((m.space_id = spaces.id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = spaces.id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))));
 
 
 --
@@ -4177,7 +4177,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Q8c7tUKuFJqdckRqc7Z3PFvtvVTE0JCLQWf3zVbEjrymIKWiB3V46mTJdvmjWKS
+\unrestrict XSjgGN9eHdBICUuTF4DLQTCSWuVCwE6RCOupCQA0EUHfWwUf04L8iAg6TVv1b9e
 
 
 
