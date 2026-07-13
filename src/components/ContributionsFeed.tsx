@@ -128,11 +128,11 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             trusted={myMyc.has('profile:' + p.author_id)}
-            recommended={myRecs.has(p.id)}
+            recommended={myRecs.has('post:' + p.id)}
             mycelium={overlays[p.id]}
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
-            onRecommend={(on) => { void setRecommend(p.id, on).catch(console.error); }}
+            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}

@@ -35,31 +35,32 @@ export async function setTrust(type: TargetType, id: string, on: boolean): Promi
   }
 }
 
-/** Post IDs the current user recommends. */
+/** Everything the current user recommends, as `${type}:${id}` keys (same
+ *  polymorphic shape as trust — posts, profiles, and spaces alike). */
 export async function loadMyRecommendations(): Promise<Set<string>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Set();
   const { data } = await supabase
     .from('recommendations')
-    .select('post_id')
+    .select('target_type, target_id')
     .eq('recommender_id', user.id);
-  return new Set((data ?? []).map((r) => r.post_id));
+  return new Set((data ?? []).map((r) => myceliumKey(r.target_type as TargetType, r.target_id)));
 }
 
-/** Recommend (amplify) or un-recommend a post. */
-export async function setRecommend(postId: string, on: boolean): Promise<void> {
+/** Recommend (amplify) or un-recommend an entity — a post, a person, a space. */
+export async function setRecommend(type: TargetType, id: string, on: boolean): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   if (on) {
     const { error } = await supabase
       .from('recommendations')
-      .insert({ recommender_id: user.id, post_id: postId });
+      .insert({ recommender_id: user.id, target_type: type, target_id: id });
     if (error && error.code !== '23505') throw error;
   } else {
     const { error } = await supabase
       .from('recommendations')
       .delete()
-      .eq('recommender_id', user.id).eq('post_id', postId);
+      .eq('recommender_id', user.id).eq('target_type', type).eq('target_id', id);
     if (error) throw error;
   }
 }
@@ -84,8 +85,8 @@ export async function loadEndorsements(
   const [{ data: trustRows }, { data: recRows }, { data: profs }] = await Promise.all([
     supabase.from('mycelium').select('truster_id, target_id')
       .eq('target_type', 'profile').in('target_id', authorIds).in('truster_id', myProfileIds),
-    supabase.from('recommendations').select('recommender_id, post_id')
-      .in('post_id', postIds).in('recommender_id', myProfileIds),
+    supabase.from('recommendations').select('recommender_id, target_id')
+      .eq('target_type', 'post').in('target_id', postIds).in('recommender_id', myProfileIds),
     supabase.from('profiles').select('id, full_name, handle').in('id', myProfileIds),
   ]);
 
@@ -109,9 +110,9 @@ export async function loadEndorsements(
   // post → my-mycelium members who recommend that specific post
   const recByPost = new Map<string, MyceliumMember[]>();
   for (const r of recRows ?? []) {
-    const arr = recByPost.get(r.post_id) ?? [];
+    const arr = recByPost.get(r.target_id) ?? [];
     arr.push(member(r.recommender_id));
-    recByPost.set(r.post_id, arr);
+    recByPost.set(r.target_id, arr);
   }
 
   const out: Record<string, MyceliumSignals> = {};

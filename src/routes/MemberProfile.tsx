@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { loadMyMycelium, setTrust } from '../lib/myceliumApi';
+import { loadMyMycelium, loadMyRecommendations, setTrust, setRecommend } from '../lib/myceliumApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
 import './Profile.css';
@@ -23,21 +23,24 @@ export default function MemberProfile() {
   const [member, setMember] = useState<MemberRow | null>(null);
   const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
   const [trusted, setTrusted] = useState(false);
+  const [recommended, setRecommended] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let live = true;
     (async () => {
-      const [m, off, myc] = await Promise.all([
+      const [m, off, myc, recs] = await Promise.all([
         loadMemberProfile(id),
         loadMemberOfferings(id),
         me ? loadMyMycelium() : Promise.resolve(new Set<string>()),
+        me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
       ]);
       if (!live) return;
       setMember(m);
       setOfferings(off);
       setTrusted(myc.has(`profile:${id}`));
+      setRecommended(recs.has(`profile:${id}`));
       setLoading(false);
     })();
     return () => { live = false; };
@@ -57,6 +60,13 @@ export default function MemberProfile() {
     const next = !trusted;
     setTrusted(next);   // optimistic — same gesture as Trust on a feed card
     try { await setTrust('profile', id, next); } catch (e) { console.error(e); setTrusted(!next); }
+  }
+
+  async function toggleRecommend() {
+    if (!me) return;
+    const next = !recommended;
+    setRecommended(next);   // optimistic — amplify this person to those who trust you
+    try { await setRecommend('profile', id, next); } catch (e) { console.error(e); setRecommended(!next); }
   }
 
   async function message() {
@@ -95,6 +105,13 @@ export default function MemberProfile() {
               title={trusted ? 'In your mycelium' : 'Add to your mycelium'}
             >
               <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+            </button>
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
+              onClick={toggleRecommend}
+              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
+            >
+              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
             </button>
           </div>
         )}
