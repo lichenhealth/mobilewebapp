@@ -1,0 +1,45 @@
+/* Home location + who-can-find-you rules (calendar-settings vocabulary) */
+.homeloc__h3 {
+  font-size: var(--t-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--ink-soft);
+  margin: var(--s-4) 0 var(--s-1);
+}
+.homeloc__row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 6px 0;
+}
+.homeloc__aud {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.homeloc__select {
+  padding: 7px 10px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 12px; color: var(--ink); font-family: inherit;
+}
+.homeloc__remove {
+  display: inline-flex; padding: 6px; border-radius: var(--r-full);
+  background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
+}
+.homeloc__remove:hover { color: #c0564f; }
+.homeloc__add { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+.homeloc__grow { flex: 1; }
+.homeloc__add-btn { flex-shrink: 0; }
+.homeloc__pick {
+  flex: 1; display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm)); border: 1px solid var(--peach);
+  font-size: 13px; color: var(--ink);
+}
+.homeloc__pick em, .homeloc__match em {
+  font-style: normal; font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+.homeloc__matches { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s-2); }
+.homeloc__match {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: 8px 12px; border-radius: var(--r-md); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.homeloc__match:hover { border-color: var(--peach); }

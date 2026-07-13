@@ -15,7 +15,9 @@ export default function LocationField({
 }: {
   value: string;
   geo: GeoPoint | null;
-  onChange: (text: string, geo: GeoPoint | null) => void;
+  /** `suggestion` is present only on picks — carries areaLabel for the
+   *  location-privacy 'area' tier. Composer callers can ignore it. */
+  onChange: (text: string, geo: GeoPoint | null, suggestion?: GeoSuggestion) => void;
   placeholder?: string;
   className?: string;   // the host form's input class (cmp__input / cedit__input)
 }) {
@@ -60,7 +62,7 @@ export default function LocationField({
   function pick(s: GeoSuggestion) {
     skipNextLookup.current = true;
     setSuggestions([]); setOpen(false);
-    onChange(s.label, { lat: s.lat, lng: s.lng });
+    onChange(s.label, { lat: s.lat, lng: s.lng }, s);
   }
 
   return (
