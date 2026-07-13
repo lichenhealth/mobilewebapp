@@ -116,13 +116,6 @@ export default function HomeLocationSection({ me }: { me: string }) {
           Pick a suggestion to be findable on Maps. Hidden by default — choose who can see it below.
         </p>
       </div>
-      <div className="prof__save-row">
-        <button className="btn btn-primary" onClick={saveHome} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        {msg && <span className="prof__msg">{msg}</span>}
-      </div>
-
       <h3 className="homeloc__h3">Who can find you on the map</h3>
       <p className="prof__care-lead">
         Town-level shows you near {area || 'your town'} without your address. Rules for a person beat
@@ -219,6 +212,15 @@ export default function HomeLocationSection({ me }: { me: string }) {
           ))}
         </div>
       )}
+
+      {/* Save sits after the privacy rules so the flow reads: address →
+          choose who can see it → save. (Rules themselves apply instantly.) */}
+      <div className="prof__save-row homeloc__save">
+        <button className="btn btn-primary" onClick={saveHome} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {msg && <span className="prof__msg">{msg}</span>}
+      </div>
     </section>
   );
 }

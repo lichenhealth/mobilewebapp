@@ -43,3 +43,4 @@
   font-size: 13px; color: var(--ink); cursor: pointer;
 }
 .homeloc__match:hover { border-color: var(--peach); }
+.homeloc__save { margin-top: var(--s-4); }
