@@ -689,3 +689,14 @@
   color: var(--peach);
   font-size: 13px;
 }
+
+/* Avatars & names are doors to profiles */
+.thread__head-id--link { cursor: pointer; }
+.thread__head-id--link:hover .thread__head-name { color: var(--peach-deep); }
+.thread__intro-mark--link { cursor: pointer; }
+.msg-run__avatar--link { background: transparent; border: 0; padding: 0; cursor: pointer; }
+.msg-run__sender-link {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: inherit;
+}
+.msg-run__sender-link:hover { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }

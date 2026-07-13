@@ -27,6 +27,15 @@
 .prof__field { display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-3); }
 .prof__label { font-size: var(--t-xs); color: var(--ink-muted); font-weight: 500; }
 .prof__hint { font-size: var(--t-xs); color: var(--ink-faint); }
+.prof__public-row { display: flex; justify-content: center; padding: 0 var(--s-5) var(--s-3); }
+.prof__public-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 5px 14px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-muted); cursor: pointer;
+}
+.prof__public-btn:hover { border-color: var(--peach); color: var(--ink); }
 .prof__space-open {
   display: inline-flex; padding: 6px; border-radius: var(--r-full);
   background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;

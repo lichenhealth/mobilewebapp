@@ -99,6 +99,19 @@ export async function loadSpaceMembers(id: string): Promise<SpaceMemberRow[]> {
       || (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
 }
 
+/** The space's chat room id (every space gets one at creation via trigger).
+ *  chats RLS is member-gated, so non-members simply get null — the Chat
+ *  circle on the profile hides itself. */
+export async function loadSpaceChatId(spaceId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('chats')
+    .select('id')
+    .eq('space_id', spaceId)
+    .maybeSingle();
+  if (error) { console.warn('loadSpaceChatId:', error.message); return null; }
+  return (data as { id: string } | null)?.id ?? null;
+}
+
 /** Admin edits the space's public profile (name/description/avatar/location). */
 export async function updateSpaceProfile(id: string, patch: {
   name?: string;

@@ -3,16 +3,19 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
+import ContributionsFeed from '../components/ContributionsFeed';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import type { GeoPoint } from '../lib/geoApi';
 import {
-  loadSpaceProfile, loadSpaceMembers, updateSpaceProfile, uploadSpaceAvatar,
+  loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
 } from '../lib/spacesApi';
+import { loadMyMycelium, loadMyRecommendations, setTrust, setRecommend } from '../lib/myceliumApi';
 import './Profile.css';
 import './SpaceProfile.css';
+import './MemberProfile.css';   // shares the mprof action-button styles
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -32,7 +35,11 @@ export default function SpaceProfile() {
 
   const [space, setSpace] = useState<SpaceProfileRow | null>(null);
   const [members, setMembers] = useState<SpaceMemberRow[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [trusted, setTrusted] = useState(false);
+  const [recommended, setRecommended] = useState(false);
   const [loading, setLoading] = useState(true);
+  const membersRef = useRef<HTMLElement>(null);
 
   // edit state (admins)
   const [name, setName] = useState('');
@@ -52,9 +59,16 @@ export default function SpaceProfile() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, m] = await Promise.all([loadSpaceProfile(id), loadSpaceMembers(id)]);
+    const [s, m, c, myc, recs] = await Promise.all([
+      loadSpaceProfile(id), loadSpaceMembers(id), loadSpaceChatId(id),
+      me ? loadMyMycelium() : Promise.resolve(new Set<string>()),
+      me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
+    ]);
     setSpace(s);
     setMembers(m);
+    setChatId(c);
+    setTrusted(myc.has(`space:${id}`));
+    setRecommended(recs.has(`space:${id}`));
     if (s) {
       setName(s.name);
       setDescription(s.description ?? '');
@@ -62,8 +76,22 @@ export default function SpaceProfile() {
       setLocGeo(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
     }
     setLoading(false);
-  }, [id]);
+  }, [id, me]);
   useEffect(() => { load(); }, [load]);
+
+  async function toggleTrust() {
+    if (!me) return;
+    const next = !trusted;
+    setTrusted(next);
+    try { await setTrust('space', id, next); } catch (e) { console.error(e); setTrusted(!next); }
+  }
+
+  async function toggleRecommend() {
+    if (!me) return;
+    const next = !recommended;
+    setRecommended(next);
+    try { await setRecommend('space', id, next); } catch (e) { console.error(e); setRecommended(!next); }
+  }
 
   const myRole = members.find((m) => m.profile_id === me)?.role;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
@@ -154,6 +182,24 @@ export default function SpaceProfile() {
             )}
           </p>
         )}
+        {me && (
+          <div className="mprof__actions">
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+              onClick={toggleTrust}
+              title={trusted ? 'In your mycelium' : 'Add to your mycelium'}
+            >
+              <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+            </button>
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
+              onClick={toggleRecommend}
+              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
+            >
+              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <p className="prof__error">{error}</p>}
@@ -218,7 +264,19 @@ export default function SpaceProfile() {
         </section>
       )}
 
-      <section className="prof__section">
+      {/* The profile IS a feed — the space's wall (posted AS it or TO it),
+          with the space-anatomy circles (Chat for members, Members) leading
+          the icon row. Identical for all four kinds. */}
+      <ContributionsFeed
+        spaceId={space.id}
+        me={me}
+        leading={[
+          ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
+          { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+        ]}
+      />
+
+      <section className="prof__section" ref={membersRef}>
         <h2 className="prof__h2">Members</h2>
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">

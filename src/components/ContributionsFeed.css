@@ -1,0 +1,38 @@
+/* Profile contributions feed — content-type tabs + conditional area toggles */
+.cfeed { display: flex; flex-direction: column; }
+
+.cfeed__areas {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-3) var(--s-5) var(--s-2);
+  overflow-x: auto;
+}
+.cfeed__areas::-webkit-scrollbar { display: none; }
+.cfeed__area {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: 0; cursor: pointer; flex-shrink: 0;
+}
+.cfeed__area-circle {
+  width: 36px; height: 36px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.cfeed__area.is-active .cfeed__area-circle {
+  background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
+}
+.cfeed__area-gap { width: 1px; align-self: stretch; background: var(--bone-edge); flex-shrink: 0; margin: 2px var(--s-1); }
+.cfeed__area-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-muted); max-width: 64px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.cfeed__list {
+  display: flex; flex-direction: column; gap: var(--s-4);
+  padding: var(--s-2) var(--s-5) var(--s-6);
+}
+.cfeed__empty {
+  padding: var(--s-5); text-align: center;
+  font-size: 13px; font-weight: 300; color: var(--ink-muted);
+}

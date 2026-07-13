@@ -88,9 +88,12 @@ const SECTIONS: NavSection[] = [
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
   const { isAdmin, user } = useAuth();
-  const primary = PRIMARY.filter(
-    (p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL,
-  );
+  const primary = PRIMARY
+    .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
+    // "Public profile" = see yourself as other members do (/members/<me>).
+    .flatMap((p) => (p.to === '/profile' && user
+      ? [p, { to: `/members/${user.id}`, label: 'Public profile', icon: 'globe' as IconName }]
+      : [p]));
   const { countsBySection, totalUnread } = useNotifications();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))

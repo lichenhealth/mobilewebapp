@@ -38,6 +38,8 @@ export interface FeedCardProps {
   onBadgeAction?: () => void;
   /** Open the full page for this card (event page etc.) — title/body become links. */
   onOpen?: () => void;
+  /** Open the author's profile (member or space) — avatar/title/handle become links. */
+  onAuthor?: () => void;
   /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
   previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
 }
@@ -62,6 +64,7 @@ export default function FeedCard({
   onMessage,
   onBadgeAction,
   onOpen,
+  onAuthor,
   previews,
 }: FeedCardProps) {
   // Whole-card click-through: anywhere that isn't itself interactive opens
@@ -76,24 +79,47 @@ export default function FeedCard({
 
   return (
     <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '')} onClick={onCardClick}>
-      {/* HEADER */}
+      {/* HEADER — avatar + name open the author's profile when wired */}
       <header className="feed-card__head">
-        <div className="feed-card__avatar" aria-hidden="true">
-          {avatar ? (
-            <img src={avatar} alt="" />
-          ) : (
-            <span className="feed-card__monogram">
-              {avatarMonogram ?? title.charAt(0)}
-            </span>
-          )}
-        </div>
-        <div className="feed-card__head-text">
-          <h3 className="feed-card__title">{title}</h3>
-          <div className="feed-card__handle">
-            {handle}
-            {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
-          </div>
-        </div>
+        {onAuthor ? (
+          <button className="feed-card__author-btn" onClick={onAuthor} aria-label={`${title}'s profile`}>
+            <div className="feed-card__avatar" aria-hidden="true">
+              {avatar ? (
+                <img src={avatar} alt="" />
+              ) : (
+                <span className="feed-card__monogram">
+                  {avatarMonogram ?? title.charAt(0)}
+                </span>
+              )}
+            </div>
+            <div className="feed-card__head-text">
+              <h3 className="feed-card__title">{title}</h3>
+              <div className="feed-card__handle">
+                {handle}
+                {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
+              </div>
+            </div>
+          </button>
+        ) : (
+          <>
+            <div className="feed-card__avatar" aria-hidden="true">
+              {avatar ? (
+                <img src={avatar} alt="" />
+              ) : (
+                <span className="feed-card__monogram">
+                  {avatarMonogram ?? title.charAt(0)}
+                </span>
+              )}
+            </div>
+            <div className="feed-card__head-text">
+              <h3 className="feed-card__title">{title}</h3>
+              <div className="feed-card__handle">
+                {handle}
+                {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
+              </div>
+            </div>
+          </>
+        )}
         {(categoryIcons.length > 0 || onMessage) && (
           <div className="feed-card__head-actions">
             {categoryIcons.length > 0 && (

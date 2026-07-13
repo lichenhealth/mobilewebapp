@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   MessageRow, MemberInfo, ChatKind, ReactionRow, Attachment, MediaType,
@@ -9,7 +10,7 @@ import {
 } from '../lib/chatApi';
 import '../routes/ChatThread.css';
 
-interface ChatInfo { id: string; kind: ChatKind; title: string | null; }
+interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -45,14 +46,14 @@ export default function ChatConversation({
     (async () => {
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
-        supabase.from('chats').select('id, kind, title').eq('id', chatId).maybeSingle(),
+        supabase.from('chats').select('id, kind, title, space_id').eq('id', chatId).maybeSingle(),
         supabase.from('chat_members').select('profile_id, profiles(full_name)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
       if (!cRes.data) { setMissing(true); setLoading(false); return; }
-      const c = cRes.data as { id: string; kind: ChatKind; title: string | null };
-      setChat({ id: c.id, kind: c.kind, title: c.title });
+      const c = cRes.data as { id: string; kind: ChatKind; title: string | null; space_id: string | null };
+      setChat({ id: c.id, kind: c.kind, title: c.title, space_id: c.space_id });
       const map: Record<string, MemberInfo> = {};
       for (const r of (mRes.data as { profile_id: string; profiles: { full_name: string | null } | null }[] | null) ?? []) {
         map[r.profile_id] = { profile_id: r.profile_id, name: r.profiles?.full_name ?? 'Member' };
@@ -233,7 +234,23 @@ export default function ChatConversation({
   );
 }
 
+/** Where this room's identity lives: a DM partner's member profile, or the
+ *  space's profile for org/community/group/place rooms. Care-team, event,
+ *  and help rooms have no profile page — returns null (no link). */
+function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): string | null {
+  if (chat.kind === 'direct') {
+    const other = otherMember(members, me);
+    return other ? `/members/${other.profile_id}` : null;
+  }
+  if (chat.space_id && ['organization', 'community', 'group', 'place'].includes(chat.kind)) {
+    return `/spaces/${chat.space_id}`;
+  }
+  return null;
+}
+
 function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void }) {
+  const navigate = useNavigate();
+  const profilePath = profilePathFor(chat, members, me);
   const isDirect = chat.kind === 'direct' || chat.kind === 'help';
   const other = otherMember(members, me);
   return (
@@ -245,7 +262,13 @@ function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; titl
       ) : (
         <span className="thread__icon-spacer" aria-hidden="true" />
       )}
-      <div className="thread__head-id">
+      <div
+        className={'thread__head-id' + (profilePath ? ' thread__head-id--link' : '')}
+        onClick={profilePath ? () => navigate(profilePath) : undefined}
+        role={profilePath ? 'link' : undefined}
+        tabIndex={profilePath ? 0 : undefined}
+        onKeyDown={profilePath ? (e) => { if (e.key === 'Enter') navigate(profilePath); } : undefined}
+      >
         <div className="thread__head-avatar">
           {isDirect && other ? (
             <div className="thread__head-group">
@@ -278,11 +301,18 @@ function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; titl
 }
 
 function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string }) {
+  const navigate = useNavigate();
   const isDirect = chat.kind === 'direct' || chat.kind === 'help';
   const other = otherMember(members, me);
+  const profilePath = profilePathFor(chat, members, me);
   return (
     <div className="thread__intro">
-      <div className="thread__intro-mark">
+      <div
+        className={'thread__intro-mark' + (profilePath ? ' thread__intro-mark--link' : '')}
+        onClick={profilePath ? () => navigate(profilePath) : undefined}
+        role={profilePath ? 'link' : undefined}
+        tabIndex={profilePath ? 0 : undefined}
+      >
         {isDirect && other ? (
           <div className="thread__intro-single" style={{ background: colorFor(other.profile_id), color: 'var(--bone-warm)' }}>
             {monogramFor(other.name)}
@@ -336,19 +366,25 @@ function MessageRun({
   onReply: (m: MessageRow) => void;
   onReact: (messageId: string, emoji: string) => void;
 }) {
+  const navigate = useNavigate();
   const isMe = run.senderId === me;
   const sender = members[run.senderId];
   const showSender = !isMe;
+  const openSender = () => navigate(`/members/${run.senderId}`);
 
   return (
     <div className={'msg-run' + (isMe ? ' msg-run--me' : '')}>
       {!isMe && (
-        <div className="msg-run__avatar" aria-hidden="true">
+        <button className="msg-run__avatar msg-run__avatar--link" onClick={openSender} aria-label={`${sender?.name ?? 'Member'}'s profile`}>
           <span style={{ background: colorFor(run.senderId) }}>{monogramFor(sender?.name ?? '?')}</span>
-        </div>
+        </button>
       )}
       <div className="msg-run__bubbles">
-        {showSender && <p className="msg-run__sender">{sender?.name ?? 'Member'}</p>}
+        {showSender && (
+          <p className="msg-run__sender">
+            <button className="msg-run__sender-link" onClick={openSender}>{sender?.name ?? 'Member'}</button>
+          </p>
+        )}
         {run.messages.map((m, i) => {
           const quoted = m.reply_to ? messagesById[m.reply_to] : undefined;
           const rx = reactionsByMessage[m.id] ?? [];

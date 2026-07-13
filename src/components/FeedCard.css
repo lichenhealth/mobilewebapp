@@ -14,6 +14,15 @@
 .feed-card--clickable { cursor: pointer; }
 .feed-card--clickable:hover { border-color: var(--peach); }
 
+/* Avatar + name are a door to the author's profile */
+.feed-card__author-btn {
+  grid-column: 1 / 3;
+  display: flex; align-items: center; gap: var(--s-3); min-width: 0;
+  background: transparent; border: 0; padding: 0;
+  text-align: left; font: inherit; cursor: pointer;
+}
+.feed-card__author-btn:hover .feed-card__title { color: var(--peach-deep); }
+
 .feed-card__head {
   display: grid;
   grid-template-columns: 40px 1fr auto;
