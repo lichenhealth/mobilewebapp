@@ -297,6 +297,7 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
   onFly: (lng: number, lat: number, zoom?: number, markerKey?: string) => void;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [geoRows, setGeoRows] = useState<GeoSuggestion[]>([]);
   const debounceRef = useRef<number | null>(null);
@@ -371,6 +372,9 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
           ))}
         </ul>
       )}
+      <button className="mapv__search-smart" onClick={() => navigate('/search')}>
+        <Icon name="sliders" size={13} /> Smart search — filters, trust, distance…
+      </button>
     </div>
   );
 }

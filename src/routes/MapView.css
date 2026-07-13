@@ -70,6 +70,14 @@
   font-style: normal; font-family: var(--font-mono); font-size: 9px;
   color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;
 }
+.mapv__search-smart {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--s-2); padding: 6px 4px;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 12px; color: var(--ink-soft);
+}
+.mapv__search-smart:hover { color: var(--peach-deep); }
+.mapv__search-smart svg { color: var(--peach-deep); }
 
 /* ── the map itself ── */
 .mapv__frame { position: relative; flex: 1; min-height: 0; }
