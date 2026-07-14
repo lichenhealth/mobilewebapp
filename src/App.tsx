@@ -121,7 +121,8 @@ export default function App() {
 
           {/* Marketplace */}
           <Route path="/market"        element={<Marketplace />} />
-          <Route path="/market/:kind"  element={<Marketplace />} />
+          {/* Legacy kind tabs (goods/services/…) — one market now */}
+          <Route path="/market/:kind"  element={<Navigate to="/market" replace />} />
 
           {/* Donate */}
           <Route path="/donate" element={<Donate />} />

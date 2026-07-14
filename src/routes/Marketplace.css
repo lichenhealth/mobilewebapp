@@ -351,3 +351,11 @@
   from { opacity: 0; transform: translate(-50%, 8px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* smart-search hand-off inside the local search bar */
+.mkt__search-smartlink {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 4px 10px; border-radius: var(--r-full);
+  background: transparent; border: 1px solid var(--peach);
+  font-size: 11px; color: var(--peach-deep, var(--peach)); cursor: pointer;
+}
