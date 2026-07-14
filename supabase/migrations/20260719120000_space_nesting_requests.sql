@@ -161,3 +161,150 @@ drop trigger if exists on_space_request_created on public.space_membership_reque
 create trigger on_space_request_created
   after insert on public.space_membership_requests
   for each row execute function public.handle_new_space_request();
+
+-- ── 5. Group nesting is CONSENSUAL (founder): a group PROPOSES itself to a
+--       community/organization; the parent's admins approve or decline.
+--       Proposing a brand-new group = create it standalone + propose. ──────────
+create table if not exists public.space_nesting_requests (
+  group_id uuid primary key references public.spaces(id) on delete cascade,
+  parent_id uuid not null references public.spaces(id) on delete cascade,
+  initiated_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.space_nesting_requests enable row level security;
+
+-- Group admins and the prospective parent's admins can see it.
+create policy "snr: read either side" on public.space_nesting_requests
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.space_members m
+      where m.space_id = space_nesting_requests.group_id
+        and m.profile_id = auth.uid() and m.role in ('admin', 'super_admin')
+    )
+    or exists (
+      select 1 from public.space_members m
+      where m.space_id = space_nesting_requests.parent_id
+        and m.profile_id = auth.uid() and m.role in ('admin', 'super_admin')
+    )
+  );
+
+-- Only the group's own admins propose it somewhere.
+create policy "snr: group admins propose" on public.space_nesting_requests
+  for insert to authenticated
+  with check (
+    initiated_by = auth.uid()
+    and exists (
+      select 1 from public.space_members m
+      where m.space_id = space_nesting_requests.group_id
+        and m.profile_id = auth.uid() and m.role in ('admin', 'super_admin')
+    )
+  );
+
+-- Withdraw (group side) or decline (parent side).
+create policy "snr: withdraw or decline" on public.space_nesting_requests
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.space_members m
+      where m.space_id = space_nesting_requests.group_id
+        and m.profile_id = auth.uid() and m.role in ('admin', 'super_admin')
+    )
+    or exists (
+      select 1 from public.space_members m
+      where m.space_id = space_nesting_requests.parent_id
+        and m.profile_id = auth.uid() and m.role in ('admin', 'super_admin')
+    )
+  );
+
+-- Parent admin approves → the group moves in.
+create or replace function public.approve_group_nesting(p_group uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare v_parent uuid; v_gname text; v_pname text; v_admin uuid;
+begin
+  select parent_id into v_parent from public.space_nesting_requests where group_id = p_group;
+  if v_parent is null then
+    raise exception 'No nesting proposal for this group';
+  end if;
+  if not exists (
+    select 1 from public.space_members m
+    where m.space_id = v_parent and m.profile_id = auth.uid()
+      and m.role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Only the community''s admins can approve this';
+  end if;
+  update public.spaces set parent_space_id = v_parent where id = p_group;
+  delete from public.space_nesting_requests where group_id = p_group;
+  select name into v_gname from public.spaces where id = p_group;
+  select name into v_pname from public.spaces where id = v_parent;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = p_group and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', p_group, 'group_nesting_approved',
+      coalesce(v_gname, 'Your group') || ' is now part of ' || coalesce(v_pname, 'the community'),
+      'The admins welcomed your group in.',
+      '/spaces/' || p_group, auth.uid()
+    );
+  end loop;
+end; $$;
+
+revoke all on function public.approve_group_nesting(uuid) from public, anon;
+grant execute on function public.approve_group_nesting(uuid) to authenticated;
+
+-- DIRECT parent changes need the parent's consent too: setting a parent is
+-- only allowed for that parent's admins (the approve RPC runs as definer and
+-- bypasses this); clearing back to standalone is always the group's right.
+create or replace function public.enforce_parent_consent()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.parent_space_id is not null
+     and new.parent_space_id is distinct from old.parent_space_id
+     and auth.uid() is not null
+     and not exists (
+       select 1 from public.space_members m
+       where m.space_id = new.parent_space_id and m.profile_id = auth.uid()
+         and m.role in ('admin', 'super_admin')
+     ) then
+    raise exception 'Propose the group to that community — its admins decide';
+  end if;
+  return new;
+end; $$;
+
+drop trigger if exists on_space_parent_change on public.spaces;
+create trigger on_space_parent_change
+  before update of parent_space_id on public.spaces
+  for each row execute function public.enforce_parent_consent();
+
+-- Tell the parent's admins a group is knocking.
+create or replace function public.handle_new_nesting_request()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare v_gname text; v_pname text; v_admin uuid;
+begin
+  select name into v_gname from public.spaces where id = new.group_id;
+  select name into v_pname from public.spaces where id = new.parent_id;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = new.parent_id and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', new.parent_id, 'group_nesting_request',
+      'The group ' || coalesce(v_gname, 'a group') || ' proposes to join ' || coalesce(v_pname, 'your community'),
+      'Approve or decline on your community''s profile page.',
+      '/spaces/' || new.parent_id, new.initiated_by
+    );
+  end loop;
+  return new;
+end; $$;
+
+drop trigger if exists on_nesting_request_created on public.space_nesting_requests;
+create trigger on_nesting_request_created
+  after insert on public.space_nesting_requests
+  for each row execute function public.handle_new_nesting_request();

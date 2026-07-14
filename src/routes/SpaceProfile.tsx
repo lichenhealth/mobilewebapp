@@ -12,6 +12,8 @@ import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
   approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
+  amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting,
+  type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
@@ -59,7 +61,12 @@ export default function SpaceProfile() {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   // "Part of" picker: a group can join (or leave) a community/org home later.
+  // Setting a parent you don't admin becomes a PROPOSAL its admins approve.
   const [parentPick, setParentPick] = useState<{ id: string; name: string } | null>(null);
+  const [myProposal, setMyProposal] = useState<{ parent_id: string; parentName: string } | null>(null);
+  const [proposals, setProposals] = useState<NestingRequestRow[]>([]);
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [proposeName, setProposeName] = useState('');
   const [parentQ, setParentQ] = useState('');
   const [parentHits, setParentHits] = useState<{ id: string; name: string; kind: string }[]>([]);
 
@@ -88,6 +95,7 @@ export default function SpaceProfile() {
       me ? loadMyRequestFor(id, me) : Promise.resolve(null as MyRequestState),
       listChildGroups(id),
     ]);
+    setMyProposal(s?.kind === 'group' ? await loadNestingFor(id) : null);
     setSpace(s);
     setMembers(m);
     setChatId(c);
@@ -137,14 +145,18 @@ export default function SpaceProfile() {
   const adminTools = isAdmin && !publicView;
 
   useEffect(() => {
-    if (!isAdmin) { setPendingReqs([]); return; }
+    if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
     let live = true;
     (async () => {
-      const rows = await listPendingRequests(id);
-      if (live) setPendingReqs(rows);
+      const [rows, props] = await Promise.all([
+        listPendingRequests(id),
+        (space?.kind === 'community' || space?.kind === 'organization')
+          ? listNestingProposals(id) : Promise.resolve([]),
+      ]);
+      if (live) { setPendingReqs(rows); setProposals(props); }
     })();
     return () => { live = false; };
-  }, [id, isAdmin, members.length]);
+  }, [id, isAdmin, members.length, space?.kind]);
 
   // admin invite type-ahead (members + already-pending filtered out)
   useEffect(() => {
@@ -215,6 +227,22 @@ export default function SpaceProfile() {
     }
   }
 
+  /** Anyone can PROPOSE a group: it's created standalone (theirs to run) and
+   *  a nesting proposal goes to this community's admins. */
+  async function proposeNewGroup() {
+    const nm = proposeName.trim();
+    if (!nm) return;
+    setMemBusy(true); setError('');
+    try {
+      const gid = await createSpaceWithLocation(me, nm, 'group', '', null, null);
+      await proposeNesting(gid, id, me);
+      navigate(`/spaces/${gid}`);
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not propose the group.');
+      setMemBusy(false);
+    }
+  }
+
   async function onAvatarFile(file: File | undefined) {
     if (!file || !me || !space) return;
     setAvatarBusy(true); setError('');
@@ -232,15 +260,27 @@ export default function SpaceProfile() {
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
     try {
-      await updateSpaceProfile(space.id, {
+      let note = 'Saved';
+      const patch: Parameters<typeof updateSpaceProfile>[1] = {
         name: name.trim() || space.name,
         description: description.trim() || null,
         location: locText.trim() || null,
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
-        ...(space.kind === 'group' ? { parent_space_id: parentPick?.id ?? null } : {}),
-      });
-      setMsg('Saved');
+      };
+      if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
+        if (!parentPick) {
+          patch.parent_space_id = null;   // going standalone is always the group's right
+        } else if (await amIAdminOf(parentPick.id, me)) {
+          patch.parent_space_id = parentPick.id;
+        } else {
+          // Consensual nesting: their admins decide.
+          await proposeNesting(space.id, parentPick.id, me);
+          note = `Proposed — waiting for ${parentPick.name}'s admins`;
+        }
+      }
+      await updateSpaceProfile(space.id, patch);
+      setMsg(note);
       setTimeout(() => setMsg(''), 2000);
       await load();
     } catch (e) {
@@ -300,6 +340,9 @@ export default function SpaceProfile() {
                 part of {space.parent.name}
               </Link>
             </>
+          )}
+          {!space.parent && myProposal && isAdmin && (
+            <> · proposed to {myProposal.parentName}</>
           )}
         </p>
         {space.description && <p className="sprof__desc">{space.description}</p>}
@@ -437,7 +480,15 @@ export default function SpaceProfile() {
                   ))}
                 </div>
               )}
-              <p className="prof__hint">A group can stand alone — nest it under a community whenever it finds a home. Save to apply.</p>
+              {myProposal && (
+                <p className="prof__hint">
+                  Proposed to {myProposal.parentName} — waiting on their admins.{' '}
+                  <button className="sprof__withdraw" onClick={() => void act(async () => { await removeNesting(id); setMyProposal(null); })}>
+                    Withdraw
+                  </button>
+                </p>
+              )}
+              <p className="prof__hint">A group can stand alone — propose it to a community whenever it finds a home (their admins approve). Save to apply.</p>
             </div>
           )}
           <div className="prof__field">
@@ -551,7 +602,7 @@ export default function SpaceProfile() {
       </section>
 
       {/* Nested groups — the community's smaller circles. */}
-      {(childGroups.length > 0 || (adminTools && (space.kind === 'community' || space.kind === 'organization'))) && (
+      {(space.kind === 'community' || space.kind === 'organization') && (childGroups.length > 0 || !!me) && (
         <section className="prof__section" ref={groupsRef}>
           <h2 className="prof__h2">Groups</h2>
           {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
@@ -566,7 +617,23 @@ export default function SpaceProfile() {
               </button>
             ))}
           </div>
-          {adminTools && (space.kind === 'community' || space.kind === 'organization') && (
+          {/* Groups knocking on the door — admins decide. */}
+          {adminTools && proposals.length > 0 && proposals.map((pr) => (
+            <div className="sprof__req" key={pr.group_id}>
+              <Avatar id={pr.group_id} name={pr.group?.name ?? 'Group'} url={pr.group?.avatar_url} size={34} />
+              <span className="sprof__req-name">
+                {pr.group?.name ?? 'A group'}
+                <em className="sprof__req-tag"> proposed by {pr.proposer?.full_name ?? 'a member'}</em>
+              </span>
+              <span className="sprof__req-actions">
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                  onClick={() => void act(() => approveNesting(pr.group_id))}>Approve</button>
+                <button className="btn sprof__invite-btn" disabled={memBusy}
+                  onClick={() => void act(() => removeNesting(pr.group_id))}>Decline</button>
+              </span>
+            </div>
+          ))}
+          {adminTools ? (
             !newGroupOpen ? (
               <button className="sprof__edit-btn" onClick={() => setNewGroupOpen(true)}>
                 + New group
@@ -586,7 +653,29 @@ export default function SpaceProfile() {
                   onClick={() => { setNewGroupOpen(false); setNewGroupName(''); }}>Cancel</button>
               </div>
             )
-          )}
+          ) : me ? (
+            /* Anyone can propose a group; the admins here decide whether it
+               joins. The group is theirs to run either way. */
+            !proposeOpen ? (
+              <button className="sprof__edit-btn" onClick={() => setProposeOpen(true)}>
+                Propose a group
+              </button>
+            ) : (
+              <div className="sprof__newgroup">
+                <input
+                  className="prof__input"
+                  value={proposeName}
+                  onChange={(e) => setProposeName(e.target.value)}
+                  placeholder={`Name your group — ${space.name}'s admins will review it`}
+                  autoFocus
+                />
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !proposeName.trim()}
+                  onClick={() => void proposeNewGroup()}>Propose</button>
+                <button className="btn sprof__invite-btn" disabled={memBusy}
+                  onClick={() => { setProposeOpen(false); setProposeName(''); }}>Cancel</button>
+              </div>
+            )
+          ) : null}
         </section>
       )}
 

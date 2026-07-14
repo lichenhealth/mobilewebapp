@@ -287,3 +287,59 @@ export async function leaveSpace(spaceId: string, me: string): Promise<void> {
     .delete().eq('space_id', spaceId).eq('profile_id', me);
   if (error) throw error;
 }
+
+// ─── Group nesting proposals (consensual: parent admins approve) ──────────────
+
+export interface NestingRequestRow {
+  group_id: string;
+  parent_id: string;
+  initiated_by: string;
+  group: { name: string; avatar_url: string | null } | null;
+  parent: { name: string } | null;
+  proposer: { full_name: string | null } | null;
+}
+
+/** Is this member an admin/super_admin of the space? */
+export async function amIAdminOf(spaceId: string, me: string): Promise<boolean> {
+  const { data } = await supabase.from('space_members')
+    .select('role').eq('space_id', spaceId).eq('profile_id', me).maybeSingle();
+  const role = (data as { role: string } | null)?.role;
+  return role === 'admin' || role === 'super_admin';
+}
+
+export async function proposeNesting(groupId: string, parentId: string, me: string): Promise<void> {
+  const { error } = await supabase.from('space_nesting_requests')
+    .insert({ group_id: groupId, parent_id: parentId, initiated_by: me });
+  if (error && error.code !== '23505') throw error;
+}
+
+/** A group's own pending proposal (visible to its admins). */
+export async function loadNestingFor(groupId: string): Promise<{ parent_id: string; parentName: string } | null> {
+  const { data, error } = await supabase.from('space_nesting_requests')
+    .select('parent_id, parent:spaces!space_nesting_requests_parent_id_fkey(name)')
+    .eq('group_id', groupId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as unknown as { parent_id: string; parent: { name: string } | null };
+  return { parent_id: row.parent_id, parentName: row.parent?.name ?? 'a community' };
+}
+
+/** Groups knocking on this community/organization's door (admin view). */
+export async function listNestingProposals(parentId: string): Promise<NestingRequestRow[]> {
+  const { data, error } = await supabase.from('space_nesting_requests')
+    .select('group_id, parent_id, initiated_by, group:spaces!space_nesting_requests_group_id_fkey(name, avatar_url), proposer:profiles!space_nesting_requests_initiated_by_fkey(full_name)')
+    .eq('parent_id', parentId)
+    .order('created_at');
+  if (error) { console.warn('listNestingProposals:', error.message); return []; }
+  return ((data as unknown as NestingRequestRow[] | null) ?? []);
+}
+
+export async function approveNesting(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('approve_group_nesting', { p_group: groupId });
+  if (error) throw error;
+}
+
+/** Withdraw (group side) or decline (parent side). */
+export async function removeNesting(groupId: string): Promise<void> {
+  const { error } = await supabase.from('space_nesting_requests').delete().eq('group_id', groupId);
+  if (error) throw error;
+}
