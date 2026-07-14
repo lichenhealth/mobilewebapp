@@ -1,12 +1,12 @@
 import { supabase } from './supabase';
 import { geocodeSuggest, type GeoPoint } from './geoApi';
 import { loadFeed, postAreas, type FeedPost, type ServiceArea, type ContentType } from './postsApi';
-import { loadMyMycelium } from './myceliumApi';
 import { loadMappableMembers, type MappableMember } from './locationApi';
+import { freeBusy, type FreeBusyRow } from './calendarApi';
 import { occursOn } from './recurrence';
 import { todayISO } from './conciergeApi';
 
-// ─── Smart search (Figma 286-3407) ────────────────────────────────────────────
+// ─── Smart search (Figma 286-3407 + criteria panel 286-2515) ─────────────────
 // One sentence in, structured criteria out. The parser is deliberately
 // rule-based (no AI call): deterministic, instant, offline, and every match
 // is explainable — the UI highlights exactly the phrases it understood.
@@ -21,29 +21,49 @@ export type SpanKind =
 /** A recognized phrase inside the raw query — drives the peach highlighting. */
 export interface ParsedSpan { start: number; end: number; kind: SpanKind }
 
+/** Endorsement filters (mockup's Trusted by / Recommended by, per degree):
+ *  'mine' = my mycelium · 'second' = by people my mycelium trusts ·
+ *  'any' = anyone on the platform · personId = one specific member. */
+export type EndorseDegree = 'any' | 'mine' | 'second';
+export interface EndorseFilter { degree: EndorseDegree | null; personId: string | null }
+const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
+
+/** Offer modes (mockup's How): gift=free, buy=paid/sale/sliding. */
+export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'buy';
+
+export type WhoKind = 'people' | 'providers' | 'organizations';
+
 export interface SearchCriteria {
-  trusted: boolean;         // authors/people in MY mycelium
-  recommended: boolean;     // recommended by people in my mycelium
-  free: boolean; trade: boolean; paid: boolean;
+  trust: EndorseFilter;
+  rec: EndorseFilter;
+  offers: OfferKind[];
+  priceMin: number | null;
+  priceMax: number | null;
   online: boolean; inPerson: boolean;
+  who: WhoKind[];
+  spaceScope: string[];           // limit to these organizations/communities/groups/places
   areas: ServiceArea[];
   contentTypes: ContentType[];
-  categories: SearchCategory[];   // provider categories matched by name
+  categories: SearchCategory[];   // provider categories (mockup's Topics)
   radiusMiles: number | null;
   anchorText: string | null;      // "98110", "Bainbridge Island" — geocoded at run time
   anchorGeo: GeoPoint | null;     // pre-resolved center (criteria panel picks skip geocoding)
   nearMe: boolean;
-  monthsAhead: number | null;     // time window for events
+  dateFrom: string | null;        // ISO event window (mockup's When)
+  dateTo: string | null;
+  hideConflicts: boolean;         // drop events overlapping my calendar's busy times
   terms: string[];                // leftover meaningful words → free-text match
 }
 
 export function emptyCriteria(): SearchCriteria {
   return {
-    trusted: false, recommended: false,
-    free: false, trade: false, paid: false,
+    trust: noEndorse(), rec: noEndorse(),
+    offers: [], priceMin: null, priceMax: null,
     online: false, inPerson: false,
+    who: [], spaceScope: [],
     areas: [], contentTypes: [], categories: [],
-    radiusMiles: null, anchorText: null, anchorGeo: null, nearMe: false, monthsAhead: null,
+    radiusMiles: null, anchorText: null, anchorGeo: null, nearMe: false,
+    dateFrom: null, dateTo: null, hideConflicts: false,
     terms: [],
   };
 }
@@ -83,6 +103,12 @@ const STOPWORDS = new Set([
   'find', 'show', 'looking', 'look', 'want', 'need', 'please', 'from', 'near',
 ]);
 
+function addMonths(iso: string, months: number): string {
+  const d = new Date(iso + 'T00:00:00');
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Parse a natural sentence into criteria + the spans that were understood. */
 export function parseQuery(raw: string, categories: SearchCategory[]): {
   criteria: SearchCriteria; spans: ParsedSpan[];
@@ -108,14 +134,25 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
   };
 
   // Longest, most specific phrases first — order matters.
+  // Second-degree trust (the assistant mockup's Pro Tip) before first-degree.
+  scan(/\btrusted by (?:(?:people|members|those|folks) i trust|my mycelium)\b/g,
+    'trust', () => { c.trust.degree = 'second'; });
+  scan(/\brecommended by (?:people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
+    'recommend', () => { c.rec.degree = 'second'; });
   scan(/\brecommended(?: by (?:(?:people|members|those|folks) i trust|my mycelium|people in my mycelium))?\b/g,
-    'recommend', () => { c.recommended = true; });
+    'recommend', () => { c.rec.degree ??= 'mine'; });
   scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy mycelium\b|\btrusted\b/g,
-    'trust', () => { c.trusted = true; });
+    'trust', () => { c.trust.degree ??= 'mine'; });
 
-  scan(/\bfree or low[- ]?cost\b|\blow[- ]?cost\b|\bfree\b|\binexpensive\b/g, 'price', () => { c.free = true; });
-  scan(/\btrade\b|\bbarter\b/g, 'price', () => { c.trade = true; });
-  scan(/\bpaid\b/g, 'price', () => { c.paid = true; });
+  scan(/\bfree or low[- ]?cost\b|\blow[- ]?cost\b|\bfree\b|\binexpensive\b/g, 'price', () => {
+    if (!c.offers.includes('gift')) c.offers.push('gift');
+  });
+  scan(/\btrade\b|\bbarter\b/g, 'price', () => { if (!c.offers.includes('trade')) c.offers.push('trade'); });
+  scan(/\bpaid\b|\bfor sale\b/g, 'price', () => { if (!c.offers.includes('buy')) c.offers.push('buy'); });
+  scan(/\bto rent\b|\brentals?\b/g, 'price', () => { if (!c.offers.includes('rent')) c.offers.push('rent'); });
+  scan(/\bborrow(?:able)?\b|\bto lend\b/g, 'price', () => { if (!c.offers.includes('lend')) c.offers.push('lend'); });
+  scan(/\bunder \$?(\d+)\b/g, 'price', (m) => { c.priceMax = parseInt(m[1], 10); });
+  scan(/\bover \$?(\d+)\b/g, 'price', (m) => { c.priceMin = parseInt(m[1], 10); });
 
   scan(/\bonline\b|\bvirtual(?:ly)?\b|\bremote(?:ly)?\b/g, 'mode', () => { c.online = true; });
   scan(/\bin[- ]person\b|\boffline\b/g, 'mode', () => { c.inPerson = true; });
@@ -134,13 +171,22 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
     });
 
   // "in the next six months" / "next 2 weeks" / "this month" / "upcoming"
-  scan(/\b(?:in the )?next[,\s]+(\d+|[a-z]+)\s+(weeks?|months?|years?)\b/g, 'time', (m) => {
+  const window = (months: number) => {
+    c.dateFrom = todayISO();
+    c.dateTo = addMonths(todayISO(), months);
+  };
+  scan(/\b(?:in the )?next[,\s]+(\d+|[a-z]+)\s+(days?|weeks?|months?|years?)\b/g, 'time', (m) => {
     const n = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : WORD_NUMS[m[1]];
     if (!n) return;
-    c.monthsAhead = /week/.test(m[2]) ? Math.max(1, Math.round(n / 4)) : /year/.test(m[2]) ? n * 12 : n;
+    if (/day/.test(m[2])) {
+      c.dateFrom = todayISO();
+      const d = new Date(todayISO() + 'T00:00:00');
+      d.setDate(d.getDate() + n);
+      c.dateTo = d.toISOString().slice(0, 10);
+    } else window(/week/.test(m[2]) ? Math.max(1, Math.round(n / 4)) : /year/.test(m[2]) ? n * 12 : n);
   });
-  scan(/\bthis (week|weekend|month)\b/g, 'time', () => { c.monthsAhead = 1; });
-  scan(/\bupcoming\b|\bsoon\b/g, 'time', () => { c.monthsAhead = 3; });
+  scan(/\bthis (week|weekend|month)\b/g, 'time', () => window(1));
+  scan(/\bupcoming\b|\bsoon\b/g, 'time', () => window(3));
 
   // Provider categories by name — whole category name, or any significant
   // word of it ("spiritual" finds Spiritual Counseling). OR-combined.
@@ -173,14 +219,14 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
 
   // Leftover words → free-text terms
   let word = ''; let start = -1;
-  const flush = (end: number) => {
+  const flush = () => {
     if (word.length >= 3 && !STOPWORDS.has(word) && start >= 0 && !consumed[start]) c.terms.push(word);
     word = ''; start = -1;
   };
   for (let i = 0; i <= q.length; i++) {
     const ch = q[i] ?? ' ';
     if (/[a-z0-9']/.test(ch)) { if (!word) start = i; word += ch; }
-    else flush(i);
+    else flush();
   }
 
   spans.sort((a, b) => a.start - b.start);
@@ -193,8 +239,8 @@ export interface PersonHit {
   id: string; full_name: string | null; headline: string | null; avatar_url: string | null;
   categoryNames: string[];
   place: string | null; level: 'area' | 'exact' | null; distanceMi: number | null;
-  recommenders: string[];   // names from MY mycelium who recommend them
-  trusted: boolean;
+  recommenders: string[];   // names of qualifying recommenders
+  trusted: boolean;         // in MY mycelium
 }
 
 export interface SpaceHit {
@@ -231,31 +277,53 @@ function browserLocation(): Promise<GeoPoint | null> {
   });
 }
 
-function addMonths(iso: string, months: number): string {
-  const d = new Date(iso + 'T00:00:00');
-  d.setMonth(d.getMonth() + months);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Does this post's event land inside [today, today+months]? */
-function eventInWindow(p: FeedPost, months: number): boolean {
-  const ev = p.linked_event;
-  if (!ev) return false;
-  const today = todayISO();
-  const until = addMonths(today, months);
-  if (ev.recurrence) {
-    // walk the window day by day (≤ ~366 iterations, instant)
-    for (let d = today; d <= until; d = nextDay(d)) {
-      if (occursOn(ev, d)) return true;
-    }
-    return false;
-  }
-  return ev.start_date <= until && (ev.end_date ?? ev.start_date) >= today;
-}
 function nextDay(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+/** Does this post's event land inside [from, to]? */
+function eventInWindow(p: FeedPost, from: string, to: string): boolean {
+  const ev = p.linked_event;
+  if (!ev) return false;
+  if (ev.recurrence) {
+    // walk the window day by day (bounded below, instant at these sizes)
+    let days = 0;
+    for (let d = from; d <= to && days < 400; d = nextDay(d), days++) {
+      if (occursOn(ev, d)) return true;
+    }
+    return false;
+  }
+  return ev.start_date <= to && (ev.end_date ?? ev.start_date) >= from;
+}
+
+/** First day in [from, to] this event occurs on (for the conflict check). */
+function firstOccurrence(p: FeedPost, from: string, to: string): string | null {
+  const ev = p.linked_event;
+  if (!ev) return null;
+  if (!ev.recurrence) return ev.start_date >= from ? ev.start_date : from;
+  let days = 0;
+  for (let d = from; d <= to && days < 400; d = nextDay(d), days++) {
+    if (occursOn(ev, d)) return d;
+  }
+  return null;
+}
+
+/** Does the event clash with any of MY busy blocks on its (first) day? */
+function conflictsWithBusy(p: FeedPost, busy: FreeBusyRow[], from: string, to: string): boolean {
+  const ev = p.linked_event;
+  if (!ev) return false;
+  const day = firstOccurrence(p, from, to);
+  if (!day) return false;
+  for (const b of busy) {
+    if (!occursOn(b, day)) continue;
+    if (b.all_day || ev.all_day || ev.start_min == null || b.start_min == null) return true;
+    const bEnd = b.end_min ?? b.start_min + 60;
+    const eEnd = ev.end_min ?? ev.start_min + 60;
+    if (ev.start_min < bEnd && b.start_min < eEnd) return true;
+  }
+  return false;
 }
 
 function postGeo(p: FeedPost): GeoPoint | null {
@@ -266,11 +334,63 @@ function postGeo(p: FeedPost): GeoPoint | null {
   return g?.lat != null && g?.lng != null ? { lat: g.lat, lng: g.lng } : null;
 }
 
+/** Which offer kinds does this post satisfy? (events: event_mode column;
+ *  marketplace listings: details.mode — gift|sale|sliding|trade|lend|rent) */
+function postOffers(p: FeedPost): OfferKind[] {
+  const out = new Set<OfferKind>();
+  if (p.event_mode === 'free') out.add('gift');
+  if (p.event_mode === 'trade') out.add('trade');
+  if (p.event_mode === 'paid') out.add('buy');
+  const m = p.details?.mode as string | undefined;
+  if (m === 'gift') out.add('gift');
+  if (m === 'trade') out.add('trade');
+  if (m === 'sale' || m === 'sliding') out.add('buy');
+  if (m === 'rent') out.add('rent');
+  if (m === 'lend') out.add('lend');
+  return [...out];
+}
+
+/** First number in a price string — "$45", "Sliding scale $20–$50" → 45, 20. */
+function postPrice(p: FeedPost): number | null {
+  const s = p.details?.price;
+  if (typeof s !== 'string') return null;
+  const m = s.replace(/,/g, '').match(/(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
 const hasText = (hay: (string | null | undefined)[], terms: string[]) => {
   if (terms.length === 0) return true;
   const s = hay.filter(Boolean).join(' ').toLowerCase();
   return terms.some((t) => s.includes(t));
 };
+
+interface Edge { actor: string; target_type: string; target_id: string }
+
+/** Given a filter + the full edge list, who qualifies as an endorser of a
+ *  target key? Returns the qualifying actor ids (empty = doesn't pass). */
+function endorsersOf(
+  filter: EndorseFilter, edges: Edge[], type: string, id: string,
+  me: string, myWeb: Set<string>,
+): string[] {
+  if (!filter.degree && !filter.personId) return [];
+  const forTarget = edges.filter((e) => e.target_type === type && e.target_id === id);
+  if (filter.personId) return forTarget.filter((e) => e.actor === filter.personId).map((e) => e.actor);
+  if (filter.degree === 'mine') {
+    return forTarget.filter((e) => myWeb.has('profile:' + e.actor) || e.actor === me).map((e) => e.actor);
+  }
+  if (filter.degree === 'second') {
+    // people trusted BY my mycelium (my web's web)
+    const secondWeb = new Set<string>();
+    for (const e of edges) {
+      if (e.target_type === 'profile' && (myWeb.has('profile:' + e.actor) || e.actor === me)) {
+        secondWeb.add(e.target_id);
+      }
+    }
+    return forTarget.filter((e) => secondWeb.has(e.actor) || myWeb.has('profile:' + e.actor) || e.actor === me)
+      .map((e) => e.actor);
+  }
+  return forTarget.map((e) => e.actor);   // 'any'
+}
 
 export async function runSmartSearch(c: SearchCriteria, me: string): Promise<SmartResults> {
   // Resolve the radius center first (pre-picked, browser location, or geocode).
@@ -281,49 +401,66 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   }
   const anchorMissing = c.radiusMiles != null && !anchor;
 
-  const wantPrice = c.free || c.trade || c.paid;
   const catIds = c.categories.map((x) => x.id);
+  const wantProviders = c.who.includes('providers');
 
-  const [posts, myc, mappable, profRes, spaceRes, pcRes] = await Promise.all([
+  const [posts, mappable, profRes, spaceRes, pcRes, trustRes, recRes] = await Promise.all([
     loadFeed(200),
-    loadMyMycelium(),
     loadMappableMembers().catch(() => [] as MappableMember[]),
     supabase.from('profiles').select('id, full_name, headline, bio, avatar_url').limit(500),
     supabase.from('spaces').select('id, name, kind, location, lat, lng').limit(500),
-    catIds.length
-      ? supabase.from('profile_categories').select('profile_id, category_id').in('category_id', catIds)
+    (catIds.length || wantProviders)
+      ? supabase.from('profile_categories').select('profile_id, category_id').limit(3000)
       : Promise.resolve({ data: [] as { profile_id: string; category_id: string }[] }),
+    // The whole visible trust/recommend web — beta-scale fine; the trust LENS
+    // needs cross-member edges anyway (same reads as the feed's endorsement overlay).
+    supabase.from('mycelium').select('truster_id, target_type, target_id').limit(5000),
+    supabase.from('recommendations').select('recommender_id, target_type, target_id').limit(5000),
   ]);
 
   const profiles = (profRes.data as { id: string; full_name: string | null; headline: string | null; bio: string | null; avatar_url: string | null }[] | null) ?? [];
   const spaces = (spaceRes.data as { id: string; name: string; kind: string; location: string | null; lat: number | null; lng: number | null }[] | null) ?? [];
   const pcRows = (pcRes.data as { profile_id: string; category_id: string }[] | null) ?? [];
 
-  const mycProfileIds = [...myc].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
-  const nameOf = (id: string) => profiles.find((p) => p.id === id)?.full_name || 'Someone you trust';
+  const trustEdges: Edge[] = ((trustRes.data as { truster_id: string; target_type: string; target_id: string }[] | null) ?? [])
+    .map((r) => ({ actor: r.truster_id, target_type: r.target_type, target_id: r.target_id }));
+  const recEdges: Edge[] = ((recRes.data as { recommender_id: string; target_type: string; target_id: string }[] | null) ?? [])
+    .map((r) => ({ actor: r.recommender_id, target_type: r.target_type, target_id: r.target_id }));
 
-  // Recommendations BY my mycelium, for profiles and spaces (posts reuse the
-  // same pattern as the feed's endorsement overlay).
-  const [profRecs, spaceRecs, postRecs] = mycProfileIds.length
-    ? await Promise.all([
-      supabase.from('recommendations').select('recommender_id, target_id')
-        .eq('target_type', 'profile').in('recommender_id', mycProfileIds),
-      supabase.from('recommendations').select('recommender_id, target_id')
-        .eq('target_type', 'space').in('recommender_id', mycProfileIds),
-      supabase.from('recommendations').select('recommender_id, target_id')
-        .eq('target_type', 'post').in('recommender_id', mycProfileIds),
-    ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+  const myWeb = new Set(trustEdges.filter((e) => e.actor === me).map((e) => `${e.target_type}:${e.target_id}`));
+  const nameOf = (id: string) => profiles.find((p) => p.id === id)?.full_name || 'A member';
 
-  const recsFor = (rows: { data: unknown }, id: string): string[] =>
-    ((rows.data as { recommender_id: string; target_id: string }[] | null) ?? [])
-      .filter((r) => r.target_id === id)
-      .map((r) => nameOf(r.recommender_id));
+  // Space scope: members of the selected spaces (for the People section).
+  let scopeMembers: Set<string> | null = null;
+  if (c.spaceScope.length) {
+    const { data } = await supabase.from('space_members')
+      .select('profile_id, space_id').in('space_id', c.spaceScope);
+    scopeMembers = new Set(((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id));
+  }
+
+  // My busy blocks, once, if conflicts are hidden (needs a window to check).
+  const winFrom = c.dateFrom ?? todayISO();
+  const winTo = c.dateTo ?? addMonths(todayISO(), 12);
+  const busy = (c.hideConflicts && me) ? await freeBusy([me], winFrom, winTo) : [];
+
+  const trustPass = (type: string, id: string): boolean =>
+    !(c.trust.degree || c.trust.personId)
+    || endorsersOf(c.trust, trustEdges, type, id, me, myWeb).length > 0;
+  const recNames = (type: string, id: string): string[] =>
+    [...new Set(endorsersOf(c.rec, recEdges, type, id, me, myWeb).map(nameOf))];
+  const recPass = (type: string, id: string, extra = false): boolean =>
+    !(c.rec.degree || c.rec.personId) || recNames(type, id).length > 0 || extra;
+  // Display recommenders even when no filter is on (mycelium lens: my web's recs).
+  const displayRecs = (type: string, id: string): string[] => {
+    const f: EndorseFilter = (c.rec.degree || c.rec.personId) ? c.rec : { degree: 'mine', personId: null };
+    return [...new Set(endorsersOf(f, recEdges, type, id, me, myWeb).map(nameOf))];
+  };
 
   const catNamesFor = (profileId: string): string[] =>
     pcRows.filter((r) => r.profile_id === profileId)
       .map((r) => c.categories.find((x) => x.id === r.category_id)?.name)
       .filter((n): n is string => !!n);
+  const isProvider = (profileId: string): boolean => pcRows.some((r) => r.profile_id === profileId);
 
   const spot = (id: string) => mappable.find((m) => m.id === id) ?? null;
 
@@ -337,15 +474,17 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
         categoryNames: catNamesFor(p.id),
         place: s?.place ?? null, level: (s?.level as 'area' | 'exact' | undefined) ?? null,
         distanceMi: anchor && s ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
-        recommenders: recsFor(profRecs as { data: unknown }, p.id),
-        trusted: myc.has('profile:' + p.id),
+        recommenders: displayRecs('profile', p.id),
+        trusted: myWeb.has('profile:' + p.id),
         _bio: p.bio,
       } as PersonHit & { _bio: string | null };
     })
     .filter((p) => {
-      if (catIds.length && p.categoryNames.length === 0) return false;
-      if (c.trusted && !p.trusted) return false;
-      if (c.recommended && p.recommenders.length === 0) return false;
+      if (catIds.length && !p.categoryNames.length) return false;
+      if (wantProviders && !c.who.includes('people') && !isProvider(p.id)) return false;
+      if (scopeMembers && !scopeMembers.has(p.id)) return false;
+      if (!trustPass('profile', p.id)) return false;
+      if (!recPass('profile', p.id)) return false;
       if (anchor && c.radiusMiles != null) {
         if (p.distanceMi == null || p.distanceMi > c.radiusMiles) return false;
       }
@@ -353,8 +492,9 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       return true;
     });
   // Only surface people when the query points at people at all.
-  const wantsPeople = catIds.length > 0 || c.areas.includes('people')
-    || ((c.trusted || c.recommended) && c.areas.length === 0);
+  const endorseOnly = (c.trust.degree || c.trust.personId || c.rec.degree || c.rec.personId) && c.areas.length === 0;
+  const wantsPeople = c.who.includes('people') || wantProviders
+    || catIds.length > 0 || c.areas.includes('people') || (!c.who.length && !!endorseOnly);
   if (!wantsPeople) people = [];
   people.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)
@@ -363,12 +503,18 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
 
   // ── Posts ───────────────────────────────────────────────────────────────────
   const postAreaFilter: ServiceArea[] = c.areas.filter((a) => a !== 'people');
-  const postHits = posts.filter((p) => {
+  let postHits = posts.filter((p) => {
     if (postAreaFilter.length && !postAreas(p).some((a) => postAreaFilter.includes(a))) return false;
     if (c.contentTypes.length && !c.contentTypes.includes(p.content_type)) return false;
-    if (wantPrice) {
-      if (!p.event_mode) return false;
-      if (!((c.free && p.event_mode === 'free') || (c.trade && p.event_mode === 'trade') || (c.paid && p.event_mode === 'paid'))) return false;
+    if (c.spaceScope.length
+      && !(p.author_space_id && c.spaceScope.includes(p.author_space_id))
+      && !p.audience_space_ids?.some((id) => c.spaceScope.includes(id))) return false;
+    if (c.offers.length && !postOffers(p).some((o) => c.offers.includes(o))) return false;
+    if (c.priceMin != null || c.priceMax != null) {
+      const price = postPrice(p) ?? (postOffers(p).includes('gift') ? 0 : null);
+      if (price == null) return false;
+      if (c.priceMin != null && price < c.priceMin) return false;
+      if (c.priceMax != null && price > c.priceMax) return false;
     }
     // online XOR in-person only filters when exactly one is asked for
     if (c.online !== c.inPerson) {
@@ -376,10 +522,11 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       if (c.inPerson && !inPerson) return false;
       if (c.online && inPerson) return false;
     }
-    if (c.monthsAhead != null && !eventInWindow(p, c.monthsAhead)) return false;
-    if (c.trusted && !(myc.has('profile:' + p.author_id) || (p.author_space_id && myc.has('space:' + p.author_space_id)))) return false;
-    if (c.recommended && recsFor(postRecs as { data: unknown }, p.id).length === 0
-      && recsFor(profRecs as { data: unknown }, p.author_id).length === 0) return false;
+    if ((c.dateFrom || c.dateTo) && !eventInWindow(p, winFrom, winTo)) return false;
+    if (c.hideConflicts && p.linked_event && conflictsWithBusy(p, busy, winFrom, winTo)) return false;
+    if (!trustPass('profile', p.author_id)
+      && !(p.author_space_id && trustPass('space', p.author_space_id) && (c.trust.degree || c.trust.personId))) return false;
+    if (!recPass('post', p.id, recNames('profile', p.author_id).length > 0)) return false;
     if (anchor && c.radiusMiles != null) {
       const g = postGeo(p);
       if (!g || milesBetween(anchor, g) > c.radiusMiles) return false;
@@ -388,6 +535,11 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       && !c.categories.some((cat) => hasText([p.title, p.body], [cat.name.toLowerCase()]))) return false;
     return true;
   });
+  if (c.who.length && !c.who.includes('organizations') && (c.who.includes('people') || wantProviders)
+    && !postAreaFilter.length && !c.contentTypes.length) {
+    // pure Who=People searches read as a member directory — keep posts out
+    postHits = [];
+  }
 
   // ── Spaces ──────────────────────────────────────────────────────────────────
   let spaceHits: SpaceHit[] = spaces.map((s) => ({
@@ -395,20 +547,20 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     lat: s.lat, lng: s.lng,
     distanceMi: anchor && s.lat != null && s.lng != null
       ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
-    recommenders: recsFor(spaceRecs as { data: unknown }, s.id),
-    trusted: myc.has('space:' + s.id),
+    recommenders: displayRecs('space', s.id),
+    trusted: myWeb.has('space:' + s.id),
   })).filter((s) => {
-    if (c.trusted && !s.trusted) return false;
-    if (c.recommended && s.recommenders.length === 0) return false;
+    if (c.spaceScope.length && !c.spaceScope.includes(s.id)) return false;
+    if (!trustPass('space', s.id)) return false;
+    if (!recPass('space', s.id)) return false;
     if (anchor && c.radiusMiles != null) {
       if (s.distanceMi == null || s.distanceMi > c.radiusMiles) return false;
     }
     if (!hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
     return true;
   });
-  // Same relevance guard as people: only when the query points at places/orgs.
-  const wantsSpaces = c.areas.includes('places') || c.terms.length > 0
-    || ((c.trusted || c.recommended) && c.areas.length === 0);
+  const wantsSpaces = c.who.includes('organizations') || c.spaceScope.length > 0
+    || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly);
   if (!wantsSpaces) spaceHits = [];
   spaceHits.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)
