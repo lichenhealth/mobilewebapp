@@ -12,7 +12,7 @@ import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
   approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
-  amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting,
+  amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
@@ -608,13 +608,29 @@ export default function SpaceProfile() {
           {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
           <div className="sprof__members">
             {childGroups.map((g) => (
-              <button className="sprof__member" key={g.id} onClick={() => navigate(`/spaces/${g.id}`)}>
-                <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
-                <span className="sprof__member-name">{g.name}</span>
-                <span className="sprof__member-role">
-                  {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
-                </span>
-              </button>
+              <div className="sprof__grouprow" key={g.id}>
+                <button className="sprof__member" onClick={() => navigate(`/spaces/${g.id}`)}>
+                  <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
+                  <span className="sprof__member-name">{g.name}</span>
+                  <span className="sprof__member-role">
+                    {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
+                  </span>
+                </button>
+                {adminTools && (
+                  <button
+                    className="btn sprof__invite-btn"
+                    disabled={memBusy}
+                    title="Release this group — it becomes standalone; nothing else changes"
+                    onClick={() => {
+                      if (window.confirm(`Release ${g.name} from ${space.name}? It becomes a standalone group — its members, chat, and posts are untouched.`)) {
+                        void act(() => ejectGroup(g.id));
+                      }
+                    }}
+                  >
+                    Release
+                  </button>
+                )}
+              </div>
             ))}
           </div>
           {/* Groups knocking on the door — admins decide. */}

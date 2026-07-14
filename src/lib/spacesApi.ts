@@ -343,3 +343,10 @@ export async function removeNesting(groupId: string): Promise<void> {
   const { error } = await supabase.from('space_nesting_requests').delete().eq('group_id', groupId);
   if (error) throw error;
 }
+
+/** Parent-side un-nest: the community's admins release a nested group back
+ *  to standalone (its members, chat, and posts are untouched). */
+export async function ejectGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('eject_group', { p_group: groupId });
+  if (error) throw error;
+}

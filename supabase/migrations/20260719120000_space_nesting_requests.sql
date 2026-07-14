@@ -308,3 +308,41 @@ drop trigger if exists on_nesting_request_created on public.space_nesting_reques
 create trigger on_nesting_request_created
   after insert on public.space_nesting_requests
   for each row execute function public.handle_new_nesting_request();
+
+-- ── 6. Un-nesting cuts both ways: the parent's admins may release a nested
+--       group back to standalone (the group's admins could already leave). ────
+create or replace function public.eject_group(p_group uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare v_parent uuid; v_gname text; v_pname text; v_admin uuid;
+begin
+  select parent_space_id into v_parent from public.spaces where id = p_group;
+  if v_parent is null then
+    raise exception 'This group is not nested anywhere';
+  end if;
+  if not exists (
+    select 1 from public.space_members m
+    where m.space_id = v_parent and m.profile_id = auth.uid()
+      and m.role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Only the community''s admins can release a group';
+  end if;
+  select name into v_gname from public.spaces where id = p_group;
+  select name into v_pname from public.spaces where id = v_parent;
+  update public.spaces set parent_space_id = null where id = p_group;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = p_group and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', p_group, 'group_unnested',
+      coalesce(v_gname, 'Your group') || ' now stands on its own',
+      coalesce(v_pname, 'The community') || '''s admins released it — everything else about the group is unchanged.',
+      '/spaces/' || p_group, auth.uid()
+    );
+  end loop;
+end; $$;
+
+revoke all on function public.eject_group(uuid) from public, anon;
+grant execute on function public.eject_group(uuid) to authenticated;
