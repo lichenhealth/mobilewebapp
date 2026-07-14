@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xjeOThdlbCrWRHhefNlF5eDgtxGMwM7zsR2AU8f70d6WSwHWanVE7hPHUdH9bNg
+\restrict huejfZqCYQnwhSNezyWA0FEFpCeuwZTBWAc3VskeutlmANxgpcwIgxtaooizd25
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1563,6 +1563,7 @@ CREATE TABLE public.mycelium (
     target_type text NOT NULL,
     target_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    vouched boolean DEFAULT true NOT NULL,
     CONSTRAINT mycelium_target_type_check CHECK ((target_type = ANY (ARRAY['profile'::text, 'space'::text, 'post'::text])))
 );
 
@@ -3345,6 +3346,13 @@ CREATE POLICY "mycelium: read" ON public.mycelium FOR SELECT TO authenticated US
 
 
 --
+-- Name: mycelium mycelium: update own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "mycelium: update own" ON public.mycelium FOR UPDATE TO authenticated USING ((truster_id = auth.uid())) WITH CHECK ((truster_id = auth.uid()));
+
+
+--
 -- Name: notifications notif delete; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -4361,7 +4369,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xjeOThdlbCrWRHhefNlF5eDgtxGMwM7zsR2AU8f70d6WSwHWanVE7hPHUdH9bNg
+\unrestrict huejfZqCYQnwhSNezyWA0FEFpCeuwZTBWAc3VskeutlmANxgpcwIgxtaooizd25
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
