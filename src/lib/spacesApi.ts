@@ -72,7 +72,7 @@ export interface SpaceProfileRow {
 export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | null> {
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent:spaces!spaces_parent_space_id_fkey(id, name)')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent:spaces!parent_space_id(id, name)')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }
@@ -174,7 +174,7 @@ export interface SpaceDirectoryRow {
 export async function listSpacesByKind(kind: SpaceKind): Promise<SpaceDirectoryRow[]> {
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, name, kind, description, avatar_url, location, parent:spaces!spaces_parent_space_id_fkey(id, name), space_members(count)')
+    .select('id, name, kind, description, avatar_url, location, parent:spaces!parent_space_id(id, name), space_members(count)')
     .eq('kind', kind)
     .order('name');
   if (error) { console.warn('listSpacesByKind:', error.message); return []; }
