@@ -9,7 +9,7 @@ import { IconName } from '../components/Icon';
 import { MyceliumSignals, ActionAvailability } from '../components/EngagementFooter';
 
 export type ListingKind = 'good' | 'service' | 'space' | 'iso';
-export type ListingMode = 'sale' | 'gift' | 'rent' | 'lend' | 'trade' | 'sliding';
+export type ListingMode = 'sale' | 'gift' | 'rent' | 'lend' | 'borrow' | 'trade' | 'sliding';
 
 export const KIND_LABELS: Record<ListingKind, string> = {
   good: 'Goods',
@@ -23,6 +23,7 @@ export const MODE_LABELS: Record<ListingMode, string> = {
   gift: 'Gift',
   rent: 'Rent',
   lend: 'Lend',
+  borrow: 'Borrow',
   trade: 'Trade',
   sliding: 'Sliding scale',
 };
@@ -33,6 +34,7 @@ export const MODE_ICONS: Record<ListingMode, IconName> = {
   gift: 'heart-line',
   rent: 'rent',
   lend: 'lend',
+  borrow: 'lend',
   trade: 'trade',
   sliding: 'sparkle',
 };
@@ -257,6 +259,19 @@ export const LISTINGS: Listing[] = [
   },
 
   // ─ ISO (In Search Of) ─
+  {
+    id: 'iso-borrow-dehydrator',
+    kind: 'iso',
+    mode: 'borrow',
+    title: 'Borrow: food dehydrator for a weekend',
+    handle: '@willow-herbal',
+    monogram: 'W',
+    body: 'Harvest weekend coming up — hoping to borrow a dehydrator (any size) Friday to Monday. Happy to return it with a jar of dried nettles.',
+    price: 'Returned + thanks',
+    location: 'Bainbridge Island, WA',
+    trust: 3, recommends: 1, comments: 2,
+    color: '#7A8B6F',
+  },
   {
     id: 'iso-freezer',
     kind: 'iso',

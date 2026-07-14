@@ -29,7 +29,7 @@ export interface EndorseFilter { degree: EndorseDegree | null; personId: string 
 const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
 
 /** Offer modes (mockup's How): gift=free, buy=paid/sale/sliding. */
-export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'buy';
+export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'buy';
 
 export type WhoKind = 'people' | 'providers' | 'organizations';
 
@@ -150,7 +150,10 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
   scan(/\btrade\b|\bbarter\b/g, 'price', () => { if (!c.offers.includes('trade')) c.offers.push('trade'); });
   scan(/\bpaid\b|\bfor sale\b/g, 'price', () => { if (!c.offers.includes('buy')) c.offers.push('buy'); });
   scan(/\bto rent\b|\brentals?\b/g, 'price', () => { if (!c.offers.includes('rent')) c.offers.push('rent'); });
-  scan(/\bborrow(?:able)?\b|\bto lend\b/g, 'price', () => { if (!c.offers.includes('lend')) c.offers.push('lend'); });
+  scan(/\bborrow(?:able)?\b|\bto lend\b/g, 'price', () => {
+    if (!c.offers.includes('lend')) c.offers.push('lend');
+    if (!c.offers.includes('borrow')) c.offers.push('borrow');
+  });
   scan(/\bunder \$?(\d+)\b/g, 'price', (m) => { c.priceMax = parseInt(m[1], 10); });
   scan(/\bover \$?(\d+)\b/g, 'price', (m) => { c.priceMin = parseInt(m[1], 10); });
 
@@ -347,6 +350,7 @@ function postOffers(p: FeedPost): OfferKind[] {
   if (m === 'sale' || m === 'sliding') out.add('buy');
   if (m === 'rent') out.add('rent');
   if (m === 'lend') out.add('lend');
+  if (m === 'borrow') out.add('borrow');
   return [...out];
 }
 

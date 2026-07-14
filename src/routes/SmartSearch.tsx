@@ -486,7 +486,7 @@ export default function SmartSearch() {
             onToggle={() => toggleSect('how')}
           >
             <div className="ssrch__pills">
-              {([['gift', 'Gift / Free'], ['trade', 'Trade'], ['rent', 'Rent'], ['lend', 'Lend'], ['buy', 'Buy']] as [OfferKind, string][]).map(([k, label]) => (
+              {([['gift', 'Gift / Free'], ['trade', 'Trade'], ['rent', 'Rent'], ['lend', 'Lend'], ['borrow', 'Borrow'], ['buy', 'Buy']] as [OfferKind, string][]).map(([k, label]) => (
                 <button
                   key={k}
                   className={'ssrch__pill' + (criteria.offers.includes(k) ? ' is-on' : '')}
