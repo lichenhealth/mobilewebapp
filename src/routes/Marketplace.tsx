@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import MarketplaceCard, { MarketplaceCardCompact } from '../components/MarketplaceCard';
 import {
@@ -8,7 +8,6 @@ import {
   ListingKind,
   ListingMode,
 } from '../data/marketplace';
-import { parseScope, handlesInScope } from '../data/network';
 import './Marketplace.css';
 
 // URL slug → ListingKind (or 'all')
@@ -43,8 +42,6 @@ export default function Marketplace() {
   const { kind: urlSlug = '' } = useParams();
   const activeKind = URL_TO_KIND[urlSlug] ?? 'all';
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const scope = useMemo(() => parseScope(searchParams.get('from')), [searchParams]);
 
   const [activeModes, setActiveModes] = useState<ListingMode[]>([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -55,10 +52,6 @@ export default function Marketplace() {
     let list = activeKind === 'all'
       ? LISTINGS
       : LISTINGS.filter((l) => l.kind === activeKind);
-    if (scope) {
-      const allowed = handlesInScope(scope);
-      list = list.filter((l) => allowed.has(l.handle));
-    }
     if (activeModes.length) {
       list = list.filter((l) => activeModes.includes(l.mode));
     }
@@ -72,13 +65,7 @@ export default function Marketplace() {
       );
     }
     return list;
-  }, [activeKind, activeModes, query, scope]);
-
-  const clearScope = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete('from');
-    setSearchParams(next);
-  };
+  }, [activeKind, activeModes, query]);
 
   const handleAction = (action: ActionItem) => {
     if (action.kind === 'search') {
@@ -108,22 +95,6 @@ export default function Marketplace() {
         </p>
       </header>
 
-      {/* Scope banner — visible when filtered to a community/group/type */}
-      {scope && (
-        <div className="mkt__scope">
-          <span className="mkt__scope-eyebrow">Filtered to</span>
-          <span className="mkt__scope-label">{scope.label}</span>
-          <span className="mkt__scope-kind">{scope.kind}</span>
-          <button
-            className="mkt__scope-clear"
-            onClick={clearScope}
-            aria-label="Clear scope filter"
-          >
-            Show all
-          </button>
-        </div>
-      )}
-
       {/* Kind tabs */}
       <nav className="mkt__tabs">
         {([
@@ -133,11 +104,10 @@ export default function Marketplace() {
           { slug: '/spaces',   label: 'Spaces',   kind: 'space'   },
           { slug: '/iso',      label: 'ISO',      kind: 'iso'     },
         ] as const).map((t) => {
-          const qs = scope ? `?from=${scope.kind}:${scope.id}` : '';
           return (
             <Link
               key={t.label}
-              to={`/market${t.slug}${qs}`}
+              to={`/market${t.slug}`}
               className={'mkt__tab' + (activeKind === t.kind ? ' is-active' : '')}
             >
               {t.label}

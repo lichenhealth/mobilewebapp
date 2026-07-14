@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
-import { COMMUNITIES, GROUPS, NETWORK_LABELS } from '../data/network';
+import { listMyMemberSpaces, type MappableSpace } from '../lib/spacesApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
@@ -42,47 +42,23 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
 /** The Lichen support account answers help chats — it doesn't open one with itself. */
 const SUPPORT_EMAIL = 'connect@lichen.health';
 
+/** Mycelium sub-items are lens routes; the four space sections' sub-items
+ *  are the member's REAL memberships, fetched when the menu opens. */
+const MYCELIUM_ITEMS = [
+  { label: 'People', href: '/mycelium/people' },
+  { label: 'Providers', href: '/mycelium/providers' },
+  { label: 'Organizations', href: '/mycelium/organizations' },
+  { label: 'Places', href: '/mycelium/places' },
+];
+const SPACE_SECTIONS: { key: string; title: string; href: string; kind: MappableSpace['kind'] }[] = [
+  { key: 'communities', title: 'Communities', href: '/communities', kind: 'community' },
+  { key: 'groups', title: 'Groups', href: '/groups', kind: 'group' },
+  { key: 'organizations', title: 'Organizations', href: '/organizations', kind: 'organization' },
+  { key: 'places', title: 'Places', href: '/places', kind: 'place' },
+];
 const SECTIONS: NavSection[] = [
-  {
-    key: 'mycelium',
-    title: 'Mycelium',
-    href: '/mycelium',
-    items: (Object.keys(NETWORK_LABELS) as Array<keyof typeof NETWORK_LABELS>).map(
-      (type) => ({
-        label: NETWORK_LABELS[type],
-        href: `/mycelium/${type === 'person' ? 'people' : type === 'place' ? 'places' : `${type}s`}`,
-      })
-    ),
-    defaultExpanded: false,
-  },
-  {
-    key: 'communities',
-    title: 'Communities',
-    href: '/communities',
-    items: COMMUNITIES.map((c) => ({ label: c.name, href: `/communities/${c.id}` })),
-    defaultExpanded: false,
-  },
-  {
-    key: 'groups',
-    title: 'Groups',
-    href: '/groups',
-    items: GROUPS.map((g) => ({ label: g.name, href: `/groups/${g.id}` })),
-    defaultExpanded: false,
-  },
-  {
-    key: 'organizations',
-    title: 'Organizations',
-    href: '/organizations',
-    items: [],
-    defaultExpanded: false,
-  },
-  {
-    key: 'places',
-    title: 'Places',
-    href: '/places',
-    items: [],
-    defaultExpanded: false,
-  },
+  { key: 'mycelium', title: 'Mycelium', href: '/mycelium', items: MYCELIUM_ITEMS, defaultExpanded: false },
+  ...SPACE_SECTIONS.map((s) => ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false })),
 ];
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
@@ -98,6 +74,24 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
+  const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
+
+  useEffect(() => {
+    if (!open || !user) return;
+    let live = true;
+    (async () => {
+      const rows = await listMyMemberSpaces(user.id);
+      if (live) setMySpaces(rows);
+    })();
+    return () => { live = false; };
+  }, [open, user]);
+
+  const itemsFor = (key: string): { label: string; href: string }[] => {
+    const kind = SPACE_SECTIONS.find((s) => s.key === key)?.kind;
+    if (!kind) return MYCELIUM_ITEMS;
+    return mySpaces.filter((s) => s.kind === kind)
+      .map((s) => ({ label: s.name, href: `/spaces/${s.id}` }));
+  };
 
   // Lock body scroll + close on Escape
   useEffect(() => {
@@ -181,40 +175,43 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             </div>
           )}
 
-          {SECTIONS.map((s) => (
-            <div key={s.key} className="side-menu__section">
-              <button
-                className="side-menu__header"
-                onClick={() => toggleAndGo(s)}
-                aria-expanded={expanded[s.key]}
-              >
-                <span className="side-menu__header-label">{s.title}</span>
-                {s.items.length > 0 && (
-                  <span
-                    className={
-                      'side-menu__chevron' +
-                      (expanded[s.key] ? ' is-open' : '')
-                    }
-                    aria-hidden="true"
-                  />
+          {SECTIONS.map((s) => {
+            const items = itemsFor(s.key);
+            return (
+              <div key={s.key} className="side-menu__section">
+                <button
+                  className="side-menu__header"
+                  onClick={() => toggleAndGo(s)}
+                  aria-expanded={expanded[s.key]}
+                >
+                  <span className="side-menu__header-label">{s.title}</span>
+                  {items.length > 0 && (
+                    <span
+                      className={
+                        'side-menu__chevron' +
+                        (expanded[s.key] ? ' is-open' : '')
+                      }
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+                {expanded[s.key] && items.length > 0 && (
+                  <ul className="side-menu__sub-list">
+                    {items.map((item) => (
+                      <li key={item.href}>
+                        <button
+                          className="side-menu__sub-item"
+                          onClick={() => go(item.href)}
+                        >
+                          {item.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </button>
-              {expanded[s.key] && s.items.length > 0 && (
-                <ul className="side-menu__sub-list">
-                  {s.items.map((item) => (
-                    <li key={item.href}>
-                      <button
-                        className="side-menu__sub-item"
-                        onClick={() => go(item.href)}
-                      >
-                        {item.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
 
           <div className="side-menu__section">
             <button

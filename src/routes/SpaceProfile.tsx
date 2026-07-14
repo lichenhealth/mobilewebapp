@@ -10,8 +10,12 @@ import { colorFor, monogramFor } from '../lib/chatApi';
 import type { GeoPoint } from '../lib/geoApi';
 import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
+  loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
+  approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
+  type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
+import { supabase } from '../lib/supabase';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
 import './Profile.css';
 import './SpaceProfile.css';
@@ -41,6 +45,19 @@ export default function SpaceProfile() {
   const [recommended, setRecommended] = useState(false);
   const [loading, setLoading] = useState(true);
   const membersRef = useRef<HTMLElement>(null);
+  const groupsRef = useRef<HTMLElement>(null);
+
+  // membership machinery (request + approval / admin invites)
+  const [myRequest, setMyRequest] = useState<MyRequestState>(null);
+  const [pendingReqs, setPendingReqs] = useState<PendingRequestRow[]>([]);
+  const [childGroups, setChildGroups] = useState<SpaceDirectoryRow[]>([]);
+  const [memBusy, setMemBusy] = useState(false);
+  // admin invite type-ahead
+  const [invQ, setInvQ] = useState('');
+  const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  // + New group (admins of a community/organization)
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
 
   // edit state (admins)
   const [name, setName] = useState('');
@@ -60,14 +77,18 @@ export default function SpaceProfile() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, m, c, mine, recs] = await Promise.all([
+    const [s, m, c, mine, recs, req, kids] = await Promise.all([
       loadSpaceProfile(id), loadSpaceMembers(id), loadSpaceChatId(id),
       me ? loadMyWeb() : Promise.resolve({ web: new Set<string>(), vouched: new Set<string>() }),
       me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
+      me ? loadMyRequestFor(id, me) : Promise.resolve(null as MyRequestState),
+      listChildGroups(id),
     ]);
     setSpace(s);
     setMembers(m);
     setChatId(c);
+    setMyRequest(req);
+    setChildGroups(kids);
     setInWebState(mine.web.has(`space:${id}`));
     setTrusted(mine.vouched.has(`space:${id}`));
     setRecommended(recs.has(`space:${id}`));
@@ -106,8 +127,71 @@ export default function SpaceProfile() {
   }
 
   const myRole = members.find((m) => m.profile_id === me)?.role;
+  const isMember = !!myRole;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
   const adminTools = isAdmin && !publicView;
+
+  useEffect(() => {
+    if (!isAdmin) { setPendingReqs([]); return; }
+    let live = true;
+    (async () => {
+      const rows = await listPendingRequests(id);
+      if (live) setPendingReqs(rows);
+    })();
+    return () => { live = false; };
+  }, [id, isAdmin, members.length]);
+
+  // admin invite type-ahead (members + already-pending filtered out)
+  useEffect(() => {
+    const q = invQ.trim();
+    if (q.length < 2) { setInvHits([]); return; }
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name').ilike('full_name', `%${q}%`).limit(8);
+      if (!live) return;
+      const taken = new Set([
+        ...members.map((m) => m.profile_id),
+        ...pendingReqs.map((r) => r.profile_id),
+      ]);
+      setInvHits((((data as { id: string; full_name: string | null }[] | null) ?? [])
+        .filter((h) => !taken.has(h.id)).slice(0, 5)));
+    })();
+    return () => { live = false; };
+  }, [invQ, members, pendingReqs]);
+
+  async function act(fn: () => Promise<void>) {
+    setMemBusy(true); setError('');
+    try { await fn(); await load(); }
+    catch (e) { setError((e as Error)?.message || 'Something went wrong.'); }
+    setMemBusy(false);
+  }
+
+  const onMembershipTap = () => {
+    if (isMember) {
+      if (myRole === 'super_admin') return;   // owners can't leave their own space
+      if (window.confirm(`Leave ${space?.name ?? 'this space'}? You'll also leave its chat.`)) {
+        void act(() => leaveSpace(id, me));
+      }
+    } else if (myRequest === 'requested') {
+      void act(() => removeRequest(id, me));
+    } else if (!myRequest) {
+      void act(() => requestToJoin(id, me));
+    }
+  };
+
+  async function createChildGroup() {
+    const nm = newGroupName.trim();
+    if (!nm) return;
+    setMemBusy(true); setError('');
+    try {
+      const gid = await createSpaceWithLocation(me, nm, 'group', '', null, id);
+      navigate(`/spaces/${gid}`);
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not create the group.');
+      setMemBusy(false);
+    }
+  }
 
   async function onAvatarFile(file: File | undefined) {
     if (!file || !me || !space) return;
@@ -184,7 +268,17 @@ export default function SpaceProfile() {
           />
         </div>
         <h1 className="prof__name">{space.name}</h1>
-        <p className="sprof__kind">{kindLabel}</p>
+        <p className="sprof__kind">
+          {kindLabel}
+          {space.parent && (
+            <>
+              {' · '}
+              <Link className="sprof__parent" to={`/spaces/${space.parent.id}`}>
+                part of {space.parent.name}
+              </Link>
+            </>
+          )}
+        </p>
         {space.description && <p className="sprof__desc">{space.description}</p>}
         {space.location && (
           <p className="sprof__loc">
@@ -196,6 +290,20 @@ export default function SpaceProfile() {
         )}
         {me && (
           <div className="mprof__actions">
+            {myRequest !== 'invited' && (
+              <button
+                className={'btn mprof__btn mprof__btn--trust' + (isMember || myRequest === 'requested' ? ' is-on' : '')}
+                onClick={onMembershipTap}
+                disabled={memBusy}
+                title={isMember
+                  ? (myRole === 'super_admin' ? 'You run this space' : 'Member — tap to leave')
+                  : myRequest === 'requested' ? 'Waiting for an admin — tap to cancel'
+                  : 'Ask the admins to let you in'}
+              >
+                <Icon name={isMember ? 'check' : 'plus'} size={14} />{' '}
+                {isMember ? 'Member ✓' : myRequest === 'requested' ? 'Requested ✓' : 'Request to join'}
+              </button>
+            )}
             <button
               className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
               onClick={toggleWeb}
@@ -227,6 +335,16 @@ export default function SpaceProfile() {
       </div>
 
       {error && <p className="prof__error">{error}</p>}
+
+      {myRequest === 'invited' && (
+        <div className="sprof__invite">
+          <span>You&rsquo;re invited to join {space.name}.</span>
+          <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+            onClick={() => void act(() => acceptInvite(id))}>Accept</button>
+          <button className="btn sprof__invite-btn" disabled={memBusy}
+            onClick={() => void act(() => removeRequest(id, me))}>Decline</button>
+        </div>
+      )}
 
       {isAdmin && publicView && (
         <div className="sprof__manage">
@@ -301,8 +419,40 @@ export default function SpaceProfile() {
           { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
           ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
           { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+          // The founder's Marketplace-icon analogy: a Groups door appears only
+          // when this space actually has groups nested under it.
+          ...(childGroups.length > 0
+            ? [{ icon: 'user-multiple' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
+            : []),
         ]}
       />
+
+      {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
+      {adminTools && pendingReqs.length > 0 && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Waiting at the door</h2>
+          {pendingReqs.map((r) => (
+            <div className="sprof__req" key={r.profile_id}>
+              <Avatar id={r.profile_id} name={r.profile?.full_name ?? 'Member'} url={r.profile?.avatar_url} size={34} />
+              <span className="sprof__req-name">{r.profile?.full_name ?? 'A member'}</span>
+              {r.initiated_by === r.profile_id ? (
+                <span className="sprof__req-actions">
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => approveJoin(id, r.profile_id))}>Approve</button>
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => removeRequest(id, r.profile_id))}>Decline</button>
+                </span>
+              ) : (
+                <span className="sprof__req-actions">
+                  <em className="sprof__req-tag">invited</em>
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => removeRequest(id, r.profile_id))}>Withdraw</button>
+                </span>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="prof__section" ref={membersRef}>
         <h2 className="prof__h2">Members</h2>
@@ -325,7 +475,67 @@ export default function SpaceProfile() {
             </button>
           ))}
         </div>
+        {adminTools && (
+          <div className="sprof__invitebox">
+            <input
+              className="prof__input"
+              value={invQ}
+              onChange={(e) => setInvQ(e.target.value)}
+              placeholder="Invite a member by name…"
+            />
+            {invHits.length > 0 && (
+              <div className="sprof__invhits">
+                {invHits.map((h) => (
+                  <button key={h.id} className="sprof__invhit" disabled={memBusy}
+                    onClick={() => { setInvQ(''); void act(() => inviteMember(id, me, h.id)); }}>
+                    {h.full_name ?? 'Member'} <em>Invite</em>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
+
+      {/* Nested groups — the community's smaller circles. */}
+      {(childGroups.length > 0 || (adminTools && (space.kind === 'community' || space.kind === 'organization'))) && (
+        <section className="prof__section" ref={groupsRef}>
+          <h2 className="prof__h2">Groups</h2>
+          {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
+          <div className="sprof__members">
+            {childGroups.map((g) => (
+              <button className="sprof__member" key={g.id} onClick={() => navigate(`/spaces/${g.id}`)}>
+                <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
+                <span className="sprof__member-name">{g.name}</span>
+                <span className="sprof__member-role">
+                  {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
+                </span>
+              </button>
+            ))}
+          </div>
+          {adminTools && (space.kind === 'community' || space.kind === 'organization') && (
+            !newGroupOpen ? (
+              <button className="sprof__edit-btn" onClick={() => setNewGroupOpen(true)}>
+                + New group
+              </button>
+            ) : (
+              <div className="sprof__newgroup">
+                <input
+                  className="prof__input"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder={`Name the new group (it lives inside ${space.name})`}
+                  autoFocus
+                />
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newGroupName.trim()}
+                  onClick={() => void createChildGroup()}>Create</button>
+                <button className="btn sprof__invite-btn" disabled={memBusy}
+                  onClick={() => { setNewGroupOpen(false); setNewGroupName(''); }}>Cancel</button>
+              </div>
+            )
+          )}
+        </section>
+      )}
 
       {pinned && (
         <section className="prof__section">
