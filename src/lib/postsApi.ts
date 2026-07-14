@@ -232,12 +232,12 @@ export async function loadAuthorFeed(by: { profileId?: string; spaceId?: string 
   return (data as unknown as FeedPost[]) ?? [];
 }
 
-export async function loadFeed(): Promise<FeedPost[]> {
+export async function loadFeed(limit = 50): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts')
     .select(FEED_SELECT)
     .order('created_at', { ascending: false })
-    .limit(50);
+    .limit(limit);
   if (error) { console.error('loadFeed', error); return []; }
   return (data as unknown as FeedPost[]) ?? [];
 }

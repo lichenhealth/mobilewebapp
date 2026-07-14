@@ -18,7 +18,7 @@ import './Home.css';
 const FILTERS = ['All', 'Social', 'Creative', 'Educational', 'Actionable', 'Q&A'];
 
 const CATEGORY_ICONS: IconRowItem[] = [
-  { icon: 'search',         label: 'Search'      },
+  { icon: 'search',         label: 'Search',      to: '/search' },
   { icon: 'plus',           label: 'Post',        to: '/compose' },
   { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
   { icon: 'rsvp',           label: 'Events',      to: '/events'        },

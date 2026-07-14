@@ -36,6 +36,7 @@ import Invite from './routes/Invite';
 import Help from './routes/Help';
 import Membership from './routes/Membership';
 import Compose from './routes/Compose';
+import SmartSearch from './routes/SmartSearch';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/help"      element={<Help />} />
           <Route path="/membership" element={<Membership />} />
           <Route path="/compose"   element={<Compose />} />
+          <Route path="/search"    element={<SmartSearch />} />
           <Route path="/login"     element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup"    element={<SignUp />} />
