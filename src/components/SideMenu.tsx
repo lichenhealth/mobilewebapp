@@ -76,8 +76,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   );
   const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
 
+  // Fetch memberships whenever we have a user — on DESKTOP the menu is a
+  // persistent sidebar that never "opens", so this must not gate on `open`
+  // (that hid everyone's communities on wide screens). `open` stays in the
+  // deps so the mobile overlay refreshes each time it slides out.
   useEffect(() => {
-    if (!open || !user) return;
+    if (!user) return;
     let live = true;
     (async () => {
       const rows = await listMyMemberSpaces(user.id);
