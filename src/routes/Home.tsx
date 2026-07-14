@@ -5,7 +5,6 @@ import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
-import { FEED } from '../data/feed';
 import { loadFeed, type FeedPost } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
@@ -69,7 +68,6 @@ export default function Home() {
       </section>
 
       <section className="home__feed">
-        {/* Real posts first, then the demo feed below (until the platform fills in). */}
         {posts.map((p) => (
           <FeedCard
             key={p.id}
@@ -84,9 +82,6 @@ export default function Home() {
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
-        ))}
-        {FEED.map((card, i) => (
-          <FeedCard key={i} {...card} />
         ))}
       </section>
 

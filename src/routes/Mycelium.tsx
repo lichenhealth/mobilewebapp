@@ -4,7 +4,6 @@ import { Icon, IconName } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import { FEED } from '../data/feed';
 import {
   loadFeed, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
@@ -40,14 +39,6 @@ type Item = {
   areas: ServiceArea[];       // a post can live in several areas
 };
 
-// Demo cards (until your web fills with real posts), tagged so the filters bite.
-const MOCK_META: { kind: Kind; contentLabel: string; area: ServiceArea | null }[] = [
-  { kind: 'provider',     contentLabel: 'Social',      area: 'marketplace' },
-  { kind: 'organization', contentLabel: 'Educational', area: 'courses' },
-  { kind: 'provider',     contentLabel: 'Social',      area: 'people' },
-  { kind: 'place',        contentLabel: 'Actionable',  area: 'food' },
-];
-
 export default function Mycelium() {
   const { type: urlSlug = '' } = useParams();
   const { user } = useAuth();
@@ -80,9 +71,9 @@ export default function Mycelium() {
     })();
   }, []);
 
-  // Build the combined feed: real posts from entities in your mycelium, then demo cards.
+  // The feed: real posts from entities in your mycelium.
   const items = useMemo<Item[]>(() => {
-    const real: Item[] = posts
+    return posts
       // Authors in your WEB (person or the space they posted as — membership,
       // vouched or not) — and always your own posts, so what you share to your
       // mycelium shows in your own web.
@@ -106,18 +97,7 @@ export default function Mycelium() {
           onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));
-    const mock: Item[] = FEED.map((card, i) => {
-      const meta = MOCK_META[i % MOCK_META.length];
-      return {
-        key: 'mock-' + i,
-        card,
-        kind: meta.kind,
-        contentLabel: meta.contentLabel,
-        areas: meta.area ? [meta.area] : [],
-      };
-    });
-    return [...real, ...mock];
-  }, [posts, myMyc, myRecs, overlays, user]);
+  }, [posts, myWeb, myMyc, myRecs, overlays, user]);
 
   const visible = useMemo(
     () => items.filter((it) =>
@@ -196,7 +176,7 @@ export default function Mycelium() {
         {visible.length === 0 && (
           <div className="myc__empty">
             <span className="display-italic">Nothing matches.</span>
-            <p>Clear a filter, or trust more entities to grow your web.</p>
+            <p>Clear a filter, or weave more people and places into your web.</p>
           </div>
         )}
       </section>

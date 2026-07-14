@@ -1,10 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './routes/Home';
-import Community from './routes/Community';
-import CommunityList from './routes/CommunityList';
-import Group from './routes/Group';
-import GroupList from './routes/GroupList';
+import SpacesDirectory from './routes/SpacesDirectory';
 import Mycelium from './routes/Mycelium';
 import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
@@ -115,14 +112,12 @@ export default function App() {
           <Route path="/mycelium/:type"  element={<Mycelium />} />
 
           {/* Communities — feed per community */}
-          <Route path="/communities"      element={<CommunityList />} />
-          <Route path="/communities/:id"  element={<Community />} />
+          <Route path="/communities"      element={<SpacesDirectory kind="community" />} />
           {/* Legacy /community path — redirect */}
-          <Route path="/community"        element={<Navigate to="/communities/mons-sana" replace />} />
+          <Route path="/community"        element={<Navigate to="/communities" replace />} />
 
           {/* Groups — feed per group */}
-          <Route path="/groups"      element={<GroupList />} />
-          <Route path="/groups/:id"  element={<Group />} />
+          <Route path="/groups"      element={<SpacesDirectory kind="group" />} />
 
           {/* Marketplace */}
           <Route path="/market"        element={<Marketplace />} />
@@ -132,8 +127,8 @@ export default function App() {
           <Route path="/donate" element={<Donate />} />
 
           {/* Side-menu passages — placeholders */}
-          <Route path="/organizations" element={<Placeholder title="Organizations" icon="user-multiple" intro="Practices, nonprofits, and businesses rooted in the network." hint="Coming soon" />} />
-          <Route path="/places"   element={<Placeholder title="Places"   icon="location"       intro="Spaces members open up — kitchens, studios, libraries, fields." hint="Coming soon" />} />
+          <Route path="/organizations" element={<SpacesDirectory kind="organization" />} />
+          <Route path="/places"   element={<SpacesDirectory kind="place" />} />
           <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}

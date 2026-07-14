@@ -66,12 +66,13 @@ export interface SpaceProfileRow {
   lat: number | null;
   lng: number | null;
   created_by: string | null;
+  parent: { id: string; name: string } | null;   // a group's home community/org
 }
 
 export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | null> {
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent:spaces!spaces_parent_space_id_fkey(id, name)')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }
@@ -120,6 +121,7 @@ export async function updateSpaceProfile(id: string, patch: {
   location?: string | null;
   lat?: number | null;
   lng?: number | null;
+  parent_space_id?: string | null;   // group admins nest/unnest under a community/org
 }): Promise<void> {
   const { error } = await supabase.from('spaces').update(patch).eq('id', id);
   if (error) throw error;
@@ -135,10 +137,12 @@ export async function uploadSpaceAvatar(uid: string, spaceId: string, file: File
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
-/** Create a place/organization with its location in one go (creator becomes
- *  super_admin via the handle_new_space trigger). Returns the new space id. */
+/** Create a space with its location in one go (creator becomes super_admin
+ *  via the handle_new_space trigger). parentId nests a group under a
+ *  community/organization. Returns the new space id. */
 export async function createSpaceWithLocation(
   me: string, name: string, kind: SpaceKind, location: string, geo: GeoPoint | null,
+  parentId?: string | null,
 ): Promise<string> {
   const { data, error } = await supabase.from('spaces').insert({
     kind,
@@ -147,7 +151,202 @@ export async function createSpaceWithLocation(
     location: location.trim() || null,
     lat: geo?.lat ?? null,
     lng: geo?.lng ?? null,
+    parent_space_id: parentId ?? null,
   }).select('id').single();
   if (error) throw error;
   return (data as { id: string }).id;
+}
+
+// ─── Directory (real Communities/Groups/Organizations/Places screens) ─────────
+
+export interface SpaceDirectoryRow {
+  id: string;
+  name: string;
+  kind: SpaceKind;
+  description: string | null;
+  avatar_url: string | null;
+  location: string | null;
+  parent: { id: string; name: string } | null;
+  member_count: number;
+}
+
+/** Every space of a kind, with member counts and (for groups) the parent. */
+export async function listSpacesByKind(kind: SpaceKind): Promise<SpaceDirectoryRow[]> {
+  const { data, error } = await supabase
+    .from('spaces')
+    .select('id, name, kind, description, avatar_url, location, parent:spaces!spaces_parent_space_id_fkey(id, name), space_members(count)')
+    .eq('kind', kind)
+    .order('name');
+  if (error) { console.warn('listSpacesByKind:', error.message); return []; }
+  type Raw = Omit<SpaceDirectoryRow, 'parent' | 'member_count'> & {
+    parent: { id: string; name: string } | null;
+    space_members: { count: number }[];
+  };
+  return (((data as unknown as Raw[] | null) ?? []).map((r) => ({
+    ...r, member_count: r.space_members?.[0]?.count ?? 0,
+  })));
+}
+
+/** Groups nested under a community/organization. */
+export async function listChildGroups(parentId: string): Promise<SpaceDirectoryRow[]> {
+  const { data, error } = await supabase
+    .from('spaces')
+    .select('id, name, kind, description, avatar_url, location, space_members(count)')
+    .eq('parent_space_id', parentId)
+    .order('name');
+  if (error) { console.warn('listChildGroups:', error.message); return []; }
+  type Raw = Omit<SpaceDirectoryRow, 'parent' | 'member_count'> & { space_members: { count: number }[] };
+  return (((data as unknown as Raw[] | null) ?? []).map((r) => ({
+    ...r, parent: null, member_count: r.space_members?.[0]?.count ?? 0,
+  })));
+}
+
+/** All spaces I'm a member of, for the side menu's per-kind sub-lists. */
+export async function listMyMemberSpaces(me: string): Promise<MappableSpace[]> {
+  const { data, error } = await supabase
+    .from('space_members')
+    .select('spaces(id, name, kind, location, lat, lng)')
+    .eq('profile_id', me);
+  if (error) { console.warn('listMyMemberSpaces:', error.message); return []; }
+  return (((data as unknown as { spaces: MappableSpace | null }[] | null) ?? [])
+    .map((r) => r.spaces)
+    .filter((s): s is MappableSpace => !!s))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ─── Membership: request + approval, or admin invite (care-team pattern) ──────
+// One pending row per (space, person). initiated_by = the person → a JOIN
+// REQUEST admins approve; initiated_by = an admin → an INVITE the person
+// accepts. Approval/acceptance go through SECURITY DEFINER RPCs; the
+// sync_member_to_chat trigger adds the new member to the space chat.
+
+export type MyRequestState = 'requested' | 'invited' | null;
+
+export async function loadMyRequestFor(spaceId: string, me: string): Promise<MyRequestState> {
+  const { data, error } = await supabase
+    .from('space_membership_requests')
+    .select('initiated_by')
+    .eq('space_id', spaceId).eq('profile_id', me)
+    .maybeSingle();
+  if (error) { console.warn('loadMyRequestFor:', error.message); return null; }
+  if (!data) return null;
+  return (data as { initiated_by: string }).initiated_by === me ? 'requested' : 'invited';
+}
+
+export async function requestToJoin(spaceId: string, me: string): Promise<void> {
+  const { error } = await supabase.from('space_membership_requests')
+    .insert({ space_id: spaceId, profile_id: me, initiated_by: me });
+  if (error && error.code !== '23505') throw error;
+}
+
+/** Cancel my request, decline my invite, or (as admin) decline/withdraw. */
+export async function removeRequest(spaceId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.from('space_membership_requests')
+    .delete().eq('space_id', spaceId).eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+export interface PendingRequestRow {
+  profile_id: string;
+  initiated_by: string;
+  created_at: string;
+  profile: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+/** Admin view: everything pending on a space (requests AND outstanding invites). */
+export async function listPendingRequests(spaceId: string): Promise<PendingRequestRow[]> {
+  const { data, error } = await supabase
+    .from('space_membership_requests')
+    .select('profile_id, initiated_by, created_at, profile:profiles!space_membership_requests_profile_id_fkey(full_name, avatar_url)')
+    .eq('space_id', spaceId)
+    .order('created_at');
+  if (error) { console.warn('listPendingRequests:', error.message); return []; }
+  return ((data as unknown as PendingRequestRow[] | null) ?? []);
+}
+
+export async function inviteMember(spaceId: string, me: string, profileId: string): Promise<void> {
+  const { error } = await supabase.from('space_membership_requests')
+    .insert({ space_id: spaceId, profile_id: profileId, initiated_by: me });
+  if (error && error.code !== '23505') throw error;
+}
+
+export async function approveJoin(spaceId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.rpc('approve_join_request', { p_space: spaceId, p_profile: profileId });
+  if (error) throw error;
+}
+
+export async function acceptInvite(spaceId: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_space_invite', { p_space: spaceId });
+  if (error) throw error;
+}
+
+/** Leave a space (existing self-delete RLS; the chat sync trigger removes
+ *  chat membership too). Super admins can't leave — they run the place. */
+export async function leaveSpace(spaceId: string, me: string): Promise<void> {
+  const { error } = await supabase.from('space_members')
+    .delete().eq('space_id', spaceId).eq('profile_id', me);
+  if (error) throw error;
+}
+
+// ─── Group nesting proposals (consensual: parent admins approve) ──────────────
+
+export interface NestingRequestRow {
+  group_id: string;
+  parent_id: string;
+  initiated_by: string;
+  group: { name: string; avatar_url: string | null } | null;
+  parent: { name: string } | null;
+  proposer: { full_name: string | null } | null;
+}
+
+/** Is this member an admin/super_admin of the space? */
+export async function amIAdminOf(spaceId: string, me: string): Promise<boolean> {
+  const { data } = await supabase.from('space_members')
+    .select('role').eq('space_id', spaceId).eq('profile_id', me).maybeSingle();
+  const role = (data as { role: string } | null)?.role;
+  return role === 'admin' || role === 'super_admin';
+}
+
+export async function proposeNesting(groupId: string, parentId: string, me: string): Promise<void> {
+  const { error } = await supabase.from('space_nesting_requests')
+    .insert({ group_id: groupId, parent_id: parentId, initiated_by: me });
+  if (error && error.code !== '23505') throw error;
+}
+
+/** A group's own pending proposal (visible to its admins). */
+export async function loadNestingFor(groupId: string): Promise<{ parent_id: string; parentName: string } | null> {
+  const { data, error } = await supabase.from('space_nesting_requests')
+    .select('parent_id, parent:spaces!space_nesting_requests_parent_id_fkey(name)')
+    .eq('group_id', groupId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as unknown as { parent_id: string; parent: { name: string } | null };
+  return { parent_id: row.parent_id, parentName: row.parent?.name ?? 'a community' };
+}
+
+/** Groups knocking on this community/organization's door (admin view). */
+export async function listNestingProposals(parentId: string): Promise<NestingRequestRow[]> {
+  const { data, error } = await supabase.from('space_nesting_requests')
+    .select('group_id, parent_id, initiated_by, group:spaces!space_nesting_requests_group_id_fkey(name, avatar_url), proposer:profiles!space_nesting_requests_initiated_by_fkey(full_name)')
+    .eq('parent_id', parentId)
+    .order('created_at');
+  if (error) { console.warn('listNestingProposals:', error.message); return []; }
+  return ((data as unknown as NestingRequestRow[] | null) ?? []);
+}
+
+export async function approveNesting(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('approve_group_nesting', { p_group: groupId });
+  if (error) throw error;
+}
+
+/** Withdraw (group side) or decline (parent side). */
+export async function removeNesting(groupId: string): Promise<void> {
+  const { error } = await supabase.from('space_nesting_requests').delete().eq('group_id', groupId);
+  if (error) throw error;
+}
+
+/** Parent-side un-nest: the community's admins release a nested group back
+ *  to standalone (its members, chat, and posts are untouched). */
+export async function ejectGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('eject_group', { p_group: groupId });
+  if (error) throw error;
 }
