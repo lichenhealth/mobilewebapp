@@ -196,6 +196,10 @@ export default function Events() {
 
           {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
           <div className="evt__actions h-scroll">
+            <button className="evt__action" onClick={() => navigate('/search?area=events')}>
+              <span className="evt__action-circle"><Icon name="search" size={14} /></span>
+              <span className="evt__action-label">Search</span>
+            </button>
             <button className="evt__action" onClick={() => navigate('/compose?area=events')}>
               <span className="evt__action-circle">
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">

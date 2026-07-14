@@ -1,6 +1,22 @@
 /* Smart search (Figma 286-3407) — sentence box with inline peach highlights */
 .ssrch { padding: var(--s-4); max-width: 720px; margin: 0 auto; }
 
+.ssrch__scope {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-bottom: var(--s-2); padding: 6px 12px;
+  border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm)); border: 1px solid var(--peach);
+  font-size: 12px; color: var(--ink);
+}
+.ssrch__scope > svg { color: var(--peach-deep, var(--peach)); }
+.ssrch__scope-x {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px; border-radius: var(--r-full);
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 11px; color: var(--ink-soft);
+}
+.ssrch__scope-x:hover { color: var(--ink); }
+
 .ssrch__boxwrap { display: flex; align-items: flex-start; gap: var(--s-2); }
 .ssrch__box {
   position: relative; flex: 1;

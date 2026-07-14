@@ -42,6 +42,7 @@ export interface SearchCriteria {
   online: boolean; inPerson: boolean;
   who: WhoKind[];
   spaceScope: string[];           // limit to these organizations/communities/groups/places
+  authorScope: string | null;     // limit to one member's own contributions (their profile's Search)
   areas: ServiceArea[];
   contentTypes: ContentType[];
   categories: SearchCategory[];   // provider categories (mockup's Topics)
@@ -60,7 +61,7 @@ export function emptyCriteria(): SearchCriteria {
     trust: noEndorse(), rec: noEndorse(),
     offers: [], priceMin: null, priceMax: null,
     online: false, inPerson: false,
-    who: [], spaceScope: [],
+    who: [], spaceScope: [], authorScope: null,
     areas: [], contentTypes: [], categories: [],
     radiusMiles: null, anchorText: null, anchorGeo: null, nearMe: false,
     dateFrom: null, dateTo: null, hideConflicts: false,
@@ -497,8 +498,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     });
   // Only surface people when the query points at people at all.
   const endorseOnly = (c.trust.degree || c.trust.personId || c.rec.degree || c.rec.personId) && c.areas.length === 0;
-  const wantsPeople = c.who.includes('people') || wantProviders
-    || catIds.length > 0 || c.areas.includes('people') || (!c.who.length && !!endorseOnly);
+  const wantsPeople = !c.authorScope && (c.who.includes('people') || wantProviders
+    || catIds.length > 0 || c.areas.includes('people') || (!c.who.length && !!endorseOnly));
   if (!wantsPeople) people = [];
   people.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)
@@ -508,6 +509,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   // ── Posts ───────────────────────────────────────────────────────────────────
   const postAreaFilter: ServiceArea[] = c.areas.filter((a) => a !== 'people');
   let postHits = posts.filter((p) => {
+    if (c.authorScope && !(p.author_id === c.authorScope && !p.author_space_id)) return false;
     if (postAreaFilter.length && !postAreas(p).some((a) => postAreaFilter.includes(a))) return false;
     if (c.contentTypes.length && !c.contentTypes.includes(p.content_type)) return false;
     if (c.spaceScope.length
@@ -563,8 +565,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     if (!hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
     return true;
   });
-  const wantsSpaces = c.who.includes('organizations') || c.spaceScope.length > 0
-    || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly);
+  const wantsSpaces = !c.authorScope && (c.who.includes('organizations') || c.spaceScope.length > 0
+    || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly));
   if (!wantsSpaces) spaceHits = [];
   spaceHits.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)

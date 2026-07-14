@@ -271,6 +271,10 @@ export default function SpaceProfile() {
         spaceId={space.id}
         me={me}
         leading={[
+          // Every section carries its own doors: + posts INTO this space,
+          // Search searches WITHIN it (Figma 286-11770).
+          { icon: 'plus' as const, label: 'Post', onClick: () => navigate(`/compose?space=${space.id}`) },
+          { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
           ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
           { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
         ]}

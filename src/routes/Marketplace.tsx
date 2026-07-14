@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import MarketplaceCard, { MarketplaceCardCompact } from '../components/MarketplaceCard';
 import {
@@ -42,6 +42,7 @@ const ACTIONS: ActionItem[] = [
 export default function Marketplace() {
   const { kind: urlSlug = '' } = useParams();
   const activeKind = URL_TO_KIND[urlSlug] ?? 'all';
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const scope = useMemo(() => parseScope(searchParams.get('from')), [searchParams]);
 
@@ -81,11 +82,10 @@ export default function Marketplace() {
 
   const handleAction = (action: ActionItem) => {
     if (action.kind === 'search') {
-      setShowSearch((s) => !s);
-      if (showSearch) setQuery('');
+      // Section-scoped smart search: opens pre-filtered to Marketplace.
+      navigate('/search?area=marketplace');
     } else if (action.kind === 'post') {
-      setPostNote(true);
-      setTimeout(() => setPostNote(false), 2400);
+      navigate('/compose?area=marketplace');
     } else if (action.kind === 'mode-filter' && action.mode) {
       const mode = action.mode;
       setActiveModes((modes) => modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode]);

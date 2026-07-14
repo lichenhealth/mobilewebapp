@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
@@ -120,6 +120,31 @@ export default function SmartSearch() {
   const { user } = useAuth();
   const me = user?.id ?? '';
 
+  // Section doors: /search?space=<id> · ?member=<id> · ?area=<x> · ?who=people
+  // Scope comes from WHERE you pressed Search; the X on the banner widens out.
+  const [urlParams] = useSearchParams();
+  const scopeSpaceId = urlParams.get('space');
+  const scopeMemberId = urlParams.get('member');
+  const scopeArea = urlParams.get('area') as ServiceArea | null;
+  const scopeWho = urlParams.get('who') as WhoKind | null;
+  const hasScope = !!(scopeSpaceId || scopeMemberId || scopeArea || scopeWho);
+  const [scopeName, setScopeName] = useState('');
+
+  useEffect(() => {
+    if (!scopeSpaceId && !scopeMemberId) { setScopeName(''); return; }
+    let live = true;
+    (async () => {
+      if (scopeSpaceId) {
+        const { data } = await supabase.from('spaces').select('name').eq('id', scopeSpaceId).maybeSingle();
+        if (live) setScopeName((data as { name: string } | null)?.name ?? 'this space');
+      } else if (scopeMemberId) {
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', scopeMemberId).maybeSingle();
+        if (live) setScopeName((data as { full_name: string | null } | null)?.full_name ?? 'this member');
+      }
+    })();
+    return () => { live = false; };
+  }, [scopeSpaceId, scopeMemberId]);
+
   const [q, setQ] = useState('');
   const [cats, setCats] = useState<SearchCategory[]>([]);
   const [mySpaces, setMySpaces] = useState<MySpace[]>([]);
@@ -154,9 +179,16 @@ export default function SmartSearch() {
     () => (q.trim() ? parseQuery(q, cats) : { criteria: emptyCriteria(), spans: [] as ParsedSpan[] }),
     [q, cats],
   );
-  const criteria = useMemo(() => merge(parsed, extras, cats), [parsed, extras, cats]);
+  const criteria = useMemo(() => {
+    const c = merge(parsed, extras, cats);
+    if (scopeSpaceId && !c.spaceScope.includes(scopeSpaceId)) c.spaceScope = [...c.spaceScope, scopeSpaceId];
+    if (scopeMemberId) c.authorScope = scopeMemberId;
+    if (scopeArea && !c.areas.includes(scopeArea)) c.areas = [...c.areas, scopeArea];
+    if (scopeWho && !c.who.includes(scopeWho)) c.who = [...c.who, scopeWho];
+    return c;
+  }, [parsed, extras, cats, scopeSpaceId, scopeMemberId, scopeArea, scopeWho]);
 
-  const hasSignal = q.trim().length >= 3
+  const hasSignal = hasScope || q.trim().length >= 3
     || !!criteria.trust.degree || !!criteria.trust.personId
     || !!criteria.rec.degree || !!criteria.rec.personId
     || criteria.areas.length > 0 || criteria.categories.length > 0
@@ -315,6 +347,20 @@ export default function SmartSearch() {
 
   return (
     <div className="ssrch">
+      {hasScope && (
+        <div className="ssrch__scope">
+          <Icon name="search" size={12} />
+          <span>
+            Searching {scopeMemberId ? `${scopeName || 'this member'}’s contributions`
+              : scopeSpaceId ? `within ${scopeName || 'this space'}`
+              : scopeWho ? 'people'
+              : SERVICE_AREAS.find((a) => a.value === scopeArea)?.label ?? scopeArea}
+          </span>
+          <button className="ssrch__scope-x" onClick={() => navigate('/search', { replace: true })} aria-label="Search everywhere instead">
+            <Icon name="close" size={11} /> everywhere
+          </button>
+        </div>
+      )}
       <div className="ssrch__boxwrap">
         <div className="ssrch__box">
           <div className="ssrch__mirror" aria-hidden>
