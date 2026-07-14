@@ -54,8 +54,8 @@ const EMPTY_EXTRAS: Extras = {
 };
 
 const DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
-  { value: 'mine', label: 'My mycelium' },
-  { value: 'second', label: 'Trusted by my mycelium' },
+  { value: 'mine', label: 'Someone I trust' },
+  { value: 'second', label: 'Trusted by someone I trust' },
   { value: 'any', label: 'Anyone' },
 ];
 
@@ -248,9 +248,9 @@ export default function SmartSearch() {
     const c = criteria;
     const out: string[] = [];
     if (c.trust.personId) out.push(`trusted by ${members.find((m) => m.id === c.trust.personId)?.full_name ?? 'someone'}`);
-    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by my mycelium' : 'trusted by anyone');
+    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by someone I trust' : 'trusted by anyone');
     if (c.rec.personId) out.push(`recommended by ${members.find((m) => m.id === c.rec.personId)?.full_name ?? 'someone'}`);
-    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by my mycelium' : c.rec.degree === 'second' ? 'recommended by their web' : 'recommended by anyone');
+    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by someone I trust' : c.rec.degree === 'second' ? 'recommended via extended trust' : 'recommended by anyone');
     for (const o of c.offers) out.push(o === 'gift' ? 'free / gift' : o);
     if (c.priceMin != null || c.priceMax != null) {
       out.push(`$${c.priceMin ?? 0}–${c.priceMax != null ? '$' + c.priceMax : 'up'}`);

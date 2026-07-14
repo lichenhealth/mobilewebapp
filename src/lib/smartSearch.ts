@@ -136,11 +136,11 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
 
   // Longest, most specific phrases first — order matters.
   // Second-degree trust (the assistant mockup's Pro Tip) before first-degree.
-  scan(/\btrusted by (?:(?:people|members|those|folks) i trust|my mycelium)\b/g,
+  scan(/\btrusted by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium)\b/g,
     'trust', () => { c.trust.degree = 'second'; });
   scan(/\brecommended by (?:people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
     'recommend', () => { c.rec.degree = 'second'; });
-  scan(/\brecommended(?: by (?:(?:people|members|those|folks) i trust|my mycelium|people in my mycelium))?\b/g,
+  scan(/\brecommended(?: by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium|people in my mycelium))?\b/g,
     'recommend', () => { c.rec.degree ??= 'mine'; });
   scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy mycelium\b|\btrusted\b/g,
     'trust', () => { c.trust.degree ??= 'mine'; });
