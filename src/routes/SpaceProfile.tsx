@@ -58,6 +58,10 @@ export default function SpaceProfile() {
   // + New group (admins of a community/organization)
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  // "Part of" picker: a group can join (or leave) a community/org home later.
+  const [parentPick, setParentPick] = useState<{ id: string; name: string } | null>(null);
+  const [parentQ, setParentQ] = useState('');
+  const [parentHits, setParentHits] = useState<{ id: string; name: string; kind: string }[]>([]);
 
   // edit state (admins)
   const [name, setName] = useState('');
@@ -94,6 +98,7 @@ export default function SpaceProfile() {
     setRecommended(recs.has(`space:${id}`));
     if (s) {
       setName(s.name);
+      setParentPick(s.parent);
       setDescription(s.description ?? '');
       setLocText(s.location ?? '');
       setLocGeo(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
@@ -160,6 +165,23 @@ export default function SpaceProfile() {
     return () => { live = false; };
   }, [invQ, members, pendingReqs]);
 
+  // "Part of" type-ahead: communities + organizations a group could call home.
+  useEffect(() => {
+    const q = parentQ.trim();
+    if (q.length < 2) { setParentHits([]); return; }
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('spaces')
+        .select('id, name, kind')
+        .in('kind', ['community', 'organization'])
+        .neq('id', id)
+        .ilike('name', `%${q}%`)
+        .limit(5);
+      if (live) setParentHits(((data as { id: string; name: string; kind: string }[] | null) ?? []));
+    })();
+    return () => { live = false; };
+  }, [parentQ, id]);
+
   async function act(fn: () => Promise<void>) {
     setMemBusy(true); setError('');
     try { await fn(); await load(); }
@@ -216,6 +238,7 @@ export default function SpaceProfile() {
         location: locText.trim() || null,
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
+        ...(space.kind === 'group' ? { parent_space_id: parentPick?.id ?? null } : {}),
       });
       setMsg('Saved');
       setTimeout(() => setMsg(''), 2000);
@@ -387,6 +410,36 @@ export default function SpaceProfile() {
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
           </div>
+          {space.kind === 'group' && (
+            <div className="prof__field">
+              <label className="prof__label">Part of</label>
+              {parentPick ? (
+                <span className="sprof__parentpick">
+                  {parentPick.name}
+                  <button className="sprof__parentpick-x" onClick={() => setParentPick(null)} aria-label="Remove from its community">
+                    <Icon name="close" size={11} />
+                  </button>
+                </span>
+              ) : (
+                <input
+                  className="prof__input"
+                  value={parentQ}
+                  onChange={(e) => setParentQ(e.target.value)}
+                  placeholder="A community or organization this group belongs to (optional)"
+                />
+              )}
+              {!parentPick && parentHits.length > 0 && (
+                <div className="sprof__invhits">
+                  {parentHits.map((h) => (
+                    <button key={h.id} className="sprof__invhit" onClick={() => { setParentPick({ id: h.id, name: h.name }); setParentQ(''); }}>
+                      {h.name} <em>{h.kind}</em>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="prof__hint">A group can stand alone — nest it under a community whenever it finds a home. Save to apply.</p>
+            </div>
+          )}
           <div className="prof__field">
             <label className="prof__label">Location</label>
             <LocationField

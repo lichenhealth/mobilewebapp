@@ -107,3 +107,13 @@
 }
 .sprof__newgroup { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
 .sprof__newgroup .prof__input { flex: 1; }
+.sprof__parentpick {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm)); border: 1px solid var(--peach);
+  font-size: 13px; color: var(--ink);
+}
+.sprof__parentpick-x {
+  display: inline-flex; padding: 2px; border-radius: var(--r-full);
+  background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
+}

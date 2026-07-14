@@ -121,6 +121,7 @@ export async function updateSpaceProfile(id: string, patch: {
   location?: string | null;
   lat?: number | null;
   lng?: number | null;
+  parent_space_id?: string | null;   // group admins nest/unnest under a community/org
 }): Promise<void> {
   const { error } = await supabase.from('spaces').update(patch).eq('id', id);
   if (error) throw error;
