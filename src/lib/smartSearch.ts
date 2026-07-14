@@ -377,26 +377,28 @@ interface Edge { actor: string; target_type: string; target_id: string }
  *  target key? Returns the qualifying actor ids (empty = doesn't pass). */
 function endorsersOf(
   filter: EndorseFilter, edges: Edge[], type: string, id: string,
-  me: string, myWeb: Set<string>,
+  me: string, myVouched: Set<string>,
 ): string[] {
   if (!filter.degree && !filter.personId) return [];
   const forTarget = edges.filter((e) => e.target_type === type && e.target_id === id);
-  if (filter.personId) return forTarget.filter((e) => e.actor === filter.personId).map((e) => e.actor);
-  if (filter.degree === 'mine') {
-    return forTarget.filter((e) => myWeb.has('profile:' + e.actor) || e.actor === me).map((e) => e.actor);
-  }
+  return forTarget.filter((e) => actorQualifies(filter, e.actor, edges, me, myVouched)).map((e) => e.actor);
+}
+
+/** Does this actor's endorsement count under the filter's degree? */
+function actorQualifies(
+  filter: EndorseFilter, actor: string, trustEdges: Edge[],
+  me: string, myVouched: Set<string>,
+): boolean {
+  if (filter.personId) return actor === filter.personId;
+  if (filter.degree === 'mine') return myVouched.has('profile:' + actor) || actor === me;
   if (filter.degree === 'second') {
-    // people trusted BY my mycelium (my web's web)
-    const secondWeb = new Set<string>();
-    for (const e of edges) {
-      if (e.target_type === 'profile' && (myWeb.has('profile:' + e.actor) || e.actor === me)) {
-        secondWeb.add(e.target_id);
-      }
-    }
-    return forTarget.filter((e) => secondWeb.has(e.actor) || myWeb.has('profile:' + e.actor) || e.actor === me)
-      .map((e) => e.actor);
+    if (myVouched.has('profile:' + actor) || actor === me) return true;
+    // someone trusted by someone I trust (vouched-of-vouched)
+    return trustEdges.some((e) =>
+      e.target_type === 'profile' && e.target_id === actor
+      && (myVouched.has('profile:' + e.actor) || e.actor === me));
   }
-  return forTarget.map((e) => e.actor);   // 'any'
+  return true;   // 'any'
 }
 
 export async function runSmartSearch(c: SearchCriteria, me: string): Promise<SmartResults> {
@@ -420,8 +422,11 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       ? supabase.from('profile_categories').select('profile_id, category_id').limit(3000)
       : Promise.resolve({ data: [] as { profile_id: string; category_id: string }[] }),
     // The whole visible trust/recommend web — beta-scale fine; the trust LENS
-    // needs cross-member edges anyway (same reads as the feed's endorsement overlay).
-    supabase.from('mycelium').select('truster_id, target_type, target_id').limit(5000),
+    // needs cross-member edges anyway (same reads as the feed's endorsement
+    // overlay). Only VOUCHED edges are trust signals — web-only membership
+    // speaks for nobody (founder: mycelium ≠ trust).
+    supabase.from('mycelium').select('truster_id, target_type, target_id')
+      .eq('vouched', true).limit(5000),
     supabase.from('recommendations').select('recommender_id, target_type, target_id').limit(5000),
   ]);
 
@@ -434,7 +439,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   const recEdges: Edge[] = ((recRes.data as { recommender_id: string; target_type: string; target_id: string }[] | null) ?? [])
     .map((r) => ({ actor: r.recommender_id, target_type: r.target_type, target_id: r.target_id }));
 
-  const myWeb = new Set(trustEdges.filter((e) => e.actor === me).map((e) => `${e.target_type}:${e.target_id}`));
+  const myVouched = new Set(trustEdges.filter((e) => e.actor === me).map((e) => `${e.target_type}:${e.target_id}`));
   const nameOf = (id: string) => profiles.find((p) => p.id === id)?.full_name || 'A member';
 
   // Space scope: members of the selected spaces (for the People section).
@@ -450,18 +455,37 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   const winTo = c.dateTo ?? addMonths(todayISO(), 12);
   const busy = (c.hideConflicts && me) ? await freeBusy([me], winFrom, winTo) : [];
 
+  const trustFilterOn = !!(c.trust.degree || c.trust.personId);
+  const recFilterOn = !!(c.rec.degree || c.rec.personId);
   const trustPass = (type: string, id: string): boolean =>
-    !(c.trust.degree || c.trust.personId)
-    || endorsersOf(c.trust, trustEdges, type, id, me, myWeb).length > 0;
+    !trustFilterOn || endorsersOf(c.trust, trustEdges, type, id, me, myVouched).length > 0;
   const recNames = (type: string, id: string): string[] =>
-    [...new Set(endorsersOf(c.rec, recEdges, type, id, me, myWeb).map(nameOf))];
+    [...new Set(endorsersOf(c.rec, recEdges, type, id, me, myVouched).map(nameOf))];
   const recPass = (type: string, id: string, extra = false): boolean =>
-    !(c.rec.degree || c.rec.personId) || recNames(type, id).length > 0 || extra;
-  // Display recommenders even when no filter is on (mycelium lens: my web's recs).
-  const displayRecs = (type: string, id: string): string[] => {
-    const f: EndorseFilter = (c.rec.degree || c.rec.personId) ? c.rec : { degree: 'mine', personId: null };
-    return [...new Set(endorsersOf(f, recEdges, type, id, me, myWeb).map(nameOf))];
-  };
+    !recFilterOn || recNames(type, id).length > 0 || extra;
+  // Display recommenders even when no filter is on (mycelium lens: recs by people I trust).
+  const displayFilter: EndorseFilter = recFilterOn ? c.rec : { degree: 'mine', personId: null };
+  const displayRecs = (type: string, id: string): string[] =>
+    [...new Set(endorsersOf(displayFilter, recEdges, type, id, me, myVouched).map(nameOf))];
+
+  // People aren't recommended directly anymore (founder: recommend THINGS) —
+  // a person's recommenders aggregate from recommendations of their POSTS.
+  const postRecEdges = recEdges.filter((e) => e.target_type === 'post');
+  const postAuthor = new Map<string, string>();
+  for (const post of posts) postAuthor.set(post.id, post.author_id);
+  const unknownPostIds = [...new Set(postRecEdges.map((e) => e.target_id))]
+    .filter((id) => !postAuthor.has(id));
+  if (unknownPostIds.length) {
+    const { data } = await supabase.from('posts').select('id, author_id').in('id', unknownPostIds);
+    for (const r of (data as { id: string; author_id: string }[] | null) ?? []) {
+      postAuthor.set(r.id, r.author_id);
+    }
+  }
+  const personRecNames = (profileId: string, f: EndorseFilter): string[] =>
+    [...new Set(postRecEdges
+      .filter((e) => postAuthor.get(e.target_id) === profileId
+        && actorQualifies(f, e.actor, trustEdges, me, myVouched))
+      .map((e) => nameOf(e.actor)))];
 
   const catNamesFor = (profileId: string): string[] =>
     pcRows.filter((r) => r.profile_id === profileId)
@@ -481,8 +505,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
         categoryNames: catNamesFor(p.id),
         place: s?.place ?? null, level: (s?.level as 'area' | 'exact' | undefined) ?? null,
         distanceMi: anchor && s ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
-        recommenders: displayRecs('profile', p.id),
-        trusted: myWeb.has('profile:' + p.id),
+        recommenders: personRecNames(p.id, displayFilter),
+        trusted: myVouched.has('profile:' + p.id),
         _bio: p.bio,
       } as PersonHit & { _bio: string | null };
     })
@@ -491,7 +515,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       if (wantProviders && !c.who.includes('people') && !isProvider(p.id)) return false;
       if (scopeMembers && !scopeMembers.has(p.id)) return false;
       if (!trustPass('profile', p.id)) return false;
-      if (!recPass('profile', p.id)) return false;
+      if (recFilterOn && personRecNames(p.id, c.rec).length === 0) return false;
       if (anchor && c.radiusMiles != null) {
         if (p.distanceMi == null || p.distanceMi > c.radiusMiles) return false;
       }
@@ -534,7 +558,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     if (c.hideConflicts && p.linked_event && conflictsWithBusy(p, busy, winFrom, winTo)) return false;
     if (!trustPass('profile', p.author_id)
       && !(p.author_space_id && trustPass('space', p.author_space_id) && (c.trust.degree || c.trust.personId))) return false;
-    if (!recPass('post', p.id, recNames('profile', p.author_id).length > 0)) return false;
+    if (!recPass('post', p.id, personRecNames(p.author_id, c.rec).length > 0)) return false;
     if (anchor && c.radiusMiles != null) {
       const g = postGeo(p);
       if (!g || milesBetween(anchor, g) > c.radiusMiles) return false;
@@ -555,12 +579,21 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     lat: s.lat, lng: s.lng,
     distanceMi: anchor && s.lat != null && s.lng != null
       ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
-    recommenders: displayRecs('space', s.id),
-    trusted: myWeb.has('space:' + s.id),
+    // Places are recommended (things); org/community/group are trusted
+    // (relationships) — each kind carries only its own signal.
+    recommenders: s.kind === 'place' ? displayRecs('space', s.id) : [],
+    trusted: s.kind !== 'place' && myVouched.has('space:' + s.id),
   })).filter((s) => {
     if (c.spaceScope.length && !c.spaceScope.includes(s.id)) return false;
-    if (!trustPass('space', s.id)) return false;
-    if (!recPass('space', s.id)) return false;
+    if (s.kind === 'place') {
+      // A place can't be trusted; a trust-only filter excludes places.
+      if (trustFilterOn && !recFilterOn) return false;
+      if (!recPass('space', s.id)) return false;
+    } else {
+      // Org/community/group can't be recommended; a rec-only filter excludes them.
+      if (recFilterOn && !trustFilterOn) return false;
+      if (!trustPass('space', s.id)) return false;
+    }
     if (anchor && c.radiusMiles != null) {
       if (s.distanceMi == null || s.distanceMi > c.radiusMiles) return false;
     }

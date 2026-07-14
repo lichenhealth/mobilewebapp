@@ -12,7 +12,7 @@ import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
 } from '../lib/spacesApi';
-import { loadMyMycelium, loadMyRecommendations, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
 import './Profile.css';
 import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
@@ -36,6 +36,7 @@ export default function SpaceProfile() {
   const [space, setSpace] = useState<SpaceProfileRow | null>(null);
   const [members, setMembers] = useState<SpaceMemberRow[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
   const [recommended, setRecommended] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,15 +60,16 @@ export default function SpaceProfile() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, m, c, myc, recs] = await Promise.all([
+    const [s, m, c, mine, recs] = await Promise.all([
       loadSpaceProfile(id), loadSpaceMembers(id), loadSpaceChatId(id),
-      me ? loadMyMycelium() : Promise.resolve(new Set<string>()),
+      me ? loadMyWeb() : Promise.resolve({ web: new Set<string>(), vouched: new Set<string>() }),
       me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
     ]);
     setSpace(s);
     setMembers(m);
     setChatId(c);
-    setTrusted(myc.has(`space:${id}`));
+    setInWebState(mine.web.has(`space:${id}`));
+    setTrusted(mine.vouched.has(`space:${id}`));
     setRecommended(recs.has(`space:${id}`));
     if (s) {
       setName(s.name);
@@ -79,11 +81,21 @@ export default function SpaceProfile() {
   }, [id, me]);
   useEffect(() => { load(); }, [load]);
 
+  async function toggleWeb() {
+    if (!me) return;
+    const next = !inWeb;
+    setInWebState(next);                      // optimistic
+    if (!next && trusted) setTrusted(false);  // leaving the web withdraws the vouch
+    try { await setInWeb('space', id, next); }
+    catch (e) { console.error(e); setInWebState(!next); }
+  }
+
   async function toggleTrust() {
     if (!me) return;
     const next = !trusted;
     setTrusted(next);
-    try { await setTrust('space', id, next); } catch (e) { console.error(e); setTrusted(!next); }
+    if (next && !inWeb) setInWebState(true);  // trusting auto-adds to the web
+    try { await setVouch('space', id, next); } catch (e) { console.error(e); setTrusted(!next); }
   }
 
   async function toggleRecommend() {
@@ -185,19 +197,31 @@ export default function SpaceProfile() {
         {me && (
           <div className="mprof__actions">
             <button
-              className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
-              onClick={toggleTrust}
-              title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
+              className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
+              onClick={toggleWeb}
+              title={inWeb ? 'In your mycelium — its doings flow to you' : 'Weave it into your mycelium (no trust implied)'}
             >
-              <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your Mycelium ✓' : 'Add to Mycelium'}
             </button>
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
-              onClick={toggleRecommend}
-              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
-            >
-              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
-            </button>
+            {space.kind !== 'place' ? (
+              /* Trust is for relationships: people, orgs, communities, groups. */
+              <button
+                className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+                onClick={toggleTrust}
+                title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
+              >
+                <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+              </button>
+            ) : (
+              /* Recommend is for things — a place is a thing you point at. */
+              <button
+                className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
+                onClick={toggleRecommend}
+                title={recommended ? 'Recommended to those who trust you' : 'Recommend this place to those who trust you'}
+              >
+                <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
+              </button>
+            )}
           </div>
         )}
       </div>

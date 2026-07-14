@@ -13,7 +13,7 @@ import {
   type FeedPost, type EventCategory, type EventMode, type MyRsvpStatus,
 } from '../lib/postsApi';
 import { minToLabel } from '../lib/calendarApi';
-import { loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
 import './Events.css';
@@ -53,7 +53,7 @@ export default function Events() {
 
   const load = useCallback(async () => {
     const feed = (await loadFeed()).filter((p) => postAreas(p).includes('events'));
-    const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
+    const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
     const ov = await loadEndorsements(feed, myc);
     const rsvps = me
       ? await loadMyRsvpStatuses(feed.map((p) => p.linked_event_id).filter((id): id is string => !!id), me)

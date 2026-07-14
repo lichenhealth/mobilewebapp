@@ -12,7 +12,7 @@ import {
 import { postToCard } from '../lib/feedMapping';
 import { ensureDirectChat } from '../lib/chatApi';
 import {
-  loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
@@ -66,6 +66,7 @@ export default function Mycelium() {
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [myWeb, setMyWeb] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
@@ -73,20 +74,21 @@ export default function Mycelium() {
   useEffect(() => {
     (async () => {
       const feed = await loadFeed();
-      const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
-      const ov = await loadEndorsements(feed, myc);
-      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed);
+      const [{ web, vouched }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const ov = await loadEndorsements(feed, vouched);
+      setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setOverlays(ov); setPosts(feed);
     })();
   }, []);
 
   // Build the combined feed: real posts from entities in your mycelium, then demo cards.
   const items = useMemo<Item[]>(() => {
     const real: Item[] = posts
-      // Trusted authors (person or the space they posted as) — and always your
-      // own posts, so what you share to your mycelium shows in your own web.
+      // Authors in your WEB (person or the space they posted as — membership,
+      // vouched or not) — and always your own posts, so what you share to your
+      // mycelium shows in your own web.
       .filter((p) =>
-        myMyc.has('profile:' + p.author_id)
-        || (p.author_space_id != null && myMyc.has('space:' + p.author_space_id))
+        myWeb.has('profile:' + p.author_id)
+        || (p.author_space_id != null && myWeb.has('space:' + p.author_space_id))
         || p.author_id === user?.id)
       .map((p) => ({
         key: p.id,
@@ -140,7 +142,7 @@ export default function Mycelium() {
         </p>
         <h1 className="myc__title">Your Mycelium</h1>
         <p className="myc__sub">
-          What your trusted web is sharing — filter by kind, area, or content.
+          What your web is sharing — filter by kind, area, or content.
         </p>
       </header>
 

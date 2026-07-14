@@ -9,7 +9,7 @@ import { FEED } from '../data/feed';
 import { loadFeed, type FeedPost } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
-  loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
@@ -47,7 +47,7 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       const feed = await loadFeed();
-      const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
       const ov = await loadEndorsements(feed, myc);
       // Set posts last so cards mount once, with engagement state already in hand.
       setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed);
