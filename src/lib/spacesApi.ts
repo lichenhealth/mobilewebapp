@@ -251,13 +251,14 @@ export interface PendingRequestRow {
   initiated_by: string;
   created_at: string;
   profile: { full_name: string | null; avatar_url: string | null } | null;
+  initiator: { full_name: string | null } | null;
 }
 
 /** Admin view: everything pending on a space (requests AND outstanding invites). */
 export async function listPendingRequests(spaceId: string): Promise<PendingRequestRow[]> {
   const { data, error } = await supabase
     .from('space_membership_requests')
-    .select('profile_id, initiated_by, created_at, profile:profiles!space_membership_requests_profile_id_fkey(full_name, avatar_url)')
+    .select('profile_id, initiated_by, created_at, profile:profiles!space_membership_requests_profile_id_fkey(full_name, avatar_url), initiator:profiles!space_membership_requests_initiated_by_fkey(full_name)')
     .eq('space_id', spaceId)
     .order('created_at');
   if (error) { console.warn('listPendingRequests:', error.message); return []; }
@@ -268,6 +269,16 @@ export async function inviteMember(spaceId: string, me: string, profileId: strin
   const { error } = await supabase.from('space_membership_requests')
     .insert({ space_id: spaceId, profile_id: profileId, initiated_by: me });
   if (error && error.code !== '23505') throw error;
+}
+
+/** A plain member suggests someone — same row shape; admins must endorse it
+ *  into a real invite before the person hears anything. */
+export const suggestMember = inviteMember;
+
+/** Admin endorses a member's suggestion → it becomes the admin's invite. */
+export async function endorseSuggestion(spaceId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.rpc('endorse_member_suggestion', { p_space: spaceId, p_profile: profileId });
+  if (error) throw error;
 }
 
 export async function approveJoin(spaceId: string, profileId: string): Promise<void> {
