@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { loadMyMycelium, loadMyRecommendations, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
 import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
@@ -23,8 +23,8 @@ export default function MemberProfile() {
 
   const [member, setMember] = useState<MemberRow | null>(null);
   const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
+  const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
-  const [recommended, setRecommended] = useState(false);
   const [homeSpot, setHomeSpot] = useState<MappableMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -32,18 +32,17 @@ export default function MemberProfile() {
   useEffect(() => {
     let live = true;
     (async () => {
-      const [m, off, myc, recs, mappable] = await Promise.all([
+      const [m, off, mine, mappable] = await Promise.all([
         loadMemberProfile(id),
         loadMemberOfferings(id),
-        me ? loadMyMycelium() : Promise.resolve(new Set<string>()),
-        me ? loadMyRecommendations() : Promise.resolve(new Set<string>()),
+        me ? loadMyWeb() : Promise.resolve({ web: new Set<string>(), vouched: new Set<string>() }),
         me ? loadMappableMembers() : Promise.resolve([] as MappableMember[]),
       ]);
       if (!live) return;
       setMember(m);
       setOfferings(off);
-      setTrusted(myc.has(`profile:${id}`));
-      setRecommended(recs.has(`profile:${id}`));
+      setInWebState(mine.web.has(`profile:${id}`));
+      setTrusted(mine.vouched.has(`profile:${id}`));
       // What THIS viewer is allowed to see of their home (hidden → absent).
       setHomeSpot(mappable.find((x) => x.id === id) ?? null);
       setLoading(false);
@@ -60,18 +59,22 @@ export default function MemberProfile() {
 
   const name = member.full_name || 'A Lichen member';
 
+  async function toggleWeb() {
+    if (!me) return;
+    const next = !inWeb;
+    setInWebState(next);                      // optimistic
+    if (!next && trusted) setTrusted(false);  // leaving the web withdraws the vouch
+    try { await setInWeb('profile', id, next); }
+    catch (e) { console.error(e); setInWebState(!next); }
+  }
+
   async function toggleTrust() {
     if (!me) return;
     const next = !trusted;
-    setTrusted(next);   // optimistic — same gesture as Trust on a feed card
-    try { await setTrust('profile', id, next); } catch (e) { console.error(e); setTrusted(!next); }
-  }
-
-  async function toggleRecommend() {
-    if (!me) return;
-    const next = !recommended;
-    setRecommended(next);   // optimistic — amplify this person to those who trust you
-    try { await setRecommend('profile', id, next); } catch (e) { console.error(e); setRecommended(!next); }
+    setTrusted(next);                         // optimistic — a private vouch
+    if (next && !inWeb) setInWebState(true);  // trusting auto-adds to the web
+    try { await setVouch('profile', id, next); }
+    catch (e) { console.error(e); setTrusted(!next); }
   }
 
   async function message() {
@@ -108,18 +111,18 @@ export default function MemberProfile() {
               <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}
             </button>
             <button
+              className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
+              onClick={toggleWeb}
+              title={inWeb ? 'In your mycelium — their doings flow to you' : 'Weave them into your mycelium (no trust implied)'}
+            >
+              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your Mycelium ✓' : 'Add to Mycelium'}
+            </button>
+            <button
               className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
               onClick={toggleTrust}
               title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
             >
               <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
-            </button>
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
-              onClick={toggleRecommend}
-              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
-            >
-              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
             </button>
           </div>
         )}

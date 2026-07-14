@@ -11,7 +11,7 @@ import {
   loadAuthorFeed, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
-import { loadMyMycelium, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
 import type { MyceliumSignals } from './EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
 import './ContributionsFeed.css';
@@ -55,7 +55,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     let live = true;
     (async () => {
       const feed = await loadAuthorFeed({ profileId, spaceId });
-      const [myc, recs] = await Promise.all([loadMyMycelium(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setPosts(feed); setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setReady(true);

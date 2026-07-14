@@ -1,31 +1,53 @@
 import { supabase } from './supabase';
 import type { MyceliumSignals, MyceliumMember } from '../components/EngagementFooter';
 
-// Trust / "Add to Mycelium" is one polymorphic edge: you → (target_type, target_id).
+// Mycelium is one polymorphic edge: you → (target_type, target_id), with a
+// PRIVATE `vouched` flag (founder, 2026-07-14): membership means "in my web,
+// their doings flow to me" — trust is the vouch layered on top, never implied,
+// never counted. Trusting auto-adds to the web; the reverse never happens.
 export type TargetType = 'profile' | 'space' | 'post';
 
 const myceliumKey = (type: TargetType, id: string) => `${type}:${id}`;
 
-/** Everything the current user trusts, as a set of `${type}:${id}` keys. */
-export async function loadMyMycelium(): Promise<Set<string>> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Set();
-  const { data } = await supabase
-    .from('mycelium')
-    .select('target_type, target_id')
-    .eq('truster_id', user.id);
-  return new Set((data ?? []).map((r) => myceliumKey(r.target_type as TargetType, r.target_id)));
+export interface MyWeb {
+  web: Set<string>;      // everyone/everything in my mycelium (vouched ⊆ web)
+  vouched: Set<string>;  // the subset I privately trust
 }
 
-/** Trust (add) or untrust (remove) an entity. */
-export async function setTrust(type: TargetType, id: string, on: boolean): Promise<void> {
+/** My whole web, split into membership and trust. Keys are `${type}:${id}`. */
+export async function loadMyWeb(): Promise<MyWeb> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { web: new Set(), vouched: new Set() };
+  const { data } = await supabase
+    .from('mycelium')
+    .select('target_type, target_id, vouched')
+    .eq('truster_id', user.id);
+  const web = new Set<string>();
+  const vouched = new Set<string>();
+  for (const r of (data as { target_type: TargetType; target_id: string; vouched: boolean }[] | null) ?? []) {
+    const k = myceliumKey(r.target_type, r.target_id);
+    web.add(k);
+    if (r.vouched) vouched.add(k);
+  }
+  return { web, vouched };
+}
+
+/** Back-compat wrapper: the full web as a flat set. */
+export async function loadMyMycelium(): Promise<Set<string>> {
+  return (await loadMyWeb()).web;
+}
+
+/** Weave into / remove from my mycelium (membership only — no vouch).
+ *  Removing deletes the edge entirely: leaving the web withdraws trust too. */
+export async function setInWeb(type: TargetType, id: string, on: boolean): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   if (on) {
+    // Plain insert, duplicates ignored — must NEVER downgrade an existing vouch.
     const { error } = await supabase
       .from('mycelium')
-      .insert({ truster_id: user.id, target_type: type, target_id: id });
-    if (error && error.code !== '23505') throw error; // ignore duplicate
+      .insert({ truster_id: user.id, target_type: type, target_id: id, vouched: false });
+    if (error && error.code !== '23505') throw error;
   } else {
     const { error } = await supabase
       .from('mycelium')
@@ -34,6 +56,31 @@ export async function setTrust(type: TargetType, id: string, on: boolean): Promi
     if (error) throw error;
   }
 }
+
+/** Vouch (trust) or unvouch. Vouching auto-adds to the web (upsert);
+ *  unvouching keeps them in the web — it only withdraws the private signal. */
+export async function setVouch(type: TargetType, id: string, on: boolean): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  if (on) {
+    const { error } = await supabase
+      .from('mycelium')
+      .upsert(
+        { truster_id: user.id, target_type: type, target_id: id, vouched: true },
+        { onConflict: 'truster_id,target_type,target_id' },
+      );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('mycelium')
+      .update({ vouched: false })
+      .eq('truster_id', user.id).eq('target_type', type).eq('target_id', id);
+    if (error) throw error;
+  }
+}
+
+/** The feed cards' shield = vouch the author (trust implies adding). */
+export const setTrust = setVouch;
 
 /** Everything the current user recommends, as `${type}:${id}` keys (same
  *  polymorphic shape as trust — posts, profiles, and spaces alike). */
@@ -66,15 +113,17 @@ export async function setRecommend(type: TargetType, id: string, on: boolean): P
 }
 
 /**
- * The endorsement overlay: for each post, which of MY mycelium members trust its
- * author or recommend it. This is the trust lens — `(endorsers) ∩ (your mycelium)`.
+ * The endorsement overlay: for each post, which of the people I TRUST vouch
+ * for its author or recommend it. This is the trust lens —
+ * `(endorsers) ∩ (people I trust)`. Pass the VOUCHED set (MyWeb.vouched):
+ * web-only members don't speak for you, and only their vouched edges count.
  * Returns a map of post id → signals (only posts with at least one endorser).
  */
 export async function loadEndorsements(
   posts: { id: string; author_id: string }[],
-  myMycelium: Set<string>,
+  myVouched: Set<string>,
 ): Promise<Record<string, MyceliumSignals>> {
-  const myProfileIds = [...myMycelium]
+  const myProfileIds = [...myVouched]
     .filter((k) => k.startsWith('profile:'))
     .map((k) => k.slice('profile:'.length));
   if (myProfileIds.length === 0 || posts.length === 0) return {};
@@ -84,7 +133,8 @@ export async function loadEndorsements(
 
   const [{ data: trustRows }, { data: recRows }, { data: profs }] = await Promise.all([
     supabase.from('mycelium').select('truster_id, target_id')
-      .eq('target_type', 'profile').in('target_id', authorIds).in('truster_id', myProfileIds),
+      .eq('target_type', 'profile').eq('vouched', true)
+      .in('target_id', authorIds).in('truster_id', myProfileIds),
     supabase.from('recommendations').select('recommender_id, target_id')
       .eq('target_type', 'post').in('target_id', postIds).in('recommender_id', myProfileIds),
     supabase.from('profiles').select('id, full_name, handle').in('id', myProfileIds),
