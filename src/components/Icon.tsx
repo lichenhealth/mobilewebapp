@@ -19,6 +19,8 @@ export type IconName =
   | 'calendar'
   | 'chat'
   | 'check'
+  | 'groups'
+  | 'member-heart'
   | 'check-double'
   | 'chevron-left'
   | 'chevron-right'
@@ -127,6 +129,26 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="m3 12 4 4 7-7M11 16l3 3 8-12" /></>,
+  },
+  // Founder's Groups mark (Figma icon set: user-multiple-group)
+  'groups': {
+    viewBox: '-1 -1 18 16.85',
+    strokeWidth: 1.1,
+    content: <>
+      <path d="M5.69231 6.26923C7.28543 6.26923 8.57692 4.97774 8.57692 3.38462C8.57692 1.79149 7.28543 0.5 5.69231 0.5C4.09918 0.5 2.80769 1.79149 2.80769 3.38462C2.80769 4.97774 4.09918 6.26923 5.69231 6.26923Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M0.5 14.3462H5.69231H10.8846V13.7207C10.8754 12.8412 10.6435 11.9783 10.2105 11.2129C9.77742 10.4473 9.15742 9.80404 8.40838 9.34309C7.65933 8.88213 6.80567 8.61855 5.92714 8.57696C5.84882 8.57325 5.77052 8.57132 5.69231 8.57115C5.6141 8.57132 5.5358 8.57325 5.45748 8.57696C4.57895 8.61855 3.72529 8.88213 2.97623 9.34309C2.22719 9.80404 1.6072 10.4473 1.17416 11.2129C0.741127 11.9783 0.509186 12.8412 0.5 13.7207V14.3462Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.3077 6.26923C11.9008 6.26923 13.1923 4.97774 13.1923 3.38462C13.1923 1.79149 11.9008 0.5 10.3077 0.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.1923 14.3463H15.5V13.7207C15.4908 12.8412 15.2588 11.9783 14.8258 11.2129C14.3928 10.4473 13.7728 9.80406 13.0237 9.34311C12.5396 9.04513 12.0116 8.82964 11.4615 8.70327" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </>,
+  },
+  // Founder's Members mark: a person whose body is a heart
+  'member-heart': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <>
+      <path d="M12 8.8a2.9 2.9 0 1 0 0-5.8 2.9 2.9 0 0 0 0 5.8Z" />
+      <path d="M12 21c-3.9-2.9-6.3-5.2-6.3-7.7 0-1.8 1.4-3.1 3-3.1 1.3 0 2.5.8 3.3 2 .8-1.2 2-2 3.3-2 1.6 0 3 1.3 3 3.1 0 2.5-2.4 4.8-6.3 7.7Z" />
+    </>,
   },
   'close': {
     viewBox: '0 0 24 24',

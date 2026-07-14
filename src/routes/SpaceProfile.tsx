@@ -563,11 +563,11 @@ export default function SpaceProfile() {
           { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
           { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
           ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
-          { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+          { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
           // The founder's Marketplace-icon analogy: a Groups door appears only
           // when this space actually has groups nested under it.
           ...(childGroups.length > 0
-            ? [{ icon: 'user-multiple' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
+            ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
             : []),
         ]}
       />
