@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict huejfZqCYQnwhSNezyWA0FEFpCeuwZTBWAc3VskeutlmANxgpcwIgxtaooizd25
+\restrict Hgikp2ZeNshsLkcdgfecLfinhc8b6HRXfUWZ7vovJrxnHigLQqaUfvlZjXbZcwG
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -73,6 +73,32 @@ CREATE TYPE public.space_member_role AS ENUM (
 
 
 ALTER TYPE public.space_member_role OWNER TO postgres;
+
+--
+-- Name: accept_space_invite(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.accept_space_invite(p_space uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if not exists (
+    select 1 from public.space_membership_requests r
+    where r.space_id = p_space and r.profile_id = auth.uid()
+      and r.initiated_by <> r.profile_id
+  ) then
+    raise exception 'No invitation to accept';
+  end if;
+  insert into public.space_members (space_id, profile_id, role)
+  values (p_space, auth.uid(), 'member')
+  on conflict do nothing;
+  delete from public.space_membership_requests
+  where space_id = p_space and profile_id = auth.uid();
+end; $$;
+
+
+ALTER FUNCTION public.accept_space_invite(p_space uuid) OWNER TO postgres;
 
 --
 -- Name: admin_list_supporters(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -146,6 +172,88 @@ $$;
 
 
 ALTER FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
+
+--
+-- Name: approve_group_nesting(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.approve_group_nesting(p_group uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_parent uuid; v_gname text; v_pname text; v_admin uuid;
+begin
+  select parent_id into v_parent from public.space_nesting_requests where group_id = p_group;
+  if v_parent is null then
+    raise exception 'No nesting proposal for this group';
+  end if;
+  if not exists (
+    select 1 from public.space_members m
+    where m.space_id = v_parent and m.profile_id = auth.uid()
+      and m.role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Only the community''s admins can approve this';
+  end if;
+  update public.spaces set parent_space_id = v_parent where id = p_group;
+  delete from public.space_nesting_requests where group_id = p_group;
+  select name into v_gname from public.spaces where id = p_group;
+  select name into v_pname from public.spaces where id = v_parent;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = p_group and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', p_group, 'group_nesting_approved',
+      coalesce(v_gname, 'Your group') || ' is now part of ' || coalesce(v_pname, 'the community'),
+      'The admins welcomed your group in.',
+      '/spaces/' || p_group, auth.uid()
+    );
+  end loop;
+end; $$;
+
+
+ALTER FUNCTION public.approve_group_nesting(p_group uuid) OWNER TO postgres;
+
+--
+-- Name: approve_join_request(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_name text;
+begin
+  if not exists (
+    select 1 from public.space_members m
+    where m.space_id = p_space and m.profile_id = auth.uid()
+      and m.role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Only admins can approve join requests';
+  end if;
+  if not exists (
+    select 1 from public.space_membership_requests r
+    where r.space_id = p_space and r.profile_id = p_profile
+      and r.initiated_by = r.profile_id
+  ) then
+    raise exception 'No pending join request';
+  end if;
+  insert into public.space_members (space_id, profile_id, role)
+  values (p_space, p_profile, 'member')
+  on conflict do nothing;
+  delete from public.space_membership_requests
+  where space_id = p_space and profile_id = p_profile;
+  select name into v_name from public.spaces where id = p_space;
+  perform public.notify(
+    p_profile, 'home', p_space, 'space_join_approved',
+    'Welcome to ' || coalesce(v_name, 'the space'),
+    'Your request to join was approved.',
+    '/spaces/' || p_space, auth.uid()
+  );
+end; $$;
+
+
+ALTER FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) OWNER TO postgres;
 
 --
 -- Name: availability_of(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
@@ -322,6 +430,71 @@ end; $$;
 
 
 ALTER FUNCTION public.create_space_chat() OWNER TO postgres;
+
+--
+-- Name: eject_group(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.eject_group(p_group uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_parent uuid; v_gname text; v_pname text; v_admin uuid;
+begin
+  select parent_space_id into v_parent from public.spaces where id = p_group;
+  if v_parent is null then
+    raise exception 'This group is not nested anywhere';
+  end if;
+  if not exists (
+    select 1 from public.space_members m
+    where m.space_id = v_parent and m.profile_id = auth.uid()
+      and m.role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Only the community''s admins can release a group';
+  end if;
+  select name into v_gname from public.spaces where id = p_group;
+  select name into v_pname from public.spaces where id = v_parent;
+  update public.spaces set parent_space_id = null where id = p_group;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = p_group and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', p_group, 'group_unnested',
+      coalesce(v_gname, 'Your group') || ' now stands on its own',
+      coalesce(v_pname, 'The community') || '''s admins released it — everything else about the group is unchanged.',
+      '/spaces/' || p_group, auth.uid()
+    );
+  end loop;
+end; $$;
+
+
+ALTER FUNCTION public.eject_group(p_group uuid) OWNER TO postgres;
+
+--
+-- Name: enforce_parent_consent(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.enforce_parent_consent() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.parent_space_id is not null
+     and new.parent_space_id is distinct from old.parent_space_id
+     and auth.uid() is not null
+     and not exists (
+       select 1 from public.space_members m
+       where m.space_id = new.parent_space_id and m.profile_id = auth.uid()
+         and m.role in ('admin', 'super_admin')
+     ) then
+    raise exception 'Propose the group to that community — its admins decide';
+  end if;
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.enforce_parent_consent() OWNER TO postgres;
 
 --
 -- Name: ensure_care_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -550,6 +723,35 @@ end; $$;
 ALTER FUNCTION public.gift_subscription(p_email text, p_tier text) OWNER TO postgres;
 
 --
+-- Name: handle_new_nesting_request(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.handle_new_nesting_request() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_gname text; v_pname text; v_admin uuid;
+begin
+  select name into v_gname from public.spaces where id = new.group_id;
+  select name into v_pname from public.spaces where id = new.parent_id;
+  for v_admin in
+    select m.profile_id from public.space_members m
+    where m.space_id = new.parent_id and m.role in ('admin', 'super_admin')
+  loop
+    perform public.notify(
+      v_admin, 'home', new.parent_id, 'group_nesting_request',
+      'The group ' || coalesce(v_gname, 'a group') || ' proposes to join ' || coalesce(v_pname, 'your community'),
+      'Approve or decline on your community''s profile page.',
+      '/spaces/' || new.parent_id, new.initiated_by
+    );
+  end loop;
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.handle_new_nesting_request() OWNER TO postgres;
+
+--
 -- Name: handle_new_space(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -569,6 +771,45 @@ $$;
 
 
 ALTER FUNCTION public.handle_new_space() OWNER TO postgres;
+
+--
+-- Name: handle_new_space_request(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.handle_new_space_request() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_name text; v_who text; v_admin uuid;
+begin
+  select name into v_name from public.spaces where id = new.space_id;
+  if new.initiated_by = new.profile_id then
+    select full_name into v_who from public.profiles where id = new.profile_id;
+    for v_admin in
+      select m.profile_id from public.space_members m
+      where m.space_id = new.space_id and m.role in ('admin', 'super_admin')
+    loop
+      perform public.notify(
+        v_admin, 'home', new.space_id, 'space_join_request',
+        coalesce(v_who, 'A member') || ' asked to join ' || coalesce(v_name, 'your space'),
+        'Approve or decline on the profile page.',
+        '/spaces/' || new.space_id, new.profile_id
+      );
+    end loop;
+  else
+    select full_name into v_who from public.profiles where id = new.initiated_by;
+    perform public.notify(
+      new.profile_id, 'home', new.space_id, 'space_invite',
+      coalesce(v_who, 'An admin') || ' invited you to ' || coalesce(v_name, 'a space'),
+      'Accept or decline on the profile page.',
+      '/spaces/' || new.space_id, new.initiated_by
+    );
+  end if;
+  return new;
+end; $$;
+
+
+ALTER FUNCTION public.handle_new_space_request() OWNER TO postgres;
 
 --
 -- Name: handle_new_user(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1716,6 +1957,34 @@ CREATE TABLE public.space_members (
 ALTER TABLE public.space_members OWNER TO postgres;
 
 --
+-- Name: space_membership_requests; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.space_membership_requests (
+    space_id uuid NOT NULL,
+    profile_id uuid NOT NULL,
+    initiated_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.space_membership_requests OWNER TO postgres;
+
+--
+-- Name: space_nesting_requests; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.space_nesting_requests (
+    group_id uuid NOT NULL,
+    parent_id uuid NOT NULL,
+    initiated_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.space_nesting_requests OWNER TO postgres;
+
+--
 -- Name: spaces; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1730,7 +1999,8 @@ CREATE TABLE public.spaces (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     lat double precision,
-    lng double precision
+    lng double precision,
+    parent_space_id uuid
 );
 
 
@@ -1993,6 +2263,22 @@ ALTER TABLE ONLY public.space_members
 
 
 --
+-- Name: space_membership_requests space_membership_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_membership_requests
+    ADD CONSTRAINT space_membership_requests_pkey PRIMARY KEY (space_id, profile_id);
+
+
+--
+-- Name: space_nesting_requests space_nesting_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_nesting_requests
+    ADD CONSTRAINT space_nesting_requests_pkey PRIMARY KEY (group_id);
+
+
+--
 -- Name: spaces spaces_handle_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2227,6 +2513,13 @@ CREATE INDEX recommendations_target_idx ON public.recommendations USING btree (t
 
 
 --
+-- Name: spaces_parent_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX spaces_parent_idx ON public.spaces USING btree (parent_space_id);
+
+
+--
 -- Name: spaces a_on_space_create_chat; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -2325,6 +2618,13 @@ CREATE TRIGGER on_message_notify_trg AFTER INSERT ON public.chat_messages FOR EA
 
 
 --
+-- Name: space_nesting_requests on_nesting_request_created; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_nesting_request_created AFTER INSERT ON public.space_nesting_requests FOR EACH ROW EXECUTE FUNCTION public.handle_new_nesting_request();
+
+
+--
 -- Name: health_snapshots on_snapshot_notify_trg; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -2336,6 +2636,20 @@ CREATE TRIGGER on_snapshot_notify_trg AFTER INSERT ON public.health_snapshots FO
 --
 
 CREATE TRIGGER on_space_created AFTER INSERT ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.handle_new_space();
+
+
+--
+-- Name: spaces on_space_parent_change; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_space_parent_change BEFORE UPDATE OF parent_space_id ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.enforce_parent_consent();
+
+
+--
+-- Name: space_membership_requests on_space_request_created; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_space_request_created AFTER INSERT ON public.space_membership_requests FOR EACH ROW EXECUTE FUNCTION public.handle_new_space_request();
 
 
 --
@@ -2807,11 +3121,67 @@ ALTER TABLE ONLY public.space_members
 
 
 --
+-- Name: space_membership_requests space_membership_requests_initiated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_membership_requests
+    ADD CONSTRAINT space_membership_requests_initiated_by_fkey FOREIGN KEY (initiated_by) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: space_membership_requests space_membership_requests_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_membership_requests
+    ADD CONSTRAINT space_membership_requests_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: space_membership_requests space_membership_requests_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_membership_requests
+    ADD CONSTRAINT space_membership_requests_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: space_nesting_requests space_nesting_requests_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_nesting_requests
+    ADD CONSTRAINT space_nesting_requests_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: space_nesting_requests space_nesting_requests_initiated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_nesting_requests
+    ADD CONSTRAINT space_nesting_requests_initiated_by_fkey FOREIGN KEY (initiated_by) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: space_nesting_requests space_nesting_requests_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.space_nesting_requests
+    ADD CONSTRAINT space_nesting_requests_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
 -- Name: spaces spaces_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.spaces
     ADD CONSTRAINT spaces_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: spaces spaces_parent_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spaces
+    ADD CONSTRAINT spaces_parent_space_id_fkey FOREIGN KEY (parent_space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
 
 
 --
@@ -3488,10 +3858,80 @@ CREATE POLICY "recs: read" ON public.recommendations FOR SELECT TO authenticated
 
 
 --
+-- Name: space_membership_requests smr: read own or admin; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "smr: read own or admin" ON public.space_membership_requests FOR SELECT TO authenticated USING (((profile_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_membership_requests.space_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+
+
+--
+-- Name: space_membership_requests smr: request or invite; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "smr: request or invite" ON public.space_membership_requests FOR INSERT TO authenticated WITH CHECK ((((profile_id = auth.uid()) AND (initiated_by = auth.uid())) OR ((initiated_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_membership_requests.space_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))))));
+
+
+--
+-- Name: space_membership_requests smr: withdraw or decline; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "smr: withdraw or decline" ON public.space_membership_requests FOR DELETE TO authenticated USING (((profile_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_membership_requests.space_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+
+
+--
+-- Name: space_nesting_requests snr: group admins propose; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "snr: group admins propose" ON public.space_nesting_requests FOR INSERT TO authenticated WITH CHECK (((initiated_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+
+
+--
+-- Name: space_nesting_requests snr: read either side; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "snr: read either side" ON public.space_nesting_requests FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_nesting_requests.parent_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+
+
+--
+-- Name: space_nesting_requests snr: withdraw or decline; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "snr: withdraw or decline" ON public.space_nesting_requests FOR DELETE TO authenticated USING (((EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))) OR (EXISTS ( SELECT 1
+   FROM public.space_members m
+  WHERE ((m.space_id = space_nesting_requests.parent_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+
+
+--
 -- Name: space_members; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
 ALTER TABLE public.space_members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: space_membership_requests; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.space_membership_requests ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: space_nesting_requests; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.space_nesting_requests ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: spaces; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -3560,6 +4000,15 @@ GRANT USAGE ON SCHEMA public TO service_role;
 
 
 --
+-- Name: FUNCTION accept_space_invite(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.accept_space_invite(p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.accept_space_invite(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.accept_space_invite(p_space uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION admin_list_supporters(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3575,6 +4024,24 @@ GRANT ALL ON FUNCTION public.admin_list_supporters() TO service_role;
 GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO anon;
 GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION approve_group_nesting(p_group uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.approve_group_nesting(p_group uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.approve_group_nesting(p_group uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.approve_group_nesting(p_group uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION approve_join_request(p_space uuid, p_profile uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) TO service_role;
 
 
 --
@@ -3641,6 +4108,24 @@ GRANT ALL ON FUNCTION public.create_space_chat() TO service_role;
 
 
 --
+-- Name: FUNCTION eject_group(p_group uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.eject_group(p_group uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.eject_group(p_group uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.eject_group(p_group uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION enforce_parent_consent(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.enforce_parent_consent() TO anon;
+GRANT ALL ON FUNCTION public.enforce_parent_consent() TO authenticated;
+GRANT ALL ON FUNCTION public.enforce_parent_consent() TO service_role;
+
+
+--
 -- Name: FUNCTION ensure_care_chat(p_patient uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -3704,12 +4189,30 @@ GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text) TO ser
 
 
 --
+-- Name: FUNCTION handle_new_nesting_request(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.handle_new_nesting_request() TO anon;
+GRANT ALL ON FUNCTION public.handle_new_nesting_request() TO authenticated;
+GRANT ALL ON FUNCTION public.handle_new_nesting_request() TO service_role;
+
+
+--
 -- Name: FUNCTION handle_new_space(); Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON FUNCTION public.handle_new_space() TO anon;
 GRANT ALL ON FUNCTION public.handle_new_space() TO authenticated;
 GRANT ALL ON FUNCTION public.handle_new_space() TO service_role;
+
+
+--
+-- Name: FUNCTION handle_new_space_request(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.handle_new_space_request() TO anon;
+GRANT ALL ON FUNCTION public.handle_new_space_request() TO authenticated;
+GRANT ALL ON FUNCTION public.handle_new_space_request() TO service_role;
 
 
 --
@@ -4288,6 +4791,24 @@ GRANT ALL ON TABLE public.space_members TO service_role;
 
 
 --
+-- Name: TABLE space_membership_requests; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.space_membership_requests TO anon;
+GRANT ALL ON TABLE public.space_membership_requests TO authenticated;
+GRANT ALL ON TABLE public.space_membership_requests TO service_role;
+
+
+--
+-- Name: TABLE space_nesting_requests; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.space_nesting_requests TO anon;
+GRANT ALL ON TABLE public.space_nesting_requests TO authenticated;
+GRANT ALL ON TABLE public.space_nesting_requests TO service_role;
+
+
+--
 -- Name: TABLE spaces; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4369,7 +4890,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict huejfZqCYQnwhSNezyWA0FEFpCeuwZTBWAc3VskeutlmANxgpcwIgxtaooizd25
+\unrestrict Hgikp2ZeNshsLkcdgfecLfinhc8b6HRXfUWZ7vovJrxnHigLQqaUfvlZjXbZcwG
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
