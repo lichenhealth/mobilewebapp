@@ -109,10 +109,11 @@ function Section({ label, active, open, onToggle, children }: {
   return (
     <div className={'ssrch__sect' + (open ? ' is-open' : '')}>
       <button className="ssrch__sect-head" onClick={onToggle} aria-expanded={open}>
-        <span className={'ssrch__sect-box' + (active ? ' is-on' : '')}>
-          {active && <Icon name="check" size={10} />}
+        <span className="ssrch__sect-label">
+          {label}
+          {/* peach dot = this section is narrowing the search right now */}
+          {active && <span className="ssrch__sect-dot" aria-label="active" />}
         </span>
-        <span className="ssrch__sect-label">{label}</span>
         <span className="ssrch__sect-chev" aria-hidden>
           <Icon name="chevron-right" size={13} />
         </span>

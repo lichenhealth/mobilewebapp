@@ -133,19 +133,18 @@
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   color: var(--ink-soft);
 }
-.ssrch__sect-chev svg { transform: rotate(90deg); transition: transform 140ms; }
-.ssrch__sect.is-open .ssrch__sect-chev svg { transform: rotate(-90deg); }
+.ssrch__sect-chev svg { transition: transform 140ms; }
+.ssrch__sect.is-open .ssrch__sect-chev svg { transform: rotate(90deg); }
 .ssrch__sect.is-open .ssrch__sect-chev { background: var(--peach-tint, var(--bone-warm)); border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
-.ssrch__sect-box {
-  width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--ink-faint); color: var(--bone);
-}
-.ssrch__sect-box.is-on { background: var(--peach); border-color: var(--peach); }
 .ssrch__sect-label {
-  flex: 1; font-size: 13px; font-weight: 600; color: var(--ink);
+  flex: 1; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--ink);
 }
-.ssrch__sect-body { padding: var(--s-1) 6px var(--s-4) 32px; }
+.ssrch__sect-dot {
+  width: 8px; height: 8px; border-radius: var(--r-full);
+  background: var(--peach); flex-shrink: 0;
+}
+.ssrch__sect-body { padding: var(--s-1) 6px var(--s-4) 6px; }
 .ssrch__topics {
   columns: 2; column-gap: var(--s-3); margin-top: var(--s-2);
   max-height: 40dvh; overflow-y: auto; overscroll-behavior: contain;
