@@ -38,7 +38,18 @@ export default function Compose() {
   const [toMycelium, setToMycelium] = useState(false);
   const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
-  const [contentType, setContentType] = useState<ContentType>('social');
+  // Picking a Where suggests the natural Type (marketplace listing = something
+  // to act on; a course = educational) — but never overrides a type the
+  // member chose by hand.
+  const AREA_TYPE: Partial<Record<ServiceArea, ContentType>> = {
+    marketplace: 'actionable', events: 'actionable', work: 'actionable',
+    courses: 'educational', library: 'educational', art: 'creative',
+  };
+  const [contentType, setContentType] = useState<ContentType>(() => {
+    const a = params.get('area') as ServiceArea | null;
+    return (a && AREA_TYPE[a]) || 'social';
+  });
+  const [typeTouched, setTypeTouched] = useState(false);
   // "Where": a post can live in several areas at once.
   const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
     const a = params.get('area') as ServiceArea | null;
@@ -104,6 +115,7 @@ export default function Compose() {
       setToMycelium(p.to_mycelium);
       setAudienceSpaces(new Set(p.audience_space_ids ?? []));
       setContentType(p.content_type);
+      setTypeTouched(true);
       setAreas(new Set(postAreas(p)));
       setTitle(p.title ?? '');
       setBody(p.body ?? '');
@@ -167,6 +179,7 @@ export default function Compose() {
     // Editing an event post: it's anchored to a real calendar event, so
     // 'events' can't be unchecked (cancel the event instead).
     if (editing && a === 'events' && areas.has('events') && editLinkedEvent.current) return;
+    if (!areas.has(a) && !typeTouched && AREA_TYPE[a]) setContentType(AREA_TYPE[a]!);
     setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
   };
   const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
@@ -380,7 +393,7 @@ export default function Compose() {
           <div className="cmp__chips">
             {CONTENT_TYPES.map((t) => (
               <button key={t.value} className={'cmp__chip' + (contentType === t.value ? ' is-on' : '')}
-                onClick={() => setContentType(t.value)}>{t.label}</button>
+                onClick={() => { setContentType(t.value); setTypeTouched(true); }}>{t.label}</button>
             ))}
           </div>
         </>
