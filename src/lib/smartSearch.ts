@@ -22,8 +22,10 @@ export type SpanKind =
 export interface ParsedSpan { start: number; end: number; kind: SpanKind }
 
 /** Endorsement filters (mockup's Trusted by / Recommended by, per degree):
- *  'mine' = my mycelium · 'second' = by people my mycelium trusts ·
- *  'any' = anyone on the platform · personId = one specific member. */
+ *  'mine' = someone I trust · 'second' = someone trusted by someone I trust ·
+ *  'any' = anyone on the platform · personId = one specific member.
+ *  Founder vocabulary (2026-07-14): never say "my mycelium" as a trust
+ *  degree — mycelium is your network, trust is a private per-person signal. */
 export type EndorseDegree = 'any' | 'mine' | 'second';
 export interface EndorseFilter { degree: EndorseDegree | null; personId: string | null }
 const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
@@ -134,12 +136,12 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
     }
   };
 
-  // Longest, most specific phrases first — order matters.
-  // Second-degree trust (the assistant mockup's Pro Tip) before first-degree.
+  // Longest, most specific phrases first — order matters. The recommend-second
+  // phrase CONTAINS the trust-second phrase, so it must scan before it.
+  scan(/\brecommended by (?:(?:someone|people|members|those|folks) trusted by (?:someone|people|members|those|folks) i trust|people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
+    'recommend', () => { c.rec.degree = 'second'; });
   scan(/\btrusted by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium)\b/g,
     'trust', () => { c.trust.degree = 'second'; });
-  scan(/\brecommended by (?:people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
-    'recommend', () => { c.rec.degree = 'second'; });
   scan(/\brecommended(?: by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium|people in my mycelium))?\b/g,
     'recommend', () => { c.rec.degree ??= 'mine'; });
   scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy mycelium\b|\btrusted\b/g,

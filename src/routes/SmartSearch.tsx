@@ -250,7 +250,7 @@ export default function SmartSearch() {
     if (c.trust.personId) out.push(`trusted by ${members.find((m) => m.id === c.trust.personId)?.full_name ?? 'someone'}`);
     else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by someone I trust' : 'trusted by anyone');
     if (c.rec.personId) out.push(`recommended by ${members.find((m) => m.id === c.rec.personId)?.full_name ?? 'someone'}`);
-    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by someone I trust' : c.rec.degree === 'second' ? 'recommended via extended trust' : 'recommended by anyone');
+    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by someone I trust' : c.rec.degree === 'second' ? 'recommended by someone trusted by someone I trust' : 'recommended by anyone');
     for (const o of c.offers) out.push(o === 'gift' ? 'free / gift' : o);
     if (c.priceMin != null || c.priceMax != null) {
       out.push(`$${c.priceMin ?? 0}–${c.priceMax != null ? '$' + c.priceMax : 'up'}`);

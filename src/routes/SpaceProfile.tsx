@@ -187,7 +187,7 @@ export default function SpaceProfile() {
             <button
               className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
               onClick={toggleTrust}
-              title={trusted ? 'In your mycelium' : 'Add to your mycelium'}
+              title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
             >
               <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
             </button>
