@@ -13,6 +13,7 @@ import {
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
   approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
+  suggestMember, endorseSuggestion,
   type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
@@ -67,6 +68,8 @@ export default function SpaceProfile() {
   const [proposals, setProposals] = useState<NestingRequestRow[]>([]);
   const [proposeOpen, setProposeOpen] = useState(false);
   const [proposeName, setProposeName] = useState('');
+  // the + circle asks WHAT you're adding (Figma 286-14250)
+  const [plusOpen, setPlusOpen] = useState(false);
   const [parentQ, setParentQ] = useState('');
   const [parentHits, setParentHits] = useState<{ id: string; name: string; kind: string }[]>([]);
 
@@ -510,6 +513,44 @@ export default function SpaceProfile() {
         </section>
       )}
 
+      {/* + menu: what are you adding to this space? (Figma 286-14250) */}
+      {plusOpen && (
+        <div className="sprof__plus">
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}`)}>
+            <Icon name="sparkle" size={14} /> Post to {space.name}
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=marketplace`)}>
+            <Icon name="store" size={14} /> Marketplace listing
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=events`)}>
+            <Icon name="rsvp" size={14} /> Event
+          </button>
+          {(space.kind === 'community' || space.kind === 'organization') && me && (
+            adminTools ? (
+              <button
+                className="sprof__plus-row"
+                onClick={() => {
+                  setPlusOpen(false); setNewGroupOpen(true);
+                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                }}
+              >
+                <Icon name="user-multiple" size={14} /> New group
+              </button>
+            ) : (
+              <button
+                className="sprof__plus-row"
+                onClick={() => {
+                  setPlusOpen(false); setProposeOpen(true);
+                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                }}
+              >
+                <Icon name="user-multiple" size={14} /> Propose a group
+              </button>
+            )
+          )}
+        </div>
+      )}
+
       {/* The profile IS a feed — the space's wall (posted AS it or TO it),
           with the space-anatomy circles (Chat for members, Members) leading
           the icon row. Identical for all four kinds. */}
@@ -519,14 +560,14 @@ export default function SpaceProfile() {
         leading={[
           // Every section carries its own doors: + posts INTO this space,
           // Search searches WITHIN it (Figma 286-11770).
-          { icon: 'plus' as const, label: 'Post', onClick: () => navigate(`/compose?space=${space.id}`) },
+          { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
           { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
           ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
-          { icon: 'user-multiple' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+          { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
           // The founder's Marketplace-icon analogy: a Groups door appears only
           // when this space actually has groups nested under it.
           ...(childGroups.length > 0
-            ? [{ icon: 'user-multiple' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
+            ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
             : []),
         ]}
       />
@@ -535,26 +576,47 @@ export default function SpaceProfile() {
       {adminTools && pendingReqs.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Waiting at the door</h2>
-          {pendingReqs.map((r) => (
-            <div className="sprof__req" key={r.profile_id}>
-              <Avatar id={r.profile_id} name={r.profile?.full_name ?? 'Member'} url={r.profile?.avatar_url} size={34} />
-              <span className="sprof__req-name">{r.profile?.full_name ?? 'A member'}</span>
-              {r.initiated_by === r.profile_id ? (
-                <span className="sprof__req-actions">
-                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
-                    onClick={() => void act(() => approveJoin(id, r.profile_id))}>Approve</button>
-                  <button className="btn sprof__invite-btn" disabled={memBusy}
-                    onClick={() => void act(() => removeRequest(id, r.profile_id))}>Decline</button>
+          {pendingReqs.map((r) => {
+            const initiatorRole = members.find((m) => m.profile_id === r.initiated_by)?.role;
+            const kind = r.initiated_by === r.profile_id ? 'request'
+              : (initiatorRole === 'admin' || initiatorRole === 'super_admin') ? 'invite'
+              : 'suggestion';
+            return (
+              <div className="sprof__req" key={r.profile_id}>
+                <Avatar id={r.profile_id} name={r.profile?.full_name ?? 'Member'} url={r.profile?.avatar_url} size={34} />
+                <span className="sprof__req-name">
+                  {r.profile?.full_name ?? 'A member'}
+                  {kind === 'suggestion' && (
+                    <em className="sprof__req-tag"> suggested by {r.initiator?.full_name ?? 'a member'}</em>
+                  )}
                 </span>
-              ) : (
-                <span className="sprof__req-actions">
-                  <em className="sprof__req-tag">invited</em>
-                  <button className="btn sprof__invite-btn" disabled={memBusy}
-                    onClick={() => void act(() => removeRequest(id, r.profile_id))}>Withdraw</button>
-                </span>
-              )}
-            </div>
-          ))}
+                {kind === 'request' && (
+                  <span className="sprof__req-actions">
+                    <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                      onClick={() => void act(() => approveJoin(id, r.profile_id))}>Approve</button>
+                    <button className="btn sprof__invite-btn" disabled={memBusy}
+                      onClick={() => void act(() => removeRequest(id, r.profile_id))}>Decline</button>
+                  </span>
+                )}
+                {kind === 'invite' && (
+                  <span className="sprof__req-actions">
+                    <em className="sprof__req-tag">invited</em>
+                    <button className="btn sprof__invite-btn" disabled={memBusy}
+                      onClick={() => void act(() => removeRequest(id, r.profile_id))}>Withdraw</button>
+                  </span>
+                )}
+                {kind === 'suggestion' && (
+                  <span className="sprof__req-actions">
+                    <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                      title="Turn this suggestion into your invite"
+                      onClick={() => void act(() => endorseSuggestion(id, r.profile_id))}>Invite</button>
+                    <button className="btn sprof__invite-btn" disabled={memBusy}
+                      onClick={() => void act(() => removeRequest(id, r.profile_id))}>Decline</button>
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </section>
       )}
 
@@ -579,20 +641,26 @@ export default function SpaceProfile() {
             </button>
           ))}
         </div>
-        {adminTools && (
+        {(adminTools || (isMember && !publicView)) && (
           <div className="sprof__invitebox">
             <input
               className="prof__input"
               value={invQ}
               onChange={(e) => setInvQ(e.target.value)}
-              placeholder="Invite a member by name…"
+              placeholder={adminTools ? 'Invite a member by name…' : 'Suggest a member to the admins…'}
             />
+            {!adminTools && invQ.trim().length >= 2 && (
+              <p className="prof__hint">The admins review suggestions before anyone is invited.</p>
+            )}
             {invHits.length > 0 && (
               <div className="sprof__invhits">
                 {invHits.map((h) => (
                   <button key={h.id} className="sprof__invhit" disabled={memBusy}
-                    onClick={() => { setInvQ(''); void act(() => inviteMember(id, me, h.id)); }}>
-                    {h.full_name ?? 'Member'} <em>Invite</em>
+                    onClick={() => {
+                      setInvQ('');
+                      void act(() => adminTools ? inviteMember(id, me, h.id) : suggestMember(id, me, h.id));
+                    }}>
+                    {h.full_name ?? 'Member'} <em>{adminTools ? 'Invite' : 'Suggest'}</em>
                   </button>
                 ))}
               </div>
@@ -650,11 +718,7 @@ export default function SpaceProfile() {
             </div>
           ))}
           {adminTools ? (
-            !newGroupOpen ? (
-              <button className="sprof__edit-btn" onClick={() => setNewGroupOpen(true)}>
-                + New group
-              </button>
-            ) : (
+            !newGroupOpen ? null : (
               <div className="sprof__newgroup">
                 <input
                   className="prof__input"
@@ -670,13 +734,9 @@ export default function SpaceProfile() {
               </div>
             )
           ) : me ? (
-            /* Anyone can propose a group; the admins here decide whether it
-               joins. The group is theirs to run either way. */
-            !proposeOpen ? (
-              <button className="sprof__edit-btn" onClick={() => setProposeOpen(true)}>
-                Propose a group
-              </button>
-            ) : (
+            /* Opened from the + menu: anyone can propose a group; the admins
+               here decide whether it joins. It's theirs to run either way. */
+            !proposeOpen ? null : (
               <div className="sprof__newgroup">
                 <input
                   className="prof__input"

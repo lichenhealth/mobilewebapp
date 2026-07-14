@@ -123,3 +123,19 @@
 }
 .sprof__grouprow { display: flex; align-items: center; gap: var(--s-2); }
 .sprof__grouprow .sprof__member { flex: 1; min-width: 0; }
+
+/* ── the + menu: what are you adding to this space? ── */
+.sprof__plus {
+  display: flex; flex-direction: column; gap: 4px;
+  margin: var(--s-2) 0; padding: var(--s-2);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+}
+.sprof__plus-row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 10px 12px; border-radius: var(--r-md); text-align: left;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 13px; color: var(--ink);
+}
+.sprof__plus-row:hover { background: var(--bone); }
+.sprof__plus-row svg { color: var(--peach-deep, var(--peach)); }
