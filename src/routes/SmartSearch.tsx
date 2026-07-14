@@ -26,7 +26,9 @@ interface MySpace { id: string; name: string; kind: string }
 interface MemberLite { id: string; full_name: string | null }
 
 interface Extras {
-  categoryIds: string[];
+  /** 'all' = every topic included (the default — not a filter); an array is
+   *  an explicit narrowing. Empty array = none picked yet = also no filter. */
+  categoryIds: string[] | 'all';
   who: WhoKind[];
   spaceScope: string[];
   areas: ServiceArea[];
@@ -42,7 +44,7 @@ interface Extras {
   recDegree: EndorseDegree | null; recPerson: MemberLite | null;
 }
 const EMPTY_EXTRAS: Extras = {
-  categoryIds: [], who: [], spaceScope: [], areas: [], contentTypes: [], offers: [],
+  categoryIds: 'all', who: [], spaceScope: [], areas: [], contentTypes: [], offers: [],
   priceMin: '', priceMax: '',
   online: false, inPerson: false,
   radiusMiles: null, anchorText: '', anchorGeo: null,
@@ -58,7 +60,10 @@ const DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
 ];
 
 function merge(parsed: SearchCriteria, x: Extras, cats: SearchCategory[]): SearchCriteria {
-  const pickedCats = cats.filter((c) => x.categoryIds.includes(c.id));
+  // 'all' and empty both mean "no topic narrowing" — only a real subset filters.
+  const sel = x.categoryIds;
+  const pickedCats = (sel === 'all' || sel.length === 0 || sel.length === cats.length)
+    ? [] : cats.filter((c) => sel.includes(c.id));
   const catIds = new Set(parsed.categories.map((c) => c.id));
   return {
     ...parsed,
@@ -108,7 +113,9 @@ function Section({ label, active, open, onToggle, children }: {
           {active && <Icon name="check" size={10} />}
         </span>
         <span className="ssrch__sect-label">{label}</span>
-        <Icon name="chevron-right" size={13} />
+        <span className="ssrch__sect-chev" aria-hidden>
+          <Icon name="chevron-right" size={13} />
+        </span>
       </button>
       {open && <div className="ssrch__sect-body">{children}</div>}
     </div>
@@ -259,7 +266,8 @@ export default function SmartSearch() {
     if (c.hideConflicts) out.push('fits my calendar');
     for (const a of c.areas) out.push(SERVICE_AREAS.find((s) => s.value === a)?.label ?? a);
     for (const ct of c.contentTypes) out.push(CONTENT_TYPES.find((s) => s.value === ct)?.label ?? ct);
-    for (const cat of c.categories) out.push(cat.name);
+    if (c.categories.length > 6) out.push(`${c.categories.length} topics`);
+    else for (const cat of c.categories) out.push(cat.name);
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteria, members, mySpaces]);
@@ -408,41 +416,57 @@ export default function SmartSearch() {
               <Icon name="sparkle" size={12} /> Include AI · coming soon
             </span>
           </div>
+          <p className="ssrch__panel-hint">
+            Everything is included until you narrow it — open a section to pick less.
+          </p>
 
           <Section
             label="Topics"
-            active={criteria.categories.length > 0}
+            active={parsed.categories.length > 0
+              || (extras.categoryIds !== 'all' && extras.categoryIds.length > 0 && extras.categoryIds.length < cats.length)}
             open={openSects.has('topics')}
             onToggle={() => toggleSect('topics')}
           >
-            <input
-              className="ssrch__personq"
-              value={topicQ}
-              onChange={(e) => setTopicQ(e.target.value)}
-              placeholder="Filter topics…"
-            />
+            <div className="ssrch__topics-top">
+              <label className="ssrch__check ssrch__check--tight">
+                <input
+                  type="checkbox"
+                  checked={extras.categoryIds === 'all'}
+                  onChange={() => setExtras((x) => ({ ...x, categoryIds: x.categoryIds === 'all' ? [] : 'all' }))}
+                />
+                Select all
+              </label>
+              <input
+                className="ssrch__personq ssrch__topics-q"
+                value={topicQ}
+                onChange={(e) => setTopicQ(e.target.value)}
+                placeholder="Filter topics…"
+              />
+            </div>
             <div className="ssrch__topics">
               {topicHits.map((c) => {
-                const on = criteria.categories.some((x) => x.id === c.id);
                 const fromSentence = parsed.categories.some((x) => x.id === c.id);
+                const on = extras.categoryIds === 'all' || extras.categoryIds.includes(c.id)
+                  || fromSentence;
                 return (
                   <label key={c.id} className={'ssrch__topic' + (on ? ' is-on' : '')}>
                     <input
                       type="checkbox"
                       checked={on}
                       disabled={fromSentence}
-                      onChange={() => setExtras((x) => ({ ...x, categoryIds: toggleIn(x.categoryIds, c.id) }))}
+                      onChange={() => setExtras((x) => ({
+                        ...x,
+                        // Unchecking while everything is selected = keep the rest.
+                        categoryIds: x.categoryIds === 'all'
+                          ? cats.filter((cc) => cc.id !== c.id).map((cc) => cc.id)
+                          : toggleIn(x.categoryIds, c.id),
+                      }))}
                     />
                     {c.name}
                   </label>
                 );
               })}
             </div>
-            {extras.categoryIds.length > 0 && (
-              <button className="ssrch__clear" onClick={() => setExtras((x) => ({ ...x, categoryIds: [] }))}>
-                Clear topics
-              </button>
-            )}
           </Section>
 
           <Section
