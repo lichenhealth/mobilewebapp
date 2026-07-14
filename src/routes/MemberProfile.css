@@ -24,8 +24,14 @@
 }
 .mprof__loc svg { color: var(--peach-deep); }
 
-.mprof__actions { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
-.mprof__btn { display: inline-flex; align-items: center; gap: 6px; }
+.mprof__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); }
+/* Compact — three of these sit side by side (Message · Add to Mycelium · Trust).
+   .btn.mprof__btn outranks the base .btn regardless of CSS bundle order. */
+.btn.mprof__btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 13px; font-size: 12px;
+}
+.btn.mprof__btn svg { width: 13px; height: 13px; }
 .mprof__btn--trust {
   background: var(--bone-warm); border: 1px solid var(--bone-edge); color: var(--ink);
 }
