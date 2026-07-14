@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
@@ -26,7 +26,9 @@ interface MySpace { id: string; name: string; kind: string }
 interface MemberLite { id: string; full_name: string | null }
 
 interface Extras {
-  categoryIds: string[];
+  /** 'all' = every topic included (the default — not a filter); an array is
+   *  an explicit narrowing. Empty array = none picked yet = also no filter. */
+  categoryIds: string[] | 'all';
   who: WhoKind[];
   spaceScope: string[];
   areas: ServiceArea[];
@@ -42,7 +44,7 @@ interface Extras {
   recDegree: EndorseDegree | null; recPerson: MemberLite | null;
 }
 const EMPTY_EXTRAS: Extras = {
-  categoryIds: [], who: [], spaceScope: [], areas: [], contentTypes: [], offers: [],
+  categoryIds: 'all', who: [], spaceScope: [], areas: [], contentTypes: [], offers: [],
   priceMin: '', priceMax: '',
   online: false, inPerson: false,
   radiusMiles: null, anchorText: '', anchorGeo: null,
@@ -52,13 +54,16 @@ const EMPTY_EXTRAS: Extras = {
 };
 
 const DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
-  { value: 'mine', label: 'My mycelium' },
-  { value: 'second', label: 'Trusted by my mycelium' },
+  { value: 'mine', label: 'Someone I trust' },
+  { value: 'second', label: 'Trusted by someone I trust' },
   { value: 'any', label: 'Anyone' },
 ];
 
 function merge(parsed: SearchCriteria, x: Extras, cats: SearchCategory[]): SearchCriteria {
-  const pickedCats = cats.filter((c) => x.categoryIds.includes(c.id));
+  // 'all' and empty both mean "no topic narrowing" — only a real subset filters.
+  const sel = x.categoryIds;
+  const pickedCats = (sel === 'all' || sel.length === 0 || sel.length === cats.length)
+    ? [] : cats.filter((c) => sel.includes(c.id));
   const catIds = new Set(parsed.categories.map((c) => c.id));
   return {
     ...parsed,
@@ -104,11 +109,14 @@ function Section({ label, active, open, onToggle, children }: {
   return (
     <div className={'ssrch__sect' + (open ? ' is-open' : '')}>
       <button className="ssrch__sect-head" onClick={onToggle} aria-expanded={open}>
-        <span className={'ssrch__sect-box' + (active ? ' is-on' : '')}>
-          {active && <Icon name="check" size={10} />}
+        <span className="ssrch__sect-label">
+          {label}
+          {/* peach dot = this section is narrowing the search right now */}
+          {active && <span className="ssrch__sect-dot" aria-label="active" />}
         </span>
-        <span className="ssrch__sect-label">{label}</span>
-        <Icon name="chevron-right" size={13} />
+        <span className="ssrch__sect-chev" aria-hidden>
+          <Icon name="chevron-right" size={13} />
+        </span>
       </button>
       {open && <div className="ssrch__sect-body">{children}</div>}
     </div>
@@ -119,6 +127,31 @@ export default function SmartSearch() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
+
+  // Section doors: /search?space=<id> · ?member=<id> · ?area=<x> · ?who=people
+  // Scope comes from WHERE you pressed Search; the X on the banner widens out.
+  const [urlParams] = useSearchParams();
+  const scopeSpaceId = urlParams.get('space');
+  const scopeMemberId = urlParams.get('member');
+  const scopeArea = urlParams.get('area') as ServiceArea | null;
+  const scopeWho = urlParams.get('who') as WhoKind | null;
+  const hasScope = !!(scopeSpaceId || scopeMemberId || scopeArea || scopeWho);
+  const [scopeName, setScopeName] = useState('');
+
+  useEffect(() => {
+    if (!scopeSpaceId && !scopeMemberId) { setScopeName(''); return; }
+    let live = true;
+    (async () => {
+      if (scopeSpaceId) {
+        const { data } = await supabase.from('spaces').select('name').eq('id', scopeSpaceId).maybeSingle();
+        if (live) setScopeName((data as { name: string } | null)?.name ?? 'this space');
+      } else if (scopeMemberId) {
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', scopeMemberId).maybeSingle();
+        if (live) setScopeName((data as { full_name: string | null } | null)?.full_name ?? 'this member');
+      }
+    })();
+    return () => { live = false; };
+  }, [scopeSpaceId, scopeMemberId]);
 
   const [q, setQ] = useState('');
   const [cats, setCats] = useState<SearchCategory[]>([]);
@@ -154,9 +187,16 @@ export default function SmartSearch() {
     () => (q.trim() ? parseQuery(q, cats) : { criteria: emptyCriteria(), spans: [] as ParsedSpan[] }),
     [q, cats],
   );
-  const criteria = useMemo(() => merge(parsed, extras, cats), [parsed, extras, cats]);
+  const criteria = useMemo(() => {
+    const c = merge(parsed, extras, cats);
+    if (scopeSpaceId && !c.spaceScope.includes(scopeSpaceId)) c.spaceScope = [...c.spaceScope, scopeSpaceId];
+    if (scopeMemberId) c.authorScope = scopeMemberId;
+    if (scopeArea && !c.areas.includes(scopeArea)) c.areas = [...c.areas, scopeArea];
+    if (scopeWho && !c.who.includes(scopeWho)) c.who = [...c.who, scopeWho];
+    return c;
+  }, [parsed, extras, cats, scopeSpaceId, scopeMemberId, scopeArea, scopeWho]);
 
-  const hasSignal = q.trim().length >= 3
+  const hasSignal = hasScope || q.trim().length >= 3
     || !!criteria.trust.degree || !!criteria.trust.personId
     || !!criteria.rec.degree || !!criteria.rec.personId
     || criteria.areas.length > 0 || criteria.categories.length > 0
@@ -208,9 +248,9 @@ export default function SmartSearch() {
     const c = criteria;
     const out: string[] = [];
     if (c.trust.personId) out.push(`trusted by ${members.find((m) => m.id === c.trust.personId)?.full_name ?? 'someone'}`);
-    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by my mycelium' : 'trusted by anyone');
+    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by someone I trust' : 'trusted by anyone');
     if (c.rec.personId) out.push(`recommended by ${members.find((m) => m.id === c.rec.personId)?.full_name ?? 'someone'}`);
-    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by my mycelium' : c.rec.degree === 'second' ? 'recommended by their web' : 'recommended by anyone');
+    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by someone I trust' : c.rec.degree === 'second' ? 'recommended by someone trusted by someone I trust' : 'recommended by anyone');
     for (const o of c.offers) out.push(o === 'gift' ? 'free / gift' : o);
     if (c.priceMin != null || c.priceMax != null) {
       out.push(`$${c.priceMin ?? 0}–${c.priceMax != null ? '$' + c.priceMax : 'up'}`);
@@ -227,7 +267,8 @@ export default function SmartSearch() {
     if (c.hideConflicts) out.push('fits my calendar');
     for (const a of c.areas) out.push(SERVICE_AREAS.find((s) => s.value === a)?.label ?? a);
     for (const ct of c.contentTypes) out.push(CONTENT_TYPES.find((s) => s.value === ct)?.label ?? ct);
-    for (const cat of c.categories) out.push(cat.name);
+    if (c.categories.length > 6) out.push(`${c.categories.length} topics`);
+    else for (const cat of c.categories) out.push(cat.name);
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteria, members, mySpaces]);
@@ -315,6 +356,20 @@ export default function SmartSearch() {
 
   return (
     <div className="ssrch">
+      {hasScope && (
+        <div className="ssrch__scope">
+          <Icon name="search" size={12} />
+          <span>
+            Searching {scopeMemberId ? `${scopeName || 'this member'}’s contributions`
+              : scopeSpaceId ? `within ${scopeName || 'this space'}`
+              : scopeWho ? 'people'
+              : SERVICE_AREAS.find((a) => a.value === scopeArea)?.label ?? scopeArea}
+          </span>
+          <button className="ssrch__scope-x" onClick={() => navigate('/search', { replace: true })} aria-label="Search everywhere instead">
+            <Icon name="close" size={11} /> everywhere
+          </button>
+        </div>
+      )}
       <div className="ssrch__boxwrap">
         <div className="ssrch__box">
           <div className="ssrch__mirror" aria-hidden>
@@ -362,41 +417,57 @@ export default function SmartSearch() {
               <Icon name="sparkle" size={12} /> Include AI · coming soon
             </span>
           </div>
+          <p className="ssrch__panel-hint">
+            Everything is included until you narrow it — open a section to pick less.
+          </p>
 
           <Section
             label="Topics"
-            active={criteria.categories.length > 0}
+            active={parsed.categories.length > 0
+              || (extras.categoryIds !== 'all' && extras.categoryIds.length > 0 && extras.categoryIds.length < cats.length)}
             open={openSects.has('topics')}
             onToggle={() => toggleSect('topics')}
           >
-            <input
-              className="ssrch__personq"
-              value={topicQ}
-              onChange={(e) => setTopicQ(e.target.value)}
-              placeholder="Filter topics…"
-            />
+            <div className="ssrch__topics-top">
+              <label className="ssrch__check ssrch__check--tight">
+                <input
+                  type="checkbox"
+                  checked={extras.categoryIds === 'all'}
+                  onChange={() => setExtras((x) => ({ ...x, categoryIds: x.categoryIds === 'all' ? [] : 'all' }))}
+                />
+                Select all
+              </label>
+              <input
+                className="ssrch__personq ssrch__topics-q"
+                value={topicQ}
+                onChange={(e) => setTopicQ(e.target.value)}
+                placeholder="Filter topics…"
+              />
+            </div>
             <div className="ssrch__topics">
               {topicHits.map((c) => {
-                const on = criteria.categories.some((x) => x.id === c.id);
                 const fromSentence = parsed.categories.some((x) => x.id === c.id);
+                const on = extras.categoryIds === 'all' || extras.categoryIds.includes(c.id)
+                  || fromSentence;
                 return (
                   <label key={c.id} className={'ssrch__topic' + (on ? ' is-on' : '')}>
                     <input
                       type="checkbox"
                       checked={on}
                       disabled={fromSentence}
-                      onChange={() => setExtras((x) => ({ ...x, categoryIds: toggleIn(x.categoryIds, c.id) }))}
+                      onChange={() => setExtras((x) => ({
+                        ...x,
+                        // Unchecking while everything is selected = keep the rest.
+                        categoryIds: x.categoryIds === 'all'
+                          ? cats.filter((cc) => cc.id !== c.id).map((cc) => cc.id)
+                          : toggleIn(x.categoryIds, c.id),
+                      }))}
                     />
                     {c.name}
                   </label>
                 );
               })}
             </div>
-            {extras.categoryIds.length > 0 && (
-              <button className="ssrch__clear" onClick={() => setExtras((x) => ({ ...x, categoryIds: [] }))}>
-                Clear topics
-              </button>
-            )}
           </Section>
 
           <Section

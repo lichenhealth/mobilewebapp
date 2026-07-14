@@ -110,7 +110,7 @@ export default function MemberProfile() {
             <button
               className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
               onClick={toggleTrust}
-              title={trusted ? 'In your mycelium' : 'Add to your mycelium'}
+              title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
             >
               <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
             </button>
@@ -137,8 +137,13 @@ export default function MemberProfile() {
         </div>
       )}
 
-      {/* The profile IS a feed — their contributions, standard lenses. */}
-      <ContributionsFeed profileId={member.id} me={me} />
+      {/* The profile IS a feed — their contributions, standard lenses.
+          Search scopes to just this person's stream. */}
+      <ContributionsFeed
+        profileId={member.id}
+        me={me}
+        leading={[{ icon: 'search', label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) }]}
+      />
     </div>
   );
 }

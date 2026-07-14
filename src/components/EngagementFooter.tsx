@@ -123,8 +123,8 @@ export default function EngagementFooter({
             onClick={(e) => { e.stopPropagation(); clickSignal('trust', hasTrust); }}
             onMouseEnter={() => hoverOpen('trust', hasTrust)}
             tabIndex={hasTrust ? 0 : -1}
-            aria-label={hasTrust ? `Trusted by ${trustedBy.length} in your mycelium` : 'No one in your mycelium has trusted this yet'}
-            title={hasTrust ? 'Trusted by your mycelium' : 'No trust from your mycelium yet'}
+            aria-label={hasTrust ? `Trusted by ${trustedBy.length} ${trustedBy.length === 1 ? 'person' : 'people'} you trust` : 'No one you trust has trusted this yet'}
+            title={hasTrust ? 'Trusted by people you trust' : 'No trust signals from people you trust yet'}
           >
             <Icon name="shield-user" size={11} />
           </button>
@@ -138,8 +138,8 @@ export default function EngagementFooter({
             onClick={(e) => { e.stopPropagation(); clickSignal('recommend', hasRec); }}
             onMouseEnter={() => hoverOpen('recommend', hasRec)}
             tabIndex={hasRec ? 0 : -1}
-            aria-label={hasRec ? `Recommended by ${recommendedBy.length} in your mycelium` : 'No one in your mycelium has recommended this yet'}
-            title={hasRec ? 'Recommended by your mycelium' : 'No recommendations from your mycelium yet'}
+            aria-label={hasRec ? `Recommended by ${recommendedBy.length} ${recommendedBy.length === 1 ? 'person' : 'people'} you trust` : 'No one you trust has recommended this yet'}
+            title={hasRec ? 'Recommended by people you trust' : 'No recommendations from people you trust yet'}
           >
             <Icon name="thumbs-up" size={11} />
           </button>
@@ -201,7 +201,7 @@ export default function EngagementFooter({
       {openPanel && (
         <div className="engage__panel">
           <p className="engage__panel-label">
-            {openPanel === 'trust' ? 'Trusted by' : 'Recommended by'} in your mycelium:
+            {openPanel === 'trust' ? 'Trusted' : 'Recommended'} by people you trust:
           </p>
           <ul className="engage__members">
             {(openPanel === 'trust' ? trustedBy : recommendedBy).map((m) => (

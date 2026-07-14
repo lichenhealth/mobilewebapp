@@ -22,8 +22,10 @@ export type SpanKind =
 export interface ParsedSpan { start: number; end: number; kind: SpanKind }
 
 /** Endorsement filters (mockup's Trusted by / Recommended by, per degree):
- *  'mine' = my mycelium · 'second' = by people my mycelium trusts ·
- *  'any' = anyone on the platform · personId = one specific member. */
+ *  'mine' = someone I trust · 'second' = someone trusted by someone I trust ·
+ *  'any' = anyone on the platform · personId = one specific member.
+ *  Founder vocabulary (2026-07-14): never say "my mycelium" as a trust
+ *  degree — mycelium is your network, trust is a private per-person signal. */
 export type EndorseDegree = 'any' | 'mine' | 'second';
 export interface EndorseFilter { degree: EndorseDegree | null; personId: string | null }
 const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
@@ -42,6 +44,7 @@ export interface SearchCriteria {
   online: boolean; inPerson: boolean;
   who: WhoKind[];
   spaceScope: string[];           // limit to these organizations/communities/groups/places
+  authorScope: string | null;     // limit to one member's own contributions (their profile's Search)
   areas: ServiceArea[];
   contentTypes: ContentType[];
   categories: SearchCategory[];   // provider categories (mockup's Topics)
@@ -60,7 +63,7 @@ export function emptyCriteria(): SearchCriteria {
     trust: noEndorse(), rec: noEndorse(),
     offers: [], priceMin: null, priceMax: null,
     online: false, inPerson: false,
-    who: [], spaceScope: [],
+    who: [], spaceScope: [], authorScope: null,
     areas: [], contentTypes: [], categories: [],
     radiusMiles: null, anchorText: null, anchorGeo: null, nearMe: false,
     dateFrom: null, dateTo: null, hideConflicts: false,
@@ -133,13 +136,13 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
     }
   };
 
-  // Longest, most specific phrases first — order matters.
-  // Second-degree trust (the assistant mockup's Pro Tip) before first-degree.
-  scan(/\btrusted by (?:(?:people|members|those|folks) i trust|my mycelium)\b/g,
-    'trust', () => { c.trust.degree = 'second'; });
-  scan(/\brecommended by (?:people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
+  // Longest, most specific phrases first — order matters. The recommend-second
+  // phrase CONTAINS the trust-second phrase, so it must scan before it.
+  scan(/\brecommended by (?:(?:someone|people|members|those|folks) trusted by (?:someone|people|members|those|folks) i trust|people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
     'recommend', () => { c.rec.degree = 'second'; });
-  scan(/\brecommended(?: by (?:(?:people|members|those|folks) i trust|my mycelium|people in my mycelium))?\b/g,
+  scan(/\btrusted by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium)\b/g,
+    'trust', () => { c.trust.degree = 'second'; });
+  scan(/\brecommended(?: by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium|people in my mycelium))?\b/g,
     'recommend', () => { c.rec.degree ??= 'mine'; });
   scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy mycelium\b|\btrusted\b/g,
     'trust', () => { c.trust.degree ??= 'mine'; });
@@ -497,8 +500,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     });
   // Only surface people when the query points at people at all.
   const endorseOnly = (c.trust.degree || c.trust.personId || c.rec.degree || c.rec.personId) && c.areas.length === 0;
-  const wantsPeople = c.who.includes('people') || wantProviders
-    || catIds.length > 0 || c.areas.includes('people') || (!c.who.length && !!endorseOnly);
+  const wantsPeople = !c.authorScope && (c.who.includes('people') || wantProviders
+    || catIds.length > 0 || c.areas.includes('people') || (!c.who.length && !!endorseOnly));
   if (!wantsPeople) people = [];
   people.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)
@@ -508,6 +511,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   // ── Posts ───────────────────────────────────────────────────────────────────
   const postAreaFilter: ServiceArea[] = c.areas.filter((a) => a !== 'people');
   let postHits = posts.filter((p) => {
+    if (c.authorScope && !(p.author_id === c.authorScope && !p.author_space_id)) return false;
     if (postAreaFilter.length && !postAreas(p).some((a) => postAreaFilter.includes(a))) return false;
     if (c.contentTypes.length && !c.contentTypes.includes(p.content_type)) return false;
     if (c.spaceScope.length
@@ -563,8 +567,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     if (!hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
     return true;
   });
-  const wantsSpaces = c.who.includes('organizations') || c.spaceScope.length > 0
-    || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly);
+  const wantsSpaces = !c.authorScope && (c.who.includes('organizations') || c.spaceScope.length > 0
+    || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly));
   if (!wantsSpaces) spaceHits = [];
   spaceHits.sort((a, b) =>
     (b.recommenders.length - a.recommenders.length)

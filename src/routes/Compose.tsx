@@ -32,9 +32,11 @@ export default function Compose() {
   const [params] = useSearchParams();
 
   // Audiences: Everyone is exclusive; Mycelium + spaces combine freely.
-  const [isPublic, setIsPublic] = useState(true);
+  // ?space=<id> = the + button on a space profile: post INTO that space.
+  const presetSpace = params.get('space');
+  const [isPublic, setIsPublic] = useState(!presetSpace);
   const [toMycelium, setToMycelium] = useState(false);
-  const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(new Set());
+  const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
   const [contentType, setContentType] = useState<ContentType>('social');
   // "Where": a post can live in several areas at once.
