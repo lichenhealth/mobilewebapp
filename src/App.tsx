@@ -138,13 +138,13 @@ export default function App() {
           <Route path="/events/:postId" element={<EventPage />} />
           <Route path="/courses"  element={
             <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
-              title="Learning the network" italic="offers & seeks."
+              title="Lichen" italic="Courses."
               sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
               addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training." mediaLenses />
           } />
           <Route path="/library"  element={
             <AreaFeed area="library" icon="book" crumb="Library"
-              title="The network's" italic="bookshelf."
+              title="Lichen" italic="Library."
               sub="Essays, field guides, and zines on land, food, and care."
               addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." mediaLenses />
           } />

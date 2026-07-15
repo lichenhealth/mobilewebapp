@@ -95,6 +95,19 @@ export default function Compose() {
   // Edit mode: ?post=<id> loads an existing post (author only) and submit
   // updates in place instead of creating.
   const editPostId = params.get('post');
+
+  /** After posting, land back where the + was pressed: the space's profile,
+   *  else the section (Library → /library), else Home. */
+  const AREA_HOME: Partial<Record<ServiceArea, string>> = {
+    marketplace: '/market', courses: '/courses', library: '/library',
+    events: '/events', work: '/work', places: '/places',
+  };
+  function afterPostDestination(isEventPost: boolean): string {
+    if (presetSpace) return `/spaces/${presetSpace}`;
+    if (isEventPost) return '/events';
+    const a = params.get('area') as ServiceArea | null;
+    return (a && AREA_HOME[a]) || '/home';
+  }
   const editing = !!editPostId;
   const [editReady, setEditReady] = useState(!editing);
   const editLinkedEvent = useRef<string | null>(null);
@@ -346,7 +359,7 @@ export default function Compose() {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
         throw postErr;
       }
-      navigate(isEvent ? '/events' : '/home');
+      navigate(afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
       setError((e as Error)?.message || 'Couldn’t post. Please try again.');

@@ -46,7 +46,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [showSearch, setShowSearch] = useState(false);
-  const [media, setMedia] = useState<PostMedium[]>([]);
+  // All lenses start ON (founder): everything shows; deselect to narrow.
+  const [media, setMedia] = useState<PostMedium[]>(MEDIA_LENSES.map((m) => m.medium));
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
   const filtered = useMemo(() => {
     let list = posts;
-    if (media.length) list = list.filter((p) => media.includes(postMedium(p)));
+    if (mediaLenses) list = list.filter((p) => media.includes(postMedium(p)));
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter((p) =>
@@ -158,7 +159,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <div className="mkt__empty">
             <Icon name={icon} size={20} />
             <p><span className="display-italic">Nothing here yet.</span></p>
-            <p className="mkt__empty-sub">{posts.length === 0 ? emptyHint : 'Try a different search.'}</p>
+            <p className="mkt__empty-sub">
+              {posts.length === 0 ? emptyHint
+                : mediaLenses && media.length === 0 ? 'All lenses are off — tap one to see that kind of piece.'
+                : 'Try a different search or turn a lens back on.'}
+            </p>
           </div>
         )}
         {filtered.map((p) => (
