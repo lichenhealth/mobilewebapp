@@ -46,6 +46,8 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/work',        label: 'Work',        icon: 'briefcase'     },
   { prefix: '/events',      label: 'Events',      icon: 'sparkle'       },
   { prefix: '/library',     label: 'Library',     icon: 'book'          },
+  { prefix: '/art',         label: 'Art',         icon: 'palette'       },
+  { prefix: '/food',        label: 'Food',        icon: 'fork-spoon'    },
   { prefix: '/places',      label: 'Places',      icon: 'location'      },
   { prefix: '/donate',      label: 'Donate',      icon: 'heart-line'    },
 ];
