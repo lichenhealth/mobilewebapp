@@ -70,13 +70,23 @@ export interface SpaceProfileRow {
 }
 
 export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | null> {
+  // NOTE: no self-join embed here — spaces!parent_space_id resolves to the
+  // CHILDREN direction (an array), not the parent. Fetch the parent by id.
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent:spaces!parent_space_id(id, name)')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }
-  return (data as SpaceProfileRow | null) ?? null;
+  if (!data) return null;
+  const row = data as Omit<SpaceProfileRow, 'parent'> & { parent_space_id: string | null };
+  let parent: { id: string; name: string } | null = null;
+  if (row.parent_space_id) {
+    const { data: p } = await supabase.from('spaces')
+      .select('id, name').eq('id', row.parent_space_id).maybeSingle();
+    parent = (p as { id: string; name: string } | null) ?? null;
+  }
+  return { ...row, parent };
 }
 
 export type SpaceRole = 'super_admin' | 'admin' | 'member';
@@ -174,17 +184,27 @@ export interface SpaceDirectoryRow {
 export async function listSpacesByKind(kind: SpaceKind): Promise<SpaceDirectoryRow[]> {
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, name, kind, description, avatar_url, location, parent:spaces!parent_space_id(id, name), space_members(count)')
+    .select('id, name, kind, description, avatar_url, location, parent_space_id, space_members(count)')
     .eq('kind', kind)
     .order('name');
   if (error) { console.warn('listSpacesByKind:', error.message); return []; }
   type Raw = Omit<SpaceDirectoryRow, 'parent' | 'member_count'> & {
-    parent: { id: string; name: string } | null;
+    parent_space_id: string | null;
     space_members: { count: number }[];
   };
-  return (((data as unknown as Raw[] | null) ?? []).map((r) => ({
-    ...r, member_count: r.space_members?.[0]?.count ?? 0,
-  })));
+  const rows = ((data as unknown as Raw[] | null) ?? []);
+  // Parent names in one shot (self-join embeds resolve the wrong way — see above).
+  const parentIds = [...new Set(rows.map((r) => r.parent_space_id).filter((x): x is string => !!x))];
+  const names = new Map<string, string>();
+  if (parentIds.length) {
+    const { data: ps } = await supabase.from('spaces').select('id, name').in('id', parentIds);
+    for (const p of (ps as { id: string; name: string }[] | null) ?? []) names.set(p.id, p.name);
+  }
+  return rows.map((r) => ({
+    ...r,
+    parent: r.parent_space_id ? { id: r.parent_space_id, name: names.get(r.parent_space_id) ?? 'a community' } : null,
+    member_count: r.space_members?.[0]?.count ?? 0,
+  }));
 }
 
 /** Groups nested under a community/organization. */
