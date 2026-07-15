@@ -19,6 +19,14 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   const media = Array.isArray(p.details?.media)
     ? (p.details.media as FeedCardProps['media'])
     : undefined;
+  // Listings wear their offer: "Rent · $20/day", "Gift", "Sliding scale $20–$60".
+  const MODE_LABEL: Record<string, string> = {
+    gift: 'Gift', sale: 'For sale', sliding: 'Sliding scale',
+    trade: 'Trade', rent: 'Rent', lend: 'Lend', borrow: 'Looking to borrow',
+  };
+  const mode = typeof p.details?.mode === 'string' ? MODE_LABEL[p.details.mode as string] : undefined;
+  const price = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
+  const offerLine = mode ? (price && !price.toLowerCase().startsWith('sliding') ? `${mode} · ${price}` : mode === 'Sliding scale' && price ? price : mode) : undefined;
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;
@@ -31,7 +39,7 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     avatarMonogram: name.charAt(0).toUpperCase(),
     body: p.body,
     categoryIcons: icons,
-    eyebrow: (p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined,
+    eyebrow: offerLine ?? ((p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined),
     media,
     previews,
   };

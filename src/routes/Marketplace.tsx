@@ -1,83 +1,95 @@
-import { useMemo, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
-import MarketplaceCard, { MarketplaceCardCompact } from '../components/MarketplaceCard';
+import FeedCard from '../components/FeedCard';
+import type { MyceliumSignals } from '../components/EngagementFooter';
+import { useAuth } from '../auth/AuthProvider';
+import { ensureDirectChat } from '../lib/chatApi';
+import { loadFeed, postAreas, type FeedPost } from '../lib/postsApi';
+import { postToCard } from '../lib/feedMapping';
 import {
-  LISTINGS,
-  KIND_LABELS,
-  ListingKind,
-  ListingMode,
-} from '../data/marketplace';
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+} from '../lib/myceliumApi';
 import './Marketplace.css';
 
-// URL slug → ListingKind (or 'all')
-const URL_TO_KIND: Record<string, ListingKind | 'all'> = {
-  '': 'all',
-  goods: 'good',
-  services: 'service',
-  spaces: 'space',
-  iso: 'iso',
-};
-
-interface ActionItem {
-  icon: IconName;
-  label: string;
-  kind: 'search' | 'post' | 'mode-filter';
-  mode?: ListingMode;
-}
-
-const ACTIONS: ActionItem[] = [
-  { icon: 'search',         label: 'Search',  kind: 'search' },
-  { icon: 'plus',           label: 'Post',    kind: 'post'   },
-  { icon: 'heart-line',     label: 'Gift',    kind: 'mode-filter', mode: 'gift'     },
-  { icon: 'trade',          label: 'Trade',   kind: 'mode-filter', mode: 'trade'    },
-  { icon: 'rent',           label: 'Rent',    kind: 'mode-filter', mode: 'rent'     },
-  { icon: 'lend',           label: 'Lend',    kind: 'mode-filter', mode: 'lend'     },
-  { icon: 'lend',           label: 'Borrow',  kind: 'mode-filter', mode: 'borrow'   },
-  { icon: 'sliders',        label: 'Sliding', kind: 'mode-filter', mode: 'sliding'  },
-  { icon: 'store',          label: 'Sale',    kind: 'mode-filter', mode: 'sale'     },
+// Offer modes as stored by Compose: details.mode (marketplace listings) with
+// event_mode as the fallback for event cross-posts.
+type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding';
+const MODES: { mode: Mode; label: string; icon: IconName }[] = [
+  { mode: 'gift',    label: 'Gift',    icon: 'heart-line' },
+  { mode: 'trade',   label: 'Trade',   icon: 'trade' },
+  { mode: 'rent',    label: 'Rent',    icon: 'rent' },
+  { mode: 'lend',    label: 'Lend',    icon: 'lend' },
+  { mode: 'borrow',  label: 'Borrow',  icon: 'lend' },
+  { mode: 'sliding', label: 'Sliding', icon: 'sliders' },
+  { mode: 'sale',    label: 'Sale',    icon: 'store' },
 ];
 
-export default function Marketplace() {
-  const { kind: urlSlug = '' } = useParams();
-  const activeKind = URL_TO_KIND[urlSlug] ?? 'all';
-  const navigate = useNavigate();
+function postMode(p: FeedPost): Mode | null {
+  const m = p.details?.mode;
+  if (typeof m === 'string' && MODES.some((x) => x.mode === m)) return m as Mode;
+  if (p.event_mode === 'free') return 'gift';
+  if (p.event_mode === 'trade') return 'trade';
+  if (p.event_mode === 'paid') return 'sale';
+  return null;
+}
 
-  const [activeModes, setActiveModes] = useState<ListingMode[]>([]);
+/** The real Marketplace: every post shared to the marketplace area, under the
+ *  same trust lens as every other feed. Offers and asks alike — Gift, Trade,
+ *  Rent, Lend, Borrow, Sale — filtered by mode, searchable, one tap from
+ *  listing anything via Compose. */
+export default function Marketplace() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const me = user?.id ?? '';
+
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [ready, setReady] = useState(false);
+  const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
+  const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
+  const [activeModes, setActiveModes] = useState<Mode[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
-  const [postNote, setPostNote] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes('marketplace'));
+      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const ov = await loadEndorsements(feed, myc);
+      if (!live) return;
+      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed); setReady(true);
+    })();
+    return () => { live = false; };
+  }, []);
 
   const filtered = useMemo(() => {
-    let list = activeKind === 'all'
-      ? LISTINGS
-      : LISTINGS.filter((l) => l.kind === activeKind);
+    let list = posts;
     if (activeModes.length) {
-      list = list.filter((l) => activeModes.includes(l.mode));
+      list = list.filter((p) => {
+        const m = postMode(p);
+        return m != null && activeModes.includes(m);
+      });
     }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      list = list.filter(
-        (l) =>
-          l.title.toLowerCase().includes(q) ||
-          l.handle.toLowerCase().includes(q) ||
-          l.body.toLowerCase().includes(q)
-      );
+      list = list.filter((p) =>
+        (p.title ?? '').toLowerCase().includes(q)
+        || p.body.toLowerCase().includes(q)
+        || (p.author?.full_name ?? '').toLowerCase().includes(q)
+        || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [activeKind, activeModes, query]);
+  }, [posts, activeModes, query]);
 
-  const handleAction = (action: ActionItem) => {
-    if (action.kind === 'search') {
-      // Section-scoped smart search: opens pre-filtered to Marketplace.
-      navigate('/search?area=marketplace');
-    } else if (action.kind === 'post') {
-      navigate('/compose?area=marketplace');
-    } else if (action.kind === 'mode-filter' && action.mode) {
-      const mode = action.mode;
-      setActiveModes((modes) => modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode]);
-    }
-  };
+  const toggleMode = (m: Mode) =>
+    setActiveModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+
+  async function messageAuthor(authorId: string) {
+    try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
+    catch (e) { console.error(e); }
+  }
 
   return (
     <div className="mkt">
@@ -90,122 +102,92 @@ export default function Marketplace() {
           What members are <span className="display-italic">offering &amp; seeking.</span>
         </h1>
         <p className="mkt__sub">
-          Goods, services, spaces, and things people are looking for.
+          Goods, services, and things people are looking for.
           Trust the trader, not the platform.
         </p>
       </header>
 
-      {/* Kind tabs */}
-      <nav className="mkt__tabs">
-        {([
-          { slug: '',         label: 'All',      kind: 'all'     },
-          { slug: '/goods',    label: 'Goods',    kind: 'good'    },
-          { slug: '/services', label: 'Services', kind: 'service' },
-          { slug: '/spaces',   label: 'Spaces',   kind: 'space'   },
-          { slug: '/iso',      label: 'ISO',      kind: 'iso'     },
-        ] as const).map((t) => {
-          return (
-            <Link
-              key={t.label}
-              to={`/market${t.slug}`}
-              className={'mkt__tab' + (activeKind === t.kind ? ' is-active' : '')}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Action chips */}
+      {/* Action chips: search & list something, then the offer-mode filters */}
       <div className="mkt__actions h-scroll">
-        {ACTIONS.flatMap((a, i) => {
-          const active =
-            (a.kind === 'search' && showSearch) ||
-            (a.kind === 'mode-filter' && !!a.mode && activeModes.includes(a.mode));
-          const nodes = [];
-          // Insert a visual gap when transitioning from action buttons to mode filters
-          if (a.kind === 'mode-filter' && i > 0 && ACTIONS[i - 1].kind !== 'mode-filter') {
-            nodes.push(<div key={`${a.label}-spacer`} className="mkt__action-spacer" />);
-          }
-          nodes.push(
-            <button
-              key={a.label}
-              className={'mkt__action' + (active ? ' is-active' : '')}
-              onClick={() => handleAction(a)}
-            >
-              <span className="mkt__action-circle">
-                <Icon name={a.icon} size={14} />
-              </span>
-              <span className="mkt__action-label">{a.label}</span>
-            </button>
-          );
-          return nodes;
-        })}
+        <button
+          className={'mkt__action' + (showSearch ? ' is-active' : '')}
+          onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
+        >
+          <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
+          <span className="mkt__action-label">Search</span>
+        </button>
+        <button className="mkt__action" onClick={() => navigate('/compose?area=marketplace')}>
+          <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
+          <span className="mkt__action-label">List</span>
+        </button>
+        <div className="mkt__action-spacer" />
+        {MODES.map((m) => (
+          <button
+            key={m.mode}
+            className={'mkt__action' + (activeModes.includes(m.mode) ? ' is-active' : '')}
+            onClick={() => toggleMode(m.mode)}
+          >
+            <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
+            <span className="mkt__action-label">{m.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Search input (toggleable) */}
       {showSearch && (
         <div className="mkt__search">
           <Icon name="search" size={14} />
           <input
             autoFocus
             className="mkt__search-input"
-            placeholder="Search listings by title, handle, or description"
+            placeholder="Search listings — or use smart search for distance & trust"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <button className="mkt__search-smartlink" onClick={() => navigate('/search?area=marketplace')}>
+            <Icon name="sliders" size={12} /> Smart
+          </button>
           {query && (
-            <button
-              className="mkt__search-clear"
-              onClick={() => setQuery('')}
-              aria-label="Clear"
-            >
+            <button className="mkt__search-clear" onClick={() => setQuery('')} aria-label="Clear">
               <Icon name="close" size={12} />
             </button>
           )}
         </div>
       )}
 
-      {/* Result count */}
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
-        {activeKind !== 'all' && ` in ${KIND_LABELS[activeKind]}`}
       </p>
 
-      {/* Listings */}
       <section className="mkt__list">
-        {filtered.length === 0 && (
+        {!ready && <p className="mkt__empty-sub">Loading…</p>}
+        {ready && filtered.length === 0 && (
           <div className="mkt__empty">
             <Icon name="store" size={20} />
-            <p>
-              <span className="display-italic">Nothing here yet.</span>
-            </p>
+            <p><span className="display-italic">Nothing here yet.</span></p>
             <p className="mkt__empty-sub">
-              Try clearing filters or check back when the market is fuller.
+              {posts.length === 0
+                ? 'Be the first — tap List and offer something to the network.'
+                : 'Try clearing a filter or searching differently.'}
             </p>
           </div>
         )}
-        {/* First few cards full-size, rest compact (matches wireframe pattern) */}
-        {filtered.slice(0, 4).map((l) => (
-          <MarketplaceCard key={l.id} listing={l} />
+        {filtered.map((p) => (
+          <FeedCard
+            key={p.id}
+            {...postToCard(p, me || undefined)}
+            trusted={myMyc.has('profile:' + p.author_id)}
+            recommended={myRecs.has('post:' + p.id)}
+            mycelium={overlays[p.id]}
+            availability={{ trust: !!me && p.author_id !== me }}
+            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+            onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
+          />
         ))}
-        {filtered.length > 4 && (
-          <div className="mkt__compact-section">
-            <p className="eyebrow">More in this section</p>
-            {filtered.slice(4).map((l) => (
-              <MarketplaceCardCompact key={l.id} listing={l} />
-            ))}
-          </div>
-        )}
       </section>
-
-      {/* Post-listing toast */}
-      {postNote && (
-        <div className="mkt__toast">
-          Posting a listing is being set up &mdash; coming soon.
-        </div>
-      )}
 
       <footer className="mkt__end">
         <span className="eyebrow">End of market</span>

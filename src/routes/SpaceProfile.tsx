@@ -525,6 +525,21 @@ export default function SpaceProfile() {
           <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=events`)}>
             <Icon name="rsvp" size={14} /> Event
           </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=courses`)}>
+            <Icon name="graduation-cap" size={14} /> Course or training
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=library`)}>
+            <Icon name="book" size={14} /> Library piece
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=work`)}>
+            <Icon name="briefcase" size={14} /> Work — help wanted or offered
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=food`)}>
+            <Icon name="fork-spoon" size={14} /> Food
+          </button>
+          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=art`)}>
+            <Icon name="palette" size={14} /> Art
+          </button>
           {(space.kind === 'community' || space.kind === 'organization') && me && (
             adminTools ? (
               <button
