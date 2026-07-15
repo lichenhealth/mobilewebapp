@@ -6,6 +6,14 @@ import './Invite.css';
 
 type GiftTier = 'community' | 'concierge';
 
+// null = no end date. Labels double as email copy ("a year of Lichen").
+const GIFT_SPANS: { months: number | null; label: string }[] = [
+  { months: 3, label: '3 months' },
+  { months: 6, label: '6 months' },
+  { months: 12, label: '1 year' },
+  { months: null, label: 'No end date' },
+];
+
 export default function Invite() {
   const { loading, user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -16,6 +24,7 @@ export default function Invite() {
   // automatically when that email signs up — the invitee never sees the paywall.
   const [gift, setGift] = useState(false);
   const [giftTier, setGiftTier] = useState<GiftTier>('community');
+  const [giftMonths, setGiftMonths] = useState<number | null>(12);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -37,10 +46,10 @@ export default function Invite() {
     const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: to });
     if (((existing as unknown[] | null) ?? []).length > 0) {
       if (gifting) {
-        const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier });
+        const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
         setBusy(false);
         if (ge) { setError(ge.message); return; }
-        setMsg(`${to} is already on Lichen 🌿 — ${giftTier === 'concierge' ? 'Concierge' : 'Community'} membership gifted instead.`);
+        setMsg(`${to} is already on Lichen 🌿 — gifted ${giftMonths ? GIFT_SPANS.find((sp) => sp.months === giftMonths)?.label + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.`);
         setEmail(''); setNote('');
         return;
       }
@@ -55,11 +64,11 @@ export default function Invite() {
       await supabase.from('membership_gifts')
         .delete().eq('invitee_email', to.toLowerCase()).eq('status', 'pending');
       const { error: mg } = await supabase.from('membership_gifts')
-        .insert({ inviter_id: user.id, invitee_email: to.toLowerCase(), tier: giftTier });
+        .insert({ inviter_id: user.id, invitee_email: to.toLowerCase(), tier: giftTier, months: giftMonths });
       if (mg) { setBusy(false); setError(mg.message); return; }
     }
     const { error: e } = await supabase.functions.invoke('send-invite', {
-      body: { email: to, inviterName: fullName, note: note.trim(), giftTier: gifting ? giftTier : undefined },
+      body: { email: to, inviterName: fullName, note: note.trim(), giftTier: gifting ? giftTier : undefined, giftMonths: gifting ? giftMonths : undefined },
     });
     setBusy(false);
     if (e) {
@@ -69,7 +78,7 @@ export default function Invite() {
       return;
     }
     setMsg(gifting
-      ? `Invitation sent to ${to} — their ${giftTier === 'concierge' ? 'Concierge' : 'Community'} membership is waiting for them at signup.`
+      ? `Invitation sent to ${to} — ${giftMonths ? (GIFT_SPANS.find((sp) => sp.months === giftMonths)?.label + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
       : `Invitation sent to ${to}.`);
     setEmail('');
     setNote('');
@@ -126,6 +135,20 @@ export default function Invite() {
                     onClick={() => setGiftTier(t)}
                   >
                     {t === 'concierge' ? 'Concierge' : 'Community'}
+                  </button>
+                ))}
+              </div>
+            )}
+            {gift && (
+              <div className="invite__gift-tiers">
+                {GIFT_SPANS.map((sp) => (
+                  <button
+                    key={String(sp.months)}
+                    type="button"
+                    className={'invite__gift-tier' + (giftMonths === sp.months ? ' is-on' : '')}
+                    onClick={() => setGiftMonths(sp.months)}
+                  >
+                    {sp.label}
                   </button>
                 ))}
               </div>

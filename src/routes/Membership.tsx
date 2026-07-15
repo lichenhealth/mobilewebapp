@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import './Membership.css';
 
-type Sub = { tier: 'community' | 'concierge'; source: 'gift' | 'stripe'; status: string } | null;
+type Sub = { tier: 'community' | 'concierge'; source: 'gift' | 'stripe'; status: string; current_period_end: string | null } | null;
 
 const PLANS: { tier: 'community' | 'concierge'; label: string; price: string; blurb: string }[] = [
   { tier: 'community', label: 'Community', price: '$29', blurb: 'Your access to Lichen — the feed, spaces, marketplace, and your network.' },
@@ -24,7 +24,7 @@ export default function Membership() {
   const load = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
-      .from('subscriptions').select('tier, source, status').eq('profile_id', user.id).maybeSingle();
+      .from('subscriptions').select('tier, source, status, current_period_end').eq('profile_id', user.id).maybeSingle();
     setSub((data as Sub) ?? null);
     setLoaded(true);
   }, [user]);
@@ -63,7 +63,13 @@ export default function Membership() {
 
   if (loading || !loaded) return <div className="mship"><p className="mship__muted">Loading…</p></div>;
 
-  const activeTier = sub && sub.status === 'active' ? sub.tier : null;
+  // A time-boxed gift that has run out no longer counts as membership.
+  const giftEnded = !!sub && sub.source === 'gift' && !!sub.current_period_end
+    && new Date(sub.current_period_end) <= new Date();
+  const activeTier = sub && sub.status === 'active' && !giftEnded ? sub.tier : null;
+  const giftUntil = sub && sub.source === 'gift' && sub.current_period_end && !giftEnded
+    ? new Date(sub.current_period_end).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
 
   return (
     <div className="mship">
@@ -73,13 +79,18 @@ export default function Membership() {
       </header>
 
       {msg && <p className="mship__msg">{msg}</p>}
+      {giftEnded && (
+        <p className="mship__msg">
+          Your gifted membership ended on {new Date(sub!.current_period_end!).toLocaleDateString()} — we’d love to keep you.
+        </p>
+      )}
       {error && <p className="mship__error">{error}</p>}
 
       {activeTier ? (
         <div className="mship__current">
           <p className="mship__status">
             You’re a <strong>{activeTier === 'concierge' ? 'Concierge' : 'Community'}</strong> member
-            {sub!.source === 'gift' ? ' — gifted by Lichen' : ''}.
+            {sub!.source === 'gift' ? ' — gifted by Lichen' : ''}{giftUntil ? ` through ${giftUntil}` : ''}.
           </p>
           {sub!.source === 'stripe' ? (
             <button className="btn btn-ghost mship__btn" onClick={manage} disabled={busy === 'manage'}>

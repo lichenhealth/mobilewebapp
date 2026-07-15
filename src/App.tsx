@@ -86,8 +86,14 @@ export default function App() {
     if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
     let live = true;
     (async () => {
-      const { data } = await supabase.from('subscriptions').select('status').eq('profile_id', user.id).maybeSingle();
-      let ok = !!data && ['active', 'past_due'].includes((data as { status: string }).status);
+      const { data } = await supabase.from('subscriptions')
+        .select('status, source, current_period_end').eq('profile_id', user.id).maybeSingle();
+      const sub = data as { status: string; source: string; current_period_end: string | null } | null;
+      // Gifts can be time-boxed ("a year of Lichen") — an ended gift no
+      // longer passes. Stripe rows keep their own lifecycle via status.
+      const giftAlive = !sub || sub.source !== 'gift'
+        || !sub.current_period_end || new Date(sub.current_period_end) > new Date();
+      let ok = !!sub && ['active', 'past_due'].includes(sub.status) && giftAlive;
       if (!ok) {
         const { data: claimed } = await supabase.rpc('claim_membership_gift');
         ok = ((claimed as number | null) ?? 0) > 0;

@@ -32,14 +32,17 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string, giftTier: string) {
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null) {
   const signup = `${APP_URL}/signup`;
   const subject = `${inviterName} invited you to Lichen`;
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
   const giftLabel = giftTier === 'concierge' ? 'Concierge' : giftTier === 'community' ? 'Community' : '';
+  const span = giftMonths === 12 ? 'a year' : giftMonths === 1 ? 'a month' : giftMonths ? `${giftMonths} months` : '';
   const giftLine = giftLabel
-    ? `This invitation includes a gifted ${giftLabel} membership — Lichen is yours from the moment you sign up.`
+    ? (span
+        ? `This invitation includes a gift: ${span} of Lichen (${giftLabel} membership) — yours from the moment you sign up.`
+        : `This invitation includes a gifted ${giftLabel} membership — Lichen is yours from the moment you sign up.`)
     : '';
 
   const noteText = note ? `\n\nThey added a note:\n"${note}"\n` : '';
@@ -77,7 +80,7 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number };
   try {
     body = await req.json();
   } catch {
@@ -90,12 +93,14 @@ Deno.serve(async (req) => {
   // Cosmetic only — the gift itself lives in membership_gifts, written by the
   // admin-gated client flow; a forged giftTier here just decorates an email.
   const giftTier = (body.giftTier ?? '').trim().toLowerCase();
+  const giftMonths = Number.isFinite(body.giftMonths) && (body.giftMonths as number) > 0
+    ? Math.round(body.giftMonths as number) : null;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return json({ error: 'A valid recipient email is required.' }, 400);
   }
 
-  const { subject, text, html } = content(inviterName, note, giftTier);
+  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
