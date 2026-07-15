@@ -25,13 +25,13 @@ const CHIP_MODES: Record<Chip, Mode[]> = {
   lendborrow: ['lend', 'borrow'], iso: ['iso'], sliding: ['sliding'], sale: ['sale'],
 };
 const MODES: { chip: Chip; label: string; icon: IconName }[] = [
-  { chip: 'gift',       label: 'Gift',          icon: 'heart-line' },
-  { chip: 'trade',      label: 'Trade',         icon: 'trade' },
-  { chip: 'rent',       label: 'Rent',          icon: 'rent' },
-  { chip: 'lendborrow', label: 'Lend & Borrow', icon: 'lend' },
-  { chip: 'iso',        label: 'ISO',           icon: 'search' },
-  { chip: 'sliding',    label: 'Sliding',       icon: 'sliders' },
-  { chip: 'sale',       label: 'Sale',          icon: 'store' },
+  { chip: 'gift',       label: 'Gift',        icon: 'heart-line' },
+  { chip: 'trade',      label: 'Trade',       icon: 'trade' },
+  { chip: 'rent',       label: 'Rent',        icon: 'rent' },
+  { chip: 'lendborrow', label: 'Lend/Borrow', icon: 'lend' },
+  { chip: 'sliding',    label: 'Sliding',     icon: 'sliders' },
+  { chip: 'sale',       label: 'Sale',        icon: 'store' },
+  { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
 
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
