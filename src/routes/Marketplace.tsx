@@ -16,20 +16,28 @@ import './Marketplace.css';
 
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
-type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding';
-const MODES: { mode: Mode; label: string; icon: IconName }[] = [
-  { mode: 'gift',    label: 'Gift',    icon: 'heart-line' },
-  { mode: 'trade',   label: 'Trade',   icon: 'trade' },
-  { mode: 'rent',    label: 'Rent',    icon: 'rent' },
-  { mode: 'lend',    label: 'Lend',    icon: 'lend' },
-  { mode: 'borrow',  label: 'Borrow',  icon: 'lend' },
-  { mode: 'sliding', label: 'Sliding', icon: 'sliders' },
-  { mode: 'sale',    label: 'Sale',    icon: 'store' },
+type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding' | 'iso';
+// Lend & Borrow are two sides of one exchange — one chip shows both (the
+// card eyebrows tell you which side each post is). ISO = in-search-of asks.
+type Chip = 'gift' | 'trade' | 'rent' | 'lendborrow' | 'iso' | 'sliding' | 'sale';
+const CHIP_MODES: Record<Chip, Mode[]> = {
+  gift: ['gift'], trade: ['trade'], rent: ['rent'],
+  lendborrow: ['lend', 'borrow'], iso: ['iso'], sliding: ['sliding'], sale: ['sale'],
+};
+const MODES: { chip: Chip; label: string; icon: IconName }[] = [
+  { chip: 'gift',       label: 'Gift',          icon: 'heart-line' },
+  { chip: 'trade',      label: 'Trade',         icon: 'trade' },
+  { chip: 'rent',       label: 'Rent',          icon: 'rent' },
+  { chip: 'lendborrow', label: 'Lend & Borrow', icon: 'lend' },
+  { chip: 'iso',        label: 'ISO',           icon: 'search' },
+  { chip: 'sliding',    label: 'Sliding',       icon: 'sliders' },
+  { chip: 'sale',       label: 'Sale',          icon: 'store' },
 ];
 
+const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
 function postMode(p: FeedPost): Mode | null {
   const m = p.details?.mode;
-  if (typeof m === 'string' && MODES.some((x) => x.mode === m)) return m as Mode;
+  if (typeof m === 'string' && ALL_MODES.includes(m as Mode)) return m as Mode;
   if (p.event_mode === 'free') return 'gift';
   if (p.event_mode === 'trade') return 'trade';
   if (p.event_mode === 'paid') return 'sale';
@@ -51,7 +59,7 @@ export default function Marketplace() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
-  const [activeModes, setActiveModes] = useState<Mode[]>([]);
+  const [activeChips, setActiveChips] = useState<Chip[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -69,10 +77,11 @@ export default function Marketplace() {
 
   const filtered = useMemo(() => {
     let list = posts;
-    if (activeModes.length) {
+    if (activeChips.length) {
+      const wanted = new Set(activeChips.flatMap((c) => CHIP_MODES[c]));
       list = list.filter((p) => {
         const m = postMode(p);
-        return m != null && activeModes.includes(m);
+        return m != null && wanted.has(m);
       });
     }
     if (query.trim()) {
@@ -84,10 +93,10 @@ export default function Marketplace() {
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, activeModes, query]);
+  }, [posts, activeChips, query]);
 
-  const toggleMode = (m: Mode) =>
-    setActiveModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+  const toggleChip = (c: Chip) =>
+    setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -126,9 +135,9 @@ export default function Marketplace() {
         <div className="mkt__action-spacer" />
         {MODES.map((m) => (
           <button
-            key={m.mode}
-            className={'mkt__action' + (activeModes.includes(m.mode) ? ' is-active' : '')}
-            onClick={() => toggleMode(m.mode)}
+            key={m.chip}
+            className={'mkt__action' + (activeChips.includes(m.chip) ? ' is-active' : '')}
+            onClick={() => toggleChip(m.chip)}
           >
             <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
             <span className="mkt__action-label">{m.label}</span>

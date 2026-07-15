@@ -62,7 +62,7 @@ export default function Compose() {
   const [evCategory, setEvCategory] = useState<EventCategory>('experiences');
   // Unified offer mode: events use free|trade|paid; marketplace-only listings
   // additionally get lend|rent (you can't rent someone an event).
-  type OfferMode = EventMode | 'lend' | 'rent' | 'borrow';
+  type OfferMode = EventMode | 'lend' | 'rent' | 'borrow' | 'iso';
   const [evMode, setEvMode] = useState<OfferMode>('free');
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
@@ -146,7 +146,7 @@ export default function Compose() {
         // Marketplace listings carry their mode in details.mode only.
         const back: Record<string, OfferMode> = {
           gift: 'free', sale: 'paid', sliding: 'paid',
-          trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow',
+          trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow', iso: 'iso',
         };
         if (back[d.mode]) setEvMode(back[d.mode]);
       }
@@ -493,7 +493,7 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Gift, trade, lend, rent, borrow, or paid?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
           <div className="cmp__chips">
             <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
@@ -502,6 +502,7 @@ export default function Compose() {
                 <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => setEvMode('lend')}>Lend</button>
                 <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>
                 <button className={'cmp__chip' + (evMode === 'borrow' ? ' is-on' : '')} onClick={() => setEvMode('borrow')}>Borrow</button>
+                <button className={'cmp__chip' + (evMode === 'iso' ? ' is-on' : '')} onClick={() => setEvMode('iso')} title="In search of — you're looking to buy or find this">ISO</button>
               </>
             )}
             <button className={'cmp__chip' + (evMode === 'paid' ? ' is-on' : '')} onClick={() => setEvMode('paid')}>Paid</button>
@@ -526,8 +527,8 @@ export default function Compose() {
               {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
             </>
           )}
-          {(evMode === 'lend' || evMode === 'rent' || evMode === 'borrow') && (
-            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={evMode === 'rent' ? 'Rate (e.g. $20/day)' : evMode === 'borrow' ? 'For how long? (e.g. just the weekend)' : 'Terms (e.g. return within a week)'} />
+          {(evMode === 'lend' || evMode === 'rent' || evMode === 'borrow' || evMode === 'iso') && (
+            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={evMode === 'rent' ? 'Rate (e.g. $20/day)' : evMode === 'borrow' ? 'For how long? (e.g. just the weekend)' : evMode === 'iso' ? 'Budget (optional — e.g. up to $200)' : 'Terms (e.g. return within a week)'} />
           )}
           {evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
