@@ -95,6 +95,19 @@ export default function Compose() {
   // Edit mode: ?post=<id> loads an existing post (author only) and submit
   // updates in place instead of creating.
   const editPostId = params.get('post');
+
+  /** After posting, land back where the + was pressed: the space's profile,
+   *  else the section (Library → /library), else Home. */
+  const AREA_HOME: Partial<Record<ServiceArea, string>> = {
+    marketplace: '/market', courses: '/courses', library: '/library',
+    events: '/events', work: '/work', places: '/places',
+  };
+  function afterPostDestination(isEventPost: boolean): string {
+    if (presetSpace) return `/spaces/${presetSpace}`;
+    if (isEventPost) return '/events';
+    const a = params.get('area') as ServiceArea | null;
+    return (a && AREA_HOME[a]) || '/home';
+  }
   const editing = !!editPostId;
   const [editReady, setEditReady] = useState(!editing);
   const editLinkedEvent = useRef<string | null>(null);
@@ -235,8 +248,10 @@ export default function Compose() {
     setMedia((m) => m.filter((_, idx) => idx !== i));
   }
 
+  const canPost = !!(body.trim() || title.trim() || media.length > 0);
+
   async function submit() {
-    if (!body.trim()) { setError('Add a few words first.'); return; }
+    if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
     if (!hasAudience) { setError('Pick at least one audience.'); return; }
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
@@ -346,7 +361,7 @@ export default function Compose() {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
         throw postErr;
       }
-      navigate(isEvent ? '/events' : '/home');
+      navigate(afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
       setError((e as Error)?.message || 'Couldn’t post. Please try again.');
@@ -544,7 +559,12 @@ export default function Compose() {
         </div>
       )}
 
-      <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !body.trim()}>
+      {/* Rejections must be visible WHERE you clicked — a silent disabled
+          button reads as a freeze (this hid 'add a few words' from an
+          audio-only post until it was fixed). */}
+      {error && <p className="cmp__error">{error}</p>}
+      {uploading && <p className="cmp__error">Uploading media… one moment.</p>}
+      <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !canPost}>
         {busy ? (editing ? 'Saving…' : 'Posting…') : (editing ? 'Save changes' : 'Post')}
       </button>
     </div>
