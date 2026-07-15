@@ -5,6 +5,7 @@ import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
+import { loadMySaved, setSaved } from '../lib/savedApi';
 import { loadFeed, postAreas, type FeedPost } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
@@ -47,6 +48,7 @@ export default function Marketplace() {
   const [ready, setReady] = useState(false);
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [activeModes, setActiveModes] = useState<Mode[]>([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -56,10 +58,10 @@ export default function Marketplace() {
     let live = true;
     (async () => {
       const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes('marketplace'));
-      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
-      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed); setReady(true);
+      setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
   }, []);
@@ -182,6 +184,8 @@ export default function Marketplace() {
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            saved={mySaves.has('post:' + p.id)}
+            onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}

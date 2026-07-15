@@ -11,7 +11,7 @@ import Directory from './routes/Directory';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
-import { Saved } from './routes/Stubs';
+import Saved from './routes/Saved';
 
 // mapbox-gl is heavy — the Maps screen loads as its own chunk on first visit.
 const MapView = lazy(() => import('./routes/MapView'));

@@ -11,6 +11,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { ensureDirectChat } from '../lib/chatApi';
+import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Home.css';
 
@@ -41,15 +42,16 @@ export default function Home() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   useEffect(() => {
     (async () => {
       const feed = await loadFeed();
-      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       // Set posts last so cards mount once, with engagement state already in hand.
-      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(feed);
+      setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
   }, []);
 
@@ -78,6 +80,8 @@ export default function Home() {
             availability={{ trust: p.author_id !== user?.id }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            saved={mySaves.has('post:' + p.id)}
+            onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
             onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}

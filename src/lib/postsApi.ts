@@ -198,6 +198,14 @@ export async function loadMyRsvpStatuses(eventIds: string[], me: string): Promis
 
 const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence, lat, lng)';
 
+/** A set of posts by id (the Saved shelf). RLS applies — hidden ones drop. */
+export async function loadPostsByIds(ids: string[]): Promise<FeedPost[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from('posts').select(FEED_SELECT).in('id', ids);
+  if (error) { console.warn('loadPostsByIds', error.message); return []; }
+  return (data as unknown as FeedPost[] | null) ?? [];
+}
+
 /** One post (the event page's About). RLS applies. */
 export async function loadPost(id: string): Promise<FeedPost | null> {
   const { data, error } = await supabase.from('posts').select(FEED_SELECT).eq('id', id).maybeSingle();

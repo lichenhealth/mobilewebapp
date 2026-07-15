@@ -12,6 +12,7 @@ import {
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from './EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
 import './ContributionsFeed.css';
@@ -49,16 +50,17 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   useEffect(() => {
     let live = true;
     (async () => {
       const feed = await loadAuthorFeed({ profileId, spaceId });
-      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
-      setPosts(feed); setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setReady(true);
+      setPosts(feed); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setReady(true);
     })();
     return () => { live = false; };
   }, [profileId, spaceId]);
@@ -133,6 +135,8 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            saved={mySaves.has('post:' + p.id)}
+            onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}
