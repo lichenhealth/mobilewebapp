@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9H3aS7NKmTucgBZvWfKOg0arREEJs2BNb3Z3XkS7cPOfxA6WrHMgb3jl8vpZycz
+\restrict zT5yePljBe442s2NSlckxc3vXDV5bfQAkwqo8NmFOR3nEa4bRjFERLgZDIxY00K
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1759,6 +1759,38 @@ CREATE TABLE public.chats (
 ALTER TABLE public.chats OWNER TO postgres;
 
 --
+-- Name: collection_items; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.collection_items (
+    collection_id uuid NOT NULL,
+    target_type text DEFAULT 'post'::text NOT NULL,
+    target_id uuid NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    added_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT collection_items_target_type_check CHECK ((target_type = 'post'::text))
+);
+
+
+ALTER TABLE public.collection_items OWNER TO postgres;
+
+--
+-- Name: collections; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.collections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id uuid NOT NULL,
+    name text NOT NULL,
+    description text,
+    is_public boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.collections OWNER TO postgres;
+
+--
 -- Name: event_attendees; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2241,6 +2273,22 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: collection_items collection_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.collection_items
+    ADD CONSTRAINT collection_items_pkey PRIMARY KEY (collection_id, target_type, target_id);
+
+
+--
+-- Name: collections collections_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.collections
+    ADD CONSTRAINT collections_pkey PRIMARY KEY (id);
 
 
 --
@@ -3022,6 +3070,22 @@ ALTER TABLE ONLY public.chats
 
 
 --
+-- Name: collection_items collection_items_collection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.collection_items
+    ADD CONSTRAINT collection_items_collection_id_fkey FOREIGN KEY (collection_id) REFERENCES public.collections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: collections collections_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.collections
+    ADD CONSTRAINT collections_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: event_attendees event_attendees_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3618,6 +3682,66 @@ ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: collection_items citems: read via collection; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "citems: read via collection" ON public.collection_items FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.collections c
+  WHERE ((c.id = collection_items.collection_id) AND ((c.owner_id = auth.uid()) OR c.is_public)))));
+
+
+--
+-- Name: collection_items citems: write own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "citems: write own" ON public.collection_items TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.collections c
+  WHERE ((c.id = collection_items.collection_id) AND (c.owner_id = auth.uid()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM public.collections c
+  WHERE ((c.id = collection_items.collection_id) AND (c.owner_id = auth.uid())))));
+
+
+--
+-- Name: collection_items; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.collection_items ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: collections; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: collections collections: delete own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "collections: delete own" ON public.collections FOR DELETE TO authenticated USING ((owner_id = auth.uid()));
+
+
+--
+-- Name: collections collections: insert own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "collections: insert own" ON public.collections FOR INSERT TO authenticated WITH CHECK ((owner_id = auth.uid()));
+
+
+--
+-- Name: collections collections: read own or public; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "collections: read own or public" ON public.collections FOR SELECT TO authenticated USING (((owner_id = auth.uid()) OR is_public));
+
+
+--
+-- Name: collections collections: update own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "collections: update own" ON public.collections FOR UPDATE TO authenticated USING ((owner_id = auth.uid())) WITH CHECK ((owner_id = auth.uid()));
+
 
 --
 -- Name: event_attendees; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -4745,6 +4869,24 @@ GRANT ALL ON TABLE public.chats TO service_role;
 
 
 --
+-- Name: TABLE collection_items; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.collection_items TO anon;
+GRANT ALL ON TABLE public.collection_items TO authenticated;
+GRANT ALL ON TABLE public.collection_items TO service_role;
+
+
+--
+-- Name: TABLE collections; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.collections TO anon;
+GRANT ALL ON TABLE public.collections TO authenticated;
+GRANT ALL ON TABLE public.collections TO service_role;
+
+
+--
 -- Name: TABLE event_attendees; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -5068,7 +5210,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9H3aS7NKmTucgBZvWfKOg0arREEJs2BNb3Z3XkS7cPOfxA6WrHMgb3jl8vpZycz
+\unrestrict zT5yePljBe442s2NSlckxc3vXDV5bfQAkwqo8NmFOR3nEa4bRjFERLgZDIxY00K
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
