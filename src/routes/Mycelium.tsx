@@ -14,6 +14,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
@@ -45,6 +46,7 @@ export default function Mycelium() {
   const { type: urlSlug = '' } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -98,7 +100,8 @@ export default function Mycelium() {
           onTrust: (on: boolean) => { void setTrust('profile', p.author_id, on).catch(console.error); },
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
           saved: mySaves.has('post:' + p.id),
-          onSave: (on: boolean) => { void setSaved('post', p.id, on).catch(console.error); },
+          onSave: (on: boolean) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); },
+          extraMenuItems: user ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined,
           viewerIsAuthor: p.author_id === user?.id,
           onManage: p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined,
           onEdit: !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined,
@@ -107,7 +110,7 @@ export default function Mycelium() {
           onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));
-  }, [posts, myWeb, myMyc, myRecs, mySaves, overlays, user]);
+  }, [posts, myWeb, myMyc, myRecs, mySaves, overlays, user, promptSaved, openPicker]);
 
   const visible = useMemo(
     () => items.filter((it) =>

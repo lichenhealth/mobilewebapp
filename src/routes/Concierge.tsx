@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
@@ -17,11 +17,15 @@ import {
   type CarePostRow, type Dimension, type OnCallCaregiver,
 } from '../lib/conciergeApi';
 import { minToLabel } from '../lib/calendarApi';
+import {
+  loadCareLinks, inviteCare, approveCare, removeCare, cancelCareInvite,
+  copyCareInvite, sendCareInviteEmail, type CareLink, type CareInvite,
+} from '../lib/careTeamApi';
 import { occursOn } from '../lib/recurrence';
 import { useAuth } from '../auth/AuthProvider';
 import './Concierge.css';
 
-type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
+type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'team';
 
 /** Urgent Care: who on the subject's care team is on call RIGHT NOW
  *  (availability_windows kind='on_call' via the on_call_roster RPC), with real
@@ -398,6 +402,168 @@ function ConciergeEmpty({ icon, title, sub, action }: {
   );
 }
 
+/** Care Team — the directory behind the chat's info circle. On your own
+ *  Concierge you manage the team right here (invite by email, approve,
+ *  remove); viewing a client's Concierge it stays a read-only roster —
+ *  who joins their team is the patient's call. */
+function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string }) {
+  const navigate = useNavigate();
+  const managing = !!me && subjectId === me;
+
+  const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
+  const [links, setLinks] = useState<CareLink[]>([]);
+  const [invites, setInvites] = useState<CareInvite[]>([]);
+  const [myName, setMyName] = useState('');
+  const [ready, setReady] = useState(false);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    const [r, care, prof] = await Promise.all([
+      loadOnCallRoster(subjectId).catch(() => [] as OnCallCaregiver[]),
+      managing ? loadCareLinks().catch(() => ({ links: [], invites: [] })) : Promise.resolve({ links: [], invites: [] }),
+      managing ? supabase.from('profiles').select('full_name').eq('id', me).maybeSingle() : Promise.resolve(null),
+    ]);
+    setRoster(r);
+    setLinks(care.links.filter((l) => l.patient_id === me));
+    setInvites(care.invites.filter((i) => i.role === 'caregiver'));
+    setMyName((prof?.data as { full_name: string | null } | null)?.full_name ?? '');
+    setReady(true);
+  }, [subjectId, me, managing]);
+  useEffect(() => { setReady(false); void load(); }, [load]);
+
+  async function act(fn: () => Promise<void>) {
+    setBusy(true); setMsg('');
+    try { await fn(); await load(); } catch (e) { setMsg((e as Error)?.message || 'Something went wrong.'); }
+    setBusy(false);
+  }
+
+  async function invite() {
+    setBusy(true); setMsg('');
+    const res = await inviteCare('caregiver', email);
+    setBusy(false);
+    setMsg(res.message);
+    if (res.ok) { setEmail(''); void load(); }
+  }
+
+  // Rich roster data (avatar/headline/phone) exists for ACTIVE caregivers;
+  // pending links render from the care rows alone.
+  const rosterMap = new Map(roster.map((r) => [r.id, r]));
+  const active = links.filter((l) => l.status === 'active');
+  const pending = links.filter((l) => l.status === 'pending');
+  // Client view has no care links — the roster itself is the list.
+  const activeRows = managing
+    ? active.map((l) => ({ key: l.id, linkId: l.id, personId: l.caregiver_id, name: l.caregiverName, rich: rosterMap.get(l.caregiver_id) }))
+    : roster.map((r) => ({ key: r.id, linkId: '', personId: r.id, name: r.name, rich: r as OnCallCaregiver | undefined }));
+
+  return (
+    <section className="conc__team">
+      <p className="conc__team-lead">
+        {managing
+          ? 'The people who help care for you. Invite by email — they approve before joining.'
+          : 'The people actively caring here. Tap a name for their profile.'}
+      </p>
+      {!ready && <p className="conc__team-muted">Loading…</p>}
+
+      {ready && activeRows.length === 0 && pending.length === 0 && invites.length === 0 && (
+        <p className="conc__team-muted">
+          {managing ? 'No one on your care team yet — invite your first caregiver below.'
+            : 'No active care team yet.'}
+        </p>
+      )}
+
+      {ready && activeRows.map((row) => (
+        <div className="conc__team-row" key={row.key}>
+          <button className="conc__team-who" onClick={() => navigate(`/members/${row.personId}`)}>
+            <span
+              className="urgent__avatar urgent__avatar--sm"
+              style={row.rich?.avatarUrl ? undefined : { background: colorFor(row.personId) }}
+              aria-hidden
+            >
+              {row.rich?.avatarUrl ? <img src={row.rich.avatarUrl} alt="" /> : monogramFor(row.name)}
+            </span>
+            <span className="conc__team-text">
+              <span className="conc__team-name">{row.name}</span>
+              <span className="conc__team-sub">
+                Caregiver{row.rich?.headline ? ` · ${row.rich.headline}` : ''}
+                {row.rich && row.rich.windows.length > 0 ? ' · takes on-call shifts' : ''}
+              </span>
+            </span>
+          </button>
+          <span className="conc__team-actions">
+            {row.rich?.phone && <a className="btn conc__team-btn" href={`tel:${row.rich.phone}`}>Call</a>}
+            {row.rich?.phone && <a className="btn conc__team-btn" href={`sms:${row.rich.phone}`}>Text</a>}
+            {managing && (
+              <button className="btn conc__team-btn" disabled={busy}
+                onClick={() => { void act(() => removeCare(row.linkId)); }}>Remove</button>
+            )}
+          </span>
+        </div>
+      ))}
+
+      {ready && managing && pending.map((l) => {
+        const incoming = l.initiated_by !== me;
+        return (
+          <div className="conc__team-row" key={l.id}>
+            <button className="conc__team-who" onClick={() => navigate(`/members/${l.caregiver_id}`)}>
+              <span className="urgent__avatar urgent__avatar--sm"
+                style={{ background: colorFor(l.caregiver_id) }} aria-hidden>
+                {monogramFor(l.caregiverName)}
+              </span>
+              <span className="conc__team-text">
+                <span className="conc__team-name">{l.caregiverName}</span>
+                <span className="conc__team-sub">{incoming ? 'wants to join your care team' : 'invited · awaiting their approval'}</span>
+              </span>
+            </button>
+            <span className="conc__team-actions">
+              {incoming && (
+                <button className="btn btn-primary conc__team-btn" disabled={busy}
+                  onClick={() => { void act(() => approveCare(l.id)); }}>Approve</button>
+              )}
+              <button className="btn conc__team-btn" disabled={busy}
+                onClick={() => { void act(() => removeCare(l.id)); }}>{incoming ? 'Decline' : 'Cancel'}</button>
+            </span>
+          </div>
+        );
+      })}
+
+      {ready && managing && invites.map((i) => (
+        <div className="conc__team-row" key={i.id}>
+          <span className="conc__team-who conc__team-who--static">
+            <span className="urgent__avatar urgent__avatar--sm"
+              style={{ background: 'var(--bone-edge)' }} aria-hidden>@</span>
+            <span className="conc__team-text">
+              <span className="conc__team-name">{i.email}</span>
+              <span className="conc__team-sub">invited to Lichen — waiting for them to sign up</span>
+            </span>
+          </span>
+          <span className="conc__team-actions">
+            <button className="btn conc__team-btn" disabled={busy}
+              onClick={() => { void sendCareInviteEmail(i.email, 'caregiver', myName).then(setMsg); }}>Email</button>
+            <button className="btn conc__team-btn" disabled={busy}
+              onClick={() => { void copyCareInvite(i.email).then(setMsg); }}>Copy</button>
+            <button className="btn conc__team-btn" disabled={busy}
+              onClick={() => { void act(() => cancelCareInvite(i.id)); }}>Cancel</button>
+          </span>
+        </div>
+      ))}
+
+      {ready && managing && (
+        <div className="conc__team-add">
+          <input className="conc__team-input" type="email" value={email}
+            onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && email.trim() && !busy) void invite(); }}
+            placeholder="Add a caregiver by email" />
+          <button className="btn btn-primary conc__team-btn" disabled={busy || !email.trim()}
+            onClick={() => { void invite(); }}>Invite</button>
+        </div>
+      )}
+      {msg && <p className="conc__team-msg">{msg}</p>}
+    </section>
+  );
+}
+
 export default function Concierge() {
   const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
   const navigate = useNavigate();
@@ -597,6 +763,12 @@ export default function Concierge() {
         >
           Urgent Care
         </button>
+        <button
+          className={'conc__tab' + (activeTab === 'team' ? ' is-active' : '')}
+          onClick={() => handleTabClick('team')}
+        >
+          Care Team
+        </button>
       </nav>
 
       {/* Tool row (search · AI brain · scope · pagination) */}
@@ -784,13 +956,14 @@ export default function Concierge() {
 
           {careReady && careAllowed && careChatId && (
             <div className="conc__care" style={{ top: careTop }}>
-              <ChatConversation chatId={careChatId} me={me} showIntro={false} />
+              <ChatConversation chatId={careChatId} me={me} showIntro={false} onInfo={() => handleTabClick('team')} />
             </div>
           )}
         </>
       )}
 
       {activeTab === 'urgent' && <UrgentCare subjectId={subjectId} me={me} />}
+      {activeTab === 'team' && <CareTeamDirectory subjectId={subjectId} me={me} />}
     </div>
   );
 }

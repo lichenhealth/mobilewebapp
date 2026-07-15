@@ -12,6 +12,7 @@ import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
 import Saved from './routes/Saved';
+import CollectionPage from './routes/CollectionPage';
 
 // mapbox-gl is heavy — the Maps screen loads as its own chunk on first visit.
 const MapView = lazy(() => import('./routes/MapView'));
@@ -40,6 +41,7 @@ import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
+import { CollectPromptProvider } from './collections/CollectPrompt';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -65,6 +67,7 @@ export default function App() {
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
 
   return (
+    <CollectPromptProvider>
     <div className="app-shell">
       <ScrollToTop />
       {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
@@ -87,6 +90,7 @@ export default function App() {
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/saved"     element={<Saved />} />
+          <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/maps"      element={
             <Suspense fallback={<div className="scroll-view"><p style={{ padding: 'var(--s-6)', color: 'var(--ink-muted)' }}>Loading map…</p></div>}>
               <MapView />
@@ -162,7 +166,7 @@ export default function App() {
             <AreaFeed area="library" icon="book" crumb="Library"
               title="Lichen" italic="Library."
               sub="Essays, field guides, and zines on land, food, and care."
-              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." mediaLenses />
+              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." mediaLenses collections />
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
@@ -172,5 +176,6 @@ export default function App() {
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {!isChatThread && !isAuth && <InstallPrompt />}
     </div>
+    </CollectPromptProvider>
   );
 }

@@ -1,0 +1,62 @@
+/* Save→organize bridge: after-save toast + the app-wide folder picker.
+   The toast speaks the profile-dropdown's language — bone card, soft edge,
+   the same rise — and appears right where the Save tap happened. */
+.collect__toast {
+  position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%); z-index: 80;
+  display: flex; align-items: center; gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px; border-radius: var(--r-lg);
+  background: var(--bone); color: var(--ink);
+  border: 1px solid var(--bone-edge);
+  font-size: 13px; box-shadow: var(--sh-pop);
+  animation: notif-rise 160ms var(--ease-out);
+}
+.collect__toast--anchored {
+  bottom: auto;
+  transform: translate(-50%, -100%);   /* sits just above the tapped spot */
+}
+.collect__toast svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+.collect__toast span { white-space: nowrap; color: var(--ink-soft); }
+.collect__toast button {
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--peach-deep, var(--peach)); font-size: 13px; font-weight: 600; white-space: nowrap;
+  padding: 0;
+}
+.collect__toast-x { display: inline-flex; padding: 2px; color: var(--ink-faint) !important; }
+.collect__toast--note { gap: 0; color: var(--ink); }
+
+.collect__scrim { position: fixed; inset: 0; z-index: 81; background: rgb(18 24 28 / 0.3); }
+.collect__picker {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 82;
+  width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop); padding: var(--s-4);
+}
+.collect__picker h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.collect__muted { font-size: 12px; color: var(--ink-soft); margin: 0; }
+.collect__row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 10px 12px; border-radius: var(--r-md); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.collect__row:hover { border-color: var(--peach); }
+.collect__row svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+.collect__row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collect__row em {
+  font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint);
+}
+.collect__new { display: flex; gap: 6px; margin-top: 4px; }
+.collect__new input {
+  flex: 1; padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink);
+}
+.collect__new button {
+  padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--peach); border: 0; color: var(--bone);
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.collect__new button:disabled { opacity: 0.5; }

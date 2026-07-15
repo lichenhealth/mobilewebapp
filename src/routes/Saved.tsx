@@ -12,6 +12,8 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPosts, setSaved } from '../lib/savedApi';
+import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
+import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 
@@ -21,6 +23,7 @@ const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
  *  under the platform's standard lenses. Nobody else can see it. */
 export default function Saved() {
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -31,6 +34,11 @@ export default function Saved() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   // Unsaving keeps the card mounted this visit (no jumpy list); it's gone next time.
   const [unsaved, setUnsaved] = useState<Set<string>>(new Set());
+  // Folders (collections): strip up top, add-to picker per card.
+  const [collections, setCollections] = useState<CollectionRow[]>([]);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
   const [content, setContent] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
@@ -38,10 +46,10 @@ export default function Saved() {
     let live = true;
     (async () => {
       const shelf = await loadSavedPosts();
-      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
       const ov = await loadEndorsements(shelf, myc);
       if (!live) return;
-      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(shelf); setReady(true);
+      setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(shelf); setReady(true);
     })();
     return () => { live = false; };
   }, [me]);
@@ -63,6 +71,16 @@ export default function Saved() {
       .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
   }, [posts, content, areas]);
 
+  async function makeFolder() {
+    const nm = newFolderName.trim();
+    if (!nm) return;
+    try {
+      await createCollection(nm);
+      setCollections(await listMyCollections());
+      setNewFolderOpen(false); setNewFolderName('');
+    } catch (e) { console.error(e); }
+  }
+
   async function messageAuthor(otherId: string) {
     try { navigate(`/chat/${await ensureDirectChat(otherId)}`); }
     catch (e) { console.error(e); }
@@ -80,6 +98,37 @@ export default function Saved() {
           Things you wanted to come back to — kept quietly in one place, visible only to you.
         </p>
       </header>
+
+      {/* Folders — private collections; published ones double as Library playlists. */}
+      {me && (
+        <div className="myc__kinds h-scroll">
+          {collections.map((c) => (
+            <button key={c.id} className="myc__kind" onClick={() => navigate(`/collections/${c.id}`)}>
+              <span className="myc__kind-circle">
+                <Icon name={c.is_public ? 'book' : 'bookmark'} size={13} />
+              </span>
+              <span className="myc__kind-label">{c.name} · {c.item_count}</span>
+            </button>
+          ))}
+          {!newFolderOpen ? (
+            <button className="myc__kind" onClick={() => setNewFolderOpen(true)}>
+              <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
+              <span className="myc__kind-label">New folder</span>
+            </button>
+          ) : (
+            <span className="saved__newfolder">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void makeFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
+                placeholder="Folder name"
+              />
+              <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
+            </span>
+          )}
+        </div>
+      )}
 
       {posts.length > 0 && <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />}
 
@@ -142,14 +191,20 @@ export default function Saved() {
             onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onSave={(on) => {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
-              void setSaved('post', p.id, on).catch(console.error);
+              void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
             }}
+            extraMenuItems={[{
+              label: 'Add to collection…',
+              hint: collections.length ? undefined : 'Create your first folder above',
+              onClick: () => openPicker(p.id),
+            }]}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
       </section>
+
     </div>
   );
 }

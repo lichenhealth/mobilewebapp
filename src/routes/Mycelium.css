@@ -135,3 +135,51 @@
   margin-bottom: var(--s-2);
 }
 .myc__empty p { font-size: 12px; font-weight: 300; }
+
+/* ── Saved shelf: folders + add-to-collection picker (shares myc__ vocabulary) ── */
+.saved__newfolder { display: inline-flex; align-items: center; gap: 6px; }
+.saved__newfolder input {
+  padding: 7px 12px; border-radius: var(--r-full);
+  background: var(--bone); border: 1px solid var(--peach);
+  font-size: 12px; color: var(--ink); width: 150px;
+}
+.saved__newfolder button {
+  padding: 7px 12px; border-radius: var(--r-full);
+  background: var(--peach); border: 0; color: var(--bone);
+  font-size: 12px; cursor: pointer;
+}
+.saved__newfolder button:disabled { opacity: 0.5; }
+.saved__toast { font-size: 12px; color: var(--peach-deep, var(--peach)); margin: var(--s-1) 0; }
+.saved__scrim { position: fixed; inset: 0; z-index: 60; background: rgb(18 24 28 / 0.3); }
+.saved__picker {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 61;
+  width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop); padding: var(--s-4);
+}
+.saved__picker h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.saved__picker-row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 10px 12px; border-radius: var(--r-md); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.saved__picker-row:hover { border-color: var(--peach); }
+.saved__picker-row svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+.saved__picker-row span { flex: 1; min-width: 0; }
+.saved__picker-row em {
+  font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint);
+}
+.saved__picker-new { display: flex; gap: 6px; margin-top: 4px; }
+.saved__picker-new input {
+  flex: 1; padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink);
+}
+.saved__picker-new button {
+  padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--peach); border: 0; color: var(--bone);
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.saved__picker-new button:disabled { opacity: 0.5; }
