@@ -23,6 +23,9 @@ type SupporterRow = {
   email: string | null;
 };
 
+// A gift riding an invitation, waiting for that email to sign up.
+type PendingGift = { id: string; invitee_email: string; tier: Tier; created_at: string };
+
 const TIERS: { id: Tier; label: string; price: string }[] = [
   { id: 'community', label: 'Community', price: '$29/mo' },
   { id: 'concierge', label: 'Concierge', price: '$99/mo' },
@@ -38,9 +41,17 @@ export default function AdminSupporters() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
+  const [pending, setPending] = useState<PendingGift[]>([]);
+
   const load = useCallback(async () => {
     // Admin-only RPC: returns supporters with member name + email. Regular
     // members can no longer read emails via a direct table query.
+    const { data: pg } = await supabase
+      .from('membership_gifts')
+      .select('id, invitee_email, tier, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    setPending(((pg as PendingGift[] | null) ?? []));
     const { data, error: e } = await supabase.rpc('admin_list_supporters');
     if (e) setError(e.message);
     else setRows(((data as SupporterRow[] | null) ?? []).map((d) => ({
@@ -65,6 +76,12 @@ export default function AdminSupporters() {
     setMsg(`Gifted ${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
     setEmail('');
     load();
+  }
+
+  async function cancelGift(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('membership_gifts').delete().eq('id', id);
+    if (e) setError(e.message); else load();
   }
 
   async function revoke(em: string | null) {
@@ -113,6 +130,30 @@ export default function AdminSupporters() {
         </button>
       </div>
       {msg && <p className="adminc__msg">{msg}</p>}
+
+      {pending.length > 0 && (
+        <>
+          <h2 className="adminc__subhead">Waiting to sign up</h2>
+          <ul className="adminc__list">
+            {pending.map((g) => (
+              <li key={g.id} className="adminc__row">
+                <div className="adminc__info">
+                  <span className={'adminc__badge adminc__badge--' + (g.tier === 'concierge' ? 'good' : 'service')}>
+                    {g.tier}
+                  </span>
+                  <span className="adminc__name">{g.invitee_email}</span>
+                  <span className="adminc__by">invited {new Date(g.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="adminc__actions">
+                  <button className="adminc__btn adminc__btn--reject" onClick={() => cancelGift(g.id)}>
+                    Cancel
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2 className="adminc__subhead">Current supporters</h2>
       {loaded && rows.length === 0 && <p className="adminc__empty">No supporters yet.</p>}

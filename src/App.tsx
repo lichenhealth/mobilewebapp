@@ -72,22 +72,29 @@ export default function App() {
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
 
   // MEMBERSHIP GATE (2026-07-15, founder): Lichen is a membership — every
-  // non-admin needs an active subscription (Stripe or gifted via
-  // /admin/supporters). Checked per navigation with a session cache; the
-  // cache stays empty until a subscription exists, so the check re-runs
-  // and picks up a fresh Stripe-webhook write the moment they leave
-  // /membership. past_due keeps access (Stripe's retry window).
+  // non-admin needs an active subscription (Stripe, or gifted — either from
+  // /admin/supporters or riding an admin's invitation). Checked per
+  // navigation with a session cache; the cache stays empty until a
+  // subscription exists, so the check re-runs and picks up a fresh
+  // Stripe-webhook write the moment they leave /membership. past_due keeps
+  // access (Stripe's retry window). Before turning anyone away, we redeem
+  // any membership gift waiting on their email — an invited person walks
+  // straight in without ever seeing the paywall.
   const memberOk = useRef(false);
   useEffect(() => {
     if (memberOk.current || loading || !user || onboarded !== true || isAdmin) return;
     if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
     let live = true;
-    supabase.from('subscriptions').select('status').eq('profile_id', user.id).maybeSingle()
-      .then(({ data }) => {
-        const ok = !!data && ['active', 'past_due'].includes((data as { status: string }).status);
-        if (ok) memberOk.current = true;
-        else if (live) navigate('/membership', { replace: true });
-      });
+    (async () => {
+      const { data } = await supabase.from('subscriptions').select('status').eq('profile_id', user.id).maybeSingle();
+      let ok = !!data && ['active', 'past_due'].includes((data as { status: string }).status);
+      if (!ok) {
+        const { data: claimed } = await supabase.rpc('claim_membership_gift');
+        ok = ((claimed as number | null) ?? 0) > 0;
+      }
+      if (ok) memberOk.current = true;
+      else if (live) navigate('/membership', { replace: true });
+    })();
     return () => { live = false; };
   }, [user, loading, onboarded, isAdmin, pathname, navigate]);
 
