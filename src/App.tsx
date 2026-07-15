@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './routes/Home';
 import SpacesDirectory from './routes/SpacesDirectory';
@@ -41,7 +41,12 @@ import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
+import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
+
+// Reachable without a membership: auth flows, the paywall itself, and Help
+// (a member with a payment problem must be able to reach support).
+const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help'];
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -58,13 +63,33 @@ export default function App() {
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
-  const { user, loading, onboarded } = useAuth();
+  const { user, loading, onboarded, isAdmin } = useAuth();
   useEffect(() => {
     if (loading || onboarded === null) return;
     if (user && onboarded === false && !isAuth) {
       navigate('/onboarding', { replace: true });
     }
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
+
+  // MEMBERSHIP GATE (2026-07-15, founder): Lichen is a membership — every
+  // non-admin needs an active subscription (Stripe or gifted via
+  // /admin/supporters). Checked per navigation with a session cache; the
+  // cache stays empty until a subscription exists, so the check re-runs
+  // and picks up a fresh Stripe-webhook write the moment they leave
+  // /membership. past_due keeps access (Stripe's retry window).
+  const memberOk = useRef(false);
+  useEffect(() => {
+    if (memberOk.current || loading || !user || onboarded !== true || isAdmin) return;
+    if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
+    let live = true;
+    supabase.from('subscriptions').select('status').eq('profile_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        const ok = !!data && ['active', 'past_due'].includes((data as { status: string }).status);
+        if (ok) memberOk.current = true;
+        else if (live) navigate('/membership', { replace: true });
+      });
+    return () => { live = false; };
+  }, [user, loading, onboarded, isAdmin, pathname, navigate]);
 
   return (
     <CollectPromptProvider>
