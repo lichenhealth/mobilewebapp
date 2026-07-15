@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gbnqtB7Fxwy702TwHBFgyfXmiE0Pt02GXlde6s3vUYW1hgkoHmtYFDT7ohVDDo8
+\restrict 9H3aS7NKmTucgBZvWfKOg0arREEJs2BNb3Z3XkS7cPOfxA6WrHMgb3jl8vpZycz
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1839,6 +1839,19 @@ CREATE TABLE public.health_snapshots (
 ALTER TABLE public.health_snapshots OWNER TO postgres;
 
 --
+-- Name: hidden_posts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.hidden_posts (
+    profile_id uuid NOT NULL,
+    post_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.hidden_posts OWNER TO postgres;
+
+--
 -- Name: location_shares; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2260,6 +2273,14 @@ ALTER TABLE ONLY public.health_snapshots
 
 ALTER TABLE ONLY public.health_snapshots
     ADD CONSTRAINT health_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hidden_posts hidden_posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.hidden_posts
+    ADD CONSTRAINT hidden_posts_pkey PRIMARY KEY (profile_id, post_id);
 
 
 --
@@ -3065,6 +3086,14 @@ ALTER TABLE ONLY public.health_snapshots
 
 
 --
+-- Name: hidden_posts hidden_posts_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.hidden_posts
+    ADD CONSTRAINT hidden_posts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: location_shares location_shares_audience_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3687,6 +3716,19 @@ CREATE POLICY "events update" ON public.events FOR UPDATE TO authenticated USING
 --
 
 ALTER TABLE public.health_snapshots ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: hidden_posts hidden: own only; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "hidden: own only" ON public.hidden_posts TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+
+
+--
+-- Name: hidden_posts; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.hidden_posts ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: care_invitations inv cancel own; Type: POLICY; Schema: public; Owner: postgres
@@ -4730,6 +4772,15 @@ GRANT ALL ON TABLE public.health_snapshots TO service_role;
 
 
 --
+-- Name: TABLE hidden_posts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.hidden_posts TO anon;
+GRANT ALL ON TABLE public.hidden_posts TO authenticated;
+GRANT ALL ON TABLE public.hidden_posts TO service_role;
+
+
+--
 -- Name: TABLE location_shares; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -5017,7 +5068,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gbnqtB7Fxwy702TwHBFgyfXmiE0Pt02GXlde6s3vUYW1hgkoHmtYFDT7ohVDDo8
+\unrestrict 9H3aS7NKmTucgBZvWfKOg0arREEJs2BNb3Z3XkS7cPOfxA6WrHMgb3jl8vpZycz
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
