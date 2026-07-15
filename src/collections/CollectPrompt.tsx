@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon';
 import {
   listMyCollections, createCollection, addToCollection, type CollectionRow,
@@ -23,6 +23,15 @@ export const useCollect = () => useContext(Ctx);
 
 export function CollectPromptProvider({ children }: { children: React.ReactNode }) {
   const [toastFor, setToastFor] = useState<string | null>(null);
+  const [toastPos, setToastPos] = useState<{ x: number; y: number } | null>(null);
+  // Where did the member last tap? The toast rises right there — beside the
+  // Save button they pressed — instead of a far-away corner.
+  const lastTap = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const track = (e: PointerEvent) => { lastTap.current = { x: e.clientX, y: e.clientY }; };
+    window.addEventListener('pointerdown', track, { capture: true });
+    return () => window.removeEventListener('pointerdown', track, { capture: true });
+  }, []);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [cols, setCols] = useState<CollectionRow[]>([]);
   const [newName, setNewName] = useState('');
@@ -32,6 +41,14 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
 
   const promptSaved = useCallback((postId: string) => {
     setToastFor(postId);
+    if (lastTap.current) {
+      // Clamp so the card never hangs off an edge (its width is ~330px).
+      const x = Math.min(Math.max(lastTap.current.x, 175), window.innerWidth - 175);
+      const y = Math.max(lastTap.current.y, 90);
+      setToastPos({ x, y });
+    } else {
+      setToastPos(null);   // keyboard path — fall back to bottom-center
+    }
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastFor(null), 6000);
   }, []);
@@ -74,7 +91,11 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
       {children}
 
       {toastFor && (
-        <div className="collect__toast" role="status">
+        <div
+          className={'collect__toast' + (toastPos ? ' collect__toast--anchored' : '')}
+          style={toastPos ? { left: toastPos.x, top: toastPos.y - 14 } : undefined}
+          role="status"
+        >
           <Icon name="bookmark" size={13} />
           <span>Saved to your shelf</span>
           <button onClick={() => openPicker(toastFor)}>Add to collection…</button>
