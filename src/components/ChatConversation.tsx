@@ -18,12 +18,14 @@ interface Pending { type: MediaType; path: string; localUrl: string; }
  *  attachments / reactions / replies. Fills its parent (give the parent a bounded
  *  height). Used by the full-screen thread route and the Concierge care tab. */
 export default function ChatConversation({
-  chatId, me, onBack, showIntro = true,
+  chatId, me, onBack, showIntro = true, onInfo,
 }: {
   chatId: string;
   me: string;
   onBack?: () => void;      // when set, the header shows a back button
   showIntro?: boolean;
+  /** Gives the header's info circle a job (e.g. Concierge → Care Team tab). Hidden when absent. */
+  onInfo?: () => void;
 }) {
   const [chat, setChat] = useState<ChatInfo | null>(null);
   const [members, setMembers] = useState<Record<string, MemberInfo>>({});
@@ -204,7 +206,7 @@ export default function ChatConversation({
 
   return (
     <div className="conv">
-      <ChatHeader chat={chat} title={title} members={memberList} me={me} onBack={onBack} />
+      <ChatHeader chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo} />
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
         {runs.map((run, i) => (
@@ -248,7 +250,7 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
   return null;
 }
 
-function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void }) {
+function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void }) {
   const navigate = useNavigate();
   const profilePath = profilePathFor(chat, members, me);
   const isDirect = chat.kind === 'direct' || chat.kind === 'help';
@@ -293,9 +295,11 @@ function ChatHeader({ chat, title, members, me, onBack }: { chat: ChatInfo; titl
           </p>
         </div>
       </div>
-      <button className="thread__icon" aria-label="Info">
-        <Icon name="info" size={18} />
-      </button>
+      {onInfo && (
+        <button className="thread__icon" aria-label="Info" onClick={onInfo}>
+          <Icon name="info" size={18} />
+        </button>
+      )}
     </header>
   );
 }

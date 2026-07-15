@@ -21,7 +21,7 @@ import { occursOn } from '../lib/recurrence';
 import { useAuth } from '../auth/AuthProvider';
 import './Concierge.css';
 
-type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent';
+type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'team';
 
 /** Urgent Care: who on the subject's care team is on call RIGHT NOW
  *  (availability_windows kind='on_call' via the on_call_roster RPC), with real
@@ -398,6 +398,64 @@ function ConciergeEmpty({ icon, title, sub, action }: {
   );
 }
 
+/** Care Team — the directory behind the chat's info circle: everyone
+ *  actively caring here, with the fastest ways to reach them. */
+function CareTeamDirectory({ subjectId }: { subjectId: string }) {
+  const navigate = useNavigate();
+  const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void loadOnCallRoster(subjectId).then((r) => {
+      if (live) { setRoster(r); setReady(true); }
+    }).catch(() => { if (live) setReady(true); });
+    return () => { live = false; };
+  }, [subjectId]);
+
+  return (
+    <section className="conc__team">
+      <p className="conc__team-lead">
+        The people actively caring here. Tap a name for their profile; manage
+        the team itself from your Profile page.
+      </p>
+      {!ready && <p className="conc__team-muted">Loading…</p>}
+      {ready && roster.length === 0 && (
+        <p className="conc__team-muted">No active care team yet — invite caregivers from your Profile page.</p>
+      )}
+      {roster.map((c) => (
+        <div className="conc__team-row" key={c.id}>
+          <button className="conc__team-who" onClick={() => navigate(`/members/${c.id}`)}>
+            <span
+              className="urgent__avatar urgent__avatar--sm"
+              style={c.avatarUrl ? undefined : { background: colorFor(c.id) }}
+              aria-hidden
+            >
+              {c.avatarUrl ? <img src={c.avatarUrl} alt="" /> : monogramFor(c.name)}
+            </span>
+            <span className="conc__team-text">
+              <span className="conc__team-name">{c.name}</span>
+              <span className="conc__team-sub">
+                Caregiver{c.headline ? ` · ${c.headline}` : ''}
+                {c.windows.length > 0 ? ' · takes on-call shifts' : ''}
+              </span>
+            </span>
+          </button>
+          {c.phone && (
+            <span className="conc__team-actions">
+              <a className="btn conc__team-btn" href={`tel:${c.phone}`}>Call</a>
+              <a className="btn conc__team-btn" href={`sms:${c.phone}`}>Text</a>
+            </span>
+          )}
+        </div>
+      ))}
+      <button className="conc__team-manage" onClick={() => navigate('/profile')}>
+        Manage care team on your Profile
+      </button>
+    </section>
+  );
+}
+
 export default function Concierge() {
   const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
   const navigate = useNavigate();
@@ -597,6 +655,12 @@ export default function Concierge() {
         >
           Urgent Care
         </button>
+        <button
+          className={'conc__tab' + (activeTab === 'team' ? ' is-active' : '')}
+          onClick={() => handleTabClick('team')}
+        >
+          Care Team
+        </button>
       </nav>
 
       {/* Tool row (search · AI brain · scope · pagination) */}
@@ -784,13 +848,14 @@ export default function Concierge() {
 
           {careReady && careAllowed && careChatId && (
             <div className="conc__care" style={{ top: careTop }}>
-              <ChatConversation chatId={careChatId} me={me} showIntro={false} />
+              <ChatConversation chatId={careChatId} me={me} showIntro={false} onInfo={() => handleTabClick('team')} />
             </div>
           )}
         </>
       )}
 
       {activeTab === 'urgent' && <UrgentCare subjectId={subjectId} me={me} />}
+      {activeTab === 'team' && <CareTeamDirectory subjectId={subjectId} />}
     </div>
   );
 }
