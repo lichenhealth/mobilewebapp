@@ -45,6 +45,9 @@ export interface FeedCardProps {
   /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
   previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
   // ⋯ menu: author controls vs viewer controls. Renders only when a handler fits.
+  /** Screen-specific rows rendered at the top of the ⋯ menu (e.g. the Saved
+   *  shelf's "Add to collection…"). */
+  extraMenuItems?: { label: string; hint?: string; onClick: () => void }[];
   viewerIsAuthor?: boolean;
   onEdit?: () => void;      // author, non-event posts
   onDelete?: () => void;    // author, non-event posts (confirmed inside)
@@ -75,6 +78,7 @@ export default function FeedCard({
   onOpen,
   onAuthor,
   previews,
+  extraMenuItems,
   viewerIsAuthor,
   onEdit,
   onDelete,
@@ -82,7 +86,8 @@ export default function FeedCard({
   onHide,
 }: FeedCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const hasMenu = viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide;
+  const hasMenu = !!(extraMenuItems && extraMenuItems.length)
+    || (viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide);
   // Whole-card click-through: anywhere that isn't itself interactive opens
   // the post/event page. Inner buttons, links, and media keep their own
   // behavior via the closest() guard.
@@ -170,6 +175,13 @@ export default function FeedCard({
                   <>
                     <div className="feed-card__more-scrim" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
                     <div className="feed-card__more" role="menu">
+                      {(extraMenuItems ?? []).map((item) => (
+                        <button key={item.label} role="menuitem"
+                          onClick={(e) => { e.stopPropagation(); setMenuOpen(false); item.onClick(); }}>
+                          {item.label}
+                          {item.hint && <em>{item.hint}</em>}
+                        </button>
+                      ))}
                       {viewerIsAuthor && onManage && (
                         <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onManage(); }}>
                           Manage on event page

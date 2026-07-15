@@ -12,6 +12,9 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPosts, setSaved } from '../lib/savedApi';
+import {
+  listMyCollections, createCollection, addToCollection, type CollectionRow,
+} from '../lib/collectionsApi';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 
@@ -31,6 +34,12 @@ export default function Saved() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   // Unsaving keeps the card mounted this visit (no jumpy list); it's gone next time.
   const [unsaved, setUnsaved] = useState<Set<string>>(new Set());
+  // Folders (collections): strip up top, add-to picker per card.
+  const [collections, setCollections] = useState<CollectionRow[]>([]);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [pickerFor, setPickerFor] = useState<string | null>(null);   // post id
+  const [added, setAdded] = useState('');                            // toast text
   const [content, setContent] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
@@ -38,10 +47,10 @@ export default function Saved() {
     let live = true;
     (async () => {
       const shelf = await loadSavedPosts();
-      const [{ vouched: myc }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
       const ov = await loadEndorsements(shelf, myc);
       if (!live) return;
-      setMyMyc(myc); setMyRecs(recs); setOverlays(ov); setPosts(shelf); setReady(true);
+      setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(shelf); setReady(true);
     })();
     return () => { live = false; };
   }, [me]);
@@ -63,6 +72,27 @@ export default function Saved() {
       .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
   }, [posts, content, areas]);
 
+  async function makeFolder() {
+    const nm = newFolderName.trim();
+    if (!nm) return;
+    try {
+      await createCollection(nm);
+      setCollections(await listMyCollections());
+      setNewFolderOpen(false); setNewFolderName('');
+    } catch (e) { console.error(e); }
+  }
+
+  async function addTo(collectionId: string, postId: string) {
+    try {
+      await addToCollection(collectionId, postId);
+      const col = collections.find((c) => c.id === collectionId);
+      setAdded(`Added to ${col?.name ?? 'collection'} ✓`);
+      setTimeout(() => setAdded(''), 2200);
+      setCollections(await listMyCollections());
+    } catch (e) { console.error(e); }
+    setPickerFor(null);
+  }
+
   async function messageAuthor(otherId: string) {
     try { navigate(`/chat/${await ensureDirectChat(otherId)}`); }
     catch (e) { console.error(e); }
@@ -80,6 +110,39 @@ export default function Saved() {
           Things you wanted to come back to — kept quietly in one place, visible only to you.
         </p>
       </header>
+
+      {/* Folders — private collections; published ones double as Library playlists. */}
+      {me && (
+        <div className="myc__kinds h-scroll">
+          {collections.map((c) => (
+            <button key={c.id} className="myc__kind" onClick={() => navigate(`/collections/${c.id}`)}>
+              <span className="myc__kind-circle">
+                <Icon name={c.is_public ? 'book' : 'bookmark'} size={13} />
+              </span>
+              <span className="myc__kind-label">{c.name} · {c.item_count}</span>
+            </button>
+          ))}
+          {!newFolderOpen ? (
+            <button className="myc__kind" onClick={() => setNewFolderOpen(true)}>
+              <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
+              <span className="myc__kind-label">New folder</span>
+            </button>
+          ) : (
+            <span className="saved__newfolder">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void makeFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
+                placeholder="Folder name"
+              />
+              <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {added && <p className="saved__toast">{added}</p>}
 
       {posts.length > 0 && <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />}
 
@@ -144,12 +207,61 @@ export default function Saved() {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
               void setSaved('post', p.id, on).catch(console.error);
             }}
+            extraMenuItems={[{
+              label: 'Add to collection…',
+              hint: collections.length ? undefined : 'Create your first folder above',
+              onClick: () => setPickerFor(p.id),
+            }]}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
       </section>
+
+      {/* Add-to-collection picker */}
+      {pickerFor && (
+        <>
+          <div className="saved__scrim" onClick={() => setPickerFor(null)} />
+          <div className="saved__picker" role="dialog" aria-label="Add to collection">
+            <h3>Add to collection</h3>
+            {collections.length === 0 && <p className="myc__sub">No folders yet — name your first:</p>}
+            {collections.map((c) => (
+              <button key={c.id} className="saved__picker-row" onClick={() => void addTo(c.id, pickerFor)}>
+                <Icon name={c.is_public ? 'book' : 'bookmark'} size={14} />
+                <span>{c.name}</span>
+                <em>{c.item_count}</em>
+              </button>
+            ))}
+            <div className="saved__picker-new">
+              <input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="New folder name…"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newFolderName.trim()) {
+                    void (async () => {
+                      const cid = await createCollection(newFolderName.trim());
+                      setNewFolderName('');
+                      await addTo(cid, pickerFor);
+                    })();
+                  }
+                }}
+              />
+              <button
+                disabled={!newFolderName.trim()}
+                onClick={() => void (async () => {
+                  const cid = await createCollection(newFolderName.trim());
+                  setNewFolderName('');
+                  await addTo(cid, pickerFor);
+                })()}
+              >
+                Create & add
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

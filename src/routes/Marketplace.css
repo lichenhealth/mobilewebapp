@@ -361,3 +361,18 @@
   background: transparent; border: 1px solid var(--peach);
   font-size: 11px; color: var(--peach-deep, var(--peach)); cursor: pointer;
 }
+
+/* published-collections strip (Library) */
+.afeed__cols { display: flex; gap: var(--s-2); margin: var(--s-2) 0 var(--s-3); }
+.afeed__col {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px;
+  min-width: 160px; max-width: 220px;
+  padding: 12px 14px; border-radius: var(--r-lg); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); cursor: pointer;
+}
+.afeed__col:hover { border-color: var(--peach); }
+.afeed__col-name {
+  font-family: var(--font-display); font-style: italic; font-size: 15px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.afeed__col-by { font-size: 11px; color: var(--ink-soft); }

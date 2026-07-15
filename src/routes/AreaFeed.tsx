@@ -6,6 +6,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { listPublicCollections, type CollectionRow } from '../lib/collectionsApi';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postToCard, postMedium, type PostMedium } from '../lib/feedMapping';
@@ -24,7 +25,7 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -35,6 +36,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   emptyHint: string;
   /** Read/Look/Listen/Watch circles (Library, Courses) — derived per post. */
   mediaLenses?: boolean;
+  /** Published collections strip (Library): playlists & anthologies. */
+  collections?: boolean;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -49,6 +52,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [showSearch, setShowSearch] = useState(false);
   // All lenses start ON (founder): everything shows; deselect to narrow.
   const [media, setMedia] = useState<PostMedium[]>(MEDIA_LENSES.map((m) => m.medium));
+  const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -56,6 +60,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     setReady(false);
     (async () => {
       const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes(area));
+      if (collections) setPublicCols(await listPublicCollections());
       const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
@@ -146,6 +151,20 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               <Icon name="close" size={12} />
             </button>
           )}
+        </div>
+      )}
+
+      {/* Published playlists & anthologies — curation as contribution. */}
+      {collections && publicCols.length > 0 && (
+        <div className="afeed__cols h-scroll">
+          {publicCols.map((c) => (
+            <button key={c.id} className="afeed__col" onClick={() => navigate(`/collections/${c.id}`)}>
+              <span className="afeed__col-name">{c.name}</span>
+              <span className="afeed__col-by">
+                {c.owner?.full_name ?? 'a member'} · {c.item_count} {c.item_count === 1 ? 'piece' : 'pieces'}
+              </span>
+            </button>
+          ))}
         </div>
       )}
 
