@@ -15,6 +15,7 @@ import {
 import { minToLabel } from '../lib/calendarApi';
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
@@ -42,6 +43,7 @@ export default function Events() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -169,7 +171,8 @@ export default function Events() {
       onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
       onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
       saved={mySaves.has('post:' + p.id)}
-      onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
+      onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
+      extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
       viewerIsAuthor={p.author_id === me}
       onManage={() => navigate(`/events/${p.id}`)}
       onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}

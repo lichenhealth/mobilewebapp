@@ -41,6 +41,7 @@ import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
+import { CollectPromptProvider } from './collections/CollectPrompt';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -66,6 +67,7 @@ export default function App() {
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
 
   return (
+    <CollectPromptProvider>
     <div className="app-shell">
       <ScrollToTop />
       {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
@@ -174,5 +176,6 @@ export default function App() {
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {!isChatThread && !isAuth && <InstallPrompt />}
     </div>
+    </CollectPromptProvider>
   );
 }

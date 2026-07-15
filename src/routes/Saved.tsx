@@ -12,9 +12,8 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPosts, setSaved } from '../lib/savedApi';
-import {
-  listMyCollections, createCollection, addToCollection, type CollectionRow,
-} from '../lib/collectionsApi';
+import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
+import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 
@@ -24,6 +23,7 @@ const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
  *  under the platform's standard lenses. Nobody else can see it. */
 export default function Saved() {
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -38,8 +38,7 @@ export default function Saved() {
   const [collections, setCollections] = useState<CollectionRow[]>([]);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [pickerFor, setPickerFor] = useState<string | null>(null);   // post id
-  const [added, setAdded] = useState('');                            // toast text
+
   const [content, setContent] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
@@ -80,17 +79,6 @@ export default function Saved() {
       setCollections(await listMyCollections());
       setNewFolderOpen(false); setNewFolderName('');
     } catch (e) { console.error(e); }
-  }
-
-  async function addTo(collectionId: string, postId: string) {
-    try {
-      await addToCollection(collectionId, postId);
-      const col = collections.find((c) => c.id === collectionId);
-      setAdded(`Added to ${col?.name ?? 'collection'} ✓`);
-      setTimeout(() => setAdded(''), 2200);
-      setCollections(await listMyCollections());
-    } catch (e) { console.error(e); }
-    setPickerFor(null);
   }
 
   async function messageAuthor(otherId: string) {
@@ -141,8 +129,6 @@ export default function Saved() {
           )}
         </div>
       )}
-
-      {added && <p className="saved__toast">{added}</p>}
 
       {posts.length > 0 && <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />}
 
@@ -205,12 +191,12 @@ export default function Saved() {
             onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onSave={(on) => {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
-              void setSaved('post', p.id, on).catch(console.error);
+              void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
             }}
             extraMenuItems={[{
               label: 'Add to collection…',
               hint: collections.length ? undefined : 'Create your first folder above',
-              onClick: () => setPickerFor(p.id),
+              onClick: () => openPicker(p.id),
             }]}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
@@ -219,49 +205,6 @@ export default function Saved() {
         ))}
       </section>
 
-      {/* Add-to-collection picker */}
-      {pickerFor && (
-        <>
-          <div className="saved__scrim" onClick={() => setPickerFor(null)} />
-          <div className="saved__picker" role="dialog" aria-label="Add to collection">
-            <h3>Add to collection</h3>
-            {collections.length === 0 && <p className="myc__sub">No folders yet — name your first:</p>}
-            {collections.map((c) => (
-              <button key={c.id} className="saved__picker-row" onClick={() => void addTo(c.id, pickerFor)}>
-                <Icon name={c.is_public ? 'book' : 'bookmark'} size={14} />
-                <span>{c.name}</span>
-                <em>{c.item_count}</em>
-              </button>
-            ))}
-            <div className="saved__picker-new">
-              <input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="New folder name…"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newFolderName.trim()) {
-                    void (async () => {
-                      const cid = await createCollection(newFolderName.trim());
-                      setNewFolderName('');
-                      await addTo(cid, pickerFor);
-                    })();
-                  }
-                }}
-              />
-              <button
-                disabled={!newFolderName.trim()}
-                onClick={() => void (async () => {
-                  const cid = await createCollection(newFolderName.trim());
-                  setNewFolderName('');
-                  await addTo(cid, pickerFor);
-                })()}
-              >
-                Create & add
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, type CollectionRow } from '../lib/collectionsApi';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
@@ -40,6 +41,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   collections?: boolean;
 }) {
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -197,7 +199,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
-            onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
+            onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
+            extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}

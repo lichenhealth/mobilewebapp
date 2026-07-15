@@ -16,6 +16,7 @@ import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection,
   type CollectionRow,
 } from '../lib/collectionsApi';
+import { useCollect } from '../collections/CollectPrompt';
 import './CollectionPage.css';
 
 /** One collection — a private shelf folder, or a playlist/anthology published
@@ -23,6 +24,7 @@ import './CollectionPage.css';
 export default function CollectionPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -165,15 +167,18 @@ export default function CollectionPage() {
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
-            onSave={me ? (on) => { void setSaved('post', p.id, on).catch(console.error); } : undefined}
-            extraMenuItems={isOwner ? [{
-              label: 'Remove from this collection',
-              onClick: () => {
-                void removeFromCollection(id, p.id)
-                  .then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id)))
-                  .catch(console.error);
-              },
-            }] : undefined}
+            onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
+            extraMenuItems={[
+              ...(me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : []),
+              ...(isOwner ? [{
+                label: 'Remove from this collection',
+                onClick: () => {
+                  void removeFromCollection(id, p.id)
+                    .then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id)))
+                    .catch(console.error);
+                },
+              }] : []),
+            ]}
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
