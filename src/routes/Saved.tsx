@@ -6,12 +6,13 @@ import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { postAreas, CONTENT_TYPES, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { postAreas, deletePost, CONTENT_TYPES, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPosts, setSaved } from '../lib/savedApi';
+import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 
 const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
@@ -134,6 +135,11 @@ export default function Saved() {
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            viewerIsAuthor={p.author_id === me}
+            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onSave={(on) => {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
               void setSaved('post', p.id, on).catch(console.error);

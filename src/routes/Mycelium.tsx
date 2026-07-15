@@ -5,7 +5,7 @@ import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import {
-  loadFeed, postAreas, CONTENT_TYPES, SERVICE_AREAS,
+  loadFeed, deletePost, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
@@ -14,6 +14,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
 
@@ -98,6 +99,11 @@ export default function Mycelium() {
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
           saved: mySaves.has('post:' + p.id),
           onSave: (on: boolean) => { void setSaved('post', p.id, on).catch(console.error); },
+          viewerIsAuthor: p.author_id === user?.id,
+          onManage: p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined,
+          onEdit: !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined,
+          onDelete: !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined,
+          onHide: user ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined,
           onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));

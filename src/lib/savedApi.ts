@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { loadPostsByIds, type FeedPost } from './postsApi';
+import { loadMyHidden } from './hiddenApi';
 
 // Save — your private shelf. Strictly owner-only (RLS): what you save is
 // invisible to everyone, including the author. Keys mirror the mycelium
@@ -47,7 +48,9 @@ export async function loadSavedPosts(): Promise<FeedPost[]> {
     .select('target_id, created_at')
     .eq('profile_id', user.id).eq('target_type', 'post')
     .order('created_at', { ascending: false });
-  const ids = ((data as { target_id: string }[] | null) ?? []).map((r) => r.target_id);
+  const hidden = await loadMyHidden();
+  const ids = ((data as { target_id: string }[] | null) ?? [])
+    .map((r) => r.target_id).filter((id) => !hidden.has(id));
   if (ids.length === 0) return [];
   const posts = await loadPostsByIds(ids);
   const order = new Map(ids.map((id, i) => [id, i]));

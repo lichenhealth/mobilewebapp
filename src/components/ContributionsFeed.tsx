@@ -8,11 +8,12 @@ import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import { minToLabel } from '../lib/calendarApi';
 import {
-  loadAuthorFeed, postAreas, CONTENT_TYPES, SERVICE_AREAS,
+  loadAuthorFeed, deletePost, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from './EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
 import './ContributionsFeed.css';
@@ -137,6 +138,11 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
+            viewerIsAuthor={p.author_id === me}
+            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}
