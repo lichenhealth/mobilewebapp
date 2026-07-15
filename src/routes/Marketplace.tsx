@@ -6,7 +6,8 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
-import { loadFeed, postAreas, type FeedPost } from '../lib/postsApi';
+import { setHidden } from '../lib/hiddenApi';
+import { loadFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -186,6 +187,11 @@ export default function Marketplace() {
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).catch(console.error); }}
+            viewerIsAuthor={p.author_id === me}
+            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}

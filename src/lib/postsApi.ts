@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { loadMyHidden } from './hiddenApi';
 import type { IconName } from '../components/Icon';
 
 export type Visibility = 'public' | 'mycelium' | 'space';
@@ -235,17 +236,20 @@ export async function loadAuthorFeed(by: { profileId?: string; spaceId?: string 
   if (by.spaceId) q = q.or(`author_space_id.eq.${by.spaceId},audience_space_ids.cs.{${by.spaceId}}`);
   else if (by.profileId) q = q.eq('author_id', by.profileId).is('author_space_id', null);
   else return [];
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(50);
+  const [{ data, error }, hidden] = await Promise.all([
+    q.order('created_at', { ascending: false }).limit(50),
+    loadMyHidden(),
+  ]);
   if (error) { console.warn('loadAuthorFeed:', error.message); return []; }
-  return (data as unknown as FeedPost[]) ?? [];
+  return (((data as unknown as FeedPost[]) ?? []).filter((p) => !hidden.has(p.id)));
 }
 
 export async function loadFeed(limit = 50): Promise<FeedPost[]> {
-  const { data, error } = await supabase
-    .from('posts')
-    .select(FEED_SELECT)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  // Hidden posts drop here, centrally — every feed surface inherits it.
+  const [{ data, error }, hidden] = await Promise.all([
+    supabase.from('posts').select(FEED_SELECT).order('created_at', { ascending: false }).limit(limit),
+    loadMyHidden(),
+  ]);
   if (error) { console.error('loadFeed', error); return []; }
-  return (data as unknown as FeedPost[]) ?? [];
+  return (((data as unknown as FeedPost[]) ?? []).filter((p) => !hidden.has(p.id)));
 }

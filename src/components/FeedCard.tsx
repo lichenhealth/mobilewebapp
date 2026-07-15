@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
@@ -43,6 +44,12 @@ export interface FeedCardProps {
   onAuthor?: () => void;
   /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
   previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
+  // ⋯ menu: author controls vs viewer controls. Renders only when a handler fits.
+  viewerIsAuthor?: boolean;
+  onEdit?: () => void;      // author, non-event posts
+  onDelete?: () => void;    // author, non-event posts (confirmed inside)
+  onManage?: () => void;    // author, event posts → the event page's tested flow
+  onHide?: () => void;      // everyone else — hides it for THEM only
 }
 
 export default function FeedCard({
@@ -68,7 +75,14 @@ export default function FeedCard({
   onOpen,
   onAuthor,
   previews,
+  viewerIsAuthor,
+  onEdit,
+  onDelete,
+  onManage,
+  onHide,
 }: FeedCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const hasMenu = viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide;
   // Whole-card click-through: anywhere that isn't itself interactive opens
   // the post/event page. Inner buttons, links, and media keep their own
   // behavior via the closest() guard.
@@ -122,7 +136,7 @@ export default function FeedCard({
             </div>
           </>
         )}
-        {(categoryIcons.length > 0 || onMessage) && (
+        {(categoryIcons.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">
             {categoryIcons.length > 0 && (
               <div className="feed-card__cat-icons">
@@ -141,6 +155,53 @@ export default function FeedCard({
               >
                 <Icon name="message" size={16} />
               </button>
+            )}
+            {hasMenu && (
+              <div className="feed-card__more-wrap">
+                <button
+                  className="feed-card__message"
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+                  aria-label="Post options"
+                  aria-expanded={menuOpen}
+                >
+                  <Icon name="more-horizontal" size={16} />
+                </button>
+                {menuOpen && (
+                  <>
+                    <div className="feed-card__more-scrim" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+                    <div className="feed-card__more" role="menu">
+                      {viewerIsAuthor && onManage && (
+                        <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onManage(); }}>
+                          Manage on event page
+                        </button>
+                      )}
+                      {viewerIsAuthor && onEdit && (
+                        <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}>
+                          Edit post
+                        </button>
+                      )}
+                      {viewerIsAuthor && onDelete && (
+                        <button
+                          role="menuitem"
+                          className="feed-card__more-danger"
+                          onClick={(e) => {
+                            e.stopPropagation(); setMenuOpen(false);
+                            if (window.confirm('Delete this post? This can\'t be undone.')) onDelete();
+                          }}
+                        >
+                          Delete post
+                        </button>
+                      )}
+                      {!viewerIsAuthor && onHide && (
+                        <button role="menuitem" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide(); }}>
+                          Hide this post
+                          <em>Only hides it for you</em>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}
