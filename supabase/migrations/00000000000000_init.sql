@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bDKPlOoyxFnMa9My7rXHu6tybmfZefxlcK3Jm7Ty6B0wzsVgDtW7Z110a6qpDCR
+\restrict gbnqtB7Fxwy702TwHBFgyfXmiE0Pt02GXlde6s3vUYW1hgkoHmtYFDT7ohVDDo8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -2008,6 +2008,21 @@ CREATE TABLE public.recommendations (
 ALTER TABLE public.recommendations OWNER TO postgres;
 
 --
+-- Name: saved_items; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.saved_items (
+    profile_id uuid NOT NULL,
+    target_type text DEFAULT 'post'::text NOT NULL,
+    target_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT saved_items_target_type_check CHECK ((target_type = ANY (ARRAY['post'::text, 'profile'::text, 'space'::text, 'event'::text])))
+);
+
+
+ALTER TABLE public.saved_items OWNER TO postgres;
+
+--
 -- Name: space_members; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2317,6 +2332,14 @@ ALTER TABLE ONLY public.profiles
 
 ALTER TABLE ONLY public.recommendations
     ADD CONSTRAINT recommendations_pkey PRIMARY KEY (recommender_id, target_type, target_id);
+
+
+--
+-- Name: saved_items saved_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.saved_items
+    ADD CONSTRAINT saved_items_pkey PRIMARY KEY (profile_id, target_type, target_id);
 
 
 --
@@ -3170,6 +3193,14 @@ ALTER TABLE ONLY public.recommendations
 
 
 --
+-- Name: saved_items saved_items_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.saved_items
+    ADD CONSTRAINT saved_items_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: space_members space_members_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3920,6 +3951,19 @@ CREATE POLICY "recs: drop own" ON public.recommendations FOR DELETE TO authentic
 --
 
 CREATE POLICY "recs: read" ON public.recommendations FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: saved_items; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.saved_items ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: saved_items saves: own only; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "saves: own only" ON public.saved_items TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
 
 
 --
@@ -4856,6 +4900,15 @@ GRANT ALL ON TABLE public.recommendations TO service_role;
 
 
 --
+-- Name: TABLE saved_items; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.saved_items TO anon;
+GRANT ALL ON TABLE public.saved_items TO authenticated;
+GRANT ALL ON TABLE public.saved_items TO service_role;
+
+
+--
 -- Name: TABLE space_members; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4964,7 +5017,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bDKPlOoyxFnMa9My7rXHu6tybmfZefxlcK3Jm7Ty6B0wzsVgDtW7Z110a6qpDCR
+\unrestrict gbnqtB7Fxwy702TwHBFgyfXmiE0Pt02GXlde6s3vUYW1hgkoHmtYFDT7ohVDDo8
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
