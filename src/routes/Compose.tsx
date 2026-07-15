@@ -248,8 +248,10 @@ export default function Compose() {
     setMedia((m) => m.filter((_, idx) => idx !== i));
   }
 
+  const canPost = !!(body.trim() || title.trim() || media.length > 0);
+
   async function submit() {
-    if (!body.trim()) { setError('Add a few words first.'); return; }
+    if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
     if (!hasAudience) { setError('Pick at least one audience.'); return; }
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
@@ -557,7 +559,12 @@ export default function Compose() {
         </div>
       )}
 
-      <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !body.trim()}>
+      {/* Rejections must be visible WHERE you clicked — a silent disabled
+          button reads as a freeze (this hid 'add a few words' from an
+          audio-only post until it was fixed). */}
+      {error && <p className="cmp__error">{error}</p>}
+      {uploading && <p className="cmp__error">Uploading media… one moment.</p>}
+      <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !canPost}>
         {busy ? (editing ? 'Saving…' : 'Posting…') : (editing ? 'Save changes' : 'Post')}
       </button>
     </div>
