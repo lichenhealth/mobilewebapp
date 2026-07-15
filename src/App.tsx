@@ -35,7 +35,6 @@ import Membership from './routes/Membership';
 import Compose from './routes/Compose';
 import SmartSearch from './routes/SmartSearch';
 import AreaFeed from './routes/AreaFeed';
-import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
@@ -131,7 +130,24 @@ export default function App() {
           {/* Side-menu passages — placeholders */}
           <Route path="/organizations" element={<SpacesDirectory kind="organization" />} />
           <Route path="/places"   element={<SpacesDirectory kind="place" />} />
-          <Route path="/work"     element={<Placeholder title="Work"     icon="briefcase"      intro="Help wanted, help offered. Hourly, project-based, and apprenticeships." hint="Coming soon" />} />
+          <Route path="/work"     element={
+            <AreaFeed area="work" icon="briefcase" crumb="Work"
+              title="Lichen" italic="Work."
+              sub="Help wanted, help offered. Hourly, project-based, and apprenticeships."
+              addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help." />
+          } />
+          <Route path="/art"      element={
+            <AreaFeed area="art" icon="palette" crumb="Art"
+              title="Lichen" italic="Art."
+              sub="What members make — image, sound, word, and craft."
+              addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
+          } />
+          <Route path="/food"     element={
+            <AreaFeed area="food" icon="fork-spoon" crumb="Food"
+              title="Lichen" italic="Food."
+              sub="Meals, harvests, recipes, and nourishment."
+              addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
+          } />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />
