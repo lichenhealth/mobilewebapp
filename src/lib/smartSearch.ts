@@ -31,7 +31,7 @@ export interface EndorseFilter { degree: EndorseDegree | null; personId: string 
 const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
 
 /** Offer modes (mockup's How): gift=free, buy=paid/sale/sliding. */
-export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'buy';
+export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'iso' | 'buy';
 
 export type WhoKind = 'people' | 'providers' | 'organizations';
 
@@ -157,6 +157,7 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
     if (!c.offers.includes('lend')) c.offers.push('lend');
     if (!c.offers.includes('borrow')) c.offers.push('borrow');
   });
+  scan(/\biso\b|\bin search of\b/g, 'price', () => { if (!c.offers.includes('iso')) c.offers.push('iso'); });
   scan(/\bunder \$?(\d+)\b/g, 'price', (m) => { c.priceMax = parseInt(m[1], 10); });
   scan(/\bover \$?(\d+)\b/g, 'price', (m) => { c.priceMin = parseInt(m[1], 10); });
 
@@ -354,6 +355,7 @@ function postOffers(p: FeedPost): OfferKind[] {
   if (m === 'rent') out.add('rent');
   if (m === 'lend') out.add('lend');
   if (m === 'borrow') out.add('borrow');
+  if (m === 'iso') out.add('iso');
   return [...out];
 }
 

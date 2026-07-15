@@ -40,7 +40,7 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   // Listings wear their offer: "Rent · $20/day", "Gift", "Sliding scale $20–$60".
   const MODE_LABEL: Record<string, string> = {
     gift: 'Gift', sale: 'For sale', sliding: 'Sliding scale',
-    trade: 'Trade', rent: 'Rent', lend: 'Lend', borrow: 'Looking to borrow',
+    trade: 'Trade', rent: 'Rent', lend: 'Lend', borrow: 'Looking to borrow', iso: 'In search of',
   };
   const mode = typeof p.details?.mode === 'string' ? MODE_LABEL[p.details.mode as string] : undefined;
   const price = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;

@@ -146,6 +146,7 @@
 
 .mkt__action {
   flex: 0 0 auto;
+  width: 72px;   /* uniform slots — label length no longer skews the rhythm */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -156,6 +157,7 @@
   cursor: pointer;
   transition: transform var(--d-fast) var(--ease-out);
 }
+.mkt__action-label { white-space: nowrap; }
 .mkt__action:hover { transform: translateY(-1px); }
 .mkt__action:active { transform: scale(0.96); }
 
