@@ -11,7 +11,7 @@ import Directory from './routes/Directory';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
-import { Saved } from './routes/Stubs';
+import Saved from './routes/Saved';
 
 // mapbox-gl is heavy — the Maps screen loads as its own chunk on first visit.
 const MapView = lazy(() => import('./routes/MapView'));
@@ -34,6 +34,7 @@ import Help from './routes/Help';
 import Membership from './routes/Membership';
 import Compose from './routes/Compose';
 import SmartSearch from './routes/SmartSearch';
+import AreaFeed from './routes/AreaFeed';
 import Placeholder from './routes/Placeholder';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
@@ -135,7 +136,18 @@ export default function App() {
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />
           <Route path="/events/:postId" element={<EventPage />} />
-          <Route path="/library"  element={<Placeholder title="Library"  icon="book"           intro="Essays, field guides, and zines on land, food, and care." hint="Coming soon" />} />
+          <Route path="/courses"  element={
+            <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
+              title="Learning the network" italic="offers & seeks."
+              sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
+              addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training." />
+          } />
+          <Route path="/library"  element={
+            <AreaFeed area="library" icon="book" crumb="Library"
+              title="The network's" italic="bookshelf."
+              sub="Essays, field guides, and zines on land, food, and care."
+              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." />
+          } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

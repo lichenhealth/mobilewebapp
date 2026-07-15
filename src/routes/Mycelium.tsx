@@ -13,6 +13,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
+import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
 
@@ -60,14 +61,15 @@ export default function Mycelium() {
   const [myWeb, setMyWeb] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   useEffect(() => {
     (async () => {
       const feed = await loadFeed();
-      const [{ web, vouched }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ web, vouched }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, vouched);
-      setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setOverlays(ov); setPosts(feed);
+      setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
   }, []);
 
@@ -94,10 +96,12 @@ export default function Mycelium() {
           availability: { trust: p.author_id !== user?.id },
           onTrust: (on: boolean) => { void setTrust('profile', p.author_id, on).catch(console.error); },
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
+          saved: mySaves.has('post:' + p.id),
+          onSave: (on: boolean) => { void setSaved('post', p.id, on).catch(console.error); },
           onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined,
         },
       }));
-  }, [posts, myWeb, myMyc, myRecs, overlays, user]);
+  }, [posts, myWeb, myMyc, myRecs, mySaves, overlays, user]);
 
   const visible = useMemo(
     () => items.filter((it) =>

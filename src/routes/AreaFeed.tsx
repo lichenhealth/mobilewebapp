@@ -6,40 +6,26 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
-import { loadFeed, postAreas, type FeedPost } from '../lib/postsApi';
+import { loadFeed, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
-import './Marketplace.css';
+import './Marketplace.css';   // shares the mkt__ section vocabulary
 
-// Offer modes as stored by Compose: details.mode (marketplace listings) with
-// event_mode as the fallback for event cross-posts.
-type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding';
-const MODES: { mode: Mode; label: string; icon: IconName }[] = [
-  { mode: 'gift',    label: 'Gift',    icon: 'heart-line' },
-  { mode: 'trade',   label: 'Trade',   icon: 'trade' },
-  { mode: 'rent',    label: 'Rent',    icon: 'rent' },
-  { mode: 'lend',    label: 'Lend',    icon: 'lend' },
-  { mode: 'borrow',  label: 'Borrow',  icon: 'lend' },
-  { mode: 'sliding', label: 'Sliding', icon: 'sliders' },
-  { mode: 'sale',    label: 'Sale',    icon: 'store' },
-];
-
-function postMode(p: FeedPost): Mode | null {
-  const m = p.details?.mode;
-  if (typeof m === 'string' && MODES.some((x) => x.mode === m)) return m as Mode;
-  if (p.event_mode === 'free') return 'gift';
-  if (p.event_mode === 'trade') return 'trade';
-  if (p.event_mode === 'paid') return 'sale';
-  return null;
-}
-
-/** The real Marketplace: every post shared to the marketplace area, under the
- *  same trust lens as every other feed. Offers and asks alike — Gift, Trade,
- *  Rent, Lend, Borrow, Sale — filtered by mode, searchable, one tap from
- *  listing anything via Compose. */
-export default function Marketplace() {
+/** A real service-area section (Courses, Library, …): every post shared to
+ *  the area, standard feed cards under the trust lens, its own Add + Search
+ *  doors. The pattern the Marketplace proved, reusable per area. */
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint }: {
+  area: ServiceArea;
+  icon: IconName;
+  crumb: string;
+  title: string;        // leading (roman) part of the headline
+  italic: string;       // display-italic tail
+  sub: string;
+  addLabel: string;     // the + chip label, e.g. "Offer a course"
+  emptyHint: string;
+}) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -50,43 +36,31 @@ export default function Marketplace() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
-  const [activeModes, setActiveModes] = useState<Mode[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     let live = true;
+    setReady(false);
     (async () => {
-      const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes('marketplace'));
+      const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes(area));
       const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, []);
+  }, [area]);
 
   const filtered = useMemo(() => {
-    let list = posts;
-    if (activeModes.length) {
-      list = list.filter((p) => {
-        const m = postMode(p);
-        return m != null && activeModes.includes(m);
-      });
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((p) =>
-        (p.title ?? '').toLowerCase().includes(q)
-        || p.body.toLowerCase().includes(q)
-        || (p.author?.full_name ?? '').toLowerCase().includes(q)
-        || (p.author_space?.name ?? '').toLowerCase().includes(q));
-    }
-    return list;
-  }, [posts, activeModes, query]);
-
-  const toggleMode = (m: Mode) =>
-    setActiveModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+    if (!query.trim()) return posts;
+    const q = query.trim().toLowerCase();
+    return posts.filter((p) =>
+      (p.title ?? '').toLowerCase().includes(q)
+      || p.body.toLowerCase().includes(q)
+      || (p.author?.full_name ?? '').toLowerCase().includes(q)
+      || (p.author_space?.name ?? '').toLowerCase().includes(q));
+  }, [posts, query]);
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -97,19 +71,15 @@ export default function Marketplace() {
     <div className="mkt">
       <header className="mkt__head">
         <p className="mkt__crumb">
-          <Icon name="store" size={11} />
-          <span>Marketplace</span>
+          <Icon name={icon} size={11} />
+          <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
-          What members are <span className="display-italic">offering &amp; seeking.</span>
+          {title} <span className="display-italic">{italic}</span>
         </h1>
-        <p className="mkt__sub">
-          Goods, services, and things people are looking for.
-          Trust the trader, not the platform.
-        </p>
+        <p className="mkt__sub">{sub}</p>
       </header>
 
-      {/* Action chips: search & list something, then the offer-mode filters */}
       <div className="mkt__actions h-scroll">
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
@@ -118,21 +88,10 @@ export default function Marketplace() {
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
           <span className="mkt__action-label">Search</span>
         </button>
-        <button className="mkt__action" onClick={() => navigate('/compose?area=marketplace')}>
+        <button className="mkt__action" onClick={() => navigate(`/compose?area=${area}`)}>
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
-          <span className="mkt__action-label">List</span>
+          <span className="mkt__action-label">{addLabel}</span>
         </button>
-        <div className="mkt__action-spacer" />
-        {MODES.map((m) => (
-          <button
-            key={m.mode}
-            className={'mkt__action' + (activeModes.includes(m.mode) ? ' is-active' : '')}
-            onClick={() => toggleMode(m.mode)}
-          >
-            <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
-            <span className="mkt__action-label">{m.label}</span>
-          </button>
-        ))}
       </div>
 
       {showSearch && (
@@ -141,11 +100,11 @@ export default function Marketplace() {
           <input
             autoFocus
             className="mkt__search-input"
-            placeholder="Search listings — or use smart search for distance & trust"
+            placeholder={`Search ${crumb.toLowerCase()} — or use smart search for trust & distance`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="mkt__search-smartlink" onClick={() => navigate('/search?area=marketplace')}>
+          <button className="mkt__search-smartlink" onClick={() => navigate(`/search?area=${area}`)}>
             <Icon name="sliders" size={12} /> Smart
           </button>
           {query && (
@@ -158,20 +117,16 @@ export default function Marketplace() {
 
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
-        {filtered.length === 1 ? 'listing' : 'listings'}
+        {filtered.length === 1 ? 'post' : 'posts'}
       </p>
 
       <section className="mkt__list">
         {!ready && <p className="mkt__empty-sub">Loading…</p>}
         {ready && filtered.length === 0 && (
           <div className="mkt__empty">
-            <Icon name="store" size={20} />
+            <Icon name={icon} size={20} />
             <p><span className="display-italic">Nothing here yet.</span></p>
-            <p className="mkt__empty-sub">
-              {posts.length === 0
-                ? 'Be the first — tap List and offer something to the network.'
-                : 'Try clearing a filter or searching differently.'}
-            </p>
+            <p className="mkt__empty-sub">{posts.length === 0 ? emptyHint : 'Try a different search.'}</p>
           </div>
         )}
         {filtered.map((p) => (
@@ -194,7 +149,7 @@ export default function Marketplace() {
       </section>
 
       <footer className="mkt__end">
-        <span className="eyebrow">End of market</span>
+        <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>
         <Icon name="sparkle" size={14} />
       </footer>
     </div>
