@@ -6,13 +6,11 @@ import './Invite.css';
 
 type GiftTier = 'community' | 'concierge';
 
-// null = no end date. Labels double as email copy ("a year of Lichen").
-const GIFT_SPANS: { months: number | null; label: string }[] = [
-  { months: 3, label: '3 months' },
-  { months: 6, label: '6 months' },
-  { months: 12, label: '1 year' },
-  { months: null, label: 'No end date' },
-];
+// The chip and the email say the same thing: 1 month, 2 months… 1 year, 2 years.
+const spanText = (m: number | null) =>
+  m === null ? 'no end date'
+    : m % 12 === 0 ? (m === 12 ? '1 year' : `${m / 12} years`)
+    : m === 1 ? '1 month' : `${m} months`;
 
 export default function Invite() {
   const { loading, user, isAdmin } = useAuth();
@@ -49,7 +47,7 @@ export default function Invite() {
         const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
         setBusy(false);
         if (ge) { setError(ge.message); return; }
-        setMsg(`${to} is already on Lichen 🌿 — gifted ${giftMonths ? GIFT_SPANS.find((sp) => sp.months === giftMonths)?.label + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.`);
+        setMsg(`${to} is already on Lichen 🌿 — gifted ${giftMonths ? spanText(giftMonths) + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.`);
         setEmail(''); setNote('');
         return;
       }
@@ -78,7 +76,7 @@ export default function Invite() {
       return;
     }
     setMsg(gifting
-      ? `Invitation sent to ${to} — ${giftMonths ? (GIFT_SPANS.find((sp) => sp.months === giftMonths)?.label + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
+      ? `Invitation sent to ${to} — ${giftMonths ? (spanText(giftMonths) + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
       : `Invitation sent to ${to}.`);
     setEmail('');
     setNote('');
@@ -140,17 +138,23 @@ export default function Invite() {
               </div>
             )}
             {gift && (
-              <div className="invite__gift-tiers">
-                {GIFT_SPANS.map((sp) => (
-                  <button
-                    key={String(sp.months)}
-                    type="button"
-                    className={'invite__gift-tier' + (giftMonths === sp.months ? ' is-on' : '')}
-                    onClick={() => setGiftMonths(sp.months)}
-                  >
-                    {sp.label}
-                  </button>
-                ))}
+              <div className="invite__gift-span">
+                <div className={'invite__gift-stepper' + (giftMonths === null ? ' is-off' : '')}>
+                  <button type="button" aria-label="Less time"
+                    disabled={giftMonths === null || giftMonths <= 1}
+                    onClick={() => setGiftMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
+                  <span>{giftMonths === null ? '∞' : spanText(giftMonths)}</span>
+                  <button type="button" aria-label="More time"
+                    disabled={giftMonths === null || giftMonths >= 24}
+                    onClick={() => setGiftMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
+                </div>
+                <button
+                  type="button"
+                  className={'invite__gift-tier' + (giftMonths === null ? ' is-on' : '')}
+                  onClick={() => setGiftMonths(giftMonths === null ? 12 : null)}
+                >
+                  No end date
+                </button>
               </div>
             )}
             {gift && (

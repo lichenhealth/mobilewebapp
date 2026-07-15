@@ -28,15 +28,11 @@ type SupporterRow = {
 // A gift riding an invitation, waiting for that email to sign up.
 type PendingGift = { id: string; invitee_email: string; tier: Tier; months: number | null; created_at: string };
 
-// null = no end date. Shared vocabulary with the Invite screen's gift block.
-const GIFT_SPANS: { months: number | null; label: string }[] = [
-  { months: 3, label: '3 months' },
-  { months: 6, label: '6 months' },
-  { months: 12, label: '1 year' },
-  { months: null, label: 'No end date' },
-];
-const spanLabel = (m: number | null) =>
-  GIFT_SPANS.find((sp) => sp.months === m)?.label ?? `${m} months`;
+// The chip and the email say the same thing: 1 month, 2 months… 1 year, 2 years.
+const spanText = (m: number | null) =>
+  m === null ? 'no end date'
+    : m % 12 === 0 ? (m === 12 ? '1 year' : `${m / 12} years`)
+    : m === 1 ? '1 month' : `${m} months`;
 
 const TIERS: { id: Tier; label: string; price: string }[] = [
   { id: 'community', label: 'Community', price: '$29/mo' },
@@ -87,7 +83,7 @@ export default function AdminSupporters() {
     const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier, p_months: months });
     setBusy(false);
     if (e) { setError(e.message); return; }
-    setMsg(`Gifted ${months ? spanLabel(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
+    setMsg(`Gifted ${months ? spanText(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
     setEmail('');
     load();
   }
@@ -140,16 +136,22 @@ export default function AdminSupporters() {
           ))}
         </div>
         <div className="adminc__gift-tiers">
-          {GIFT_SPANS.map((sp) => (
-            <button
-              key={String(sp.months)}
-              type="button"
-              className={'adminc__tier-btn' + (months === sp.months ? ' is-on' : '')}
-              onClick={() => setMonths(sp.months)}
-            >
-              {sp.label}
-            </button>
-          ))}
+          <div className={'adminc__gift-stepper' + (months === null ? ' is-off' : '')}>
+            <button type="button" aria-label="Less time"
+              disabled={months === null || months <= 1}
+              onClick={() => setMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
+            <span>{months === null ? '∞' : spanText(months)}</span>
+            <button type="button" aria-label="More time"
+              disabled={months === null || months >= 24}
+              onClick={() => setMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
+          </div>
+          <button
+            type="button"
+            className={'adminc__tier-btn' + (months === null ? ' is-on' : '')}
+            onClick={() => setMonths(months === null ? 12 : null)}
+          >
+            No end date
+          </button>
         </div>
         <button className="adminc__btn adminc__btn--approve" onClick={gift} disabled={busy || !email.trim()}>
           {busy ? '…' : 'Gift access'}
@@ -168,7 +170,7 @@ export default function AdminSupporters() {
                     {g.tier}
                   </span>
                   <span className="adminc__name">{g.invitee_email}</span>
-                  <span className="adminc__by">{spanLabel(g.months)} · invited {new Date(g.created_at).toLocaleDateString()}</span>
+                  <span className="adminc__by">{spanText(g.months)} · invited {new Date(g.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="adminc__actions">
                   <button className="adminc__btn adminc__btn--reject" onClick={() => cancelGift(g.id)}>

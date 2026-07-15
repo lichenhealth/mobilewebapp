@@ -38,7 +38,11 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
   const giftLabel = giftTier === 'concierge' ? 'Concierge' : giftTier === 'community' ? 'Community' : '';
-  const span = giftMonths === 12 ? 'a year' : giftMonths === 1 ? 'a month' : giftMonths ? `${giftMonths} months` : '';
+  const span = giftMonths
+    ? (giftMonths % 12 === 0
+        ? (giftMonths === 12 ? 'a year' : `${giftMonths / 12} years`)
+        : giftMonths === 1 ? 'a month' : `${giftMonths} months`)
+    : '';
   const giftLine = giftLabel
     ? (span
         ? `This invitation includes a gift: ${span} of Lichen (${giftLabel} membership) — yours from the moment you sign up.`
