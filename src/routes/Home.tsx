@@ -22,7 +22,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
   { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
-  { icon: 'graduation-cap', label: 'Education'   },
+  { icon: 'graduation-cap', label: 'Education',   to: '/courses'       },
   { icon: 'fork-spoon',     label: 'Food'        },
   { icon: 'palette',        label: 'Creative'    },
   { icon: 'location',       label: 'Places',      to: '/places'        },
