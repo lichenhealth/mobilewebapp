@@ -140,13 +140,13 @@ export default function App() {
             <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
               title="Learning the network" italic="offers & seeks."
               sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
-              addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training." />
+              addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training." mediaLenses />
           } />
           <Route path="/library"  element={
             <AreaFeed area="library" icon="book" crumb="Library"
               title="The network's" italic="bookshelf."
               sub="Essays, field guides, and zines on land, food, and care."
-              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." />
+              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping." mediaLenses />
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

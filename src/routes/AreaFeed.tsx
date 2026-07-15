@@ -7,7 +7,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { loadFeed, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, postMedium, type PostMedium } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -16,7 +16,14 @@ import './Marketplace.css';   // shares the mkt__ section vocabulary
 /** A real service-area section (Courses, Library, …): every post shared to
  *  the area, standard feed cards under the trust lens, its own Add + Search
  *  doors. The pattern the Marketplace proved, reusable per area. */
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint }: {
+const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
+  { medium: 'read',   label: 'Read',   icon: 'book' },
+  { medium: 'look',   label: 'Look',   icon: 'image' },
+  { medium: 'listen', label: 'Listen', icon: 'mic' },
+  { medium: 'watch',  label: 'Watch',  icon: 'video' },
+];
+
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -25,6 +32,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   sub: string;
   addLabel: string;     // the + chip label, e.g. "Offer a course"
   emptyHint: string;
+  /** Read/Look/Listen/Watch circles (Library, Courses) — derived per post. */
+  mediaLenses?: boolean;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -37,6 +46,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [showSearch, setShowSearch] = useState(false);
+  const [media, setMedia] = useState<PostMedium[]>([]);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -53,14 +63,21 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   }, [area]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return posts;
-    const q = query.trim().toLowerCase();
-    return posts.filter((p) =>
-      (p.title ?? '').toLowerCase().includes(q)
-      || p.body.toLowerCase().includes(q)
-      || (p.author?.full_name ?? '').toLowerCase().includes(q)
-      || (p.author_space?.name ?? '').toLowerCase().includes(q));
-  }, [posts, query]);
+    let list = posts;
+    if (media.length) list = list.filter((p) => media.includes(postMedium(p)));
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter((p) =>
+        (p.title ?? '').toLowerCase().includes(q)
+        || p.body.toLowerCase().includes(q)
+        || (p.author?.full_name ?? '').toLowerCase().includes(q)
+        || (p.author_space?.name ?? '').toLowerCase().includes(q));
+    }
+    return list;
+  }, [posts, media, query]);
+
+  const toggleMedium = (m: PostMedium) =>
+    setMedia((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -92,6 +109,21 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
           <span className="mkt__action-label">{addLabel}</span>
         </button>
+        {mediaLenses && (
+          <>
+            <div className="mkt__action-spacer" />
+            {MEDIA_LENSES.map((m) => (
+              <button
+                key={m.medium}
+                className={'mkt__action' + (media.includes(m.medium) ? ' is-active' : '')}
+                onClick={() => toggleMedium(m.medium)}
+              >
+                <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
+                <span className="mkt__action-label">{m.label}</span>
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       {showSearch && (

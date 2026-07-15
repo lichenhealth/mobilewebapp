@@ -2,6 +2,24 @@ import type { FeedCardProps } from '../components/FeedCard';
 import { serviceAreaIcon, postAreas, type FeedPost } from './postsApi';
 import type { IconName } from '../components/Icon';
 
+/** How you'd consume a post — derived, never declared: video (or a YouTube
+ *  preview) → watch · audio (or Spotify/SoundCloud/Bandcamp links) → listen ·
+ *  images → look · plain text → read. Priority: watch > listen > look > read. */
+export type PostMedium = 'read' | 'look' | 'listen' | 'watch';
+export function postMedium(p: FeedPostLike): PostMedium {
+  const media = Array.isArray(p.details?.media)
+    ? (p.details.media as { type: string; url: string }[]) : [];
+  const previews = Array.isArray(p.details?.previews)
+    ? (p.details.previews as { url: string; kind: string }[]) : [];
+  if (media.some((m) => m.type === 'video')
+    || previews.some((v) => v.kind === 'youtube' || /vimeo\.com/i.test(v.url))) return 'watch';
+  if (media.some((m) => m.type === 'audio')
+    || previews.some((v) => /spotify\.com|soundcloud\.com|bandcamp\.com/i.test(v.url))) return 'listen';
+  if (media.some((m) => m.type === 'photo') || p.image_url) return 'look';
+  return 'read';
+}
+interface FeedPostLike { details: Record<string, unknown>; image_url: string | null }
+
 // Map a real DB post into the existing FeedCard shape. Shared by Home + Mycelium.
 export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   // Attribution: a space-authored post ("acting as") displays as the entity.
