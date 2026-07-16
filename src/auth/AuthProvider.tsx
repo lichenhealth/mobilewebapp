@@ -51,6 +51,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [userId]);
 
+  // Presence heartbeat: stamp last_seen_at on arrival and every 10 minutes
+  // while the app is open. Soft signal only — it feeds the Home greeting's
+  // aggregate "N in your network are awake" count (individual timestamps
+  // aren't readable by anyone; no column SELECT grant).
+  useEffect(() => {
+    if (!userId) return;
+    const beat = () => {
+      void supabase.from('profiles')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', userId)
+        .then(() => {}, () => {});
+    };
+    beat();
+    const t = window.setInterval(beat, 10 * 60 * 1000);
+    return () => window.clearInterval(t);
+  }, [userId]);
+
   const markOnboarded = useCallback(() => setOnboarded(true), []);
 
   return (
