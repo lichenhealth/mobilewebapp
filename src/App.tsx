@@ -81,6 +81,7 @@ export default function App() {
   // any membership gift waiting on their email — an invited person walks
   // straight in without ever seeing the paywall.
   const memberOk = useRef(false);
+  const endingNoticed = useRef(false);
   useEffect(() => {
     if (memberOk.current || loading || !user || onboarded !== true || isAdmin) return;
     if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
@@ -98,8 +99,15 @@ export default function App() {
         const { data: claimed } = await supabase.rpc('claim_membership_gift');
         ok = ((claimed as number | null) ?? 0) > 0;
       }
-      if (ok) memberOk.current = true;
-      else if (live) navigate('/membership', { replace: true });
+      if (ok) {
+        memberOk.current = true;
+        // Time-boxed gift? Let the DB decide whether an ending-soon warning
+        // is due (it self-dedupes to one per gift window).
+        if (sub?.source === 'gift' && sub.current_period_end && !endingNoticed.current) {
+          endingNoticed.current = true;
+          void supabase.rpc('notice_gift_ending').then(() => {}, () => {});
+        }
+      } else if (live) navigate('/membership', { replace: true });
     })();
     return () => { live = false; };
   }, [user, loading, onboarded, isAdmin, pathname, navigate]);
