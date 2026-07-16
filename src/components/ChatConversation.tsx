@@ -7,6 +7,7 @@ import {
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
   colorFor, monogramFor, formatTime, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
+  markChatRead,
 } from '../lib/chatApi';
 import '../routes/ChatThread.css';
 
@@ -64,6 +65,9 @@ export default function ChatConversation({
       setMessages(((msgRes.data as MessageRow[] | null) ?? []));
       setReactions(await loadReactions(chatId));
       setLoading(false);
+      // Being here IS reading: bump the read cursor + clear this chat's
+      // bell notifications (the TopBar updates itself via realtime).
+      void markChatRead(chatId);
     })();
     return () => { active = false; };
   }, [chatId]);
@@ -79,6 +83,7 @@ export default function ChatConversation({
         (payload) => {
           const row = payload.new as MessageRow;
           setMessages((cur) => (cur.some((m) => m.id === row.id) ? cur : [...cur, row]));
+          void markChatRead(chatId);   // still looking — stay caught up
         },
       )
       .subscribe();

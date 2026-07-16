@@ -159,6 +159,20 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
 }
 
 /** Find-or-create the 1:1 direct chat with another member; returns its id. */
+/** Per-conversation unread counts (messages newer than my read cursor). */
+export async function loadUnreadCounts(): Promise<Map<string, number>> {
+  const { data, error } = await supabase.rpc('chat_unread_counts');
+  if (error) { console.warn('chat_unread_counts:', error.message); return new Map(); }
+  return new Map(((data as { chat_id: string; unread: number }[] | null) ?? [])
+    .map((r) => [r.chat_id, Number(r.unread)]));
+}
+
+/** Reading a chat: bump my read cursor + clear its bell notifications. */
+export async function markChatRead(chatId: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_chat_read', { p_chat: chatId });
+  if (error) console.warn('mark_chat_read:', error.message);
+}
+
 export async function ensureDirectChat(otherId: string): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_direct_chat', { p_other: otherId });
   if (error) throw error;
