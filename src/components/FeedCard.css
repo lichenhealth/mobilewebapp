@@ -3,7 +3,10 @@
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
   border-radius: var(--r-md);
-  overflow: hidden;
+  /* clip-x only: wide media stays contained, but the ⋯ menu can extend
+     BELOW a short card (overflow:hidden was amputating "Delete post" —
+     same lesson as .app-shell: hidden kills pop-outs). */
+  overflow-x: clip;
   box-shadow: var(--sh-soft);
   transition: box-shadow var(--d-base) var(--ease-out),
               transform var(--d-base) var(--ease-out);
@@ -272,9 +275,9 @@
 
 /* ⋯ post options menu */
 .feed-card__more-wrap { position: relative; display: inline-flex; }
-.feed-card__more-scrim { position: fixed; inset: 0; z-index: 40; }
+.feed-card__more-scrim { position: fixed; inset: 0; z-index: 60; }
 .feed-card__more {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 41;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 61;
   min-width: 200px; display: flex; flex-direction: column; gap: 2px;
   background: var(--bone); border: 1px solid var(--bone-edge);
   border-radius: var(--r-md); box-shadow: var(--sh-pop); padding: 6px;
