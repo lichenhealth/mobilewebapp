@@ -51,6 +51,7 @@ export default function AdminSupporters() {
   const [error, setError] = useState('');
 
   const [pending, setPending] = useState<PendingGift[]>([]);
+  const [myName, setMyName] = useState('');
 
   const load = useCallback(async () => {
     // Admin-only RPC: returns supporters with member name + email. Regular
@@ -76,6 +77,12 @@ export default function AdminSupporters() {
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin, load]);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setMyName((data as { full_name: string | null } | null)?.full_name ?? ''));
+  }, [user]);
+
   async function gift() {
     const em = email.trim();
     if (!em) return;
@@ -83,6 +90,9 @@ export default function AdminSupporters() {
     const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier, p_months: months });
     setBusy(false);
     if (e) { setError(e.message); return; }
+    void supabase.functions.invoke('send-gift-notice', {
+      body: { email: em, inviterName: myName, tier, months },
+    }).catch(console.warn);
     setMsg(`Gifted ${months ? spanText(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
     setEmail('');
     load();

@@ -47,6 +47,11 @@ export default function Invite() {
         const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
         setBusy(false);
         if (ge) { setError(ge.message); return; }
+        // Email echo — the in-app bell comes from gift_subscription itself,
+        // so a failed send here shouldn't fail the gift.
+        void supabase.functions.invoke('send-gift-notice', {
+          body: { email: to, inviterName: fullName, tier: giftTier, months: giftMonths },
+        }).catch(console.warn);
         setMsg(`${to} is already on Lichen 🌿 — gifted ${giftMonths ? spanText(giftMonths) + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.`);
         setEmail(''); setNote('');
         return;
