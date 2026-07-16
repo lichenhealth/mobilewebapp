@@ -54,7 +54,7 @@ const ROLE_LABEL: Record<SpaceRole, string> = {
 };
 
 export default function Profile() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const { actor, setActor, options: actingOptions, refreshSelf } = useActing();
   const navigate = useNavigate();
 
@@ -82,6 +82,7 @@ export default function Profile() {
   const [addingKind, setAddingKind] = useState<SpaceKind | null>(null);
   const [error, setError] = useState('');
 
+  const [pendingCats, setPendingCats] = useState(0);
   const [care, setCare] = useState<CareRow[]>([]);
   const [invites, setInvites] = useState<{ id: string; email: string; role: 'caregiver' | 'patient' }[]>([]);
   const [caregiverEmail, setCaregiverEmail] = useState('');
@@ -156,6 +157,15 @@ export default function Profile() {
     if (!loading && !user) { navigate('/login', { replace: true }); return; }
     if (user) { loadAll(); loadCare(); }
   }, [user, loading, navigate, loadAll, loadCare]);
+
+  // Admin badge: how many category suggestions are waiting for review.
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase.from('category_suggestions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingCats(count ?? 0));
+  }, [isAdmin]);
 
   async function inviteCare(role: 'caregiver' | 'patient', emailRaw: string) {
     if (!user) return;
@@ -616,6 +626,26 @@ export default function Profile() {
           </section>
         );
       })}
+
+      {isAdmin && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Admin</h2>
+          <p className="prof__care-lead">Lichen-wide tools — only admins see this section.</p>
+          <div className="prof__admin-rows">
+            <button className="prof__admin-row" onClick={() => navigate('/admin/categories')}>
+              <Icon name="sparkle" size={18} />
+              <span>Review categories</span>
+              {pendingCats > 0 && <em className="prof__admin-badge">{pendingCats}</em>}
+              <span className="prof__admin-go" aria-hidden>→</span>
+            </button>
+            <button className="prof__admin-row" onClick={() => navigate('/admin/supporters')}>
+              <Icon name="member-heart" size={18} />
+              <span>Memberships &amp; gifts</span>
+              <span className="prof__admin-go" aria-hidden>→</span>
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="prof__signout">
         <button className="btn btn-ghost" onClick={signOut}>Sign out</button>

@@ -185,3 +185,21 @@
   display: inline-flex; align-items: center; justify-content: center;
   border: 2px solid var(--bone);
 }
+
+/* Admin section — Lichen-wide tools live here, not in the nav */
+.prof__admin-rows { display: flex; flex-direction: column; gap: var(--s-2); }
+.prof__admin-row {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 12px 14px; border-radius: var(--r-md); text-align: left;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 14px; color: var(--ink); cursor: pointer;
+}
+.prof__admin-row:hover { border-color: var(--peach); }
+.prof__admin-row svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+.prof__admin-badge {
+  font-style: normal; min-width: 20px; height: 20px; padding: 0 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-full); background: var(--peach); color: var(--bone);
+  font-size: 11px; font-weight: 600;
+}
+.prof__admin-go { margin-left: auto; color: var(--ink-faint); }

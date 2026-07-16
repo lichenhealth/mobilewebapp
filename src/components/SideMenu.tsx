@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { listMyMemberSpaces, type MappableSpace } from '../lib/spacesApi';
@@ -63,7 +63,7 @@ const SECTIONS: NavSection[] = [
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
-  const { isAdmin, user } = useAuth();
+  const { user } = useAuth();
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
     // "Public profile" = see yourself as other members do (/members/<me>).
@@ -138,8 +138,10 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 ? totalUnread
                 : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
               return (
+                <Fragment key={p.to}>
+                {/* "you" above the line, platform doors below it */}
+                {p.to === '/invite' && <div className="side-menu__divider" aria-hidden />}
                 <NavLink
-                  key={p.to}
                   to={p.to}
                   onClick={onClose}
                   className={({ isActive }) =>
@@ -150,34 +152,10 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   <span>{p.label}</span>
                   {count > 0 && <span className="nav-badge side-menu__badge">{count > 9 ? '9+' : count}</span>}
                 </NavLink>
+                </Fragment>
               );
             })}
           </div>
-
-          {isAdmin && (
-            <div className="side-menu__admin">
-              <NavLink
-                to="/admin/categories"
-                onClick={onClose}
-                className={({ isActive }) =>
-                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
-                }
-              >
-                <Icon name="sparkle" size={20} />
-                <span>Review categories</span>
-              </NavLink>
-              <NavLink
-                to="/admin/supporters"
-                onClick={onClose}
-                className={({ isActive }) =>
-                  'side-menu__primary-item' + (isActive ? ' is-active' : '')
-                }
-              >
-                <Icon name="sparkle" size={20} />
-                <span>Gift access</span>
-              </NavLink>
-            </div>
-          )}
 
           {SECTIONS.map((s) => {
             const items = itemsFor(s.key);
