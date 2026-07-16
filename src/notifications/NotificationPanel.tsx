@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { colorFor, monogramFor, formatRelative } from '../lib/chatApi';
@@ -15,15 +16,29 @@ function scopeLabel(scope: Scope): string {
 
 export default function NotificationPanel({ scope, onClose }: { scope: Scope; onClose: () => void }) {
   const navigate = useNavigate();
-  const { rowsForScope, unreadForScope, markRead, markScopeRead } = useNotifications();
+  const { rowsForScope, markScopeRead } = useNotifications();
   const rows = rowsForScope(scope);
-  const unread = unreadForScope(scope);
+
+  // Opening the panel counts as reading (founder, 2026-07-15): the badge
+  // clears immediately, no row-by-row clicking. We snapshot which rows were
+  // unread at open so they keep their "new" highlight while you look.
+  const [freshIds] = useState(() => new Set(rows.filter((r) => !r.read_at).map((r) => r.id)));
+  const marked = useRef(false);
+  useEffect(() => {
+    if (marked.current) return;
+    marked.current = true;
+    markScopeRead(scope);
+    // scope is stable for the panel's lifetime (TopBar remounts it per route).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const open = (n: NotificationRow) => {
-    if (!n.read_at) markRead(n.id);
     onClose();
     if (n.link) navigate(n.link);
   };
+
+  // A row is highlighted if it was unread at open, or arrived live since.
+  const isFresh = (n: NotificationRow) => freshIds.has(n.id) || !n.read_at;
 
   return (
     <>
@@ -31,9 +46,6 @@ export default function NotificationPanel({ scope, onClose }: { scope: Scope; on
       <div className="notif-panel" role="dialog" aria-label="Notifications">
         <div className="notif-panel__head">
           <span className="notif-panel__title">{scopeLabel(scope)}</span>
-          {unread > 0 && (
-            <button className="notif-panel__mark" onClick={() => markScopeRead(scope)}>Mark all read</button>
-          )}
         </div>
         <div className="notif-panel__list">
           {rows.length === 0 && (
@@ -45,7 +57,7 @@ export default function NotificationPanel({ scope, onClose }: { scope: Scope; on
           {rows.map((n) => (
             <button
               key={n.id}
-              className={'notif-row' + (n.read_at ? '' : ' is-unread')}
+              className={'notif-row' + (isFresh(n) ? ' is-unread' : '')}
               onClick={() => open(n)}
             >
               <span className="notif-row__avatar" style={{ background: colorFor(n.actor_id ?? n.id) }}>
@@ -57,7 +69,7 @@ export default function NotificationPanel({ scope, onClose }: { scope: Scope; on
                 </span>
                 <span className="notif-row__time">{formatRelative(n.created_at)}</span>
               </span>
-              {!n.read_at && <span className="notif-row__dot" aria-hidden="true" />}
+              {isFresh(n) && <span className="notif-row__dot" aria-hidden="true" />}
             </button>
           ))}
         </div>

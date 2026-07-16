@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import {
-  loadChatList, ensureDirectChat, messagePreview,
+  loadChatList, loadUnreadCounts, ensureDirectChat, messagePreview,
   colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM,
 } from '../lib/chatApi';
 import './Chat.css';
@@ -12,6 +12,7 @@ import './Chat.css';
 export default function Chat() {
   const [query, setQuery] = useState('');
   const [chats, setChats] = useState<ChatVM[]>([]);
+  const [unread, setUnread] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function Chat() {
     if (!me) return;
     let active = true;
     loadChatList(me).then((vms) => { if (active) { setChats(vms); setLoading(false); } });
+    loadUnreadCounts().then((m) => { if (active) setUnread(m); });
     return () => { active = false; };
   }, [me]);
 
@@ -96,6 +98,7 @@ export default function Chat() {
             chat={c}
             me={me}
             highlight={query}
+            unread={unread.get(c.id) ?? 0}
             onClick={() => navigate(`/chat/${c.id}`)}
           />
         ))}
@@ -121,7 +124,7 @@ export default function Chat() {
   );
 }
 
-function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: string; highlight?: string; onClick: () => void }) {
+function ConversationRow({ chat, me, highlight, unread = 0, onClick }: { chat: ChatVM; me: string; highlight?: string; unread?: number; onClick: () => void }) {
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
   const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
@@ -131,7 +134,7 @@ function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: s
   const showSender = last && !isDM;
 
   return (
-    <button className="conv-row" onClick={onClick}>
+    <button className={'conv-row' + (unread > 0 ? ' has-unread' : '')} onClick={onClick}>
       <div className="conv-row__avatar-stack">
         <GroupAvatar chat={chat} me={me} />
       </div>
@@ -149,6 +152,7 @@ function ConversationRow({ chat, me, highlight, onClick }: { chat: ChatVM; me: s
               ? <>{showSender && senderName && <span className="conv-row__sender">{senderName}: </span>}{highlightText(messagePreview(last), highlight)}</>
               : <em>No messages yet</em>}
           </span>
+          {unread > 0 && <span className="conv-row__unread">{unread > 99 ? '99+' : unread}</span>}
         </div>
       </div>
     </button>

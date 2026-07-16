@@ -32,19 +32,35 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string) {
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null) {
   const signup = `${APP_URL}/signup`;
   const subject = `${inviterName} invited you to Lichen`;
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
+  const giftLabel = giftTier === 'concierge' ? 'Concierge' : giftTier === 'community' ? 'Community' : '';
+  const span = giftMonths
+    ? (giftMonths % 12 === 0
+        ? (giftMonths === 12 ? 'a year' : `${giftMonths / 12} years`)
+        : giftMonths === 1 ? 'a month' : `${giftMonths} months`)
+    : '';
+  const giftLine = giftLabel
+    ? (span
+        ? `This invitation includes a gift: ${span} of Lichen (${giftLabel} membership) — yours from the moment you sign up.`
+        : `This invitation includes a gifted ${giftLabel} membership — Lichen is yours from the moment you sign up.`)
+    : '';
+
   const noteText = note ? `\n\nThey added a note:\n"${note}"\n` : '';
+  const giftText = giftLine ? `\n${giftLine}\n` : '';
   const text =
-    `${intro}\n${noteText}\n` +
+    `${intro}\n${noteText}${giftText}\n` +
     `Join here:\n${signup}\n\n` +
     `— Lichen`;
 
   const noteHtml = note
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#fff;border-radius:12px;color:#4a463f">${esc(note)}</p>`
+    : '';
+  const giftHtml = giftLine
+    ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#2b2b28"><strong>${esc(giftLine)}</strong></p>`
     : '';
 
   const html = `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
@@ -52,6 +68,7 @@ function content(inviterName: string, note: string) {
     <p style="font-size:22px;font-weight:600;margin:0 0 16px">Lichen</p>
     <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${esc(intro)}</p>
     ${noteHtml}
+    ${giftHtml}
     <p style="margin:0 0 28px">
       <a href="${signup}" style="display:inline-block;background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">Join on Lichen</a>
     </p>
@@ -67,7 +84,7 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number };
   try {
     body = await req.json();
   } catch {
@@ -77,12 +94,17 @@ Deno.serve(async (req) => {
   const email = (body.email ?? '').trim();
   const inviterName = (body.inviterName ?? '').trim() || 'A friend on Lichen';
   const note = (body.note ?? '').trim().slice(0, 500);
+  // Cosmetic only — the gift itself lives in membership_gifts, written by the
+  // admin-gated client flow; a forged giftTier here just decorates an email.
+  const giftTier = (body.giftTier ?? '').trim().toLowerCase();
+  const giftMonths = Number.isFinite(body.giftMonths) && (body.giftMonths as number) > 0
+    ? Math.round(body.giftMonths as number) : null;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return json({ error: 'A valid recipient email is required.' }, 400);
   }
 
-  const { subject, text, html } = content(inviterName, note);
+  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

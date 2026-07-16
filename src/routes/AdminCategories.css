@@ -51,3 +51,18 @@
 .adminc__tier-price { font-weight: 400; opacity: 0.8; }
 .adminc__msg { font-size: var(--t-sm); color: var(--peach-deep); margin-bottom: var(--s-3); }
 .adminc__subhead { font-family: var(--font-display); font-size: var(--t-lg); color: var(--ink); margin: var(--s-3) 0 var(--s-2); }
+
+/* Gift-duration stepper (Gift access) */
+.adminc__gift-stepper {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--bone); border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  padding: 2px;
+}
+.adminc__gift-stepper.is-off { opacity: 0.45; }
+.adminc__gift-stepper span { min-width: 78px; text-align: center; font-size: 13px; color: var(--ink); }
+.adminc__gift-stepper button {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 15px; line-height: 1; color: var(--ink); cursor: pointer;
+}
+.adminc__gift-stepper button:disabled { opacity: 0.4; cursor: default; }

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './routes/Home';
 import SpacesDirectory from './routes/SpacesDirectory';
@@ -41,7 +41,12 @@ import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
+import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
+
+// Reachable without a membership: auth flows, the paywall itself, and Help
+// (a member with a payment problem must be able to reach support).
+const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help'];
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -58,13 +63,54 @@ export default function App() {
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
-  const { user, loading, onboarded } = useAuth();
+  const { user, loading, onboarded, isAdmin } = useAuth();
   useEffect(() => {
     if (loading || onboarded === null) return;
     if (user && onboarded === false && !isAuth) {
       navigate('/onboarding', { replace: true });
     }
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
+
+  // MEMBERSHIP GATE (2026-07-15, founder): Lichen is a membership — every
+  // non-admin needs an active subscription (Stripe, or gifted — either from
+  // /admin/supporters or riding an admin's invitation). Checked per
+  // navigation with a session cache; the cache stays empty until a
+  // subscription exists, so the check re-runs and picks up a fresh
+  // Stripe-webhook write the moment they leave /membership. past_due keeps
+  // access (Stripe's retry window). Before turning anyone away, we redeem
+  // any membership gift waiting on their email — an invited person walks
+  // straight in without ever seeing the paywall.
+  const memberOk = useRef(false);
+  const endingNoticed = useRef(false);
+  useEffect(() => {
+    if (memberOk.current || loading || !user || onboarded !== true || isAdmin) return;
+    if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('subscriptions')
+        .select('status, source, current_period_end').eq('profile_id', user.id).maybeSingle();
+      const sub = data as { status: string; source: string; current_period_end: string | null } | null;
+      // Gifts can be time-boxed ("a year of Lichen") — an ended gift no
+      // longer passes. Stripe rows keep their own lifecycle via status.
+      const giftAlive = !sub || sub.source !== 'gift'
+        || !sub.current_period_end || new Date(sub.current_period_end) > new Date();
+      let ok = !!sub && ['active', 'past_due'].includes(sub.status) && giftAlive;
+      if (!ok) {
+        const { data: claimed } = await supabase.rpc('claim_membership_gift');
+        ok = ((claimed as number | null) ?? 0) > 0;
+      }
+      if (ok) {
+        memberOk.current = true;
+        // Time-boxed gift? Let the DB decide whether an ending-soon warning
+        // is due (it self-dedupes to one per gift window).
+        if (sub?.source === 'gift' && sub.current_period_end && !endingNoticed.current) {
+          endingNoticed.current = true;
+          void supabase.rpc('notice_gift_ending').then(() => {}, () => {});
+        }
+      } else if (live) navigate('/membership', { replace: true });
+    })();
+    return () => { live = false; };
+  }, [user, loading, onboarded, isAdmin, pathname, navigate]);
 
   return (
     <CollectPromptProvider>

@@ -10,6 +10,7 @@ type Row = {
   tier: Tier;
   source: 'gift' | 'stripe';
   status: string;
+  current_period_end: string | null;
   member: { full_name: string | null; email: string | null } | null;
 };
 
@@ -21,7 +22,17 @@ type SupporterRow = {
   status: string;
   full_name: string | null;
   email: string | null;
+  current_period_end: string | null;
 };
+
+// A gift riding an invitation, waiting for that email to sign up.
+type PendingGift = { id: string; invitee_email: string; tier: Tier; months: number | null; created_at: string };
+
+// The chip and the email say the same thing: 1 month, 2 months… 1 year, 2 years.
+const spanText = (m: number | null) =>
+  m === null ? 'no end date'
+    : m % 12 === 0 ? (m === 12 ? '1 year' : `${m / 12} years`)
+    : m === 1 ? '1 month' : `${m} months`;
 
 const TIERS: { id: Tier; label: string; price: string }[] = [
   { id: 'community', label: 'Community', price: '$29/mo' },
@@ -34,13 +45,23 @@ export default function AdminSupporters() {
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState('');
   const [tier, setTier] = useState<Tier>('community');
+  const [months, setMonths] = useState<number | null>(12);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
+  const [pending, setPending] = useState<PendingGift[]>([]);
+  const [myName, setMyName] = useState('');
+
   const load = useCallback(async () => {
     // Admin-only RPC: returns supporters with member name + email. Regular
     // members can no longer read emails via a direct table query.
+    const { data: pg } = await supabase
+      .from('membership_gifts')
+      .select('id, invitee_email, tier, months, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    setPending(((pg as PendingGift[] | null) ?? []));
     const { data, error: e } = await supabase.rpc('admin_list_supporters');
     if (e) setError(e.message);
     else setRows(((data as SupporterRow[] | null) ?? []).map((d) => ({
@@ -48,6 +69,7 @@ export default function AdminSupporters() {
       tier: d.tier as Tier,
       source: d.source as 'gift' | 'stripe',
       status: d.status,
+      current_period_end: d.current_period_end,
       member: { full_name: d.full_name, email: d.email },
     })));
     setLoaded(true);
@@ -55,16 +77,31 @@ export default function AdminSupporters() {
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin, load]);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setMyName((data as { full_name: string | null } | null)?.full_name ?? ''));
+  }, [user]);
+
   async function gift() {
     const em = email.trim();
     if (!em) return;
     setBusy(true); setMsg(''); setError('');
-    const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier });
+    const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier, p_months: months });
     setBusy(false);
     if (e) { setError(e.message); return; }
-    setMsg(`Gifted ${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
+    void supabase.functions.invoke('send-gift-notice', {
+      body: { email: em, inviterName: myName, tier, months },
+    }).catch(console.warn);
+    setMsg(`Gifted ${months ? spanText(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
     setEmail('');
     load();
+  }
+
+  async function cancelGift(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('membership_gifts').delete().eq('id', id);
+    if (e) setError(e.message); else load();
   }
 
   async function revoke(em: string | null) {
@@ -108,11 +145,53 @@ export default function AdminSupporters() {
             </button>
           ))}
         </div>
+        <div className="adminc__gift-tiers">
+          <div className={'adminc__gift-stepper' + (months === null ? ' is-off' : '')}>
+            <button type="button" aria-label="Less time"
+              disabled={months === null || months <= 1}
+              onClick={() => setMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
+            <span>{months === null ? '∞' : spanText(months)}</span>
+            <button type="button" aria-label="More time"
+              disabled={months === null || months >= 24}
+              onClick={() => setMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
+          </div>
+          <button
+            type="button"
+            className={'adminc__tier-btn' + (months === null ? ' is-on' : '')}
+            onClick={() => setMonths(months === null ? 12 : null)}
+          >
+            No end date
+          </button>
+        </div>
         <button className="adminc__btn adminc__btn--approve" onClick={gift} disabled={busy || !email.trim()}>
           {busy ? '…' : 'Gift access'}
         </button>
       </div>
       {msg && <p className="adminc__msg">{msg}</p>}
+
+      {pending.length > 0 && (
+        <>
+          <h2 className="adminc__subhead">Waiting to sign up</h2>
+          <ul className="adminc__list">
+            {pending.map((g) => (
+              <li key={g.id} className="adminc__row">
+                <div className="adminc__info">
+                  <span className={'adminc__badge adminc__badge--' + (g.tier === 'concierge' ? 'good' : 'service')}>
+                    {g.tier}
+                  </span>
+                  <span className="adminc__name">{g.invitee_email}</span>
+                  <span className="adminc__by">{spanText(g.months)} · invited {new Date(g.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="adminc__actions">
+                  <button className="adminc__btn adminc__btn--reject" onClick={() => cancelGift(g.id)}>
+                    Cancel
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2 className="adminc__subhead">Current supporters</h2>
       {loaded && rows.length === 0 && <p className="adminc__empty">No supporters yet.</p>}
@@ -124,7 +203,14 @@ export default function AdminSupporters() {
                 {r.tier}
               </span>
               <span className="adminc__name">{r.member?.full_name || r.member?.email || 'Member'}</span>
-              <span className="adminc__by">{r.source === 'gift' ? 'gifted' : 'paid'} · {r.status}</span>
+              <span className="adminc__by">
+                {r.source === 'gift' ? 'gifted' : 'paid'} · {r.status}
+                {r.source === 'gift' && r.current_period_end
+                  ? (new Date(r.current_period_end) > new Date()
+                      ? ` · through ${new Date(r.current_period_end).toLocaleDateString()}`
+                      : ` · ended ${new Date(r.current_period_end).toLocaleDateString()}`)
+                  : ''}
+              </span>
             </div>
             <div className="adminc__actions">
               <button className="adminc__btn adminc__btn--reject" onClick={() => revoke(r.member?.email ?? null)}>

@@ -198,13 +198,10 @@
   .side-menu__primary { display: none; }
 }
 
-/* Admin links — visible on BOTH desktop and mobile (unlike .side-menu__primary,
-   which mobile hides in favor of the bottom nav). */
-.side-menu__admin {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: var(--s-4);
-  padding-bottom: var(--s-4);
-  border-bottom: 1px solid var(--bone-edge);
+/* Thin break between "you" (Profile/Public profile) and the platform doors
+   (Invite/Help/Membership). Admin tools live on the Profile page now. */
+.side-menu__divider {
+  height: 1px;
+  background: var(--bone-edge);
+  margin: var(--s-3) var(--s-2);
 }
