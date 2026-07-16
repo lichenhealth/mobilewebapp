@@ -20,20 +20,23 @@ import './Marketplace.css';
 type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding' | 'iso';
 // Lend & Borrow are two sides of one exchange — one chip shows both (the
 // card eyebrows tell you which side each post is). ISO = in-search-of asks.
-type Chip = 'gift' | 'trade' | 'rent' | 'lendborrow' | 'iso' | 'sliding' | 'sale';
+// "For Sale" covers fixed-price AND sliding-scale — sliding is a pricing
+// style, not a category (founder, 2026-07-16); the card's eyebrow shows
+// either the fixed price or the sliding range.
+type Chip = 'gift' | 'trade' | 'rent' | 'lendborrow' | 'iso' | 'sale';
 const CHIP_MODES: Record<Chip, Mode[]> = {
   gift: ['gift'], trade: ['trade'], rent: ['rent'],
-  lendborrow: ['lend', 'borrow'], iso: ['iso'], sliding: ['sliding'], sale: ['sale'],
+  lendborrow: ['lend', 'borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
 };
 const MODES: { chip: Chip; label: string; icon: IconName }[] = [
   { chip: 'gift',       label: 'Gift',        icon: 'heart-line' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
   { chip: 'lendborrow', label: 'Lend/Borrow', icon: 'lend' },
-  { chip: 'sliding',    label: 'Sliding',     icon: 'sliders' },
-  { chip: 'sale',       label: 'Sale',        icon: 'store' },
+  { chip: 'sale',       label: 'For Sale',    icon: 'store' },
   { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
+const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
 function postMode(p: FeedPost): Mode | null {
@@ -61,7 +64,7 @@ export default function Marketplace() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
-  const [activeChips, setActiveChips] = useState<Chip[]>([]);
+  const [activeChips, setActiveChips] = useState<Chip[]>(ALL_CHIPS);   // lenses default all-on
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -78,14 +81,13 @@ export default function Marketplace() {
   }, []);
 
   const filtered = useMemo(() => {
-    let list = posts;
-    if (activeChips.length) {
-      const wanted = new Set(activeChips.flatMap((c) => CHIP_MODES[c]));
-      list = list.filter((p) => {
-        const m = postMode(p);
-        return m != null && wanted.has(m);
-      });
-    }
+    const wanted = new Set(activeChips.flatMap((c) => CHIP_MODES[c]));
+    // Unlabeled listings stay visible while any lens is on — only an
+    // explicit mode can be filtered away.
+    let list = posts.filter((p) => {
+      const m = postMode(p);
+      return m == null ? activeChips.length > 0 : wanted.has(m);
+    });
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter((p) =>

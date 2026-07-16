@@ -38,13 +38,19 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     ? (p.details.media as FeedCardProps['media'])
     : undefined;
   // Listings wear their offer: "Rent · $20/day", "Gift", "Sliding scale $20–$60".
+  // Sliding scale is a pricing style within For sale, not its own category:
+  // fixed price → "For sale · $50", sliding → "For sale · sliding $20–$60".
   const MODE_LABEL: Record<string, string> = {
-    gift: 'Gift', sale: 'For sale', sliding: 'Sliding scale',
+    gift: 'Gift', sale: 'For sale', sliding: 'For sale',
     trade: 'Trade', rent: 'Rent', lend: 'Lend', borrow: 'Looking to borrow', iso: 'In search of',
   };
-  const mode = typeof p.details?.mode === 'string' ? MODE_LABEL[p.details.mode as string] : undefined;
-  const price = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
-  const offerLine = mode ? (price && !price.toLowerCase().startsWith('sliding') ? `${mode} · ${price}` : mode === 'Sliding scale' && price ? price : mode) : undefined;
+  const rawMode = typeof p.details?.mode === 'string' ? (p.details.mode as string) : undefined;
+  const mode = rawMode ? MODE_LABEL[rawMode] : undefined;
+  const rawPrice = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
+  const price = rawMode === 'sliding' && rawPrice
+    ? 'sliding ' + rawPrice.replace(/^sliding scale\s*/i, '')
+    : rawPrice;
+  const offerLine = mode ? (price ? `${mode} · ${price}` : mode) : undefined;
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;
