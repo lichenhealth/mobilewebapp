@@ -98,6 +98,36 @@ export default function AdminSupporters() {
     load();
   }
 
+  // Inline gift editing: re-gifting overwrites tier + end date server-side.
+  const [editing, setEditing] = useState<string | null>(null);   // profile_id
+  const [editTier, setEditTier] = useState<Tier>('community');
+  const [editMonths, setEditMonths] = useState<number | null>(12);
+
+  function startEdit(r: Row) {
+    setEditing(r.profile_id);
+    setEditTier(r.tier);
+    // Prefill with time REMAINING; saving re-stamps end = now + months,
+    // which lands within days of the current end date.
+    setEditMonths(r.current_period_end
+      ? Math.max(1, Math.round((new Date(r.current_period_end).getTime() - Date.now()) / (30.44 * 24 * 3600 * 1000)))
+      : null);
+    setMsg('');
+  }
+
+  async function saveEdit(r: Row) {
+    const em = r.member?.email;
+    if (!em) return;
+    setBusy(true); setError('');
+    // Same RPC as gifting — the upsert replaces tier + end date and rings
+    // their bell with the new terms. No email echo for edits.
+    const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: editTier, p_months: editMonths });
+    setBusy(false);
+    if (e) { setError(e.message); return; }
+    setMsg(`Updated ${r.member?.full_name || em}: ${editMonths ? spanText(editMonths) + ' of ' : ''}${TIERS.find((t) => t.id === editTier)?.label}.`);
+    setEditing(null);
+    load();
+  }
+
   async function cancelGift(id: string) {
     setError('');
     const { error: e } = await supabase.from('membership_gifts').delete().eq('id', id);
@@ -213,10 +243,52 @@ export default function AdminSupporters() {
               </span>
             </div>
             <div className="adminc__actions">
+              {r.source === 'gift' && (
+                <button className="adminc__btn" onClick={() => (editing === r.profile_id ? setEditing(null) : startEdit(r))}>
+                  {editing === r.profile_id ? 'Close' : 'Edit'}
+                </button>
+              )}
               <button className="adminc__btn adminc__btn--reject" onClick={() => revoke(r.member?.email ?? null)}>
                 Revoke
               </button>
             </div>
+            {editing === r.profile_id && (
+              <div className="adminc__edit">
+                <div className="adminc__gift-tiers">
+                  {TIERS.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={'adminc__tier-btn' + (editTier === t.id ? ' is-on' : '')}
+                      onClick={() => setEditTier(t.id)}
+                    >
+                      {t.label} <span className="adminc__tier-price">{t.price}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="adminc__gift-tiers">
+                  <div className={'adminc__gift-stepper' + (editMonths === null ? ' is-off' : '')}>
+                    <button type="button" aria-label="Less time"
+                      disabled={editMonths === null || editMonths <= 1}
+                      onClick={() => setEditMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
+                    <span>{editMonths === null ? '∞' : spanText(editMonths)}</span>
+                    <button type="button" aria-label="More time"
+                      disabled={editMonths === null || editMonths >= 24}
+                      onClick={() => setEditMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
+                  </div>
+                  <button
+                    type="button"
+                    className={'adminc__tier-btn' + (editMonths === null ? ' is-on' : '')}
+                    onClick={() => setEditMonths(editMonths === null ? 12 : null)}
+                  >
+                    No end date
+                  </button>
+                </div>
+                <button className="adminc__btn adminc__btn--approve" disabled={busy} onClick={() => void saveEdit(r)}>
+                  {busy ? '…' : 'Save changes'}
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
