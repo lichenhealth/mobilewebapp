@@ -48,7 +48,7 @@ export default function Events() {
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [tab, setTab] = useState('All');
-  const [modes, setModes] = useState<EventMode[]>([]);
+  const [modes, setModes] = useState<EventMode[]>(['free', 'trade', 'paid']);   // lenses default all-on
   const [statuses, setStatuses] = useState<Map<string, MyRsvpStatus>>(new Map());
   const [showPast, setShowPast] = useState(false);
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -80,7 +80,7 @@ export default function Events() {
     const cat = EVENT_CATEGORIES.find((c) => c.label === tab)?.value as EventCategory | undefined;
     return posts
       .filter((p) => (tab === 'All' || p.event_category === cat))
-      .filter((p) => (modes.length === 0 || (p.event_mode != null && modes.includes(p.event_mode))))
+      .filter((p) => (p.event_mode == null ? modes.length > 0 : modes.includes(p.event_mode)))
       .sort((a, b) => {
         const da = a.linked_event?.start_date ?? '9999-12-31';
         const db = b.linked_event?.start_date ?? '9999-12-31';
