@@ -54,11 +54,14 @@ export default function Mycelium() {
   }
 
   const [content, setContent] = useState('All');
+  // Lenses default ALL-ON (founder, 2026-07-16, media-lens grammar): you see
+  // everything until you deselect to narrow. A /mycelium/<kind> URL starts
+  // narrowed to that kind.
   const [kinds, setKinds] = useState<Kind[]>(() => {
     const k = URL_TO_KIND[urlSlug];
-    return k ? [k] : [];
+    return k ? [k] : KINDS.map((x) => x.type);
   });
-  const [areas, setAreas] = useState<ServiceArea[]>([]);
+  const [areas, setAreas] = useState<ServiceArea[]>(() => SERVICE_AREAS.map((a) => a.value));
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [myWeb, setMyWeb] = useState<Set<string>>(new Set());
@@ -115,8 +118,8 @@ export default function Mycelium() {
   const visible = useMemo(
     () => items.filter((it) =>
       (content === 'All' || it.contentLabel === content) &&
-      (kinds.length === 0 || kinds.includes(it.kind)) &&
-      (areas.length === 0 || it.areas.some((a) => areas.includes(a)))
+      kinds.includes(it.kind) &&
+      it.areas.some((a) => areas.includes(a))
     ),
     [items, content, kinds, areas]
   );
