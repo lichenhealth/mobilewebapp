@@ -39,7 +39,7 @@ begin
     granted_by = v_caller, granted_at = now(), current_period_end = excluded.current_period_end,
     stripe_customer_id = null, stripe_subscription_id = null, updated_at = now();
   perform public.notify(
-    v_target, 'profile', null, 'membership_gifted',
+    v_target, 'membership', null, 'membership_gifted',
     'You''ve been gifted ' || coalesce(v_span || ' of ', '') || 'Lichen (' || initcap(p_tier) || ')',
     'It''s already active — welcome in.',
     '/membership', v_caller
@@ -74,7 +74,7 @@ begin
       set status = 'claimed', claimed_profile_id = v_uid, claimed_at = now()
       where id = g.id;
     perform public.notify(
-      v_uid, 'profile', null, 'membership_gifted',
+      v_uid, 'membership', null, 'membership_gifted',
       'Your gift is active: ' || coalesce(public.gift_span_text(g.months) || ' of ', '') || 'Lichen (' || initcap(g.tier) || ')',
       'Welcome in.',
       '/membership', g.inviter_id
