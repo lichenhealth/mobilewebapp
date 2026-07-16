@@ -14,7 +14,7 @@ create table if not exists public.membership_gifts (
   status text not null default 'pending' check (status in ('pending','claimed')),
   created_at timestamptz not null default now(),
   claimed_at timestamptz,
-  claimed_profile_id uuid references public.profiles(id)
+  claimed_profile_id uuid references public.profiles(id) on delete set null
 );
 
 -- (no-op on a fresh run; upgrades a table created before months existed)
