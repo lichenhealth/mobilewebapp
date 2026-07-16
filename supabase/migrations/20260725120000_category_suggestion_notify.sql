@@ -14,7 +14,7 @@ begin
   select full_name into v_who from public.profiles where id = new.proposer_id;
   for v_admin in select id from public.profiles where is_admin loop
     perform public.notify(
-      v_admin, 'home', null, 'category_suggested',
+      v_admin, 'profile', null, 'category_suggested',
       coalesce(v_who, 'A member') || ' suggests a new category: “' || new.name || '”',
       'Review it under Admin on your Profile.',
       '/admin/categories', new.proposer_id
