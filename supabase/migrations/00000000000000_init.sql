@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zT5yePljBe442s2NSlckxc3vXDV5bfQAkwqo8NmFOR3nEa4bRjFERLgZDIxY00K
+\restrict kLirEbaA0QHVFmogxf8S2F9YS72qaMWDQUiLJXxW6tggZQMM9OcV88p05LqqUGh
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -108,7 +108,7 @@ ALTER FUNCTION public.accept_space_invite(p_space uuid) OWNER TO postgres;
 -- Name: admin_list_supporters(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.admin_list_supporters() RETURNS TABLE(profile_id uuid, tier text, source text, status text, full_name text, email text)
+CREATE FUNCTION public.admin_list_supporters() RETURNS TABLE(profile_id uuid, tier text, source text, status text, full_name text, email text, current_period_end timestamp with time zone)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
@@ -117,7 +117,7 @@ begin
     raise exception 'not authorized';
   end if;
   return query
-    select s.profile_id, s.tier, s.source, s.status, p.full_name, p.email
+    select s.profile_id, s.tier, s.source, s.status, p.full_name, p.email, s.current_period_end
     from public.subscriptions s
     left join public.profiles p on p.id = s.profile_id
     order by s.granted_at desc nulls last;
@@ -360,6 +360,26 @@ $$;
 ALTER FUNCTION public.care_member_display(p_ids uuid[]) OWNER TO postgres;
 
 --
+-- Name: chat_unread_counts(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.chat_unread_counts() RETURNS TABLE(chat_id uuid, unread bigint)
+    LANGUAGE sql STABLE
+    AS $$
+  select m.chat_id, count(msg.id)
+  from public.chat_members m
+  join public.chat_messages msg
+    on msg.chat_id = m.chat_id
+   and msg.created_at > m.last_read_at
+   and msg.sender_id <> auth.uid()
+  where m.profile_id = auth.uid()
+  group by m.chat_id;
+$$;
+
+
+ALTER FUNCTION public.chat_unread_counts() OWNER TO postgres;
+
+--
 -- Name: claim_care_invitations(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -399,6 +419,51 @@ end; $$;
 
 
 ALTER FUNCTION public.claim_care_invitations() OWNER TO postgres;
+
+--
+-- Name: claim_membership_gift(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.claim_membership_gift() RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid   uuid := auth.uid();
+  v_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  g       record;
+  v_count int := 0;
+begin
+  if v_uid is null or v_email = '' then return 0; end if;
+  for g in
+    select * from public.membership_gifts
+    where lower(invitee_email) = v_email and status = 'pending'
+    order by (tier = 'concierge') desc, created_at desc
+  loop
+    insert into public.subscriptions (profile_id, tier, source, status, granted_by, granted_at, current_period_end, updated_at)
+    values (
+      v_uid, g.tier, 'gift', 'active', g.inviter_id, now(),
+      case when g.months is null then null else now() + make_interval(months => g.months) end,
+      now()
+    )
+    on conflict (profile_id) do nothing;
+    update public.membership_gifts
+      set status = 'claimed', claimed_profile_id = v_uid, claimed_at = now()
+      where id = g.id;
+    perform public.notify(
+      v_uid, 'membership', null, 'membership_gifted',
+      'Your gift is active: ' || coalesce(public.gift_span_text(g.months) || ' of ', '') || 'Lichen (' || initcap(g.tier) || ')',
+      'Welcome in.',
+      '/membership', g.inviter_id
+    );
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end;
+$$;
+
+
+ALTER FUNCTION public.claim_membership_gift() OWNER TO postgres;
 
 --
 -- Name: compose_full_name(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -741,30 +806,90 @@ $$;
 ALTER FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date) OWNER TO postgres;
 
 --
--- Name: gift_subscription(text, text); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: gift_span_text(integer); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.gift_subscription(p_email text, p_tier text) RETURNS void
+CREATE FUNCTION public.gift_span_text(p_months integer) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  select case
+    when p_months is null then null
+    when p_months % 12 = 0 and p_months = 12 then 'a year'
+    when p_months % 12 = 0 then (p_months / 12) || ' years'
+    when p_months = 1 then 'a month'
+    else p_months || ' months'
+  end;
+$$;
+
+
+ALTER FUNCTION public.gift_span_text(p_months integer) OWNER TO postgres;
+
+--
+-- Name: gift_subscription(text, text, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.gift_subscription(p_email text, p_tier text, p_months integer DEFAULT NULL::integer) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_caller uuid := auth.uid(); v_is_admin boolean; v_target uuid;
+declare
+  v_caller uuid := auth.uid();
+  v_is_admin boolean;
+  v_target uuid;
+  v_end timestamptz := case when p_months is null then null else now() + make_interval(months => p_months) end;
+  v_span text := public.gift_span_text(p_months);
 begin
   select is_admin into v_is_admin from public.profiles where id = v_caller;
   if not coalesce(v_is_admin, false) then raise exception 'Not authorized'; end if;
   if p_tier not in ('community','concierge') then raise exception 'Invalid tier'; end if;
+  if p_months is not null and p_months <= 0 then raise exception 'Invalid duration'; end if;
   select id into v_target from public.profiles where lower(email) = lower(p_email);
   if v_target is null then raise exception 'No member with that email'; end if;
-  insert into public.subscriptions (profile_id, tier, source, status, granted_by, granted_at, updated_at)
-  values (v_target, p_tier, 'gift', 'active', v_caller, now(), now())
+  insert into public.subscriptions (profile_id, tier, source, status, granted_by, granted_at, current_period_end, updated_at)
+  values (v_target, p_tier, 'gift', 'active', v_caller, now(), v_end, now())
   on conflict (profile_id) do update set
     tier = excluded.tier, source = 'gift', status = 'active',
-    granted_by = v_caller, granted_at = now(),
+    granted_by = v_caller, granted_at = now(), current_period_end = excluded.current_period_end,
     stripe_customer_id = null, stripe_subscription_id = null, updated_at = now();
-end; $$;
+  perform public.notify(
+    v_target, 'membership', null, 'membership_gifted',
+    'You''ve been gifted ' || coalesce(v_span || ' of ', '') || 'Lichen (' || initcap(p_tier) || ')',
+    'It''s already active — welcome in.',
+    '/membership', v_caller
+  );
+end;
+$$;
 
 
-ALTER FUNCTION public.gift_subscription(p_email text, p_tier text) OWNER TO postgres;
+ALTER FUNCTION public.gift_subscription(p_email text, p_tier text, p_months integer) OWNER TO postgres;
+
+--
+-- Name: handle_new_category_suggestion(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.handle_new_category_suggestion() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_who text;
+  v_admin uuid;
+begin
+  select full_name into v_who from public.profiles where id = new.proposer_id;
+  for v_admin in select id from public.profiles where is_admin loop
+    perform public.notify(
+      v_admin, 'profile', null, 'category_suggested',
+      coalesce(v_who, 'A member') || ' suggests a new category: “' || new.name || '”',
+      'Review it under Admin on your Profile.',
+      '/admin/categories', new.proposer_id
+    );
+  end loop;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.handle_new_category_suggestion() OWNER TO postgres;
 
 --
 -- Name: handle_new_nesting_request(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1046,6 +1171,27 @@ $$;
 ALTER FUNCTION public.mappable_members() OWNER TO postgres;
 
 --
+-- Name: mark_chat_read(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.mark_chat_read(p_chat uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  update public.chat_members set last_read_at = now()
+    where chat_id = p_chat and profile_id = auth.uid();
+  if not found then return; end if;   -- not a member: touch nothing
+  update public.notifications set read_at = now()
+    where recipient_id = auth.uid() and section = 'chat'
+      and link = '/chat/' || p_chat and read_at is null;
+end;
+$$;
+
+
+ALTER FUNCTION public.mark_chat_read(p_chat uuid) OWNER TO postgres;
+
+--
 -- Name: my_home(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1068,6 +1214,43 @@ CREATE FUNCTION public.my_phone() RETURNS text
 
 
 ALTER FUNCTION public.my_phone() OWNER TO postgres;
+
+--
+-- Name: notice_gift_ending(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.notice_gift_ending() RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  s record;
+begin
+  if v_uid is null then return 0; end if;
+  select * into s from public.subscriptions
+    where profile_id = v_uid and source = 'gift' and status = 'active'
+      and current_period_end is not null
+      and current_period_end > now()
+      and current_period_end <= now() + interval '14 days';
+  if s.profile_id is null then return 0; end if;
+  if exists (
+    select 1 from public.notifications
+    where recipient_id = v_uid and type = 'membership_ending'
+      and created_at > s.current_period_end - interval '14 days'
+  ) then return 0; end if;
+  perform public.notify(
+    v_uid, 'membership', null, 'membership_ending',
+    'Your gifted membership ends ' || to_char(s.current_period_end, 'FMMonth FMDD'),
+    'Choose a plan to keep your access uninterrupted.',
+    '/membership', null
+  );
+  return 1;
+end;
+$$;
+
+
+ALTER FUNCTION public.notice_gift_ending() OWNER TO postgres;
 
 --
 -- Name: notify(uuid, text, uuid, text, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1698,7 +1881,8 @@ ALTER TABLE public.category_suggestions OWNER TO postgres;
 CREATE TABLE public.chat_members (
     chat_id uuid NOT NULL,
     profile_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_read_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1904,6 +2088,28 @@ CREATE TABLE public.location_shares (
 
 
 ALTER TABLE public.location_shares OWNER TO postgres;
+
+--
+-- Name: membership_gifts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.membership_gifts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    inviter_id uuid NOT NULL,
+    invitee_email text NOT NULL,
+    tier text DEFAULT 'community'::text NOT NULL,
+    months integer,
+    status text DEFAULT 'pending'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
+    claimed_profile_id uuid,
+    CONSTRAINT membership_gifts_months_check CHECK (((months IS NULL) OR (months > 0))),
+    CONSTRAINT membership_gifts_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'claimed'::text]))),
+    CONSTRAINT membership_gifts_tier_check CHECK ((tier = ANY (ARRAY['community'::text, 'concierge'::text])))
+);
+
+
+ALTER TABLE public.membership_gifts OWNER TO postgres;
 
 --
 -- Name: mycelium; Type: TABLE; Schema: public; Owner: postgres
@@ -2340,6 +2546,14 @@ ALTER TABLE ONLY public.location_shares
 
 
 --
+-- Name: membership_gifts membership_gifts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membership_gifts
+    ADD CONSTRAINT membership_gifts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mycelium mycelium_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2509,6 +2723,13 @@ CREATE INDEX care_posts_wow_idx ON public.care_posts USING btree (patient_id, cr
 
 
 --
+-- Name: chat_messages_chat_created_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX chat_messages_chat_created_idx ON public.chat_messages USING btree (chat_id, created_at DESC);
+
+
+--
 -- Name: chats_direct_uidx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2576,6 +2797,13 @@ CREATE INDEX health_snapshots_patient_date_idx ON public.health_snapshots USING 
 --
 
 CREATE UNIQUE INDEX location_shares_audience_uniq ON public.location_shares USING btree (owner_id, kind, audience_type, COALESCE(audience_space_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(audience_profile_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
+-- Name: membership_gifts_one_pending; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX membership_gifts_one_pending ON public.membership_gifts USING btree (lower(invitee_email)) WHERE (status = 'pending'::text);
 
 
 --
@@ -2744,6 +2972,13 @@ CREATE TRIGGER on_care_remove_trg AFTER DELETE ON public.care_team_members FOR E
 --
 
 CREATE TRIGGER on_care_request_notify_trg AFTER INSERT ON public.care_team_members FOR EACH ROW EXECUTE FUNCTION public.on_care_request_notify();
+
+
+--
+-- Name: category_suggestions on_category_suggestion; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_category_suggestion AFTER INSERT ON public.category_suggestions FOR EACH ROW EXECUTE FUNCTION public.handle_new_category_suggestion();
 
 
 --
@@ -3179,6 +3414,22 @@ ALTER TABLE ONLY public.location_shares
 
 ALTER TABLE ONLY public.location_shares
     ADD CONSTRAINT location_shares_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: membership_gifts membership_gifts_claimed_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membership_gifts
+    ADD CONSTRAINT membership_gifts_claimed_profile_id_fkey FOREIGN KEY (claimed_profile_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: membership_gifts membership_gifts_inviter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membership_gifts
+    ADD CONSTRAINT membership_gifts_inviter_id_fkey FOREIGN KEY (inviter_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -3937,6 +4188,23 @@ CREATE POLICY "location_shares owner all" ON public.location_shares TO authentic
 
 
 --
+-- Name: membership_gifts; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.membership_gifts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: membership_gifts membership_gifts: admins all; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "membership_gifts: admins all" ON public.membership_gifts TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin)))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin))));
+
+
+--
 -- Name: chat_messages messages read; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -4287,7 +4555,7 @@ GRANT ALL ON FUNCTION public.accept_space_invite(p_space uuid) TO service_role;
 -- Name: FUNCTION admin_list_supporters(); Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON FUNCTION public.admin_list_supporters() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.admin_list_supporters() TO anon;
 GRANT ALL ON FUNCTION public.admin_list_supporters() TO authenticated;
 GRANT ALL ON FUNCTION public.admin_list_supporters() TO service_role;
 
@@ -4356,12 +4624,30 @@ GRANT ALL ON FUNCTION public.care_member_display(p_ids uuid[]) TO service_role;
 
 
 --
+-- Name: FUNCTION chat_unread_counts(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.chat_unread_counts() TO anon;
+GRANT ALL ON FUNCTION public.chat_unread_counts() TO authenticated;
+GRANT ALL ON FUNCTION public.chat_unread_counts() TO service_role;
+
+
+--
 -- Name: FUNCTION claim_care_invitations(); Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON FUNCTION public.claim_care_invitations() TO anon;
 GRANT ALL ON FUNCTION public.claim_care_invitations() TO authenticated;
 GRANT ALL ON FUNCTION public.claim_care_invitations() TO service_role;
+
+
+--
+-- Name: FUNCTION claim_membership_gift(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.claim_membership_gift() TO anon;
+GRANT ALL ON FUNCTION public.claim_membership_gift() TO authenticated;
+GRANT ALL ON FUNCTION public.claim_membership_gift() TO service_role;
 
 
 --
@@ -4464,12 +4750,30 @@ GRANT ALL ON FUNCTION public.free_busy(p_profiles uuid[], p_from date, p_to date
 
 
 --
--- Name: FUNCTION gift_subscription(p_email text, p_tier text); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION gift_span_text(p_months integer); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text) TO anon;
-GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text) TO authenticated;
-GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text) TO service_role;
+GRANT ALL ON FUNCTION public.gift_span_text(p_months integer) TO anon;
+GRANT ALL ON FUNCTION public.gift_span_text(p_months integer) TO authenticated;
+GRANT ALL ON FUNCTION public.gift_span_text(p_months integer) TO service_role;
+
+
+--
+-- Name: FUNCTION gift_subscription(p_email text, p_tier text, p_months integer); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text, p_months integer) TO anon;
+GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text, p_months integer) TO authenticated;
+GRANT ALL ON FUNCTION public.gift_subscription(p_email text, p_tier text, p_months integer) TO service_role;
+
+
+--
+-- Name: FUNCTION handle_new_category_suggestion(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.handle_new_category_suggestion() TO anon;
+GRANT ALL ON FUNCTION public.handle_new_category_suggestion() TO authenticated;
+GRANT ALL ON FUNCTION public.handle_new_category_suggestion() TO service_role;
 
 
 --
@@ -4581,6 +4885,15 @@ GRANT ALL ON FUNCTION public.mappable_members() TO service_role;
 
 
 --
+-- Name: FUNCTION mark_chat_read(p_chat uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO anon;
+GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION my_home(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4596,6 +4909,15 @@ GRANT ALL ON FUNCTION public.my_home() TO service_role;
 REVOKE ALL ON FUNCTION public.my_phone() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.my_phone() TO authenticated;
 GRANT ALL ON FUNCTION public.my_phone() TO service_role;
+
+
+--
+-- Name: FUNCTION notice_gift_ending(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.notice_gift_ending() TO anon;
+GRANT ALL ON FUNCTION public.notice_gift_ending() TO authenticated;
+GRANT ALL ON FUNCTION public.notice_gift_ending() TO service_role;
 
 
 --
@@ -4932,6 +5254,15 @@ GRANT ALL ON TABLE public.location_shares TO service_role;
 
 
 --
+-- Name: TABLE membership_gifts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.membership_gifts TO anon;
+GRANT ALL ON TABLE public.membership_gifts TO authenticated;
+GRANT ALL ON TABLE public.membership_gifts TO service_role;
+
+
+--
 -- Name: TABLE mycelium; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -5210,7 +5541,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zT5yePljBe442s2NSlckxc3vXDV5bfQAkwqo8NmFOR3nEa4bRjFERLgZDIxY00K
+\unrestrict kLirEbaA0QHVFmogxf8S2F9YS72qaMWDQUiLJXxW6tggZQMM9OcV88p05LqqUGh
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
