@@ -121,7 +121,7 @@ export default function Invite() {
           <div className="invite__gift">
             <label className="invite__gift-toggle">
               <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
-              <span>Include a gifted membership</span>
+              <span>Gift membership</span>
             </label>
             {gift && (
               <div className="invite__gift-tiers">
