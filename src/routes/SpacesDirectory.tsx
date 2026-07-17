@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { listSpacesByKind, type SpaceDirectoryRow, type SpaceKind } from '../lib/spacesApi';
+import { listSpacesByKind, createSpaceWithLocation, type SpaceDirectoryRow, type SpaceKind } from '../lib/spacesApi';
 import './SpacesDirectory.css';
 
 /** The real Communities / Groups / Organizations / Places sections: every
@@ -19,8 +19,8 @@ const KIND_COPY: Record<SpaceKind, { title: string; lead: string; empty: string 
   },
   group: {
     title: 'Groups',
-    lead: 'Smaller circles — many live inside a community.',
-    empty: 'No groups yet — community admins can create them on the community’s profile.',
+    lead: 'Smaller circles — standalone, or nested in a community.',
+    empty: 'No groups yet — start the first one right here.',
   },
   organization: {
     title: 'Organizations',
@@ -45,6 +45,11 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
   const [q, setQ] = useState('');
+  // Standalone group creation (founder, 2026-07-17): groups don't NEED a
+  // community — nesting stays available later via the Part-of picker.
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -95,6 +100,45 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
           </button>
         )}
       </div>
+
+      {kind === 'group' && me && (
+        <div className="sdir__create">
+          {!creating ? (
+            <button className="sdir__create-btn" onClick={() => setCreating(true)}>
+              <Icon name="plus" size={13} /> New group
+            </button>
+          ) : (
+            <div className="sdir__create-form">
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Name your group"
+                onKeyDown={(e) => { if (e.key === 'Escape') { setCreating(false); setNewName(''); } }}
+              />
+              <button
+                className="sdir__create-go"
+                disabled={!newName.trim() || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const gid = await createSpaceWithLocation(me, newName.trim(), 'group', '', null, null);
+                    navigate(`/spaces/${gid}`);
+                  } catch (e) { console.error(e); setBusy(false); }
+                }}
+              >
+                {busy ? 'Creating…' : 'Create'}
+              </button>
+              <button className="sdir__clear" onClick={() => { setCreating(false); setNewName(''); }} aria-label="Cancel">
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+          )}
+          <p className="sdir__create-hint">
+            Standalone is fine — a group can join a community later from its own page.
+          </p>
+        </div>
+      )}
 
       {!ready && <p className="sdir__muted">Loading…</p>}
       {ready && rows.length === 0 && <p className="sdir__muted">{copy.empty}</p>}
