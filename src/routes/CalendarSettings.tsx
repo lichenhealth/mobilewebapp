@@ -268,9 +268,10 @@ export default function CalendarSettings() {
             <summary>How do I find my secret address?</summary>
             <div className="cset__howto-body">
               <p><strong>Google Calendar</strong> (use a browser — it&rsquo;s not in the phone app):
-                go to calendar.google.com &rarr; gear &rarr; <em>Settings</em> &rarr; click your
-                calendar&rsquo;s name in the left list &rarr; scroll to <em>Integrate calendar</em> &rarr;
-                copy the <em>Secret address in iCal format</em>.</p>
+                {' '}<a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noreferrer">open
+                Google Calendar settings</a> &rarr; click your calendar&rsquo;s name in the left
+                list &rarr; scroll to <em>Integrate calendar</em> &rarr; copy the
+                <em> Secret address in iCal format</em>.</p>
               <p><strong>Apple / iCloud</strong>: at icloud.com open Calendar &rarr; tap the
                 share icon beside your calendar &rarr; turn on <em>Public Calendar</em> &rarr;
                 copy the link (it starts with webcal:// — paste it as-is).</p>
