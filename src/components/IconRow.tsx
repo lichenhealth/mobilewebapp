@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
+import { ScrollHintRow } from './ScrollHintRow';
 import './IconRow.css';
 
 export interface IconRowItem {
@@ -20,7 +21,7 @@ interface IconRowProps {
 export default function IconRow({ items, onSelect }: IconRowProps) {
   const navigate = useNavigate();
   return (
-    <div className="icon-row h-scroll" role="toolbar" aria-label="Categories">
+    <ScrollHintRow className="icon-row h-scroll" role="toolbar" ariaLabel="Categories">
       {items.flatMap(({ icon, label, to, divider }, i) => {
         const nodes = [];
         if (divider && i > 0) {
@@ -42,6 +43,6 @@ export default function IconRow({ items, onSelect }: IconRowProps) {
         );
         return nodes;
       })}
-    </div>
+    </ScrollHintRow>
   );
 }

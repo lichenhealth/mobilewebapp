@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { MyceliumMark } from './MyceliumMark';
 import './WeaveMark.css';
@@ -20,6 +20,9 @@ export function WeaveMark({
   size?: number;
 }) {
   const [active, setActive] = useState(on);
+  // Follow the parent when it holds real state (e.g. trusting auto-weaves,
+  // so a directory's shield tap must light the mark beside it).
+  useEffect(() => { setActive(on); }, [on]);
 
   const toggle = (e: MouseEvent) => {
     e.stopPropagation();

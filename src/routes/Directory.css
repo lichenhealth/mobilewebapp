@@ -93,6 +93,40 @@
 .dir__msg:active { transform: scale(0.96); }
 .dir__msg:disabled { opacity: 0.6; }
 
+/* All row actions share the grid's third column as one flex cluster */
+.dir__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dir__row-actions .dir__msg { margin-left: var(--s-2); }
+
+/* Relationship signals on each row: shield (trust) + thumb (recommend);
+   the weave mark ships its own styles. */
+.dir__sig {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  transition: color var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+}
+.dir__sig:hover { color: var(--ink); }
+.dir__sig.is-on {
+  color: var(--peach-deep, var(--peach));
+  background: var(--peach-tint);
+}
+
+/* Phones: icons keep their tap targets, the Message label steps aside */
+@media (max-width: 480px) {
+  .dir__msg-label { display: none; }
+  .dir__msg { padding: 7px 9px; }
+}
+
 /* ─── Empty ───────────────────────────────────────────────────────── */
 .dir__empty {
   padding: var(--s-9) var(--s-7);
