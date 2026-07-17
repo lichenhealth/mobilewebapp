@@ -1,6 +1,7 @@
 .filter-row {
   padding: 0 var(--s-5);
-  border-bottom: 1px solid var(--bone-edge);
+  /* no full-bleed hairline — the text-width underline alone marks the
+     selection (design rule, Figma 286-11770 / founder 2026-07-17) */
   gap: var(--s-5);
 }
 
