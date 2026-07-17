@@ -19,21 +19,22 @@ import './Marketplace.css';
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
 type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding' | 'iso';
-// Lend & Borrow are two sides of one exchange — one chip shows both (the
-// card eyebrows tell you which side each post is). ISO = in-search-of asks.
+// Lend and Borrow are separate chips (founder, 2026-07-17): Lend = offers
+// to lend out, Borrow = asks to borrow. ISO = in-search-of asks.
 // "For Sale" covers fixed-price AND sliding-scale — sliding is a pricing
 // style, not a category (founder, 2026-07-16); the card's eyebrow shows
 // either the fixed price or the sliding range.
-type Chip = 'gift' | 'trade' | 'rent' | 'lendborrow' | 'iso' | 'sale';
+type Chip = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'iso' | 'sale';
 const CHIP_MODES: Record<Chip, Mode[]> = {
   gift: ['gift'], trade: ['trade'], rent: ['rent'],
-  lendborrow: ['lend', 'borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
+  lend: ['lend'], borrow: ['borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
 };
 const MODES: { chip: Chip; label: string; icon: IconName }[] = [
   { chip: 'gift',       label: 'Gift',        icon: 'heart-line' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
-  { chip: 'lendborrow', label: 'Lend/Borrow', icon: 'lend' },
+  { chip: 'lend',       label: 'Lend',        icon: 'lend' },
+  { chip: 'borrow',     label: 'Borrow',      icon: 'reply' },
   { chip: 'sale',       label: 'For Sale',    icon: 'store' },
   { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
