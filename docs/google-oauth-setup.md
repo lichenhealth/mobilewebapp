@@ -26,44 +26,41 @@ The two-track plan:
 3. Left menu → **APIs & Services → Library** → search **Google Calendar API**
    → Enable.
 
-## Part 2 — Consent screen
+## Part 2 — Google Auth Platform (the redesigned "consent screen")
 
-4. **APIs & Services → OAuth consent screen**:
-   - User type: **External** → Create. (Workspace accounts also see
-     "Internal" — don't pick it; Internal would limit calendar connections
-     to lichen.health Workspace accounts only, not members.)
-   - App name: `Lichen` · Support email: `connect@lichen.health`
-   - App logo: the Lichen mark (optional now; required for verification later)
-   - App home page: `https://lichen.healthcare`
-   - Privacy policy: `https://lichen.healthcare/privacy`  ← Claude is building
-     this page; merge it before submitting for verification.
-   - Authorized domain: `lichen.healthcare`
-   - Developer contact: your email. Save.
-5. **Scopes** step → Add or remove scopes → find and check
-   `.../auth/calendar.readonly` ("See and download any calendar you can
-   access using your Google Calendar"). Save.
-6. Back on the consent screen page: **Publish app** → confirm (this is the
-   "In production, unverified" state the alpha uses).
+4. **APIs & Services → OAuth consent screen** now lands on "Google Auth
+   Platform". Click **Get started** and walk the wizard:
+   - App information: name `Lichen`, support email `connect@lichen.health`
+   - Audience: **External** (Workspace accounts also see Internal — don't;
+     it would limit connections to Lichen Health staff accounts)
+   - Contact info: your email → agree → **Create**.
+5. Left menu → **Branding**: homepage `https://lichen.healthcare`, privacy
+   policy `https://lichen.healthcare/privacy`, authorized domain
+   `lichen.healthcare` (logo optional until verification). Save.
+6. Left menu → **Data Access** → Add or remove scopes → check
+   `.../auth/calendar.readonly`. Save.
+7. Left menu → **Audience** → **Publish app** (Testing → In production;
+   the unverified-but-working state the alpha uses).
 
 ## Part 3 — Credentials
 
-7. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+8. Left menu → **Clients** → **Create client**:
    - Type: **Web application**. Name: `Lichen PWA`.
    - Authorized redirect URIs — add BOTH:
      - `https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/google-oauth-callback`
      - `http://localhost:5173/calendar/settings` (dev)
    - Create. You'll get a **Client ID** (public — paste it to Claude in chat)
      and a **Client secret** (NEVER paste in chat).
-   - Put the secret where the other secrets live: Supabase dashboard →
-     Edge Functions → Secrets → add `GOOGLE_OAUTH_CLIENT_SECRET`. Add the
-     Client ID too as `GOOGLE_OAUTH_CLIENT_ID`.
+   - Put both where the other secrets live: Supabase dashboard →
+     Edge Functions → Secrets → `GOOGLE_OAUTH_CLIENT_SECRET` and
+     `GOOGLE_OAUTH_CLIENT_ID`.
 
 ## Part 4 — Verification (when public launch nears)
 
 8. Verify the domain: **search.google.com/search-console** → add property
    `lichen.healthcare` → DNS TXT record (add it in Vercel DNS, where the
    domain's records live).
-9. OAuth consent screen → **Submit for verification**. Google will ask for
+9. Google Auth Platform → **Verification Center** → submit. Google will ask for
    the privacy policy URL (live by then), scope justification ("Lichen reads
    calendar busy/free time so members' real availability powers scheduling
    and booking; data is never shared or used for ads"), and a short screen
