@@ -18,7 +18,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import './Events.css';
 
 const TABS = ['All', ...EVENT_CATEGORIES.map((c) => c.label)];
@@ -51,6 +51,7 @@ export default function Events() {
   const [modes, setModes] = useState<EventMode[]>(['free', 'trade', 'paid']);   // lenses default all-on
   const [statuses, setStatuses] = useState<Map<string, MyRsvpStatus>>(new Map());
   const [showPast, setShowPast] = useState(false);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
@@ -58,12 +59,12 @@ export default function Events() {
 
   const load = useCallback(async () => {
     const feed = (await loadFeed()).filter((p) => postAreas(p).includes('events'));
-    const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
+    const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
     const ov = await loadEndorsements(feed, myc);
     const rsvps = me
       ? await loadMyRsvpStatuses(feed.map((p) => p.linked_event_id).filter((id): id is string => !!id), me)
       : new Map<string, MyRsvpStatus>();
-    setPosts(feed); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setStatuses(rsvps);
+    setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setStatuses(rsvps);
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -159,6 +160,7 @@ export default function Events() {
     <FeedCard
       key={p.id}
       {...postToCard(p, me)}
+      {...weaveProps(p, myWebSet, me)}
       eyebrow={eyebrow ?? whenLabel(p) ?? postToCard(p, me).eyebrow}
       image={badgeFor(p)}
       onBadgeAction={() => onBadge(p)}

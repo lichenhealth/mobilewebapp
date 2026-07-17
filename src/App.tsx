@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-
 import Home from './routes/Home';
 import SpacesDirectory from './routes/SpacesDirectory';
 import Mycelium from './routes/Mycelium';
+import MyceliumDirectory from './routes/MyceliumDirectory';
 import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
 import Caregiver from './routes/Caregiver';
@@ -159,6 +160,7 @@ export default function App() {
 
           {/* Mycelium — your full network */}
           <Route path="/mycelium"        element={<Mycelium />} />
+          <Route path="/mycelium/directory" element={<MyceliumDirectory />} />
           <Route path="/mycelium/:type"  element={<Mycelium />} />
 
           {/* Communities — feed per community */}

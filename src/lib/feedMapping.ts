@@ -1,5 +1,6 @@
 import type { FeedCardProps } from '../components/FeedCard';
 import { serviceAreaIcon, postAreas, type FeedPost } from './postsApi';
+import { setInWeb } from './myceliumApi';
 import type { IconName } from '../components/Icon';
 
 /** How you'd consume a post — derived, never declared: video (or a YouTube
@@ -19,6 +20,30 @@ export function postMedium(p: FeedPostLike): PostMedium {
   return 'read';
 }
 interface FeedPostLike { details: Record<string, unknown>; image_url: string | null }
+
+/** The entity a card's weave mark acts on: the DISPLAYED author — the space
+ *  when posted acting-as, else the person. */
+export function weaveTarget(p: FeedPost): { type: 'profile' | 'space'; id: string } {
+  return p.author_space_id
+    ? { type: 'space', id: p.author_space_id }
+    : { type: 'profile', id: p.author_id };
+}
+
+/** Card props for the 1-click weave mark. Empty for signed-out viewers and
+ *  for the viewer's own person-authored posts (you're not in your own web). */
+export function weaveProps(
+  p: FeedPost,
+  myWeb: Set<string>,
+  viewerId?: string,
+): Pick<FeedCardProps, 'inWeb' | 'onWeave'> {
+  if (!viewerId) return {};
+  const t = weaveTarget(p);
+  if (t.type === 'profile' && t.id === viewerId) return {};
+  return {
+    inWeb: myWeb.has(`${t.type}:${t.id}`),
+    onWeave: (on) => { void setInWeb(t.type, t.id, on).catch(console.error); },
+  };
+}
 
 // Map a real DB post into the existing FeedCard shape. Shared by Home + Mycelium.
 export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {

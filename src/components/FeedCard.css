@@ -33,6 +33,9 @@
   align-items: center;
   padding: var(--s-3) var(--s-4) 0;
 }
+/* Weave mark leads the actions cluster; hairline gap sets it apart from
+   the post-level icons to its right */
+.feed-card__head-actions .weave-mark { margin-right: 2px; }
 
 .feed-card__avatar {
   width: 40px;

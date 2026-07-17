@@ -8,7 +8,7 @@ import {
   loadFeed, deletePost, postAreas, CONTENT_TYPES, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import { ensureDirectChat } from '../lib/chatApi';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -96,6 +96,7 @@ export default function Mycelium() {
         areas: postAreas(p),
         card: {
           ...postToCard(p, user?.id),
+          ...weaveProps(p, myWeb, user?.id),
           trusted: myMyc.has('profile:' + p.author_id),
           recommended: myRecs.has('post:' + p.id),
           mycelium: overlays[p.id],
@@ -180,6 +181,15 @@ export default function Mycelium() {
             </button>
           );
         })}
+        {/* Door, not a lens: the whole web as a browsable directory */}
+        <button
+          className="myc__area myc__area--door"
+          onClick={() => navigate('/mycelium/directory')}
+          aria-label="Your web — directory"
+          title="Your web — directory"
+        >
+          <Icon name="health" size={18} />
+        </button>
       </div>
 
       <p className="myc__count">

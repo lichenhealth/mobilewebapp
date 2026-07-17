@@ -10,7 +10,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, type CollectionRow } from '../lib/collectionsApi';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
-import { postToCard, postMedium, type PostMedium } from '../lib/feedMapping';
+import { postToCard, postMedium, weaveProps, type PostMedium } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -47,6 +47,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [ready, setReady] = useState(false);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
@@ -63,10 +64,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     (async () => {
       const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes(area));
       if (collections) setPublicCols(await listPublicCollections());
-      const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
+      const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
-      setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
+      setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
   }, [area]);
@@ -192,6 +193,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <FeedCard
             key={p.id}
             {...postToCard(p, me || undefined)}
+            {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}
             mycelium={overlays[p.id]}

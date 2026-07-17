@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase';
 import type { GeoPoint } from '../lib/geoApi';
 import { SERVICE_AREAS, CONTENT_TYPES, postAreas, type FeedPost, type ServiceArea, type ContentType } from '../lib/postsApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
+import { loadMyWeb, setInWeb } from '../lib/myceliumApi';
+import { WeaveMark } from '../components/WeaveMark';
 import {
   parseQuery, runSmartSearch, emptyCriteria,
   type SearchCategory, type SearchCriteria, type ParsedSpan, type SmartResults,
@@ -127,6 +129,15 @@ export default function SmartSearch() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
+
+  // Your web, for the 1-click weave mark on people/space hits.
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadMyWeb().then(({ web }) => { if (live) setMyWebSet(web); });
+    return () => { live = false; };
+  }, [me]);
 
   // Section doors: /search?space=<id> · ?member=<id> · ?area=<x> · ?who=people
   // Scope comes from WHERE you pressed Search; the X on the banner widens out.
@@ -692,7 +703,18 @@ export default function SmartSearch() {
         <section className="ssrch__sec">
           <h2 className="ssrch__h2">People</h2>
           {results.people.map((p) => (
-            <button key={p.id} className="ssrch__hit" onClick={() => navigate(`/members/${p.id}`)}>
+            // div, not button: the weave mark inside is its own control
+            <div
+              key={p.id}
+              className="ssrch__hit"
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('.weave-mark')) return;
+                navigate(`/members/${p.id}`);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/members/${p.id}`); }}
+            >
               <Avatar id={p.id} name={p.full_name ?? 'Member'} url={p.avatar_url} size={40} />
               <span className="ssrch__hit-body">
                 <span className="ssrch__hit-name">
@@ -716,8 +738,16 @@ export default function SmartSearch() {
                   </span>
                 )}
               </span>
+              {me && p.id !== me && (
+                <WeaveMark
+                  on={myWebSet.has('profile:' + p.id)}
+                  onToggle={(on) => { void setInWeb('profile', p.id, on).catch(console.error); }}
+                  entityName={p.full_name ?? 'this member'}
+                  size={20}
+                />
+              )}
               <Icon name="chevron-right" size={14} />
-            </button>
+            </div>
           ))}
         </section>
       )}
@@ -755,7 +785,17 @@ export default function SmartSearch() {
         <section className="ssrch__sec">
           <h2 className="ssrch__h2">Organizations & places</h2>
           {results.spaces.map((s) => (
-            <button key={s.id} className="ssrch__hit" onClick={() => navigate(`/spaces/${s.id}`)}>
+            <div
+              key={s.id}
+              className="ssrch__hit"
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('.weave-mark')) return;
+                navigate(`/spaces/${s.id}`);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/spaces/${s.id}`); }}
+            >
               <span className="ssrch__hit-icon"><Icon name="location" size={16} /></span>
               <span className="ssrch__hit-body">
                 <span className="ssrch__hit-name">
@@ -774,8 +814,16 @@ export default function SmartSearch() {
                   </span>
                 )}
               </span>
+              {me && (
+                <WeaveMark
+                  on={myWebSet.has('space:' + s.id)}
+                  onToggle={(on) => { void setInWeb('space', s.id, on).catch(console.error); }}
+                  entityName={s.name}
+                  size={20}
+                />
+              )}
               <Icon name="chevron-right" size={14} />
-            </button>
+            </div>
           ))}
         </section>
       )}
