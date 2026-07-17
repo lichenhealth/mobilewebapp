@@ -44,7 +44,10 @@ begin
 end; $$;
 
 -- ── owner reads own home incl. the new labels ────────────────────────────────
-create or replace function public.my_home()
+-- The return row gains two columns, and Postgres refuses to change a
+-- function's return type in place (42P13) — drop first, then recreate.
+drop function if exists public.my_home();
+create function public.my_home()
 returns table (
   home_location text, home_lat double precision, home_lng double precision,
   home_area text, home_county text, home_state text
