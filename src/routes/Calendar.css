@@ -141,6 +141,10 @@
   font-size: 10px; font-weight: 500; line-height: 1.25; padding: 3px 5px;
   text-align: left; overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.35);
+  /* buttons center content vertically by default — a 12-hour block's title
+     was floating to its middle, under overlapping events. Anchor to top. */
+  display: flex;
+  align-items: flex-start;
 }
 /* Invited but not yet answered → white with a peach outline (à la Google Cal);
    declined → faded + struck through. */
