@@ -19,8 +19,9 @@ The two-track plan:
    to own this long-term — connect@lichen.health's Google account if it has
    one, else yours).
 2. Top bar → project picker → **New project**. Name: `Lichen`.
-   - **Parent resource** (appears because the account is in a Google
-     Workspace org): Browse → pick the lichen.health organization.
+   - **Parent resource**: Browse → pick whatever it offers — if the only
+     row is "No organization", select that (fine; the warning triangle is
+     cosmetic for a single-app setup).
    Create, then make sure it's selected.
 3. Left menu → **APIs & Services → Library** → search **Google Calendar API**
    → Enable.
