@@ -3,6 +3,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import { LinkifiedText, CarePreview } from './CarePostCard';
+import { WeaveMark } from './WeaveMark';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -42,6 +43,11 @@ export interface FeedCardProps {
   onOpen?: () => void;
   /** Open the author's profile (member or space) — avatar/title/handle become links. */
   onAuthor?: () => void;
+  /** The author entity is in the viewer's web (mycelium membership). */
+  inWeb?: boolean;
+  /** 1-click weave/unweave the author — renders the mark beside the name.
+   *  Omit for the viewer's own posts. */
+  onWeave?: (next: boolean) => void;
   /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
   previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
   // ⋯ menu: author controls vs viewer controls. Renders only when a handler fits.
@@ -77,6 +83,8 @@ export default function FeedCard({
   onBadgeAction,
   onOpen,
   onAuthor,
+  inWeb,
+  onWeave,
   previews,
   extraMenuItems,
   viewerIsAuthor,
@@ -141,8 +149,11 @@ export default function FeedCard({
             </div>
           </>
         )}
-        {(categoryIcons.length > 0 || onMessage || hasMenu) && (
+        {(onWeave || categoryIcons.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">
+            {onWeave && (
+              <WeaveMark on={inWeb ?? false} onToggle={onWeave} entityName={title} size={20} />
+            )}
             {categoryIcons.length > 0 && (
               <div className="feed-card__cat-icons">
                 {categoryIcons.map((n) => (

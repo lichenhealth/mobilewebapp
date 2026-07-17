@@ -6,7 +6,7 @@ import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -62,6 +62,7 @@ export default function Home() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
@@ -71,14 +72,14 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       const feed = await loadFeed();
-      const [{ vouched: myc }, recs, saves, awakeRes] = await Promise.all([
+      const [{ web, vouched: myc }, recs, saves, awakeRes] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), loadMySaved(),
         supabase.rpc('network_awake_count'),
       ]);
       setAwake((awakeRes.data as number | null) ?? null);
       const ov = await loadEndorsements(feed, myc);
       // Set posts last so cards mount once, with engagement state already in hand.
-      setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
+      setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
   }, []);
 
@@ -101,6 +102,7 @@ export default function Home() {
           <FeedCard
             key={p.id}
             {...postToCard(p, user?.id)}
+            {...weaveProps(p, myWebSet, user?.id)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}
             mycelium={overlays[p.id]}

@@ -115,6 +115,14 @@
   background: var(--peach);
   color: var(--bone-warm);
 }
+/* The directory DOOR at the row's end — never lights up like a lens;
+   a touch of left margin sets it apart from the toggles. */
+.myc__area--door {
+  margin-left: var(--s-2);
+  background: var(--bone);
+  color: var(--ink);
+}
+.myc__area--door:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
 
 /* Phone widths: compact circles so all nine areas fit on one row
    (38px × 9 overflows a 375px screen); wrap is the safety net for

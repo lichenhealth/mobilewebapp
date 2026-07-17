@@ -1,0 +1,21 @@
+/* WeaveMark — the mycelium branch as a small toggle. Quiet when off,
+   peach when the entity is in your web. Own hit target: never layered
+   on an avatar (avatars are doors to profiles). */
+.weave-mark {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  transition: color var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+}
+.weave-mark:hover { color: var(--ink); }
+.weave-mark.is-on {
+  color: var(--peach-deep, var(--peach));
+  background: var(--peach-tint);
+}
+.weave-mark svg { display: block; }

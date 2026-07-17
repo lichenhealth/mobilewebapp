@@ -16,7 +16,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from './EngagementFooter';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
 
 const TABS = ['All', ...CONTENT_TYPES.map((t) => t.label)];
@@ -51,6 +51,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
@@ -60,10 +61,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     let live = true;
     (async () => {
       const feed = await loadAuthorFeed({ profileId, spaceId });
-      const [{ vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
+      const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
-      setPosts(feed); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setReady(true);
+      setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setReady(true);
     })();
     return () => { live = false; };
   }, [profileId, spaceId]);
@@ -129,6 +130,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           <FeedCard
             key={p.id}
             {...postToCard(p, me)}
+            {...weaveProps(p, myWebSet, me)}
             eyebrow={whenLabel(p) ?? postToCard(p, me).eyebrow}
             onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}

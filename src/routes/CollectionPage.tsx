@@ -6,7 +6,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { deletePost, type FeedPost } from '../lib/postsApi';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -31,6 +31,7 @@ export default function CollectionPage() {
   const [meta, setMeta] = useState<CollectionRow | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [ready, setReady] = useState(false);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
@@ -44,14 +45,14 @@ export default function CollectionPage() {
 
   const load = useCallback(async () => {
     setReady(false);
-    const [col, { vouched: myc }, recs, saves] = await Promise.all([
+    const [col, { web, vouched: myc }, recs, saves] = await Promise.all([
       loadCollection(id), loadMyWeb(), loadMyRecommendations(), loadMySaved(),
     ]);
     if (!col) { setMeta(null); setReady(true); return; }
     const ov = await loadEndorsements(col.posts, myc);
     setMeta(col.meta); setPosts(col.posts);
     setName(col.meta.name); setDescription(col.meta.description ?? '');
-    setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
+    setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
     setReady(true);
   }, [id]);
   useEffect(() => { void load(); }, [load]);
@@ -160,6 +161,7 @@ export default function CollectionPage() {
           <FeedCard
             key={p.id}
             {...postToCard(p, me || undefined)}
+            {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}
             saved={mySaves.has('post:' + p.id)}

@@ -7,7 +7,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { postAreas, deletePost, CONTENT_TYPES, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -29,6 +29,7 @@ export default function Saved() {
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [ready, setReady] = useState(false);
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
@@ -46,10 +47,10 @@ export default function Saved() {
     let live = true;
     (async () => {
       const shelf = await loadSavedPosts();
-      const [{ vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
+      const [{ web, vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
       const ov = await loadEndorsements(shelf, myc);
       if (!live) return;
-      setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(shelf); setReady(true);
+      setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(shelf); setReady(true);
     })();
     return () => { live = false; };
   }, [me]);
@@ -177,6 +178,7 @@ export default function Saved() {
           <FeedCard
             key={p.id}
             {...postToCard(p, me || undefined)}
+            {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}
             saved={!unsaved.has(p.id)}
