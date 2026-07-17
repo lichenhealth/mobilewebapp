@@ -262,9 +262,26 @@ export default function CalendarSettings() {
             Bring your Google, Apple, or Outlook calendar into Lichen: paste its
             <strong> secret iCal address</strong> and your busy times flow into
             find-a-time and booking — other members only ever see &ldquo;busy,&rdquo;
-            never your event details. In Google Calendar: Settings &rarr; your
-            calendar &rarr; &ldquo;Secret address in iCal format.&rdquo;
+            never your event details.
           </p>
+          <details className="cset__howto">
+            <summary>How do I find my secret address?</summary>
+            <div className="cset__howto-body">
+              <p><strong>Google Calendar</strong> (use a browser — it&rsquo;s not in the phone app):
+                go to calendar.google.com &rarr; gear &rarr; <em>Settings</em> &rarr; click your
+                calendar&rsquo;s name in the left list &rarr; scroll to <em>Integrate calendar</em> &rarr;
+                copy the <em>Secret address in iCal format</em>.</p>
+              <p><strong>Apple / iCloud</strong>: at icloud.com open Calendar &rarr; tap the
+                share icon beside your calendar &rarr; turn on <em>Public Calendar</em> &rarr;
+                copy the link (it starts with webcal:// — paste it as-is).</p>
+              <p><strong>Outlook</strong>: at outlook.com &rarr; gear &rarr; <em>Calendar</em> &rarr;
+                <em>Shared calendars</em> &rarr; publish your calendar (&ldquo;Can view all
+                details&rdquo;) &rarr; copy the <em>ICS</em> link.</p>
+              <p className="cset__howto-note">Treat the address like a password — anyone
+                holding it can read your calendar. Lichen never shows it again after you
+                add it, and each provider&rsquo;s settings can reset the link if it ever leaks.</p>
+            </div>
+          </details>
 
           {extCals.map((c) => (
             <div className="cset__row" key={c.id}>
