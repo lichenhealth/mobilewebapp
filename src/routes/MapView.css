@@ -29,7 +29,7 @@
 /* Layer pills scroll in their own lane; the ScrollHintRow wrapper takes the
    rest of the bar and floats the more-this-way chevron when pills overflow */
 .mapv__bar .scrollrow { flex: 1; min-width: 0; }
-.mapv__layers {
+.mapv__layers.h-scroll {
   display: flex;
   align-items: center;
   gap: var(--s-2);

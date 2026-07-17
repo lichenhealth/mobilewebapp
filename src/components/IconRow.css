@@ -1,6 +1,7 @@
-.icon-row {
+.icon-row.h-scroll {
+  /* double class beats .h-scroll's 12px gap; snug icons, roomy edges */
   padding: var(--s-3) 32px;
-  gap: 2px;
+  gap: 4px;
   display: flex;
   align-items: center;
 }
