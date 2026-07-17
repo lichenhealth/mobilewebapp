@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { WeaveMark } from '../components/WeaveMark';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { ensureDirectChat, colorFor, monogramFor } from '../lib/chatApi';
+import {
+  loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
+} from '../lib/myceliumApi';
 import './Directory.css';
 
 interface MemberRow { id: string; full_name: string | null; headline: string | null; }
@@ -19,6 +23,39 @@ export default function Directory() {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<string | null>(null);
+
+  // Relationship signals, all toggleable in place: weave (web membership),
+  // shield (private trust), thumb (recommend). Trust and recommend are
+  // deliberately independent (founder, 2026-07-17): you might trust someone
+  // but not recommend their offering — or the reverse.
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
+  const [myVouched, setMyVouched] = useState<Set<string>>(new Set());
+  const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!me) return;
+    void loadMyWeb().then(({ web, vouched }) => { setMyWebSet(web); setMyVouched(vouched); });
+    void loadMyRecommendations().then(setMyRecs);
+  }, [me]);
+
+  const withKey = (set: Set<string>, key: string, on: boolean) => {
+    const next = new Set(set);
+    if (on) next.add(key); else next.delete(key);
+    return next;
+  };
+  const toggleWeave = (id: string, on: boolean) => {
+    setMyWebSet((s) => withKey(s, 'profile:' + id, on));
+    if (!on) setMyVouched((s) => withKey(s, 'profile:' + id, false)); // unweave withdraws trust
+    void setInWeb('profile', id, on).catch(console.error);
+  };
+  const toggleVouch = (id: string, on: boolean) => {
+    setMyVouched((s) => withKey(s, 'profile:' + id, on));
+    if (on) setMyWebSet((s) => withKey(s, 'profile:' + id, true)); // trusting auto-weaves
+    void setVouch('profile', id, on).catch(console.error);
+  };
+  const toggleRec = (id: string, on: boolean) => {
+    setMyRecs((s) => withKey(s, 'profile:' + id, on));
+    void setRecommend('profile', id, on).catch(console.error);
+  };
 
   useEffect(() => {
     if (!me) return;
@@ -113,14 +150,40 @@ export default function Directory() {
                 <span className="dir__row-name">{name}</span>
                 {m.headline && <span className="dir__row-sub">{m.headline}</span>}
               </span>
+              <span className="dir__row-actions">
+              <button
+                className={'dir__sig' + (myVouched.has('profile:' + m.id) ? ' is-on' : '')}
+                onClick={(e) => { e.stopPropagation(); toggleVouch(m.id, !myVouched.has('profile:' + m.id)); }}
+                aria-pressed={myVouched.has('profile:' + m.id)}
+                aria-label={myVouched.has('profile:' + m.id) ? `Stop trusting ${name}` : `Trust ${name}`}
+                title={myVouched.has('profile:' + m.id) ? 'Someone you trust' : 'Trust (private)'}
+              >
+                <Icon name="shield-user" size={16} />
+              </button>
+              <button
+                className={'dir__sig' + (myRecs.has('profile:' + m.id) ? ' is-on' : '')}
+                onClick={(e) => { e.stopPropagation(); toggleRec(m.id, !myRecs.has('profile:' + m.id)); }}
+                aria-pressed={myRecs.has('profile:' + m.id)}
+                aria-label={myRecs.has('profile:' + m.id) ? `Stop recommending ${name}` : `Recommend ${name}`}
+                title={myRecs.has('profile:' + m.id) ? 'Recommended by you' : 'Recommend'}
+              >
+                <Icon name="thumbs-up" size={16} />
+              </button>
+              <WeaveMark
+                on={myWebSet.has('profile:' + m.id)}
+                onToggle={(on) => toggleWeave(m.id, on)}
+                entityName={name}
+                size={20}
+              />
               <button
                 className="dir__msg"
                 onClick={(e) => { e.stopPropagation(); message(m.id); }}
                 disabled={opening === m.id}
               >
                 <Icon name="message" size={15} />
-                <span>{opening === m.id ? '…' : 'Message'}</span>
+                <span className="dir__msg-label">{opening === m.id ? '…' : 'Message'}</span>
               </button>
+              </span>
             </div>
           );
         })}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -125,7 +126,7 @@ export default function Marketplace() {
       </header>
 
       {/* Action chips: search & list something, then the offer-mode filters */}
-      <div className="mkt__actions h-scroll">
+      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Marketplace tools and filters">
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
@@ -148,7 +149,7 @@ export default function Marketplace() {
             <span className="mkt__action-label">{m.label}</span>
           </button>
         ))}
-      </div>
+      </ScrollHintRow>
 
       {showSearch && (
         <div className="mkt__search">

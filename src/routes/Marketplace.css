@@ -137,7 +137,7 @@
 /* ─── Action row ────────────────────────────────────────────────────── */
 .mkt__actions {
   display: flex;
-  gap: var(--s-4);
+  gap: var(--s-2);
   padding: var(--s-3) var(--s-5);
   overflow-x: auto;
   scrollbar-width: none;
@@ -146,14 +146,16 @@
 
 .mkt__action {
   flex: 0 0 auto;
-  width: 72px;   /* uniform slots — label length no longer skews the rhythm */
+  /* content-sized, compact — founder 2026-07-17: the 72px uniform slots
+     read as "spread out and cut off" */
+  min-width: 46px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   background: transparent;
   border: 0;
-  padding: 2px;
+  padding: 2px 4px;
   cursor: pointer;
   transition: transform var(--d-fast) var(--ease-out);
 }
@@ -161,10 +163,15 @@
 .mkt__action:hover { transform: translateY(-1px); }
 .mkt__action:active { transform: scale(0.96); }
 
-/* Spacer pushes mode-filter chips toward the right of the row */
+/* Hairline between the tools (Search, List) and the mode-filter chips —
+   groups stay legible without pushing the chips to the far edge */
 .mkt__action-spacer {
-  flex: 1 0 var(--s-4);
-  min-width: var(--s-4);
+  flex: 0 0 auto;
+  width: 1px;
+  align-self: center;
+  height: 30px;
+  margin: 0 var(--s-2);
+  background: var(--bone-edge);
 }
 
 .mkt__action-circle {

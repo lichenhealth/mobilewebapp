@@ -5,7 +5,7 @@ import Avatar from '../components/Avatar';
 import { WeaveMark } from '../components/WeaveMark';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
 import './MyceliumDirectory.css';
 
 /** Your whole web in one place — every person and space you've woven in,
@@ -23,7 +23,7 @@ interface Entry {
   kind: string;              // 'person' | space kind
   avatarUrl?: string | null;
   vouched: boolean;
-  canVouch: boolean;         // places take Recommend, not Trust
+  recommended: boolean;
 }
 
 const GROUPS: { kind: string; title: string }[] = [
@@ -90,7 +90,7 @@ export default function MyceliumDirectory() {
     setEntries((cur) => {
       if (!on) return cur.filter((x) => x.key !== key);
       if (cur.some((x) => x.key === key)) return cur;
-      return [...cur, { ...h, key, vouched: false, canVouch: h.kind !== 'place' }]
+      return [...cur, { ...h, key, vouched: false, recommended: false }]
         .sort((a, b) => a.name.localeCompare(b.name));
     });
   };
@@ -99,7 +99,7 @@ export default function MyceliumDirectory() {
     if (!user) { setReady(true); return; }
     let live = true;
     (async () => {
-      const { web, vouched } = await loadMyWeb();
+      const [{ web, vouched }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
       const spaceIds = [...web].filter((k) => k.startsWith('space:')).map((k) => k.slice(6));
       const [profs, spaces] = await Promise.all([
@@ -122,7 +122,7 @@ export default function MyceliumDirectory() {
             kind: 'person',
             avatarUrl: p.avatar_url,
             vouched: vouched.has('profile:' + p.id),
-            canVouch: true,
+            recommended: recs.has('profile:' + p.id),
           })),
         ...((spaces.data ?? []) as { id: string; name: string; kind: string; avatar_url: string | null }[])
           .map((s) => ({
@@ -133,7 +133,7 @@ export default function MyceliumDirectory() {
             kind: s.kind,
             avatarUrl: s.avatar_url,
             vouched: vouched.has('space:' + s.id),
-            canVouch: s.kind !== 'place',
+            recommended: recs.has('space:' + s.id),
           })),
       ].sort((a, b) => a.name.localeCompare(b.name));
       setEntries(rows);
@@ -147,8 +147,16 @@ export default function MyceliumDirectory() {
     void setVouch(e.type, e.id, on).catch(console.error);
   };
 
+  // Trust and recommend are independent signals (founder, 2026-07-17): you
+  // may trust someone yet not recommend what they offer, or the reverse.
+  const toggleRec = (e: Entry, on: boolean) => {
+    setEntries((cur) => cur.map((x) => (x.key === e.key ? { ...x, recommended: on } : x)));
+    void setRecommend(e.type, e.id, on).catch(console.error);
+  };
+
   // Unweaving deletes the whole edge — trust goes with it, so the shield
-  // must fall dark too (and re-weaving starts untrusted).
+  // must fall dark too (and re-weaving starts untrusted). Recommendations
+  // live in their own table and survive.
   const toggleWeave = (e: Entry, on: boolean) => {
     if (!on) setEntries((cur) => cur.map((x) => (x.key === e.key ? { ...x, vouched: false } : x)));
     void setInWeb(e.type, e.id, on).catch(console.error);
@@ -177,8 +185,8 @@ export default function MyceliumDirectory() {
         </p>
         <h1 className="mycdir__title">Your web</h1>
         <p className="mycdir__sub">
-          Everyone and everything you&rsquo;ve woven in. The mark removes;
-          the shield is your private trust.
+          Everyone and everything you&rsquo;ve woven in. Shield = private
+          trust, thumb = recommend, mark = remove.
         </p>
         {ready && entries.length > 0 && (
           <p className="mycdir__count">
@@ -271,17 +279,24 @@ export default function MyceliumDirectory() {
                   <span className="mycdir__row-name">{e.name}</span>
                   {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
                 </span>
-                {e.canVouch && (
-                  <button
-                    className={'mycdir__shield' + (e.vouched ? ' is-on' : '')}
-                    onClick={() => toggleVouch(e, !e.vouched)}
-                    aria-pressed={e.vouched}
-                    aria-label={e.vouched ? `Stop trusting ${e.name}` : `Trust ${e.name}`}
-                    title={e.vouched ? 'Someone you trust' : 'Trust (private)'}
-                  >
-                    <Icon name="shield-user" size={16} />
-                  </button>
-                )}
+                <button
+                  className={'mycdir__shield' + (e.vouched ? ' is-on' : '')}
+                  onClick={() => toggleVouch(e, !e.vouched)}
+                  aria-pressed={e.vouched}
+                  aria-label={e.vouched ? `Stop trusting ${e.name}` : `Trust ${e.name}`}
+                  title={e.vouched ? 'Someone you trust' : 'Trust (private)'}
+                >
+                  <Icon name="shield-user" size={16} />
+                </button>
+                <button
+                  className={'mycdir__shield' + (e.recommended ? ' is-on' : '')}
+                  onClick={() => toggleRec(e, !e.recommended)}
+                  aria-pressed={e.recommended}
+                  aria-label={e.recommended ? `Stop recommending ${e.name}` : `Recommend ${e.name}`}
+                  title={e.recommended ? 'Recommended by you' : 'Recommend'}
+                >
+                  <Icon name="thumbs-up" size={16} />
+                </button>
                 <WeaveMark
                   on
                   onToggle={(on) => toggleWeave(e, on)}

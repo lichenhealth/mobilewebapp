@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -107,7 +108,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <p className="mkt__sub">{sub}</p>
       </header>
 
-      <div className="mkt__actions h-scroll">
+      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses">
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
@@ -134,7 +135,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
             ))}
           </>
         )}
-      </div>
+      </ScrollHintRow>
 
       {showSearch && (
         <div className="mkt__search">
@@ -159,7 +160,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
       {/* Published playlists & anthologies — curation as contribution. */}
       {collections && publicCols.length > 0 && (
-        <div className="afeed__cols h-scroll">
+        <ScrollHintRow className="afeed__cols h-scroll">
           {publicCols.map((c) => (
             <button key={c.id} className="afeed__col" onClick={() => navigate(`/collections/${c.id}`)}>
               <span className="afeed__col-name">{c.name}</span>
@@ -168,7 +169,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               </span>
             </button>
           ))}
-        </div>
+        </ScrollHintRow>
       )}
 
       <p className="mkt__count">

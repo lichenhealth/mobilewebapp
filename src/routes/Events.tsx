@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -208,7 +209,7 @@ export default function Events() {
           <FilterRow options={TABS} value={tab} onChange={setTab} />
 
           {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
-          <div className="evt__actions h-scroll">
+          <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters">
             <button className="evt__action" onClick={() => navigate('/search?area=events')}>
               <span className="evt__action-circle"><Icon name="search" size={14} /></span>
               <span className="evt__action-label">Search</span>
@@ -232,7 +233,7 @@ export default function Events() {
                 <span className="evt__action-label">{m.label}</span>
               </button>
             ))}
-          </div>
+          </ScrollHintRow>
 
           <section className="evt__feed">
             {visible.length === 0 && (
