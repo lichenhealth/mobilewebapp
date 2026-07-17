@@ -1,0 +1,46 @@
+/* Emoji popover — matches the attach-menu popover language (bone card,
+   soft shadow, menu-rise). Parent anchors it; see .thread__attach-menu. */
+.emoji-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  width: min(316px, 84vw);
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-pop);
+  padding: var(--s-3);
+  animation: menu-rise 160ms var(--ease-out);
+  scrollbar-width: thin;
+}
+
+.emoji-pop__section + .emoji-pop__section { margin-top: var(--s-3); }
+
+.emoji-pop__label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--s-1) 2px;
+}
+
+.emoji-pop__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+}
+
+.emoji-pop__btn {
+  height: 34px;
+  border-radius: var(--r-sm);
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.emoji-pop__btn:hover { background: var(--bone); }

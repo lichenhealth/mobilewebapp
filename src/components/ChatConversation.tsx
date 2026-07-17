@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   MessageRow, MemberInfo, ChatKind, ReactionRow, Attachment, MediaType,
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
-  colorFor, monogramFor, formatTime, chatTitle, otherMember,
+  colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
   markChatRead,
 } from '../lib/chatApi';
+import { EmojiPicker } from './EmojiPicker';
 import '../routes/ChatThread.css';
 
 interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; }
@@ -214,21 +215,29 @@ export default function ChatConversation({
       <ChatHeader chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo} />
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
-        {runs.map((run, i) => (
-          <MessageRun
-            key={i}
-            run={run}
-            me={me}
-            members={members}
-            messagesById={messagesById}
-            reactionsByMessage={reactionsByMessage}
-            mediaUrls={mediaUrls}
-            menuFor={menuFor}
-            setMenuFor={setMenuFor}
-            onReply={setReplyTo}
-            onReact={react}
-          />
-        ))}
+        {runs.map((run, i) => {
+          const day = new Date(run.messages[0].created_at).toDateString();
+          const prevDay = i > 0 ? new Date(runs[i - 1].messages[0].created_at).toDateString() : null;
+          return (
+            <Fragment key={i}>
+              {day !== prevDay && (
+                <div className="thread__day">{dayLabel(run.messages[0].created_at)}</div>
+              )}
+              <MessageRun
+                run={run}
+                me={me}
+                members={members}
+                messagesById={messagesById}
+                reactionsByMessage={reactionsByMessage}
+                mediaUrls={mediaUrls}
+                menuFor={menuFor}
+                setMenuFor={setMenuFor}
+                onReply={setReplyTo}
+                onReact={react}
+              />
+            </Fragment>
+          );
+        })}
       </div>
       <ChatInputBar
         draft={draft} setDraft={setDraft} onSend={sendMessage} inputRef={inputRef}
@@ -518,6 +527,7 @@ function ChatInputBar({
   const chunksRef = useRef<Blob[]>([]);
   const [recording, setRecording] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -561,6 +571,25 @@ function ChatInputBar({
 
   const canSend = (draft.trim().length > 0 || pending.length > 0) && !uploading;
 
+  function insertEmoji(emoji: string) {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? start;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(end));
+    // Re-focus after React re-renders so the caret lands after the emoji.
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  function send() {
+    setEmojiOpen(false);
+    onSend();
+  }
+
   return (
     <div className="thread__input-wrap">
       {replyTo && (
@@ -591,7 +620,7 @@ function ChatInputBar({
 
       <div className="thread__input">
         <div className="thread__attach-wrap">
-          <button className="thread__input-icon" aria-label="Attach" onClick={() => setAttachOpen((o) => !o)}>
+          <button className="thread__input-icon" aria-label="Attach" onClick={() => { setEmojiOpen(false); setAttachOpen((o) => !o); }}>
             <Icon name="paperclip" size={18} />
           </button>
           {attachOpen && (
@@ -606,6 +635,16 @@ function ChatInputBar({
           <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
           <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
         </div>
+        <div className="thread__emoji-wrap">
+          <button
+            className={'thread__input-icon' + (emojiOpen ? ' is-active' : '')}
+            aria-label="Emoji"
+            onClick={() => { setAttachOpen(false); setEmojiOpen((o) => !o); }}
+          >
+            <Icon name="smile" size={18} />
+          </button>
+          {emojiOpen && <EmojiPicker onPick={insertEmoji} />}
+        </div>
         <textarea
           ref={inputRef}
           className="thread__input-text"
@@ -613,13 +652,13 @@ function ChatInputBar({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
           }}
           rows={1}
         />
         <button
           className={'thread__send' + (canSend ? ' is-ready' : '')}
-          onClick={onSend}
+          onClick={send}
           disabled={!canSend}
           aria-label="Send"
         >
