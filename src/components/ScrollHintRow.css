@@ -1,20 +1,21 @@
 /* ScrollHintRow — overflow prompt per the Figma icon-row: a bare peach
-   chevron (no circle, not a button) standing where the next icon would
-   be. Cut icons hide until scrolled whole. */
-.scrollrow { position: relative; min-width: 0; }
+   chevron pinned at the CONTENT edge (the same line tab text aligns to),
+   never a circle, never a button. Cut icons hide until scrolled whole. */
+.scrollrow { position: relative; min-width: 0; --srow-gutter: 0px; }
 
 /* Side margins that HOLD: a row's own padding scrolls away with the
    content, so gutters live on the wrapper — icons clip at the gutter
    line, never the screen edge (founder, 2026-07-17). */
-.scrollrow--gutter { padding: 0 var(--s-5); }
+.scrollrow--gutter { padding: 0 var(--s-5); --srow-gutter: var(--s-5); }
 
 .scrollrow__hint {
   position: absolute;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   color: var(--peach);
   pointer-events: none;
 }
 .scrollrow__hint svg { width: 16px; height: 16px; }
-.scrollrow__hint--left svg { transform: scaleX(-1); }
+.scrollrow__hint--r { right: var(--srow-gutter); justify-content: flex-end; }
+.scrollrow__hint--l { left: var(--srow-gutter); justify-content: flex-start; }
+.scrollrow__hint--l svg { transform: scaleX(-1); }

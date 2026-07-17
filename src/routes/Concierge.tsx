@@ -793,29 +793,16 @@ export default function Concierge() {
         </button>
         {activeTab !== 'chat' && activeTab !== 'urgent' && (
           <>
-            <div className="conc__scope">
-              <button
-                className="conc__scope-label"
-                onClick={() => {
-                  const order: typeof scope[] = ['Day', 'Week', 'Month'];
-                  const i = order.indexOf(scope);
-                  setScope(order[(i + 1) % order.length]);
-                }}
-              >
-                {scope}
-              </button>
-              <button
-                className="conc__scope-arrow"
-                onClick={() => {
-                  const order: typeof scope[] = ['Day', 'Week', 'Month'];
-                  const i = order.indexOf(scope);
-                  setScope(order[(i + 1) % order.length]);
-                }}
-                aria-label="Cycle scope"
-              >
-                <Icon name="chevron-right" size={10} />
-              </button>
-            </div>
+            {/* Same control language as the Calendar's view picker (founder,
+                2026-07-17) — a dropdown, not a tap-to-cycle pill. */}
+            <select
+              className="conc__vselect"
+              value={scope}
+              onChange={(e) => setScope(e.target.value as typeof scope)}
+              aria-label="Scope"
+            >
+              {(['Day', 'Week', 'Month'] as const).map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
             <div className="conc__pager">
               <button className="conc__tool-circle conc__pager-btn" aria-label="Previous">
                 <Icon name="chevron-left" size={12} />
