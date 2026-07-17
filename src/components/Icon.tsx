@@ -278,7 +278,9 @@ const ICONS: Record<IconName, IconEntry> = {
   'search': {
     viewBox: '28 211 30 30',
     strokeWidth: 1.88,
-    content: <><path d="M43 241C51.2844 241 58 234.284 58 226C58 217.716 51.2844 211 43 211C34.7157 211 28 217.716 28 226C28 234.284 34.7157 241 43 241Z" fill="white" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M41.8454 230.615C45.0317 230.615 47.6146 228.032 47.6146 224.846C47.6146 221.66 45.0317 219.077 41.8454 219.077C38.6591 219.077 36.0762 221.66 36.0762 224.846C36.0762 228.032 38.6591 230.615 41.8454 230.615Z" fill="white" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M49.9229 232.923L45.9307 228.931Z" fill="white"/><path d="M49.9229 232.923L45.9307 228.931" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+    // fill=none, not white: on a filled peach chip (Marketplace ISO) a white
+    // fill swallowed the glyph into a blank disc
+    content: <><path d="M43 241C51.2844 241 58 234.284 58 226C58 217.716 51.2844 211 43 211C34.7157 211 28 217.716 28 226C28 234.284 34.7157 241 43 241Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M41.8454 230.615C45.0317 230.615 47.6146 228.032 47.6146 224.846C47.6146 221.66 45.0317 219.077 41.8454 219.077C38.6591 219.077 36.0762 221.66 36.0762 224.846C36.0762 228.032 38.6591 230.615 41.8454 230.615Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M49.9229 232.923L45.9307 228.931" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'send': {
     viewBox: '224 457 14 14',
