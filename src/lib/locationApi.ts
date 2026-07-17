@@ -93,6 +93,21 @@ export async function deleteLocationShare(id: string): Promise<void> {
 
 // ─── People on the map (per-viewer resolution happens server-side) ───────────
 
+/** Member-facing area label (founder, 2026-07-17): the town reads as a
+ *  place, not an apology — "Bailey, Colorado", never
+ *  "Near Bailey, Colorado 80421, United States". */
+export function areaLabel(place: string | null): string | null {
+  if (!place) return null;
+  const trimmed = place
+    .replace(/\b\d{5}(-\d{4})?\b/g, '')
+    .replace(/,\s*United States\s*$/i, '')
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*,/g, ',')
+    .replace(/[,\s]+$/, '')
+    .trim();
+  return trimmed || null;
+}
+
 export interface MappableMember {
   id: string;
   full_name: string | null;
