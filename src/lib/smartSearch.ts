@@ -505,8 +505,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       return {
         id: p.id, full_name: p.full_name, headline: p.headline, avatar_url: p.avatar_url,
         categoryNames: catNamesFor(p.id),
-        place: s?.place ?? null, level: (s?.level as 'area' | 'exact' | undefined) ?? null,
-        distanceMi: anchor && s ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
+        place: s?.place ?? null, level: (s?.level as 'state' | 'county' | 'area' | 'exact' | undefined) ?? null,
+        distanceMi: anchor && s && s.lat != null && s.lng != null ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
         recommenders: personRecNames(p.id, displayFilter),
         trusted: myVouched.has('profile:' + p.id),
         _bio: p.bio,

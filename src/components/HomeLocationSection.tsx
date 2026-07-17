@@ -5,13 +5,16 @@ import { supabase } from '../lib/supabase';
 import type { GeoPoint } from '../lib/geoApi';
 import {
   loadMyHome, saveMyHome, loadMyLocationShares, upsertLocationShare, deleteLocationShare,
+  areaLabel,
   type LocationLevel, type LocationShareRule,
 } from '../lib/locationApi';
 import './HomeLocationSection.css';
 
 const LEVEL_LABELS: Record<LocationLevel, string> = {
   hidden: 'Hidden',
-  area: 'Town-level',
+  state: 'State only',
+  county: 'County',
+  area: 'Town',
   exact: 'Exact address',
 };
 
@@ -25,6 +28,8 @@ export default function HomeLocationSection({ me }: { me: string }) {
   const [location, setLocation] = useState('');
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [area, setArea] = useState('');
+  const [county, setCounty] = useState('');
+  const [homeState, setHomeState] = useState('');
   const [rules, setRules] = useState<LocationShareRule[]>([]);
   const [members, setMembers] = useState<{ id: string; full_name: string | null }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -48,6 +53,7 @@ export default function HomeLocationSection({ me }: { me: string }) {
       ]);
       if (!live) return;
       setLocation(home.location); setGeo(home.geo); setArea(home.area);
+      setCounty(home.county); setHomeState(home.state);
       setRules(myRules);
       setMembers((memRes.data as { id: string; full_name: string | null }[] | null) ?? []);
     })();
@@ -88,7 +94,7 @@ export default function HomeLocationSection({ me }: { me: string }) {
   async function saveHome() {
     setSaving(true); setMsg(''); setError('');
     try {
-      await saveMyHome(me, { location, geo, area });
+      await saveMyHome(me, { location, geo, area, county, state: homeState });
       setMsg('Saved');
       setTimeout(() => setMsg(''), 2000);
     } catch (e) {
@@ -109,6 +115,8 @@ export default function HomeLocationSection({ me }: { me: string }) {
             setLocation(text);
             setGeo(g);
             setArea(g && suggestion?.areaLabel ? suggestion.areaLabel : '');
+            setCounty(g && suggestion?.countyLabel ? suggestion.countyLabel : '');
+            setHomeState(g && suggestion?.stateLabel ? suggestion.stateLabel : '');
           }}
           placeholder="Your home address or town"
         />
@@ -118,7 +126,7 @@ export default function HomeLocationSection({ me }: { me: string }) {
       </div>
       <h3 className="homeloc__h3">Who can find you on the map</h3>
       <p className="prof__care-lead">
-        Town-level shows you near {area || 'your town'} without your address. Rules for a person beat
+        Town shows you as {area ? (areaLabel(area) ?? 'your town') : 'your town'}; county and state zoom further out; nothing shows your address but Exact. Rules for a person beat
         rules for a group; at a tie, the more private rule wins — so a person set to Hidden stays
         hidden no matter what.
       </p>

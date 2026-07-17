@@ -53,6 +53,11 @@ export default function MemberProfile() {
         const [home, rules] = await Promise.all([loadMyHome(), loadMyLocationShares(me)]);
         if (!live) return;
         const everyone = rules.find((r) => r.audience_type === 'everyone')?.level ?? 'hidden';
+        // Coarser levels never fall back toward the address — missing label = nothing.
+        const placeFor: Record<string, string | null> = {
+          area: home.area || null, county: home.county || null,
+          state: home.state || null, exact: home.location || null,
+        };
         setHomeSpot(
           everyone === 'hidden' ? null : {
             id: me,
@@ -60,8 +65,7 @@ export default function MemberProfile() {
             avatar_url: null,
             lat: 0, lng: 0,
             level: everyone,
-            // area with no stored town label → show nothing, never the address
-            place: everyone === 'area' ? (home.area || null) : home.location,
+            place: placeFor[everyone] ?? null,
           },
         );
       } else {
@@ -125,7 +129,7 @@ export default function MemberProfile() {
         {homeSpot?.place && (
           <p className="mprof__loc">
             <Icon name="location" size={12} />{' '}
-            {homeSpot.level === 'area' ? areaLabel(homeSpot.place) : homeSpot.place}
+            {homeSpot.level !== 'exact' ? areaLabel(homeSpot.place) : homeSpot.place}
           </p>
         )}
         {me && !isSelf && (

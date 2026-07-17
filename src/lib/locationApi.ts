@@ -6,26 +6,34 @@ import type { GeoPoint } from './geoApi';
 // via my_home(), and everyone else only ever sees what mappable_members()
 // resolves for THEM (hidden by default; 'area' = town label + ~5km grid).
 
-export type LocationLevel = 'hidden' | 'area' | 'exact';
+// Ladder of specificity (founder, 2026-07-17): hidden < state < county <
+// area (town) < exact. Most-restrictive-wins ties use exactly this order.
+export type LocationLevel = 'hidden' | 'state' | 'county' | 'area' | 'exact';
 
 export interface MyHome {
   location: string;
   geo: GeoPoint | null;
   area: string;
+  county: string;
+  state: string;
 }
 
 export async function loadMyHome(): Promise<MyHome> {
+  const empty: MyHome = { location: '', geo: null, area: '', county: '', state: '' };
   const { data, error } = await supabase.rpc('my_home');
-  if (error) { console.warn('my_home:', error.message); return { location: '', geo: null, area: '' }; }
+  if (error) { console.warn('my_home:', error.message); return empty; }
   const row = (data as {
     home_location: string | null; home_lat: number | null;
     home_lng: number | null; home_area: string | null;
+    home_county?: string | null; home_state?: string | null;
   }[] | null)?.[0];
-  if (!row) return { location: '', geo: null, area: '' };
+  if (!row) return empty;
   return {
     location: row.home_location ?? '',
     geo: row.home_lat != null && row.home_lng != null ? { lat: row.home_lat, lng: row.home_lng } : null,
     area: row.home_area ?? '',
+    county: row.home_county ?? '',
+    state: row.home_state ?? '',
   };
 }
 
@@ -35,6 +43,8 @@ export async function saveMyHome(me: string, home: MyHome): Promise<void> {
     home_lat: home.geo?.lat ?? null,
     home_lng: home.geo?.lng ?? null,
     home_area: home.area.trim() || null,
+    home_county: home.county.trim() || null,
+    home_state: home.state.trim() || null,
   }).eq('id', me);
   if (error) throw error;
 }
@@ -113,8 +123,9 @@ export interface MappableMember {
   full_name: string | null;
   avatar_url: string | null;
   level: LocationLevel;
-  lat: number;
-  lng: number;
+  /** null at 'state' level — findable, not pinnable */
+  lat: number | null;
+  lng: number | null;
   place: string | null;
 }
 
