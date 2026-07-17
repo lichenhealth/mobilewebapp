@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
 import {
-  loadMappableMembers, loadMyHome, loadMyLocationShares, type MappableMember,
+  loadMappableMembers, loadMyHome, loadMyLocationShares, areaLabel, type MappableMember,
 } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
@@ -125,7 +125,7 @@ export default function MemberProfile() {
         {homeSpot?.place && (
           <p className="mprof__loc">
             <Icon name="location" size={12} />{' '}
-            {homeSpot.level === 'area' ? `Near ${homeSpot.place}` : homeSpot.place}
+            {homeSpot.level === 'area' ? areaLabel(homeSpot.place) : homeSpot.place}
           </p>
         )}
         {me && !isSelf && (

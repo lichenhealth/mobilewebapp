@@ -4,6 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { supabase } from '../lib/supabase';
+import { areaLabel } from '../lib/locationApi';
 import { Icon } from '../components/Icon';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
@@ -202,7 +203,7 @@ export default function MapView() {
           [
             { cls: 'mapv__popup-title', text: name },
             { cls: 'mapv__popup-when', text: m.level === 'area' ? 'Member · approximate' : 'Member' },
-            { cls: 'mapv__popup-loc', text: m.place ? (m.level === 'area' ? `Near ${m.place}` : m.place) : '' },
+            { cls: 'mapv__popup-loc', text: (m.level === 'area' ? areaLabel(m.place) : m.place) ?? '' },
           ],
           { label: 'View profile', onClick: () => navigate(`/members/${m.id}`) },
         ))
@@ -381,7 +382,7 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
             <li key={'p' + m.id}>
               <button onClick={() => { onFly(m.lng, m.lat, m.level === 'area' ? 11 : 13, `usr:${m.id}`); onClose(); }}>
                 <Icon name="profile" size={14} /> <span>{m.full_name ?? 'Member'}</span>
-                <em>{m.place ? (m.level === 'area' ? `Near ${m.place}` : m.place) : 'Member'}</em>
+                <em>{(m.level === 'area' ? areaLabel(m.place) : m.place) ?? 'Member'}</em>
               </button>
             </li>
           ))}
