@@ -108,7 +108,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <p className="mkt__sub">{sub}</p>
       </header>
 
-      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses">
+      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses" gutter>
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
