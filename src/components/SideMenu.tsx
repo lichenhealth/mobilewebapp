@@ -42,14 +42,10 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
 /** The Lichen support account answers help chats — it doesn't open one with itself. */
 const SUPPORT_EMAIL = 'connect@lichen.health';
 
-/** Mycelium sub-items are lens routes; the four space sections' sub-items
- *  are the member's REAL memberships, fetched when the menu opens. */
-const MYCELIUM_ITEMS = [
-  { label: 'People', href: '/mycelium/people' },
-  { label: 'Providers', href: '/mycelium/providers' },
-  { label: 'Organizations', href: '/mycelium/organizations' },
-  { label: 'Places', href: '/mycelium/places' },
-];
+/** The four space sections' sub-items are the member's REAL memberships,
+ *  fetched when the menu opens. Mycelium has no sub-items — its kind lenses
+ *  live as chips on the feed itself (PR #72; the old sub-links duplicated
+ *  them and didn't switch the lens once the feed was already open). */
 const SPACE_SECTIONS: { key: string; title: string; href: string; kind: MappableSpace['kind'] }[] = [
   { key: 'communities', title: 'Communities', href: '/communities', kind: 'community' },
   { key: 'groups', title: 'Groups', href: '/groups', kind: 'group' },
@@ -57,7 +53,7 @@ const SPACE_SECTIONS: { key: string; title: string; href: string; kind: Mappable
   { key: 'places', title: 'Places', href: '/places', kind: 'place' },
 ];
 const SECTIONS: NavSection[] = [
-  { key: 'mycelium', title: 'Mycelium', href: '/mycelium', items: MYCELIUM_ITEMS, defaultExpanded: false },
+  { key: 'mycelium', title: 'Mycelium', href: '/mycelium', items: [], defaultExpanded: false },
   ...SPACE_SECTIONS.map((s) => ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false })),
 ];
 
@@ -92,7 +88,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
   const itemsFor = (key: string): { label: string; href: string }[] => {
     const kind = SPACE_SECTIONS.find((s) => s.key === key)?.kind;
-    if (!kind) return MYCELIUM_ITEMS;
+    if (!kind) return [];
     return mySpaces.filter((s) => s.kind === kind)
       .map((s) => ({ label: s.name, href: `/spaces/${s.id}` }));
   };
