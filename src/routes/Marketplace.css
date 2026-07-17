@@ -135,7 +135,7 @@
 }
 
 /* ─── Action row ────────────────────────────────────────────────────── */
-.mkt__actions {
+.mkt__actions.h-scroll {
   display: flex;
   gap: var(--s-2);
   padding: var(--s-3) var(--s-5);

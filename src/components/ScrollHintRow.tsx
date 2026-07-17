@@ -37,14 +37,31 @@ export function ScrollHintRow({ className, role, ariaLabel, children }: {
     if (firstCut) {
       // Anchor the ghost to the item's inner icon circle when it has one
       // (marketplace/events slots are circle-plus-label columns).
-      const anchor = (firstCut.querySelector('[class*="circle"]') as HTMLElement | null) ?? firstCut;
-      const ar = anchor.getBoundingClientRect();
-      const size = Math.min(ar.width, ar.height);
-      next = {
-        left: ar.left - wrapRect.left + (ar.width - size) / 2,
-        top: ar.top - wrapRect.top + (ar.height - size) / 2,
-        size,
+      const geom = (child: HTMLElement): HintBox => {
+        const anchor = (child.querySelector('[class*="circle"]') as HTMLElement | null) ?? child;
+        const ar = anchor.getBoundingClientRect();
+        const size = Math.min(ar.width, ar.height);
+        return {
+          left: ar.left - wrapRect.left + (ar.width - size) / 2,
+          top: ar.top - wrapRect.top + (ar.height - size) / 2,
+          size,
+        };
       };
+      next = geom(firstCut);
+      // The cut item pokes past the edge, so a ghost at ITS spot would clip
+      // too. When it doesn't fit whole, stand in for the last fully visible
+      // icon instead (hiding it as well) — the ghost is always intact.
+      const boundary = rect.right - wrapRect.left;
+      if (next.left + next.size > boundary - 2) {
+        const kids = Array.from(el.children) as HTMLElement[];
+        for (let j = kids.indexOf(firstCut) - 1; j >= 0; j--) {
+          if (kids[j].getBoundingClientRect().width >= 24) {
+            kids[j].style.visibility = 'hidden';
+            next = geom(kids[j]);
+            break;
+          }
+        }
+      }
     }
     // Same-value guard: update() runs after every render, so returning the
     // previous reference on no-change is what stops a render loop.

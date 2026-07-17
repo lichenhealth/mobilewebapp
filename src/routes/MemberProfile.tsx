@@ -5,7 +5,9 @@ import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
-import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
+import {
+  loadMappableMembers, loadMyHome, loadMyLocationShares, type MappableMember,
+} from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
 import './Profile.css';
@@ -43,8 +45,29 @@ export default function MemberProfile() {
       setOfferings(off);
       setInWebState(mine.web.has(`profile:${id}`));
       setTrusted(mine.vouched.has(`profile:${id}`));
-      // What THIS viewer is allowed to see of their home (hidden → absent).
-      setHomeSpot(mappable.find((x) => x.id === id) ?? null);
+      if (me && id === me) {
+        // SELF-VIEW: the resolver hands the owner their exact address ("your
+        // own data"), but this page promises "how other members see you" —
+        // so render what your EVERYONE rule grants (default hidden), never
+        // the exact street address (founder, 2026-07-17).
+        const [home, rules] = await Promise.all([loadMyHome(), loadMyLocationShares(me)]);
+        if (!live) return;
+        const everyone = rules.find((r) => r.audience_type === 'everyone')?.level ?? 'hidden';
+        setHomeSpot(
+          everyone === 'hidden' ? null : {
+            id: me,
+            full_name: m?.full_name ?? null,
+            avatar_url: null,
+            lat: 0, lng: 0,
+            level: everyone,
+            // area with no stored town label → show nothing, never the address
+            place: everyone === 'area' ? (home.area || null) : home.location,
+          },
+        );
+      } else {
+        // What THIS viewer is allowed to see of their home (hidden → absent).
+        setHomeSpot(mappable.find((x) => x.id === id) ?? null);
+      }
       setLoading(false);
     })();
     return () => { live = false; };
