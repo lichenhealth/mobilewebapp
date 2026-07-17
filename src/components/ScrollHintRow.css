@@ -1,6 +1,6 @@
-/* ScrollHintRow — the ghost circle standing in for the icon that would
-   otherwise render half-cut. Hollow center (it isn't a button — swiping is
-   the gesture), same footprint as the icon it replaces. */
+/* ScrollHintRow — overflow prompt per the Figma icon-row: a bare peach
+   chevron (no circle, not a button) standing where the next icon would
+   be. Cut icons hide until scrolled whole. */
 .scrollrow { position: relative; min-width: 0; }
 
 /* Side margins that HOLD: a row's own padding scrolls away with the
@@ -8,16 +8,13 @@
    line, never the screen edge (founder, 2026-07-17). */
 .scrollrow--gutter { padding: 0 var(--s-5); }
 
-.scrollrow__hint--left svg { transform: scaleX(-1); }
-
 .scrollrow__hint {
   position: absolute;
-  border-radius: var(--r-full);
-  background: transparent;
-  border: 1px solid var(--bone-edge);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-faint);
+  color: var(--peach);
   pointer-events: none;
 }
+.scrollrow__hint svg { width: 16px; height: 16px; }
+.scrollrow__hint--left svg { transform: scaleX(-1); }

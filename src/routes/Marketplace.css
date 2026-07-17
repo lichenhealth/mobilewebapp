@@ -101,7 +101,6 @@
   justify-content: center;
   gap: var(--s-4);
   padding: var(--s-3) var(--s-5);
-  border-bottom: 1px solid var(--bone-edge-soft);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -127,8 +126,8 @@
   content: '';
   position: absolute;
   bottom: -4px;
-  left: 10%;
-  right: 10%;
+  left: 0;
+  right: 0;
   height: 2px;
   background: var(--peach);
   border-radius: var(--r-full);
