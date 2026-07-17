@@ -101,6 +101,7 @@ export default function Compose() {
   const AREA_HOME: Partial<Record<ServiceArea, string>> = {
     marketplace: '/market', courses: '/courses', library: '/library',
     events: '/events', work: '/work', places: '/places',
+    art: '/art', food: '/food',
   };
   function afterPostDestination(isEventPost: boolean): string {
     if (presetSpace) return `/spaces/${presetSpace}`;
@@ -372,6 +373,17 @@ export default function Compose() {
 
   return (
     <div className="cmp">
+      {/* Way back without posting — real history when we came from inside
+          the app, else the section this composer would land in anyway. */}
+      <button
+        className="cmp__back"
+        onClick={() => {
+          if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
+          else navigate(afterPostDestination(isEvent));
+        }}
+      >
+        <Icon name="arrow-left" size={14} /> Back
+      </button>
       <header className="cmp__head">
         <h1 className="cmp__title">{editing ? (isEvent ? 'Edit event' : 'Edit post') : 'New post'}</h1>
         <p className="cmp__sub">
