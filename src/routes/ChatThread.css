@@ -221,6 +221,17 @@
   line-height: 1.6;
 }
 
+/* ─── Day dividers ────────────────────────────────────────────────── */
+.thread__day {
+  align-self: center;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: var(--s-2) 0 calc(-1 * var(--s-3));
+}
+
 /* ─── Message runs ────────────────────────────────────────────────── */
 .msg-run {
   display: grid;

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   MessageRow, MemberInfo, ChatKind, ReactionRow, Attachment, MediaType,
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
-  colorFor, monogramFor, formatTime, chatTitle, otherMember,
+  colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
   markChatRead,
 } from '../lib/chatApi';
@@ -214,21 +214,29 @@ export default function ChatConversation({
       <ChatHeader chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo} />
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
-        {runs.map((run, i) => (
-          <MessageRun
-            key={i}
-            run={run}
-            me={me}
-            members={members}
-            messagesById={messagesById}
-            reactionsByMessage={reactionsByMessage}
-            mediaUrls={mediaUrls}
-            menuFor={menuFor}
-            setMenuFor={setMenuFor}
-            onReply={setReplyTo}
-            onReact={react}
-          />
-        ))}
+        {runs.map((run, i) => {
+          const day = new Date(run.messages[0].created_at).toDateString();
+          const prevDay = i > 0 ? new Date(runs[i - 1].messages[0].created_at).toDateString() : null;
+          return (
+            <Fragment key={i}>
+              {day !== prevDay && (
+                <div className="thread__day">{dayLabel(run.messages[0].created_at)}</div>
+              )}
+              <MessageRun
+                run={run}
+                me={me}
+                members={members}
+                messagesById={messagesById}
+                reactionsByMessage={reactionsByMessage}
+                mediaUrls={mediaUrls}
+                menuFor={menuFor}
+                setMenuFor={setMenuFor}
+                onReply={setReplyTo}
+                onReact={react}
+              />
+            </Fragment>
+          );
+        })}
       </div>
       <ChatInputBar
         draft={draft} setDraft={setDraft} onSend={sendMessage} inputRef={inputRef}
