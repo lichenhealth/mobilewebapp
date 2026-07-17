@@ -33,6 +33,20 @@ export function ScrollHintRow({ className, role, ariaLabel, children }: {
       kid.style.visibility = cut ? 'hidden' : '';
       if (cut && !firstCut && kr.width >= 24) firstCut = kid;
     }
+    // Clean break: nothing straddles the edge but content continues — the
+    // row would end looking complete while hiding more. Stand in for the
+    // last fully visible item so the prompt still shows.
+    if (!firstCut && el.scrollWidth - el.scrollLeft - el.clientWidth > 8) {
+      const kids = Array.from(el.children) as HTMLElement[];
+      for (let j = kids.length - 1; j >= 0; j--) {
+        const kr = kids[j].getBoundingClientRect();
+        if (kr.width >= 24 && kr.right <= rect.right + 1 && kr.left >= rect.left - 1) {
+          kids[j].style.visibility = 'hidden';
+          firstCut = kids[j];
+          break;
+        }
+      }
+    }
     let next: HintBox | null = null;
     if (firstCut) {
       // Anchor the ghost to the item's inner icon circle when it has one
