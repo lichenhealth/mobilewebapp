@@ -136,7 +136,7 @@
 /* ─── Action row ────────────────────────────────────────────────────── */
 .mkt__actions.h-scroll {
   display: flex;
-  gap: var(--s-2);
+  gap: 6px;
   padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
   overflow-x: auto;
   scrollbar-width: none;
@@ -145,18 +145,25 @@
 
 .mkt__action {
   flex: 0 0 auto;
-  /* content-sized, compact — founder 2026-07-17: the 72px uniform slots
-     read as "spread out and cut off" */
-  min-width: 46px;
+  /* label-sized — founder 2026-07-17: ALL six offer filters must fit a
+     phone screen without scrolling; the label is the widest part */
+  min-width: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   background: transparent;
   border: 0;
-  padding: 2px 4px;
+  padding: 2px 0;
   cursor: pointer;
   transition: transform var(--d-fast) var(--ease-out);
+}
+@media (max-width: 520px) {
+  /* All six offer filters + tools fit a 375px screen: 4px gaps, tighter
+     label tracking (LEND/BORROW is the long pole), slim divider. */
+  .mkt__actions.h-scroll { gap: 4px; }
+  .mkt__actions .mkt__action-spacer { margin: 0 2px; }
+  .mkt__actions .mkt__action-label { letter-spacing: 0.02em; }
 }
 .mkt__action-label { white-space: nowrap; }
 .mkt__action:hover { transform: translateY(-1px); }
