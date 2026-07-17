@@ -9,6 +9,8 @@ import {
   AvailabilityKind, AvailabilityWindow, ShareLevel, ShareRule, minToLabel,
   loadMyAvailability, addAvailability, deleteAvailability,
   loadMyShares, upsertShare, deleteShare,
+  ExternalCalendar, listExternalCalendars, addExternalCalendar,
+  removeExternalCalendar, syncExternalCalendars,
 } from '../lib/calendarApi';
 import { loadMyPhone } from '../lib/conciergeApi';
 import './Concierge.css';
@@ -47,17 +49,25 @@ export default function CalendarSettings() {
   const [rResults, setRResults] = useState<RulePick[]>([]);
   const [rLevel, setRLevel] = useState<ShareLevel>('details');
 
+  // External calendars (secret iCal import)
+  const [extCals, setExtCals] = useState<ExternalCalendar[]>([]);
+  const [extName, setExtName] = useState('');
+  const [extUrl, setExtUrl] = useState('');
+  const [syncing, setSyncing] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!me) return;
-    const [w, r, memRes, phone] = await Promise.all([
+    const [w, r, memRes, phone, ext] = await Promise.all([
       loadMyAvailability(me),
       loadMyShares(me),
       supabase.from('profiles').select('id, full_name').neq('id', me).order('full_name').limit(500),
       loadMyPhone(),
+      listExternalCalendars(me),
     ]);
     setWindows(w); setRules(r);
     setMembers((memRes.data as MemberOpt[] | null) ?? []);
     setMyPhone(phone);
+    setExtCals(ext);
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -243,6 +253,70 @@ export default function CalendarSettings() {
               {r.name} <span className="cset__kind">{r.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* ── Other calendars (secret iCal import) ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">Other calendars</span>
+          <p className="cedit__hint">
+            Bring your Google, Apple, or Outlook calendar into Lichen: paste its
+            <strong> secret iCal address</strong> and your busy times flow into
+            find-a-time and booking — other members only ever see &ldquo;busy,&rdquo;
+            never your event details. In Google Calendar: Settings &rarr; your
+            calendar &rarr; &ldquo;Secret address in iCal format.&rdquo;
+          </p>
+
+          {extCals.map((c) => (
+            <div className="cset__row" key={c.id}>
+              <span className="cset__aud cset__extname">{c.name}</span>
+              <span className="cset__extmeta">
+                {c.last_error
+                  ? <em className="cset__exterr" title={c.last_error}>couldn&rsquo;t sync</em>
+                  : c.last_synced_at
+                    ? `${c.event_count} busy ${c.event_count === 1 ? 'block' : 'blocks'}`
+                    : 'not synced yet'}
+              </span>
+              <button
+                className="cedit__add cedit__add--sm"
+                disabled={syncing === c.id}
+                onClick={async () => {
+                  setSyncing(c.id); setError('');
+                  try { await syncExternalCalendars({ force: true, calendarId: c.id }); await load(); }
+                  catch (e) { setError((e as { message?: string } | null)?.message || 'Sync failed.'); }
+                  setSyncing(null);
+                }}
+              >
+                {syncing === c.id ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button className="cedit__remove" onClick={() => act(() => removeExternalCalendar(c.id))} aria-label="Remove calendar">
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          ))}
+
+          <div className="cset__add cset__add--wrap">
+            <input
+              className="cedit__input cset__extfield"
+              placeholder="Name (e.g. Work Google Cal)"
+              value={extName} onChange={(e) => setExtName(e.target.value)}
+            />
+            <input
+              className="cedit__input cset__grow"
+              placeholder="Paste the secret iCal address (https://… or webcal://…)"
+              value={extUrl} onChange={(e) => setExtUrl(e.target.value)}
+            />
+            <button
+              className="cedit__add cedit__add--sm"
+              disabled={!/^(https?|webcal):\/\/.+/i.test(extUrl.trim())}
+              onClick={() => act(async () => {
+                await addExternalCalendar(me, extName, extUrl);
+                setExtName(''); setExtUrl('');
+                try { await syncExternalCalendars({ force: true }); } catch { /* surfaced per-row */ }
+              })}
+            >
+              <Icon name="plus" size={12} /> Add calendar
+            </button>
+          </div>
         </div>
       </div>
     </div>
