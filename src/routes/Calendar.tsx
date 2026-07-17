@@ -277,6 +277,34 @@ export default function Calendar() {
 
   const timedOn = (iso: string) =>
     events.filter((e) => !e.all_day && occursOn(e, iso)).sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
+
+  /** Google-style overlap layout: events that overlap in time share the
+   *  column side-by-side instead of stacking (founder, 2026-07-17 — a long
+   *  block's title was buried under shorter ones). Greedy column assignment
+   *  within each cluster of transitively-overlapping events. */
+  const layoutDay = (list: EventRow[]): Map<string, { col: number; cols: number }> => {
+    const out = new Map<string, { col: number; cols: number }>();
+    let cluster: { id: string; col: number }[] = [];
+    const colEnds: number[] = [];
+    let clusterEnd = 0;
+    const flush = () => {
+      const cols = Math.max(1, colEnds.length);
+      for (const c of cluster) out.set(c.id, { col: c.col, cols });
+      cluster = []; colEnds.length = 0; clusterEnd = 0;
+    };
+    for (const e of list) {
+      const start = e.start_min ?? 0;
+      const end = Math.max(e.end_min ?? start + 60, start + 15);
+      if (cluster.length && start >= clusterEnd) flush();
+      let col = colEnds.findIndex((busyUntil) => busyUntil <= start);
+      if (col === -1) { col = colEnds.length; colEnds.push(0); }
+      colEnds[col] = end;
+      cluster.push({ id: e.id, col });
+      clusterEnd = Math.max(clusterEnd, end);
+    }
+    flush();
+    return out;
+  };
   const allDayOn = (iso: string) => events.filter((e) => e.all_day && occursOn(e, iso));
   const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
   const hasAllDayRow = days.some((d) => allDayOn(d).length > 0);
@@ -572,19 +600,25 @@ export default function Calendar() {
                         </span>
                       );
                     }))}
-                  {timedOn(iso).map((e) => {
+                  {(() => { const lay = layoutDay(timedOn(iso)); return timedOn(iso).map((e) => {
                     const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
                     const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
+                    const g = lay.get(e.id) ?? { col: 0, cols: 1 };
                     return (
                       <button
                         className={blockClass(e, 'calp__event')} key={e.id + iso}
-                        style={{ top, height }}
+                        style={{
+                          top, height,
+                          left: `calc(${(g.col / g.cols) * 100}% + 2px)`,
+                          width: `calc(${100 / g.cols}% - 4px)`,
+                          right: 'auto',
+                        }}
                         onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >
                         {e.title}
                       </button>
                     );
-                  })}
+                  }); })()}
                 </div>
               ))}
             </div>
