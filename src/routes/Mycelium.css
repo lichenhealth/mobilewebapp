@@ -46,6 +46,7 @@
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-top: var(--s-2);
+  padding: 0 var(--s-5);
 }
 .myc__count-n { color: var(--peach); font-weight: 600; }
 
@@ -113,6 +114,20 @@
   border-color: var(--peach);
   background: var(--peach);
   color: var(--bone-warm);
+}
+
+/* Phone widths: compact circles so all nine areas fit on one row
+   (38px × 9 overflows a 375px screen); wrap is the safety net for
+   the very narrowest devices. Saved shares these classes. */
+@media (max-width: 520px) {
+  /* double class outranks .h-scroll's gap */
+  .myc__areas.h-scroll { gap: 6px; flex-wrap: wrap; }
+  .myc__area { width: 30px; height: 30px; }
+  .myc__area svg { width: 15px; height: 15px; }
+  .myc__kinds.h-scroll { gap: 6px; flex-wrap: wrap; }
+  .myc__kind { font-size: 11px; padding: 4px 9px 4px 4px; gap: 4px; }
+  .myc__kind-circle { width: 20px; height: 20px; }
+  .myc__kind-circle svg { width: 11px; height: 11px; }
 }
 
 /* ─── Feed ──────────────────────────────────────────────────────────── */
