@@ -85,10 +85,19 @@ export default function Calendar() {
   const [searchPool, setSearchPool] = useState<EventRow[]>([]);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Which calendar: mine, or a space's (with the find-a-time overlay).
+  // Which calendars are showing — additive, like every lens row: Mine starts
+  // on, tap a space chip to layer its events in (tap again to drop it).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
-  const [selectedCal, setSelectedCal] = useState('me');
+  const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
   const [overlayOn, setOverlayOn] = useState(false);
+  // Find-a-time works one space at a time: available when exactly one space
+  // chip is on (Mine may be on alongside).
+  const spaceSel = selectedCals.filter((x) => x !== 'me');
+  const soloSpace = spaceSel.length === 1 ? spaceSel[0] : null;
+  const toggleCal = (id: string) => {
+    setSelectedCals((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    setOverlayOn(false);
+  };
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
@@ -111,11 +120,18 @@ export default function Calendar() {
   const load = useCallback(async () => {
     if (!me) return;
     setLoading(true);
-    setEvents(selectedCal === 'me'
-      ? await loadMyEvents(me, from, to)
-      : await loadSpaceEvents(selectedCal, from, to));
+    // Merge every selected source; an event visible from two sources (mine +
+    // its space) appears once. All chips off = an honestly empty calendar.
+    const sources = await Promise.all([
+      selectedCals.includes('me') ? loadMyEvents(me, from, to) : Promise.resolve([]),
+      ...spaceSel.map((id) => loadSpaceEvents(id, from, to)),
+    ]);
+    const byId = new Map<string, EventRow>();
+    for (const arr of sources) for (const ev of arr) byId.set(ev.id, ev);
+    setEvents([...byId.values()]);
     setLoading(false);
-  }, [me, from, to, selectedCal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, from, to, selectedCals.join(',')]);
   useEffect(() => { load(); }, [load]);
 
   // My spaces → calendar chips.
@@ -130,15 +146,15 @@ export default function Calendar() {
 
   // Find-a-time overlay data: the space's members' busy fragments + declared hours.
   useEffect(() => {
-    if (!overlayOn || selectedCal === 'me' || view === 'month') { setFbRows([]); setMemberWindows([]); return; }
+    if (!overlayOn || !soloSpace || view === 'month') { setFbRows([]); setMemberWindows([]); return; }
     (async () => {
-      const { data } = await supabase.from('space_members').select('profile_id').eq('space_id', selectedCal);
+      const { data } = await supabase.from('space_members').select('profile_id').eq('space_id', soloSpace);
       const ids = ((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id);
       setMemberIds(ids);
       const [fb, wins] = await Promise.all([freeBusy(ids, from, to), availabilityOf(ids)]);
       setFbRows(fb); setMemberWindows(wins);
     })();
-  }, [overlayOn, selectedCal, view, from, to]);
+  }, [overlayOn, soloSpace, view, from, to]);
 
   /** Free members for a 30-min slot: not busy, and (if they declared hours)
    *  inside a declared window. Members with no declared hours count as free
@@ -269,7 +285,7 @@ export default function Calendar() {
    *  ("Blair's calendar is on my screen → she's who I'm scheduling with"). */
   const composerQS = (extra: string[] = []) => {
     const parts = [...extra];
-    if (selectedCal !== 'me') parts.push(`space=${selectedCal}`);
+    if (soloSpace) parts.push(`space=${soloSpace}`);
     const ids = overlays.filter((o) => o.kind === 'profile').map((o) => o.id);
     if (ids.length) parts.push(`inv=${ids.join(',')}`);
     return parts.length ? `?${parts.join('&')}` : '';
@@ -342,24 +358,27 @@ export default function Calendar() {
           </button>
         </div>
 
-        {/* Calendar chips: mine + my spaces (+ find-a-time toggle on a space) */}
+        {/* Calendar chips — ADDITIVE: Mine defaults on, tap spaces to layer
+            their events in (+ find-a-time toggle when exactly one space is on) */}
         <div className="calp__chips">
           <button
-            className={'calp__calchip' + (selectedCal === 'me' ? ' is-on' : '')}
-            onClick={() => { setSelectedCal('me'); setOverlayOn(false); }}
+            className={'calp__calchip' + (selectedCals.includes('me') ? ' is-on' : '')}
+            onClick={() => toggleCal('me')}
+            aria-pressed={selectedCals.includes('me')}
           >
             Mine
           </button>
           {calendars.map((c) => (
             <button
               key={c.id}
-              className={'calp__calchip' + (selectedCal === c.id ? ' is-on' : '')}
-              onClick={() => { setSelectedCal(c.id); setOverlayOn(false); }}
+              className={'calp__calchip' + (selectedCals.includes(c.id) ? ' is-on' : '')}
+              onClick={() => toggleCal(c.id)}
+              aria-pressed={selectedCals.includes(c.id)}
             >
               {c.name}
             </button>
           ))}
-          {selectedCal !== 'me' && view !== 'month' && (
+          {soloSpace && view !== 'month' && (
             <button
               className={'calp__calchip calp__calchip--overlay' + (overlayOn ? ' is-on' : '')}
               onClick={() => setOverlayOn((o) => !o)}
@@ -486,7 +505,7 @@ export default function Calendar() {
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
                   {/* Find-a-time shading: greener = more members free; tap to book */}
-                  {overlayOn && selectedCal !== 'me' && memberIds.length > 0 &&
+                  {overlayOn && soloSpace && memberIds.length > 0 &&
                     Array.from({ length: 48 }, (_, s) => s * 30).map((slot) => {
                       const free = freeMembersAt(iso, slot);
                       if (free.length === 0) return null;
@@ -499,7 +518,7 @@ export default function Calendar() {
                           title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/calendar/new?space=${selectedCal}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
+                            navigate(`/calendar/new?space=${soloSpace}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
                           }}
                         />
                       );
