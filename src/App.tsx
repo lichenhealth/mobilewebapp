@@ -5,6 +5,7 @@ import SpacesDirectory from './routes/SpacesDirectory';
 import Mycelium from './routes/Mycelium';
 import MyceliumDirectory from './routes/MyceliumDirectory';
 import Privacy from './routes/Privacy';
+import Terms from './routes/Terms';
 import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
 import Caregiver from './routes/Caregiver';
@@ -48,7 +49,7 @@ import { CollectPromptProvider } from './collections/CollectPrompt';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
-const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy'];
+const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms'];
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -161,6 +162,7 @@ export default function App() {
 
           {/* Mycelium — your full network */}
           <Route path="/privacy"         element={<Privacy />} />
+          <Route path="/terms"           element={<Terms />} />
           <Route path="/mycelium"        element={<Mycelium />} />
           <Route path="/mycelium/directory" element={<MyceliumDirectory />} />
           <Route path="/mycelium/:type"  element={<Mycelium />} />
