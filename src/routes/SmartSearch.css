@@ -1,6 +1,17 @@
 /* Smart search (Figma 286-3407) — sentence box with inline peach highlights */
 .ssrch { padding: var(--s-4); max-width: 720px; margin: 0 auto; }
 
+/* Door back to where search was opened from (maps for now) */
+.ssrch__back {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin: 0 var(--s-2) var(--s-2) 0; padding: 6px 12px;
+  border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.ssrch__back:hover { border-color: var(--peach); color: var(--ink); }
+.ssrch__back svg { color: var(--peach-deep, var(--peach)); }
+
 .ssrch__scope {
   display: inline-flex; align-items: center; gap: 7px;
   margin-bottom: var(--s-2); padding: 6px 12px;

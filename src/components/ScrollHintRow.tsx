@@ -2,24 +2,60 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import './ScrollHintRow.css';
 
-/** Horizontal-scroll wrapper with an honesty chip: when content continues
- *  past the right edge, a chevron floats there — rows should never look
- *  merely cut off. Tapping it nudges the row along; it disappears at the
- *  end. Pass the row's own classes via className (they land on the inner
- *  scroller so existing padding/gap CSS keeps applying). */
+interface HintBox { left: number; top: number; size: number; }
+
+/** Horizontal-scroll wrapper that never shows a half-cut icon (founder,
+ *  2026-07-17): the first item straddling the right edge is hidden until
+ *  scrolling reveals it fully, and a ghost circle — same size and spot as
+ *  the icon it stands in for, hollow center, not clickable — holds its
+ *  place as the "more this way" prompt. Pass the row's own classes via
+ *  className; they land on the inner scroller so existing CSS applies. */
 export function ScrollHintRow({ className, role, ariaLabel, children }: {
   className?: string;
   role?: string;
   ariaLabel?: string;
   children: ReactNode;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState(false);
+  const [hint, setHint] = useState<HintBox | null>(null);
 
   const update = () => {
-    const el = ref.current;
-    if (!el) return;
-    setMore(el.scrollWidth - el.scrollLeft - el.clientWidth > 8);
+    const el = ref.current, wrap = wrapRef.current;
+    if (!el || !wrap) return;
+    const rect = el.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    let firstCut: HTMLElement | null = null;
+    for (const kid of Array.from(el.children) as HTMLElement[]) {
+      const kr = kid.getBoundingClientRect();
+      // Straddling the right edge = would render sliced. Hide until whole.
+      const cut = kr.left < rect.right - 1 && kr.right > rect.right + 1;
+      kid.style.visibility = cut ? 'hidden' : '';
+      if (cut && !firstCut && kr.width >= 24) firstCut = kid;
+    }
+    let next: HintBox | null = null;
+    if (firstCut) {
+      // Anchor the ghost to the item's inner icon circle when it has one
+      // (marketplace/events slots are circle-plus-label columns).
+      const anchor = (firstCut.querySelector('[class*="circle"]') as HTMLElement | null) ?? firstCut;
+      const ar = anchor.getBoundingClientRect();
+      const size = Math.min(ar.width, ar.height);
+      next = {
+        left: ar.left - wrapRect.left + (ar.width - size) / 2,
+        top: ar.top - wrapRect.top + (ar.height - size) / 2,
+        size,
+      };
+    }
+    // Same-value guard: update() runs after every render, so returning the
+    // previous reference on no-change is what stops a render loop.
+    setHint((prev) => {
+      if (prev === null && next === null) return prev;
+      if (prev && next
+        && Math.abs(prev.left - next.left) < 0.5
+        && Math.abs(prev.top - next.top) < 0.5
+        && Math.abs(prev.size - next.size) < 0.5) return prev;
+      return next;
+    });
   };
 
   // No deps: re-measure after every render so chip/filter changes are caught.
@@ -35,16 +71,16 @@ export function ScrollHintRow({ className, role, ariaLabel, children }: {
   }, []);
 
   return (
-    <div className="scrollrow">
+    <div className="scrollrow" ref={wrapRef}>
       <div className={className} ref={ref} role={role} aria-label={ariaLabel}>{children}</div>
-      {more && (
-        <button
+      {hint && (
+        <span
           className="scrollrow__hint"
-          aria-label="Scroll for more"
-          onClick={() => ref.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+          style={{ left: hint.left, top: hint.top, width: hint.size, height: hint.size }}
+          aria-hidden="true"
         >
           <Icon name="chevron-right" size={13} />
-        </button>
+        </span>
       )}
     </div>
   );

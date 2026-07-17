@@ -367,6 +367,11 @@ export default function SmartSearch() {
 
   return (
     <div className="ssrch">
+      {urlParams.get('from') === 'maps' && (
+        <button className="ssrch__back" onClick={() => navigate('/maps')}>
+          <Icon name="arrow-left" size={14} /> Back to map
+        </button>
+      )}
       {hasScope && (
         <div className="ssrch__scope">
           <Icon name="search" size={12} />

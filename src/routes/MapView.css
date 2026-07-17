@@ -84,6 +84,10 @@
   font-style: normal; font-family: var(--font-mono); font-size: 9px;
   color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;
 }
+/* Matches without a pin — findable, honestly labeled, opens the profile */
+.mapv__search-list .mapv__search-offmap svg { color: var(--ink-faint); }
+.mapv__search-list .mapv__search-offmap span { color: var(--ink-soft); }
+
 .mapv__search-smart {
   display: inline-flex; align-items: center; gap: 6px;
   margin-top: var(--s-2); padding: 6px 4px;
