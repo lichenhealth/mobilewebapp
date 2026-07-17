@@ -316,8 +316,12 @@ export default function CalendarSettings() {
             {connecting ? 'Opening Google…' : 'Connect Google Calendar — one tap'}
           </button>
           <p className="cedit__hint cset__gconnect-hint">
-            Or paste any calendar&rsquo;s secret iCal address below (works for
-            Apple, Outlook, and Google alike).
+            Heads up: until Google finishes verifying Lichen, their consent
+            screens shout &ldquo;unverified app&rdquo; — that&rsquo;s expected.
+            Tap <em>Advanced&nbsp;&rarr;&nbsp;Continue</em> and carry on; Lichen
+            only ever reads busy times, and other members never see your event
+            details. Or paste any calendar&rsquo;s secret iCal address below
+            (Apple, Outlook, and Google alike).
           </p>
 
           {extCals.map((c) => (
