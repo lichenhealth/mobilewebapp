@@ -1,12 +1,56 @@
 .mycdir { padding-bottom: var(--s-7); }
 
 .mycdir__head {
+  position: relative;
   padding: var(--s-6) var(--s-5) var(--s-3);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--s-2);
   text-align: center;
+}
+
+/* The + — weave someone in by searching the platform (chat__new language) */
+.mycdir__add {
+  position: absolute;
+  top: var(--s-6);
+  right: var(--s-5);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  background: var(--peach);
+  color: var(--bone-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter var(--d-fast) var(--ease-out);
+}
+.mycdir__add:hover { filter: brightness(1.05); }
+
+.mycdir__addpanel { padding: 0 var(--s-4) var(--s-3); }
+.mycdir__addsearch {
+  margin: 0 8px var(--s-2);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 14px;
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  color: var(--ink-muted);
+}
+.mycdir__addsearch input {
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+.mycdir__addsearch button {
+  display: inline-flex;
+  color: var(--ink-faint);
 }
 .mycdir__crumb {
   display: inline-flex;
