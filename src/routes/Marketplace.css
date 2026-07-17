@@ -138,7 +138,7 @@
 .mkt__actions.h-scroll {
   display: flex;
   gap: var(--s-2);
-  padding: var(--s-3) var(--s-5);
+  padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
   overflow-x: auto;
   scrollbar-width: none;
 }

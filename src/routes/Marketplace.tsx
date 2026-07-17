@@ -126,7 +126,7 @@ export default function Marketplace() {
       </header>
 
       {/* Action chips: search & list something, then the offer-mode filters */}
-      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Marketplace tools and filters">
+      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Marketplace tools and filters" gutter>
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}

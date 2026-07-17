@@ -21,7 +21,7 @@ interface IconRowProps {
 export default function IconRow({ items, onSelect }: IconRowProps) {
   const navigate = useNavigate();
   return (
-    <ScrollHintRow className="icon-row h-scroll" role="toolbar" ariaLabel="Categories">
+    <ScrollHintRow className="icon-row h-scroll" role="toolbar" ariaLabel="Categories" gutter>
       {items.flatMap(({ icon, label, to, divider }, i) => {
         const nodes = [];
         if (divider && i > 0) {

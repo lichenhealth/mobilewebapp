@@ -209,7 +209,7 @@ export default function Events() {
           <FilterRow options={TABS} value={tab} onChange={setTab} />
 
           {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
-          <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters">
+          <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters" gutter>
             <button className="evt__action" onClick={() => navigate('/search?area=events')}>
               <span className="evt__action-circle"><Icon name="search" size={14} /></span>
               <span className="evt__action-label">Search</span>
