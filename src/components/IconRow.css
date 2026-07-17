@@ -1,14 +1,16 @@
 .icon-row.h-scroll {
   /* double class beats .h-scroll's 12px gap; snug icons, roomy edges */
   padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
-  gap: 4px;
+  /* 34px icons + 3px gaps: eight icons + the chevron land exactly on a
+     375px screen (36/4 left a one-pixel miss and a 35px hole) */
+  gap: 3px;
   display: flex;
   align-items: center;
 }
 
 .icon-row__btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;

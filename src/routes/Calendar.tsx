@@ -37,6 +37,7 @@ import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
 import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
+  loadMyExternalBusy, syncExternalCalendars,
 } from '../lib/calendarApi';
 import './Calendar.css';
 
@@ -128,11 +129,33 @@ export default function Calendar() {
     ]);
     const byId = new Map<string, EventRow>();
     for (const arr of sources) for (const ev of arr) byId.set(ev.id, ev);
+    // Imported busy blocks ride along on YOUR calendar — muted, read-only.
+    if (selectedCals.includes('me')) {
+      for (const b of await loadMyExternalBusy(me, from, to)) {
+        byId.set('ext:' + b.id, {
+          id: 'ext:' + b.id, creator_id: '', owner_profile_id: me, owner_space_id: null,
+          title: b.title || 'Busy', description: '', location: '', lat: null, lng: null,
+          start_date: b.on_date, end_date: b.on_date, all_day: b.all_day,
+          start_min: b.start_min, end_min: b.end_min, recurrence: null,
+          created_at: '', external: true,
+        });
+      }
+    }
     setEvents([...byId.values()]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, from, to, selectedCals.join(',')]);
   useEffect(() => { load(); }, [load]);
+
+  // Refresh imported calendars quietly on arrival (the edge function skips
+  // anything synced in the last 30 minutes), then fold new blocks in.
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    syncExternalCalendars().then(() => { if (live) load(); }).catch(() => { /* no external calendars / offline */ });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
 
   // My spaces → calendar chips.
   useEffect(() => {
@@ -267,6 +290,7 @@ export default function Calendar() {
   // Google-style block state: pending invite / tentative = white w/ peach
   // outline; declined = faded.
   const blockClass = (ev: EventRow, base: string) => {
+    if (ev.external) return `${base} ${base}--external`;
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
     return base + (st === 'invited' || st === 'tentative' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
   };
@@ -582,6 +606,9 @@ export default function Calendar() {
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
+            {selected.external && (
+              <p className="calp__sheet-ext">Imported from your external calendar — edit it there; Lichen re-syncs on its own.</p>
+            )}
             {selected.location && <SmartLocation loc={selected.location} className="calp__sheet-loc" />}
             {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
 

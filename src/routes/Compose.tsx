@@ -511,9 +511,9 @@ export default function Compose() {
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
             {!isEvent && (
               <>
-                <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => setEvMode('lend')}>Lend</button>
+                <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => { setEvMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
                 <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>
-                <button className={'cmp__chip' + (evMode === 'borrow' ? ' is-on' : '')} onClick={() => setEvMode('borrow')}>Borrow</button>
+                <button className={'cmp__chip' + (evMode === 'borrow' ? ' is-on' : '')} onClick={() => { setEvMode('borrow'); if (!price.trim()) setPrice('Free'); }}>Borrow</button>
                 <button className={'cmp__chip' + (evMode === 'iso' ? ' is-on' : '')} onClick={() => setEvMode('iso')} title="In search of — you're looking to buy or find this">ISO</button>
               </>
             )}

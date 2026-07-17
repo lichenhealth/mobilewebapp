@@ -330,3 +330,26 @@
 .calp__invitee:hover { border-color: #c0564f; }
 .calp__match { width: fit-content; }
 .calp__match:hover { border-color: var(--peach); }
+
+/* ── Imported (external-calendar) blocks: yours to see, theirs to edit ── */
+.calp__event--external,
+.calp__chip--external {
+  background: var(--bone-deep, var(--bone-warm));
+  border: 1px dashed var(--bone-edge);
+  color: var(--ink-muted);
+}
+.calp__mdot--external { background: var(--ink-faint); }
+.calp__sheet-ext {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: var(--s-1) 0;
+}
+
+/* External-calendar rows in settings */
+.cset__extname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cset__extmeta { font-size: 11px; color: var(--ink-muted); flex-shrink: 0; }
+.cset__exterr { font-style: normal; color: var(--rust, #b4553a); }
+.cset__extfield { width: 170px; flex-shrink: 0; }

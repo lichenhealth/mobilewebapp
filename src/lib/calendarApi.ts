@@ -28,6 +28,8 @@ export interface EventRow {
   recurrence: Recurrence | null;
   created_at: string;
   attendees?: EventAttendee[];
+  /** Synthetic row imported from an external calendar (owner's view only). */
+  external?: boolean;
 }
 
 const EVENT_COLS =
@@ -338,4 +340,72 @@ export async function availabilityOf(profileIds: string[]): Promise<MemberWindow
   const { data, error } = await supabase.rpc('availability_of', { p_profiles: profileIds });
   if (error) console.warn('availabilityOf:', error.message);
   return (data as MemberWindow[] | null) ?? [];
+}
+
+// ─── External calendars (secret iCal import — calendar thread 7a) ────────────
+// A member pastes their Google/Apple/Outlook secret iCal URL; the
+// sync-external-calendar edge function expands it into per-day busy blocks
+// (external_busy) which free_busy() unions in. Titles are owner-only.
+
+export interface ExternalCalendar {
+  id: string;
+  name: string;
+  url: string;
+  last_synced_at: string | null;
+  last_error: string | null;
+  event_count: number;
+}
+
+export async function listExternalCalendars(me: string): Promise<ExternalCalendar[]> {
+  const { data, error } = await supabase
+    .from('external_calendars')
+    .select('id, name, url, last_synced_at, last_error, event_count')
+    .eq('profile_id', me)
+    .order('created_at');
+  if (error) { console.warn('listExternalCalendars:', error.message); return []; }
+  return (data as ExternalCalendar[] | null) ?? [];
+}
+
+export async function addExternalCalendar(me: string, name: string, url: string): Promise<void> {
+  const { error } = await supabase.from('external_calendars')
+    .insert({ profile_id: me, name: name.trim() || 'Calendar', url: url.trim() });
+  if (error) throw error;
+}
+
+export async function removeExternalCalendar(id: string): Promise<void> {
+  const { error } = await supabase.from('external_calendars').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Ask the edge function to refresh imported busy blocks. Fire-and-forget on
+ *  Calendar load (the function skips calendars synced <30 min ago); pass
+ *  force for the settings "Sync now" button. */
+export async function syncExternalCalendars(opts: { force?: boolean; calendarId?: string } = {}): Promise<void> {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { error } = await supabase.functions.invoke('sync-external-calendar', {
+    body: { timezone, ...opts },
+  });
+  if (error) throw error;
+}
+
+export interface ExternalBusyRow {
+  id: string;
+  calendar_id: string;
+  on_date: string;
+  all_day: boolean;
+  start_min: number | null;
+  end_min: number | null;
+  title: string | null;
+}
+
+/** The owner's own imported blocks (titles included) for the calendar grid. */
+export async function loadMyExternalBusy(me: string, from: string, to: string): Promise<ExternalBusyRow[]> {
+  const { data, error } = await supabase
+    .from('external_busy')
+    .select('id, calendar_id, on_date, all_day, start_min, end_min, title')
+    .eq('profile_id', me)
+    .gte('on_date', from)
+    .lte('on_date', to);
+  if (error) { console.warn('loadMyExternalBusy:', error.message); return []; }
+  return (data as ExternalBusyRow[] | null) ?? [];
 }
