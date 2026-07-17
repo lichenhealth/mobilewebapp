@@ -388,6 +388,27 @@ export async function syncExternalCalendars(opts: { force?: boolean; calendarId?
   if (error) throw error;
 }
 
+/** One-tap Google connection: ask the edge function for a consent URL and
+ *  send the browser there; Google bounces back to Calendar settings. */
+export async function startGoogleConnect(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('google-oauth-start', {
+    body: { returnTo: window.location.origin },
+  });
+  if (error || !data?.url) throw new Error('Google connection isn’t configured yet');
+  window.location.href = data.url as string;
+}
+
+export async function disconnectGoogle(accountId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('google-oauth-start', {
+    body: { action: 'disconnect', accountId },
+  });
+  if (error) throw error;
+}
+
+/** external_calendars rows whose url is 'google:<id>' are OAuth connections. */
+export const googleAccountId = (url: string): string | null =>
+  url.startsWith('google:') ? url.slice(7) : null;
+
 export interface ExternalBusyRow {
   id: string;
   calendar_id: string;

@@ -11,7 +11,9 @@ import {
   loadMyShares, upsertShare, deleteShare,
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
   removeExternalCalendar, syncExternalCalendars,
+  startGoogleConnect, disconnectGoogle, googleAccountId,
 } from '../lib/calendarApi';
+import { useSearchParams } from 'react-router-dom';
 import { loadMyPhone } from '../lib/conciergeApi';
 import './Concierge.css';
 import './Calendar.css';
@@ -54,6 +56,24 @@ export default function CalendarSettings() {
   const [extName, setExtName] = useState('');
   const [extUrl, setExtUrl] = useState('');
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  // Back from Google's consent screen: sync the fresh connection, tidy the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const googleStatus = searchParams.get('google');
+  useEffect(() => {
+    if (!googleStatus || !me) return;
+    if (googleStatus === 'connected') {
+      void syncExternalCalendars({ force: true }).catch(() => {}).then(() => load());
+    } else {
+      setError(googleStatus === 'denied'
+        ? 'Google connection was cancelled.'
+        : 'Google connection didn’t complete — try again.');
+    }
+    searchParams.delete('google');
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleStatus, me]);
 
   const load = useCallback(async () => {
     if (!me) return;
@@ -284,9 +304,28 @@ export default function CalendarSettings() {
             </div>
           </details>
 
+          <button
+            className="cedit__add cset__gconnect"
+            disabled={connecting}
+            onClick={async () => {
+              setConnecting(true); setError('');
+              try { await startGoogleConnect(); }
+              catch (e) { setError((e as Error).message); setConnecting(false); }
+            }}
+          >
+            {connecting ? 'Opening Google…' : 'Connect Google Calendar — one tap'}
+          </button>
+          <p className="cedit__hint cset__gconnect-hint">
+            Or paste any calendar&rsquo;s secret iCal address below (works for
+            Apple, Outlook, and Google alike).
+          </p>
+
           {extCals.map((c) => (
             <div className="cset__row" key={c.id}>
-              <span className="cset__aud cset__extname">{c.name}</span>
+              <span className="cset__aud cset__extname">
+                {c.name}
+                {googleAccountId(c.url) && <em className="cset__gtag"> · Google</em>}
+              </span>
               <span className="cset__extmeta">
                 {c.last_error
                   ? <em className="cset__exterr" title={c.last_error}>couldn&rsquo;t sync</em>
@@ -306,7 +345,15 @@ export default function CalendarSettings() {
               >
                 {syncing === c.id ? 'Syncing…' : 'Sync now'}
               </button>
-              <button className="cedit__remove" onClick={() => act(() => removeExternalCalendar(c.id))} aria-label="Remove calendar">
+              <button
+                className="cedit__remove"
+                onClick={() => act(async () => {
+                  const gid = googleAccountId(c.url);
+                  if (gid) await disconnectGoogle(gid);   // token + row + busy blocks
+                  else await removeExternalCalendar(c.id);
+                })}
+                aria-label="Remove calendar"
+              >
                 <Icon name="close" size={13} />
               </button>
             </div>

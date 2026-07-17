@@ -17,6 +17,9 @@
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? '';
+const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? '';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -262,6 +265,84 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
   return rows.slice(0, 4000);
 }
 
+// ─── Google-connected calendars (url = 'google:<account id>') ────────────────
+// The Calendar API with singleEvents=true expands recurrence for us — richer
+// and fresher than the secret-ICS feed. Tokens live in a deny-all table; only
+// this service-role path can read them.
+function googleItemsToRows(
+  items: { status?: string; summary?: string;
+    start?: { date?: string; dateTime?: string };
+    end?: { date?: string; dateTime?: string } }[],
+  tz: string,
+): BusyRow[] {
+  const rows: BusyRow[] = [];
+  for (const it of items) {
+    if (it.status === 'cancelled') continue;
+    const title = (it.summary ?? '').slice(0, 200);
+    if (it.start?.date) {
+      const startT = Date.parse(it.start.date + 'T00:00:00Z');
+      const endT = it.end?.date ? Date.parse(it.end.date + 'T00:00:00Z') : startT + DAY_MS;
+      const days = Math.max(1, Math.round((endT - startT) / DAY_MS));
+      for (let i = 0; i < Math.min(days, 60); i++) {
+        const dd = new Date(startT + i * DAY_MS);
+        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title });
+      }
+    } else if (it.start?.dateTime) {
+      let cursor = Date.parse(it.start.dateTime);
+      const endUtc = Math.max(it.end?.dateTime ? Date.parse(it.end.dateTime) : cursor, cursor + 15 * 60000);
+      let guard = 0;
+      while (cursor < endUtc && guard++ < 60) {
+        const w = utcToWall(cursor, tz);
+        const segEnd = Math.min(endUtc, cursor + (1440 - w.min) * 60000);
+        rows.push({
+          on_date: isoDate(w.y, w.mo, w.d), all_day: false,
+          start_min: w.min, end_min: Math.min(1440, w.min + Math.round((segEnd - cursor) / 60000)), title,
+        });
+        cursor = segEnd;
+      }
+    }
+  }
+  return rows.slice(0, 4000);
+}
+
+async function fetchGoogleRows(
+  accountId: string, profileId: string, tz: string, windowStart: number, windowEnd: number,
+): Promise<BusyRow[]> {
+  const svc = { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` };
+  const accts = await (await fetch(
+    `${SUPABASE_URL}/rest/v1/google_calendar_accounts?select=refresh_token&id=eq.${accountId}&profile_id=eq.${profileId}`,
+    { headers: svc })).json();
+  const refresh = accts?.[0]?.refresh_token;
+  if (!refresh) throw new Error('Google connection missing — reconnect');
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refresh, client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET, grant_type: 'refresh_token',
+    }),
+  });
+  if (!tokenRes.ok) throw new Error('Google sign-in expired — reconnect');
+  const { access_token } = await tokenRes.json();
+
+  const items: unknown[] = [];
+  let pageToken = '';
+  for (let page = 0; page < 3; page++) {
+    const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+      + `?timeMin=${new Date(windowStart).toISOString()}&timeMax=${new Date(windowEnd).toISOString()}`
+      + '&singleEvents=true&maxResults=2500&fields=items(status,summary,start,end),nextPageToken'
+      + (pageToken ? `&pageToken=${pageToken}` : '');
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${access_token}` } });
+    if (!res.ok) throw new Error(`Google Calendar answered ${res.status}`);
+    const body = await res.json();
+    items.push(...(body.items ?? []));
+    if (!body.nextPageToken) break;
+    pageToken = body.nextPageToken;
+  }
+  return googleItemsToRows(items as Parameters<typeof googleItemsToRows>[0], tz);
+}
+
 // ─── REST helpers (caller's token — RLS scopes everything) ───────────────────
 function rest(auth: string) {
   const headers = { apikey: SUPABASE_ANON_KEY, Authorization: auth, 'Content-Type': 'application/json' };
@@ -306,12 +387,17 @@ Deno.serve(async (req) => {
       continue;
     }
     try {
-      const url = String(cal.url).replace(/^webcal:\/\//i, 'https://');
-      const res = await fetch(url, { headers: { 'User-Agent': 'Lichen-Calendar-Sync/1.0' }, redirect: 'follow' });
-      if (!res.ok) throw new Error(`Calendar URL answered ${res.status}`);
-      const text = await res.text();
-      if (!text.includes('BEGIN:VCALENDAR')) throw new Error('Not an iCal feed — check the URL');
-      const rows = expand(parseIcs(text, tz), tz, windowStart, windowEnd);
+      let rows: BusyRow[];
+      if (String(cal.url).startsWith('google:')) {
+        rows = await fetchGoogleRows(String(cal.url).slice(7), user.id, tz, windowStart, windowEnd);
+      } else {
+        const url = String(cal.url).replace(/^webcal:\/\//i, 'https://');
+        const res = await fetch(url, { headers: { 'User-Agent': 'Lichen-Calendar-Sync/1.0' }, redirect: 'follow' });
+        if (!res.ok) throw new Error(`Calendar URL answered ${res.status}`);
+        const text = await res.text();
+        if (!text.includes('BEGIN:VCALENDAR')) throw new Error('Not an iCal feed — check the URL');
+        rows = expand(parseIcs(text, tz), tz, windowStart, windowEnd);
+      }
 
       await db.del(`external_busy?calendar_id=eq.${cal.id}`);
       for (let i = 0; i < rows.length; i += 400) {

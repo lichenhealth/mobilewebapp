@@ -368,3 +368,15 @@
 }
 .cset__howto-body p { font-size: 12px; font-weight: 300; color: var(--ink-soft); line-height: 1.55; margin: 0; }
 .cset__howto-note { color: var(--ink-muted); font-style: italic; }
+
+/* One-tap Google connect */
+.cset__gconnect {
+  background: var(--peach);
+  color: var(--bone-warm);
+  border-color: var(--peach);
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.cset__gconnect:hover { filter: brightness(1.05); }
+.cset__gconnect-hint { margin-bottom: var(--s-2); }
+.cset__gtag { font-style: normal; font-size: 10px; color: var(--ink-faint); }
