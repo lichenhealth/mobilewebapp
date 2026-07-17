@@ -45,3 +45,29 @@
 .sdir__chip--in {
   background: var(--peach-tint, var(--bone-warm)); border-color: var(--peach); color: var(--ink);
 }
+
+/* ── Standalone group creation (founder 2026-07-17) ── */
+.sdir__create { padding: 0 var(--s-5) var(--s-2); }
+.sdir__create-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--r-full);
+  background: var(--peach); color: var(--bone-warm);
+  font-size: 12px; border: 0; cursor: pointer;
+}
+.sdir__create-btn:hover { filter: brightness(1.05); }
+.sdir__create-form { display: flex; align-items: center; gap: 6px; }
+.sdir__create-form input {
+  flex: 1; min-width: 0; padding: 8px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--peach); background: var(--bone);
+  font-size: 13px; color: var(--ink);
+}
+.sdir__create-go {
+  padding: 8px 14px; border-radius: var(--r-full);
+  background: var(--peach); color: var(--bone-warm);
+  font-size: 12px; border: 0; cursor: pointer; white-space: nowrap;
+}
+.sdir__create-go:disabled { opacity: 0.5; }
+.sdir__create-hint {
+  font-size: 11px; font-weight: 300; color: var(--ink-faint);
+  margin-top: 6px;
+}
