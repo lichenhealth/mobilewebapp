@@ -15,6 +15,8 @@
   border-bottom: 1px solid var(--bone-edge);
 }
 .mapv__bar-btn {
+  /* flex-shrink 0: overflowing layer pills used to squash these circles */
+  flex-shrink: 0;
   width: 36px; height: 36px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
@@ -23,7 +25,19 @@
 }
 .mapv__bar-btn:hover { border-color: var(--peach); color: var(--ink); }
 .mapv__bar-btn.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
-.mapv__bar-spring { flex: 1; }
+
+/* Layer pills scroll in their own lane; the ScrollHintRow wrapper takes the
+   rest of the bar and floats the more-this-way chevron when pills overflow */
+.mapv__bar .scrollrow { flex: 1; min-width: 0; }
+.mapv__layers {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.mapv__layers::-webkit-scrollbar { display: none; }
 .mapv__layer {
   padding: 5px 12px; border-radius: var(--r-full); flex-shrink: 0;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
@@ -129,7 +143,7 @@
 .mapv__empty svg { color: var(--peach-deep); flex-shrink: 0; margin-top: 1px; }
 
 /* ── Add-a-Place panel: drops under the + button (profile-switcher pattern) ── */
-.mapv__add-wrap { position: relative; display: inline-flex; }
+.mapv__add-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .mapv__scrim { position: fixed; inset: 0; z-index: 70; }
 .mapv__sheet {
   position: absolute; top: calc(100% + 8px); left: 0;

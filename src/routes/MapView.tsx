@@ -4,6 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { Icon } from '../components/Icon';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
@@ -251,16 +252,17 @@ export default function MapView() {
         >
           <Icon name="search" size={16} />
         </button>
-        <span className="mapv__bar-spring" />
-        {LAYERS.map((l) => (
-          <button
-            key={l.key}
-            className={'mapv__layer' + (layers[l.key] ? ' is-on' : '')}
-            onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
-          >
-            {l.label}
-          </button>
-        ))}
+        <ScrollHintRow className="mapv__layers h-scroll" role="toolbar" ariaLabel="Map layers">
+          {LAYERS.map((l) => (
+            <button
+              key={l.key}
+              className={'mapv__layer' + (layers[l.key] ? ' is-on' : '')}
+              onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
+            >
+              {l.label}
+            </button>
+          ))}
+        </ScrollHintRow>
       </div>
 
       {searchOpen && (
