@@ -52,8 +52,8 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/donate',      label: 'Donate',      icon: 'heart-line'    },
 ];
 
-/** Routes that show a settings gear next to the bell */
-const SETTINGS_PREFIXES = ['/concierge'];
+// (Concierge's settings gear removed 2026-07-17 — it only opened /profile,
+// which the avatar chip already does everywhere.)
 
 export default function TopBar({
   onMenu,
@@ -61,7 +61,6 @@ export default function TopBar({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const section = SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
-  const showSettings = SETTINGS_PREFIXES.some((p) => pathname.startsWith(p));
 
   const { unreadForScope } = useNotifications();
   const { actor, setActor, options, self } = useActing();
@@ -180,15 +179,6 @@ export default function TopBar({
           </>
         )}
         </div>
-        {showSettings && (
-          <button
-            className="top-bar__icon top-bar__settings"
-            onClick={() => navigate('/profile')}
-            aria-label="Settings"
-          >
-            <Icon name="settings" size={16} />
-          </button>
-        )}
         <button
           className="top-bar__icon top-bar__bell"
           onClick={() => setPanelOpen((o) => !o)}

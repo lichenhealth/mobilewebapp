@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
+import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
@@ -302,17 +303,36 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [geoRows, setGeoRows] = useState<GeoSuggestion[]>([]);
+  // Members/spaces that MATCH but have no pin — they still deserve to be
+  // found (founder, 2026-07-17); their row says so and opens the profile.
+  interface OffMapHit { type: 'profile' | 'space'; id: string; name: string; sub: string }
+  const [offMap, setOffMap] = useState<OffMapHit[]>([]);
   const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     const t = q.trim();
-    if (t.length < 3) { setGeoRows([]); return; }
+    if (t.length < 3) { setGeoRows([]); setOffMap([]); return; }
     debounceRef.current = window.setTimeout(async () => {
-      setGeoRows(await geocodeSuggest(t));
+      const [geo, profs, sps] = await Promise.all([
+        geocodeSuggest(t),
+        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${t}%`).limit(5),
+        supabase.from('spaces').select('id, name, kind').ilike('name', `%${t}%`).limit(5),
+      ]);
+      setGeoRows(geo);
+      const pinnedPeople = new Set(people.map((m) => m.id));
+      const pinnedSpaces = new Set(spaces.filter((s) => s.lat != null && s.lng != null).map((s) => s.id));
+      setOffMap([
+        ...((profs.data ?? []) as { id: string; full_name: string | null }[])
+          .filter((p) => !pinnedPeople.has(p.id))
+          .map((p) => ({ type: 'profile' as const, id: p.id, name: p.full_name || 'Member', sub: 'Not sharing a location' })),
+        ...((sps.data ?? []) as { id: string; name: string; kind: MappableSpace['kind'] }[])
+          .filter((s) => !pinnedSpaces.has(s.id))
+          .map((s) => ({ type: 'space' as const, id: s.id, name: s.name, sub: `${KIND_LABEL[s.kind]} · no location yet` })),
+      ]);
     }, 300);
     return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
-  }, [q]);
+  }, [q, people, spaces]);
 
   const needle = q.trim().toLowerCase();
   const eventHits = needle.length < 2 ? [] : events.filter(({ post }) =>
@@ -339,7 +359,7 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
           <Icon name="close" size={14} />
         </button>
       </div>
-      {(eventHits.length > 0 || spaceHits.length > 0 || peopleHits.length > 0 || geoRows.length > 0) && (
+      {(eventHits.length > 0 || spaceHits.length > 0 || peopleHits.length > 0 || offMap.length > 0 || geoRows.length > 0) && (
         <ul className="mapv__search-list">
           {eventHits.map(({ post, lat, lng }) => (
             <li key={'e' + post.id}>
@@ -365,6 +385,18 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
               </button>
             </li>
           ))}
+          {offMap.map((h) => (
+            <li key={h.type + h.id}>
+              <button
+                className="mapv__search-offmap"
+                onClick={() => { onClose(); navigate(h.type === 'profile' ? `/members/${h.id}` : `/spaces/${h.id}`); }}
+              >
+                <Icon name={h.type === 'profile' ? 'profile' : 'location'} size={14} />
+                <span>{h.name}</span>
+                <em>{h.sub}</em>
+              </button>
+            </li>
+          ))}
           {geoRows.map((g, i) => (
             <li key={'g' + i}>
               <button onClick={() => { onFly(g.lng, g.lat, 12); onClose(); }}>
@@ -374,7 +406,7 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
           ))}
         </ul>
       )}
-      <button className="mapv__search-smart" onClick={() => navigate('/search')}>
+      <button className="mapv__search-smart" onClick={() => navigate('/search?from=maps')}>
         <Icon name="sliders" size={13} /> Smart search — filters, trust, distance…
       </button>
     </div>

@@ -1,22 +1,16 @@
-/* ScrollHintRow — the floating "more this way" chevron over any h-scroll row */
+/* ScrollHintRow — the ghost circle standing in for the icon that would
+   otherwise render half-cut. Hollow center (it isn't a button — swiping is
+   the gesture), same footprint as the icon it replaces. */
 .scrollrow { position: relative; min-width: 0; }
 
 .scrollrow__hint {
   position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-  width: 26px;
-  height: 26px;
   border-radius: var(--r-full);
-  background: var(--bone);
+  background: transparent;
   border: 1px solid var(--bone-edge);
-  box-shadow: 0 1px 4px rgb(30 26 22 / 0.10);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-muted);
-  transition: color var(--d-fast) var(--ease-out);
+  color: var(--ink-faint);
+  pointer-events: none;
 }
-.scrollrow__hint:hover { color: var(--peach-deep, var(--peach)); }

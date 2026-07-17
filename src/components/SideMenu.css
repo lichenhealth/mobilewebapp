@@ -33,10 +33,16 @@
   flex-direction: column;
   padding: calc(var(--safe-top) + 80px) 0 calc(var(--nav-h) + var(--safe-bot));
   overflow-y: auto;
-  transition: transform var(--d-slow) var(--ease-spring);
+  /* visibility flips AFTER the slide-out: on wide screens the closed panel
+     otherwise parks in the left gutter, its × button floating there uselessly */
+  visibility: hidden;
+  transition: transform var(--d-slow) var(--ease-spring),
+              visibility 0s var(--d-slow);
 }
 .side-menu.is-open .side-menu__panel {
   transform: translate(0, 0) translateX(calc(-1 * (var(--app-max) / 2)));
+  visibility: visible;
+  transition: transform var(--d-slow) var(--ease-spring);
 }
 @media (max-width: 430px) {
   /* On narrow screens, app-shell is full width so center calc collapses */
