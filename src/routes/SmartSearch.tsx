@@ -739,7 +739,7 @@ export default function SmartSearch() {
                 {(p.place || p.distanceMi != null) && (
                   <span className="ssrch__hit-loc">
                     <Icon name="location" size={11} />
-                    {p.level === 'area' ? areaLabel(p.place) : p.place}
+                    {p.level !== 'exact' ? areaLabel(p.place) : p.place}
                     {p.distanceMi != null && ` · ~${Math.round(p.distanceMi)} mi`}
                   </span>
                 )}

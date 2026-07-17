@@ -10,7 +10,9 @@ export interface GeoSuggestion {
   label: string;       // full place name ("320 Rustlers Rd, Bailey, Colorado 80421, United States")
   lat: number;
   lng: number;
-  areaLabel?: string;  // town-level part ("Bailey, Colorado 80421, United States") — the 'area' privacy tier
+  areaLabel?: string;   // town-level part ("Bailey, Colorado 80421, United States") — the 'area' privacy tier
+  countyLabel?: string; // "Park County" — the 'county' privacy tier
+  stateLabel?: string;  // "Colorado" — the 'state' privacy tier
 }
 
 /** Forward-geocode with autocomplete (Mapbox Geocoding v6). Returns [] on any
@@ -27,7 +29,10 @@ export async function geocodeSuggest(q: string): Promise<GeoSuggestion[]> {
     if (!res.ok) { console.warn('geocodeSuggest:', res.status); return []; }
     const json = await res.json() as {
       features?: {
-        properties?: { full_address?: string; name?: string; place_formatted?: string };
+        properties?: {
+          full_address?: string; name?: string; place_formatted?: string;
+          context?: { district?: { name?: string }; region?: { name?: string } };
+        };
         geometry?: { coordinates?: [number, number] };
       }[];
     };
@@ -37,7 +42,11 @@ export async function geocodeSuggest(q: string): Promise<GeoSuggestion[]> {
         const name = f.properties?.full_address
           ?? [f.properties?.name, f.properties?.place_formatted].filter(Boolean).join(', ');
         return lat != null && lng != null && name
-          ? { label: name, lat, lng, areaLabel: f.properties?.place_formatted }
+          ? {
+              label: name, lat, lng, areaLabel: f.properties?.place_formatted,
+              countyLabel: f.properties?.context?.district?.name,
+              stateLabel: f.properties?.context?.region?.name,
+            }
           : null;
       })
       .filter((s): s is GeoSuggestion => !!s);

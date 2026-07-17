@@ -193,6 +193,7 @@ export default function MapView() {
     });
 
     visiblePeople.forEach((m) => {
+      if (m.lat == null || m.lng == null) return; // state-level: findable, not pinnable
       const name = m.full_name ?? 'Member';
       const el = document.createElement('button');
       el.className = 'mapv__pin mapv__pin--person';
@@ -202,8 +203,8 @@ export default function MapView() {
         .setPopup(makePopup(
           [
             { cls: 'mapv__popup-title', text: name },
-            { cls: 'mapv__popup-when', text: m.level === 'area' ? 'Member · approximate' : 'Member' },
-            { cls: 'mapv__popup-loc', text: (m.level === 'area' ? areaLabel(m.place) : m.place) ?? '' },
+            { cls: 'mapv__popup-when', text: m.level !== 'exact' ? 'Member · approximate' : 'Member' },
+            { cls: 'mapv__popup-loc', text: (m.level !== 'exact' ? areaLabel(m.place) : m.place) ?? '' },
           ],
           { label: 'View profile', onClick: () => navigate(`/members/${m.id}`) },
         ))
@@ -217,7 +218,7 @@ export default function MapView() {
       const bounds = new mapboxgl.LngLatBounds();
       visibleEvents.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
       visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
-      visiblePeople.forEach((m) => bounds.extend([m.lng, m.lat]));
+      visiblePeople.forEach((m) => { if (m.lat != null && m.lng != null) bounds.extend([m.lng, m.lat]); });
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
   }, [visibleEvents, visibleSpaces, visiblePeople, navigate]);
@@ -380,9 +381,12 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
           ))}
           {peopleHits.map((m) => (
             <li key={'p' + m.id}>
-              <button onClick={() => { onFly(m.lng, m.lat, m.level === 'area' ? 11 : 13, `usr:${m.id}`); onClose(); }}>
+              <button onClick={() => {
+                if (m.lat == null || m.lng == null) { onClose(); navigate(`/members/${m.id}`); return; }
+                onFly(m.lng, m.lat, m.level !== 'exact' ? 11 : 13, `usr:${m.id}`); onClose();
+              }}>
                 <Icon name="profile" size={14} /> <span>{m.full_name ?? 'Member'}</span>
-                <em>{(m.level === 'area' ? areaLabel(m.place) : m.place) ?? 'Member'}</em>
+                <em>{(m.level !== 'exact' ? areaLabel(m.place) : m.place) ?? 'Member'}</em>
               </button>
             </li>
           ))}
