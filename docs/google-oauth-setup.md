@@ -18,15 +18,19 @@ The two-track plan:
 1. Go to **console.cloud.google.com** and sign in (use the account you want
    to own this long-term — connect@lichen.health's Google account if it has
    one, else yours).
-2. Top bar → project picker → **New project**. Name: `Lichen`. Create, then
-   make sure it's selected.
+2. Top bar → project picker → **New project**. Name: `Lichen`.
+   - **Parent resource** (appears because the account is in a Google
+     Workspace org): Browse → pick the lichen.health organization.
+   Create, then make sure it's selected.
 3. Left menu → **APIs & Services → Library** → search **Google Calendar API**
    → Enable.
 
 ## Part 2 — Consent screen
 
 4. **APIs & Services → OAuth consent screen**:
-   - User type: **External** → Create.
+   - User type: **External** → Create. (Workspace accounts also see
+     "Internal" — don't pick it; Internal would limit calendar connections
+     to lichen.health Workspace accounts only, not members.)
    - App name: `Lichen` · Support email: `connect@lichen.health`
    - App logo: the Lichen mark (optional now; required for verification later)
    - App home page: `https://lichen.healthcare`
