@@ -368,11 +368,17 @@ export default function SmartSearch() {
 
   return (
     <div className="ssrch">
-      {urlParams.get('from') === 'maps' && (
-        <button className="ssrch__back" onClick={() => navigate('/maps')}>
-          <Icon name="arrow-left" size={14} /> Back to map
-        </button>
-      )}
+      {/* Always a way back (founder: like Compose) — real history when we
+          came from inside the app, else the door we arrived through. */}
+      <button
+        className="ssrch__back"
+        onClick={() => {
+          if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
+          else navigate(urlParams.get('from') === 'maps' ? '/maps' : '/home');
+        }}
+      >
+        <Icon name="arrow-left" size={14} /> {urlParams.get('from') === 'maps' ? 'Back to map' : 'Back'}
+      </button>
       {hasScope && (
         <div className="ssrch__scope">
           <Icon name="search" size={12} />
