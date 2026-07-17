@@ -590,7 +590,7 @@
 
 .thread__input {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   gap: var(--s-2);
   align-items: end;
   padding: var(--s-3) var(--s-4);
@@ -598,6 +598,10 @@
 
 /* Attach button + its popover menu */
 .thread__attach-wrap { position: relative; }
+.thread__emoji-wrap { position: relative; }
+/* Anchor the emoji panel to the bar's left edge (over the paperclip) so it
+   never clips the right side of a narrow screen. */
+.thread__emoji-wrap .emoji-pop { left: -44px; }
 .thread__attach-menu {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -641,6 +645,7 @@
   transition: color var(--d-fast) var(--ease-out);
 }
 .thread__input-icon:hover { color: var(--ink); }
+.thread__input-icon.is-active { color: var(--peach-deep); }
 
 .thread__input-text {
   font-family: inherit;
