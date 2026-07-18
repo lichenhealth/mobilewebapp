@@ -199,7 +199,7 @@ export default function Events() {
         >
           My Events
         </button>
-        <button className="evt__tab" onClick={() => navigate('/calendar')}>
+        <button className="evt__tab" onClick={() => navigate('/calendar?from=events')}>
           My Calendar
         </button>
       </div>

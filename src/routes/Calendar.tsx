@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
@@ -76,6 +76,9 @@ export default function Calendar() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  // Arrived via Events > My Calendar → offer the way back (maps' ?from= pattern)
+  const [urlParams] = useSearchParams();
+  const fromEvents = urlParams.get('from') === 'events';
   const today = todayISO();
 
   // Schedule (agenda list) is the phone default — a 7-column grid through a
@@ -444,6 +447,11 @@ export default function Calendar() {
       {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
           hour grid slides up and hides beneath them. The + lives here too, so
           nothing above the pin matters — no title row, grid starts high. */}
+      {fromEvents && (
+        <button className="cmp__back calp__backchip" onClick={() => navigate('/events')}>
+          <Icon name="arrow-left" size={14} /> Events
+        </button>
+      )}
       <div className="calp__pin">
         <div className="calp__toolbar">
           <button

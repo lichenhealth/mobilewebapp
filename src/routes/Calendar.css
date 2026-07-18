@@ -351,6 +351,9 @@
 .evav__slot--near { color: var(--ink-muted); }
 .evav__score { margin-left: 6px; font-size: 10px; color: var(--peach-deep, var(--peach)); }
 
+/* Back-to-events chip (shown only when you arrived from Events) */
+.calp__backchip { margin: var(--s-2) var(--s-5) 0; align-self: flex-start; }
+
 /* Reminders: private nudges — outline chips/rows with a check-off circle */
 .calp__rem { border-left-color: var(--sage, #6b7f5e) !important; }
 .calp__rem-check {
