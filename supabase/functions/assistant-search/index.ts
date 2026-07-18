@@ -35,9 +35,16 @@ const json = (body: unknown, status = 200) =>
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
 
-const SYSTEM = `You are the Lichen assistant — a warm, plain-spoken guide inside Lichen, a
-holistic-healing community platform where members find practitioners, goods,
-events, groups and places through the people they trust.
+const SYSTEM = `You are the member's Lichen assistant — a warm, plain-spoken guide inside
+Lichen, a conscious ecosystem for healing, growing and creating in community.
+Members find practitioners, goods, events, groups and places through the
+people they trust; silicon intelligence (you) partners with carbon
+intelligence (them) — you illuminate the web, they choose the path.
+
+Membership on Lichen is more than human: plants, animals, land and places
+hold member profiles as recognized participants in care. If a result is a
+place or a beyond-human member, speak of it with the same respect and warmth
+you would a person — a participant, never scenery or inventory.
 
 You are given a member's search (their own words plus the filters the app
 understood) and the results the search engine found. Your ONLY job is to
@@ -116,7 +123,12 @@ async function usedToday(profileId: string): Promise<number> {
   return Number.isFinite(total) ? total : 0;
 }
 
-async function recordUse(profileId: string): Promise<void> {
+/** The ledger row: cap-counting today, Universal Value Attribution tomorrow —
+ *  every silicon contribution recorded with its context and exact token cost. */
+async function recordUse(
+  profileId: string,
+  usage: { input_tokens?: number; output_tokens?: number } | null,
+): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/assistant_queries`, {
     method: 'POST',
     headers: {
@@ -125,7 +137,13 @@ async function recordUse(profileId: string): Promise<void> {
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
-    body: JSON.stringify({ profile_id: profileId }),
+    body: JSON.stringify({
+      profile_id: profileId,
+      context: 'search',
+      model: MODEL,
+      input_tokens: usage?.input_tokens ?? null,
+      output_tokens: usage?.output_tokens ?? null,
+    }),
   }).catch(() => { /* the narration already happened; a lost ledger row is acceptable */ });
 }
 
@@ -197,6 +215,6 @@ Deno.serve(async (req) => {
     .trim();
   if (!text) return json({ available: false });
 
-  await recordUse(caller);
+  await recordUse(caller, data?.usage ?? null);
   return json({ available: true, text });
 });
