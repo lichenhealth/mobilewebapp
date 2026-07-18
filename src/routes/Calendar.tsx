@@ -44,8 +44,8 @@ import './Calendar.css';
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type View = 'day' | '3day' | 'week' | 'month';
-const VIEW_LABELS: Record<View, string> = { day: 'Day', '3day': '3 Days', week: 'Week', month: 'Month' };
+type View = 'schedule' | 'day' | '3day' | 'week' | 'month';
+const VIEW_LABELS: Record<View, string> = { schedule: 'Schedule', day: 'Day', '3day': '3 Days', week: 'Week', month: 'Month' };
 
 /** Sunday that starts the week containing iso (grids are Sunday-first). */
 export function sundayOfWeek(iso: string): string {
@@ -76,7 +76,10 @@ export default function Calendar() {
   const navigate = useNavigate();
   const today = todayISO();
 
-  const [view, setView] = useState<View>('week');
+  // Schedule (agenda list) is the phone default — a 7-column grid through a
+  // keyhole is nobody's friend (founder + Gabe, 2026-07-17).
+  const [view, setView] = useState<View>(() =>
+    window.matchMedia('(max-width: 640px)').matches ? 'schedule' : 'week');
   const [anchor, setAnchor] = useState(todayISO());
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,12 +109,20 @@ export default function Calendar() {
   // Searched-calendar overlays: ephemeral side-by-side schedules (person or
   // space), each a dismissible chip. Re-search to bring one back — no saving.
   interface CalOverlay { kind: 'profile' | 'space'; id: string; name: string }
-  const [overlays, setOverlays] = useState<CalOverlay[]>([]);
+  // PINNED person/space overlays (founder, 2026-07-17): calendars you add
+  // from search stay put — per-viewer consent (calendar_shares) decides what
+  // each renders. Local to this device; a synced pin list can come later.
+  const [overlays, setOverlays] = useState<CalOverlay[]>(() => {
+    try { return JSON.parse(localStorage.getItem('calp:pins') || '[]') as CalOverlay[]; }
+    catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('calp:pins', JSON.stringify(overlays)); }, [overlays]);
   const [overlayRows, setOverlayRows] = useState<Record<string, FreeBusyRow[]>>({});
   const [calResults, setCalResults] = useState<CalOverlay[]>([]);
 
   // Visible days per view; month uses its own cell range.
   const days = useMemo(() => {
+    if (view === 'schedule') return Array.from({ length: 30 }, (_, i) => addDays(anchor, i));
     if (view === 'month') return monthCells(anchor);
     if (view === 'week') return Array.from({ length: 7 }, (_, i) => addDays(sundayOfWeek(anchor), i));
     return Array.from({ length: view === 'day' ? 1 : 3 }, (_, i) => addDays(anchor, i));
@@ -137,7 +148,7 @@ export default function Calendar() {
           title: b.title || 'Busy', description: '', location: '', lat: null, lng: null,
           start_date: b.on_date, end_date: b.on_date, all_day: b.all_day,
           start_min: b.start_min, end_min: b.end_min, recurrence: null,
-          created_at: '', external: true,
+          created_at: '', external: true, tint: colorFor('extcal:' + b.calendar_id),
         });
       }
     }
@@ -169,7 +180,7 @@ export default function Calendar() {
 
   // Find-a-time overlay data: the space's members' busy fragments + declared hours.
   useEffect(() => {
-    if (!overlayOn || !soloSpace || view === 'month') { setFbRows([]); setMemberWindows([]); return; }
+    if (!overlayOn || !soloSpace || view === 'month' || view === 'schedule') { setFbRows([]); setMemberWindows([]); return; }
     (async () => {
       const { data } = await supabase.from('space_members').select('profile_id').eq('space_id', soloSpace);
       const ids = ((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id);
@@ -271,6 +282,7 @@ export default function Calendar() {
 
   const page = (dir: 1 | -1) => {
     if (view === 'month') setAnchor(addMonths(anchor, dir));
+    else if (view === 'schedule') setAnchor(addDays(anchor, 30 * dir));
     else if (view === 'week') setAnchor(addDays(anchor, 7 * dir));
     else setAnchor(addDays(anchor, (view === 'day' ? 1 : 3) * dir));
   };
@@ -312,11 +324,18 @@ export default function Calendar() {
   async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
   async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
 
-  const headerLabel = localDate(view === 'month' ? anchor : days[Math.floor(days.length / 2)])
-    .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const headerLabel = view === 'schedule'
+    // The 30-day window can straddle months — label the span, not a midpoint.
+    ? `${localDate(days[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${localDate(days[days.length - 1]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+    : localDate(view === 'month' ? anchor : days[Math.floor(days.length / 2)])
+      .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const myAttend = (ev: EventRow) => ev.attendees?.find((a) => a.profile_id === me);
   // Google-style block state: pending invite / tentative = white w/ peach
   // outline; declined = faded.
+  /** Per-source hue: spaces + imported calendars wear their stable color
+   *  (mine stays peach) so layered calendars read at a glance. */
+  const tintOf = (ev: EventRow): string | null =>
+    ev.tint ?? (ev.owner_space_id ? colorFor(ev.owner_space_id) : null);
   const blockClass = (ev: EventRow, base: string) => {
     if (ev.external) return `${base} ${base}--external`;
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
@@ -427,10 +446,11 @@ export default function Calendar() {
               onClick={() => toggleCal(c.id)}
               aria-pressed={selectedCals.includes(c.id)}
             >
+              <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
               {c.name}
             </button>
           ))}
-          {soloSpace && view !== 'month' && (
+          {soloSpace && view !== 'month' && view !== 'schedule' && (
             <button
               className={'calp__calchip calp__calchip--overlay' + (overlayOn ? ' is-on' : '')}
               onClick={() => setOverlayOn((o) => !o)}
@@ -484,7 +504,7 @@ export default function Calendar() {
             ))}
           </div>
         )}
-        {view !== 'month' && (
+        {view !== 'month' && view !== 'schedule' && (
           <div className="calp__days" style={gridCols}>
             <span className="calp__gutter-head" />
             {days.map((iso) => (
@@ -497,7 +517,55 @@ export default function Calendar() {
         )}
       </div>
 
-      {view === 'month' ? (
+      {view === 'schedule' ? (
+        <div className="calp__sched">
+          {days.map((iso) => {
+            const evs = anyOn(iso).sort((a, b) =>
+              (a.all_day === b.all_day ? (a.start_min ?? 0) - (b.start_min ?? 0) : a.all_day ? -1 : 1));
+            const ovs = overlays.flatMap((o) =>
+              (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r) => ({ o, r })));
+            if (evs.length === 0 && ovs.length === 0) return null;
+            return (
+              <div className="calp__sched-day" key={iso}>
+                <div className={'calp__sched-date' + (iso === today ? ' is-today' : '')}>
+                  <span className="calp__sched-dow">{DAY_LABELS[localDate(iso).getDay()]}</span>
+                  <span className="calp__sched-num">{localDate(iso).getDate()}</span>
+                </div>
+                <div className="calp__sched-list">
+                  {evs.map((e) => {
+                    const t = tintOf(e);
+                    return (
+                      <button
+                        key={e.id + iso}
+                        className={blockClass(e, 'calp__sched-item')}
+                        style={t ? { borderLeftColor: t } : undefined}
+                        onClick={() => setSelected(e)}
+                      >
+                        <span className="calp__sched-when">
+                          {e.all_day ? 'All day' : `${minToLabel(e.start_min ?? 0)} – ${minToLabel(e.end_min ?? e.start_min ?? 0)}`}
+                        </span>
+                        <span className="calp__sched-title">{e.title}</span>
+                      </button>
+                    );
+                  })}
+                  {ovs.map(({ o, r }, i) => (
+                    <span key={o.id + i} className="calp__sched-item calp__sched-item--ov" style={{ borderLeftColor: colorFor(o.id) }}>
+                      <span className="calp__sched-when">
+                        {r.all_day ? 'All day' : `${minToLabel(r.start_min ?? 0)} – ${minToLabel(r.end_min ?? 0)}`}
+                      </span>
+                      <span className="calp__sched-title">{o.name}{r.title ? ` · ${r.title}` : ' · busy'}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {days.every((iso) => anyOn(iso).length === 0
+            && overlays.every((o) => !(overlayRows[o.id] ?? []).some((r) => occursOn(r, iso)))) && (
+            <p className="calp__sched-empty">Nothing scheduled in the next month. The + is right up there.</p>
+          )}
+        </div>
+      ) : view === 'month' ? (
         /* ── Month overview ── */
         <div className="calp__card">
           <div className="calp__mweek">
@@ -604,14 +672,19 @@ export default function Calendar() {
                     const top = ((e.start_min ?? 0) / 60) * HOUR_PX;
                     const height = Math.max(17, (((e.end_min ?? 60) - (e.start_min ?? 0)) / 60) * HOUR_PX);
                     const g = lay.get(e.id) ?? { col: 0, cols: 1 };
+                    const t = tintOf(e);
                     return (
                       <button
-                        className={blockClass(e, 'calp__event')} key={e.id + iso}
+                        className={blockClass(e, 'calp__event') + (t ? ' calp__event--tinted' : '')} key={e.id + iso}
                         style={{
                           top, height,
                           left: `calc(${(g.col / g.cols) * 100}% + 2px)`,
                           width: `calc(${100 / g.cols}% - 4px)`,
                           right: 'auto',
+                          ...(t ? {
+                            background: `color-mix(in srgb, ${t} 16%, var(--bone-warm))`,
+                            borderLeft: `3px solid ${t}`,
+                          } : {}),
                         }}
                         onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >

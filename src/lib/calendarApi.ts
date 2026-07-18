@@ -30,6 +30,8 @@ export interface EventRow {
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
   external?: boolean;
+  /** Per-source hue for layered-calendar rendering (external rows). */
+  tint?: string;
 }
 
 const EVENT_COLS =
