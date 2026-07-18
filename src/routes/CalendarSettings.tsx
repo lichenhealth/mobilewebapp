@@ -15,6 +15,9 @@ import {
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
 import { loadMyPhone } from '../lib/conciergeApi';
+import {
+  BookingType, listMyBookingTypes, saveBookingType, deleteBookingType,
+} from '../lib/bookingApi';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -51,6 +54,11 @@ export default function CalendarSettings() {
   const [rResults, setRResults] = useState<RulePick[]>([]);
   const [rLevel, setRLevel] = useState<ShareLevel>('details');
 
+  // Bookable sessions (the Calendly layer)
+  const [bkTypes, setBkTypes] = useState<BookingType[]>([]);
+  const [bkOpen, setBkOpen] = useState(false);
+  const [bkEdit, setBkEdit] = useState<Partial<BookingType>>({});
+
   // External calendars (secret iCal import)
   const [extCals, setExtCals] = useState<ExternalCalendar[]>([]);
   const [extName, setExtName] = useState('');
@@ -77,17 +85,19 @@ export default function CalendarSettings() {
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [w, r, memRes, phone, ext] = await Promise.all([
+    const [w, r, memRes, phone, ext, bk] = await Promise.all([
       loadMyAvailability(me),
       loadMyShares(me),
       supabase.from('profiles').select('id, full_name').neq('id', me).order('full_name').limit(500),
       loadMyPhone(),
       listExternalCalendars(me),
+      listMyBookingTypes(me),
     ]);
     setWindows(w); setRules(r);
     setMembers((memRes.data as MemberOpt[] | null) ?? []);
     setMyPhone(phone);
     setExtCals(ext);
+    setBkTypes(bk);
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -273,6 +283,97 @@ export default function CalendarSettings() {
               {r.name} <span className="cset__kind">{r.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* ── Bookable sessions (the Calendly layer) ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">Bookable sessions</span>
+          <p className="cedit__hint">
+            Offer sessions members can book from your profile. Open times come
+            from your hours above minus everything on your calendar (imported
+            calendars included). Price is just words — payment happens however
+            you and your people already do it.
+          </p>
+
+          {bkTypes.map((bt) => (
+            <div className={'cset__row' + (bt.active ? '' : ' cset__bkoff')} key={bt.id}>
+              <span className="cset__aud cset__extname">{bt.title}</span>
+              <span className="cset__bkrow-sub">
+                {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
+                {bt.audience === 'mycelium' ? ' · mycelium' : ''}
+              </span>
+              <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit(bt); setBkOpen(true); }}>Edit</button>
+              <button
+                className="cedit__remove"
+                aria-label={bt.active ? 'Pause' : 'Resume'}
+                title={bt.active ? 'Pause bookings' : 'Resume bookings'}
+                onClick={() => act(() => saveBookingType(me, { ...bt, active: !bt.active }))}
+              >
+                <Icon name={bt.active ? 'close' : 'plus'} size={13} />
+              </button>
+            </div>
+          ))}
+
+          {!bkOpen ? (
+            <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true }); setBkOpen(true); }}>
+              <Icon name="plus" size={12} /> New session type
+            </button>
+          ) : (
+            <div className="cset__add cset__add--wrap">
+              <input
+                className="cedit__input cset__grow"
+                placeholder="Session name (e.g. Reiki, 1:1 coaching)"
+                value={bkEdit.title ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, title: e.target.value }))}
+              />
+              <select className="cset__select" value={bkEdit.duration_min ?? 60}
+                onChange={(e) => setBkEdit((c) => ({ ...c, duration_min: Number(e.target.value) }))} aria-label="Length">
+                {[30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}
+              </select>
+              <input
+                className="cedit__input cset__extfield"
+                placeholder="Price (e.g. $90, Free)"
+                value={bkEdit.price ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, price: e.target.value }))}
+              />
+              <input
+                className="cedit__input cset__grow"
+                placeholder="Where (e.g. Online — Zoom, or an address)"
+                value={bkEdit.location ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, location: e.target.value }))}
+              />
+              <select className="cset__select" value={bkEdit.approval ?? 'request'}
+                onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
+                <option value="request">I approve each request</option>
+                <option value="instant">Book instantly</option>
+              </select>
+              <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
+                onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
+                <option value="everyone">Anyone on Lichen</option>
+                <option value="mycelium">My mycelium only</option>
+              </select>
+              <button
+                className="cedit__add cedit__add--sm"
+                disabled={!(bkEdit.title ?? '').trim()}
+                onClick={() => act(async () => {
+                  await saveBookingType(me, { ...bkEdit, title: (bkEdit.title ?? '').trim() } as Partial<BookingType> & { title: string });
+                  setBkOpen(false); setBkEdit({});
+                })}
+              >
+                <Icon name="plus" size={12} /> Save
+              </button>
+              {bkEdit.id && (
+                <button className="cedit__add cedit__add--sm" onClick={() => {
+                  if (window.confirm('Delete this session type? Its booking history goes with it.')) {
+                    void act(async () => { await deleteBookingType(me, bkEdit.id!); setBkOpen(false); setBkEdit({}); });
+                  }
+                }}>Delete</button>
+              )}
+              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); }}>
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Other calendars (secret iCal import) ── */}

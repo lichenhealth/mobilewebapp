@@ -1,0 +1,72 @@
+/* Bookings hub + slot picker (shares the composer's back chip) */
+.bkg { max-width: 640px; margin: 0 auto; padding: var(--s-5) var(--s-5) var(--s-8); }
+.bkg__head { text-align: center; margin: var(--s-3) 0 var(--s-5); }
+.bkg__title { font-size: var(--t-2xl); line-height: 1.15; margin-top: var(--s-2); }
+.bkg__sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); margin-top: var(--s-2); }
+.bkg__desc { font-size: 13px; font-weight: 300; color: var(--ink-soft); margin-top: var(--s-3); line-height: 1.6; }
+.bkg__muted { text-align: center; font-size: 12px; color: var(--ink-faint); padding: var(--s-5); line-height: 1.6; }
+.bkg__error { font-size: var(--t-sm); color: var(--rust, #b4553a); background: var(--peach-tint); border-radius: var(--r-sm); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3); }
+.bkg__sec { margin-bottom: var(--s-5); }
+.bkg__h2 { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: var(--s-2); }
+.bkg__row {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm); margin-bottom: var(--s-2);
+}
+.bkg__row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bkg__row-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.bkg__pending { font-style: normal; font-weight: 400; color: var(--peach-deep, var(--peach)); font-size: 12px; }
+.bkg__row-sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); }
+.bkg__row-note { font-size: 12px; font-style: italic; color: var(--ink-soft); }
+.bkg__row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.bkg__btn { font-size: 12px; padding: 8px 14px; }
+.bkg__btn--quiet { color: var(--ink-muted); }
+.bkg__day { margin-bottom: var(--s-4); }
+.bkg__slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.bkg__slot {
+  padding: 8px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; color: var(--ink); cursor: pointer;
+}
+.bkg__slot:hover { border-color: var(--peach); }
+.bkg__slot.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.bkg__confirm {
+  position: sticky; bottom: var(--s-3); margin-top: var(--s-4);
+  background: var(--bone); border: 1px solid var(--peach);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+  padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2);
+}
+.bkg__confirm-when { font-size: 13px; font-weight: 600; color: var(--ink); }
+.bkg__note {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-sm);
+  background: var(--bone-warm); padding: 8px 10px; font-size: 13px;
+  font-family: inherit; color: var(--ink); min-height: 52px; resize: vertical;
+}
+.bkg__doneactions { display: flex; gap: var(--s-2); justify-content: center; }
+
+/* Bookable-sessions rows in Calendar settings */
+.cset__bkrow-sub { font-size: 11px; color: var(--ink-muted); flex-shrink: 0; }
+.cset__bkoff { opacity: 0.5; }
+
+/* Book section on member profiles */
+.mprof__book { margin: var(--s-4) 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.mprof__book-row {
+  display: flex; align-items: center; gap: var(--s-3); text-align: left;
+  padding: var(--s-3); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm); cursor: pointer;
+}
+.mprof__book-row:hover { border-color: var(--peach); }
+.mprof__book-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mprof__book-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.mprof__book-sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); }
+
+/* back chip (same language as Compose/Search; local copy so it styles even
+   when those routes' stylesheets haven't loaded) */
+.bkg .cmp__back, .cmp__back {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-bottom: var(--s-3); padding: 6px 12px;
+  border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.cmp__back svg { color: var(--peach-deep, var(--peach)); }
