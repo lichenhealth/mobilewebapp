@@ -438,6 +438,9 @@ export default function Calendar() {
           <select className="calp__vselect" value={view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
             {(Object.keys(VIEW_LABELS) as View[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
+          <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Sessions & requests">
+            <Icon name="member-heart" size={15} />
+          </button>
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
             <Icon name="settings" size={15} />
           </button>
