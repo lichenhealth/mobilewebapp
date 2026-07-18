@@ -11,6 +11,7 @@ import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb } from '../lib/myceliumApi';
 import { areaLabel } from '../lib/locationApi';
 import { WeaveMark } from '../components/WeaveMark';
+import { askAssistant, type AssistantAnswer } from '../lib/assistantApi';
 import {
   parseQuery, runSmartSearch, emptyCriteria,
   type SearchCategory, type SearchCriteria, type ParsedSpan, type SmartResults,
@@ -180,6 +181,15 @@ export default function SmartSearch() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const runRef = useRef(0);
 
+  // The Assistant card: one narration per settled search. The cache means
+  // fiddling back to an earlier criteria combination never re-bills.
+  const [assistant, setAssistant] = useState<AssistantAnswer | null>(null);
+  const [assistantBusy, setAssistantBusy] = useState(false);
+  const assistantCache = useRef(new Map<string, AssistantAnswer>());
+  const assistantDead = useRef(false);   // fn absent/unconfigured → stop asking
+  const assistantAlive = useRef(false);  // answered once → thinking state may show
+  const assistantRun = useRef(0);
+
   useEffect(() => {
     (async () => {
       const [catRes, spRes, memRes] = await Promise.all([
@@ -241,6 +251,26 @@ export default function SmartSearch() {
     // criteria is derived — stringify to keep the effect honest without loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(criteria), hasSignal, me]);
+
+  // Assistant narration: waits for the search to settle, then asks once per
+  // distinct criteria combination. Silent when the feature isn't configured.
+  useEffect(() => {
+    if (!results || !me || assistantDead.current) { setAssistant(null); setAssistantBusy(false); return; }
+    const key = JSON.stringify({ q: q.trim(), c: criteria });
+    const cached = assistantCache.current.get(key);
+    if (cached) { setAssistant(cached); setAssistantBusy(false); return; }
+    const run = ++assistantRun.current;
+    setAssistant(null);
+    setAssistantBusy(assistantAlive.current);
+    const t = window.setTimeout(async () => {
+      const a = await askAssistant(q.trim(), chips, criteria, results);
+      if (!a.available && !a.capped) assistantDead.current = true;
+      else { assistantAlive.current = true; assistantCache.current.set(key, a); }
+      if (assistantRun.current === run) { setAssistant(a.available ? a : null); setAssistantBusy(false); }
+    }, 1800);
+    return () => { window.clearTimeout(t); if (assistantRun.current === run) setAssistantBusy(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, me]);
 
   // the highlight mirror: raw text split into plain/understood segments
   const segments = useMemo(() => {
@@ -696,6 +726,23 @@ export default function SmartSearch() {
       )}
 
       {searching && <p className="ssrch__status">Searching…</p>}
+      {!searching && results && (assistantBusy || assistant) && (
+        <div className="ssrch__assist">
+          <span className="ssrch__assist-mark"><Icon name="sparkle" size={14} /></span>
+          <span className="ssrch__assist-body">
+            <span className="ssrch__assist-eyebrow">Assistant</span>
+            {assistantBusy && <span className="ssrch__assist-text ssrch__assist-text--thinking">Reading the results&hellip;</span>}
+            {!assistantBusy && assistant?.capped && (
+              <span className="ssrch__assist-text">
+                The assistant is resting until tomorrow — plain search keeps working.
+              </span>
+            )}
+            {!assistantBusy && assistant?.text && (
+              <span className="ssrch__assist-text">{assistant.text}</span>
+            )}
+          </span>
+        </div>
+      )}
       {results?.anchorMissing && (
         <p className="ssrch__status">Couldn&rsquo;t place &ldquo;{criteria.anchorText ?? 'your location'}&rdquo; — distance filter skipped.</p>
       )}
