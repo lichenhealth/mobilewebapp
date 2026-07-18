@@ -219,6 +219,27 @@
 }
 .ssrch__hint em { font-style: normal; color: var(--peach); }
 
+/* The Assistant card (Figma 286-5477): a bone card above the results,
+   sparkle mark, one short conversational narration. */
+.ssrch__assist {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-top: var(--s-4); padding: 14px 16px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+}
+.ssrch__assist-mark {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--peach); color: var(--peach);
+}
+.ssrch__assist-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ssrch__assist-eyebrow {
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.ssrch__assist-text { font-size: 14px; line-height: 1.55; color: var(--ink); }
+.ssrch__assist-text--thinking { color: var(--ink-soft); }
+
 .ssrch__sec { margin-top: var(--s-5); }
 .ssrch__h2 {
   font-family: var(--font-display); font-size: var(--t-lg); font-weight: 400;
