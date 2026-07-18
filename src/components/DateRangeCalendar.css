@@ -20,7 +20,7 @@
 }
 .cal__nav:hover { border-color: var(--ink-muted); }
 
-.cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; user-select: none; }
 .cal__weekdays { margin-bottom: 2px; }
 .cal__wd {
   text-align: center; font-family: var(--font-mono); font-size: 9px;
