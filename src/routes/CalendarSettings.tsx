@@ -23,6 +23,11 @@ import './Calendar.css';
 
 interface MemberOpt { id: string; full_name: string | null }
 
+// Parked until Google verifies Lichen (founder, 2026-07-18): the OAuth flow
+// works but unverified consent is three alarm screens + flaky generic errors.
+// The secret-address route is the alpha path. Flip to true post-verification.
+const SHOW_GOOGLE_CONNECT = false;
+
 const LEVEL_LABELS: Record<ShareLevel, string> = {
   hidden: 'Nothing', busy: 'Busy times only', details: 'Full details',
 };
@@ -405,25 +410,35 @@ export default function CalendarSettings() {
             </div>
           </details>
 
-          <button
-            className="cedit__add cset__gconnect"
-            disabled={connecting}
-            onClick={async () => {
-              setConnecting(true); setError('');
-              try { await startGoogleConnect(); }
-              catch (e) { setError((e as Error).message); setConnecting(false); }
-            }}
-          >
-            {connecting ? 'Opening Google…' : 'Connect Google Calendar — one tap'}
-          </button>
-          <p className="cedit__hint cset__gconnect-hint">
-            Heads up: until Google finishes verifying Lichen, their consent
-            screens shout &ldquo;unverified app&rdquo; — that&rsquo;s expected.
-            Tap <em>Advanced&nbsp;&rarr;&nbsp;Continue</em> and carry on; Lichen
-            only ever reads busy times, and other members never see your event
-            details. Or paste any calendar&rsquo;s secret iCal address below
-            (Apple, Outlook, and Google alike).
-          </p>
+          {/* One-tap Google OAuth: BUILT AND DEPLOYED but parked for alpha
+              (founder decision 2026-07-18) — until Google verifies Lichen,
+              their consent flow shows three alarm screens and fails with
+              generic errors for some accounts (Workspace policies, embedded
+              browsers). The secret-address route below is deterministic.
+              Flip SHOW_GOOGLE_CONNECT when verification clears. */}
+          {SHOW_GOOGLE_CONNECT && (
+            <>
+              <button
+                className="cedit__add cset__gconnect"
+                disabled={connecting}
+                onClick={async () => {
+                  setConnecting(true); setError('');
+                  try { await startGoogleConnect(); }
+                  catch (e) { setError((e as Error).message); setConnecting(false); }
+                }}
+              >
+                {connecting ? 'Opening Google…' : 'Connect Google Calendar — one tap'}
+              </button>
+              <p className="cedit__hint cset__gconnect-hint">
+                Heads up: until Google finishes verifying Lichen, their consent
+                screens shout &ldquo;unverified app&rdquo; — that&rsquo;s expected.
+                Tap <em>Advanced&nbsp;&rarr;&nbsp;Continue</em> and carry on; Lichen
+                only ever reads busy times, and other members never see your event
+                details. Or paste any calendar&rsquo;s secret iCal address below
+                (Apple, Outlook, and Google alike).
+              </p>
+            </>
+          )}
 
           {extCals.map((c) => (
             <div className="cset__row" key={c.id}>
