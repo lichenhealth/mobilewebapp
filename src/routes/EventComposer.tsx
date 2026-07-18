@@ -8,7 +8,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
-import { todayISO, formatDateShort } from '../lib/conciergeApi';
+import { todayISO, formatDateShort, addDays } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel, occursOn } from '../lib/recurrence';
 import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow } from '../lib/calendarApi';
 import LocationField from '../components/LocationField';
@@ -51,44 +51,89 @@ export default function EventComposer() {
 
   const anchor = range.start ?? todayISO();
 
-  // ── Availability: everyone's busy times for the chosen day, per what they
-  //    share with you (free_busy respects calendar_shares + imported cals). ──
+  // ── Availability (founder sketch 2026-07-18): three date shapes. ──────────
+  //    one   — a fixed day; check the chosen time, suggest same-day slots
+  //    multi — a fixed stretch (retreat); show per-person conflicts, suggest
+  //            other same-length stretches with fewer conflicts
+  //    flex  — "we know how long, not when"; search the next 8 weeks
+  //    All of it reads free_busy: only what each member shares with you.
+  type DateMode = 'one' | 'multi' | 'flex';
+  const [dateMode, setDateMode] = useState<DateMode>('one');
+  const [flexDays, setFlexDays] = useState(3);
+  const spanLen = useMemo(() => {
+    if (!range.start || !range.end || range.end === range.start) return 1;
+    let n = 1; let d = range.start;
+    while (d < range.end && n < 60) { d = addDays(d, 1); n += 1; }
+    return n;
+  }, [range.start, range.end]);
+
   const [fb, setFb] = useState<FreeBusyRow[]>([]);
   const [fbLoading, setFbLoading] = useState(false);
-  const singleTimedDay = !allDay && (!range.end || range.end === range.start);
+  const singleTimedDay = dateMode === 'one' && !allDay && (!range.end || range.end === range.start);
   const inviteeKey = invitees.map((i) => i.id).sort().join(',');
+  const HORIZON = 56; // flexible/multi searches look 8 weeks out
   useEffect(() => {
-    if (!me || !singleTimedDay || invitees.length === 0) { setFb([]); return; }
+    if (!me || invitees.length === 0) { setFb([]); return; }
+    if (dateMode === 'one' && !singleTimedDay) { setFb([]); return; }
     let live = true;
     setFbLoading(true);
+    const from = dateMode === 'one' ? anchor : todayISO();
+    const to = dateMode === 'one' ? anchor : addDays(todayISO(), HORIZON);
     const t = window.setTimeout(async () => {
-      const rows = await freeBusy([me, ...invitees.map((i) => i.id)], anchor, anchor);
+      const rows = await freeBusy([me, ...invitees.map((i) => i.id)], from, to);
       if (live) { setFb(rows); setFbLoading(false); }
     }, 300);
     return () => { live = false; window.clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, anchor, inviteeKey, singleTimedDay]);
+  }, [me, anchor, inviteeKey, singleTimedDay, dateMode]);
 
-  const busyAt = (pid: string, s: number, e: number) => fb.some((r) =>
-    r.profile_id === pid && occursOn(r, anchor)
+  const people = useMemo(() => [me, ...invitees.map((i) => i.id)], [me, inviteeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const busyAt = (pid: string, iso: string, s: number, e: number) => fb.some((r) =>
+    r.profile_id === pid && occursOn(r, iso)
     && (r.all_day || ((r.start_min ?? 0) < e && (r.end_min ?? 1440) > s)));
+  const busyOnDay = (pid: string, iso: string) => fb.some((r) => r.profile_id === pid && occursOn(r, iso));
+  /** Days within a stretch on which this person has anything at all. */
+  const conflictDays = (pid: string, startISO: string, len: number): string[] => {
+    const out: string[] = [];
+    for (let i = 0, d = startISO; i < len; i += 1, d = addDays(d, 1)) {
+      if (busyOnDay(pid, d)) out.push(d);
+    }
+    return out;
+  };
 
-  // Slots where every invitee (and you) look free — same day, event's length.
-  const suggestions = useMemo(() => {
+  // ONE DAY: slots where everyone looks free — same day, event's length.
+  const daySlots = useMemo(() => {
     if (!singleTimedDay || invitees.length === 0 || fb.length === 0) return [];
     const dur = Math.max(30, endMin - startMin);
-    const people = [me, ...invitees.map((i) => i.id)];
     const now = new Date();
     const minStart = anchor === todayISO()
       ? Math.ceil((now.getHours() * 60 + now.getMinutes() + 15) / 30) * 30 : 0;
     const out: number[] = [];
     for (let t = Math.max(7 * 60, minStart); t + dur <= 21 * 60 && out.length < 6; t += 30) {
       if (t === startMin) continue;
-      if (!people.some((p) => busyAt(p, t, t + dur))) out.push(t);
+      if (!people.some((p) => busyAt(p, anchor, t, t + dur))) out.push(t);
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fb, anchor, startMin, endMin, inviteeKey, singleTimedDay, me]);
+  }, [fb, anchor, startMin, endMin, inviteeKey, singleTimedDay]);
+
+  // SEVERAL DAYS / FLEXIBLE: same-length stretches ranked by total conflict
+  // person-days (0 = everyone clear all days). Real calendars are busy, so
+  // near-misses show with their count instead of vanishing.
+  const windowHits = useMemo(() => {
+    if (dateMode === 'one' || invitees.length === 0 || fb.length === 0) return [];
+    const len = dateMode === 'flex' ? flexDays : spanLen;
+    const scored: { start: string; score: number }[] = [];
+    for (let i = 0, d = addDays(todayISO(), 1); i <= HORIZON - len; i += 1, d = addDays(d, 1)) {
+      if (dateMode === 'multi' && d === range.start) continue;
+      let score = 0;
+      for (const p of people) score += conflictDays(p, d, len).length;
+      scored.push({ start: d, score });
+    }
+    scored.sort((a, b) => a.score - b.score || (a.start < b.start ? -1 : 1));
+    return scored.slice(0, 6);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fb, dateMode, flexDays, spanLen, inviteeKey, range.start]);
 
   useEffect(() => {
     if (!me) return;
@@ -214,54 +259,111 @@ export default function EventComposer() {
       )}
       <RecurrenceSelect
         anchor={anchor} recurrence={recurrence}
-        onChange={(r) => { setRecurrence(r); if (r) setRange({ start: anchor, end: anchor }); }}
+        onChange={(r) => { setRecurrence(r); if (r) { setRange({ start: anchor, end: anchor }); setDateMode('one'); } }}
       />
     </>
   );
 
   // Availability checker (founder's sketch, 2026-07-18): per-invitee free/busy
-  // at the chosen time + times that work for everyone. Honest by design — it
-  // reads only what each member shares with you (free_busy / calendar_shares).
-  const availabilityPanel = singleTimedDay && invitees.length > 0 && (
+  // + suggestions, shaped by the date mode. Honest by design — it reads only
+  // what each member shares with you (free_busy / calendar_shares).
+  const fmtWindow = (startISO: string, len: number) =>
+    formatDateShort(startISO) + (len > 1 ? ` – ${formatDateShort(addDays(startISO, len - 1))}` : '');
+  const activeLen = dateMode === 'flex' ? flexDays : spanLen;
+  const showPanel = invitees.length > 0 && !recurrence
+    && (dateMode !== 'one' ? true : singleTimedDay);
+
+  const availabilityPanel = showPanel && (
     <div className="evav">
       <p className="evprev__eyebrow">Availability</p>
       <div className="evprev__card">
         {fbLoading && fb.length === 0 && <p className="evav__note">Checking calendars&hellip;</p>}
-        {!fbLoading || fb.length > 0 ? (
+
+        {dateMode === 'flex' && (
+          <div className="evav__flexrow">
+            <span className="evav__flexlbl">How long?</span>
+            <button type="button" className="evav__step" onClick={() => setFlexDays((n) => Math.max(1, n - 1))}>−</button>
+            <span className="evav__flexn">{flexDays === 1 ? '1 day' : `${flexDays} days`}</span>
+            <button type="button" className="evav__step" onClick={() => setFlexDays((n) => Math.min(14, n + 1))}>+</button>
+          </div>
+        )}
+
+        {fb.length > 0 && dateMode === 'one' && (
+          <div className="evav__people">
+            {[{ id: me, full_name: 'You' } as MemberOpt, ...invitees].map((m) => {
+              const busy = busyAt(m.id, anchor, startMin, endMin);
+              return (
+                <span className={'evav__person' + (busy ? ' is-busy' : '')} key={m.id}>
+                  <span className="evav__dot" aria-hidden />
+                  {m.full_name ?? 'Member'}
+                  <em>{busy ? 'busy then' : 'looks free'}</em>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {fb.length > 0 && dateMode === 'multi' && range.start && (
+          <div className="evav__people">
+            {[{ id: me, full_name: 'You' } as MemberOpt, ...invitees].map((m) => {
+              const days = conflictDays(m.id, range.start as string, spanLen);
+              return (
+                <span className={'evav__person' + (days.length > 0 ? ' is-busy' : '')} key={m.id}>
+                  <span className="evav__dot" aria-hidden />
+                  {m.full_name ?? 'Member'}
+                  <em>
+                    {days.length === 0 ? (spanLen === 1 ? 'looks free' : 'free all days')
+                      : `busy ${formatDateShort(days[0])}${days.length > 1 ? ` +${days.length - 1}` : ''}`}
+                  </em>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {dateMode === 'one' && daySlots.length > 0 && (
           <>
-            <div className="evav__people">
-              {[{ id: me, full_name: 'You' } as MemberOpt, ...invitees].map((m) => {
-                const busy = busyAt(m.id, startMin, endMin);
-                return (
-                  <span className={'evav__person' + (busy ? ' is-busy' : '')} key={m.id}>
-                    <span className="evav__dot" aria-hidden />
-                    {m.full_name ?? 'Member'}
-                    <em>{busy ? 'busy then' : 'looks free'}</em>
-                  </span>
-                );
-              })}
+            <p className="evav__sub">Times that work for everyone</p>
+            <div className="evav__slots">
+              {daySlots.map((t) => (
+                <button
+                  key={t} type="button" className="evav__slot"
+                  onClick={() => { const dur = Math.max(30, endMin - startMin); setStartMin(t); setEndMin(Math.min(t + dur, 1440)); }}
+                >
+                  {minToLabel(t)}
+                </button>
+              ))}
             </div>
-            {suggestions.length > 0 && (
-              <>
-                <p className="evav__sub">Times that work for everyone</p>
-                <div className="evav__slots">
-                  {suggestions.map((t) => (
-                    <button
-                      key={t} type="button" className="evav__slot"
-                      onClick={() => { const dur = Math.max(30, endMin - startMin); setStartMin(t); setEndMin(Math.min(t + dur, 1440)); }}
-                    >
-                      {minToLabel(t)}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            {suggestions.length === 0 && !fbLoading
-              && [me, ...invitees.map((i) => i.id)].some((p) => busyAt(p, startMin, endMin)) && (
-              <p className="evav__note">No open slot fits everyone on this day — try another date.</p>
-            )}
           </>
-        ) : null}
+        )}
+        {dateMode === 'one' && daySlots.length === 0 && !fbLoading && fb.length > 0
+          && people.some((p) => busyAt(p, anchor, startMin, endMin)) && (
+          <p className="evav__note">No open slot fits everyone on this day — try another date.</p>
+        )}
+
+        {dateMode !== 'one' && windowHits.length > 0 && (
+          <>
+            <p className="evav__sub">
+              {dateMode === 'flex' ? 'Dates that work' : 'Other dates that work'}
+            </p>
+            <div className="evav__slots">
+              {windowHits.map((w) => (
+                <button
+                  key={w.start} type="button"
+                  className={'evav__slot' + (w.score > 0 ? ' evav__slot--near' : '')}
+                  onClick={() => setRange({ start: w.start, end: activeLen > 1 ? addDays(w.start, activeLen - 1) : w.start })}
+                >
+                  {fmtWindow(w.start, activeLen)}
+                  {w.score > 0 && <span className="evav__score">{w.score} conflict{w.score > 1 ? 's' : ''}</span>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {dateMode !== 'one' && windowHits.length === 0 && !fbLoading && (
+          <p className="evav__note">Add people above and I&rsquo;ll look for dates across the next 8 weeks.</p>
+        )}
+
         <p className="evav__fine">Based on what each member shares with you.</p>
       </div>
     </div>
@@ -302,13 +404,37 @@ export default function EventComposer() {
           {whenControls}
         </div>
         <div className="cedit__field">
-          <span className="cedit__label">Date</span>
+          <span className="cedit__label evav__datehead">
+            Date
+            {!recurrence && (
+              <span className="evav__modes">
+                {([['one', 'One day'], ['multi', 'Several days'], ['flex', 'Flexible']] as const).map(([m, label]) => (
+                  <button
+                    key={m} type="button"
+                    className={'evav__mode' + (dateMode === m ? ' is-on' : '')}
+                    onClick={() => {
+                      setDateMode(m);
+                      if (m === 'one') setRange({ start: anchor, end: anchor });
+                      if (m === 'flex' && spanLen > 1) setFlexDays(spanLen);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
+            )}
+          </span>
           <DateRangeCalendar
             value={recurrence ? { start: range.start, end: range.start } : range}
-            onChange={(r) => setRange(recurrence ? { start: r.start, end: r.start } : r)}
+            onChange={(r) => {
+              if (recurrence || dateMode === 'one') setRange({ start: r.start, end: r.start });
+              else setRange(r);
+            }}
           />
           <p className="rec__summary">
-            {recurrence ? recurrenceLabel(recurrence, anchor) : range.start === (range.end ?? range.start) ? 'One day' : 'Multi-day'}
+            {recurrence ? recurrenceLabel(recurrence, anchor)
+              : dateMode === 'flex' ? `Flexible · looking for ${flexDays === 1 ? 'a day' : `${flexDays} days`} that work`
+              : range.start === (range.end ?? range.start) ? 'One day' : `${spanLen} days`}
           </p>
         </div>
 
