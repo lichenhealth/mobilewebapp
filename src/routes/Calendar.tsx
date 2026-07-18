@@ -38,6 +38,7 @@ import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
   loadMyExternalBusy, syncExternalCalendars,
+  listCalendarPins, addCalendarPin, removeCalendarPin,
 } from '../lib/calendarApi';
 import './Calendar.css';
 
@@ -111,12 +112,29 @@ export default function Calendar() {
   interface CalOverlay { kind: 'profile' | 'space'; id: string; name: string }
   // PINNED person/space overlays (founder, 2026-07-17): calendars you add
   // from search stay put — per-viewer consent (calendar_shares) decides what
-  // each renders. Local to this device; a synced pin list can come later.
+  // each renders. Synced across devices via calendar_pins; localStorage is
+  // only a seed while signed-out plus a one-time migration source.
   const [overlays, setOverlays] = useState<CalOverlay[]>(() => {
     try { return JSON.parse(localStorage.getItem('calp:pins') || '[]') as CalOverlay[]; }
     catch { return []; }
   });
-  useEffect(() => { localStorage.setItem('calp:pins', JSON.stringify(overlays)); }, [overlays]);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    (async () => {
+      const probe = await listCalendarPins(me);
+      if (probe === null) return; // table not ready — device-local pins stand
+      // Migrate any device-local pins up, once, then the table is the truth.
+      let local: CalOverlay[] = [];
+      try { local = JSON.parse(localStorage.getItem('calp:pins') || '[]') as CalOverlay[]; } catch { /* fine */ }
+      for (const o of local) await addCalendarPin(me, o.kind, o.id, o.name);
+      localStorage.removeItem('calp:pins');
+      const pins = local.length ? (await listCalendarPins(me) ?? probe) : probe;
+      if (!live) return;
+      setOverlays(pins.map((p) => ({ kind: p.target_kind, id: p.target_id, name: p.name })));
+    })();
+    return () => { live = false; };
+  }, [me]);
   const [overlayRows, setOverlayRows] = useState<Record<string, FreeBusyRow[]>>({});
   const [calResults, setCalResults] = useState<CalOverlay[]>([]);
 
@@ -276,9 +294,14 @@ export default function Calendar() {
 
   const addOverlay = (o: CalOverlay) => {
     setOverlays((cur) => (cur.some((x) => x.id === o.id) ? cur : [...cur, o]));
+    if (me) void addCalendarPin(me, o.kind, o.id, o.name);
     setSearchOpen(false); setQuery('');
   };
-  const removeOverlay = (id: string) => setOverlays((cur) => cur.filter((o) => o.id !== id));
+  const removeOverlay = (id: string) => {
+    const gone = overlays.find((o) => o.id === id);
+    setOverlays((cur) => cur.filter((o) => o.id !== id));
+    if (me && gone) void removeCalendarPin(me, gone.kind, gone.id);
+  };
 
   const page = (dir: 1 | -1) => {
     if (view === 'month') setAnchor(addMonths(anchor, dir));
