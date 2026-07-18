@@ -57,6 +57,9 @@ export function toISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 export function todayISO(): string { return toISO(new Date()); }
+export function addDays(iso: string, n: number): string {
+  const d = localDate(iso); d.setDate(d.getDate() + n); return toISO(d);
+}
 export function mondayOfWeek(iso: string): string {
   const d = localDate(iso);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // shift back to Monday

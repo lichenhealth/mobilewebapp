@@ -66,6 +66,14 @@
   justify-content: center;
 }
 .top-bar__section-mark svg { color: var(--ink); }
+/* Hairline icons to match the hairline circle (founder, 2026-07-17): at
+   this 68px scale the icons' native strokes render ~2× the ring's 1px.
+   non-scaling-stroke pins stroke width in SCREEN px — every icon lands
+   at the same elegant weight as the Mycelium mark (~1.2px). */
+.top-bar__section-mark svg * {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.2px;
+}
 
 /* Custom variant — used for branded marks like Mycelium that already
  * include their own circle outline in the SVG. No wrapper border to

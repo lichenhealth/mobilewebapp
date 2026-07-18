@@ -10,6 +10,8 @@ import {
 } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
+import { BookingType, listBookableTypes } from '../lib/bookingApi';
+import '../routes/Bookings.css';
 import './Profile.css';
 import './MemberProfile.css';
 
@@ -28,6 +30,7 @@ export default function MemberProfile() {
   const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
   const [homeSpot, setHomeSpot] = useState<MappableMember | null>(null);
+  const [bookables, setBookables] = useState<BookingType[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -43,6 +46,7 @@ export default function MemberProfile() {
       if (!live) return;
       setMember(m);
       setOfferings(off);
+      if (me && id !== me) setBookables(await listBookableTypes(id));
       setInWebState(mine.web.has(`profile:${id}`));
       setTrusted(mine.vouched.has(`profile:${id}`));
       if (me && id === me) {
@@ -131,6 +135,21 @@ export default function MemberProfile() {
             <Icon name="location" size={12} />{' '}
             {homeSpot.level !== 'exact' ? areaLabel(homeSpot.place) : homeSpot.place}
           </p>
+        )}
+        {bookables.length > 0 && (
+          <div className="mprof__book">
+            {bookables.map((bt) => (
+              <button className="mprof__book-row" key={bt.id} onClick={() => navigate(`/book/${bt.id}`)}>
+                <span className="mprof__book-body">
+                  <span className="mprof__book-title">{bt.title}</span>
+                  <span className="mprof__book-sub">
+                    {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''}{bt.location ? ` · ${bt.location}` : ''}
+                  </span>
+                </span>
+                <Icon name="chevron-right" size={14} />
+              </button>
+            ))}
+          </div>
         )}
         {me && !isSelf && (
           <div className="mprof__actions">

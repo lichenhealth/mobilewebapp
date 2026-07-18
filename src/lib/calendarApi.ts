@@ -30,6 +30,8 @@ export interface EventRow {
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
   external?: boolean;
+  /** Per-source hue for layered-calendar rendering (external rows). */
+  tint?: string;
 }
 
 const EVENT_COLS =
@@ -388,6 +390,27 @@ export async function syncExternalCalendars(opts: { force?: boolean; calendarId?
   if (error) throw error;
 }
 
+/** One-tap Google connection: ask the edge function for a consent URL and
+ *  send the browser there; Google bounces back to Calendar settings. */
+export async function startGoogleConnect(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('google-oauth-start', {
+    body: { returnTo: window.location.origin },
+  });
+  if (error || !data?.url) throw new Error('Google connection isn’t configured yet');
+  window.location.href = data.url as string;
+}
+
+export async function disconnectGoogle(accountId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('google-oauth-start', {
+    body: { action: 'disconnect', accountId },
+  });
+  if (error) throw error;
+}
+
+/** external_calendars rows whose url is 'google:<id>' are OAuth connections. */
+export const googleAccountId = (url: string): string | null =>
+  url.startsWith('google:') ? url.slice(7) : null;
+
 export interface ExternalBusyRow {
   id: string;
   calendar_id: string;
@@ -408,4 +431,46 @@ export async function loadMyExternalBusy(me: string, from: string, to: string): 
     .lte('on_date', to);
   if (error) { console.warn('loadMyExternalBusy:', error.message); return []; }
   return (data as ExternalBusyRow[] | null) ?? [];
+}
+
+// ─── Pinned calendar overlays (cross-device; founder 2026-07-17) ─────────────
+// The pin is a bookmark, not a permission: what an overlay renders is always
+// resolved per-viewer by free_busy()/calendar_shares.
+
+export interface CalendarPin {
+  id: string;
+  target_kind: 'profile' | 'space';
+  target_id: string;
+  name: string;
+}
+
+/** null = the pins table isn't reachable (e.g. migration not run yet) —
+ *  callers keep device-local behavior rather than clobbering anything. */
+export async function listCalendarPins(me: string): Promise<CalendarPin[] | null> {
+  const { data, error } = await supabase
+    .from('calendar_pins')
+    .select('id, target_kind, target_id, name')
+    .eq('profile_id', me)
+    .order('created_at');
+  if (error) { console.warn('listCalendarPins:', error.message); return null; }
+  return (data as CalendarPin[] | null) ?? [];
+}
+
+export async function addCalendarPin(
+  me: string, kind: 'profile' | 'space', targetId: string, name: string,
+): Promise<void> {
+  const { error } = await supabase.from('calendar_pins')
+    .upsert(
+      { profile_id: me, target_kind: kind, target_id: targetId, name },
+      { onConflict: 'profile_id,target_kind,target_id' },
+    );
+  if (error) console.warn('addCalendarPin:', error.message); // session-only until the table exists
+}
+
+export async function removeCalendarPin(
+  me: string, kind: 'profile' | 'space', targetId: string,
+): Promise<void> {
+  const { error } = await supabase.from('calendar_pins').delete()
+    .eq('profile_id', me).eq('target_kind', kind).eq('target_id', targetId);
+  if (error) console.warn('removeCalendarPin:', error.message);
 }

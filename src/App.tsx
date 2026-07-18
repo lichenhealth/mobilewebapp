@@ -6,6 +6,8 @@ import Mycelium from './routes/Mycelium';
 import MyceliumDirectory from './routes/MyceliumDirectory';
 import Privacy from './routes/Privacy';
 import Terms from './routes/Terms';
+import Bookings from './routes/Bookings';
+import BookSession from './routes/BookSession';
 import Marketplace from './routes/Marketplace';
 import Concierge from './routes/Concierge';
 import Caregiver from './routes/Caregiver';
@@ -165,6 +167,8 @@ export default function App() {
           <Route path="/terms"           element={<Terms />} />
           <Route path="/mycelium"        element={<Mycelium />} />
           <Route path="/mycelium/directory" element={<MyceliumDirectory />} />
+          <Route path="/bookings"        element={<Bookings />} />
+          <Route path="/book/:typeId"    element={<BookSession />} />
           <Route path="/mycelium/:type"  element={<Mycelium />} />
 
           {/* Communities — feed per community */}
