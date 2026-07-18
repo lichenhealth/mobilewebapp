@@ -48,6 +48,7 @@ import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
 import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
+import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
@@ -121,6 +122,7 @@ export default function App() {
     <CollectPromptProvider>
     <div className="app-shell">
       <ScrollToTop />
+      <ReminderAlerts />
       {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread || isAuth || isMaps ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
