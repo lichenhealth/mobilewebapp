@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
@@ -14,6 +14,7 @@ import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow 
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
+import { parseFlex, defaultWindow } from '../lib/flexParse';
 import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
@@ -60,6 +61,13 @@ export default function EventComposer() {
   type DateMode = 'one' | 'multi' | 'flex';
   const [dateMode, setDateMode] = useState<DateMode>('one');
   const [flexDays, setFlexDays] = useState(3);
+  // Flexible mode's sentence box: "a 3 day retreat between july 1 and
+  // august 31 with Gabe and the WAG group" → length, window, invitees.
+  const [flexQ, setFlexQ] = useState('');
+  const [flexWindow, setFlexWindow] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
+  const [flexChips, setFlexChips] = useState<string[]>([]);
+  const [spaceNotes, setSpaceNotes] = useState<string[]>([]);
+  const expandedSpaces = useRef(new Set<string>());
   const spanLen = useMemo(() => {
     if (!range.start || !range.end || range.end === range.start) return 1;
     let n = 1; let d = range.start;
@@ -67,25 +75,80 @@ export default function EventComposer() {
     return n;
   }, [range.start, range.end]);
 
+  // The sentence, applied: length + window + invitees (groups expand to
+  // their members, capped so a huge community doesn't flood the invite list).
+  useEffect(() => {
+    if (dateMode !== 'flex') return;
+    const t = window.setTimeout(async () => {
+      const p = parseFlex(
+        flexQ,
+        members.map((m) => ({ id: m.id, name: m.full_name ?? '' })),
+        spaces.map((s) => ({ id: s.id, name: s.name })),
+      );
+      if (p.days) setFlexDays(p.days);
+      setFlexWindow({ from: p.from, to: p.to });
+      setFlexChips(p.chips);
+      if (p.memberIds.length > 0) {
+        setInvitees((cur) => {
+          const add = p.memberIds.filter((id) => !cur.some((i) => i.id === id))
+            .map((id) => members.find((m) => m.id === id)).filter((m): m is MemberOpt => !!m);
+          return add.length > 0 ? [...cur, ...add] : cur;
+        });
+      }
+      for (const sid of p.spaceIds) {
+        if (expandedSpaces.current.has(sid)) continue;
+        expandedSpaces.current.add(sid);
+        const name = spaces.find((s) => s.id === sid)?.name ?? 'that group';
+        const { data } = await supabase.from('space_members')
+          .select('profiles(id, full_name)').eq('space_id', sid).limit(26);
+        const folks = ((data as unknown as { profiles: MemberOpt | null }[] | null) ?? [])
+          .map((r) => r.profiles).filter((x): x is MemberOpt => !!x && x.id !== me);
+        if (folks.length > 25) {
+          setSpaceNotes((n) => [...n, `${name}: too many members to check`]);
+        } else if (folks.length === 0) {
+          setSpaceNotes((n) => [...n, `${name}: no other members yet`]);
+        } else {
+          setInvitees((cur) => {
+            const add = folks.filter((f) => !cur.some((i) => i.id === f.id));
+            return add.length > 0 ? [...cur, ...add] : cur;
+          });
+          setSpaceNotes((n) => [...n, `${name} · ${folks.length} member${folks.length > 1 ? 's' : ''} added`]);
+        }
+      }
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flexQ, dateMode, members, spaces]);
+
   const [fb, setFb] = useState<FreeBusyRow[]>([]);
   const [fbLoading, setFbLoading] = useState(false);
   const singleTimedDay = dateMode === 'one' && !allDay && (!range.end || range.end === range.start);
   const inviteeKey = invitees.map((i) => i.id).sort().join(',');
-  const HORIZON = 56; // flexible/multi searches look 8 weeks out
+  // The stretch the multi/flex search sweeps (flex honors the sentence
+  // window; everything else looks 8 weeks out via defaultWindow()).
+  const search = useMemo(() => {
+    const dflt = defaultWindow();
+    if (dateMode !== 'flex' || !flexWindow.from || !flexWindow.to) return dflt;
+    const today = todayISO();
+    const from = flexWindow.from > today ? flexWindow.from : dflt.from;
+    let to = flexWindow.to;
+    if (to > addDays(from, 120)) to = addDays(from, 120);  // sanity cap
+    return to > from ? { from, to } : dflt;
+  }, [dateMode, flexWindow.from, flexWindow.to]);
   useEffect(() => {
     if (!me || invitees.length === 0) { setFb([]); return; }
     if (dateMode === 'one' && !singleTimedDay) { setFb([]); return; }
     let live = true;
     setFbLoading(true);
-    const from = dateMode === 'one' ? anchor : todayISO();
-    const to = dateMode === 'one' ? anchor : addDays(todayISO(), HORIZON);
+    const from = dateMode === 'one' ? anchor : search.from;
+    const to = dateMode === 'one' ? anchor : search.to;
     const t = window.setTimeout(async () => {
       const rows = await freeBusy([me, ...invitees.map((i) => i.id)], from, to);
       if (live) { setFb(rows); setFbLoading(false); }
     }, 300);
     return () => { live = false; window.clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, anchor, inviteeKey, singleTimedDay, dateMode]);
+  }, [me, anchor, inviteeKey, singleTimedDay, dateMode, search.from, search.to]);
 
   const people = useMemo(() => [me, ...invitees.map((i) => i.id)], [me, inviteeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const busyAt = (pid: string, iso: string, s: number, e: number) => fb.some((r) =>
@@ -124,7 +187,8 @@ export default function EventComposer() {
     if (dateMode === 'one' || invitees.length === 0 || fb.length === 0) return [];
     const len = dateMode === 'flex' ? flexDays : spanLen;
     const scored: { start: string; score: number }[] = [];
-    for (let i = 0, d = addDays(todayISO(), 1); i <= HORIZON - len; i += 1, d = addDays(d, 1)) {
+    const lastStart = addDays(search.to, 1 - len);
+    for (let d = search.from, i = 0; d <= lastStart && i < 130; i += 1, d = addDays(d, 1)) {
       if (dateMode === 'multi' && d === range.start) continue;
       let score = 0;
       for (const p of people) score += conflictDays(p, d, len).length;
@@ -133,7 +197,7 @@ export default function EventComposer() {
     scored.sort((a, b) => a.score - b.score || (a.start < b.start ? -1 : 1));
     return scored.slice(0, 6);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fb, dateMode, flexDays, spanLen, inviteeKey, range.start]);
+  }, [fb, dateMode, flexDays, spanLen, inviteeKey, range.start, search.from, search.to]);
 
   useEffect(() => {
     if (!me) return;
@@ -424,16 +488,37 @@ export default function EventComposer() {
               </span>
             )}
           </span>
-          <DateRangeCalendar
-            value={recurrence ? { start: range.start, end: range.start } : range}
-            onChange={(r) => {
-              if (recurrence || dateMode === 'one') setRange({ start: r.start, end: r.start });
-              else setRange(r);
-            }}
-          />
+          {dateMode === 'flex' && !recurrence ? (
+            <>
+              <textarea
+                className="cedit__input evflex__q"
+                rows={2}
+                value={flexQ}
+                onChange={(e) => setFlexQ(e.target.value)}
+                placeholder="Say it like you'd say it to a friend — &ldquo;a 3 day retreat between July 1 and August 31 with Gabe and the WAG group&rdquo;"
+              />
+              {(flexChips.length > 0 || spaceNotes.length > 0) && (
+                <div className="evflex__chips">
+                  <span className="evflex__lbl">Understood:</span>
+                  {[...flexChips, ...spaceNotes].map((c, i) => <span className="evflex__chip" key={i}>{c}</span>)}
+                </div>
+              )}
+            </>
+          ) : (
+            <DateRangeCalendar
+              value={recurrence ? { start: range.start, end: range.start } : range}
+              onChange={(r) => {
+                if (recurrence || dateMode === 'one') setRange({ start: r.start, end: r.start });
+                else setRange(r);
+              }}
+            />
+          )}
           <p className="rec__summary">
             {recurrence ? recurrenceLabel(recurrence, anchor)
-              : dateMode === 'flex' ? `Flexible · looking for ${flexDays === 1 ? 'a day' : `${flexDays} days`} that work`
+              : dateMode === 'flex' ? (
+                `Looking for ${flexDays === 1 ? 'a day' : `${flexDays} days`} between ${formatDateShort(search.from)} and ${formatDateShort(search.to)}`
+                + (range.start && range.end && range.end !== range.start ? ` · picked ${formatDateShort(range.start)} – ${formatDateShort(range.end)}` : '')
+              )
               : range.start === (range.end ?? range.start) ? 'One day' : `${spanLen} days`}
           </p>
         </div>

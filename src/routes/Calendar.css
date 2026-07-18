@@ -351,6 +351,19 @@
 .evav__slot--near { color: var(--ink-muted); }
 .evav__score { margin-left: 6px; font-size: 10px; color: var(--peach-deep, var(--peach)); }
 
+/* Flexible mode's sentence box + understood chips (smartSearch's grammar) */
+.evflex__q { resize: vertical; min-height: 58px; line-height: 1.5; }
+.evflex__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--s-2); }
+.evflex__lbl {
+  font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.evflex__chip {
+  padding: 3px 10px; border-radius: var(--r-full);
+  background: var(--peach-tint); border: 1px solid var(--peach);
+  font-size: 11px; color: var(--ink);
+}
+
 /* Responsive-only helpers for the When block's two render spots */
 .only-desktop { display: none; }
 @media (min-width: 1024px) {
