@@ -229,7 +229,7 @@ export default function Calendar() {
 
   // Open time views scrolled to the working morning (the PAGE scrolls).
   useEffect(() => {
-    if (view === 'month') return;
+    if (view === 'month' || view === 'schedule') { window.scrollTo({ top: 0 }); return; }
     const el = gridRef.current;
     if (!el) return;
     // Land 7am just below the pinned toolbar+day-header stack.
