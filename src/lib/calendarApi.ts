@@ -432,3 +432,45 @@ export async function loadMyExternalBusy(me: string, from: string, to: string): 
   if (error) { console.warn('loadMyExternalBusy:', error.message); return []; }
   return (data as ExternalBusyRow[] | null) ?? [];
 }
+
+// ─── Pinned calendar overlays (cross-device; founder 2026-07-17) ─────────────
+// The pin is a bookmark, not a permission: what an overlay renders is always
+// resolved per-viewer by free_busy()/calendar_shares.
+
+export interface CalendarPin {
+  id: string;
+  target_kind: 'profile' | 'space';
+  target_id: string;
+  name: string;
+}
+
+/** null = the pins table isn't reachable (e.g. migration not run yet) —
+ *  callers keep device-local behavior rather than clobbering anything. */
+export async function listCalendarPins(me: string): Promise<CalendarPin[] | null> {
+  const { data, error } = await supabase
+    .from('calendar_pins')
+    .select('id, target_kind, target_id, name')
+    .eq('profile_id', me)
+    .order('created_at');
+  if (error) { console.warn('listCalendarPins:', error.message); return null; }
+  return (data as CalendarPin[] | null) ?? [];
+}
+
+export async function addCalendarPin(
+  me: string, kind: 'profile' | 'space', targetId: string, name: string,
+): Promise<void> {
+  const { error } = await supabase.from('calendar_pins')
+    .upsert(
+      { profile_id: me, target_kind: kind, target_id: targetId, name },
+      { onConflict: 'profile_id,target_kind,target_id' },
+    );
+  if (error) console.warn('addCalendarPin:', error.message); // session-only until the table exists
+}
+
+export async function removeCalendarPin(
+  me: string, kind: 'profile' | 'space', targetId: string,
+): Promise<void> {
+  const { error } = await supabase.from('calendar_pins').delete()
+    .eq('profile_id', me).eq('target_kind', kind).eq('target_id', targetId);
+  if (error) console.warn('removeCalendarPin:', error.message);
+}
