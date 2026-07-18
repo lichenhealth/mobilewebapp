@@ -300,6 +300,31 @@
      edge sits level with the Event title input. */
   .evprev { display: block; position: sticky; top: var(--s-5); padding-top: var(--s-4); }
 }
+/* Availability checker in the event composer (founder sketch 2026-07-18):
+   per-invitee free/busy at the chosen time + times that fit everyone. */
+.evav { margin-top: var(--s-4); }
+.evav__people { display: flex; flex-direction: column; gap: 6px; }
+.evav__person {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink);
+}
+.evav__person em { font-style: normal; margin-left: auto; font-size: 11px; color: var(--sage, #6b7f5e); }
+.evav__person.is-busy em { color: var(--peach-deep, var(--peach)); }
+.evav__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage, #6b7f5e); flex-shrink: 0; }
+.evav__person.is-busy .evav__dot { background: var(--peach-deep, var(--peach)); }
+.evav__sub {
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint); margin: var(--s-3) 0 var(--s-2);
+}
+.evav__slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.evav__slot {
+  padding: 6px 11px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone);
+  font-size: 12px; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.evav__slot:hover { border-color: var(--peach); }
+.evav__note { font-size: 12px; color: var(--ink-muted); margin: var(--s-2) 0 0; }
+.evav__fine { font-size: 10px; color: var(--ink-faint); margin-top: var(--s-3); }
+
 /* Responsive-only helpers for the When block's two render spots */
 .only-desktop { display: none; }
 @media (min-width: 1024px) {

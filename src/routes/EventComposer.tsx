@@ -9,8 +9,8 @@ import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO, formatDateShort } from '../lib/conciergeApi';
-import { Recurrence, recurrenceLabel } from '../lib/recurrence';
-import { createEvent, updateEvent, loadEvent, minToLabel } from '../lib/calendarApi';
+import { Recurrence, recurrenceLabel, occursOn } from '../lib/recurrence';
+import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow } from '../lib/calendarApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
@@ -50,6 +50,45 @@ export default function EventComposer() {
   const [error, setError] = useState('');
 
   const anchor = range.start ?? todayISO();
+
+  // ── Availability: everyone's busy times for the chosen day, per what they
+  //    share with you (free_busy respects calendar_shares + imported cals). ──
+  const [fb, setFb] = useState<FreeBusyRow[]>([]);
+  const [fbLoading, setFbLoading] = useState(false);
+  const singleTimedDay = !allDay && (!range.end || range.end === range.start);
+  const inviteeKey = invitees.map((i) => i.id).sort().join(',');
+  useEffect(() => {
+    if (!me || !singleTimedDay || invitees.length === 0) { setFb([]); return; }
+    let live = true;
+    setFbLoading(true);
+    const t = window.setTimeout(async () => {
+      const rows = await freeBusy([me, ...invitees.map((i) => i.id)], anchor, anchor);
+      if (live) { setFb(rows); setFbLoading(false); }
+    }, 300);
+    return () => { live = false; window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, anchor, inviteeKey, singleTimedDay]);
+
+  const busyAt = (pid: string, s: number, e: number) => fb.some((r) =>
+    r.profile_id === pid && occursOn(r, anchor)
+    && (r.all_day || ((r.start_min ?? 0) < e && (r.end_min ?? 1440) > s)));
+
+  // Slots where every invitee (and you) look free — same day, event's length.
+  const suggestions = useMemo(() => {
+    if (!singleTimedDay || invitees.length === 0 || fb.length === 0) return [];
+    const dur = Math.max(30, endMin - startMin);
+    const people = [me, ...invitees.map((i) => i.id)];
+    const now = new Date();
+    const minStart = anchor === todayISO()
+      ? Math.ceil((now.getHours() * 60 + now.getMinutes() + 15) / 30) * 30 : 0;
+    const out: number[] = [];
+    for (let t = Math.max(7 * 60, minStart); t + dur <= 21 * 60 && out.length < 6; t += 30) {
+      if (t === startMin) continue;
+      if (!people.some((p) => busyAt(p, t, t + dur))) out.push(t);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fb, anchor, startMin, endMin, inviteeKey, singleTimedDay, me]);
 
   useEffect(() => {
     if (!me) return;
@@ -180,6 +219,54 @@ export default function EventComposer() {
     </>
   );
 
+  // Availability checker (founder's sketch, 2026-07-18): per-invitee free/busy
+  // at the chosen time + times that work for everyone. Honest by design — it
+  // reads only what each member shares with you (free_busy / calendar_shares).
+  const availabilityPanel = singleTimedDay && invitees.length > 0 && (
+    <div className="evav">
+      <p className="evprev__eyebrow">Availability</p>
+      <div className="evprev__card">
+        {fbLoading && fb.length === 0 && <p className="evav__note">Checking calendars&hellip;</p>}
+        {!fbLoading || fb.length > 0 ? (
+          <>
+            <div className="evav__people">
+              {[{ id: me, full_name: 'You' } as MemberOpt, ...invitees].map((m) => {
+                const busy = busyAt(m.id, startMin, endMin);
+                return (
+                  <span className={'evav__person' + (busy ? ' is-busy' : '')} key={m.id}>
+                    <span className="evav__dot" aria-hidden />
+                    {m.full_name ?? 'Member'}
+                    <em>{busy ? 'busy then' : 'looks free'}</em>
+                  </span>
+                );
+              })}
+            </div>
+            {suggestions.length > 0 && (
+              <>
+                <p className="evav__sub">Times that work for everyone</p>
+                <div className="evav__slots">
+                  {suggestions.map((t) => (
+                    <button
+                      key={t} type="button" className="evav__slot"
+                      onClick={() => { const dur = Math.max(30, endMin - startMin); setStartMin(t); setEndMin(Math.min(t + dur, 1440)); }}
+                    >
+                      {minToLabel(t)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {suggestions.length === 0 && !fbLoading
+              && [me, ...invitees.map((i) => i.id)].some((p) => busyAt(p, startMin, endMin)) && (
+              <p className="evav__note">No open slot fits everyone on this day — try another date.</p>
+            )}
+          </>
+        ) : null}
+        <p className="evav__fine">Based on what each member shares with you.</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="cedit">
       <header className="cedit__head">
@@ -253,6 +340,8 @@ export default function EventComposer() {
           ))}
         </div>
 
+        <div className="only-mobile">{availabilityPanel}</div>
+
         {/* Location + notes */}
         <div className="cedit__field">
           <span className="cedit__label">Location</span>
@@ -302,6 +391,7 @@ export default function EventComposer() {
             {calendar === 'me' ? 'On your calendar' : `On ${spaces.find((s) => s.id === calendar)?.name ?? 'a space calendar'}`}
           </p>
         </div>
+        {availabilityPanel}
       </aside>
       </div>
     </div>
