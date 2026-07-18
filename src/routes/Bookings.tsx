@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { minToLabel } from '../lib/calendarApi';
 import { formatDateShort, todayISO } from '../lib/conciergeApi';
 import {
-  BookingRow, listMyBookings, respondBooking, cancelBooking,
+  BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
 } from '../lib/bookingApi';
 import './Bookings.css';
 
@@ -19,15 +20,28 @@ export default function Bookings() {
 
   const [asProvider, setAsProvider] = useState<BookingRow[]>([]);
   const [asBooker, setAsBooker] = useState<BookingRow[]>([]);
+  const [open, setOpen] = useState<OpenSession[]>([]);
+  const [bookQ, setBookQ] = useState('');
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!me) return;
-    const { asProvider: p, asBooker: b } = await listMyBookings(me);
-    setAsProvider(p); setAsBooker(b); setReady(true);
+    const [{ asProvider: p, asBooker: b }, sessions] = await Promise.all([
+      listMyBookings(me), listOpenSessions(me),
+    ]);
+    setAsProvider(p); setAsBooker(b); setOpen(sessions); setReady(true);
   }, [me]);
   useEffect(() => { load(); }, [load]);
+
+  // The book-from-here directory: every session offered to you, narrowed by name
+  const openHits = useMemo(() => {
+    const n = bookQ.trim().toLowerCase();
+    if (!n) return open;
+    return open.filter((s) =>
+      (s.provider?.full_name ?? '').toLowerCase().includes(n)
+      || s.title.toLowerCase().includes(n));
+  }, [open, bookQ]);
 
   const act = async (fn: () => Promise<void>) => {
     setError('');
@@ -56,10 +70,44 @@ export default function Bookings() {
       {error && <p className="bkg__error">{error}</p>}
       {!ready && <p className="bkg__muted">Loading…</p>}
 
-      {ready && requests.length === 0 && upcoming.length === 0 && mine.length === 0 && (
+      {ready && open.length > 0 && (
+        <section className="bkg__sec">
+          <h2 className="bkg__h2">Book a session</h2>
+          {open.length > 4 && (
+            <input
+              className="bkg__search"
+              value={bookQ}
+              onChange={(e) => setBookQ(e.target.value)}
+              placeholder="Search by name or session…"
+            />
+          )}
+          {openHits.map((s) => (
+            <button className="bkg__row bkg__row--go" key={s.id} onClick={() => navigate(`/book/${s.id}`)}>
+              <Avatar
+                id={s.profile_id}
+                name={s.provider?.full_name ?? 'Member'}
+                url={s.provider?.avatar_url ?? null}
+                size={36}
+              />
+              <div className="bkg__row-body">
+                <span className="bkg__row-title">{s.provider?.full_name ?? 'A member'} · {s.title}</span>
+                <span className="bkg__row-sub">
+                  {s.duration_min} min{s.price ? ` · ${s.price}` : ''}{s.location ? ` · ${s.location}` : ''}
+                </span>
+              </div>
+              <Icon name="chevron-right" size={14} />
+            </button>
+          ))}
+          {openHits.length === 0 && (
+            <p className="bkg__muted">No sessions match &ldquo;{bookQ.trim()}&rdquo;.</p>
+          )}
+        </section>
+      )}
+
+      {ready && open.length === 0 && requests.length === 0 && upcoming.length === 0 && mine.length === 0 && (
         <p className="bkg__muted">
-          Nothing here yet. Offer sessions from Calendar settings, or book
-          someone from their profile.
+          Nothing here yet. Offer sessions from Calendar settings — they&rsquo;ll
+          appear here for others to book.
         </p>
       )}
 

@@ -70,6 +70,23 @@ export async function deleteBookingType(me: string, id: string): Promise<void> {
   if (error) throw error;
 }
 
+export interface OpenSession extends BookingType {
+  provider?: { full_name: string | null; headline: string | null; avatar_url: string | null } | null;
+}
+
+/** Every session the network is offering YOU — RLS trims to what you may see
+ *  (audience 'everyone', plus 'mycelium' types whose provider holds you in
+ *  their web). Own types excluded: you can't book yourself. */
+export async function listOpenSessions(me: string): Promise<OpenSession[]> {
+  const { data, error } = await supabase.from('booking_types')
+    .select(TYPE_COLS + ', provider:profiles(full_name, headline, avatar_url)')
+    .eq('active', true)
+    .neq('profile_id', me)
+    .order('created_at');
+  if (error) { console.warn('listOpenSessions:', error.message); return []; }
+  return (data as unknown as OpenSession[] | null) ?? [];
+}
+
 // ─── The slot picker's raw materials + computation ───────────────────────────
 
 interface BoardWindow { weekday: number; start_min: number; end_min: number; valid_from: string | null; valid_to: string | null }

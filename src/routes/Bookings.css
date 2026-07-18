@@ -21,6 +21,16 @@
 .bkg__row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .bkg__btn { font-size: 12px; padding: 8px 14px; }
 .bkg__btn--quiet { color: var(--ink-muted); }
+/* Book-from-here rows are real buttons (whole row navigates) */
+.bkg__row--go { width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
+.bkg__row--go:hover { border-color: var(--peach); }
+.bkg__search {
+  width: 100%; padding: 9px 14px; margin-bottom: var(--s-2);
+  border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); font-size: 13px; font-family: inherit; color: var(--ink);
+}
+.bkg__search:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
+
 .bkg__day { margin-bottom: var(--s-4); }
 .bkg__slots { display: flex; flex-wrap: wrap; gap: 6px; }
 .bkg__slot {
