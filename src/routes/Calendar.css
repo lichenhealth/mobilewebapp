@@ -351,6 +351,24 @@
 .evav__slot--near { color: var(--ink-muted); }
 .evav__score { margin-left: 6px; font-size: 10px; color: var(--peach-deep, var(--peach)); }
 
+/* Reminders: private nudges — outline chips/rows with a check-off circle */
+.calp__rem { border-left-color: var(--sage, #6b7f5e) !important; }
+.calp__rem-check {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--sage, #6b7f5e); color: var(--sage, #6b7f5e);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1; margin-right: 6px;
+}
+.calp__rem.is-done .calp__sched-title { text-decoration: line-through; color: var(--ink-faint); }
+.calp__chip--rem {
+  background: var(--bone-warm); color: var(--ink);
+  border: 1.5px dashed var(--sage, #6b7f5e);
+}
+.calp__chip--rem.is-done { text-decoration: line-through; color: var(--ink-faint); opacity: 0.7; }
+
+/* Event | Reminder pills atop the composer */
+.evkind__row { margin-bottom: var(--s-2); }
+
 /* Flexible mode's sentence box + understood chips (smartSearch's grammar) */
 .evflex__q { resize: vertical; min-height: 58px; line-height: 1.5; }
 .evflex__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--s-2); }

@@ -15,6 +15,7 @@ import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
 import { parseFlex, defaultWindow } from '../lib/flexParse';
+import { createReminder } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
@@ -31,6 +32,14 @@ export default function EventComposer() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const back = () => navigate('/calendar');
+
+  // Events vs Reminders (Gabe, 2026-07-18): an event is a social object; a
+  // reminder is a private nudge — no guests, no busy weight.
+  const [kind, setKind] = useState<'event' | 'reminder'>(
+    params.get('kind') === 'reminder' ? 'reminder' : 'event');
+  const [remHasTime, setRemHasTime] = useState(false);
+  const [remAtMin, setRemAtMin] = useState(9 * 60);
+  const [remLead, setRemLead] = useState(0);
 
   const [title, setTitle] = useState('');
   const [calendar, setCalendar] = useState('me');            // 'me' | space id
@@ -433,6 +442,97 @@ export default function EventComposer() {
     </div>
   );
 
+  const kindPills = !eventId && (
+    <div className="evav__modes evkind__row">
+      {([['event', 'Event'], ['reminder', 'Reminder']] as const).map(([k, label]) => (
+        <button
+          key={k} type="button"
+          className={'evav__mode' + (kind === k ? ' is-on' : '')}
+          onClick={() => setKind(k)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  async function saveReminder() {
+    if (!title.trim()) { setError('Give the reminder a few words.'); return; }
+    if (!range.start) { setError('Pick a date.'); return; }
+    setSaving(true); setError('');
+    try {
+      await createReminder(me, {
+        title: title.trim(), date: range.start,
+        atMin: remHasTime ? remAtMin : null,
+        leadMin: remHasTime ? remLead : 0,
+        recurrence,
+      });
+      if (remHasTime && 'Notification' in window && Notification.permission === 'default') {
+        void Notification.requestPermission();
+      }
+      back();
+    } catch (e) {
+      setError((e as { message?: string } | null)?.message || 'Could not save.');
+      setSaving(false);
+    }
+  }
+
+  if (kind === 'reminder') {
+    return (
+      <div className="cedit">
+        <header className="cedit__head">
+          <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+          <h1 className="cedit__title">New reminder</h1>
+          <button className="btn btn-primary cedit__save" onClick={saveReminder} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </header>
+        {error && <p className="cedit__error">{error}</p>}
+        <div className="cedit__body">
+          {kindPills}
+          <input
+            className="cedit__input" placeholder="Remind me to… (e.g. Pay rent)"
+            value={title} onChange={(e) => setTitle(e.target.value)}
+          />
+          <div className="cedit__field">
+            <span className="cedit__label">Date</span>
+            <DateRangeCalendar
+              value={{ start: range.start, end: range.start }}
+              onChange={(r) => setRange({ start: r.start, end: r.start })}
+            />
+            <RecurrenceSelect
+              anchor={anchor} recurrence={recurrence}
+              onChange={(r) => setRecurrence(r)}
+            />
+            <p className="rec__summary">
+              {recurrence ? recurrenceLabel(recurrence, anchor) : `Once, on ${formatDateShort(anchor)}`}
+            </p>
+          </div>
+          <div className="cedit__field">
+            <span className="cedit__label">Alert</span>
+            <label className="rec__radio">
+              <input type="checkbox" checked={remHasTime} onChange={(e) => setRemHasTime(e.target.checked)} /> At a time
+            </label>
+            {remHasTime ? (
+              <div className="rec__row">
+                <TimeField value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
+                <select className="rec__select" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))}>
+                  <option value={0}>at the time</option>
+                  <option value={10}>10 min early</option>
+                  <option value={30}>30 min early</option>
+                  <option value={60}>1 hour early</option>
+                  <option value={1440}>1 day early</option>
+                </select>
+              </div>
+            ) : (
+              <p className="evav__note">A quiet nudge on your calendar that day — it never blocks your availability.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cedit">
       <header className="cedit__head">
@@ -447,6 +547,7 @@ export default function EventComposer() {
 
       <div className="cedit__cols">
       <div className="cedit__body">
+        {kindPills}
         <input
           className="cedit__input" placeholder="Event title"
           value={title} onChange={(e) => setTitle(e.target.value)}

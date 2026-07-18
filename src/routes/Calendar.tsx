@@ -34,6 +34,7 @@ export function SmartLocation({ loc, className }: { loc: string; className: stri
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
+import { listReminders, listDone, setDone, remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
 import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
@@ -83,6 +84,9 @@ export default function Calendar() {
     window.matchMedia('(max-width: 640px)').matches ? 'schedule' : 'week');
   const [anchor, setAnchor] = useState(todayISO());
   const [events, setEvents] = useState<EventRow[]>([]);
+  // Private nudges — never busy, never shared (Gabe's Reminders, 2026-07-18).
+  const [reminders, setReminders] = useState<ReminderRow[]>([]);
+  const [remDone, setRemDone] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EventRow | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -171,6 +175,13 @@ export default function Calendar() {
       }
     }
     setEvents([...byId.values()]);
+    // Reminders ride only on YOUR calendar chip; a graceful [] before the
+    // migration runs (listReminders warns and returns empty).
+    if (selectedCals.includes('me')) {
+      const rems = await listReminders(me);
+      setReminders(rems);
+      setRemDone(await listDone(rems.map((r) => r.id), from, to));
+    } else setReminders([]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, from, to, selectedCals.join(',')]);
@@ -341,8 +352,20 @@ export default function Calendar() {
     return out;
   };
   const allDayOn = (iso: string) => events.filter((e) => e.all_day && occursOn(e, iso));
+  const remsOn = (iso: string) => selectedCals.includes('me') ? remindersOn(reminders, iso) : [];
+  const remKey = (r: ReminderRow, iso: string) => `${r.id}:${iso}`;
+  const toggleRem = (r: ReminderRow, iso: string) => {
+    const k = remKey(r, iso);
+    const done = remDone.has(k);
+    setRemDone((cur) => {
+      const n = new Set(cur);
+      if (done) n.delete(k); else n.add(k);
+      return n;
+    });
+    void setDone(r.id, iso, !done).catch(console.error);
+  };
   const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
-  const hasAllDayRow = days.some((d) => allDayOn(d).length > 0);
+  const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || remsOn(d).length > 0);
 
   async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
   async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
@@ -550,7 +573,8 @@ export default function Calendar() {
               (a.all_day === b.all_day ? (a.start_min ?? 0) - (b.start_min ?? 0) : a.all_day ? -1 : 1));
             const ovs = overlays.flatMap((o) =>
               (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r) => ({ o, r })));
-            if (evs.length === 0 && ovs.length === 0) return null;
+            const rems = remsOn(iso);
+            if (evs.length === 0 && ovs.length === 0 && rems.length === 0) return null;
             return (
               <div className="calp__sched-day" key={iso}>
                 <div className={'calp__sched-date' + (iso === today ? ' is-today' : '')}>
@@ -558,6 +582,20 @@ export default function Calendar() {
                   <span className="calp__sched-num">{localDate(iso).getDate()}</span>
                 </div>
                 <div className="calp__sched-list">
+                  {rems.map((r) => {
+                    const done = remDone.has(remKey(r, iso));
+                    return (
+                      <button
+                        key={'rem:' + r.id + iso}
+                        className={'calp__sched-item calp__rem' + (done ? ' is-done' : '')}
+                        onClick={() => toggleRem(r, iso)}
+                      >
+                        <span className="calp__rem-check" aria-hidden>{done ? '✓' : ''}</span>
+                        <span className="calp__sched-title">{r.title}</span>
+                        {r.at_min != null && <span className="calp__sched-when">{minToLabel(r.at_min)}</span>}
+                      </button>
+                    );
+                  })}
                   {evs.map((e) => {
                     const t = tintOf(e);
                     return (
@@ -624,6 +662,17 @@ export default function Calendar() {
               <span className="calp__gutter-head" />
               {days.map((iso) => (
                 <div className="calp__allday-col" key={iso}>
+                  {remsOn(iso).map((r) => {
+                    const done = remDone.has(remKey(r, iso));
+                    return (
+                      <button
+                        className={'calp__chip calp__chip--rem' + (done ? ' is-done' : '')}
+                        key={'rem:' + r.id} onClick={() => toggleRem(r, iso)}
+                      >
+                        {done ? '✓ ' : ''}{r.title}
+                      </button>
+                    );
+                  })}
                   {allDayOn(iso).map((e) => (
                     <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
                   ))}
