@@ -472,7 +472,7 @@ export default function EventComposer() {
             Date
             {!recurrence && (
               <span className="evav__modes">
-                {([['one', 'One day'], ['multi', 'Several days'], ['flex', 'Flexible']] as const).map(([m, label]) => (
+                {([['one', 'One day'], ['multi', 'Multi-day'], ['flex', 'Flexible']] as const).map(([m, label]) => (
                   <button
                     key={m} type="button"
                     className={'evav__mode' + (dateMode === m ? ' is-on' : '')}
