@@ -139,8 +139,9 @@
 .conc__brain:active { transform: scale(0.95); }
 
 /* Scope picker — the Calendar's view-select, verbatim (founder 2026-07-17) */
+.conc__vselect:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
 .conc__vselect {
-  padding: 5px 8px;
+  padding: 7px 8px 7px 16px;
   border-radius: var(--r-full);
   border: 1px solid var(--bone-edge);
   background: var(--bone-warm);

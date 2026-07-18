@@ -13,7 +13,7 @@
 .calp__tool--new { background: var(--peach); border-color: var(--peach); color: #fff; }
 .calp__tool--new:active { transform: scale(0.94); }
 .calp__vselect {
-  margin-left: auto; padding: 5px 8px; border-radius: var(--r-full);
+  margin-left: auto; padding: 7px 8px 7px 16px; border-radius: var(--r-full);
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
   font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
 }
@@ -267,6 +267,10 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236B7479' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 12px center;
   padding-right: 30px;
+}
+/* Focus ring in the platform peach, not the browser blue */
+.calp__vselect:focus, .cset__select:focus, .timefield:focus {
+  outline: 2px solid var(--peach); outline-offset: 1px;
 }
 
 
