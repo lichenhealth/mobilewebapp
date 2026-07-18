@@ -454,9 +454,9 @@ export default function EventComposer() {
 
         {/* Which calendar */}
         <div className="cedit__field">
-          <span className="cedit__label">Calendar</span>
+          <span className="cedit__label">Organizer</span>
           <select className="rec__select" value={calendar} onChange={(e) => setCalendar(e.target.value)}>
-            <option value="me">My calendar</option>
+            <option value="me">Me</option>
             {spaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
@@ -599,7 +599,7 @@ export default function EventComposer() {
             </div>
           )}
           <p className="evprev__from">
-            {calendar === 'me' ? 'On your calendar' : `On ${spaces.find((s) => s.id === calendar)?.name ?? 'a space calendar'}`}
+            {calendar === 'me' ? 'Organized by you' : `Organized by ${spaces.find((s) => s.id === calendar)?.name ?? 'your group'}`}
           </p>
         </div>
         {availabilityPanel}
