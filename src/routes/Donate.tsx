@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import './Donate.css';
 
-const ENDPOINT = 'https://lichen.health/api/create-checkout-session';
 const PORTAL = 'https://billing.stripe.com/p/login/9B6bJ00MU047bRidT3bII00';
 const PAYPAL = 'https://www.paypal.com/donate/?hosted_button_id=F2A847YRU7EPU';
 const CALENDLY = 'https://calendly.com/galyntime';
@@ -16,6 +16,7 @@ export default function Donate() {
 
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<Freq>('one-time');
+  const [designation, setDesignation] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,17 +32,17 @@ export default function Donate() {
     setLoading(true);
     setMsg('Taking you to secure checkout…');
     try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, frequency }),
+      // Our own checkout (donate-checkout edge fn) — the donation lands in
+      // Lichen's books and, once translated, in the Current-cy ledger.
+      const { data, error } = await supabase.functions.invoke('donate-checkout', {
+        body: { amount: Number(amount), frequency, designation: designation.trim() },
       });
-      const out = await res.json();
-      if (!res.ok || !out.url) throw new Error(out.error || 'Could not start checkout.');
-      window.location.href = out.url;
-    } catch (e: any) {
+      if (error || !data?.url) throw new Error(error?.message || data?.error || 'Could not start checkout.');
+      window.location.href = data.url;
+    } catch (e) {
       setErr(true);
-      setMsg(e?.message || 'Something went wrong — please try again or email connect@lichen.health.');
+      setMsg((e as { message?: string } | null)?.message
+        || 'Something went wrong — please try again or email connect@lichen.health.');
       setLoading(false);
     }
   }
@@ -124,6 +125,22 @@ export default function Donate() {
             </select>
           </label>
         </div>
+
+        <label className="donate__field donate__field--direct">
+          <span className="donate__label">Direct your gift (optional)</span>
+          <input
+            type="text"
+            placeholder='e.g. "For Melanie Bright — subsidize care for those who can&rsquo;t afford it"'
+            value={designation}
+            onChange={(e) => setDesignation(e.target.value)}
+            maxLength={300}
+          />
+          <span className="donate__direct-hint">
+            Name a practitioner, group, or purpose within the Lichen network, in
+            your own words. 95% of your gift flows there as Lichen Current-cy;
+            5% sustains the platform that makes it possible.
+          </span>
+        </label>
 
         <button type="button" className="donate__submit" onClick={donate} disabled={loading}>
           {loading ? 'One moment…' : 'Donate'}

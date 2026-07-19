@@ -61,6 +61,14 @@
 
 .donate__fields { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--s-4); }
 .donate__field { display: flex; flex-direction: column; gap: var(--s-2); }
+.donate__field--direct { margin-top: var(--s-3); }
+.donate__field--direct input {
+  padding: 12px 14px; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 14px; font-family: inherit; color: var(--ink);
+}
+.donate__field--direct input:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
+.donate__direct-hint { font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
 .donate__label { font-size: var(--t-sm); color: var(--ink-soft); }
 .donate__amount-input {
   display: flex;
