@@ -201,7 +201,7 @@ export default function App() {
           <Route path="/art"      element={
             <AreaFeed area="art" icon="palette" crumb="Art"
               title="Lichen" italic="Art."
-              sub="What members make — images, music, words, and crafts."
+              sub="What members make — images, sound, words, and crafts."
               addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
           } />
           <Route path="/food"     element={
