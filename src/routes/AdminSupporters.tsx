@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import MintCurrent from '../components/MintCurrent';
 import './AdminCategories.css';
 
 type Tier = 'community' | 'concierge';
@@ -198,6 +199,8 @@ export default function AdminSupporters() {
         </button>
       </div>
       {msg && <p className="adminc__msg">{msg}</p>}
+
+      <MintCurrent />
 
       {pending.length > 0 && (
         <>

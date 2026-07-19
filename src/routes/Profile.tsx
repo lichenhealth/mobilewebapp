@@ -14,6 +14,7 @@ import {
 import Avatar from '../components/Avatar';
 import { Icon } from '../components/Icon';
 import HomeLocationSection from '../components/HomeLocationSection';
+import CurrentcyCard from '../components/CurrentcyCard';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import './Profile.css';
@@ -479,6 +480,8 @@ export default function Profile() {
           </div>
         )}
       </section>
+
+      <CurrentcyCard />
 
       <section className="prof__section">
         <h2 className="prof__h2">Your care team</h2>
