@@ -70,6 +70,7 @@ export default function CalendarSettings() {
   const [extUrl, setExtUrl] = useState('');
   const [syncing, setSyncing] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [stepsSent, setStepsSent] = useState(false);
 
   // Back from Google's consent screen: sync the fresh connection, tidy the URL.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -407,6 +408,24 @@ export default function CalendarSettings() {
               <p className="cset__howto-note">Treat the address like a password — anyone
                 holding it can read your calendar. Lichen never shows it again after you
                 add it, and each provider&rsquo;s settings can reset the link if it ever leaks.</p>
+              <p className="cset__howto-note">
+                <strong>On your phone?</strong> Google opens its app when you tap that link —
+                and the app doesn&rsquo;t show the secret address (web only). Have the
+                steps waiting in your inbox for the next time you&rsquo;re at a computer:
+              </p>
+              <button
+                className="cedit__add"
+                disabled={stepsSent}
+                onClick={async () => {
+                  try {
+                    const { data, error: e } = await supabase.functions.invoke('send-cal-steps');
+                    if (e || !data?.ok) throw new Error(e?.message || 'Could not send.');
+                    setStepsSent(true);
+                  } catch (err) { setError((err as Error).message); }
+                }}
+              >
+                {stepsSent ? 'Sent — check your inbox' : 'Email me the steps'}
+              </button>
             </div>
           </details>
 
