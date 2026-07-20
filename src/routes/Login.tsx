@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import './Auth.css';
 
+/** Only ever bounce to a place INSIDE the app — an absolute URL in ?next=
+ *  would be an open-redirect door. */
+function safeNext(raw: string | null): string | null {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { if (user) navigate('/home'); }, [user, navigate]);
+  // Remembered destination: a signed-out tap on a notification email lands on
+  // /login?next=/spaces/…; after signing in you arrive where you were headed.
+  const next = safeNext(params.get('next')) ?? '/home';
+
+  useEffect(() => { if (user) navigate(next, { replace: true }); }, [user, navigate, next]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,7 +38,7 @@ export default function Login() {
     });
     setLoading(false);
     if (signInError) { setError(signInError.message); return; }
-    navigate('/home');
+    navigate(next, { replace: true });
   }
 
   return (

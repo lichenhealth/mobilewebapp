@@ -294,9 +294,23 @@ export default function SpaceProfile() {
 
   if (loading) return <div className="prof"><p className="sprof__muted">Loading…</p></div>;
   if (!space) {
+    // Signed-out arrivals (e.g. a notification email opened in a fresh
+    // browser) get the door, with the destination remembered through login.
     return (
       <div className="prof">
-        <p className="sprof__muted">This page isn&rsquo;t available.</p>
+        {!me ? (
+          <div className="sprof__signin">
+            <p className="sprof__muted">Sign in to see this page.</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}
+            >
+              Sign in
+            </button>
+          </div>
+        ) : (
+          <p className="sprof__muted">This page isn&rsquo;t available.</p>
+        )}
       </div>
     );
   }

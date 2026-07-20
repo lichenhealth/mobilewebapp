@@ -85,7 +85,23 @@ export default function MemberProfile() {
 
   if (loading) return <div className="prof"><p className="mprof__muted">Loading…</p></div>;
   if (!member) {
-    return <div className="prof"><p className="mprof__muted">This page isn&rsquo;t available.</p></div>;
+    return (
+      <div className="prof">
+        {!me ? (
+          <div className="sprof__signin">
+            <p className="mprof__muted">Sign in to see this page.</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}
+            >
+              Sign in
+            </button>
+          </div>
+        ) : (
+          <p className="mprof__muted">This page isn&rsquo;t available.</p>
+        )}
+      </div>
+    );
   }
 
   const name = member.full_name || 'A Lichen member';

@@ -1,4 +1,11 @@
 /* Space profile — organizations / communities / groups / places */
+/* Signed-out landing: the door, with the destination remembered via ?next= */
+.sprof__signin {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-3);
+  padding: var(--s-7) 0;
+}
+.sprof__signin .sprof__muted, .sprof__signin .mprof__muted { padding: 0; }
+
 .sprof__muted { padding: var(--s-6) var(--s-5); font-size: 13px; font-weight: 300; color: var(--ink-muted); }
 
 .sprof__avatar-wrap { position: relative; display: inline-block; }

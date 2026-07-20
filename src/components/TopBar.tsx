@@ -133,7 +133,8 @@ export default function TopBar({
         <div className="top-bar__switch-wrap">
         <button
           className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
-          onClick={() => (user ? setSwitchOpen((o) => !o) : navigate('/login'))}
+          onClick={() => (user ? setSwitchOpen((o) => !o)
+            : navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`))}
           title={!user ? 'Sign in' : actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
           aria-label={!user ? 'Sign in' : actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
