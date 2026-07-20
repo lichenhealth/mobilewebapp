@@ -401,12 +401,15 @@ export default function CalendarSettings() {
                 Google Calendar settings</a> and follow the pictures:</p>
               <CalImportGuide />
               <p>Then back here: paste it below &rarr; <em>Add</em>.</p>
-              <p><strong>Apple / iCloud</strong>: at{' '}
+              <p><strong>Apple / iCloud</strong> — easiest right on your iPhone:
+                open the <em>Calendar app</em> &rarr; <em>Calendars</em> (bottom) &rarr; tap
+                the <em>ⓘ</em> beside your iCloud calendar &rarr; turn on
+                <em> Public Calendar</em> &rarr; <em>Share Link</em> &rarr; Copy, then paste
+                it below (it starts with webcal:// — paste as-is). On a computer:{' '}
                 <a href="https://www.icloud.com/calendar" target="_blank" rel="noreferrer">icloud.com/calendar</a>
-                {' '}(computer) &rarr; tap the share icon beside your calendar &rarr; turn on
-                <em> Public Calendar</em> &rarr; copy the link (it starts with webcal:// —
-                paste it as-is).</p>
-              <p><strong>Outlook</strong>: at{' '}
+                {' '}&rarr; share icon beside your calendar &rarr; <em>Public Calendar</em>.</p>
+              <p><strong>Outlook</strong> (use a computer — publishing lives in the web
+                version, not the phone app): at{' '}
                 <a href="https://outlook.live.com/calendar/options/calendar/SharedCalendars" target="_blank" rel="noreferrer">outlook.com&rsquo;s
                 shared-calendars settings</a> &rarr; publish your calendar (&ldquo;Can view all
                 details&rdquo;) &rarr; copy the <em>ICS</em> link.</p>

@@ -34,12 +34,13 @@ GOOGLE CALENDAR
 5. Copy the "Secret address in iCal format" (starts with https://…/private-…/basic.ics).
 6. In Lichen: Calendar → gear → Other calendars → paste → Add.
 
-APPLE / iCLOUD
-1. On a computer, open icloud.com → Calendar.
-2. Click the share icon beside your calendar → turn on "Public Calendar".
-3. Copy the webcal:// link and paste it into Lichen the same way.
+APPLE / iCLOUD — easiest right on your iPhone
+1. Open the Calendar app → Calendars (bottom).
+2. Tap the ⓘ beside your iCloud calendar → turn on "Public Calendar".
+3. Share Link → Copy, then paste it into Lichen (starts with webcal:// — paste as-is).
+(On a computer: icloud.com → Calendar → share icon → Public Calendar.)
 
-OUTLOOK
+OUTLOOK (computer — publishing lives in the web version, not the phone app)
 1. At outlook.com → gear → Calendar → Shared calendars.
 2. Publish your calendar ("Can view all details") and copy the ICS link.
 
