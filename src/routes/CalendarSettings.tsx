@@ -6,15 +6,16 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { WEEKDAYS_SHORT, WEEKDAYS_FULL } from '../lib/recurrence';
 import {
-  AvailabilityKind, AvailabilityWindow, ShareLevel, ShareRule, minToLabel,
+  AvailabilityKind, AvailabilityWindow, ShareRule, minToLabel,
   loadMyAvailability, addAvailability, deleteAvailability,
   loadMyShares, upsertShare, deleteShare,
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
-  removeExternalCalendar, syncExternalCalendars, setExternalShareTitles,
+  removeExternalCalendar, syncExternalCalendars, deleteEveryoneShare,
   startGoogleConnect, disconnectGoogle, googleAccountId,
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
 import CalImportGuide from '../components/CalImportGuide';
+import ShareRulesEditor from '../components/ShareRulesEditor';
 import { loadMyPhone } from '../lib/conciergeApi';
 import {
   BookingType, listMyBookingTypes, saveBookingType, deleteBookingType,
@@ -24,14 +25,20 @@ import './Calendar.css';
 
 interface MemberOpt { id: string; full_name: string | null }
 
+/** "3m ago" / "2h ago" / "just now" for the auto-update status line. */
+function agoLabel(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`;
+}
+
 // Parked until Google verifies Lichen (founder, 2026-07-18): the OAuth flow
 // works but unverified consent is three alarm screens + flaky generic errors.
 // The secret-address route is the alpha path. Flip to true post-verification.
 const SHOW_GOOGLE_CONNECT = false;
 
-const LEVEL_LABELS: Record<ShareLevel, string> = {
-  hidden: 'Nothing', busy: 'Busy times only', details: 'Full details',
-};
 
 /** Calendar settings: declared weekly hours (availability / on-call) and
  *  audience visibility rules (most-specific wins). */
@@ -52,13 +59,6 @@ export default function CalendarSettings() {
   const [wEnd, setWEnd] = useState(17 * 60);
   const [wKind, setWKind] = useState<AvailabilityKind>('available');
 
-  // add-rule form: one smart search across members AND spaces (groups,
-  // communities, organizations, places) — no audience-type dropdown.
-  interface RulePick { type: 'profile' | 'space'; id: string; name: string; label: string }
-  const [rQuery, setRQuery] = useState('');
-  const [rPick, setRPick] = useState<RulePick | null>(null);
-  const [rResults, setRResults] = useState<RulePick[]>([]);
-  const [rLevel, setRLevel] = useState<ShareLevel>('details');
 
   // Bookable sessions (the Calendly layer)
   const [bkTypes, setBkTypes] = useState<BookingType[]>([]);
@@ -108,32 +108,6 @@ export default function CalendarSettings() {
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
-  const everyoneLevel: ShareLevel =
-    (rules.find((r) => r.audience_type === 'everyone')?.level) ?? 'busy';
-  const specificRules = rules.filter((r) => r.audience_type !== 'everyone');
-
-  // Smart audience search: members client-side + all spaces by name, labeled
-  // by what they are (Member / Group / Community / Organization / Place).
-  useEffect(() => {
-    const q = rQuery.trim();
-    if (q.length < 2 || rPick) { setRResults([]); return; }
-    let live = true;
-    (async () => {
-      const { data } = await supabase.from('spaces').select('id, name, kind').ilike('name', `%${q}%`).limit(5);
-      if (!live) return;
-      const spaceHits = ((data as { id: string; name: string; kind: string }[] | null) ?? [])
-        .map((s) => ({
-          type: 'space' as const, id: s.id, name: s.name,
-          label: s.kind === 'community' ? 'Community' : s.kind === 'organization' ? 'Organization' : s.kind === 'place' ? 'Place' : 'Group',
-        }));
-      const memberHits = members
-        .filter((m) => (m.full_name ?? '').toLowerCase().includes(q.toLowerCase()))
-        .slice(0, 5)
-        .map((m) => ({ type: 'profile' as const, id: m.id, name: m.full_name || 'Member', label: 'Member' }));
-      setRResults([...memberHits, ...spaceHits]);
-    })();
-    return () => { live = false; };
-  }, [rQuery, rPick, members]);
 
   const act = async (fn: () => Promise<void>) => {
     if (!me) return; // session still resolving — never write with an empty id
@@ -211,85 +185,20 @@ export default function CalendarSettings() {
           )}
         </div>
 
-        {/* ── Who sees my calendar ── */}
+        {/* ── My Lichen calendar — who sees it ── */}
         <div className="cedit__field">
-          <span className="cedit__label">Who sees my calendar</span>
+          <span className="cedit__label">My Lichen calendar &mdash; who sees it</span>
           <p className="cedit__hint">
             The most specific rule wins: a rule for a person beats their group's rule, which beats
             the everyone rule. "Busy times only" hides what and where — people just see you're taken.
           </p>
-
-          <div className="cset__row">
-            <span className="cset__aud">Everyone</span>
-            <select
-              className="cset__select cset__select--grow" value={everyoneLevel}
-              onChange={(e) => act(() => upsertShare(me, { type: 'everyone' }, e.target.value as ShareLevel))}
-              aria-label="Everyone sees"
-            >
-              {(Object.keys(LEVEL_LABELS) as ShareLevel[]).map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
-            </select>
-          </div>
-
-          {specificRules.map((r) => (
-            <div className="cset__row" key={r.id}>
-              <span className="cset__aud">
-                {r.audience_type === 'space'
-                  ? (r.space?.name ?? 'A space')
-                  : (r.profile?.full_name || 'A member')}
-              </span>
-              <select
-                className="cset__select cset__select--grow" value={r.level}
-                onChange={(e) => act(() =>
-                  upsertShare(
-                    me,
-                    r.audience_type === 'space'
-                      ? { type: 'space', spaceId: r.audience_space_id! }
-                      : { type: 'profile', profileId: r.audience_profile_id! },
-                    e.target.value as ShareLevel,
-                  ))}
-                aria-label="Sees"
-              >
-                {(Object.keys(LEVEL_LABELS) as ShareLevel[]).map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
-              </select>
-              <button className="cedit__remove" onClick={() => act(() => deleteShare(r.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
-            </div>
-          ))}
-
-          <div className="cset__add cset__add--wrap">
-            {rPick ? (
-              <button className="calp__invitee" onClick={() => { setRPick(null); setRQuery(''); }}>
-                {rPick.name} <span className="cset__kind">{rPick.label}</span> ×
-              </button>
-            ) : (
-              <input
-                className="cedit__input cset__grow"
-                placeholder="Search Members, Groups/Communities, Organizations and/or Places…"
-                value={rQuery} onChange={(e) => setRQuery(e.target.value)}
-              />
-            )}
-            <select className="cset__select" value={rLevel} onChange={(e) => setRLevel(e.target.value as ShareLevel)} aria-label="Level">
-              {(Object.keys(LEVEL_LABELS) as ShareLevel[]).map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
-            </select>
-            <button
-              className="cedit__add cedit__add--sm"
-              onClick={() => act(async () => {
-                if (!rPick) return;
-                await upsertShare(
-                  me,
-                  rPick.type === 'space' ? { type: 'space', spaceId: rPick.id } : { type: 'profile', profileId: rPick.id },
-                  rLevel,
-                );
-                setRPick(null); setRQuery('');
-              })}
-            >
-              <Icon name="plus" size={12} /> Add rule
-            </button>
-          </div>
-          {rResults.map((r) => (
-            <button className="calp__match" key={r.type + r.id} onClick={() => { setRPick(r); setRQuery(''); }}>
-              {r.name} <span className="cset__kind">{r.label}</span>
-            </button>
-          ))}
+          <ShareRulesEditor
+            me={me}
+            rules={rules.filter((r) => !r.external_calendar_id)}
+            onChanged={load}
+            onUpsert={(aud, lvl) => upsertShare(me, aud, lvl, null)}
+            onDeleteRule={(id) => deleteShare(id)}
+          />
         </div>
 
         {/* ── Bookable sessions (the Calendly layer) ── */}
@@ -393,7 +302,7 @@ export default function CalendarSettings() {
             never your event details.
           </p>
           <details className="cset__howto">
-            <summary>How do I find my secret address?</summary>
+            <summary>{extCals.length > 0 ? 'Adding another calendar? How to find its address' : 'How do I find my secret address?'}</summary>
             <div className="cset__howto-body">
               <p><strong>Google Calendar</strong> (use a computer — the secret address
                 only appears on the web, not in Google&rsquo;s phone app):
@@ -468,55 +377,62 @@ export default function CalendarSettings() {
           )}
 
           {extCals.map((c) => (
-            <div className="cset__row" key={c.id}>
-              <span className="cset__aud cset__extname">
-                {c.name}
-                {googleAccountId(c.url) && <em className="cset__gtag"> · Google</em>}
-              </span>
-              <span className="cset__extmeta">
-                {c.last_error
-                  ? <em className="cset__exterr" title={c.last_error}>couldn&rsquo;t sync</em>
-                  : c.last_synced_at
-                    ? `${c.event_count} busy ${c.event_count === 1 ? 'block' : 'blocks'}`
-                    : 'not synced yet'}
-              </span>
-              {c.share_titles !== undefined && (
+            <div className="cset__extcal" key={c.id}>
+              <div className="cset__row">
+                <span className="cset__aud cset__extname">
+                  {c.name}
+                  {googleAccountId(c.url) && <em className="cset__gtag"> · Google</em>}
+                </span>
+                <span className="cset__extmeta">
+                  {c.last_error
+                    ? <em className="cset__exterr" title={c.last_error}>couldn&rsquo;t sync</em>
+                    : c.last_synced_at
+                      ? `auto-updates · checked ${agoLabel(c.last_synced_at)}`
+                      : 'first sync happens when you open your calendar'}
+                </span>
                 <button
-                  className={'cset__titletoggle' + (c.share_titles ? ' is-on' : '')}
-                  title={c.share_titles
-                    ? 'People you grant Full details can see this calendar’s event titles. Tap to keep titles to yourself.'
-                    : 'This calendar’s titles are visible only to you — others see busy blocks. Tap to include titles for people you grant Full details.'}
-                  onClick={() => act(async () => {
-                    await setExternalShareTitles(c.id, !c.share_titles);
-                    await load();
-                  })}
+                  className="cedit__add cedit__add--sm"
+                  title="Refresh now (it also refreshes itself whenever you open your calendar)"
+                  aria-label="Refresh now"
+                  disabled={syncing === c.id}
+                  onClick={async () => {
+                    setSyncing(c.id); setError('');
+                    try { await syncExternalCalendars({ force: true, calendarId: c.id }); await load(); }
+                    catch (e) { setError((e as { message?: string } | null)?.message || 'Refresh failed.'); }
+                    setSyncing(null);
+                  }}
                 >
-                  {c.share_titles ? 'Titles: at Full details' : 'Titles: just you'}
+                  {syncing === c.id ? '…' : '↻'}
                 </button>
-              )}
-              <button
-                className="cedit__add cedit__add--sm"
-                disabled={syncing === c.id}
-                onClick={async () => {
-                  setSyncing(c.id); setError('');
-                  try { await syncExternalCalendars({ force: true, calendarId: c.id }); await load(); }
-                  catch (e) { setError((e as { message?: string } | null)?.message || 'Sync failed.'); }
-                  setSyncing(null);
-                }}
-              >
-                {syncing === c.id ? 'Syncing…' : 'Sync now'}
-              </button>
-              <button
-                className="cedit__remove"
-                onClick={() => act(async () => {
-                  const gid = googleAccountId(c.url);
-                  if (gid) await disconnectGoogle(gid);   // token + row + busy blocks
-                  else await removeExternalCalendar(c.id);
-                })}
-                aria-label="Remove calendar"
-              >
-                <Icon name="close" size={13} />
-              </button>
+                <button
+                  className="cedit__remove"
+                  onClick={() => act(async () => {
+                    const gid = googleAccountId(c.url);
+                    if (gid) await disconnectGoogle(gid);   // token + row + busy blocks
+                    else await removeExternalCalendar(c.id);
+                  })}
+                  aria-label={`Remove ${c.name}`}
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+              <details className="cset__calrules">
+                <summary>Who sees my {c.name}{googleAccountId(c.url) ? ' (Google)' : ''} calendar</summary>
+                <p className="cedit__hint">
+                  Without rules of its own, this calendar follows your Lichen rules —
+                  at most busy times, titles just for you. Add rules to grant chosen
+                  people or groups more (Full details shows event titles) or less.
+                </p>
+                <ShareRulesEditor
+                  me={me}
+                  rules={rules.filter((r) => r.external_calendar_id === c.id)}
+                  onChanged={load}
+                  everyoneUnsetLabel="Follow my Lichen rules (busy at most)"
+                  onUpsert={(aud, lvl) => upsertShare(me, aud, lvl, c.id)}
+                  onDeleteRule={(id) => deleteShare(id)}
+                  onUnsetEveryone={() => deleteEveryoneShare(me, c.id)}
+                />
+              </details>
             </div>
           ))}
 
