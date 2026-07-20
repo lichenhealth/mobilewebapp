@@ -271,6 +271,8 @@ export interface ShareRule {
   audience_space_id: string | null;
   audience_profile_id: string | null;
   level: ShareLevel;
+  /** null/undefined = the Lichen calendar; set = rules for that imported calendar */
+  external_calendar_id?: string | null;
   space?: { name: string } | null;
   profile?: { full_name: string | null } | null;
 }
@@ -278,7 +280,7 @@ export interface ShareRule {
 export async function loadMyShares(me: string): Promise<ShareRule[]> {
   const { data, error } = await supabase
     .from('calendar_shares')
-    .select('id, audience_type, audience_space_id, audience_profile_id, level, space:spaces(name), profile:profiles!calendar_shares_audience_profile_id_fkey(full_name)')
+    .select('*, space:spaces(name), profile:profiles!calendar_shares_audience_profile_id_fkey(full_name)')
     .eq('owner_id', me)
     .order('created_at');
   if (error) console.warn('loadMyShares:', error.message);
@@ -289,6 +291,7 @@ export async function upsertShare(
   me: string,
   audience: { type: 'everyone' } | { type: 'space'; spaceId: string } | { type: 'profile'; profileId: string },
   level: ShareLevel,
+  externalCalendarId: string | null = null,   // null = the Lichen calendar
 ): Promise<void> {
   const row = {
     owner_id: me,
@@ -296,13 +299,26 @@ export async function upsertShare(
     audience_space_id: audience.type === 'space' ? audience.spaceId : null,
     audience_profile_id: audience.type === 'profile' ? audience.profileId : null,
     level,
+    external_calendar_id: externalCalendarId,
   };
-  // Delete-then-insert keeps the "one rule per audience" unique index simple.
+  // Delete-then-insert keeps the "one rule per audience per calendar" index simple.
   let del = supabase.from('calendar_shares').delete().eq('owner_id', me).eq('audience_type', audience.type);
   if (audience.type === 'space') del = del.eq('audience_space_id', audience.spaceId);
   if (audience.type === 'profile') del = del.eq('audience_profile_id', audience.profileId);
+  del = externalCalendarId
+    ? del.eq('external_calendar_id', externalCalendarId)
+    : del.is('external_calendar_id', null);
   await del;
   const { error } = await supabase.from('calendar_shares').insert(row);
+  if (error) throw error;
+}
+
+/** Unset an imported calendar's 'everyone' rule → it falls back to following
+ *  your Lichen rules, capped at busy. */
+export async function deleteEveryoneShare(me: string, externalCalendarId: string): Promise<void> {
+  const { error } = await supabase.from('calendar_shares').delete()
+    .eq('owner_id', me).eq('audience_type', 'everyone')
+    .eq('external_calendar_id', externalCalendarId);
   if (error) throw error;
 }
 
@@ -356,10 +372,6 @@ export interface ExternalCalendar {
   last_synced_at: string | null;
   last_error: string | null;
   event_count: number;
-  /** Opt-in: this calendar's titles join 'Full details' for viewers the
-   *  member already grants details via their sharing rules. Default false —
-   *  imported titles are owner-only (they weren't authored for an audience). */
-  share_titles?: boolean;
 }
 
 export async function listExternalCalendars(me: string): Promise<ExternalCalendar[]> {
@@ -375,14 +387,6 @@ export async function listExternalCalendars(me: string): Promise<ExternalCalenda
 export async function addExternalCalendar(me: string, name: string, url: string): Promise<void> {
   const { error } = await supabase.from('external_calendars')
     .insert({ profile_id: me, name: name.trim() || 'Calendar', url: url.trim() });
-  if (error) throw error;
-}
-
-/** Per-calendar consent: titles join 'Full details' (viewers still gated by
- *  the member's sharing rules — this only lets THIS calendar participate). */
-export async function setExternalShareTitles(id: string, on: boolean): Promise<void> {
-  const { error } = await supabase.from('external_calendars')
-    .update({ share_titles: on }).eq('id', id);
   if (error) throw error;
 }
 

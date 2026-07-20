@@ -512,3 +512,16 @@
 
 /* Tinted (space / imported) blocks keep ink text over their soft hue */
 .calp__event--tinted { color: var(--ink); border-color: var(--bone-edge); }
+
+/* Imported-calendar card: status row + its own who-sees rules */
+.cset__extcal {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-2);
+}
+.cset__calrules { margin-top: 2px; }
+.cset__calrules summary {
+  cursor: pointer; font-size: 12px; color: var(--ink-soft); padding: 4px 0;
+}
+.cset__calrules summary:hover { color: var(--ink); }
+.cset__calrules[open] summary { color: var(--peach-deep); }
+.shre__error { font-size: 12px; color: var(--rust, #b4553a); margin: 4px 0; }
