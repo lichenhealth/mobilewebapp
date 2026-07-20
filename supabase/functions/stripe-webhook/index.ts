@@ -89,6 +89,22 @@ Deno.serve(async (req) => {
       await record(event.data.object, true);
     } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
       await record(event.data.object, false);
+    } else if (event.type === 'checkout.session.completed') {
+      // Donations land here (donate-checkout tags them kind=donation) and wait
+      // on /admin/supporters for translation into Current-cy (95/5 split).
+      // deno-lint-ignore no-explicit-any
+      const s = event.data.object as any;
+      if (s.metadata?.kind === 'donation' && s.payment_status === 'paid') {
+        await admin.from('donations').upsert({
+          stripe_session_id: s.id,
+          amount_cents: s.amount_total ?? 0,
+          currency: s.currency ?? 'usd',
+          donor_email: s.customer_details?.email ?? null,
+          donor_profile_id: s.metadata?.donor_profile || null,
+          designation: s.metadata?.designation ?? '',
+          frequency: s.metadata?.frequency ?? 'one-time',
+        }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+      }
     }
   } catch (err) {
     console.error('webhook handler error', err);
