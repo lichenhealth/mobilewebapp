@@ -3,7 +3,9 @@
 .notif-panel {
   position: fixed;
   top: calc(var(--safe-top) + 56px);
-  right: max(var(--s-4), calc(50vw - var(--app-max) / 2 + var(--s-4)));
+  /* Anchor to the BELL (viewport top-right) — the old centered-column math
+     floated the panel mid-screen once the desktop sidebar layout landed. */
+  right: var(--s-4);
   z-index: 71;
   width: min(360px, calc(100vw - var(--s-6)));
   max-height: 70vh;

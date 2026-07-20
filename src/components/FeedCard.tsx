@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
@@ -12,7 +13,10 @@ export interface FeedCardProps {
   title: string;
   handle: string;
   category?: 'social' | 'creative' | 'educational' | 'actionable' | 'qa' | 'commerce';
-  categoryIcons?: IconName[];    // small icons in the upper-right of card
+  categoryIcons?: IconName[];    // small icons in the upper-right of card (decorative)
+  /** Live area doors, upper-right: tap the Library icon on Melanie's post to
+   *  browse Melanie's Library (author-scoped search). Wins over categoryIcons. */
+  areaDoors?: { icon: IconName; to: string; label: string }[];
   body: string;
   // Image-badge column on the right
   image?: {
@@ -69,6 +73,7 @@ export default function FeedCard({
   title,
   handle,
   categoryIcons = [],
+  areaDoors = [],
   body,
   image,
   mycelium,
@@ -96,6 +101,7 @@ export default function FeedCard({
   onManage,
   onHide,
 }: FeedCardProps) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = !!(extraMenuItems && extraMenuItems.length)
     || (viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide);
@@ -150,12 +156,26 @@ export default function FeedCard({
             </div>
           )}
         </div>
-        {(onWeave || categoryIcons.length > 0 || onMessage || hasMenu) && (
+        {(onWeave || categoryIcons.length > 0 || areaDoors.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">
             {onWeave && (
               <WeaveMark on={inWeb ?? false} onToggle={onWeave} entityName={title} size={20} />
             )}
-            {categoryIcons.length > 0 && (
+            {areaDoors.length > 0 ? (
+              <div className="feed-card__cat-icons">
+                {areaDoors.map((d) => (
+                  <button
+                    key={d.to}
+                    className="feed-card__cat-icon feed-card__cat-icon--door"
+                    title={d.label}
+                    aria-label={d.label}
+                    onClick={() => navigate(d.to)}
+                  >
+                    <Icon name={d.icon} size={14} />
+                  </button>
+                ))}
+              </div>
+            ) : categoryIcons.length > 0 && (
               <div className="feed-card__cat-icons">
                 {categoryIcons.map((n) => (
                   <span key={n} className="feed-card__cat-icon">

@@ -1,5 +1,5 @@
 import type { FeedCardProps } from '../components/FeedCard';
-import { serviceAreaIcon, postAreas, type FeedPost } from './postsApi';
+import { serviceAreaIcon, postAreas, SERVICE_AREAS, type FeedPost } from './postsApi';
 import { setInWeb } from './myceliumApi';
 import type { IconName } from '../components/Icon';
 
@@ -60,10 +60,18 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   const handle = p.author_space
     ? '@' + p.author_space.name.toLowerCase().replace(/\s+/g, '-')
     : '@' + (p.author?.handle || name.toLowerCase().replace(/\s+/g, '-'));
-  // Every area the post lives in -> every icon, top-right.
-  const icons = postAreas(p)
-    .map((a) => serviceAreaIcon(a))
-    .filter((i): i is IconName => i != null);
+  // Every area the post lives in -> a DOOR, top-right: tap the Library icon
+  // on Melanie's post to browse Melanie's Library (author-scoped search —
+  // the browse-then-narrow surface from PR #53).
+  const scope = p.author_space_id ? `space=${p.author_space_id}` : `member=${p.author_id}`;
+  const areaDoors = postAreas(p)
+    .map((a) => {
+      const icon = serviceAreaIcon(a);
+      if (!icon) return null;
+      const areaLabel = SERVICE_AREAS.find((s) => s.value === a)?.label ?? a;
+      return { icon, to: `/search?${scope}&area=${a}`, label: `${name}'s ${areaLabel}` };
+    })
+    .filter((d): d is { icon: IconName; to: string; label: string } => d != null);
   const title = p.title || (p.body.length > 64 ? p.body.slice(0, 61) + '\u2026' : p.body);
   const media = Array.isArray(p.details?.media)
     ? (p.details.media as FeedCardProps['media'])
@@ -93,7 +101,7 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     avatar: p.author_space ? undefined : (p.author?.avatar_url ?? undefined),
     avatarMonogram: name.charAt(0).toUpperCase(),
     body: p.body,
-    categoryIcons: icons,
+    areaDoors,
     eyebrow: offerLine ?? ((p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined),
     media,
     previews,
