@@ -14,6 +14,7 @@ import {
   startGoogleConnect, disconnectGoogle, googleAccountId,
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
+import CalImportGuide from '../components/CalImportGuide';
 import { loadMyPhone } from '../lib/conciergeApi';
 import {
   BookingType, listMyBookingTypes, saveBookingType, deleteBookingType,
@@ -394,16 +395,20 @@ export default function CalendarSettings() {
           <details className="cset__howto">
             <summary>How do I find my secret address?</summary>
             <div className="cset__howto-body">
-              <p><strong>Google Calendar</strong> (use a browser — it&rsquo;s not in the phone app):
+              <p><strong>Google Calendar</strong> (use a computer — the secret address
+                only appears on the web, not in Google&rsquo;s phone app):
                 {' '}<a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noreferrer">open
-                Google Calendar settings</a> &rarr; click your calendar&rsquo;s name in the left
-                list &rarr; scroll to <em>Integrate calendar</em> &rarr; copy the
-                <em> Secret address in iCal format</em>.</p>
-              <p><strong>Apple / iCloud</strong>: at icloud.com open Calendar &rarr; tap the
-                share icon beside your calendar &rarr; turn on <em>Public Calendar</em> &rarr;
-                copy the link (it starts with webcal:// — paste it as-is).</p>
-              <p><strong>Outlook</strong>: at outlook.com &rarr; gear &rarr; <em>Calendar</em> &rarr;
-                <em>Shared calendars</em> &rarr; publish your calendar (&ldquo;Can view all
+                Google Calendar settings</a> and follow the pictures:</p>
+              <CalImportGuide />
+              <p>Then back here: paste it below &rarr; <em>Add</em>.</p>
+              <p><strong>Apple / iCloud</strong>: at{' '}
+                <a href="https://www.icloud.com/calendar" target="_blank" rel="noreferrer">icloud.com/calendar</a>
+                {' '}(computer) &rarr; tap the share icon beside your calendar &rarr; turn on
+                <em> Public Calendar</em> &rarr; copy the link (it starts with webcal:// —
+                paste it as-is).</p>
+              <p><strong>Outlook</strong>: at{' '}
+                <a href="https://outlook.live.com/calendar/options/calendar/SharedCalendars" target="_blank" rel="noreferrer">outlook.com&rsquo;s
+                shared-calendars settings</a> &rarr; publish your calendar (&ldquo;Can view all
                 details&rdquo;) &rarr; copy the <em>ICS</em> link.</p>
               <p className="cset__howto-note">Treat the address like a password — anyone
                 holding it can read your calendar. Lichen never shows it again after you

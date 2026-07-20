@@ -46,7 +46,8 @@ OUTLOOK
 Treat the address like a password — anyone holding it can read your
 calendar. Lichen never displays it again after you add it.
 
-Open Lichen: ${APP_URL}/calendar/settings
+Prefer pictures? Lichen's calendar settings carry an illustrated
+step-by-step guide: ${APP_URL}/calendar/settings
 
 — Lichen`;
 

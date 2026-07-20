@@ -1,0 +1,5 @@
+/* Illustrated calendar-import guide (drawn mockups, not screenshots) */
+.calg { display: flex; flex-direction: column; gap: var(--s-3); margin: var(--s-3) 0; }
+.calg__fig { margin: 0; }
+.calg__svg { width: 100%; max-width: 360px; height: auto; display: block; }
+.calg__cap { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
