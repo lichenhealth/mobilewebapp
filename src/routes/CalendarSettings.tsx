@@ -10,7 +10,7 @@ import {
   loadMyAvailability, addAvailability, deleteAvailability,
   loadMyShares, upsertShare, deleteShare,
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
-  removeExternalCalendar, syncExternalCalendars,
+  removeExternalCalendar, syncExternalCalendars, setExternalShareTitles,
   startGoogleConnect, disconnectGoogle, googleAccountId,
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
@@ -480,6 +480,20 @@ export default function CalendarSettings() {
                     ? `${c.event_count} busy ${c.event_count === 1 ? 'block' : 'blocks'}`
                     : 'not synced yet'}
               </span>
+              {c.share_titles !== undefined && (
+                <button
+                  className={'cset__titletoggle' + (c.share_titles ? ' is-on' : '')}
+                  title={c.share_titles
+                    ? 'People you grant Full details can see this calendar’s event titles. Tap to keep titles to yourself.'
+                    : 'This calendar’s titles are visible only to you — others see busy blocks. Tap to include titles for people you grant Full details.'}
+                  onClick={() => act(async () => {
+                    await setExternalShareTitles(c.id, !c.share_titles);
+                    await load();
+                  })}
+                >
+                  {c.share_titles ? 'Titles: at Full details' : 'Titles: just you'}
+                </button>
+              )}
               <button
                 className="cedit__add cedit__add--sm"
                 disabled={syncing === c.id}

@@ -356,12 +356,16 @@ export interface ExternalCalendar {
   last_synced_at: string | null;
   last_error: string | null;
   event_count: number;
+  /** Opt-in: this calendar's titles join 'Full details' for viewers the
+   *  member already grants details via their sharing rules. Default false —
+   *  imported titles are owner-only (they weren't authored for an audience). */
+  share_titles?: boolean;
 }
 
 export async function listExternalCalendars(me: string): Promise<ExternalCalendar[]> {
   const { data, error } = await supabase
     .from('external_calendars')
-    .select('id, name, url, last_synced_at, last_error, event_count')
+    .select('*')   // tolerant of share_titles not existing pre-migration
     .eq('profile_id', me)
     .order('created_at');
   if (error) { console.warn('listExternalCalendars:', error.message); return []; }
@@ -371,6 +375,14 @@ export async function listExternalCalendars(me: string): Promise<ExternalCalenda
 export async function addExternalCalendar(me: string, name: string, url: string): Promise<void> {
   const { error } = await supabase.from('external_calendars')
     .insert({ profile_id: me, name: name.trim() || 'Calendar', url: url.trim() });
+  if (error) throw error;
+}
+
+/** Per-calendar consent: titles join 'Full details' (viewers still gated by
+ *  the member's sharing rules — this only lets THIS calendar participate). */
+export async function setExternalShareTitles(id: string, on: boolean): Promise<void> {
+  const { error } = await supabase.from('external_calendars')
+    .update({ share_titles: on }).eq('id', id);
   if (error) throw error;
 }
 

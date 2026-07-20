@@ -354,6 +354,15 @@
 /* Back-to-events chip (shown only when you arrived from Events) */
 .calp__backchip { margin: var(--s-2) var(--s-5) 0; align-self: flex-start; }
 
+/* Per-imported-calendar title consent (busy-only by default) */
+.cset__titletoggle {
+  flex-shrink: 0; padding: 4px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 10px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.cset__titletoggle.is-on { border-color: var(--peach); color: var(--peach-deep); }
+.cset__titletoggle:hover { border-color: var(--peach); }
+
 /* Reminders: private nudges — outline chips/rows with a check-off circle */
 .calp__rem { border-left-color: var(--sage, #6b7f5e) !important; }
 .calp__rem-check {
