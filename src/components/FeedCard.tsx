@@ -39,9 +39,11 @@ export interface FeedCardProps {
   onMessage?: () => void;
   /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
   onBadgeAction?: () => void;
-  /** Open the full page for this card (event page etc.) — title/body become links. */
+  /** Open the full page for this card (post/event page) — title/body become links. */
   onOpen?: () => void;
-  /** Open the author's profile (member or space) — avatar/title/handle become links. */
+  /** The post page's full-bleed rendering: no body clamp, full-height media. */
+  expanded?: boolean;
+  /** Open the author's profile (member or space) — avatar/handle become links. */
   onAuthor?: () => void;
   /** The author entity is in the viewer's web (mycelium membership). */
   inWeb?: boolean;
@@ -82,6 +84,7 @@ export default function FeedCard({
   onMessage,
   onBadgeAction,
   onOpen,
+  expanded,
   onAuthor,
   inWeb,
   onWeave,
@@ -106,49 +109,47 @@ export default function FeedCard({
       }
     : undefined;
 
+  const avatarEl = (
+    <div className="feed-card__avatar" aria-hidden="true">
+      {avatar ? (
+        <img src={avatar} alt="" />
+      ) : (
+        <span className="feed-card__monogram">
+          {avatarMonogram ?? title.charAt(0)}
+        </span>
+      )}
+    </div>
+  );
+
   return (
-    <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '')} onClick={onCardClick}>
-      {/* HEADER — avatar + name open the author's profile when wired */}
+    <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '') + (expanded ? ' feed-card--expanded' : '')} onClick={onCardClick}>
+      {/* HEADER — identity (avatar + handle) opens the author's profile; the
+          TITLE opens the post itself. It used to sit inside the author button,
+          so tapping a post's title landed on the profile instead of the post. */}
       <header className="feed-card__head">
         {onAuthor ? (
-          <button className="feed-card__author-btn" onClick={onAuthor} aria-label={`${title}'s profile`}>
-            <div className="feed-card__avatar" aria-hidden="true">
-              {avatar ? (
-                <img src={avatar} alt="" />
-              ) : (
-                <span className="feed-card__monogram">
-                  {avatarMonogram ?? title.charAt(0)}
-                </span>
-              )}
-            </div>
-            <div className="feed-card__head-text">
-              <h3 className="feed-card__title">{title}</h3>
-              <div className="feed-card__handle">
-                {handle}
-                {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
-              </div>
-            </div>
+          <button className="feed-card__avatar-btn" onClick={onAuthor} aria-label={`Open ${handle}'s profile`}>
+            {avatarEl}
           </button>
-        ) : (
-          <>
-            <div className="feed-card__avatar" aria-hidden="true">
-              {avatar ? (
-                <img src={avatar} alt="" />
-              ) : (
-                <span className="feed-card__monogram">
-                  {avatarMonogram ?? title.charAt(0)}
-                </span>
-              )}
+        ) : avatarEl}
+        <div className="feed-card__head-text">
+          {onOpen && !expanded ? (
+            <button className="feed-card__title feed-card__title--btn" onClick={onOpen}>{title}</button>
+          ) : (
+            <h3 className="feed-card__title">{title}</h3>
+          )}
+          {onAuthor ? (
+            <button className="feed-card__handle feed-card__handle--btn" onClick={onAuthor}>
+              {handle}
+              {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
+            </button>
+          ) : (
+            <div className="feed-card__handle">
+              {handle}
+              {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
             </div>
-            <div className="feed-card__head-text">
-              <h3 className="feed-card__title">{title}</h3>
-              <div className="feed-card__handle">
-                {handle}
-                {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
-              </div>
-            </div>
-          </>
-        )}
+          )}
+        </div>
         {(onWeave || categoryIcons.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">
             {onWeave && (

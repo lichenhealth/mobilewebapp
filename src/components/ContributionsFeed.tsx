@@ -16,7 +16,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from './EngagementFooter';
-import { postToCard, weaveProps } from '../lib/feedMapping';
+import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
 
 const TABS = ['All', ...CONTENT_TYPES.map((t) => t.label)];
@@ -132,7 +132,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             {...postToCard(p, me)}
             {...weaveProps(p, myWebSet, me)}
             eyebrow={whenLabel(p) ?? postToCard(p, me).eyebrow}
-            onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}

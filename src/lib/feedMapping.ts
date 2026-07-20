@@ -21,6 +21,12 @@ export function postMedium(p: FeedPostLike): PostMedium {
 }
 interface FeedPostLike { details: Record<string, unknown>; image_url: string | null }
 
+/** Where a tapped post opens: its event page when it's an event post, else
+ *  the post's own page (Figma 286-6331 — every post has a home). */
+export function postOpenPath(p: FeedPost): string {
+  return p.linked_event_id ? `/events/${p.id}` : `/posts/${p.id}`;
+}
+
 /** The entity a card's weave mark acts on: the DISPLAYED author — the space
  *  when posted acting-as, else the person. */
 export function weaveTarget(p: FeedPost): { type: 'profile' | 'space'; id: string } {

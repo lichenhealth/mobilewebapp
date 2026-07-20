@@ -6,7 +6,7 @@ import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
-import { postToCard, weaveProps } from '../lib/feedMapping';
+import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -118,7 +118,7 @@ export default function Home() {
             onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={user ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
-            onOpen={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
