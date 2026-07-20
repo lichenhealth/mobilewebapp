@@ -39,11 +39,15 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [] }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], entityName }: {
   profileId?: string;
   spaceId?: string;
   me: string;
   leading?: { icon: IconName; label: string; onClick: () => void }[];
+  /** The entity's display name — lets a single area lens read as a PLACE:
+   *  tap Library on Melanie's profile and the feed declares "Melanie's
+   *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
+  entityName?: string;
 }) {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -121,6 +125,14 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             </button>
           ))}
         </div>
+      )}
+
+      {entityName && areas.length === 1 && (
+        <h2 className="cfeed__shelf">
+          {entityName}&rsquo;s <span className="display-italic">
+            {areasPresent.find((a) => a.value === areas[0])?.label ?? areas[0]}
+          </span>
+        </h2>
       )}
 
       <div className="cfeed__list">

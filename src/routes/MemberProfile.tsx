@@ -207,6 +207,7 @@ export default function MemberProfile() {
       <ContributionsFeed
         profileId={member.id}
         me={me}
+        entityName={name}
         leading={[{ icon: 'search', label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) }]}
       />
     </div>

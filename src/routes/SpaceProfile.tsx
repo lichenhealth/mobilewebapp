@@ -586,6 +586,7 @@ export default function SpaceProfile() {
       <ContributionsFeed
         spaceId={space.id}
         me={me}
+        entityName={space.name}
         leading={[
           // Every section carries its own doors: + posts INTO this space,
           // Search searches WITHIN it (Figma 286-11770).
