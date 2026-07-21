@@ -17,6 +17,34 @@ const PURPOSES = [
 
 interface DirectHit { key: string; label: string; kind: string; fill: string }
 
+// Donors write sentences ("Care subsidies for melanie"), so the name usually
+// sits at the END. Search the whole phrase plus its trailing words.
+function nameNeedles(raw: string): string[] {
+  const words = raw.split(/\s+/).filter(Boolean);
+  const afterFor = (() => {
+    const i = raw.toLowerCase().lastIndexOf(' for ');
+    return i >= 0 ? raw.slice(i + 5) : '';
+  })();
+  const all = [raw, afterFor, words.slice(-2).join(' '), words.slice(-1).join(' ')]
+    .map((c) => c.trim().replace(/[,%()]/g, ''))
+    .filter((c) => c.length >= 2);
+  return [...new Set(all)].slice(0, 4);
+}
+
+// Picking a hit keeps the donor's own words: the trailing name fragment is
+// replaced with the full name ("Care subsidies for melanie" → "… Melanie Bright").
+function fillWithName(name: string, q: string): string {
+  const lq = q.toLowerCase();
+  const ln = name.toLowerCase();
+  for (let i = 0; i < q.length; i++) {
+    const suffix = lq.slice(i).trim();
+    if (suffix.length >= 2 && ln.includes(suffix)) {
+      return (q.slice(0, i).trimEnd() + ' ' + name).trim();
+    }
+  }
+  return `For ${name}`;
+}
+
 type Freq = 'one-time' | 'monthly' | 'annually';
 
 export default function Donate() {
@@ -38,15 +66,19 @@ export default function Donate() {
     let live = true;
     const t = window.setTimeout(async () => {
       const needle = q.replace(/^for\s+/i, '');
+      const needles = nameNeedles(needle);
       const purposeHits: DirectHit[] = PURPOSES
-        .filter((p) => p.toLowerCase().includes(needle.toLowerCase()) || /lichen/i.test(needle) && p === 'Lichen operations')
+        .filter((p) => needles.some((n) => p.toLowerCase().includes(n.toLowerCase()))
+          || /lichen/i.test(needle) && p === 'Lichen operations')
         .map((p) => ({ key: 'p:' + p, label: p, kind: 'Purpose', fill: p }));
       let memberHits: DirectHit[] = [];
-      if (needle.length >= 2) {
+      if (needles.length > 0) {
         // Signed-out donors get an RLS-empty result — free text still works.
         const [mem, sp] = await Promise.all([
-          supabase.from('profiles').select('id, full_name, headline').ilike('full_name', `%${needle}%`).limit(4),
-          supabase.from('spaces').select('id, name, kind').ilike('name', `%${needle}%`).limit(3),
+          supabase.from('profiles').select('id, full_name, headline')
+            .or(needles.map((n) => `full_name.ilike.%${n}%`).join(',')).limit(4),
+          supabase.from('spaces').select('id, name, kind')
+            .or(needles.map((n) => `name.ilike.%${n}%`).join(',')).limit(3),
         ]);
         memberHits = [
           ...(((mem.data as { id: string; full_name: string | null; headline: string | null }[] | null) ?? [])
@@ -54,14 +86,14 @@ export default function Donate() {
               key: 'm:' + m.id,
               label: m.full_name ?? 'Member',
               kind: m.headline ?? 'Member',
-              fill: `For ${m.full_name}`,
+              fill: fillWithName(m.full_name ?? 'Member', q),
             }))),
           ...(((sp.data as { id: string; name: string; kind: string }[] | null) ?? [])
             .map((s) => ({
               key: 's:' + s.id,
               label: s.name,
               kind: s.kind.charAt(0).toUpperCase() + s.kind.slice(1),
-              fill: `For ${s.name}`,
+              fill: fillWithName(s.name, q),
             }))),
         ];
       }
@@ -185,7 +217,7 @@ export default function Donate() {
               <button
                 key={p} type="button"
                 className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
-                onClick={() => { setDesignation(p); setHits([]); }}
+                onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); }}
               >
                 {p}
               </button>
