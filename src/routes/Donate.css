@@ -261,3 +261,18 @@
   font-style: normal; font-size: 11px; color: var(--ink-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Learn-more under the purpose chips + the two-maps page */
+.donate__learn {
+  align-self: flex-start;
+  background: none; border: 0; padding: 0;
+  font-family: inherit; font-size: 12px;
+  color: var(--peach-deep); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+  text-align: left;
+}
+.donate__how { display: flex; flex-direction: column; gap: var(--s-3); }
+.donate__how p { font-size: var(--t-base); color: var(--ink-soft); line-height: var(--lh-normal); max-width: 62ch; }
+.donate__how p em { font-style: italic; }
+.donate__how .donate__give-title { margin-top: var(--s-3); }
+.donate__how .donate__submit { margin-top: var(--s-4); }

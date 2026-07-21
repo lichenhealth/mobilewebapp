@@ -9,10 +9,13 @@ const CALENDLY = 'https://calendly.com/galyntime';
 const PRESETS = [25, 50, 100, 250];
 
 // The intentions donors reach for most — one tap fills the field.
+// 'Where it's needed most' is the DEFAULT: trust the mycelium's routing.
 const PURPOSES = [
   'Where it’s needed most',
-  'Lichen operations',
   'Subsidize care for those who can’t afford it',
+  'Subsidize goods and services for those who can’t afford them',
+  'Subsidize spaces and places for those who can’t afford them',
+  'Lichen operations',
 ];
 
 interface DirectHit { key: string; label: string; kind: string; fill: string }
@@ -54,6 +57,9 @@ export default function Donate() {
 
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<Freq>('one-time');
+  // Chips behave like radios (default: trust the routing); the text box is a
+  // CUSTOM suggestion that overrides the chip when filled.
+  const [purpose, setPurpose] = useState(PURPOSES[0]);
   const [designation, setDesignation] = useState('');
   const [hits, setHits] = useState<DirectHit[]>([]);
   const [picked, setPicked] = useState(false);
@@ -132,7 +138,11 @@ export default function Donate() {
       // Our own checkout (donate-checkout edge fn) — the donation lands in
       // Lichen's books and, once translated, in the Current-cy ledger.
       const { data, error } = await supabase.functions.invoke('donate-checkout', {
-        body: { amount: Number(amount), frequency, designation: designation.trim(), kind: mode },
+        body: {
+          amount: Number(amount), frequency, kind: mode,
+          // Custom words override the chip; gifts carry only explicit words.
+          designation: designation.trim() || (flow === 'donate' ? purpose : ''),
+        },
       });
       if (error || !data?.url) throw new Error(error?.message || data?.error || 'Could not start checkout.');
       window.location.href = data.url;
@@ -270,23 +280,31 @@ export default function Donate() {
             {flow === 'gift' ? 'Who is this gift for?' : 'Direct your gift (optional)'}
           </span>
           {flow === 'donate' && (
-            <div className="donate__direct-presets">
-              {PURPOSES.map((p) => (
-                <button
-                  key={p} type="button"
-                  className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
-                  onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); setPickedLabel(''); }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="donate__direct-presets">
+                {PURPOSES.map((p) => (
+                  <button
+                    key={p} type="button"
+                    className={'donate__preset donate__preset--sm' + (purpose === p && !designation.trim() ? ' is-active' : '')}
+                    onClick={() => { setPurpose(p); setDesignation(''); setHits([]); setPickedLabel(''); }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button" className="donate__learn"
+                onClick={() => navigate('/donate/how')}
+              >
+                How does Lichen decide where it&rsquo;s needed most? Learn more
+              </button>
+            </>
           )}
           <input
             type="text"
             placeholder={flow === 'gift'
               ? 'e.g. "For Melanie Bright — sessions for the Ruiz family"'
-              : 'e.g. "For Melanie Bright — subsidize care for those who can’t afford it"'}
+              : 'Make a custom suggestion or request, e.g. "For Melanie Bright — subsidize care for those who can’t afford it"'}
             value={designation}
             onChange={(e) => { setDesignation(e.target.value); setPicked(false); setPickedLabel(''); }}
             maxLength={300}
