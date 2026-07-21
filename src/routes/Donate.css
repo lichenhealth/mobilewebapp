@@ -87,6 +87,13 @@
 }
 .donate__flow.is-active .donate__flow-name { color: var(--peach-deep); }
 .donate__flow-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+.donate__flow-law {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--peach-deep);
+  line-height: 1.5;
+}
 
 .donate__econs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
 .donate__econ {

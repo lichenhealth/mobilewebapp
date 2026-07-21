@@ -176,6 +176,10 @@ export default function Donate() {
             Tax-deductible. Voice a preference for where it flows; Lichen
             assesses need and decides, as the IRS requires.
           </span>
+          <span className="donate__flow-law">
+            Once given, your dollars are permanently dedicated to the
+            commons — by law, they can never return to private profit.
+          </span>
         </button>
         <button
           type="button"
