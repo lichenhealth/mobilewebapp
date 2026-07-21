@@ -29,6 +29,9 @@ async function sendDonationReceipt(d: {
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const recurring = d.frequency !== 'one-time' ? ` (${d.frequency})` : '';
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Human receipt number, derived from the Stripe session id so webhook
+  // retries reproduce the same number. The full machine id stays in the DB.
+  const refNo = `LCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${d.sessionId.slice(-6).toUpperCase()}`;
 
   const text =
 `Thank you for your gift to Lichen Health.
@@ -36,7 +39,7 @@ async function sendDonationReceipt(d: {
 DONATION RECEIPT
 Date: ${date}
 Amount: $${usd}${recurring}
-${d.designation ? `Directed: "${d.designation}"\n` : ''}Reference: ${d.sessionId}
+${d.designation ? `Directed: "${d.designation}"\n` : ''}Receipt no.: ${refNo}
 
 Lichen Health is a registered 501(c)(3) nonprofit organization,
 EIN 73-1683375. Your contribution is tax-deductible to the fullest
@@ -53,6 +56,8 @@ Lichen Health · lichen.healthcare`;
 
   const html = `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:560px;margin:0 auto;padding:32px 24px">
+    <img src="https://lichen.healthcare/icons/icon-192.png" width="56" height="56" alt="Lichen"
+      style="display:block;border-radius:12px;margin:0 0 10px" />
     <p style="font-size:22px;font-weight:600;margin:0 0 4px">Lichen</p>
     <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a857c;margin:0 0 20px">Donation receipt</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 20px">Thank you for your gift — you're expanding access to holistic, community-based care.</p>
@@ -60,7 +65,7 @@ Lichen Health · lichen.healthcare`;
       <tr><td style="color:#8a857c;padding-right:16px">Date</td><td>${date}</td></tr>
       <tr><td style="color:#8a857c;padding-right:16px">Amount</td><td><strong>$${usd}</strong>${recurring}</td></tr>
       ${d.designation ? `<tr><td style="color:#8a857c;padding-right:16px">Directed</td><td>&ldquo;${esc(d.designation)}&rdquo;</td></tr>` : ''}
-      <tr><td style="color:#8a857c;padding-right:16px">Reference</td><td style="font-size:11px;color:#8a857c">${d.sessionId}</td></tr>
+      <tr><td style="color:#8a857c;padding-right:16px">Receipt no.</td><td>${refNo}</td></tr>
     </table>
     <p style="font-size:12px;color:#6b665e;line-height:1.6;margin:0 0 16px">
       Lichen Health is a registered 501(c)(3) nonprofit organization, EIN 73-1683375.
