@@ -199,16 +199,18 @@ export default function Donate() {
         <div className="donate__econ">
           <span className="donate__econ-name">Current-cy</span>
           <span className="donate__econ-desc">
-            Where given value lives: dollar-backed Current-cy that practitioners
-            and groups — and someday plants and places — spend within Lichen or
-            carry back into the wider economy. Fully above board.
+            Where money given lands — both ways above: dollar-backed Current-cy
+            that practitioners and groups — and someday plants and places —
+            spend within Lichen or carry back into the wider economy. Fully
+            above board.
           </span>
         </div>
         <div className="donate__econ">
           <span className="donate__econ-name">The gift economy <em>taking root</em></span>
           <span className="donate__econ-desc">
-            A growing layer where no money changes hands and nothing is
-            counted — offerings freely given, weaving a reciprocal ecosystem.
+            The layer money can&rsquo;t enter — and that&rsquo;s the point: no
+            dollars, nothing counted. Offerings freely given, weaving a
+            reciprocal ecosystem.
           </span>
         </div>
       </section>
