@@ -59,7 +59,7 @@
 .donate__preset:hover { border-color: var(--peach); }
 .donate__preset.is-active { background: var(--peach); border-color: var(--peach); color: #fff; }
 
-.donate__fields { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--s-4); }
+.donate__fields { display: grid; grid-template-columns: 1fr 1.2fr; gap: var(--s-6); }
 .donate__field { display: flex; flex-direction: column; gap: var(--s-2); }
 .donate__field--direct { margin-top: var(--s-3); }
 .donate__field--direct input {
