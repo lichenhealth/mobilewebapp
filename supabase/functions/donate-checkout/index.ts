@@ -51,8 +51,13 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!STRIPE_KEY) return json({ error: 'Donations are not configured yet.' }, 500);
 
-  let body: { amount?: number; frequency?: string; designation?: string };
+  let body: { amount?: number; frequency?: string; designation?: string; kind?: string };
   try { body = await req.json(); } catch { return json({ error: 'Invalid request body.' }, 400); }
+
+  // 'donation' = tax-deductible (Lichen retains discretion over funds);
+  // 'sponsorship' = the donor chooses who benefits — a personal gift, NOT
+  // deductible; the webhook sends a gift acknowledgment, never a tax receipt.
+  const kind = body.kind === 'sponsorship' ? 'sponsorship' : 'donation';
 
   const dollars = Number(body.amount);
   if (!Number.isFinite(dollars) || dollars < 1 || dollars > 50000) {
@@ -80,7 +85,8 @@ Deno.serve(async (req) => {
     } catch { /* anonymous donor */ }
   }
 
-  const metadata = { kind: 'donation', designation, donor_profile: donorProfile || undefined, frequency };
+  const metadata = { kind, designation, donor_profile: donorProfile || undefined, frequency };
+  const productName = kind === 'sponsorship' ? 'Care sponsorship — Lichen Health' : 'Donation to Lichen Health';
 
   try {
     const common = {
@@ -93,10 +99,10 @@ Deno.serve(async (req) => {
       ? await stripePost('checkout/sessions', {
           ...common,
           mode: 'payment',
-          submit_type: 'donate',
+          submit_type: kind === 'sponsorship' ? 'pay' : 'donate',
           line_items: { '0': { quantity: 1, price_data: {
             currency: 'usd', unit_amount: cents,
-            product_data: { name: 'Donation to Lichen Health' },
+            product_data: { name: productName },
           } } },
         })
       : await stripePost('checkout/sessions', {
@@ -106,7 +112,7 @@ Deno.serve(async (req) => {
           line_items: { '0': { quantity: 1, price_data: {
             currency: 'usd', unit_amount: cents,
             recurring: { interval: frequency === 'monthly' ? 'month' : 'year' },
-            product_data: { name: `${frequency === 'monthly' ? 'Monthly' : 'Annual'} donation to Lichen Health` },
+            product_data: { name: `${frequency === 'monthly' ? 'Monthly' : 'Annual'} ${kind === 'sponsorship' ? 'care sponsorship — Lichen Health' : 'donation to Lichen Health'}` },
           } } },
         });
 
