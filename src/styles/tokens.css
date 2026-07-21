@@ -94,3 +94,9 @@
   --d-base: 220ms;
   --d-slow: 380ms;
 }
+
+/* Form controls wear the platform peach, never browser blue */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--peach);
+}

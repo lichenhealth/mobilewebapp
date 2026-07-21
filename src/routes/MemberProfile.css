@@ -59,3 +59,22 @@
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   font-size: 12px; font-weight: 400; color: var(--ink);
 }
+
+/* The About door (feed-first profiles) + the About room */
+.mprof__aboutdoor {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: var(--s-2); padding: 8px 16px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.mprof__aboutdoor:hover { border-color: var(--peach); }
+.mprof__aboutdoor em { font-style: normal; font-size: 11px; color: var(--ink-muted); }
+.mprof__aboutdoor svg { color: var(--peach); }
+.mabout__back { margin: var(--s-3) 0 0 var(--s-4); }
+.mabout__head { padding-bottom: var(--s-3); }
+.mabout__sec { padding: 0 var(--s-5); margin-bottom: var(--s-5); }
+.mabout__h2 {
+  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 400;
+  margin: 0 0 var(--s-2);
+}
+.mabout__bio { font-size: 14px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; margin: 0; }
