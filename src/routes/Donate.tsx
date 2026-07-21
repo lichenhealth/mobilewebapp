@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import './Donate.css';
 
@@ -50,6 +50,7 @@ type Freq = 'one-time' | 'monthly' | 'annually';
 export default function Donate() {
   const [params] = useSearchParams();
   const status = params.get('status');
+  const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<Freq>('one-time');
@@ -210,8 +211,16 @@ export default function Donate() {
           <span className="donate__econ-desc">
             The layer money can&rsquo;t enter — and that&rsquo;s the point: no
             dollars, nothing counted. Offerings freely given, weaving a
-            reciprocal ecosystem.
+            reciprocal ecosystem. You walk into this economy by offering,
+            never by paying.
           </span>
+          <button
+            type="button"
+            className="donate__econ-door"
+            onClick={() => navigate('/compose?area=marketplace')}
+          >
+            Offer a good or service freely →
+          </button>
         </div>
       </section>
 
