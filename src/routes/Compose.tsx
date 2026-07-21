@@ -73,7 +73,8 @@ export default function Compose() {
   const [sliding, setSliding] = useState(false);
   // Entrusted offering: a gift the giver hands to the mycelium's routing
   // instead of choosing a recipient themselves (details.allocation='lichen').
-  const [entrust, setEntrust] = useState(false);
+  // The Marketplace's Lichen door arrives with ?entrust=1 — pre-checked.
+  const [entrust, setEntrust] = useState(params.get('entrust') === '1');
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
   const [title, setTitle] = useState('');

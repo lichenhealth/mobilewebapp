@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
+import { LichenMark } from '../components/LichenMark';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -140,6 +141,16 @@ export default function Marketplace() {
           <span className="mkt__action-label">List</span>
         </button>
         <div className="mkt__action-spacer" />
+        {/* The featured door: entrust your offering to the routing — ideally
+            the algorithm does better than any of us could alone. */}
+        <button
+          className="mkt__action mkt__action--lichen"
+          onClick={() => navigate('/compose?area=marketplace&entrust=1')}
+          title="Offer something and let Lichen route it where it's needed most"
+        >
+          <span className="mkt__action-circle"><LichenMark size={22} label="" /></span>
+          <span className="mkt__action-label">Lichen</span>
+        </button>
         {MODES.map((m) => (
           <button
             key={m.chip}

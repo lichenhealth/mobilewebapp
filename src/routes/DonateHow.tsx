@@ -114,9 +114,13 @@ export default function DonateHow() {
           <p>
             In practice: 95% of a directed donation is translated into
             Current-cy for the recipient we resolve from your words; 5%
-            sustains the operations that make the platform possible. A proper
-            tax receipt — with the IRS-required language — arrives in your
-            inbox the moment your donation clears.
+            sustains the operations that make the platform possible. If you
+            direct nothing, your donation flows <em>where it&rsquo;s needed
+            most</em> — the routing described above — and you can also point
+            it at subsidized care, goods and services, or spaces and places
+            for those who can&rsquo;t afford them. A proper tax receipt —
+            with the IRS-required language — arrives in your inbox the moment
+            your donation clears.
           </p>
         </section>
 
@@ -165,6 +169,19 @@ export default function DonateHow() {
             you enter by offering. It runs on reciprocity rather than
             accounting, and it&rsquo;s where the marketplace&rsquo;s Gift
             mode already lives today.
+          </p>
+          <p>
+            And the trust you place in a donation extends to offerings too:
+            when you list a gift, you can choose <em>&ldquo;Let Lichen route
+            this&rdquo;</em> — handing allocation to the same algorithm that
+            directs undirected donations. The network matches your offering
+            against open asks by need, words, and even visual style, and a
+            steward completes the routing. Sometimes the best route is a
+            chain: a resourced member receives your offering at its full
+            value, that value flows onward as subsidy to a more urgent need,
+            and a second offering meets the first ask — one gift, two needs
+            closed. You&rsquo;ll see it on listings as
+            <em> &ldquo;Gift · Lichen routes.&rdquo;</em>
           </p>
         </section>
 
