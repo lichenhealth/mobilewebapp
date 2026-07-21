@@ -252,6 +252,7 @@ export default function MyceliumDirectory() {
                 </button>
               )
             )}
+            <span className="mycdir__presence-creed">Presence is a gift, not a status.</span>
           </div>
         )}
         {ready && entries.length > 0 && (

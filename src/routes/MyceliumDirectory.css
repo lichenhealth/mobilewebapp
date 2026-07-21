@@ -189,4 +189,11 @@
   font-size: 12px; color: var(--ink); cursor: pointer; font-family: inherit;
 }
 .mycdir__candle:hover { background: var(--peach-tint); }
+.mycdir__presence-creed {
+  flex-basis: 100%;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
 .mycdir__candle.is-lit { background: var(--peach-tint); color: var(--peach-deep); border-color: var(--peach); }
