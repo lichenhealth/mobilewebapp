@@ -71,19 +71,44 @@
 .donate__direct-hint { font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
 .donate__direct-ok { font-size: 12px; font-weight: 500; color: var(--peach-deep); }
 
-/* The tax-policy fork — who chooses who benefits */
-.donate__chooser {
-  display: flex; flex-direction: column; gap: 10px;
-  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
-  background: var(--bone-warm); padding: 12px 14px; margin-top: 2px;
+/* The two ways in (Donate | Give) + the two economies they feed */
+.donate__flows { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.donate__flow {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
+  background: var(--bone-warm); padding: var(--s-4); cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
 }
-.donate__chooser-q { font-size: 13px; font-weight: 500; color: var(--ink); }
-.donate__chooser-opt {
-  display: flex; gap: 10px; align-items: flex-start;
-  font-size: 13px; color: var(--ink-soft); line-height: 1.5; cursor: pointer;
+.donate__flow:hover { border-color: var(--peach); }
+.donate__flow.is-active { border-color: var(--peach); background: var(--peach-tint, #f8e8dd); }
+.donate__flow-name {
+  font-family: var(--font-display); font-size: var(--t-xl); color: var(--ink);
 }
-.donate__chooser-opt input { margin-top: 3px; flex-shrink: 0; }
-.donate__chooser-opt em { font-style: normal; color: var(--ink-muted); }
+.donate__flow.is-active .donate__flow-name { color: var(--peach-deep); }
+.donate__flow-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+
+.donate__econs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.donate__econ {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px dashed var(--bone-edge); border-radius: var(--r-lg);
+  padding: var(--s-4);
+}
+.donate__econ-name { font-family: var(--font-display); font-size: var(--t-md); color: var(--ink); }
+.donate__econ-name em {
+  font-style: italic; font-size: 12px; color: var(--peach-deep); margin-left: 6px;
+}
+.donate__econ-desc { font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .donate__flows, .donate__econs { grid-template-columns: 1fr; }
+}
+
+.donate__direct-note { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+.donate__direct-note button {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px;
+}
 .donate__label { font-size: var(--t-sm); color: var(--ink-soft); }
 .donate__amount-input {
   display: flex;

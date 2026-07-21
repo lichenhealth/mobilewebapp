@@ -58,11 +58,11 @@ export default function Donate() {
   const [picked, setPicked] = useState(false);
   // The peach receipt under the box — proof the network recognized who you named.
   const [pickedLabel, setPickedLabel] = useState('');
-  // The tax-policy fork (IRS conduit rule): naming a person is fine as a
-  // PREFERENCE — but if the donor wants to choose who receives the care,
-  // it's a personal gift, not a deductible donation. Ask, then route honestly.
-  const [chooser, setChooser] = useState<'lichen' | 'donor'>('lichen');
-  const mode: 'donation' | 'sponsorship' = pickedLabel && chooser === 'donor' ? 'sponsorship' : 'donation';
+  // The tax-policy fork (IRS conduit rule), now front and center as two
+  // columns: Donate = deductible, Lichen holds discretion; Give = the donor
+  // chooses who benefits — a personal gift, honestly not deductible.
+  const [flow, setFlow] = useState<'donate' | 'gift'>('donate');
+  const mode: 'donation' | 'sponsorship' = flow === 'gift' ? 'sponsorship' : 'donation';
 
   // Type-ahead for the designation: real members and groups (signed-in
   // donors only — the member list is private to members) + purpose
@@ -120,6 +120,11 @@ export default function Donate() {
       setMsg('Please enter an amount of at least $1.');
       return;
     }
+    if (flow === 'gift' && !designation.trim()) {
+      setErr(true);
+      setMsg('A personal gift needs a recipient — tell us who it’s for.');
+      return;
+    }
     setLoading(true);
     setMsg('Taking you to secure checkout…');
     try {
@@ -154,10 +159,55 @@ export default function Donate() {
           Restore balance by <span className="display-italic">giving back.</span>
         </h1>
         <p className="donate__sub">
-          Make a tax-deductible donation to expand access to holistic, community-based
-          care for all. Thank you for investing in a more balanced and healthy future.
+          Expand access to holistic, community-based care for all. Thank you for
+          investing in a more balanced and healthy future.
         </p>
       </header>
+
+      {/* The two ways in — the IRS conduit rule as columns. */}
+      <section className="donate__flows">
+        <button
+          type="button"
+          className={'donate__flow' + (flow === 'donate' ? ' is-active' : '')}
+          onClick={() => setFlow('donate')}
+        >
+          <span className="donate__flow-name">Donate</span>
+          <span className="donate__flow-desc">
+            Tax-deductible. Voice a preference for where it flows; Lichen
+            assesses need and decides, as the IRS requires.
+          </span>
+        </button>
+        <button
+          type="button"
+          className={'donate__flow' + (flow === 'gift' ? ' is-active' : '')}
+          onClick={() => setFlow('gift')}
+        >
+          <span className="donate__flow-name">Give</span>
+          <span className="donate__flow-desc">
+            A direct personal gift — you choose exactly who benefits.
+            Generous, honest, and not tax-deductible.
+          </span>
+        </button>
+      </section>
+
+      {/* The two economies your giving feeds. */}
+      <section className="donate__econs">
+        <div className="donate__econ">
+          <span className="donate__econ-name">Current-cy</span>
+          <span className="donate__econ-desc">
+            Where given value lives: dollar-backed Current-cy that practitioners
+            and groups — and someday plants and places — spend within Lichen or
+            carry back into the wider economy. Fully above board.
+          </span>
+        </div>
+        <div className="donate__econ">
+          <span className="donate__econ-name">The gift economy <em>taking root</em></span>
+          <span className="donate__econ-desc">
+            A growing layer where no money changes hands and nothing is
+            counted — offerings freely given, weaving a reciprocal ecosystem.
+          </span>
+        </div>
+      </section>
 
       {status === 'success' && (
         <div className="donate__banner donate__banner--ok">
@@ -218,21 +268,27 @@ export default function Donate() {
         </div>
 
         <label className="donate__field donate__field--direct">
-          <span className="donate__label">Direct your gift (optional)</span>
-          <div className="donate__direct-presets">
-            {PURPOSES.map((p) => (
-              <button
-                key={p} type="button"
-                className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
-                onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); setPickedLabel(''); }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          <span className="donate__label">
+            {flow === 'gift' ? 'Who is this gift for?' : 'Direct your gift (optional)'}
+          </span>
+          {flow === 'donate' && (
+            <div className="donate__direct-presets">
+              {PURPOSES.map((p) => (
+                <button
+                  key={p} type="button"
+                  className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
+                  onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); setPickedLabel(''); }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             type="text"
-            placeholder='e.g. "For Melanie Bright — subsidize care for those who can&rsquo;t afford it"'
+            placeholder={flow === 'gift'
+              ? 'e.g. "For Melanie Bright — sessions for the Ruiz family"'
+              : 'e.g. "For Melanie Bright — subsidize care for those who can’t afford it"'}
             value={designation}
             onChange={(e) => { setDesignation(e.target.value); setPicked(false); setPickedLabel(''); }}
             maxLength={300}
@@ -245,7 +301,6 @@ export default function Donate() {
                   onClick={() => {
                     setDesignation(h.fill); setPicked(true); setHits([]);
                     setPickedLabel(h.kind === 'Purpose' ? '' : h.label);
-                    setChooser('lichen');
                   }}
                 >
                   {h.label}
@@ -257,40 +312,33 @@ export default function Donate() {
           {pickedLabel && (
             <span className="donate__direct-ok">✓ {pickedLabel} — recognized in the Lichen network</span>
           )}
-          {pickedLabel && (
-            <div className="donate__chooser">
-              <span className="donate__chooser-q">Who decides who receives the care your gift funds?</span>
-              <label className="donate__chooser-opt">
-                <input
-                  type="radio" name="chooser" checked={chooser === 'lichen'}
-                  onChange={() => setChooser('lichen')}
-                />
-                <span>
-                  Lichen assesses need and decides — your preference for {pickedLabel} guides
-                  us. <em>A tax-deductible donation.</em>
-                </span>
-              </label>
-              <label className="donate__chooser-opt">
-                <input
-                  type="radio" name="chooser" checked={chooser === 'donor'}
-                  onChange={() => setChooser('donor')}
-                />
-                <span>
-                  I&rsquo;ll choose who receives care myself. <em>A generous personal
-                  gift — not tax-deductible. You&rsquo;ll receive a gift acknowledgment
-                  rather than a contribution receipt.</em>
-                </span>
-              </label>
-            </div>
+          {flow === 'donate' && pickedLabel && (
+            <span className="donate__direct-note">
+              Your preference for {pickedLabel} guides us — Lichen decides who
+              receives care.{' '}
+              <button type="button" onClick={() => setFlow('gift')}>
+                Want to choose yourself? Give directly instead.
+              </button>
+            </span>
           )}
-          <span className="donate__direct-hint">
-            Name a practitioner, group, or purpose within the Lichen network, in
-            your own words. 95% of your gift flows there as Lichen Current-cy;
-            5% sustains the operations required to provide the platform that
-            makes it possible. Designations are preferences — Lichen Health
-            retains full discretion and control over donated funds, as the IRS
-            requires for tax-deductibility.
-          </span>
+          {flow === 'gift' ? (
+            <span className="donate__direct-hint">
+              You choose exactly who benefits — Lichen facilitates your
+              generosity as you direct it. 95% flows to them as Lichen
+              Current-cy; 5% sustains the platform. A personal gift is not a
+              charitable donation: you&rsquo;ll receive a gift acknowledgment
+              rather than a tax receipt.
+            </span>
+          ) : (
+            <span className="donate__direct-hint">
+              Name a practitioner, group, or purpose within the Lichen network, in
+              your own words. 95% of your gift flows there as Lichen Current-cy;
+              5% sustains the operations required to provide the platform that
+              makes it possible. Designations are preferences — Lichen Health
+              retains full discretion and control over donated funds, as the IRS
+              requires for tax-deductibility.
+            </span>
+          )}
         </label>
 
         <button type="button" className="donate__submit" onClick={donate} disabled={loading}>
