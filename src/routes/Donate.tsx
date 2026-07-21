@@ -193,35 +193,19 @@ export default function Donate() {
             Generous, honest, and not tax-deductible.
           </span>
         </button>
-      </section>
-
-      {/* The two economies your giving feeds. */}
-      <section className="donate__econs">
-        <div className="donate__econ">
-          <span className="donate__econ-name">Current-cy</span>
-          <span className="donate__econ-desc">
-            Where money given lands — both ways above: dollar-backed Current-cy
-            that practitioners and groups — and someday plants and places —
-            spend within Lichen or carry back into the wider economy. Fully
-            above board.
+        <button
+          type="button"
+          className="donate__flow donate__flow--door"
+          onClick={() => navigate('/market')}
+        >
+          <span className="donate__flow-name">The Lichen Economy</span>
+          <span className="donate__flow-desc">
+            Where value lives and moves inside: dollar-backed Current-cy,
+            fully above board — and offerings freely given, which money
+            can&rsquo;t buy. You enter by offering.
           </span>
-        </div>
-        <div className="donate__econ">
-          <span className="donate__econ-name">The gift economy <em>taking root</em></span>
-          <span className="donate__econ-desc">
-            The layer money can&rsquo;t enter — and that&rsquo;s the point: no
-            dollars, nothing counted. Offerings freely given, weaving a
-            reciprocal ecosystem. You walk into this economy by offering,
-            never by paying.
-          </span>
-          <button
-            type="button"
-            className="donate__econ-door"
-            onClick={() => navigate('/compose?area=marketplace')}
-          >
-            Offer a good or service freely →
-          </button>
-        </div>
+          <span className="donate__flow-enter">Enter the Marketplace →</span>
+        </button>
       </section>
 
       {status === 'success' && (
