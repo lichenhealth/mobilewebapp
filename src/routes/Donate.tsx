@@ -160,8 +160,7 @@ export default function Donate() {
           Restore balance by <span className="display-italic">giving back.</span>
         </h1>
         <p className="donate__sub">
-          Expand access to holistic, community-based care for all. Thank you for
-          investing in a more balanced and healthy future.
+          Thank you for investing in a more balanced and healthy future.
         </p>
       </header>
 
