@@ -198,3 +198,22 @@
   .donate { max-width: 760px; }
   .donate__ways { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Directed-gift presets + type-ahead */
+.donate__direct-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.donate__preset--sm { font-size: 12px; padding: 7px 14px; }
+.donate__direct-hits {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 6px; margin-top: 4px;
+}
+.donate__direct-hit {
+  display: flex; align-items: baseline; gap: 10px; text-align: left;
+  background: transparent; border: 0; padding: 8px 10px; border-radius: var(--r-sm);
+  font-size: 14px; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.donate__direct-hit:hover { background: var(--bone-warm); }
+.donate__direct-hit em {
+  font-style: normal; font-size: 11px; color: var(--ink-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

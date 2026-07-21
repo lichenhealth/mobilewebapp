@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import './Donate.css';
@@ -7,6 +7,15 @@ const PORTAL = 'https://billing.stripe.com/p/login/9B6bJ00MU047bRidT3bII00';
 const PAYPAL = 'https://www.paypal.com/donate/?hosted_button_id=F2A847YRU7EPU';
 const CALENDLY = 'https://calendly.com/galyntime';
 const PRESETS = [25, 50, 100, 250];
+
+// The intentions donors reach for most — one tap fills the field.
+const PURPOSES = [
+  'Where it’s needed most',
+  'Lichen operations',
+  'Subsidize care for those who can’t afford it',
+];
+
+interface DirectHit { key: string; label: string; kind: string; fill: string }
 
 type Freq = 'one-time' | 'monthly' | 'annually';
 
@@ -17,6 +26,49 @@ export default function Donate() {
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<Freq>('one-time');
   const [designation, setDesignation] = useState('');
+  const [hits, setHits] = useState<DirectHit[]>([]);
+  const [picked, setPicked] = useState(false);
+
+  // Type-ahead for the designation: real members and groups (signed-in
+  // donors only — the member list is private to members) + purpose
+  // suggestions for everyone ("lichen" offers up operations, etc.).
+  useEffect(() => {
+    const q = designation.trim();
+    if (q.length < 2 || picked || PURPOSES.includes(q)) { setHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const needle = q.replace(/^for\s+/i, '');
+      const purposeHits: DirectHit[] = PURPOSES
+        .filter((p) => p.toLowerCase().includes(needle.toLowerCase()) || /lichen/i.test(needle) && p === 'Lichen operations')
+        .map((p) => ({ key: 'p:' + p, label: p, kind: 'Purpose', fill: p }));
+      let memberHits: DirectHit[] = [];
+      if (needle.length >= 2) {
+        // Signed-out donors get an RLS-empty result — free text still works.
+        const [mem, sp] = await Promise.all([
+          supabase.from('profiles').select('id, full_name, headline').ilike('full_name', `%${needle}%`).limit(4),
+          supabase.from('spaces').select('id, name, kind').ilike('name', `%${needle}%`).limit(3),
+        ]);
+        memberHits = [
+          ...(((mem.data as { id: string; full_name: string | null; headline: string | null }[] | null) ?? [])
+            .map((m) => ({
+              key: 'm:' + m.id,
+              label: m.full_name ?? 'Member',
+              kind: m.headline ?? 'Member',
+              fill: `For ${m.full_name}`,
+            }))),
+          ...(((sp.data as { id: string; name: string; kind: string }[] | null) ?? [])
+            .map((s) => ({
+              key: 's:' + s.id,
+              label: s.name,
+              kind: s.kind.charAt(0).toUpperCase() + s.kind.slice(1),
+              fill: `For ${s.name}`,
+            }))),
+        ];
+      }
+      if (live) setHits([...memberHits, ...purposeHits].slice(0, 6));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [designation, picked]);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -128,17 +180,42 @@ export default function Donate() {
 
         <label className="donate__field donate__field--direct">
           <span className="donate__label">Direct your gift (optional)</span>
+          <div className="donate__direct-presets">
+            {PURPOSES.map((p) => (
+              <button
+                key={p} type="button"
+                className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
+                onClick={() => { setDesignation(p); setHits([]); }}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
           <input
             type="text"
             placeholder='e.g. "For Melanie Bright — subsidize care for those who can&rsquo;t afford it"'
             value={designation}
-            onChange={(e) => setDesignation(e.target.value)}
+            onChange={(e) => { setDesignation(e.target.value); setPicked(false); }}
             maxLength={300}
           />
+          {hits.length > 0 && (
+            <div className="donate__direct-hits">
+              {hits.map((h) => (
+                <button
+                  key={h.key} type="button" className="donate__direct-hit"
+                  onClick={() => { setDesignation(h.fill); setPicked(true); setHits([]); }}
+                >
+                  {h.label}
+                  <em>{h.kind}</em>
+                </button>
+              ))}
+            </div>
+          )}
           <span className="donate__direct-hint">
             Name a practitioner, group, or purpose within the Lichen network, in
             your own words. 95% of your gift flows there as Lichen Current-cy;
-            5% sustains the platform that makes it possible.
+            5% sustains the operations required to provide the platform that
+            makes it possible.
           </span>
         </label>
 
