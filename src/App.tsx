@@ -17,6 +17,7 @@ import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
+import Giving from './routes/Giving';
 import Saved from './routes/Saved';
 import PostPage from './routes/PostPage';
 import CollectionPage from './routes/CollectionPage';
@@ -194,6 +195,7 @@ export default function App() {
           {/* Donate */}
           <Route path="/donate" element={<Donate />} />
           <Route path="/donate/how" element={<DonateHow />} />
+          <Route path="/giving" element={<Giving />} />
 
           {/* Side-menu passages — placeholders */}
           <Route path="/organizations" element={<SpacesDirectory kind="organization" />} />
