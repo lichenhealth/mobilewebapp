@@ -1,13 +1,25 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import './Donate.css';
 
-/** The learn-more behind "Where it's needed most" (founder, 2026-07-21):
- *  the two-maps story — actual reciprocity vs. priced value — and the
- *  routing promise an undirected donation is trusting. Gate-exempt via the
- *  /donate prefix; signed-out donors can read it. */
+/** The fiscal architecture of Lichen, for contributors (founder, 2026-07-21):
+ *  one page, anchored sections — the three cards on /donate each deep-link
+ *  here (#donate / #give / #economy), the purpose chips link #needed-most.
+ *  Explains what we settled philosophically + legally: two maps, three doors,
+ *  two economies, FAQs, and lived scenarios. Gate-exempt via /donate prefix. */
 export default function DonateHow() {
   const navigate = useNavigate();
+  const { hash } = useLocation();
+
+  // ScrollToTop fires on every pathname change; land on the asked-for
+  // section right after it.
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) window.setTimeout(() => el.scrollIntoView({ block: 'start' }), 120);
+  }, [hash]);
+
   return (
     <div className="donate">
       <button className="cmp__back" onClick={() => navigate('/donate')}>
@@ -15,62 +27,195 @@ export default function DonateHow() {
       </button>
 
       <header className="donate__head">
-        <p className="eyebrow">Where it&rsquo;s needed most</p>
+        <p className="eyebrow">Support Lichen</p>
         <h1 className="donate__title">
-          The next, <span className="display-italic">right place.</span>
+          How giving <span className="display-italic">works.</span>
         </h1>
         <p className="donate__sub">
-          How Lichen decides where an undirected gift goes.
+          The fiscal architecture of Lichen — three doors, two economies, one
+          commons — explained plainly for contributors.
         </p>
       </header>
 
       <div className="donate__how">
-        <h2 className="donate__give-title">Two maps</h2>
-        <p>
-          Imagine two maps of the same world. The first charts what every
-          being actually contributes to the ecosystem we all live in — the
-          caregiver&rsquo;s decade, the farmer&rsquo;s soil, the forest&rsquo;s
-          fifty years of growing, the horse&rsquo;s steady hour with a
-          frightened child. The second map is the one the human economy drew:
-          what each of those contributions gets <em>paid</em>.
-        </p>
-        <p>
-          The two maps disagree almost everywhere. Whole players were left
-          off the second map entirely — trees, rivers, pollinators, most care
-          work ever done. Others are wildly over-valued, and some of the
-          highest prices attach to work that contributes nothing at all. The
-          distance between the maps is where imbalance lives: in people
-          priced out of care, in land priced out of protection, in work that
-          sustains life earning less than work that extracts from it.
-        </p>
+        <section id="needed-most" className="donate__how-sec">
+          <h2 className="donate__give-title">Two maps</h2>
+          <p>
+            Imagine two maps of the same world. The first charts what every
+            being actually contributes to the ecosystem we all live in — the
+            caregiver&rsquo;s decade, the farmer&rsquo;s soil, the
+            forest&rsquo;s fifty years of growing, the horse&rsquo;s steady
+            hour with a frightened child. The second map is the one the human
+            economy drew: what each of those contributions gets <em>paid</em>.
+          </p>
+          <p>
+            The two maps disagree almost everywhere. Whole players were left
+            off the second map entirely — trees, rivers, pollinators, most
+            care work ever done. Others are wildly over-valued. The distance
+            between the maps is where imbalance lives: people priced out of
+            care, land priced out of protection, work that sustains life
+            earning less than work that extracts from it.
+          </p>
+          <p>
+            Lichen keeps the first map. Our ledger records contribution as it
+            actually happens — for people, groups, places, plants, and
+            animals alike. A gift marked <em>&ldquo;where it&rsquo;s needed
+            most&rdquo;</em> trusts that map: we route it toward the largest
+            gap — the greatest need, met by the least access — as subsidy for
+            care, goods, services, and places. Our routing principles are
+            published, not secret, and our aim is that every undirected gift
+            eventually returns a story: where it went, and what moved back
+            toward balance.
+          </p>
+        </section>
 
-        <h2 className="donate__give-title">What Lichen does with the gap</h2>
-        <p>
-          Lichen keeps the first map. Our ledger records contribution as it
-          actually happens — in care given, hours offered, value grown — for
-          people, groups, places, plants, and animals alike. So when you give
-          without directing your gift, you&rsquo;re not giving into a fog:
-          you&rsquo;re trusting a network that can <em>see</em> where the two
-          maps diverge most — the greatest need, met by the least access —
-          and routes your dollars there as subsidy: care for those priced
-          out of it, goods and services for those who can&rsquo;t afford
-          them, protection for places that markets won&rsquo;t protect.
-        </p>
-        <p>
-          Our routing principles are published, not secret: the largest gap
-          first, weighted toward nearness and freshness, honoring every
-          donor restriction we accept. Balances and circulation are open to
-          scrutiny. And by law, every donated dollar is permanently dedicated
-          to the commons — it can never return to private profit.
-        </p>
+        <section id="donate" className="donate__how-sec">
+          <h2 className="donate__give-title">Donate — the tax-deductible door</h2>
+          <p>
+            A donation is a gift to Lichen Health, a registered 501(c)(3)
+            nonprofit (EIN 73-1683375), and is tax-deductible to the fullest
+            extent allowed by law. You may voice a preference for where it
+            flows — a practitioner, a program, a place — and we honor
+            preferences gladly. But the IRS requires that Lichen keep final
+            discretion and control over donated funds; that discretion is
+            exactly what makes your deduction valid.
+          </p>
+          <p>
+            Once given, your dollars are permanently dedicated to the commons.
+            This is black-letter nonprofit law: a 501(c)(3) has no owners, can
+            pay no dividends, and even on dissolution its assets must pass to
+            another charity. A donated dollar leaves the private-profit
+            economy forever.
+          </p>
+          <p>
+            In practice: 95% of a directed donation is translated into
+            Current-cy for the recipient we resolve from your words; 5%
+            sustains the operations that make the platform possible. A proper
+            tax receipt — with the IRS-required language — arrives in your
+            inbox the moment your donation clears.
+          </p>
+        </section>
 
-        <h2 className="donate__give-title">The story comes back</h2>
-        <p>
-          Restoring balance isn&rsquo;t an abstraction — it lands somewhere,
-          with someone. As the network grows, our aim is that every
-          undirected gift returns a story: where it went, what it made
-          possible, and what moved back toward balance because you let go of
-          deciding.
+        <section id="give" className="donate__how-sec">
+          <h2 className="donate__give-title">Give — the direct-gift door</h2>
+          <p>
+            Sometimes you don&rsquo;t want an organization&rsquo;s discretion —
+            you know exactly who you want to help. Give is that door: a direct
+            personal gift where <em>you</em> choose who benefits. It is
+            generous, honest, and — because the IRS treats donor-controlled
+            gifts to chosen individuals as personal gifts, not charitable
+            contributions — it is not tax-deductible.
+          </p>
+          <p>
+            We say so plainly at every step: the checkout page says
+            sponsorship, and your email says <em>gift acknowledgment</em>{' '}
+            rather than tax receipt. Recipients owe no income tax on true
+            gifts. Lichen simply facilitates your generosity as you direct
+            it, on the same 95/5 terms.
+          </p>
+        </section>
+
+        <section id="economy" className="donate__how-sec">
+          <h2 className="donate__give-title">The Lichen Economy — where value lives</h2>
+          <p>
+            Inside Lichen, value moves in two distinct ways. <strong>
+            Current-cy</strong> is our dollar-backed unit: every Current in
+            circulation is matched by a real dollar held in reserve, and the
+            books are open. It is earned honestly and taxed honestly — value
+            received for goods or services is income under U.S. law whether
+            it arrives as dollars or Current, and we&rsquo;d never pretend
+            otherwise. It is the bridge between the world as it is and the
+            world we&rsquo;re building.
+          </p>
+          <p>
+            <strong>Offerings</strong> are the other way — the gift economy
+            taking root. Goods and services freely given, chosen by their
+            givers, carrying their stories instead of price tags. Money
+            cannot buy its way into this layer, and that&rsquo;s the point:
+            you enter by offering. It runs on reciprocity rather than
+            accounting, and it&rsquo;s where the marketplace&rsquo;s Gift
+            mode already lives today.
+          </p>
+        </section>
+
+        <section id="faq" className="donate__how-sec">
+          <h2 className="donate__give-title">Questions donors ask</h2>
+          <dl className="donate__faq">
+            <dt>Can I direct my donation to a specific practitioner?</dt>
+            <dd>
+              You can voice the preference, and we honor preferences in
+              nearly every case — but Lichen must retain final discretion for
+              your deduction to be valid. If you want binding control over
+              who benefits, that&rsquo;s the Give door, without the deduction.
+            </dd>
+            <dt>Why isn&rsquo;t a direct gift tax-deductible?</dt>
+            <dd>
+              The IRS&rsquo;s &ldquo;conduit rule&rdquo;: a gift the donor
+              controls to a chosen person is a personal gift passed through
+              an organization, not a contribution to it. We route it honestly
+              rather than pretend otherwise.
+            </dd>
+            <dt>Do recipients pay tax on what they receive?</dt>
+            <dd>
+              True gifts and charitable assistance: no — gifts are never
+              income to the receiver. Value <em>earned</em> for goods or
+              services — in dollars or Current-cy — is ordinary income, and
+              Lichen provides the paperwork that makes tax season easy.
+            </dd>
+            <dt>What is Current-cy worth?</dt>
+            <dd>
+              One dollar, always. Every Current in circulation is backed by a
+              real dollar held in Lichen&rsquo;s float account — we publish
+              circulation against reserves, and we never mint more than the
+              donations backing it.
+            </dd>
+            <dt>Does Lichen take a cut?</dt>
+            <dd>
+              5% of gifts sustains platform operations; 95% flows where the
+              gift points. Membership revenue funds operations separately.
+            </dd>
+            <dt>What happens to donations if Lichen ever dissolved?</dt>
+            <dd>
+              By law, every remaining asset must pass to another 501(c)(3).
+              Donated money can never return to private hands — the one-way
+              door is permanent.
+            </dd>
+          </dl>
+        </section>
+
+        <section id="scenarios" className="donate__how-sec">
+          <h2 className="donate__give-title">Three true-to-life scenarios</h2>
+          <p>
+            <strong>The directed donor.</strong> A donor gives $2,750,
+            writing <em>&ldquo;for subsidized care through Melanie&rsquo;s
+            practice.&rdquo;</em> Deductible — the beneficiaries are an open
+            class (people who can&rsquo;t afford care), Melanie is the
+            program&rsquo;s deliverer, and Lichen holds discretion. $2,612.50
+            becomes Current-cy behind her subsidized sessions; the donor&rsquo;s
+            words ride in the ledger forever.
+          </p>
+          <p>
+            <strong>The personal sponsor.</strong> A donor wants to pay for
+            three specific people to see Melanie — people he chose. That&rsquo;s
+            the Give door: same generosity, no deduction, a gift
+            acknowledgment instead of a receipt, and nobody&rsquo;s paperwork
+            tells a story the IRS would dispute.
+          </p>
+          <p>
+            <strong>The table.</strong> A member lists a handmade table on a
+            sliding scale from $0 to $150. A well-resourced buyer would pay
+            full price — funding the maker&rsquo;s free therapy work. Instead
+            she gifts it to a family furnishing their first apartment, who
+            answer with offered hours at a community planting day. No
+            deduction, no tax event for the family, and the table&rsquo;s
+            story — seven hours at the workbench, fifty years of ponderosa —
+            travels with it.
+          </p>
+        </section>
+
+        <p className="donate__tax">
+          This page explains our architecture in plain language — it isn&rsquo;t
+          tax advice. For your own situation, please consult your tax advisor.
         </p>
 
         <button

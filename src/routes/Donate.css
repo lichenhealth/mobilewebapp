@@ -276,3 +276,21 @@
 .donate__how p em { font-style: italic; }
 .donate__how .donate__give-title { margin-top: var(--s-3); }
 .donate__how .donate__submit { margin-top: var(--s-4); }
+
+/* Card learn-more + fiscal-architecture page sections */
+.donate__flow-learn {
+  align-self: flex-start;
+  font-size: 11px; font-weight: 500;
+  color: var(--ink-muted);
+  text-decoration: underline; text-underline-offset: 2px;
+  margin-top: 4px;
+}
+.donate__flow-learn:hover { color: var(--peach-deep); }
+.donate__how-sec { display: flex; flex-direction: column; gap: var(--s-3); scroll-margin-top: 84px; }
+.donate__how-sec + .donate__how-sec { margin-top: var(--s-4); }
+.donate__faq { margin: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.donate__faq dt { font-weight: 600; font-size: var(--t-base); color: var(--ink); }
+.donate__faq dd {
+  margin: 4px 0 var(--s-2); font-size: var(--t-sm); color: var(--ink-soft);
+  line-height: var(--lh-normal); max-width: 60ch;
+}

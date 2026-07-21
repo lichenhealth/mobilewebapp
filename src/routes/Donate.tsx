@@ -190,6 +190,12 @@ export default function Donate() {
             Once given, your dollars are permanently dedicated to the
             commons — by law, they can never return to private profit.
           </span>
+          <span
+            role="link" tabIndex={0} className="donate__flow-learn"
+            onClick={(e) => { e.stopPropagation(); navigate('/donate/how#donate'); }}
+          >
+            Learn more
+          </span>
         </button>
         <button
           type="button"
@@ -200,6 +206,12 @@ export default function Donate() {
           <span className="donate__flow-desc">
             A direct personal gift — you choose exactly who benefits.
             Generous, honest, and not tax-deductible.
+          </span>
+          <span
+            role="link" tabIndex={0} className="donate__flow-learn"
+            onClick={(e) => { e.stopPropagation(); navigate('/donate/how#give'); }}
+          >
+            Learn more
           </span>
         </button>
         <button
@@ -214,6 +226,12 @@ export default function Donate() {
             can&rsquo;t buy. You enter by offering.
           </span>
           <span className="donate__flow-enter">Enter the Marketplace →</span>
+          <span
+            role="link" tabIndex={0} className="donate__flow-learn"
+            onClick={(e) => { e.stopPropagation(); navigate('/donate/how#economy'); }}
+          >
+            Learn more
+          </span>
         </button>
       </section>
 
@@ -294,7 +312,7 @@ export default function Donate() {
               </div>
               <button
                 type="button" className="donate__learn"
-                onClick={() => navigate('/donate/how')}
+                onClick={() => navigate('/donate/how#needed-most')}
               >
                 How does Lichen decide where it&rsquo;s needed most? Learn more
               </button>
