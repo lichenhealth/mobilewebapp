@@ -15,7 +15,76 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = (Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '').replace(/[^\x21-\x7E]/g, '');
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+const RECEIPT_FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
 const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+
+// ── Donation tax receipt (the PROPER 501c3 acknowledgment — carries the EIN
+//    and the IRS "no goods or services" language Stripe's receipt lacks). ────
+async function sendDonationReceipt(d: {
+  email: string; amountCents: number; designation: string; frequency: string; sessionId: string;
+}): Promise<void> {
+  if (!RESEND_API_KEY) return;
+  const usd = (d.amountCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const recurring = d.frequency !== 'one-time' ? ` (${d.frequency})` : '';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const text =
+`Thank you for your gift to Lichen Health.
+
+DONATION RECEIPT
+Date: ${date}
+Amount: $${usd}${recurring}
+${d.designation ? `Directed: "${d.designation}"\n` : ''}Reference: ${d.sessionId}
+
+Lichen Health is a registered 501(c)(3) nonprofit organization,
+EIN 73-1683375. Your contribution is tax-deductible to the fullest
+extent allowed by law. No goods or services were provided in exchange
+for this contribution.
+
+95% of directed gifts flow to their named recipient as Lichen
+Current-cy; 5% sustains the operations that make the platform possible.
+
+Please retain this receipt for your tax records.
+
+With gratitude,
+Lichen Health · lichen.healthcare`;
+
+  const html = `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
+  <div style="max-width:560px;margin:0 auto;padding:32px 24px">
+    <p style="font-size:22px;font-weight:600;margin:0 0 4px">Lichen</p>
+    <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a857c;margin:0 0 20px">Donation receipt</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 20px">Thank you for your gift — you're expanding access to holistic, community-based care.</p>
+    <table style="font-size:14px;line-height:1.8;margin:0 0 20px">
+      <tr><td style="color:#8a857c;padding-right:16px">Date</td><td>${date}</td></tr>
+      <tr><td style="color:#8a857c;padding-right:16px">Amount</td><td><strong>$${usd}</strong>${recurring}</td></tr>
+      ${d.designation ? `<tr><td style="color:#8a857c;padding-right:16px">Directed</td><td>&ldquo;${esc(d.designation)}&rdquo;</td></tr>` : ''}
+      <tr><td style="color:#8a857c;padding-right:16px">Reference</td><td style="font-size:11px;color:#8a857c">${d.sessionId}</td></tr>
+    </table>
+    <p style="font-size:12px;color:#6b665e;line-height:1.6;margin:0 0 16px">
+      Lichen Health is a registered 501(c)(3) nonprofit organization, EIN 73-1683375.
+      Your contribution is tax-deductible to the fullest extent allowed by law.
+      <strong>No goods or services were provided in exchange for this contribution.</strong>
+      Please retain this receipt for your tax records.
+    </p>
+    <p style="font-size:12px;color:#8a857c;line-height:1.6;margin:0">
+      95% of directed gifts flow to their named recipient as Lichen Current-cy;
+      5% sustains the operations that make the platform possible.
+    </p>
+  </div></body></html>`;
+
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: RECEIPT_FROM, to: [d.email],
+      subject: `Your Lichen Health donation receipt — $${usd}`,
+      text, html,
+    }),
+  });
+  if (!r.ok) console.error('donation receipt email failed:', await r.text());
+}
 
 // SDK is used ONLY for local signature verification (no network call).
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: '2024-12-18.acacia', httpClient: Stripe.createFetchHttpClient() });
@@ -95,7 +164,7 @@ Deno.serve(async (req) => {
       // deno-lint-ignore no-explicit-any
       const s = event.data.object as any;
       if (s.metadata?.kind === 'donation' && s.payment_status === 'paid') {
-        await admin.from('donations').upsert({
+        const { data: inserted } = await admin.from('donations').upsert({
           stripe_session_id: s.id,
           amount_cents: s.amount_total ?? 0,
           currency: s.currency ?? 'usd',
@@ -103,7 +172,17 @@ Deno.serve(async (req) => {
           donor_profile_id: s.metadata?.donor_profile || null,
           designation: s.metadata?.designation ?? '',
           frequency: s.metadata?.frequency ?? 'one-time',
-        }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+        }, { onConflict: 'stripe_session_id', ignoreDuplicates: true }).select('id');
+        // Receipt rides only on FIRST insert — webhook retries never double-send.
+        if ((inserted?.length ?? 0) > 0 && s.customer_details?.email) {
+          await sendDonationReceipt({
+            email: s.customer_details.email,
+            amountCents: s.amount_total ?? 0,
+            designation: s.metadata?.designation ?? '',
+            frequency: s.metadata?.frequency ?? 'one-time',
+            sessionId: s.id,
+          });
+        }
       }
     }
   } catch (err) {
