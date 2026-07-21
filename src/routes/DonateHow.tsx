@@ -46,7 +46,8 @@ export default function DonateHow() {
             caregiver&rsquo;s decade, the farmer&rsquo;s soil, the
             forest&rsquo;s fifty years of growing, the horse&rsquo;s steady
             hour with a frightened child. The second map is the one the human
-            economy drew: what each of those contributions gets <em>paid</em>.
+            economy drew: what each of those contributions does (or
+            doesn&rsquo;t) get <em>paid</em>.
           </p>
           <p>
             The two maps disagree almost everywhere. Whole players were left
