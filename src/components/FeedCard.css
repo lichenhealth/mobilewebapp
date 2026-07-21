@@ -29,6 +29,13 @@
 }
 .feed-card__title--btn:hover { color: var(--peach-deep); }
 .feed-card__handle--btn:hover { text-decoration: underline; }
+.feed-card__handle-row { display: flex; align-items: baseline; gap: 0; min-width: 0; }
+.feed-card__handle-row .feed-card__handle { margin-top: 2px; }
+.feed-card__eyebrow-link {
+  background: transparent; border: 0; padding: 0; font: inherit; color: inherit;
+  cursor: pointer;
+}
+.feed-card__eyebrow-link:hover { text-decoration: underline; color: var(--peach-deep); }
 
 /* Expanded (the post page): the full read — no clamp, full-height media */
 .feed-card--expanded .feed-card__text {

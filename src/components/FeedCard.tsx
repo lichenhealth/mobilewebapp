@@ -144,17 +144,26 @@ export default function FeedCard({
           ) : (
             <h3 className="feed-card__title">{title}</h3>
           )}
-          {onAuthor ? (
-            <button className="feed-card__handle feed-card__handle--btn" onClick={onAuthor}>
-              {handle}
-              {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
-            </button>
-          ) : (
-            <div className="feed-card__handle">
-              {handle}
-              {eyebrow && <span className="feed-card__eyebrow"> · {eyebrow}</span>}
-            </div>
-          )}
+          <div className="feed-card__handle-row">
+            {onAuthor ? (
+              <button className="feed-card__handle feed-card__handle--btn" onClick={onAuthor}>
+                {handle}
+              </button>
+            ) : (
+              <span className="feed-card__handle">{handle}</span>
+            )}
+            {eyebrow && (
+              <span className="feed-card__eyebrow">
+                {' · '}
+                {eyebrow === 'Mycelium' ? (
+                  // the lens the post reached you through — YOUR mycelium's door
+                  <button className="feed-card__eyebrow-link" onClick={() => navigate('/mycelium')}>
+                    Mycelium
+                  </button>
+                ) : eyebrow}
+              </span>
+            )}
+          </div>
         </div>
         {(onWeave || categoryIcons.length > 0 || areaDoors.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">
