@@ -60,13 +60,13 @@ export default function DonateHow() {
           <p>
             Lichen keeps the first map. Our ledger records contribution as it
             actually happens — for people, groups, places, plants, and
-            animals alike. A gift marked <em>&ldquo;where it&rsquo;s needed
+            animals alike. A donation marked <em>&ldquo;where it&rsquo;s needed
             most&rdquo;</em> trusts that map: we route it toward the largest
             gap — the greatest need, met by the least access — as subsidy for
             care, goods, services, and places. Our routing principles are
-            published, not secret, and our aim is that every undirected gift
-            eventually returns a story: where it went, and what moved back
-            toward balance.
+            published, not secret, and our aim is that every undirected
+            donation eventually returns a story: where it went, and what
+            moved back toward balance.
           </p>
 
           <h2 className="donate__give-title">The algorithm the mycelium is building</h2>
@@ -96,7 +96,7 @@ export default function DonateHow() {
         <section id="donate" className="donate__how-sec">
           <h2 className="donate__give-title">Donate — the tax-deductible door</h2>
           <p>
-            A donation is a gift to Lichen Health, a registered 501(c)(3)
+            A donation is a contribution to Lichen Health, a registered 501(c)(3)
             nonprofit (EIN 73-1683375), and is tax-deductible to the fullest
             extent allowed by law. You may voice a preference for where it
             flows — a practitioner, a program, a place — and we honor
@@ -201,8 +201,9 @@ export default function DonateHow() {
             </dd>
             <dt>Does Lichen take a cut?</dt>
             <dd>
-              5% of gifts sustains platform operations; 95% flows where the
-              gift points. Membership revenue funds operations separately.
+              5% of every donation or gift sustains platform operations; 95%
+              flows where it points. Membership revenue funds operations
+              separately.
             </dd>
             <dt>What happens to donations if Lichen ever dissolved?</dt>
             <dd>

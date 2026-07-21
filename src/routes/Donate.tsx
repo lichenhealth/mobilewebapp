@@ -294,7 +294,7 @@ export default function Donate() {
 
         <label className="donate__field donate__field--direct">
           <span className="donate__label">
-            {flow === 'gift' ? 'Who is this gift for?' : 'Direct your gift (optional)'}
+            {flow === 'gift' ? 'Who is this gift for?' : 'Direct your donation (optional)'}
           </span>
           {flow === 'donate' && (
             <>
@@ -365,7 +365,7 @@ export default function Donate() {
           ) : (
             <span className="donate__direct-hint">
               Name a practitioner, group, or purpose within the Lichen network, in
-              your own words. 95% of your gift flows there as Lichen Current-cy;
+              your own words. 95% of your donation flows there as Lichen Current-cy;
               5% sustains the operations required to provide the platform that
               makes it possible. Designations are preferences — Lichen Health
               retains full discretion and control over donated funds, as the IRS
