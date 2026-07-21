@@ -55,3 +55,23 @@
   text-transform: uppercase; color: var(--ink-faint); margin: var(--s-4) 0 var(--s-2);
 }
 .curc__hist { font-size: 12px; color: var(--ink-muted); margin: 0 0 4px; }
+
+/* Float gauge + tax-flow badges (donation tax flows, 2026-07-21) */
+.curc__float {
+  border: 1px solid var(--peach); border-radius: var(--r-md);
+  background: var(--peach-tint, #f8e8dd); padding: var(--s-3);
+  margin-top: var(--s-2); font-size: 13px; color: var(--ink); line-height: 1.5;
+}
+.curc__float p { margin: 0; }
+.curc__float p + p { margin-top: 4px; color: var(--ink-soft); }
+.curc__donation-kind {
+  font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--rust, #b4553a); margin: 6px 0 0;
+}
+.curc__donation-acts { display: flex; gap: 8px; align-items: center; margin-top: var(--s-2); }
+.curc__donation-acts .curc__go { margin-top: 0; }
+.curc__keep {
+  font-size: 13px; border: 1px solid var(--bone-edge); background: transparent;
+  border-radius: var(--r-full); padding: 8px 16px; color: var(--ink-soft); cursor: pointer;
+}
+.curc__keep:hover { border-color: var(--peach); color: var(--ink); }

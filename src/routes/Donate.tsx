@@ -58,6 +58,11 @@ export default function Donate() {
   const [picked, setPicked] = useState(false);
   // The peach receipt under the box — proof the network recognized who you named.
   const [pickedLabel, setPickedLabel] = useState('');
+  // The tax-policy fork (IRS conduit rule): naming a person is fine as a
+  // PREFERENCE — but if the donor wants to choose who receives the care,
+  // it's a personal gift, not a deductible donation. Ask, then route honestly.
+  const [chooser, setChooser] = useState<'lichen' | 'donor'>('lichen');
+  const mode: 'donation' | 'sponsorship' = pickedLabel && chooser === 'donor' ? 'sponsorship' : 'donation';
 
   // Type-ahead for the designation: real members and groups (signed-in
   // donors only — the member list is private to members) + purpose
@@ -121,7 +126,7 @@ export default function Donate() {
       // Our own checkout (donate-checkout edge fn) — the donation lands in
       // Lichen's books and, once translated, in the Current-cy ledger.
       const { data, error } = await supabase.functions.invoke('donate-checkout', {
-        body: { amount: Number(amount), frequency, designation: designation.trim() },
+        body: { amount: Number(amount), frequency, designation: designation.trim(), kind: mode },
       });
       if (error || !data?.url) throw new Error(error?.message || data?.error || 'Could not start checkout.');
       window.location.href = data.url;
@@ -240,6 +245,7 @@ export default function Donate() {
                   onClick={() => {
                     setDesignation(h.fill); setPicked(true); setHits([]);
                     setPickedLabel(h.kind === 'Purpose' ? '' : h.label);
+                    setChooser('lichen');
                   }}
                 >
                   {h.label}
@@ -251,16 +257,44 @@ export default function Donate() {
           {pickedLabel && (
             <span className="donate__direct-ok">✓ {pickedLabel} — recognized in the Lichen network</span>
           )}
+          {pickedLabel && (
+            <div className="donate__chooser">
+              <span className="donate__chooser-q">Who decides who receives the care your gift funds?</span>
+              <label className="donate__chooser-opt">
+                <input
+                  type="radio" name="chooser" checked={chooser === 'lichen'}
+                  onChange={() => setChooser('lichen')}
+                />
+                <span>
+                  Lichen assesses need and decides — your preference for {pickedLabel} guides
+                  us. <em>A tax-deductible donation.</em>
+                </span>
+              </label>
+              <label className="donate__chooser-opt">
+                <input
+                  type="radio" name="chooser" checked={chooser === 'donor'}
+                  onChange={() => setChooser('donor')}
+                />
+                <span>
+                  I&rsquo;ll choose who receives care myself. <em>A generous personal
+                  gift — not tax-deductible. You&rsquo;ll receive a gift acknowledgment
+                  rather than a contribution receipt.</em>
+                </span>
+              </label>
+            </div>
+          )}
           <span className="donate__direct-hint">
             Name a practitioner, group, or purpose within the Lichen network, in
             your own words. 95% of your gift flows there as Lichen Current-cy;
             5% sustains the operations required to provide the platform that
-            makes it possible.
+            makes it possible. Designations are preferences — Lichen Health
+            retains full discretion and control over donated funds, as the IRS
+            requires for tax-deductibility.
           </span>
         </label>
 
         <button type="button" className="donate__submit" onClick={donate} disabled={loading}>
-          {loading ? 'One moment…' : 'Donate'}
+          {loading ? 'One moment…' : mode === 'sponsorship' ? 'Send gift' : 'Donate'}
         </button>
         {msg && (
           <p className={'donate__status' + (err ? ' is-err' : '')} role="status">
