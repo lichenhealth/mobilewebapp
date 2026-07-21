@@ -185,22 +185,6 @@ export default function CalendarSettings() {
           )}
         </div>
 
-        {/* ── My Lichen calendar — who sees it ── */}
-        <div className="cedit__field">
-          <span className="cedit__label">My Lichen calendar &mdash; who sees it</span>
-          <p className="cedit__hint">
-            The most specific rule wins: a rule for a person beats their group's rule, which beats
-            the everyone rule. "Busy times only" hides what and where — people just see you're taken.
-          </p>
-          <ShareRulesEditor
-            me={me}
-            rules={rules.filter((r) => !r.external_calendar_id)}
-            onChanged={load}
-            onUpsert={(aud, lvl) => upsertShare(me, aud, lvl, null)}
-            onDeleteRule={(id) => deleteShare(id)}
-          />
-        </div>
-
         {/* ── Bookable sessions (the Calendly layer) ── */}
         <div className="cedit__field">
           <span className="cedit__label">Bookable sessions</span>
@@ -460,6 +444,22 @@ export default function CalendarSettings() {
             </button>
           </div>
         </div>
+        {/* ── My Lichen calendar — who sees it ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">My Lichen calendar &mdash; who sees it</span>
+          <p className="cedit__hint">
+            The most specific rule wins: a rule for a person beats their group's rule, which beats
+            the everyone rule. "Busy times only" hides what and where — people just see you're taken.
+          </p>
+          <ShareRulesEditor
+            me={me}
+            rules={rules.filter((r) => !r.external_calendar_id)}
+            onChanged={load}
+            onUpsert={(aud, lvl) => upsertShare(me, aud, lvl, null)}
+            onDeleteRule={(id) => deleteShare(id)}
+          />
+        </div>
+
       </div>
     </div>
   );
