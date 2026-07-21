@@ -67,6 +67,29 @@ export default function DonateHow() {
             eventually returns a story: where it went, and what moved back
             toward balance.
           </p>
+
+          <h2 className="donate__give-title">The algorithm the mycelium is building</h2>
+          <p>
+            Lichen is building a map of the actual, reciprocal value exchange
+            among all of this planet&rsquo;s players — places, elements,
+            animals, plants, and people. Every contribution the network
+            witnesses becomes a coordinate: the care given, the hours
+            offered, the meal grown, the fifty years a tree spent becoming
+            timber, the steady work of a place that holds a community
+            together. Over it we lay the second map — what human systems
+            currently attribute value to, at what level, and everything they
+            leave out entirely.
+          </p>
+          <p>
+            The distance between those maps is the algorithm&rsquo;s whole
+            objective: <em>close the gap, as efficiently as possible.</em>
+            Donating to Lichen means trusting that process. Today the routing
+            is done by human stewards reading the ledger, aided by
+            deterministic matching of needs to offers; as the map fills in,
+            the routing sharpens — but the objective never changes, and it is
+            never secret. The algorithm serves the map; the map serves
+            balance.
+          </p>
         </section>
 
         <section id="donate" className="donate__how-sec">
@@ -112,6 +135,12 @@ export default function DonateHow() {
             rather than tax receipt. Recipients owe no income tax on true
             gifts. Lichen simply facilitates your generosity as you direct
             it, on the same 95/5 terms.
+          </p>
+          <p>
+            In short: control comes at the cost of the deduction. For gifts
+            of ordinary size the current system asks nothing of you either
+            way — no benefit, and no burden. You are simply moving your own
+            generosity, with Lichen as the path it travels.
           </p>
         </section>
 
