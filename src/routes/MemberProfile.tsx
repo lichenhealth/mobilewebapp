@@ -190,15 +190,18 @@ export default function MemberProfile() {
         )}
       </div>
 
+      {/* Feed-first on mobile (founder 2026-07-19): a taste of the bio + one
+          door to the full About room — the tag wall lives there now. */}
       {(member.bio || offerings.services.length > 0 || offerings.goods.length > 0) && (
         <div className="mprof__about">
           {member.bio && <p className="mprof__bio mprof__bio--clamp">{member.bio}</p>}
-          {(offerings.services.length > 0 || offerings.goods.length > 0) && (
-            <div className="mprof__chips">
-              {offerings.services.map((s) => <span key={'s' + s} className="mprof__chip">{s}</span>)}
-              {offerings.goods.map((g) => <span key={'g' + g} className="mprof__chip mprof__chip--good">{g}</span>)}
-            </div>
-          )}
+          <button className="mprof__aboutdoor" onClick={() => navigate(`/members/${id}/about`)}>
+            About & offerings
+            {(offerings.services.length + offerings.goods.length) > 0 && (
+              <em>{offerings.services.length + offerings.goods.length} listed</em>
+            )}
+            <Icon name="chevron-right" size={13} />
+          </button>
         </div>
       )}
 

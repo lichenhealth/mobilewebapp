@@ -6,7 +6,10 @@ import { WeaveMark } from '../components/WeaveMark';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
-import { awakeList, myPresenceVisible, setPresenceVisible } from '../lib/presenceApi';
+import {
+  awakeList, myPresence, setPresenceVisible, lightPresence, snuffPresence, candleLit,
+  type MyPresence,
+} from '../lib/presenceApi';
 import './MyceliumDirectory.css';
 
 /** Your whole web in one place — every person and space you've woven in,
@@ -57,7 +60,7 @@ export default function MyceliumDirectory() {
   const [urlParams] = useSearchParams();
   const fromHome = urlParams.get('from') === 'home';
   const [awakeSet, setAwakeSet] = useState<Set<string>>(new Set());
-  const [myVisible, setMyVisible] = useState<boolean | null>(null);
+  const [myPres, setMyPres] = useState<MyPresence | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
 
@@ -107,9 +110,9 @@ export default function MyceliumDirectory() {
     let live = true;
     (async () => {
       const [{ web, vouched }, recs, folk, mine] = await Promise.all([
-        loadMyWeb(), loadMyRecommendations(), awakeList(), myPresenceVisible(user.id),
+        loadMyWeb(), loadMyRecommendations(), awakeList(), myPresence(user.id),
       ]);
-      if (live) { setAwakeSet(new Set(folk.map((f) => f.id))); setMyVisible(mine); }
+      if (live) { setAwakeSet(new Set(folk.map((f) => f.id))); setMyPres(mine); }
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
       const spaceIds = [...web].filter((k) => k.startsWith('space:')).map((k) => k.slice(6));
       const [profs, spaces] = await Promise.all([
@@ -203,19 +206,53 @@ export default function MyceliumDirectory() {
           Everyone and everything you&rsquo;ve woven in. Shield = private
           trust, thumb = recommend, mark = remove.
         </p>
-        {myVisible !== null && (
-          <label className="mycdir__presence">
-            <input
-              type="checkbox"
-              checked={myVisible}
+        {myPres !== null && (
+          <div className="mycdir__presence">
+            <span className="mycdir__presence-lbl">
+              <Icon name="sparkle" size={13} /> Show when I&rsquo;m around:
+            </span>
+            <select
+              className="cset__select"
+              value={myPres.visible ? 'always' : 'hand'}
               onChange={(ev) => {
-                const on = ev.target.checked;
-                setMyVisible(on);
-                if (user) void setPresenceVisible(user.id, on).catch(console.error);
+                const always = ev.target.value === 'always';
+                setMyPres((cur) => cur && ({ ...cur, visible: always, litUntil: always ? null : cur.litUntil }));
+                if (user) void setPresenceVisible(user.id, always).catch(console.error);
               }}
-            />
-            <span>Let my network see when I&rsquo;m around</span>
-          </label>
+              aria-label="Presence mode"
+            >
+              <option value="always">Always, while I&rsquo;m awake</option>
+              <option value="hand">Only when I light it</option>
+            </select>
+            {!myPres.visible && (
+              candleLit(myPres) ? (
+                <button
+                  className="mycdir__candle is-lit"
+                  onClick={() => {
+                    setMyPres((cur) => cur && ({ ...cur, litUntil: null }));
+                    if (user) void snuffPresence(user.id).catch(console.error);
+                  }}
+                  title="Your presence is lit — tap to snuff it early"
+                >
+                  ✨ Lit · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </button>
+              ) : (
+                <button
+                  className="mycdir__candle"
+                  onClick={async () => {
+                    if (!user) return;
+                    try {
+                      const until = await lightPresence(user.id);
+                      setMyPres((cur) => cur && ({ ...cur, litUntil: until }));
+                    } catch (e) { console.error(e); }
+                  }}
+                  title="Be visible to your network for the next few hours"
+                >
+                  ✨ Light my presence
+                </button>
+              )
+            )}
+          </div>
         )}
         {ready && entries.length > 0 && (
           <p className="mycdir__count">
