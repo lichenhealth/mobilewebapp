@@ -49,7 +49,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/art',         label: 'Art',         icon: 'palette'       },
   { prefix: '/food',        label: 'Food',        icon: 'fork-spoon'    },
   { prefix: '/places',      label: 'Places',      icon: 'location'      },
-  { prefix: '/donate',      label: 'Donate',      icon: 'heart-line'    },
+  { prefix: '/donate',      label: 'Give',        icon: 'heart-line'    },
 ];
 
 // (Concierge's settings gear removed 2026-07-17 — it only opened /profile,

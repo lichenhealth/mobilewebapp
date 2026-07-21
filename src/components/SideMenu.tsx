@@ -196,7 +196,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               className="side-menu__donate"
               onClick={() => go('/donate')}
             >
-              Donate
+              Give
             </button>
           </div>
         </nav>
