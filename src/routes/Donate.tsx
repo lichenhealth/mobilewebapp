@@ -249,7 +249,6 @@ export default function Donate() {
       )}
 
       <section className="donate__give">
-        <h2 className="donate__give-title">Give now</h2>
         <p className="donate__give-sub">
           Choose an amount and how often you'd like to give — one time, monthly, or annually.
         </p>
