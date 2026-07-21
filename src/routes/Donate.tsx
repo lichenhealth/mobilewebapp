@@ -56,6 +56,8 @@ export default function Donate() {
   const [designation, setDesignation] = useState('');
   const [hits, setHits] = useState<DirectHit[]>([]);
   const [picked, setPicked] = useState(false);
+  // The peach receipt under the box — proof the network recognized who you named.
+  const [pickedLabel, setPickedLabel] = useState('');
 
   // Type-ahead for the designation: real members and groups (signed-in
   // donors only — the member list is private to members) + purpose
@@ -217,7 +219,7 @@ export default function Donate() {
               <button
                 key={p} type="button"
                 className={'donate__preset donate__preset--sm' + (designation === p ? ' is-active' : '')}
-                onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); }}
+                onClick={() => { setDesignation(designation === p ? '' : p); setHits([]); setPickedLabel(''); }}
               >
                 {p}
               </button>
@@ -227,7 +229,7 @@ export default function Donate() {
             type="text"
             placeholder='e.g. "For Melanie Bright — subsidize care for those who can&rsquo;t afford it"'
             value={designation}
-            onChange={(e) => { setDesignation(e.target.value); setPicked(false); }}
+            onChange={(e) => { setDesignation(e.target.value); setPicked(false); setPickedLabel(''); }}
             maxLength={300}
           />
           {hits.length > 0 && (
@@ -235,13 +237,19 @@ export default function Donate() {
               {hits.map((h) => (
                 <button
                   key={h.key} type="button" className="donate__direct-hit"
-                  onClick={() => { setDesignation(h.fill); setPicked(true); setHits([]); }}
+                  onClick={() => {
+                    setDesignation(h.fill); setPicked(true); setHits([]);
+                    setPickedLabel(h.kind === 'Purpose' ? '' : h.label);
+                  }}
                 >
                   {h.label}
                   <em>{h.kind}</em>
                 </button>
               ))}
             </div>
+          )}
+          {pickedLabel && (
+            <span className="donate__direct-ok">✓ {pickedLabel} — recognized in the Lichen network</span>
           )}
           <span className="donate__direct-hint">
             Name a practitioner, group, or purpose within the Lichen network, in

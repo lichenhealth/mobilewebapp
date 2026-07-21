@@ -69,6 +69,7 @@
 }
 .donate__field--direct input:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
 .donate__direct-hint { font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
+.donate__direct-ok { font-size: 12px; font-weight: 500; color: var(--peach-deep); }
 .donate__label { font-size: var(--t-sm); color: var(--ink-soft); }
 .donate__amount-input {
   display: flex;
