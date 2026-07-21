@@ -90,7 +90,7 @@ export default function Home() {
       <IconRow items={CATEGORY_ICONS} />
 
       <section className="home__greeting">
-        <p className="eyebrow">Presence is a gift, not a status</p>
+        <p className="eyebrow">Tend &amp; be tended</p>
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
@@ -103,6 +103,8 @@ export default function Home() {
             <span className="display">{awakeLine(awake)}</span>
           )}
         </h1>
+        {/* The creed — captions the presence doorway it explains. */}
+        <p className="home__creed">Presence is a gift, not a status.</p>
       </section>
 
       <section className="home__feed">

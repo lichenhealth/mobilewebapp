@@ -7,6 +7,15 @@
   gap: var(--s-3);
 }
 
+/* The creed — display italic, a half-step quieter than the greeting. */
+.home__creed {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-md);
+  color: var(--peach-deep);
+  margin: 0;
+}
+
 .home__title {
   font-family: var(--font-display);
   font-size: var(--t-xl);
