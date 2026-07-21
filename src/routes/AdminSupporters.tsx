@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import MintCurrent from '../components/MintCurrent';
 import DonationsDesk from '../components/DonationsDesk';
+import RoutingDesk from '../components/RoutingDesk';
 import './AdminCategories.css';
 
 type Tier = 'community' | 'concierge';
@@ -202,6 +203,7 @@ export default function AdminSupporters() {
       {msg && <p className="adminc__msg">{msg}</p>}
 
       <DonationsDesk />
+      <RoutingDesk />
       <MintCurrent />
 
       {pending.length > 0 && (
