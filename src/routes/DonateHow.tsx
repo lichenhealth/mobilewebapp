@@ -158,8 +158,8 @@ export default function DonateHow() {
             world we&rsquo;re building.
           </p>
           <p>
-            <strong>Offerings</strong> are the other way — the gift economy
-            taking root. Goods and services freely given, chosen by their
+            <strong>Offerings</strong> are the other way — the reciprocity
+            economy taking root. Goods and services freely given, chosen by their
             givers, carrying their stories instead of price tags. Money
             cannot buy its way into this layer, and that&rsquo;s the point:
             you enter by offering. It runs on reciprocity rather than
