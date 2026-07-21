@@ -348,7 +348,7 @@ export default function Compose() {
         });
       }
       try {
-        await createPost({
+        const created = await createPost({
           body, title, content_type: isEvent ? 'actionable' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...areas],
@@ -358,6 +358,21 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
         });
+        // Visual style, stage 1: marketplace listings with a photo get style
+        // tags (Claude vision, controlled vocabulary) written back into
+        // details — fire-and-forget, a post never waits on or fails over this.
+        if (isMarket && firstPhoto && created?.id) {
+          const postId = created.id;
+          void supabase.functions.invoke('style-tags', { body: { image: firstPhoto } })
+            .then(({ data }) => {
+              const tags = (data as { tags?: string[] } | null)?.tags;
+              if (!tags?.length) return;
+              return supabase.from('posts')
+                .update({ details: { ...details, styleTags: tags } })
+                .eq('id', postId);
+            })
+            .then(() => {}, () => {});
+        }
       } catch (postErr) {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
         throw postErr;

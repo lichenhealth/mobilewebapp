@@ -30,3 +30,16 @@
 }
 .postp__act:hover { border-color: var(--peach); }
 .postp__act.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+
+/* Style tags — the listing's aesthetic, in the controlled vocabulary */
+.postp__style { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--s-3) var(--s-4) 0; }
+.postp__style-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  padding: 4px 10px;
+}

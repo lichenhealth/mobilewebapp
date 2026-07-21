@@ -160,6 +160,18 @@ export default function PostPage() {
         } : undefined}
         onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
       />
+
+      {/* Visual style, stage 1: what the listing photo looks like, in the
+          controlled vocabulary — helps a seeker feel whether it's their
+          aesthetic before a single message is sent. */}
+      {Array.isArray((p.details as { styleTags?: string[] })?.styleTags) &&
+        ((p.details as { styleTags: string[] }).styleTags.length > 0) && (
+        <div className="postp__style">
+          {(p.details as { styleTags: string[] }).styleTags.map((t) => (
+            <span className="postp__style-tag" key={t}>{t}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
