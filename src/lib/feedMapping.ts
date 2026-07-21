@@ -89,7 +89,11 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   const price = rawMode === 'sliding' && rawPrice
     ? 'sliding ' + rawPrice.replace(/^sliding scale\s*/i, '')
     : rawPrice;
-  const offerLine = mode ? (price ? `${mode} · ${price}` : mode) : undefined;
+  // Entrusted gifts say so: the giver handed allocation to the mycelium.
+  const entrusted = rawMode === 'gift' && p.details?.allocation === 'lichen';
+  const offerLine = mode
+    ? (price ? `${mode} · ${price}` : entrusted ? `${mode} · Lichen routes` : mode)
+    : undefined;
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;

@@ -71,6 +71,9 @@ export default function Compose() {
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
+  // Entrusted offering: a gift the giver hands to the mycelium's routing
+  // instead of choosing a recipient themselves (details.allocation='lichen').
+  const [entrust, setEntrust] = useState(false);
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
   const [title, setTitle] = useState('');
@@ -151,6 +154,7 @@ export default function Compose() {
         };
         if (back[d.mode]) setEvMode(back[d.mode]);
       }
+      if (d.allocation === 'lichen') setEntrust(true);
       if (typeof d.location === 'string') setLocation(d.location);
       const g = d.geo as { lat?: number; lng?: number } | undefined;
       if (g && typeof g.lat === 'number' && typeof g.lng === 'number') setLocGeo({ lat: g.lat, lng: g.lng });
@@ -278,6 +282,7 @@ export default function Compose() {
           details.mode = evMode === 'free' ? 'gift'
             : evMode === 'paid' ? (sliding ? 'sliding' : 'sale')
             : evMode;
+          if (evMode === 'free' && entrust) details.allocation = 'lichen';
         }
       }
       if (media.length) details.media = media;
@@ -534,6 +539,12 @@ export default function Compose() {
             )}
             <button className={'cmp__chip' + (evMode === 'paid' ? ' is-on' : '')} onClick={() => setEvMode('paid')}>Paid</button>
           </div>
+          {!isEvent && evMode === 'free' && (
+            <label className="cmp__sliding" title="Instead of choosing a recipient yourself, the network routes this toward the greatest need">
+              <input type="checkbox" checked={entrust} onChange={(e) => setEntrust(e.target.checked)} />
+              {' '}Let Lichen route this — allocated where it&rsquo;s needed most
+            </label>
+          )}
           {evMode === 'paid' && (
             <label className="cmp__sliding">
               <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
