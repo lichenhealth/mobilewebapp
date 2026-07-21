@@ -64,7 +64,10 @@ Deno.serve(async (req) => {
   const designation = (body.designation ?? '').trim().slice(0, 300);
 
   // Signed-in donors get linked to their profile; signed-out is welcome too.
+  // Their account email prefills Checkout (Stripe renders it read-only) so
+  // members never retype it and the receipt lands where they already live.
   let donorProfile = '';
+  let donorEmail = '';
   const auth = req.headers.get('Authorization') ?? '';
   if (auth) {
     try {
@@ -73,6 +76,7 @@ Deno.serve(async (req) => {
       });
       const { data: { user } } = await userClient.auth.getUser();
       donorProfile = user?.id ?? '';
+      donorEmail = user?.email ?? '';
     } catch { /* anonymous donor */ }
   }
 
@@ -81,6 +85,7 @@ Deno.serve(async (req) => {
   try {
     const common = {
       metadata,
+      customer_email: donorEmail || undefined,
       success_url: `${APP_URL}/donate?status=success`,
       cancel_url: `${APP_URL}/donate?status=cancelled`,
     };
