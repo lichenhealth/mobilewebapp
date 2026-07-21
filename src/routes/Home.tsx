@@ -90,7 +90,7 @@ export default function Home() {
       <IconRow items={CATEGORY_ICONS} />
 
       <section className="home__greeting">
-        <p className="eyebrow">Tend &amp; be tended</p>
+        <p className="eyebrow">Inward &amp; interwoven</p>
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
