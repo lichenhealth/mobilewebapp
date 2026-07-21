@@ -172,6 +172,12 @@ export default function Donate() {
         <p className="donate__sub">
           Thank you for investing in a more balanced and healthy future.
         </p>
+        <button
+          type="button" className="donate__how-link"
+          onClick={() => navigate('/donate/how')}
+        >
+          How giving works →
+        </button>
       </header>
 
       {/* The two ways in — the IRS conduit rule as columns. */}
