@@ -168,3 +168,15 @@
   color: var(--peach-deep, var(--peach));
   background: var(--peach-tint);
 }
+
+/* Presence in the directory: awake folk float first, tagged softly */
+.mycdir__back { margin: var(--s-3) var(--s-5) 0; }
+.mycdir__awake {
+  font-style: normal; font-size: 10px; color: var(--sage, #6b7f5e);
+  margin-left: 8px; letter-spacing: 0.02em;
+}
+.mycdir__presence {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink); cursor: pointer;
+  margin-top: var(--s-3);
+}

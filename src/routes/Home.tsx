@@ -5,8 +5,6 @@ import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
-import Avatar from '../components/Avatar';
-import { awakeList, myPresenceVisible, setPresenceVisible, type AwakeMember } from '../lib/presenceApi';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
@@ -70,22 +68,6 @@ export default function Home() {
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [awake, setAwake] = useState<number | null>(null);
-  // Presence panel: opens from the greeting; shows only members who CHOSE
-  // visibility. Own toggle lives inside it (null = feature not live yet).
-  const [presenceOpen, setPresenceOpen] = useState(false);
-  const [awakeFolk, setAwakeFolk] = useState<AwakeMember[]>([]);
-  const [myVisible, setMyVisible] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!presenceOpen || !user) return;
-    let live = true;
-    (async () => {
-      const [folk, mine] = await Promise.all([awakeList(), myPresenceVisible(user.id)]);
-      if (!live) return;
-      setAwakeFolk(folk); setMyVisible(mine);
-    })();
-    return () => { live = false; };
-  }, [presenceOpen, user]);
 
   useEffect(() => {
     (async () => {
@@ -112,50 +94,15 @@ export default function Home() {
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
-            <button className="display home__awake" onClick={() => setPresenceOpen((o) => !o)}>
+            // The doorway: awake+opted-in members lead your web's directory.
+            <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
               {awakeLine(awake)}
+              <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
           ) : (
             <span className="display">{awakeLine(awake)}</span>
           )}
         </h1>
-
-        {presenceOpen && (
-          <div className="home__presence">
-            {awakeFolk.length > 0 ? (
-              awakeFolk.map((m) => (
-                <button className="home__presence-row" key={m.id} onClick={() => navigate(`/members/${m.id}`)}>
-                  <Avatar id={m.id} name={m.full_name ?? 'Member'} url={m.avatar_url} size={32} />
-                  <span className="home__presence-name">
-                    {m.full_name ?? 'A member'}
-                    {m.headline && <em>{m.headline}</em>}
-                  </span>
-                  <span className="home__presence-tag">awake recently</span>
-                </button>
-              ))
-            ) : (
-              <p className="home__presence-empty">
-                Nobody in your network is sharing their presence right now.
-                Presence here is a gift, not a status — people appear only when
-                they&rsquo;ve chosen to be seen.
-              </p>
-            )}
-            {myVisible !== null && (
-              <label className="home__presence-toggle">
-                <input
-                  type="checkbox"
-                  checked={myVisible}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setMyVisible(on);
-                    void setPresenceVisible(user!.id, on).catch(console.error);
-                  }}
-                />
-                Let my network see when I&rsquo;m around
-              </label>
-            )}
-          </div>
-        )}
       </section>
 
       <section className="home__feed">

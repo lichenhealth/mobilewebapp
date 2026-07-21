@@ -33,30 +33,11 @@
   color: var(--ink-faint);
 }
 
-/* Presence panel: opens from the greeting — visibility is a gift, not a status */
+/* The awake greeting is a doorway to your web's directory */
 .home__awake {
   background: transparent; border: 0; padding: 0; font: inherit; color: inherit;
   cursor: pointer; text-align: left;
   border-bottom: 1px dotted var(--peach);
 }
 .home__awake:hover { color: var(--peach-deep); }
-.home__presence {
-  margin-top: var(--s-3); padding: var(--s-3);
-  background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  border-radius: var(--r-lg); max-width: 480px;
-  display: flex; flex-direction: column; gap: var(--s-2);
-}
-.home__presence-row {
-  display: flex; align-items: center; gap: var(--s-3); text-align: left;
-  background: transparent; border: 0; padding: 6px; border-radius: var(--r-md);
-  cursor: pointer; font: inherit;
-}
-.home__presence-row:hover { background: var(--bone); }
-.home__presence-name { font-size: 14px; color: var(--ink); display: flex; flex-direction: column; min-width: 0; }
-.home__presence-name em { font-style: normal; font-size: 11px; color: var(--ink-muted); }
-.home__presence-tag { margin-left: auto; font-size: 10px; color: var(--sage, #6b7f5e); flex-shrink: 0; }
-.home__presence-empty { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin: 0; }
-.home__presence-toggle {
-  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink);
-  padding-top: var(--s-2); border-top: 1px solid var(--bone-edge); cursor: pointer;
-}
+.home__awake-chev { color: var(--peach); margin-left: 4px; vertical-align: baseline; }

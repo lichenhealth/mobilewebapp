@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { WeaveMark } from '../components/WeaveMark';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
+import { awakeList, myPresenceVisible, setPresenceVisible } from '../lib/presenceApi';
 import './MyceliumDirectory.css';
 
 /** Your whole web in one place — every person and space you've woven in,
@@ -51,6 +52,12 @@ export default function MyceliumDirectory() {
 
   // The + panel: search the whole platform, weave from the results.
   const [addOpen, setAddOpen] = useState(false);
+  // Presence: awake + opted-in members float to the top of People; own toggle
+  // lives here now (the greeting on Home leads straight to this room).
+  const [urlParams] = useSearchParams();
+  const fromHome = urlParams.get('from') === 'home';
+  const [awakeSet, setAwakeSet] = useState<Set<string>>(new Set());
+  const [myVisible, setMyVisible] = useState<boolean | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
 
@@ -99,7 +106,10 @@ export default function MyceliumDirectory() {
     if (!user) { setReady(true); return; }
     let live = true;
     (async () => {
-      const [{ web, vouched }, recs] = await Promise.all([loadMyWeb(), loadMyRecommendations()]);
+      const [{ web, vouched }, recs, folk, mine] = await Promise.all([
+        loadMyWeb(), loadMyRecommendations(), awakeList(), myPresenceVisible(user.id),
+      ]);
+      if (live) { setAwakeSet(new Set(folk.map((f) => f.id))); setMyVisible(mine); }
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
       const spaceIds = [...web].filter((k) => k.startsWith('space:')).map((k) => k.slice(6));
       const [profs, spaces] = await Promise.all([
@@ -167,6 +177,11 @@ export default function MyceliumDirectory() {
 
   return (
     <div className="mycdir">
+      {fromHome && (
+        <button className="cmp__back mycdir__back" onClick={() => navigate('/home')}>
+          <Icon name="arrow-left" size={14} /> Home
+        </button>
+      )}
       <header className="mycdir__head">
         <button
           className="mycdir__add"
@@ -188,6 +203,20 @@ export default function MyceliumDirectory() {
           Everyone and everything you&rsquo;ve woven in. Shield = private
           trust, thumb = recommend, mark = remove.
         </p>
+        {myVisible !== null && (
+          <label className="mycdir__presence">
+            <input
+              type="checkbox"
+              checked={myVisible}
+              onChange={(ev) => {
+                const on = ev.target.checked;
+                setMyVisible(on);
+                if (user) void setPresenceVisible(user.id, on).catch(console.error);
+              }}
+            />
+            <span>Let my network see when I&rsquo;m around</span>
+          </label>
+        )}
         {ready && entries.length > 0 && (
           <p className="mycdir__count">
             <span>{entries.length}</span> {entries.length === 1 ? 'thread' : 'threads'}
@@ -257,7 +286,10 @@ export default function MyceliumDirectory() {
       )}
 
       {GROUPS.map((g) => {
-        const rows = entries.filter((e) => e.kind === g.kind);
+        const rows = entries.filter((e) => e.kind === g.kind)
+          .sort((a, b) =>
+            Number(awakeSet.has(b.id) && b.type === 'profile') - Number(awakeSet.has(a.id) && a.type === 'profile')
+            || a.name.localeCompare(b.name));
         if (rows.length === 0) return null;
         return (
           <section key={g.kind} className="mycdir__sec">
@@ -276,7 +308,12 @@ export default function MyceliumDirectory() {
               >
                 <Avatar id={e.id} name={e.name} url={e.avatarUrl} size={40} />
                 <span className="mycdir__row-body">
-                  <span className="mycdir__row-name">{e.name}</span>
+                  <span className="mycdir__row-name">
+                    {e.name}
+                    {e.type === 'profile' && awakeSet.has(e.id) && (
+                      <em className="mycdir__awake">awake recently</em>
+                    )}
+                  </span>
                   {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
                 </span>
                 <button
