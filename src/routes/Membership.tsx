@@ -141,6 +141,14 @@ export default function Membership() {
           ))}
         </div>
       )}
+
+      <p className="mship__give">
+        Lichen Health is a 501(c)(3) nonprofit. Beyond membership, your{' '}
+        <a href="/donate" onClick={(e) => { e.preventDefault(); navigate('/donate'); }}>
+          tax-deductible donation
+        </a>{' '}
+        expands access to care for those who can&rsquo;t afford it.
+      </p>
     </div>
   );
 }

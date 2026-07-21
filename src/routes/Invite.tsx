@@ -173,6 +173,13 @@ export default function Invite() {
         <button className="btn btn-primary invite__send" onClick={send} disabled={busy || !email.trim()}>
           {busy ? 'Sending…' : 'Send invitation'}
         </button>
+
+        <p className="invite__give">
+          Another way to grow Lichen —{' '}
+          <a href="/donate" onClick={(e) => { e.preventDefault(); navigate('/donate'); }}>
+            make a tax-deductible donation
+          </a>.
+        </p>
       </div>
     </div>
   );

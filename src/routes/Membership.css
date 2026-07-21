@@ -20,3 +20,13 @@
 .mship__plan-price { font-size: var(--t-lg); font-weight: 600; color: var(--ink); }
 .mship__plan-per { font-size: var(--t-sm); color: var(--ink-muted); font-weight: 400; }
 .mship__plan-blurb { font-size: var(--t-sm); color: var(--ink-muted); line-height: var(--lh-normal); margin-top: var(--s-2); }
+
+/* Quiet giving door — membership is the money moment; donation is the mission's */
+.mship__give {
+  margin-top: var(--s-5);
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  line-height: var(--lh-normal);
+  max-width: 46ch;
+}
+.mship__give a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }

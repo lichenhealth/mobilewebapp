@@ -54,3 +54,6 @@
   font-size: 15px; line-height: 1; color: var(--ink); cursor: pointer;
 }
 .invite__gift-stepper button:disabled { opacity: 0.4; cursor: default; }
+
+.invite__give { font-size: 12px; color: var(--ink-faint); margin: var(--s-2) 0 0; }
+.invite__give a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
