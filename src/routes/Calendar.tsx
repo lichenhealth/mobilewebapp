@@ -194,7 +194,7 @@ export default function Calendar() {
     if (selectedCals.includes('me')) {
       const rems = await listReminders(me);
       setReminders(rems);
-      setRemDone(await listDone(rems.map((r) => r.id), from, to));
+      setRemDone(await listDone(me, rems.map((r) => r.id), from, to));
     } else setReminders([]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -377,7 +377,7 @@ export default function Calendar() {
       if (done) n.delete(k); else n.add(k);
       return n;
     });
-    void setDone(r.id, iso, !done).catch(console.error);
+    void setDone(me, r.id, iso, !done).catch(console.error);
   };
   const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
   const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || remsOn(d).length > 0);
@@ -613,7 +613,7 @@ export default function Calendar() {
                       >{done ? '✓' : ''}</button>
                       <button
                         className="calp__rem-open"
-                        onClick={() => navigate(`/calendar/new?reminder=${r.id}`)}
+                        onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}
                         title="Edit reminder"
                       >{r.title}</button>
                     </div>
@@ -667,7 +667,7 @@ export default function Calendar() {
                         >{done ? '✓' : ''}</button>
                         <button
                           className="calp__rem-open calp__rem-open--sched"
-                          onClick={() => navigate(`/calendar/new?reminder=${r.id}`)}
+                          onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}
                           title="Edit reminder"
                         >
                           <span className="calp__sched-title">{r.title}</span>

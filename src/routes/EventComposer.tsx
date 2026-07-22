@@ -15,7 +15,7 @@ import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
 import { parseFlex, defaultWindow } from '../lib/flexParse';
-import { createReminder, getReminder, updateReminder, deleteReminder } from '../lib/remindersApi';
+import { createReminder, getReminder, updateReminder, deleteReminder, loadReminderRecipients, type Recipient } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
@@ -41,6 +41,10 @@ export default function EventComposer() {
   const [remHasTime, setRemHasTime] = useState(false);
   const [remAtMin, setRemAtMin] = useState(9 * 60);
   const [remLead, setRemLead] = useState(10);   // default nudge: 10 mins before
+  // Shared nudge: recipients (people/orgs/groups) who also get this reminder.
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [recQ, setRecQ] = useState('');
+  const [recHits, setRecHits] = useState<Recipient[]>([]);
 
   const [title, setTitle] = useState('');
   const [calendar, setCalendar] = useState('me');            // 'me' | space id
@@ -474,9 +478,33 @@ export default function EventComposer() {
       setRecurrence(r.recurrence);
       if (r.at_min != null) { setRemHasTime(true); setRemAtMin(r.at_min); setRemLead(r.lead_min); }
       else setRemHasTime(false);
+      const recs = await loadReminderRecipients(reminderId);
+      if (live) setRecipients(recs);
     })();
     return () => { live = false; };
   }, [reminderId]);
+
+  // Recipient type-ahead — people + spaces (orgs/groups/communities).
+  useEffect(() => {
+    const q = recQ.trim();
+    if (q.length < 2) { setRecHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const [profs, sps] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${q}%`).limit(4),
+        supabase.from('spaces').select('id, name').ilike('name', `%${q}%`).limit(4),
+      ]);
+      if (!live) return;
+      const hits: Recipient[] = [
+        ...(((profs.data as { id: string; full_name: string | null }[] | null) ?? []).filter((p) => p.id !== me)
+          .map((p) => ({ type: 'profile' as const, id: p.id, name: p.full_name ?? 'Member' }))),
+        ...(((sps.data as { id: string; name: string }[] | null) ?? [])
+          .map((s) => ({ type: 'space' as const, id: s.id, name: s.name }))),
+      ];
+      setRecHits(hits.filter((h) => !recipients.some((r) => r.type === h.type && r.id === h.id)));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [recQ, me, recipients]);
 
   async function saveReminder() {
     if (!title.trim()) { setError('Give the reminder a few words.'); return; }
@@ -489,8 +517,8 @@ export default function EventComposer() {
         leadMin: remHasTime ? remLead : 0,
         recurrence,
       };
-      if (reminderId) await updateReminder(me, reminderId, payload);
-      else await createReminder(me, payload);
+      if (reminderId) await updateReminder(me, reminderId, payload, recipients);
+      else await createReminder(me, payload, recipients);
       if (remHasTime && 'Notification' in window && Notification.permission === 'default') {
         void Notification.requestPermission();
       }
@@ -573,6 +601,37 @@ export default function EventComposer() {
                 )}
               </div>
             </div>
+          </div>
+          <div className="cedit__field cedit__nudge">
+            <span className="cedit__label">Nudge others (optional)</span>
+            <p className="cedit__hint-ev">A shared nudge reminds the people you name too — no RSVP, and it never marks anyone busy.</p>
+            {recipients.length > 0 && (
+              <div className="cedit__chips">
+                {recipients.map((r) => (
+                  <span className="cedit__chip" key={r.type + r.id}>
+                    {r.name}
+                    <button aria-label={`Remove ${r.name}`} onClick={() => setRecipients((cur) => cur.filter((x) => !(x.type === r.type && x.id === r.id)))}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              className="cedit__input" value={recQ}
+              onChange={(e) => setRecQ(e.target.value)}
+              placeholder="Add a person, group, or org…"
+            />
+            {recHits.length > 0 && (
+              <div className="cedit__rec-hits">
+                {recHits.map((h) => (
+                  <button
+                    className="cedit__rec-hit" key={h.type + h.id}
+                    onClick={() => { setRecipients((cur) => [...cur, h]); setRecQ(''); setRecHits([]); }}
+                  >
+                    {h.name}<em>{h.type === 'space' ? 'Group' : 'Person'}</em>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
