@@ -225,7 +225,7 @@
 }
 .calp__person-name { font-size: 13px; color: var(--ink); margin-right: auto; }
 .calp__person-status { font-size: 12px; color: var(--ink-faint); }
-.calp__person-status.is-going { color: #4c9a63; }
+.calp__person-status.is-going { color: var(--green-deep); }
 .calp__person-status.is-tentative { color: var(--peach-deep); }
 .calp__person-status.is-declined { color: #c0564f; }
 .calp__sheet-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
@@ -292,10 +292,10 @@
   font-size: 12px; color: var(--ink);
 }
 .calp__calchip.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
-.calp__calchip--overlay.is-on { background: #4c9a63; border-color: #4c9a63; }
+.calp__calchip--overlay.is-on { background: var(--green); border-color: var(--green); }
 .calp__slot { position: absolute; left: 0; right: 0; pointer-events: auto; }
-.calp__slot--free { background: rgba(76, 154, 99, 0.14); }
-.calp__slot--free.is-strong { background: rgba(76, 154, 99, 0.3); }
+.calp__slot--free { background: rgba(152, 190, 77, 0.20); }
+.calp__slot--free.is-strong { background: rgba(152, 190, 77, 0.38); }
 
 /* ── Composer: two columns on desktop, live invite preview on the right ── */
 .cedit__cols { display: flex; flex-direction: column; }

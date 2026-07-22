@@ -24,6 +24,10 @@
   --moss:        #4A5D3F;     /* secondary accent — sparingly */
   --moss-tint:   #E6ECE0;
 
+  --green:       #98BE4D;     /* availability / "free" / go — pairs with peach */
+  --green-deep:  #7CA13A;
+  --green-tint:  #EDF3DF;
+
   --rust:        #B8623C;     /* rare, hot emphasis */
   --berry:       #7C3F4F;
   --sky:         #6B8A9C;
