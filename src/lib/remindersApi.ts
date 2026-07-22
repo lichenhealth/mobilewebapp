@@ -36,6 +36,24 @@ export async function createReminder(
   if (error) throw error;
 }
 
+/** One reminder by id (for the edit composer). */
+export async function getReminder(id: string): Promise<Reminder | null> {
+  const { data, error } = await supabase.from('reminders').select(COLS).eq('id', id).maybeSingle();
+  if (error) { console.warn('getReminder:', error.message); return null; }
+  return (data as Reminder | null) ?? null;
+}
+
+export async function updateReminder(
+  me: string, id: string,
+  r: { title: string; date: string; atMin: number | null; leadMin: number; recurrence: Recurrence | null },
+): Promise<void> {
+  const { error } = await supabase.from('reminders').update({
+    title: r.title, start_date: r.date, end_date: r.date,
+    at_min: r.atMin, lead_min: r.leadMin, recurrence: r.recurrence,
+  }).eq('id', id).eq('profile_id', me);
+  if (error) throw error;
+}
+
 export async function deleteReminder(me: string, id: string): Promise<void> {
   const { error } = await supabase.from('reminders').delete().eq('id', id).eq('profile_id', me);
   if (error) throw error;

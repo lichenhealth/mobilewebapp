@@ -534,3 +534,31 @@
 .cset__calrules summary:hover { color: var(--ink); }
 .cset__calrules[open] summary { color: var(--peach-deep); }
 .shre__error { font-size: 12px; color: var(--rust, #b4553a); margin: 4px 0; }
+
+/* Reminders are actionable: a checkbox to tick off, the rest opens the editor. */
+.calp__chip--rem { display: flex; align-items: stretch; padding: 0; gap: 0; }
+.calp__rem-box {
+  flex-shrink: 0; width: 18px; border: 0; border-right: 1.5px dashed var(--peach);
+  background: transparent; color: var(--peach-deep); cursor: pointer;
+  font-size: 10px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+}
+.calp__rem-box:hover { background: var(--peach-tint); }
+.calp__rem-open {
+  flex: 1; min-width: 0; border: 0; background: transparent; cursor: pointer;
+  font: inherit; color: inherit; text-align: left; padding: 2px 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.calp__rem-open:hover { background: var(--peach-tint); }
+
+/* Schedule-view reminder: row of [check] [title/time], each its own target. */
+.calp__sched-item.calp__rem { flex-direction: row; align-items: center; gap: 8px; }
+.calp__rem-check--btn { background: transparent; cursor: pointer; margin-right: 0; padding: 0; }
+.calp__rem-check--btn:hover { background: var(--peach-tint); }
+.calp__rem-open--sched {
+  flex: 1; min-width: 0; border: 0; background: transparent; cursor: pointer;
+  display: flex; flex-direction: column; gap: 1px; text-align: left; font: inherit; color: inherit;
+}
+
+/* Delete button in the reminder editor header. */
+.cedit__delete { color: var(--rust); border: 1px solid var(--bone-edge); background: transparent; }
+.cedit__delete:hover { border-color: var(--rust); }

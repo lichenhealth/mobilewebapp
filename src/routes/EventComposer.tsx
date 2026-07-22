@@ -15,7 +15,7 @@ import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
 import { parseFlex, defaultWindow } from '../lib/flexParse';
-import { createReminder } from '../lib/remindersApi';
+import { createReminder, getReminder, updateReminder, deleteReminder } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
 import './Concierge.css';
 import './Calendar.css';
@@ -35,8 +35,9 @@ export default function EventComposer() {
 
   // Events vs Reminders (Gabe, 2026-07-18): an event is a social object; a
   // reminder is a private nudge — no guests, no busy weight.
+  const reminderId = params.get('reminder');   // edit an existing reminder
   const [kind, setKind] = useState<'event' | 'reminder'>(
-    params.get('kind') === 'reminder' ? 'reminder' : 'event');
+    params.get('kind') === 'reminder' || reminderId ? 'reminder' : 'event');
   const [remHasTime, setRemHasTime] = useState(false);
   const [remAtMin, setRemAtMin] = useState(9 * 60);
   const [remLead, setRemLead] = useState(10);   // default nudge: 10 mins before
@@ -460,17 +461,36 @@ export default function EventComposer() {
     </div>
   );
 
+  // Editing an existing reminder: load it and prefill the form.
+  useEffect(() => {
+    if (!reminderId) return;
+    let live = true;
+    (async () => {
+      const r = await getReminder(reminderId);
+      if (!live || !r) return;
+      setKind('reminder');
+      setTitle(r.title);
+      setRange({ start: r.start_date, end: r.start_date });
+      setRecurrence(r.recurrence);
+      if (r.at_min != null) { setRemHasTime(true); setRemAtMin(r.at_min); setRemLead(r.lead_min); }
+      else setRemHasTime(false);
+    })();
+    return () => { live = false; };
+  }, [reminderId]);
+
   async function saveReminder() {
     if (!title.trim()) { setError('Give the reminder a few words.'); return; }
     if (!range.start) { setError('Pick a date.'); return; }
     setSaving(true); setError('');
     try {
-      await createReminder(me, {
+      const payload = {
         title: title.trim(), date: range.start,
         atMin: remHasTime ? remAtMin : null,
         leadMin: remHasTime ? remLead : 0,
         recurrence,
-      });
+      };
+      if (reminderId) await updateReminder(me, reminderId, payload);
+      else await createReminder(me, payload);
       if (remHasTime && 'Notification' in window && Notification.permission === 'default') {
         void Notification.requestPermission();
       }
@@ -481,12 +501,25 @@ export default function EventComposer() {
     }
   }
 
+  async function removeReminder() {
+    if (!reminderId) return;
+    setSaving(true); setError('');
+    try { await deleteReminder(me, reminderId); back(); }
+    catch (e) {
+      setError((e as { message?: string } | null)?.message || 'Could not delete.');
+      setSaving(false);
+    }
+  }
+
   if (kind === 'reminder') {
     return (
       <div className="cedit">
         <header className="cedit__head">
           <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
-          <h1 className="cedit__title">New reminder</h1>
+          <h1 className="cedit__title">{reminderId ? 'Edit reminder' : 'New reminder'}</h1>
+          {reminderId && (
+            <button className="btn cedit__delete" onClick={removeReminder} disabled={saving}>Delete</button>
+          )}
           <button className="btn btn-primary cedit__save" onClick={saveReminder} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>

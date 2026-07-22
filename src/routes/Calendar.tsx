@@ -585,12 +585,21 @@ export default function Calendar() {
                 {remsOn(iso).map((r) => {
                   const done = remDone.has(remKey(r, iso));
                   return (
-                    <button
+                    <div
                       className={'calp__chip calp__chip--rem' + (done ? ' is-done' : '')}
-                      key={'rem:' + r.id} onClick={() => toggleRem(r, iso)}
+                      key={'rem:' + r.id}
                     >
-                      {done ? '✓ ' : ''}{r.title}
-                    </button>
+                      <button
+                        className="calp__rem-box"
+                        aria-label={done ? 'Mark not done' : 'Mark done'}
+                        onClick={(e) => { e.stopPropagation(); toggleRem(r, iso); }}
+                      >{done ? '✓' : ''}</button>
+                      <button
+                        className="calp__rem-open"
+                        onClick={() => navigate(`/calendar/new?reminder=${r.id}`)}
+                        title="Edit reminder"
+                      >{r.title}</button>
+                    </div>
                   );
                 })}
                 {allDayOn(iso).map((e) => (
@@ -621,15 +630,24 @@ export default function Calendar() {
                   {rems.map((r) => {
                     const done = remDone.has(remKey(r, iso));
                     return (
-                      <button
+                      <div
                         key={'rem:' + r.id + iso}
                         className={'calp__sched-item calp__rem' + (done ? ' is-done' : '')}
-                        onClick={() => toggleRem(r, iso)}
                       >
-                        <span className="calp__rem-check" aria-hidden>{done ? '✓' : ''}</span>
-                        <span className="calp__sched-title">{r.title}</span>
-                        {r.at_min != null && <span className="calp__sched-when">{minToLabel(r.at_min)}</span>}
-                      </button>
+                        <button
+                          className="calp__rem-check calp__rem-check--btn"
+                          aria-label={done ? 'Mark not done' : 'Mark done'}
+                          onClick={(e) => { e.stopPropagation(); toggleRem(r, iso); }}
+                        >{done ? '✓' : ''}</button>
+                        <button
+                          className="calp__rem-open calp__rem-open--sched"
+                          onClick={() => navigate(`/calendar/new?reminder=${r.id}`)}
+                          title="Edit reminder"
+                        >
+                          <span className="calp__sched-title">{r.title}</span>
+                          {r.at_min != null && <span className="calp__sched-when">{minToLabel(r.at_min)}</span>}
+                        </button>
+                      </div>
                     );
                   })}
                   {evs.map((e) => {
