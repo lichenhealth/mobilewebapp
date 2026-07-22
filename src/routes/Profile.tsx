@@ -17,6 +17,7 @@ import HomeLocationSection from '../components/HomeLocationSection';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
+import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
@@ -67,6 +68,9 @@ export default function Profile() {
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
   const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
+  const [pushState, setPushState] = useState<PushState>('off');
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<MySpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -226,6 +230,23 @@ export default function Profile() {
     setNotifPref(pref);
     const { error: e } = await supabase.from('profiles').update({ notification_pref: pref }).eq('id', user.id);
     if (e) { setError(e.message); setNotifPref(prev); }
+  }
+
+  // Phone push is per-DEVICE (a browser subscription), not a stored pref.
+  useEffect(() => { void currentPushState().then(setPushState); }, []);
+
+  async function togglePush() {
+    if (!user || pushBusy) return;
+    setPushBusy(true); setPushMsg('');
+    try {
+      if (pushState === 'on') { await disablePush(user.id); setPushState('off'); }
+      else { await enablePush(user.id); setPushState('on'); setPushMsg('This device will now get phone alerts.'); }
+    } catch (e) {
+      setPushMsg((e as Error).message || 'Could not change device notifications.');
+    } finally {
+      setPushBusy(false);
+      setTimeout(() => setPushMsg(''), 6000);
+    }
   }
 
   async function toggleCap(cap: string) {
@@ -439,6 +460,31 @@ export default function Profile() {
               {label}
             </button>
           ))}
+        </div>
+
+        <div className="prof__push">
+          <div className="prof__push-row">
+            <div>
+              <p className="prof__push-title">On this device</p>
+              <p className="prof__push-sub">
+                {pushState === 'unsupported'
+                  ? 'This browser can’t show phone notifications.'
+                  : pushState === 'denied'
+                    ? 'Notifications are blocked in your browser settings.'
+                    : 'Get lock-screen alerts even when Lichen is closed.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={'prof__push-toggle' + (pushState === 'on' ? ' is-on' : '')}
+              onClick={togglePush}
+              disabled={pushBusy || pushState === 'unsupported' || pushState === 'denied'}
+              aria-pressed={pushState === 'on'}
+            >
+              {pushBusy ? '…' : pushState === 'on' ? 'On' : 'Off'}
+            </button>
+          </div>
+          {pushMsg && <p className="prof__push-msg">{pushMsg}</p>}
         </div>
       </section>
 
