@@ -180,6 +180,8 @@
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   background: var(--peach); box-shadow: 0 0 0 3px var(--peach-tint);
 }
+/* Present (candle) reads a touch stronger than around (dot). */
+.mycdir__awake--lit { color: var(--peach-deep, var(--peach)); font-weight: 500; }
 .mycdir__presence {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; color: var(--ink); cursor: pointer;

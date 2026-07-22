@@ -59,7 +59,8 @@ export default function MyceliumDirectory() {
   // lives here now (the greeting on Home leads straight to this room).
   const [urlParams] = useSearchParams();
   const fromHome = urlParams.get('from') === 'home';
-  const [awakeSet, setAwakeSet] = useState<Set<string>>(new Set());
+  const [awakeSet, setAwakeSet] = useState<Set<string>>(new Set());   // "around" (dot)
+  const [litSet, setLitSet] = useState<Set<string>>(new Set());       // "present" (candle)
   const [myPres, setMyPres] = useState<MyPresence | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
@@ -112,7 +113,11 @@ export default function MyceliumDirectory() {
       const [{ web, vouched }, recs, folk, mine] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), awakeList(), myPresence(user.id),
       ]);
-      if (live) { setAwakeSet(new Set(folk.map((f) => f.id))); setMyPres(mine); }
+      if (live) {
+        setAwakeSet(new Set(folk.map((f) => f.id)));
+        setLitSet(new Set(folk.filter((f) => f.lit).map((f) => f.id)));
+        setMyPres(mine);
+      }
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
       const spaceIds = [...web].filter((k) => k.startsWith('space:')).map((k) => k.slice(6));
       const [profs, spaces] = await Promise.all([
@@ -234,7 +239,7 @@ export default function MyceliumDirectory() {
                   }}
                   title="Your presence is lit — tap to snuff it early"
                 >
-                  ✨ Lit · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  🕯️ Lit · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </button>
               ) : (
                 <button
@@ -248,7 +253,7 @@ export default function MyceliumDirectory() {
                   }}
                   title="Be visible to your network for the next few hours"
                 >
-                  ✨ Light my presence
+                  🕯️ Light my presence
                 </button>
               )
             )}
@@ -324,10 +329,11 @@ export default function MyceliumDirectory() {
       )}
 
       {GROUPS.map((g) => {
+        // Present (candle) first, then around (dot), then the rest.
+        const presenceRank = (e: Entry) =>
+          e.type !== 'profile' ? 0 : litSet.has(e.id) ? 2 : awakeSet.has(e.id) ? 1 : 0;
         const rows = entries.filter((e) => e.kind === g.kind)
-          .sort((a, b) =>
-            Number(awakeSet.has(b.id) && b.type === 'profile') - Number(awakeSet.has(a.id) && a.type === 'profile')
-            || a.name.localeCompare(b.name));
+          .sort((a, b) => presenceRank(b) - presenceRank(a) || a.name.localeCompare(b.name));
         if (rows.length === 0) return null;
         return (
           <section key={g.kind} className="mycdir__sec">
@@ -348,13 +354,17 @@ export default function MyceliumDirectory() {
                 <span className="mycdir__row-body">
                   <span className="mycdir__row-name">
                     {e.name}
-                    {e.type === 'profile' && awakeSet.has(e.id) && (
-                      <span className="mycdir__awake">
-                        <span className="mycdir__awake-dot" aria-hidden="true" />
-                        <span aria-hidden="true">✨</span>
-                        awake
+                    {e.type === 'profile' && litSet.has(e.id) ? (
+                      <span className="mycdir__awake mycdir__awake--lit" title="Present — open to connecting">
+                        <span aria-hidden="true">🕯️</span>
+                        present
                       </span>
-                    )}
+                    ) : e.type === 'profile' && awakeSet.has(e.id) ? (
+                      <span className="mycdir__awake" title="Around recently">
+                        <span className="mycdir__awake-dot" aria-hidden="true" />
+                        around
+                      </span>
+                    ) : null}
                   </span>
                   {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
                 </span>
