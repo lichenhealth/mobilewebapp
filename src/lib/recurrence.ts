@@ -169,13 +169,24 @@ export function presetsFor(anchor: string): Preset[] {
   ];
 }
 
+/** Order-independent JSON: {a,b} and {b,a} compare equal (stored recurrences
+ *  can have different key order than the presets — that was reading daily as
+ *  "Custom…"). */
+function canonical(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  const o = v as Record<string, unknown>;
+  return '{' + Object.keys(o).sort().map((k) => JSON.stringify(k) + ':' + canonical(o[k])).join(',') + '}';
+}
+
 /** Which preset (by label) matches a recurrence for the current anchor, else "Custom…". */
 export function matchPresetLabel(rec: Recurrence | null, anchor: string): string {
   const presets = presetsFor(anchor);
   if (!rec) return 'Does not repeat';
+  const target = canonical(rec);
   for (const p of presets) {
     if (!p.recurrence) continue;
-    if (JSON.stringify(p.recurrence) === JSON.stringify(rec)) return p.label;
+    if (canonical(p.recurrence) === target) return p.label;
   }
   return 'Custom…';
 }
