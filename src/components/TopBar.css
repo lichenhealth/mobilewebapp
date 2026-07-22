@@ -18,6 +18,17 @@
   z-index: 50;
   pointer-events: none;
 }
+/* Guaranteed SOLID bone behind the iOS status bar (time/wifi/battery) in the
+   installed PWA — the gradient above can fade, and full-bleed content can peek
+   through during scroll/transition; this strip never does. Covers exactly the
+   safe-area inset, above the icons' padding so it never overlaps them. */
+.top-bar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: var(--safe-top);
+  background: var(--bone);
+}
 .top-bar > * { pointer-events: auto; }
 
 .top-bar__icon {
