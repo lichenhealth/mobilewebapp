@@ -6,7 +6,7 @@ import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { deletePost, type FeedPost } from '../lib/postsApi';
+import { deletePost, loadAuthorFeed, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -15,7 +15,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
 import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
-  loadProgress, enroll, setLessonDone,
+  addToCollection, loadProgress, enroll, setLessonDone,
   type CollectionRow, type OfferingMeta,
 } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -54,6 +54,11 @@ export default function CollectionPage() {
   const [form, setForm] = useState<OfferingMeta>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // owner lesson picker (add your own posts as lessons)
+  const [pickOpen, setPickOpen] = useState(false);
+  const [myPosts, setMyPosts] = useState<FeedPost[]>([]);
+  const [picksLoaded, setPicksLoaded] = useState(false);
+  const [pickQ, setPickQ] = useState('');
 
   const load = useCallback(async () => {
     setReady(false);
@@ -110,6 +115,26 @@ export default function CollectionPage() {
     void reorderItems(id, next.map((p) => p.id)).catch((e) => { console.error(e); void load(); });
   }
 
+  // Owner: pull your own posts in as lessons.
+  async function openLessonPicker() {
+    const opening = !pickOpen;
+    setPickOpen(opening);
+    if (opening && !picksLoaded && me) {
+      setMyPosts(await loadAuthorFeed({ profileId: me }));
+      setPicksLoaded(true);
+    }
+  }
+  const inCourse = useMemo(() => new Set(posts.map((p) => p.id)), [posts]);
+  const pickable = useMemo(() => {
+    const q = pickQ.trim().toLowerCase();
+    return myPosts.filter((p) => !inCourse.has(p.id)
+      && (!q || (p.title ?? '').toLowerCase().includes(q) || p.body.toLowerCase().includes(q)));
+  }, [myPosts, inCourse, pickQ]);
+  async function addLesson(p: FeedPost) {
+    await addToCollection(id, p.id);
+    setPosts((cur) => [...cur, p]);
+  }
+
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
 
@@ -157,6 +182,11 @@ export default function CollectionPage() {
           <button className="btn colp__btn" onClick={() => setEditOpen((o) => !o)}>
             {editOpen ? 'Done' : 'Edit'}
           </button>
+          {structured && (
+            <button className="btn colp__btn" onClick={() => void openLessonPicker()}>
+              {pickOpen ? 'Close' : 'Add lessons'}
+            </button>
+          )}
           <button
             className="btn btn-primary colp__btn"
             disabled={busy}
@@ -237,6 +267,33 @@ export default function CollectionPage() {
               Add lessons: open any of your posts (or make one via <Link to="/compose?area=courses">Teach</Link>),
               tap ⋯ → “Add to collection…”, and pick this {kindWord(meta.kind).toLowerCase()}.
             </p>
+          )}
+        </div>
+      )}
+
+      {isOwner && pickOpen && (
+        <div className="colp__picker">
+          <input
+            className="prof__input"
+            placeholder="Search your posts to add as lessons…"
+            value={pickQ}
+            onChange={(e) => setPickQ(e.target.value)}
+          />
+          {pickable.length === 0 ? (
+            <p className="colp__muted">
+              {!picksLoaded
+                ? 'Loading your posts…'
+                : <>No posts to add — create one via <Link to="/compose?area=courses">Teach</Link>.</>}
+            </p>
+          ) : (
+            <div className="colp__picker-list">
+              {pickable.map((p) => (
+                <button key={p.id} className="colp__picker-row" onClick={() => void addLesson(p)}>
+                  <span className="colp__picker-title">{p.title || p.body.slice(0, 64)}</span>
+                  <Icon name="plus" size={15} />
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}

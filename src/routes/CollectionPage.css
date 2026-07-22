@@ -58,6 +58,22 @@
 .colp__addhint { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin-top: 2px; }
 .colp__addhint a { color: var(--peach-deep, var(--peach)); }
 
+/* Owner lesson picker — add your own posts as lessons */
+.colp__picker {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-3); margin-bottom: var(--s-3);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
+}
+.colp__picker-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+.colp__picker-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: 10px 12px; text-align: left; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink);
+}
+.colp__picker-row:hover { border-color: var(--peach); }
+.colp__picker-row :where(svg) { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+.colp__picker-title { font-size: 13px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .colp__list { display: flex; flex-direction: column; gap: var(--s-3); }
 
 /* Structured lesson row: progress rail + number + reorder, then the card */
