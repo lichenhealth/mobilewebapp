@@ -102,10 +102,12 @@ export default function Calendar() {
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
   const [overlayOn, setOverlayOn] = useState(false);
-  // Find-a-time works one space at a time: available when exactly one space
-  // chip is on (Mine may be on alongside).
+  // Find-a-time spans EVERY selected space (founder 2026-07-22): the more
+  // groups you add, the more availability narrows toward when ALL their
+  // members are free. Mine may be on alongside.
   const spaceSel = selectedCals.filter((x) => x !== 'me');
-  const soloSpace = spaceSel.length === 1 ? spaceSel[0] : null;
+  const spaceKey = spaceSel.join(',');
+  const primarySpace = spaceSel[0] ?? null;   // organizer when creating from a slot
   const toggleCal = (id: string) => {
     setSelectedCals((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
     setOverlayOn(false);
@@ -212,15 +214,16 @@ export default function Calendar() {
 
   // Find-a-time overlay data: the space's members' busy fragments + declared hours.
   useEffect(() => {
-    if (!overlayOn || !soloSpace || view === 'month' || view === 'schedule') { setFbRows([]); setMemberWindows([]); return; }
+    if (!overlayOn || spaceSel.length === 0 || view === 'month' || view === 'schedule') { setFbRows([]); setMemberWindows([]); return; }
     (async () => {
-      const { data } = await supabase.from('space_members').select('profile_id').eq('space_id', soloSpace);
-      const ids = ((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id);
+      const { data } = await supabase.from('space_members').select('profile_id').in('space_id', spaceSel);
+      const ids = [...new Set(((data as { profile_id: string }[] | null) ?? []).map((r) => r.profile_id))];
       setMemberIds(ids);
       const [fb, wins] = await Promise.all([freeBusy(ids, from, to), availabilityOf(ids)]);
       setFbRows(fb); setMemberWindows(wins);
     })();
-  }, [overlayOn, soloSpace, view, from, to]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayOn, spaceKey, view, from, to]);
 
   /** Free members for a 30-min slot: not busy, and (if they declared hours)
    *  inside a declared window. Members with no declared hours count as free
@@ -405,7 +408,7 @@ export default function Calendar() {
    *  ("Blair's calendar is on my screen → she's who I'm scheduling with"). */
   const composerQS = (extra: string[] = []) => {
     const parts = [...extra];
-    if (soloSpace) parts.push(`space=${soloSpace}`);
+    if (primarySpace) parts.push(`space=${primarySpace}`);
     const ids = overlays.filter((o) => o.kind === 'profile').map((o) => o.id);
     if (ids.length) parts.push(`inv=${ids.join(',')}`);
     return parts.length ? `?${parts.join('&')}` : '';
@@ -507,7 +510,7 @@ export default function Calendar() {
               {c.name}
             </button>
           ))}
-          {soloSpace && view !== 'month' && view !== 'schedule' && (
+          {spaceSel.length > 0 && view !== "month" && view !== "schedule" && (
             <button
               className={'calp__calchip calp__calchip--overlay' + (overlayOn ? ' is-on' : '')}
               onClick={() => setOverlayOn((o) => !o)}
@@ -709,7 +712,7 @@ export default function Calendar() {
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
                   {/* Find-a-time shading: greener = more members free; tap to book */}
-                  {overlayOn && soloSpace && memberIds.length > 0 &&
+                  {overlayOn && spaceSel.length > 0 && memberIds.length > 0 &&
                     Array.from({ length: 48 }, (_, s) => s * 30).map((slot) => {
                       const free = freeMembersAt(iso, slot);
                       if (free.length === 0) return null;
@@ -722,7 +725,7 @@ export default function Calendar() {
                           title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/calendar/new?space=${soloSpace}&date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
+                            navigate(`/calendar/new?${primarySpace ? `space=${primarySpace}&` : ""}date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);
                           }}
                         />
                       );
