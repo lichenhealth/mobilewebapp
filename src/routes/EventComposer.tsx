@@ -517,12 +517,14 @@ export default function EventComposer() {
         <header className="cedit__head">
           <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
           <h1 className="cedit__title">{reminderId ? 'Edit reminder' : 'New reminder'}</h1>
-          {reminderId && (
-            <button className="btn cedit__delete" onClick={removeReminder} disabled={saving}>Delete</button>
-          )}
-          <button className="btn btn-primary cedit__save" onClick={saveReminder} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <div className="cedit__actions">
+            {reminderId && (
+              <button className="btn cedit__delete" onClick={removeReminder} disabled={saving}>Delete</button>
+            )}
+            <button className="btn btn-primary cedit__save" onClick={saveReminder} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </header>
         {error && <p className="cedit__error">{error}</p>}
         <div className="cedit__body">

@@ -416,7 +416,9 @@
   border-bottom: 1px solid var(--bone-edge);
 }
 .cedit__title { font-family: var(--font-display); font-size: var(--t-lg); font-weight: 400; letter-spacing: -0.02em; }
-.cedit__save { padding: 8px 18px; }
+.cedit__actions { display: flex; align-items: center; gap: var(--s-2); }
+.cedit__save { padding: 8px 22px; white-space: nowrap; }
+.cedit__delete { white-space: nowrap; }
 .cedit__error {
   margin: var(--s-3) var(--s-4) 0; padding: 8px 12px; border-radius: var(--r-md);
   background: #F6E0DA; color: #7C3F4F; font-size: 12px;
