@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -10,7 +11,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, type CollectionRow } from '../lib/collectionsApi';
 import { setHidden } from '../lib/hiddenApi';
-import { loadFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postOpenPath, postToCard, postMedium, weaveProps, type PostMedium } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -42,6 +43,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   collections?: boolean;
 }) {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // Member-scoped section (founder 2026-07-22): /courses?member=<id> = the
+  // full Courses section, but just this member's — "Melanie's Courses".
+  const member = params.get('member');
+  const [memberName, setMemberName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -63,15 +69,20 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     let live = true;
     setReady(false);
     (async () => {
-      const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes(area));
-      if (collections) setPublicCols(await listPublicCollections());
+      const raw = member ? await loadAuthorFeed({ profileId: member }) : await loadFeed(200);
+      const feed = raw.filter((p) => postAreas(p).includes(area));
+      if (member) {
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
+        if (live) setMemberName((data as { full_name: string | null } | null)?.full_name ?? '');
+      }
+      if (collections && !member) setPublicCols(await listPublicCollections());
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, [area]);
+  }, [area, member]);
 
   const filtered = useMemo(() => {
     let list = posts;
@@ -98,14 +109,21 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   return (
     <div className="mkt">
       <header className="mkt__head">
+        {member && (
+          <button className="cmp__back mkt__memberback" onClick={() => navigate(`/members/${member}`)}>
+            <Icon name="arrow-left" size={14} /> {memberName || 'Back'}
+          </button>
+        )}
         <p className="mkt__crumb">
           <Icon name={icon} size={11} />
           <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
-          {title} <span className="display-italic">{italic}</span>
+          {member
+            ? <>{memberName}&rsquo;s <span className="display-italic">{crumb}</span></>
+            : <>{title} <span className="display-italic">{italic}</span></>}
         </h1>
-        <p className="mkt__sub">{sub}</p>
+        {!member && <p className="mkt__sub">{sub}</p>}
       </header>
 
       <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses" gutter>

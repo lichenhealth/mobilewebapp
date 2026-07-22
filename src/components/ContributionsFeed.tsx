@@ -83,6 +83,17 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const toggleArea = (a: ServiceArea) =>
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
+  // A member's area icon opens the REAL section, scoped to them ("Melanie's
+  // Courses"); AreaFeed-backed areas get their full section, the rest a scoped
+  // browse. Space profiles keep the inline filter.
+  const AREAFEED = new Set<ServiceArea>(['courses', 'library', 'work', 'art', 'food']);
+  const areaDest = (a: ServiceArea) =>
+    AREAFEED.has(a) ? `/${a}?member=${profileId}` : `/search?member=${profileId}&area=${a}`;
+  const onArea = (a: ServiceArea) => {
+    if (profileId) navigate(areaDest(a));
+    else toggleArea(a);
+  };
+
   const visible = useMemo(() => {
     const type = CONTENT_TYPES.find((t) => t.label === tab)?.value;
     return posts
@@ -117,8 +128,8 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           {areasPresent.map((a) => (
             <button
               key={a.value}
-              className={'cfeed__area' + (areas.includes(a.value) ? ' is-active' : '')}
-              onClick={() => toggleArea(a.value)}
+              className={'cfeed__area' + (!profileId && areas.includes(a.value) ? ' is-active' : '')}
+              onClick={() => onArea(a.value)}
             >
               <span className="cfeed__area-circle"><Icon name={a.icon} size={14} /></span>
               <span className="cfeed__area-label">{a.label}</span>
