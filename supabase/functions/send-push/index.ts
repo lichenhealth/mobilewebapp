@@ -1,27 +1,26 @@
 // Supabase Edge Function: send-push
 //
-// Invoked by a Database Webhook on INSERT into public.notifications (a SECOND
-// webhook alongside send-notification-email — same table, same INSERT event).
-// For each new notification it fans a Web Push out to every device the recipient
-// has subscribed (push_subscriptions). In-app bells and email are unaffected —
-// this is the phone/lock-screen channel.
+// Invoked by the push_on_notification trigger on INSERT into public.notifications
+// (via pg_net — the same mechanism as the scheduled-reminders cron). For each new
+// notification it fans a Web Push out to every device the recipient has subscribed
+// (push_subscriptions). In-app bells and email are unaffected — this is the
+// phone/lock-screen channel.
 //
-// verify_jwt is OFF (config.toml) so the webhook can reach it; instead it checks
-// a shared secret header (x-webhook-secret == NOTIFICATION_WEBHOOK_SECRET — the
-// SAME secret the email webhook uses, so no new secret to manage). Subscriptions
-// are read with the SERVICE ROLE key (auto-injected).
+// verify_jwt is OFF (config.toml); instead it checks a shared secret header
+// (x-webhook-secret == PUSH_HOOK_SECRET). Subscriptions are read with the SERVICE
+// ROLE key (auto-injected).
 //
-// Secrets/env: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT,
-// NOTIFICATION_WEBHOOK_SECRET. SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are
-// provided automatically. VAPID keys are generated once (the private half never
-// leaves the server; the public half is also hardcoded client-side).
+// Secrets/env: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PUSH_HOOK_SECRET.
+// SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are provided automatically. VAPID keys
+// are generated once (the private half never leaves the server; the public half is
+// also hardcoded client-side).
 
 import webpush from 'npm:web-push@3.6.7';
 
 const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY');
 const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY');
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:connect@lichen.health';
-const WEBHOOK_SECRET = Deno.env.get('NOTIFICATION_WEBHOOK_SECRET');
+const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 

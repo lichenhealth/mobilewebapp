@@ -30,7 +30,7 @@ create policy push_subs_own on public.push_subscriptions for all
 -- Fan each new notification out to the recipient's subscribed devices. Uses the
 -- same pg_net + Vault secret as the scheduled-reminders cron (rather than a
 -- dashboard Database Webhook) so push and the clock share one mechanism.
--- PREREQUISITES: pg_net enabled + Vault secret 'notification_webhook_secret'
+-- PREREQUISITES: pg_net enabled + Vault secret 'push_hook_secret'
 -- (see 20260821120000_scheduled_reminders.sql).
 create or replace function public.push_on_notification()
 returns trigger language plpgsql security definer set search_path = public as $fn$
@@ -42,7 +42,7 @@ begin
   end if;
   begin
     select decrypted_secret into v_secret
-      from vault.decrypted_secrets where name = 'notification_webhook_secret';
+      from vault.decrypted_secrets where name = 'push_hook_secret';
     perform net.http_post(
       url := 'https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/send-push',
       headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', coalesce(v_secret, '')),

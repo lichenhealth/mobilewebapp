@@ -8,7 +8,7 @@
 --   • pg_cron   (the minute scheduler)
 --   • pg_net    (net.http_post — already on if Database Webhooks work)
 -- AND a Vault secret holding the webhook secret (see runbook):
---   select vault.create_secret('<NOTIFICATION_WEBHOOK_SECRET value>', 'notification_webhook_secret');
+--   select vault.create_secret('<PUSH_HOOK_SECRET value>', 'push_hook_secret');
 
 -- Each member's timezone, stamped by the client heartbeat. Not sensitive; the
 -- edge function reads it with the service role to compute local fire times.
@@ -33,7 +33,7 @@ returns void language plpgsql security definer set search_path = public as $fn$
 declare v_secret text;
 begin
   select decrypted_secret into v_secret
-    from vault.decrypted_secrets where name = 'notification_webhook_secret';
+    from vault.decrypted_secrets where name = 'push_hook_secret';
   perform net.http_post(
     url := 'https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/fire-reminders',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', coalesce(v_secret, '')),

@@ -10,9 +10,9 @@
 // pointed at as "phase 2". The recurrence math below is a faithful copy of
 // src/lib/recurrence.ts — keep the two in step if either changes.
 //
-// verify_jwt OFF; gated by x-webhook-secret == NOTIFICATION_WEBHOOK_SECRET.
+// verify_jwt OFF; gated by x-webhook-secret == PUSH_HOOK_SECRET.
 
-const WEBHOOK_SECRET = Deno.env.get('NOTIFICATION_WEBHOOK_SECRET');
+const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -137,16 +137,18 @@ Deno.serve(async (req) => {
   const reminders = (await (await sb('reminders?select=id,profile_id,title,start_date,end_date,at_min,lead_min,recurrence')).json()) as Reminder[];
   if (!Array.isArray(reminders) || reminders.length === 0) return json({ ok: true, checked: 0, fired: 0 });
 
+  const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
   const ids = reminders.map((r) => r.id);
-  const recips = (await (await sb(`reminder_recipients?reminder_id=in.(${ids.join(',')})&select=reminder_id,recipient_type,recipient_id`)).json()) as
-    { reminder_id: string; recipient_type: 'profile' | 'space'; recipient_id: string }[];
+  const recips = arr<{ reminder_id: string; recipient_type: 'profile' | 'space'; recipient_id: string }>(
+    await (await sb(`reminder_recipients?reminder_id=in.(${ids.join(',')})&select=reminder_id,recipient_type,recipient_id`)).json());
 
   // Expand space recipients to their members.
   const spaceIds = [...new Set(recips.filter((r) => r.recipient_type === 'space').map((r) => r.recipient_id))];
   const spaceMembers: Record<string, string[]> = {};
   if (spaceIds.length) {
-    const mem = (await (await sb(`space_members?space_id=in.(${spaceIds.join(',')})&select=space_id,profile_id`)).json()) as
-      { space_id: string; profile_id: string }[];
+    const mem = arr<{ space_id: string; profile_id: string }>(
+      await (await sb(`space_members?space_id=in.(${spaceIds.join(',')})&select=space_id,profile_id`)).json());
     for (const m of mem) (spaceMembers[m.space_id] ??= []).push(m.profile_id);
   }
 
@@ -162,8 +164,9 @@ Deno.serve(async (req) => {
 
   // Timezones for everyone involved.
   const everyone = [...new Set(reminders.flatMap(audience))];
-  const tzRows = (await (await sb(`profiles?id=in.(${everyone.join(',')})&select=id,timezone,notification_pref`)).json()) as
-    { id: string; timezone: string | null; notification_pref: string | null }[];
+  // timezone may not exist pre-migration → select degrades; guard so we 200, not 500.
+  const tzRows = arr<{ id: string; timezone: string | null; notification_pref: string | null }>(
+    await (await sb(`profiles?id=in.(${everyone.join(',')})&select=id,timezone,notification_pref`)).json());
   const tzOf: Record<string, string | null> = {};
   const prefOf: Record<string, string | null> = {};
   for (const p of tzRows) { tzOf[p.id] = p.timezone; prefOf[p.id] = p.notification_pref; }
