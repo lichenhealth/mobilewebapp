@@ -13,10 +13,17 @@
 .calp__tool--new { background: var(--peach); border-color: var(--peach); color: #fff; }
 .calp__tool--new:active { transform: scale(0.94); }
 .calp__vselect {
-  margin-left: auto; padding: 7px 8px 7px 16px; border-radius: var(--r-full);
+  margin-left: var(--s-2); padding: 7px 8px 7px 16px; border-radius: var(--r-full);
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
   font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
 }
+/* To-Do toggle — sits just left of the view selector, both pushed right. */
+.calp__todo-toggle {
+  margin-left: auto; padding: 7px 16px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.calp__todo-toggle.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
 
 /* Search */
 .calp__search { display: flex; flex-direction: column; gap: 4px; }
