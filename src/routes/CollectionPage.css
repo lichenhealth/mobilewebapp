@@ -32,4 +32,54 @@
 }
 .colp__edit .colp__btn { align-self: flex-start; }
 
+.colp__head .offer-chips { margin-top: var(--s-2); }
+
+/* Learner loop: progress bar + Start/Continue */
+.colp__learn {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: var(--s-3); margin-bottom: var(--s-3);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
+}
+.colp__progress { flex: 1; min-width: 140px; display: flex; align-items: center; gap: var(--s-2); }
+.colp__progress-bar { flex: 1; height: 7px; border-radius: var(--r-full); background: var(--bone-edge); overflow: hidden; }
+.colp__progress-bar > span { display: block; height: 100%; background: var(--green); transition: width var(--d-mid) var(--ease-out); }
+.colp__progress-label { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.colp__start { padding: 8px 18px; font-size: 13px; white-space: nowrap; }
+
+/* Owner metadata editor */
+.colp__meta-edit { display: flex; flex-direction: column; gap: var(--s-2); }
+.colp__meta-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.01em; }
+.colp__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.colp__chip {
+  padding: 6px 12px; border-radius: var(--r-full); font-size: 12px;
+  border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink-soft);
+}
+.colp__chip.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.colp__addhint { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin-top: 2px; }
+.colp__addhint a { color: var(--peach-deep, var(--peach)); }
+
 .colp__list { display: flex; flex-direction: column; gap: var(--s-3); }
+
+/* Structured lesson row: progress rail + number + reorder, then the card */
+.colp__lesson { display: flex; gap: var(--s-2); align-items: flex-start; }
+.colp__lesson-rail {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding-top: 6px; flex-shrink: 0; width: 30px;
+}
+.colp__lesson-n { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+.colp__lesson.is-done .colp__lesson-n { color: var(--green-deep); }
+.colp__lesson-body { flex: 1; min-width: 0; }
+.colp__tick {
+  width: 26px; height: 26px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--bone-edge); background: var(--bone-warm); color: var(--green-deep);
+}
+.colp__lesson.is-done .colp__tick { background: var(--green); border-color: var(--green); color: #fff; }
+.colp__tick-dot { width: 10px; height: 10px; border-radius: var(--r-full); border: 1.5px solid var(--ink-faint); }
+.colp__reorder { display: flex; flex-direction: column; gap: 2px; }
+.colp__reorder button {
+  width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-soft); border: 1px solid var(--bone-edge); background: var(--bone-warm); border-radius: 6px;
+}
+.colp__reorder button:disabled { opacity: 0.35; }
+.colp__reorder-down :where(svg) { transform: rotate(180deg); }

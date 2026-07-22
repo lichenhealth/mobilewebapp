@@ -5,27 +5,41 @@ import { loadPostsByIds, type FeedPost } from './postsApi';
 // shelf, or published playlists/anthologies in the Lichen Library (public,
 // curator attributed). Items are posts (extensible later).
 
+export type CollectionKind = 'collection' | 'course' | 'path';
+
+/** Legible "offering" metadata for a course/path — all optional. */
+export interface OfferingMeta {
+  level?: string;    // Intro · Deepening · Advanced (or free text)
+  format?: string;   // Live · Self-paced · Mixed
+  length?: string;   // "6 weeks", "4 lessons"
+  forWhom?: string;  // "New practitioners"
+  price?: string;    // "Free", "$120", "Sliding $40–$120"
+}
+
 export interface CollectionRow {
   id: string;
   owner_id: string;
   name: string;
   description: string | null;
   is_public: boolean;
+  kind: CollectionKind;
+  details: OfferingMeta;
   created_at: string;
   owner: { full_name: string | null } | null;
   item_count: number;
 }
 
-type RawRow = Omit<CollectionRow, 'item_count' | 'owner'> & {
+type RawRow = Omit<CollectionRow, 'item_count' | 'owner' | 'details'> & {
+  details: OfferingMeta | null;
   owner: { full_name: string | null } | null;
   collection_items: { count: number }[];
 };
 
 const COLLECTION_SELECT =
-  'id, owner_id, name, description, is_public, created_at, owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
+  'id, owner_id, name, description, is_public, kind, details, created_at, owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
 
 function shape(r: RawRow): CollectionRow {
-  return { ...r, item_count: r.collection_items?.[0]?.count ?? 0 };
+  return { ...r, details: r.details ?? {}, item_count: r.collection_items?.[0]?.count ?? 0 };
 }
 
 /** My folders/playlists, newest first. */
@@ -41,24 +55,27 @@ export async function listMyCollections(): Promise<CollectionRow[]> {
   return (((data as unknown as RawRow[] | null) ?? []).map(shape));
 }
 
-/** Published collections for the Library strip, newest first. */
-export async function listPublicCollections(limit = 12): Promise<CollectionRow[]> {
-  const { data, error } = await supabase
+/** Published collections for the Library strip, newest first. Optionally scoped
+ *  to a kind ('course' | 'path') for the section shelves. */
+export async function listPublicCollections(limit = 12, kind?: CollectionKind): Promise<CollectionRow[]> {
+  let q = supabase
     .from('collections')
     .select(COLLECTION_SELECT)
     .eq('is_public', true)
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (kind) q = q.eq('kind', kind);
+  const { data, error } = await q;
   if (error) { console.warn('listPublicCollections:', error.message); return []; }
   return (((data as unknown as RawRow[] | null) ?? []).map(shape));
 }
 
-export async function createCollection(name: string): Promise<string> {
+export async function createCollection(name: string, kind: CollectionKind = 'collection'): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('collections')
-    .insert({ owner_id: user.id, name: name.trim() })
+    .insert({ owner_id: user.id, name: name.trim(), kind })
     .select('id').single();
   if (error) throw error;
   return (data as { id: string }).id;
@@ -66,9 +83,58 @@ export async function createCollection(name: string): Promise<string> {
 
 export async function updateCollection(id: string, patch: {
   name?: string; description?: string | null; is_public?: boolean;
+  kind?: CollectionKind; details?: OfferingMeta;
 }): Promise<void> {
   const { error } = await supabase.from('collections').update(patch).eq('id', id);
   if (error) throw error;
+}
+
+/** Reorder lessons: write each post's position to match the given order. */
+export async function reorderItems(collectionId: string, orderedPostIds: string[]): Promise<void> {
+  await Promise.all(orderedPostIds.map((pid, i) =>
+    supabase.from('collection_items')
+      .update({ position: i })
+      .eq('collection_id', collectionId).eq('target_type', 'post').eq('target_id', pid)));
+}
+
+// ── Learner loop: enrollment + per-lesson progress (private to each learner) ──
+
+/** Am I enrolled, and which lessons have I finished? */
+export async function loadProgress(collectionId: string): Promise<{ enrolled: boolean; done: Set<string> }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { enrolled: false, done: new Set() };
+  const [enr, prog] = await Promise.all([
+    supabase.from('collection_enrollments').select('collection_id')
+      .eq('profile_id', user.id).eq('collection_id', collectionId).maybeSingle(),
+    supabase.from('collection_progress').select('post_id')
+      .eq('profile_id', user.id).eq('collection_id', collectionId),
+  ]);
+  const done = new Set(((prog.data as { post_id: string }[] | null) ?? []).map((r) => r.post_id));
+  return { enrolled: !!enr.data, done };
+}
+
+/** Start a course/path (idempotent). */
+export async function enroll(collectionId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('collection_enrollments')
+    .upsert({ profile_id: user.id, collection_id: collectionId }, { onConflict: 'profile_id,collection_id' });
+  if (error) throw error;
+}
+
+/** Tick / untick a lesson for myself. */
+export async function setLessonDone(collectionId: string, postId: string, done: boolean): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  if (done) {
+    const { error } = await supabase.from('collection_progress')
+      .upsert({ profile_id: user.id, collection_id: collectionId, post_id: postId }, { onConflict: 'profile_id,collection_id,post_id' });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('collection_progress').delete()
+      .eq('profile_id', user.id).eq('collection_id', collectionId).eq('post_id', postId);
+    if (error) throw error;
+  }
 }
 
 /** Deleting a collection frees its posts (they stay saved/published). */

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
+import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -13,14 +14,21 @@ import {
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
 import {
-  loadCollection, updateCollection, deleteCollection, removeFromCollection,
-  type CollectionRow,
+  loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
+  loadProgress, enroll, setLessonDone,
+  type CollectionRow, type OfferingMeta,
 } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import './CollectionPage.css';
 
-/** One collection — a private shelf folder, or a playlist/anthology published
- *  to the Lichen Library. The curator arranges; everyone else just enjoys. */
+const LEVELS = ['Intro', 'Deepening', 'Advanced'];
+const FORMATS = ['Live', 'Self-paced', 'Mixed'];
+
+const kindWord = (k: CollectionRow['kind']) => (k === 'course' ? 'Course' : k === 'path' ? 'Path' : 'Collection');
+
+/** A collection — a private folder, a published playlist, or (with kind
+ *  course/path) a structured offering: ordered lessons, a legible header, and
+ *  per-learner progress. The curator arranges; learners enroll and tick along. */
 export default function CollectionPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
@@ -36,28 +44,36 @@ export default function CollectionPage() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
+  // learner progress
+  const [enrolled, setEnrolled] = useState(false);
+  const [done, setDone] = useState<Set<string>>(new Set());
   // owner editing
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [form, setForm] = useState<OfferingMeta>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setReady(false);
-    const [col, { web, vouched: myc }, recs, saves] = await Promise.all([
-      loadCollection(id), loadMyWeb(), loadMyRecommendations(), loadMySaved(),
+    const [col, prog, { web, vouched: myc }, recs, saves] = await Promise.all([
+      loadCollection(id), loadProgress(id), loadMyWeb(), loadMyRecommendations(), loadMySaved(),
     ]);
     if (!col) { setMeta(null); setReady(true); return; }
     const ov = await loadEndorsements(col.posts, myc);
     setMeta(col.meta); setPosts(col.posts);
-    setName(col.meta.name); setDescription(col.meta.description ?? '');
+    setName(col.meta.name); setDescription(col.meta.description ?? ''); setForm(col.meta.details ?? {});
+    setEnrolled(prog.enrolled); setDone(prog.done);
     setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
     setReady(true);
   }, [id]);
   useEffect(() => { void load(); }, [load]);
 
   const isOwner = !!me && meta?.owner_id === me;
+  const structured = meta?.kind === 'course' || meta?.kind === 'path';
+  const firstUnfinished = useMemo(() => posts.find((p) => !done.has(p.id)) ?? posts[0], [posts, done]);
+  const pct = posts.length ? Math.round((done.size / posts.length) * 100) : 0;
 
   async function act(fn: () => Promise<void>) {
     setBusy(true); setError('');
@@ -70,29 +86,71 @@ export default function CollectionPage() {
     catch (e) { console.error(e); }
   }
 
+  // Start / Continue: enroll (once), then open the first unfinished lesson.
+  async function startOrContinue() {
+    if (!firstUnfinished) return;
+    if (!enrolled) { await enroll(id); setEnrolled(true); }
+    navigate(postOpenPath(firstUnfinished));
+  }
+
+  function toggleLesson(postId: string) {
+    const next = !done.has(postId);
+    setDone((cur) => { const s = new Set(cur); if (next) s.add(postId); else s.delete(postId); return s; });
+    if (!enrolled && next) setEnrolled(true);
+    void setLessonDone(id, postId, next).catch((e) => { console.error(e); void load(); });
+  }
+
+  // Owner reorder — swap a lesson with its neighbour and persist the new order.
+  function move(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= posts.length) return;
+    const next = posts.slice();
+    [next[index], next[j]] = [next[j], next[index]];
+    setPosts(next);
+    void reorderItems(id, next.map((p) => p.id)).catch((e) => { console.error(e); void load(); });
+  }
+
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
+
+  const editing = isOwner && editOpen;
 
   return (
     <div className="colp">
       <header className="colp__head">
         <p className="colp__crumb">
-          <Icon name="bookmark" size={11} />
-          <span>Collection</span>
+          <Icon name={meta.kind === 'course' ? 'book' : 'bookmark'} size={11} />
+          <span>{kindWord(meta.kind)}</span>
           <em className={'colp__badge' + (meta.is_public ? ' is-public' : '')}>
             {meta.is_public ? 'Published' : 'Private'}
           </em>
         </p>
         <h1 className="colp__title display-italic">{meta.name}</h1>
         <p className="colp__by">
-          curated by{' '}
+          {structured ? 'led by' : 'curated by'}{' '}
           <Link to={`/members/${meta.owner_id}`}>{meta.owner?.full_name ?? 'a member'}</Link>
-          {' · '}{posts.length} {posts.length === 1 ? 'piece' : 'pieces'}
+          {' · '}{posts.length} {structured ? (posts.length === 1 ? 'lesson' : 'lessons') : (posts.length === 1 ? 'piece' : 'pieces')}
         </p>
         {meta.description && <p className="colp__desc">{meta.description}</p>}
+        {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} />}
       </header>
 
       {error && <p className="colp__error">{error}</p>}
+
+      {/* Learner loop: enroll + progress (structured, signed-in non-owners, has lessons). */}
+      {structured && !isOwner && me && posts.length > 0 && (
+        <div className="colp__learn">
+          {enrolled && (
+            <div className="colp__progress">
+              <div className="colp__progress-bar"><span style={{ width: `${pct}%` }} /></div>
+              <span className="colp__progress-label">{pct}% · {done.size}/{posts.length}</span>
+            </div>
+          )}
+          <button className="btn btn-primary colp__start" onClick={() => void act(startOrContinue)} disabled={busy}>
+            {!enrolled ? `Start ${kindWord(meta.kind).toLowerCase()}` : pct === 100 ? 'Revisit' : 'Continue'}
+          </button>
+        </div>
+      )}
 
       {isOwner && (
         <div className="colp__controls">
@@ -107,7 +165,7 @@ export default function CollectionPage() {
               setMeta((m) => (m ? { ...m, is_public: !m.is_public } : m));
             })}
           >
-            {meta.is_public ? 'Make private' : 'Publish to Lichen Library'}
+            {meta.is_public ? 'Make private' : `Publish to Lichen ${meta.kind === 'path' ? 'Library' : 'Courses'}`}
           </button>
           <button
             className="btn colp__btn colp__btn--danger"
@@ -123,74 +181,130 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {isOwner && editOpen && (
+      {editing && (
         <div className="colp__edit">
           <input
             className="prof__input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Collection name"
+            placeholder={`${kindWord(meta.kind)} name`}
           />
           <textarea
             className="prof__textarea"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What is this collection for? (optional — shown when published)"
+            placeholder="What is this for? What will people come away with? (shown when published)"
           />
+          {structured && (
+            <div className="colp__meta-edit">
+              <span className="colp__meta-label">Level</span>
+              <div className="colp__chips">
+                {LEVELS.map((l) => (
+                  <button key={l} type="button"
+                    className={'colp__chip' + (form.level === l ? ' is-on' : '')}
+                    onClick={() => setForm((f) => ({ ...f, level: f.level === l ? undefined : l }))}>{l}</button>
+                ))}
+              </div>
+              <span className="colp__meta-label">Format</span>
+              <div className="colp__chips">
+                {FORMATS.map((l) => (
+                  <button key={l} type="button"
+                    className={'colp__chip' + (form.format === l ? ' is-on' : '')}
+                    onClick={() => setForm((f) => ({ ...f, format: f.format === l ? undefined : l }))}>{l}</button>
+                ))}
+              </div>
+              <input className="prof__input" value={form.length ?? ''} placeholder="Length (e.g. 6 weeks, 4 lessons)"
+                onChange={(e) => setForm((f) => ({ ...f, length: e.target.value || undefined }))} />
+              <input className="prof__input" value={form.forWhom ?? ''} placeholder="Who it's for (e.g. new practitioners)"
+                onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
+              <input className="prof__input" value={form.price ?? ''} placeholder="Price / access (e.g. Free, $120, Sliding $40–$120)"
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value || undefined }))} />
+            </div>
+          )}
           <button
             className="btn btn-primary colp__btn"
             disabled={busy || !name.trim()}
             onClick={() => void act(async () => {
-              await updateCollection(id, { name: name.trim(), description: description.trim() || null });
-              setMeta((m) => (m ? { ...m, name: name.trim(), description: description.trim() || null } : m));
+              await updateCollection(id, { name: name.trim(), description: description.trim() || null, details: form });
+              setMeta((m) => (m ? { ...m, name: name.trim(), description: description.trim() || null, details: form } : m));
               setEditOpen(false);
             })}
           >
             Save
           </button>
+          {structured && (
+            <p className="colp__addhint">
+              Add lessons: open any of your posts (or make one via <Link to="/compose?area=courses">Teach</Link>),
+              tap ⋯ → “Add to collection…”, and pick this {kindWord(meta.kind).toLowerCase()}.
+            </p>
+          )}
         </div>
       )}
 
       <section className="colp__list">
         {posts.length === 0 && (
           <p className="colp__muted">
-            Nothing here yet{isOwner ? ' — add pieces from your Saved shelf.' : '.'}
+            {structured ? 'No lessons yet' : 'Nothing here yet'}
+            {isOwner ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}
-        {posts.map((p) => (
-          <FeedCard
-            key={p.id}
-            {...postToCard(p, me || undefined)}
-            {...weaveProps(p, myWebSet, me || undefined)}
-            trusted={myMyc.has('profile:' + p.author_id)}
-            recommended={myRecs.has('post:' + p.id)}
-            saved={mySaves.has('post:' + p.id)}
-            mycelium={overlays[p.id]}
-            availability={{ trust: !!me && p.author_id !== me }}
-            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
-            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
-            onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
-            extraMenuItems={[
-              ...(me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : []),
-              ...(isOwner ? [{
-                label: 'Remove from this collection',
-                onClick: () => {
-                  void removeFromCollection(id, p.id)
-                    .then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id)))
-                    .catch(console.error);
-                },
-              }] : []),
-            ]}
-            viewerIsAuthor={p.author_id === me}
-            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
-            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
-            onOpen={() => navigate(postOpenPath(p))}
-            onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-          />
-        ))}
+        {posts.map((p, i) => {
+          const card = (
+            <FeedCard
+              key={p.id}
+              {...postToCard(p, me || undefined)}
+              {...weaveProps(p, myWebSet, me || undefined)}
+              trusted={myMyc.has('profile:' + p.author_id)}
+              recommended={myRecs.has('post:' + p.id)}
+              saved={mySaves.has('post:' + p.id)}
+              mycelium={overlays[p.id]}
+              availability={{ trust: !!me && p.author_id !== me }}
+              onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+              onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+              onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
+              extraMenuItems={[
+                ...(me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : []),
+                ...(isOwner ? [{
+                  label: 'Remove from this collection',
+                  onClick: () => {
+                    void removeFromCollection(id, p.id)
+                      .then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id)))
+                      .catch(console.error);
+                  },
+                }] : []),
+              ]}
+              viewerIsAuthor={p.author_id === me}
+              onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+              onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+              onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+              onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+              onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+              onOpen={() => navigate(postOpenPath(p))}
+              onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
+            />
+          );
+          if (!structured) return card;
+          return (
+            <div className={'colp__lesson' + (done.has(p.id) ? ' is-done' : '')} key={p.id}>
+              <div className="colp__lesson-rail">
+                {me && !isOwner && (
+                  <button className="colp__tick" onClick={() => toggleLesson(p.id)}
+                    aria-pressed={done.has(p.id)} aria-label={done.has(p.id) ? 'Mark not done' : 'Mark done'}>
+                    {done.has(p.id) ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}
+                  </button>
+                )}
+                <span className="colp__lesson-n">{i + 1}</span>
+                {editing && (
+                  <span className="colp__reorder">
+                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><Icon name="arrow-up" size={13} /></button>
+                    <button className="colp__reorder-down" onClick={() => move(i, 1)} disabled={i === posts.length - 1} aria-label="Move down"><Icon name="arrow-up" size={13} /></button>
+                  </span>
+                )}
+              </div>
+              <div className="colp__lesson-body">{card}</div>
+            </div>
+          );
+        })}
       </section>
     </div>
   );

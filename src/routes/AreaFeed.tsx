@@ -9,7 +9,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
-import { listPublicCollections, type CollectionRow } from '../lib/collectionsApi';
+import { listPublicCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
+import OfferingChips from '../components/OfferingChips';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postOpenPath, postToCard, postMedium, weaveProps, type PostMedium } from '../lib/feedMapping';
@@ -28,7 +29,7 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, createLabel }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -41,6 +42,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   mediaLenses?: boolean;
   /** Published collections strip (Library): playlists & anthologies. */
   collections?: boolean;
+  /** Structured offerings shelf + create door: 'course' (Courses) or 'path' (Library). */
+  structuredKind?: CollectionKind;
+  /** The + label for creating a structured offering, e.g. "New course". */
+  createLabel?: string;
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -63,6 +68,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   // All lenses start ON (founder): everything shows; deselect to narrow.
   const [media, setMedia] = useState<PostMedium[]>(MEDIA_LENSES.map((m) => m.medium));
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
+  const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -75,7 +81,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
         if (live) setMemberName((data as { full_name: string | null } | null)?.full_name ?? '');
       }
-      if (collections && !member) setPublicCols(await listPublicCollections());
+      if (collections && !member) setPublicCols(await listPublicCollections(12, 'collection'));
+      if (structuredKind && !member) setStructuredCols(await listPublicCollections(12, structuredKind));
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
@@ -103,6 +110,15 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
+    catch (e) { console.error(e); }
+  }
+
+  // Create a structured course/path, then open it (owner drops into edit mode).
+  async function createStructured() {
+    if (!structuredKind || !me) return;
+    const nm = window.prompt(`Name your ${structuredKind}`)?.trim();
+    if (!nm) return;
+    try { navigate(`/collections/${await createCollection(nm, structuredKind)}`); }
     catch (e) { console.error(e); }
   }
 
@@ -138,6 +154,12 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
           <span className="mkt__action-label">{addLabel}</span>
         </button>
+        {structuredKind && me && (
+          <button className="mkt__action" onClick={() => void createStructured()}>
+            <span className="mkt__action-circle"><Icon name={icon} size={14} /></span>
+            <span className="mkt__action-label">{createLabel ?? `New ${structuredKind}`}</span>
+          </button>
+        )}
         {mediaLenses && (
           <>
             <div className="mkt__action-spacer" />
@@ -174,6 +196,24 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
             </button>
           )}
         </div>
+      )}
+
+      {/* Structured offerings — courses (Courses) / paths (Library). */}
+      {structuredKind && structuredCols.length > 0 && (
+        <>
+          <p className="afeed__shelf-label">{structuredKind === 'course' ? 'Courses' : 'Paths'} to follow</p>
+          <ScrollHintRow className="afeed__courses h-scroll">
+            {structuredCols.map((c) => (
+              <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
+                <span className="afeed__course-name">{c.name}</span>
+                <span className="afeed__course-by">
+                  {c.owner?.full_name ?? 'a member'} · {c.item_count} {c.item_count === 1 ? 'lesson' : 'lessons'}
+                </span>
+                <OfferingChips meta={c.details} lessonCount={c.item_count} />
+              </button>
+            ))}
+          </ScrollHintRow>
+        </>
       )}
 
       {/* Published playlists & anthologies — curation as contribution. */}
