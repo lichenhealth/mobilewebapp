@@ -11,10 +11,19 @@ create table public.reminder_recipients (
 );
 alter table public.reminder_recipients enable row level security;
 
+-- SECURITY DEFINER ownership check — breaks the RLS cycle (reminder_recipients'
+-- owner policy would otherwise read `reminders`, whose recipient-read policy
+-- reads `reminder_recipients` back → 42P17 infinite recursion; the events
+-- is_event_attendee() pattern).
+create or replace function public.owns_reminder(p_reminder uuid)
+returns boolean language sql security definer stable set search_path = public as $fn$
+  select exists (select 1 from public.reminders where id = p_reminder and profile_id = auth.uid());
+$fn$;
+
 -- The reminder's owner manages its recipients.
 create policy reminder_recipients_owner on public.reminder_recipients for all
-  using (exists (select 1 from public.reminders r where r.id = reminder_id and r.profile_id = auth.uid()))
-  with check (exists (select 1 from public.reminders r where r.id = reminder_id and r.profile_id = auth.uid()));
+  using (public.owns_reminder(reminder_id))
+  with check (public.owns_reminder(reminder_id));
 -- A recipient may read rows that name them (to show "shared with you").
 create policy reminder_recipients_read on public.reminder_recipients for select
   using (
@@ -46,7 +55,7 @@ create policy reminder_done_self on public.reminder_done for all
 -- Notify a reminder's recipients (called by the app after create/update).
 -- SECURITY DEFINER to resolve space members; only the owner may call it.
 create or replace function public.notify_reminder(p_reminder uuid)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public as $func$
 declare r record;
 begin
   select * into r from reminders where id = p_reminder;
@@ -62,4 +71,4 @@ begin
       where rr.reminder_id = p_reminder and rr.recipient_type = 'space'
   ) t
   where t.pid <> auth.uid();
-end $$;
+end $func$;
