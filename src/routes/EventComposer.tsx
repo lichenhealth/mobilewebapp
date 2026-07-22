@@ -517,11 +517,11 @@ export default function EventComposer() {
               <div className="rec__row">
                 <TimeField value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
                 <select className="rec__select rec__select--inline" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))} aria-label="How early to alert">
-                  <option value={0}>at the time</option>
-                  <option value={10}>10 min early</option>
-                  <option value={30}>30 min early</option>
-                  <option value={60}>1 hour early</option>
-                  <option value={1440}>1 day early</option>
+                  <option value={0}>on time</option>
+                  <option value={10}>10 mins before</option>
+                  <option value={30}>30 mins before</option>
+                  <option value={60}>1 hour before</option>
+                  <option value={1440}>1 day before</option>
                 </select>
               </div>
             ) : (

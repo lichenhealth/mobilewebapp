@@ -349,7 +349,11 @@ export default function MyceliumDirectory() {
                   <span className="mycdir__row-name">
                     {e.name}
                     {e.type === 'profile' && awakeSet.has(e.id) && (
-                      <em className="mycdir__awake">awake recently</em>
+                      <span className="mycdir__awake">
+                        <span className="mycdir__awake-dot" aria-hidden="true" />
+                        <span aria-hidden="true">✨</span>
+                        awake
+                      </span>
                     )}
                   </span>
                   {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
