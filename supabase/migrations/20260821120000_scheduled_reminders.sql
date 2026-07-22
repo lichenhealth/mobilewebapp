@@ -42,4 +42,4 @@ begin
 end $fn$;
 
 -- Every minute. (Re-running this file? unschedule first: select cron.unschedule('fire-reminders');)
-select cron.schedule('fire-reminders', '* * * * *', $$select public.tick_reminders();$$);
+select cron.schedule('fire-reminders', '* * * * *', $sql$select public.tick_reminders();$sql$);
