@@ -478,6 +478,8 @@ export default function Calendar() {
             <button className="calp__month" onClick={() => setAnchor(todayISO())}>{headerLabel}</button>
             <button className="calp__navbtn" onClick={() => page(1)} aria-label="Next"><Icon name="chevron-right" size={16} /></button>
           </div>
+          {/* Wrap break: search + date on row 1, action controls together on row 2 (narrow screens). */}
+          <span className="calp__tbbreak" aria-hidden="true" />
           <button
             className={'calp__todo-toggle' + (view === 'todo' ? ' is-on' : '')}
             onClick={toggleTodo}
