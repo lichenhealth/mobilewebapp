@@ -253,7 +253,7 @@ const ICONS: Record<IconName, IconEntry> = {
   'plus': {
     viewBox: '61 211 30 30',
     strokeWidth: 1.88,
-    content: <><path d="M76 241C84.2844 241 91 234.284 91 226C91 217.716 84.2844 211 76 211C67.7157 211 61 217.716 61 226C61 234.284 67.7157 241 76 241Z" fill="white" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M76 219.077V232.923Z" fill="white"/><path d="M76 219.077V232.923" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M69.0762 226H82.9223Z" fill="white"/><path d="M69.0762 226H82.9223" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+    content: <><path d="M76 241C84.2844 241 91 234.284 91 226C91 217.716 84.2844 211 76 211C67.7157 211 61 217.716 61 226C61 234.284 67.7157 241 76 241Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M76 219.077V232.923" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M69.0762 226H82.9223" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'profile': {
     viewBox: '0 0 26 26',

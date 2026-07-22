@@ -1155,6 +1155,8 @@
   border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink);
   font-size: 13px; font-family: inherit; cursor: pointer;
 }
+/* Alert lead sits inline beside the time picker — sized to its content. */
+.rec__select--inline { width: auto; min-width: 128px; }
 .rec__custom {
   display: flex; flex-direction: column; gap: var(--s-2);
   padding: var(--s-3); border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: var(--bone);

@@ -100,3 +100,15 @@ input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--peach);
 }
+
+/* Keyboard/selection focus ring is brand peach, never the OS blue. Applies
+   wherever a control doesn't already draw its own focus treatment. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 1px;
+}

@@ -491,7 +491,7 @@ export default function Profile() {
             : `${myTeam.length} ${myTeam.length === 1 ? 'person' : 'people'} on your care team.`}
         </p>
         <button className="prof__care-dash" onClick={() => navigate('/concierge/team?from=profile')}>
-          Set up my care team
+          Manage my care team
           <span aria-hidden="true"> →</span>
         </button>
       </section>
