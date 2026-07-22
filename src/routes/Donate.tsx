@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../auth/AuthProvider';
 import './Donate.css';
 
 const PORTAL = 'https://billing.stripe.com/p/login/9B6bJ00MU047bRidT3bII00';
@@ -54,6 +55,7 @@ export default function Donate() {
   const [params] = useSearchParams();
   const status = params.get('status');
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<Freq>('one-time');
@@ -172,12 +174,22 @@ export default function Donate() {
         <p className="donate__sub">
           Thank you for investing in a more balanced and healthy future.
         </p>
-        <button
-          type="button" className="donate__how-link"
-          onClick={() => navigate('/donate/how')}
-        >
-          How giving works →
-        </button>
+        <div className="donate__head-links">
+          <button
+            type="button" className="donate__how-link"
+            onClick={() => navigate('/donate/how')}
+          >
+            How giving works →
+          </button>
+          {user && (
+            <button
+              type="button" className="donate__how-link"
+              onClick={() => navigate('/giving')}
+            >
+              My giving →
+            </button>
+          )}
+        </div>
       </header>
 
       {/* The two ways in — the IRS conduit rule as columns. */}

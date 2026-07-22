@@ -49,6 +49,11 @@ export default function RoutingDesk() {
   const navigate = useNavigate();
   const [entrusted, setEntrusted] = useState<Listing[] | null>(null);
   const [matches, setMatches] = useState<Record<string, Match[]>>({});
+  // In-kind donation offers, keyed by post id — accepting passes title to
+  // Lichen and triggers the acknowledgment email.
+  const [inkind, setInkind] = useState<Record<string, { id: string }>>({});
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -90,6 +95,16 @@ export default function RoutingDesk() {
       }
       setEntrusted(offerings);
       setMatches(m);
+
+      // In-kind offers waiting for acceptance (quietly absent pre-migration).
+      const { data: ik } = await supabase.from('inkind_donations')
+        .select('id, post_id').eq('status', 'offered');
+      if (!live) return;
+      const ikMap: Record<string, { id: string }> = {};
+      for (const row of (ik as { id: string; post_id: string | null }[] | null) ?? []) {
+        if (row.post_id) ikMap[row.post_id] = { id: row.id };
+      }
+      setInkind(ikMap);
     })();
     return () => { live = false; };
   }, []);
@@ -98,6 +113,24 @@ export default function RoutingDesk() {
 
   const message = async (profileId: string) => {
     try { navigate(`/chat/${await ensureDirectChat(profileId)}`); } catch (e) { console.error(e); }
+  };
+
+  const acceptDonation = async (postId: string) => {
+    const row = inkind[postId];
+    if (!row) return;
+    setBusy(true); setNote('');
+    try {
+      const { error } = await supabase.rpc('accept_inkind_donation', { p_id: row.id });
+      if (error) throw error;
+      const { error: mailErr } = await supabase.functions.invoke('inkind-receipt', { body: { id: row.id } });
+      setNote(mailErr
+        ? 'Accepted — but the receipt email failed; retry from the dashboard.'
+        : 'Accepted — title passed to Lichen, acknowledgment emailed.');
+      setInkind((cur) => { const n = { ...cur }; delete n[postId]; return n; });
+    } catch (e) {
+      setNote((e as { message?: string } | null)?.message || 'Could not accept.');
+    }
+    setBusy(false);
   };
   const name = (l: Listing) => l.author?.full_name ?? 'A member';
   const label = (l: Listing) => l.title || (l.body.length > 60 ? l.body.slice(0, 57) + '…' : l.body);
@@ -110,6 +143,8 @@ export default function RoutingDesk() {
         asks — ranked by shared words and style affinity. The steward
         completes what the algorithm proposes.
       </p>
+
+      {note && <p className="curc__error">{note}</p>}
 
       {entrusted.length === 0 && (
         <p className="curc__empty">
@@ -128,9 +163,19 @@ export default function RoutingDesk() {
           {styleTagsOf(o).length > 0 && (
             <p className="curc__routing-styles">{styleTagsOf(o).join(' · ')}</p>
           )}
+          {inkind[o.id] && (
+            <p className="curc__donation-kind">
+              Offered as a donation to Lichen — accepting passes title and emails the receipt
+            </p>
+          )}
           <div className="curc__routing-acts">
             <button className="curc__keep" onClick={() => navigate(`/posts/${o.id}`)}>View listing</button>
             <button className="curc__keep" onClick={() => void message(o.author_id)}>Message giver</button>
+            {inkind[o.id] && (
+              <button className="btn btn-primary curc__go" disabled={busy} onClick={() => void acceptDonation(o.id)}>
+                Accept as donation
+              </button>
+            )}
           </div>
 
           {(matches[o.id] ?? []).length === 0 ? (

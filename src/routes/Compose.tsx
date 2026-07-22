@@ -74,6 +74,10 @@ export default function Compose() {
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
+  // In-kind DONATION: title passes to Lichen (the Goodwill move) — that's
+  // what makes a tax acknowledgment legal. Offered under Lichen*; a steward
+  // accepts on the routing desk, and the receipt email follows.
+  const [inkind, setInkind] = useState(false);
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
   const [title, setTitle] = useState('');
@@ -284,6 +288,7 @@ export default function Compose() {
             : evMode === 'paid' ? (sliding ? 'sliding' : 'sale')
             : evMode;
           if (evMode === 'lichen') details.allocation = 'lichen';
+          if (evMode === 'lichen' && inkind) details.inkind = true;
         }
       }
       if (media.length) details.media = media;
@@ -364,6 +369,16 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
         });
+        // In-kind donation offer: record it for the routing desk + the
+        // donor's private My-giving dashboard. Fire-and-forget — the post
+        // never fails over the record; pre-migration this quietly no-ops.
+        if (isMarket && evMode === 'lichen' && inkind && created?.id && user) {
+          void supabase.from('inkind_donations').insert({
+            donor_profile_id: user.id,
+            post_id: created.id,
+            description: title.trim() || body.trim().slice(0, 140) || 'Donated item',
+          }).then(() => {}, () => {});
+        }
         // Visual style, stage 1: marketplace listings with a photo get style
         // tags (Claude vision, controlled vocabulary) written back into
         // details — fire-and-forget, a post never waits on or fails over this.
@@ -555,6 +570,12 @@ export default function Compose() {
               contribution — allocated where it closes the most need.{' '}
               <a href="/donate/how#economy" target="_blank" rel="noopener">Learn more</a>
             </p>
+          )}
+          {!isEvent && evMode === 'lichen' && (
+            <label className="cmp__sliding" title="Ownership passes to Lichen Health, a 501(c)(3) — once a steward accepts, your donation acknowledgment is emailed for your tax records">
+              <input type="checkbox" checked={inkind} onChange={(e) => setInkind(e.target.checked)} />
+              {' '}Donate it to Lichen — tax-deductible; a donation receipt follows when accepted
+            </label>
           )}
           {evMode === 'paid' && (
             <label className="cmp__sliding">

@@ -304,3 +304,29 @@
   text-decoration: underline; text-underline-offset: 3px;
 }
 .donate__how-link:hover { color: var(--rust, #b4553a); }
+
+/* My giving — the private dashboard */
+.giving__total {
+  border: 1px solid var(--peach); border-radius: var(--r-md);
+  background: var(--peach-tint, #f8e8dd); padding: var(--s-3) var(--s-4);
+  font-size: var(--t-sm); color: var(--ink); line-height: 1.5;
+}
+.giving__row {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: var(--s-3) var(--s-4);
+}
+.giving__row + .giving__row { margin-top: var(--s-2); }
+.giving__row-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.giving__row-head strong { font-size: var(--t-base); color: var(--ink); }
+.giving__row-head em {
+  margin-left: auto; font-style: normal; font-family: var(--font-mono);
+  font-size: 10px; color: var(--ink-faint);
+}
+.giving__kind {
+  font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--moss, #6b7f5e);
+}
+.giving__kind.is-gift { color: var(--rust, #b4553a); }
+.giving__say { font-size: 13px; font-style: italic; color: var(--ink-soft); margin: 4px 0 0; }
+.giving__ref { font-size: 11px; color: var(--ink-faint); margin: 4px 0 0; }
+.donate__head-links { display: flex; gap: var(--s-4); flex-wrap: wrap; }
