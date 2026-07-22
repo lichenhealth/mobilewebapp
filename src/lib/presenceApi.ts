@@ -21,24 +21,36 @@ export async function awakeList(): Promise<AwakeMember[]> {
 }
 
 export interface MyPresence {
-  visible: boolean;               // ALWAYS mode: show whenever awake
-  litUntil: string | null;        // BY-HAND mode: candle lit until this moment
+  visible: boolean;               // AROUND (dot): show I'm online — default on
+  alwaysPresent: boolean;         // PRESENT (candle) whenever online
+  litUntil: string | null;        // PRESENT (candle) lit by hand until this moment
 }
 
 /** My own presence choice — null when the feature isn't live yet. */
 export async function myPresence(me: string): Promise<MyPresence | null> {
   const { data, error } = await supabase.from('profiles')
-    .select('presence_visible, presence_lit_until').eq('id', me).maybeSingle();
+    .select('presence_visible, presence_always_present, presence_lit_until').eq('id', me).maybeSingle();
   if (error) return null;
-  const d = data as { presence_visible?: boolean; presence_lit_until?: string | null } | null;
+  const d = data as { presence_visible?: boolean; presence_always_present?: boolean; presence_lit_until?: string | null } | null;
   if (d?.presence_visible === undefined) return null;
-  return { visible: d.presence_visible ?? false, litUntil: d.presence_lit_until ?? null };
+  return {
+    visible: d.presence_visible ?? true,
+    alwaysPresent: d.presence_always_present ?? false,
+    litUntil: d.presence_lit_until ?? null,
+  };
 }
 
-/** ALWAYS mode on/off. Turning it on snuffs any hand-lit candle (redundant). */
+/** AROUND (the dot) on/off — independent of the candle. */
 export async function setPresenceVisible(me: string, on: boolean): Promise<void> {
   const { error } = await supabase.from('profiles')
-    .update({ presence_visible: on, ...(on ? { presence_lit_until: null } : {}) }).eq('id', me);
+    .update({ presence_visible: on }).eq('id', me);
+  if (error) throw error;
+}
+
+/** PRESENT-always (candle whenever online) on/off. */
+export async function setAlwaysPresent(me: string, on: boolean): Promise<void> {
+  const { error } = await supabase.from('profiles')
+    .update({ presence_always_present: on }).eq('id', me);
   if (error) throw error;
 }
 
