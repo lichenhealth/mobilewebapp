@@ -99,7 +99,7 @@ export default function TodoView({
                       aria-label={done ? 'Mark not done' : 'Mark done'}
                       onClick={() => onToggleRem(r, iso)}
                     >{done ? '✓' : ''}</button>
-                    <button className="todo__title todo__title--btn" onClick={() => navigate(`/calendar/new?reminder=${r.id}`)}>
+                    <button className="todo__title todo__title--btn" onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}>
                       {r.title}
                       {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
                     </button>
