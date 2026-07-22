@@ -18,7 +18,7 @@ import {
 } from '../lib/conciergeApi';
 import { minToLabel } from '../lib/calendarApi';
 import {
-  loadCareLinks, inviteCare, approveCare, removeCare, cancelCareInvite,
+  loadCareLinks, inviteCare, addCareCaregiverById, approveCare, removeCare, cancelCareInvite,
   copyCareInvite, sendCareInviteEmail, type CareLink, type CareInvite,
 } from '../lib/careTeamApi';
 import { occursOn } from '../lib/recurrence';
@@ -418,6 +418,11 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  // Add type-ahead: recognize existing members by name; fall back to email or
+  // phone for non-members.
+  const [hits, setHits] = useState<{ id: string; full_name: string | null; headline: string | null }[]>([]);
+  const isEmail = (s: string) => /\S+@\S+\.\S+/.test(s.trim());
+  const isPhone = (s: string) => /^[\d\s()+.-]{7,}$/.test(s.trim());
 
   const load = useCallback(async () => {
     const [r, care, prof] = await Promise.all([
@@ -445,6 +450,34 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
     setBusy(false);
     setMsg(res.message);
     if (res.ok) { setEmail(''); void load(); }
+  }
+
+  // Name type-ahead — existing members (skip when it looks like email/phone).
+  useEffect(() => {
+    const q = email.trim();
+    if (!managing || q.length < 2 || isEmail(q) || isPhone(q)) { setHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name, headline').ilike('full_name', `%${q}%`).limit(5);
+      if (live) setHits(((data as { id: string; full_name: string | null; headline: string | null }[] | null) ?? []).filter((m) => m.id !== me));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [email, managing, me]);
+
+  async function addExisting(id: string) {
+    setBusy(true); setMsg('');
+    const res = await addCareCaregiverById(id);
+    setBusy(false); setMsg(res.message);
+    if (res.ok) { setEmail(''); setHits([]); void load(); }
+  }
+
+  async function copyPhoneInvite() {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}/signup`);
+      setMsg(`Invite link copied — text it to ${email.trim()}. Add them here once they join.`);
+      setEmail('');
+    } catch { setMsg('Could not copy the link.'); }
   }
 
   // Rich roster data (avatar/headline/phone) exists for ACTIVE caregivers;
@@ -550,13 +583,38 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
       ))}
 
       {ready && managing && (
-        <div className="conc__team-add">
-          <input className="conc__team-input" type="email" value={email}
-            onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && email.trim() && !busy) void invite(); }}
-            placeholder="Add a caregiver by email" />
-          <button className="btn btn-primary conc__team-btn" disabled={busy || !email.trim()}
-            onClick={() => { void invite(); }}>Invite</button>
+        <div className="conc__team-addwrap">
+          <div className="conc__team-add">
+            <input className="conc__team-input" value={email}
+              onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || busy || !email.trim()) return;
+                if (isPhone(email)) void copyPhoneInvite(); else void invite();
+              }}
+              placeholder="Add to your care team — name, email, or phone" />
+            {isPhone(email) ? (
+              <button className="btn btn-primary conc__team-btn" disabled={busy}
+                onClick={() => { void copyPhoneInvite(); }}>Copy invite</button>
+            ) : isEmail(email) ? (
+              <button className="btn btn-primary conc__team-btn" disabled={busy}
+                onClick={() => { void invite(); }}>Invite</button>
+            ) : null}
+          </div>
+          {hits.length > 0 && (
+            <div className="conc__team-hits">
+              {hits.map((h) => (
+                <button className="conc__team-hit" key={h.id} disabled={busy}
+                  onClick={() => { void addExisting(h.id); }}>
+                  <span className="conc__team-name">{h.full_name ?? 'Member'}</span>
+                  {h.headline && <span className="conc__team-sub">{h.headline}</span>}
+                  <span className="conc__team-hit-add" aria-hidden>Add</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {email.trim().length >= 2 && !hits.length && !isEmail(email) && !isPhone(email) && (
+            <p className="conc__team-hint">No member by that name — type their email or phone to invite them to Lichen.</p>
+          )}
         </div>
       )}
       {msg && <p className="conc__team-msg">{msg}</p>}

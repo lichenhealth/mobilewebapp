@@ -1223,7 +1223,29 @@
 .conc__team-muted { font-size: 13px; color: var(--ink-faint); }
 .conc__team-who--static { cursor: default; }
 .conc__team-who--static:hover { background: transparent; }
-.conc__team-add { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
+.conc__team-addwrap { margin-top: var(--s-3); }
+.conc__team-add { display: flex; gap: var(--s-2); }
+.conc__team-hits {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 6px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 6px;
+}
+.conc__team-hit {
+  display: flex; align-items: baseline; gap: 8px; text-align: left;
+  background: transparent; border: 0; padding: 8px 10px; border-radius: var(--r-sm);
+  cursor: pointer; font-family: inherit; width: 100%;
+}
+.conc__team-hit:hover { background: var(--bone-warm); }
+.conc__team-hit .conc__team-name { font-size: 14px; color: var(--ink); }
+.conc__team-hit .conc__team-sub {
+  font-size: 11px; color: var(--ink-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.conc__team-hit-add {
+  margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 600;
+  color: var(--peach-deep); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.conc__team-hint { font-size: 12px; color: var(--ink-faint); margin-top: 6px; line-height: 1.5; }
 .conc__team-input {
   flex: 1; min-width: 0; padding: 9px 12px; border-radius: var(--r-md);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);

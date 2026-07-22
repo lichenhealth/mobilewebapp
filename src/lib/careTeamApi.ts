@@ -97,6 +97,20 @@ export async function inviteCare(
   return { ok: true, message: 'Request sent — pending their approval.' };
 }
 
+/** Add an EXISTING member as your caregiver by id (the type-ahead path) —
+ *  a pending request they approve, same as the email flow's found-member arm. */
+export async function addCareCaregiverById(caregiverId: string): Promise<{ ok: boolean; message: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Not signed in.' };
+  if (caregiverId === user.id) return { ok: false, message: 'That one is you!' };
+  const { error } = await supabase.from('care_team_members')
+    .insert({ patient_id: user.id, caregiver_id: caregiverId, initiated_by: user.id, status: 'pending' });
+  if (error) {
+    return { ok: false, message: /duplicate|unique/i.test(error.message) ? 'That care connection already exists.' : error.message };
+  }
+  return { ok: true, message: 'Request sent — pending their approval.' };
+}
+
 export async function approveCare(id: string): Promise<void> {
   const { error } = await supabase.from('care_team_members').update({ status: 'active' }).eq('id', id);
   if (error) throw error;
