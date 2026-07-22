@@ -26,3 +26,40 @@ alter table public.push_subscriptions enable row level security;
 create policy push_subs_own on public.push_subscriptions for all
   using (profile_id = auth.uid())
   with check (profile_id = auth.uid());
+
+-- Fan each new notification out to the recipient's subscribed devices. Uses the
+-- same pg_net + Vault secret as the scheduled-reminders cron (rather than a
+-- dashboard Database Webhook) so push and the clock share one mechanism.
+-- PREREQUISITES: pg_net enabled + Vault secret 'notification_webhook_secret'
+-- (see 20260821120000_scheduled_reminders.sql).
+create or replace function public.push_on_notification()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare v_secret text;
+begin
+  -- Skip the round-trip when the recipient has no subscribed device.
+  if not exists (select 1 from public.push_subscriptions where profile_id = new.recipient_id) then
+    return new;
+  end if;
+  begin
+    select decrypted_secret into v_secret
+      from vault.decrypted_secrets where name = 'notification_webhook_secret';
+    perform net.http_post(
+      url := 'https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/send-push',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', coalesce(v_secret, '')),
+      body := jsonb_build_object(
+        'type', 'INSERT',
+        'record', jsonb_build_object(
+          'recipient_id', new.recipient_id, 'type', new.type,
+          'title', new.title, 'body', new.body, 'link', new.link
+        )
+      )
+    );
+  exception when others then
+    null;  -- a push hiccup must NEVER block the in-app bell
+  end;
+  return new;
+end $fn$;
+
+create trigger push_on_notification
+  after insert on public.notifications
+  for each row execute function public.push_on_notification();
