@@ -295,6 +295,12 @@
 .calp__vselect:focus, .cset__select:focus, .timefield:focus {
   outline: 2px solid var(--peach); outline-offset: 1px;
 }
+/* Native time input (per-minute reminder alert): drop the dropdown chevron and
+   keep the platform's own hour/minute picker. */
+.timefield--native {
+  appearance: auto; -webkit-appearance: auto;
+  background-image: none; padding-right: 8px;
+}
 
 
 /* Calendar chips (Mine + spaces) + availability overlay */

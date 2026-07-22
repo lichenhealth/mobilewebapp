@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import DateRangeCalendar, { DateRange } from '../components/DateRangeCalendar';
 import RecurrenceSelect from '../components/RecurrenceSelect';
 import TimeField from '../components/TimeField';
+import TimeInput from '../components/TimeInput';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
@@ -587,7 +588,7 @@ export default function EventComposer() {
                 </label>
                 {remHasTime ? (
                   <div className="rec__row">
-                    <TimeField value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
+                    <TimeInput value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
                     <select className="rec__select rec__select--inline" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))} aria-label="How early to alert">
                       <option value={0}>on time</option>
                       <option value={10}>10 mins before</option>
