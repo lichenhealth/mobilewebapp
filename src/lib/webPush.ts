@@ -52,11 +52,13 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-/** Register the service worker (idempotent) and return its registration. */
+/** Register the service worker (idempotent) and return an ACTIVE registration.
+ *  iOS rejects pushManager.subscribe() on a worker that isn't active yet, so we
+ *  wait for navigator.serviceWorker.ready rather than the bare registration. */
 async function ready(): Promise<ServiceWorkerRegistration> {
   const existing = await navigator.serviceWorker.getRegistration('/');
-  if (existing) return existing;
-  return navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  if (!existing) await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  return navigator.serviceWorker.ready;   // resolves only once a worker is active
 }
 
 /** Current push state for this device + this member. */
