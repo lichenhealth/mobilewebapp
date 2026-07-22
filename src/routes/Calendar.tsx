@@ -41,13 +41,15 @@ import {
   loadMyExternalBusy, syncExternalCalendars,
   listCalendarPins, addCalendarPin, removeCalendarPin,
 } from '../lib/calendarApi';
+import TodoView from '../components/TodoView';
 import './Calendar.css';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type View = 'schedule' | 'day' | '3day' | 'week' | 'month';
-const VIEW_LABELS: Record<View, string> = { schedule: 'Schedule', day: 'Day', '3day': '3 Days', week: 'Week', month: 'Month' };
+type View = 'schedule' | 'day' | '3day' | 'week' | 'month' | 'todo';
+type GridView = Exclude<View, 'todo'>;
+const VIEW_LABELS: Record<GridView, string> = { schedule: 'Schedule', day: 'Day', '3day': '3 Days', week: 'Week', month: 'Month' };
 
 /** Sunday that starts the week containing iso (grids are Sunday-first). */
 export function sundayOfWeek(iso: string): string {
@@ -85,6 +87,13 @@ export default function Calendar() {
   // keyhole is nobody's friend (founder + Gabe, 2026-07-17).
   const [view, setView] = useState<View>(() =>
     window.matchMedia('(max-width: 640px)').matches ? 'schedule' : 'week');
+  // To-Do is a peer "view" toggled from the toolbar; toggling off returns to
+  // the grid view you were on.
+  const [prevGridView, setPrevGridView] = useState<GridView>('week');
+  const toggleTodo = () => {
+    if (view === 'todo') setView(prevGridView);
+    else { setPrevGridView(view as GridView); setView('todo'); }
+  };
   const [anchor, setAnchor] = useState(todayISO());
   const [events, setEvents] = useState<EventRow[]>([]);
   // Private nudges — never busy, never shared (Gabe's Reminders, 2026-07-18).
@@ -246,7 +255,7 @@ export default function Calendar() {
 
   // Open time views scrolled to the working morning (the PAGE scrolls).
   useEffect(() => {
-    if (view === 'month' || view === 'schedule') { window.scrollTo({ top: 0 }); return; }
+    if (view === 'month' || view === 'schedule' || view === 'todo') { window.scrollTo({ top: 0 }); return; }
     const el = gridRef.current;
     if (!el) return;
     // Land 7am just below the pinned toolbar+day-header stack.
@@ -469,8 +478,16 @@ export default function Calendar() {
             <button className="calp__month" onClick={() => setAnchor(todayISO())}>{headerLabel}</button>
             <button className="calp__navbtn" onClick={() => page(1)} aria-label="Next"><Icon name="chevron-right" size={16} /></button>
           </div>
-          <select className="calp__vselect" value={view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
-            {(Object.keys(VIEW_LABELS) as View[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
+          <button
+            className={'calp__todo-toggle' + (view === 'todo' ? ' is-on' : '')}
+            onClick={toggleTodo}
+            aria-pressed={view === 'todo'}
+            title="To-do list"
+          >
+            To Do
+          </button>
+          <select className="calp__vselect" value={view === 'todo' ? prevGridView : view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
+            {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
           <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Sessions & requests">
             <Icon name="member-heart" size={15} />
@@ -564,7 +581,7 @@ export default function Calendar() {
             ))}
           </div>
         )}
-        {view !== 'month' && view !== 'schedule' && (
+        {view !== 'month' && view !== 'schedule' && view !== 'todo' && (
           <div className="calp__days" style={gridCols}>
             <span className="calp__gutter-head" />
             {days.map((iso) => (
@@ -577,7 +594,7 @@ export default function Calendar() {
         )}
         {/* All-day + reminders ride INSIDE the pin so they stay frozen with
             the day header — reminders are top-matter you keep in view. */}
-        {view !== 'month' && view !== 'schedule' && hasAllDayRow && (
+        {view !== 'month' && view !== 'schedule' && view !== 'todo' && hasAllDayRow && (
           <div className="calp__alldays" style={gridCols}>
             <span className="calp__gutter-head" />
             {days.map((iso) => (
@@ -611,7 +628,16 @@ export default function Calendar() {
         )}
       </div>
 
-      {view === 'schedule' ? (
+      {view === 'todo' ? (
+        <TodoView
+          me={me}
+          reminders={reminders}
+          remDone={remDone}
+          onToggleRem={toggleRem}
+          days={Array.from({ length: 30 }, (_, i) => addDays(today, i))}
+          today={today}
+        />
+      ) : view === 'schedule' ? (
         <div className="calp__sched">
           {days.map((iso) => {
             const evs = anyOn(iso).sort((a, b) =>

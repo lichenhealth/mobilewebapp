@@ -1,0 +1,50 @@
+.todo { display: flex; flex-direction: column; gap: 4px; padding: 0 var(--s-3) var(--s-6); }
+
+.todo__add { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+.todo__input {
+  flex: 1; padding: 10px 14px; border-radius: var(--r-md);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 14px; font-family: inherit; color: var(--ink);
+}
+.todo__input:focus { outline: none; border-color: var(--peach); }
+.todo__addbtn { flex-shrink: 0; }
+
+.todo__empty { font-size: 13px; color: var(--ink-faint); padding: var(--s-5) var(--s-2); line-height: 1.5; }
+
+.todo__head {
+  font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); margin: var(--s-4) 4px var(--s-1);
+}
+.todo__day { margin-bottom: var(--s-2); }
+.todo__daylbl { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin: var(--s-2) 4px 4px; }
+
+.todo__row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+}
+.todo__row + .todo__row { margin-top: 4px; }
+.todo__row--rem { border-style: dashed; border-color: var(--peach); }
+
+.todo__box {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--peach); background: transparent; color: var(--peach-deep);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1; cursor: pointer;
+}
+.todo__box.is-done { background: var(--peach); color: #fff; border-color: var(--peach); }
+
+.todo__title { flex: 1; min-width: 0; font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.todo__title--btn {
+  border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.todo__when { font-family: var(--font-mono); font-size: 11px; color: var(--peach-deep); flex-shrink: 0; }
+.todo__row.is-done .todo__title { text-decoration: line-through; color: var(--ink-faint); }
+
+.todo__x {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-faint); background: transparent; cursor: pointer;
+}
+.todo__x:hover { background: var(--bone); color: var(--ink); }
