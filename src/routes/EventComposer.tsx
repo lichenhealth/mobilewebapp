@@ -39,7 +39,7 @@ export default function EventComposer() {
     params.get('kind') === 'reminder' ? 'reminder' : 'event');
   const [remHasTime, setRemHasTime] = useState(false);
   const [remAtMin, setRemAtMin] = useState(9 * 60);
-  const [remLead, setRemLead] = useState(0);
+  const [remLead, setRemLead] = useState(10);   // default nudge: 10 mins before
 
   const [title, setTitle] = useState('');
   const [calendar, setCalendar] = useState('me');            // 'me' | space id
@@ -237,7 +237,11 @@ export default function EventComposer() {
     if (qDate) setRange({ start: qDate, end: qDate });
     if (qStart) {
       const s = Number(qStart);
-      if (Number.isFinite(s)) { setStartMin(s); setEndMin(Math.min(s + 60, 1440)); }
+      if (Number.isFinite(s)) {
+        setStartMin(s); setEndMin(Math.min(s + 60, 1440));
+        // A reminder made by tapping a time slot inherits that time.
+        setRemAtMin(s); setRemHasTime(true);
+      }
     }
     if (qEnd) {
       const en = Number(qEnd);
