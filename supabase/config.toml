@@ -21,6 +21,11 @@ verify_jwt = false
 [functions.send-push]
 verify_jwt = false
 
+# Invoked every minute by pg_cron (public.tick_reminders). Fires due reminders as
+# notifications (which fan out to push). Same shared-secret header.
+[functions.fire-reminders]
+verify_jwt = false
+
 # Donors may be signed OUT — the donate page works for the public. The
 # function validates its own inputs; Stripe handles the money.
 [functions.donate-checkout]

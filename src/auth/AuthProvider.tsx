@@ -58,8 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return;
     const beat = () => {
+      // Also stamp the browser's timezone so server-side scheduled reminders
+      // (pg_cron → fire-reminders) can fire at the member's true local time.
+      let tz: string | undefined;
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* ignore */ }
       void supabase.from('profiles')
-        .update({ last_seen_at: new Date().toISOString() })
+        .update({ last_seen_at: new Date().toISOString(), ...(tz ? { timezone: tz } : {}) })
         .eq('id', userId)
         .then(() => {}, () => {});
     };
