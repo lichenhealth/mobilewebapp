@@ -184,8 +184,8 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
         <ConciergeEmpty
           icon="shield-user"
           title="No care team yet"
-          sub="Urgent care connects you with your own caregivers when they're on call. Build your care team from your Profile."
-          action={subjectId === me ? { label: 'Go to Profile', onClick: () => navigate('/profile') } : undefined}
+          sub="Urgent care connects you with your own caregivers when they're on call. Build your care team in the Care Team tab."
+          action={subjectId === me ? { label: 'Go to Care Team', onClick: () => navigate('/concierge/team') } : undefined}
         />
         <aside className="urgent__emergency">
           <Icon name="info" size={14} />
