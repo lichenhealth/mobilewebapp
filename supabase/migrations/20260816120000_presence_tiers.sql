@@ -3,6 +3,11 @@
 -- "present / open to connect" (a hand-lit candle). Both already exist as the
 -- two presence modes; the list just needs to say WHICH, so the UI can show a
 -- dot vs a 🕯️. Adds a `lit` column; everything else is unchanged.
+--
+-- Adding a column to the RETURNS TABLE changes the output type, so Postgres
+-- requires a DROP first (42P13 — same gotcha as my_home in PR #92).
+
+drop function if exists public.network_awake_list();
 
 create or replace function public.network_awake_list()
 returns table(id uuid, full_name text, avatar_url text, headline text, lit boolean)
@@ -23,3 +28,5 @@ language sql stable security definer set search_path = 'public' as $$
     )
   order by p.full_name;
 $$;
+
+grant execute on function public.network_awake_list() to authenticated;
