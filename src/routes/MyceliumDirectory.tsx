@@ -7,7 +7,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
 import {
-  awakeList, myPresence, setPresenceVisible, lightPresence, snuffPresence, candleLit,
+  awakeList, myPresence, setPresenceVisible, setAlwaysPresent,
+  lightPresence, snuffPresence, candleLit,
   type MyPresence,
 } from '../lib/presenceApi';
 import './MyceliumDirectory.css';
@@ -213,23 +214,34 @@ export default function MyceliumDirectory() {
         </p>
         {myPres !== null && (
           <div className="mycdir__presence">
-            <span className="mycdir__presence-lbl">
-              <Icon name="sparkle" size={13} /> Show when I&rsquo;m around:
-            </span>
-            <select
-              className="cset__select"
-              value={myPres.visible ? 'always' : 'hand'}
-              onChange={(ev) => {
-                const always = ev.target.value === 'always';
-                setMyPres((cur) => cur && ({ ...cur, visible: always, litUntil: always ? null : cur.litUntil }));
-                if (user) void setPresenceVisible(user.id, always).catch(console.error);
-              }}
-              aria-label="Presence mode"
-            >
-              <option value="always">Always, while I&rsquo;m awake</option>
-              <option value="hand">Only when I light it</option>
-            </select>
-            {!myPres.visible && (
+            {/* AROUND — the peach dot. Default on; opt out here. */}
+            <label className="mycdir__presence-row">
+              <input
+                type="checkbox" checked={myPres.visible}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setMyPres((cur) => cur && ({ ...cur, visible: on }));
+                  if (user) void setPresenceVisible(user.id, on).catch(console.error);
+                }}
+              />
+              <span className="mycdir__awake-dot" aria-hidden="true" />
+              Show that I&rsquo;m around when I&rsquo;m online
+            </label>
+
+            {/* PRESENT — the candle. Always-on-when-online, or lit by hand. */}
+            <label className="mycdir__presence-row">
+              <input
+                type="checkbox" checked={myPres.alwaysPresent}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setMyPres((cur) => cur && ({ ...cur, alwaysPresent: on }));
+                  if (user) void setAlwaysPresent(user.id, on).catch(console.error);
+                }}
+              />
+              <span aria-hidden="true">🕯️</span>
+              Always show I&rsquo;m present &amp; open to connecting
+            </label>
+            {!myPres.alwaysPresent && (
               candleLit(myPres) ? (
                 <button
                   className="mycdir__candle is-lit"
@@ -237,9 +249,9 @@ export default function MyceliumDirectory() {
                     setMyPres((cur) => cur && ({ ...cur, litUntil: null }));
                     if (user) void snuffPresence(user.id).catch(console.error);
                   }}
-                  title="Your presence is lit — tap to snuff it early"
+                  title="Your candle is lit — tap to snuff it early"
                 >
-                  🕯️ Lit · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  🕯️ Present · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </button>
               ) : (
                 <button
@@ -251,9 +263,9 @@ export default function MyceliumDirectory() {
                       setMyPres((cur) => cur && ({ ...cur, litUntil: until }));
                     } catch (e) { console.error(e); }
                   }}
-                  title="Be visible to your network for the next few hours"
+                  title="Light your candle for the next few hours"
                 >
-                  🕯️ Light my presence
+                  🕯️ Light my presence now
                 </button>
               )
             )}
