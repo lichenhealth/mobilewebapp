@@ -130,3 +130,7 @@
   margin: 10px 0 4px;   /* own row, clear of the mode chips above */
 }
 .cmp__sliding input { accent-color: var(--peach); }
+
+/* Lichen* — the entrusted mode's footnote */
+.cmp__lichen-hint { margin: 2px 0 0; }
+.cmp__lichen-hint a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }

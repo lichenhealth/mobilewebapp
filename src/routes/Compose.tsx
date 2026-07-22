@@ -62,8 +62,11 @@ export default function Compose() {
   const [evCategory, setEvCategory] = useState<EventCategory>('experiences');
   // Unified offer mode: events use free|trade|paid; marketplace-only listings
   // additionally get lend|rent (you can't rent someone an event).
-  type OfferMode = EventMode | 'lend' | 'rent' | 'borrow' | 'iso';
-  const [evMode, setEvMode] = useState<OfferMode>('free');
+  // 'lichen' = the entrusted mode: a gift whose allocation is handed to the
+  // Lichen Economy Algorithm (details.mode='gift' + allocation='lichen').
+  type OfferMode = EventMode | 'lend' | 'rent' | 'borrow' | 'iso' | 'lichen';
+  const [evMode, setEvMode] = useState<OfferMode>(
+    params.get('entrust') === '1' ? 'lichen' : 'free');
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
   const [evStartMin, setEvStartMin] = useState(18 * 60);
@@ -71,10 +74,6 @@ export default function Compose() {
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
-  // Entrusted offering: a gift the giver hands to the mycelium's routing
-  // instead of choosing a recipient themselves (details.allocation='lichen').
-  // The Marketplace's Lichen door arrives with ?entrust=1 — pre-checked.
-  const [entrust, setEntrust] = useState(params.get('entrust') === '1');
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
   const [title, setTitle] = useState('');
@@ -155,7 +154,7 @@ export default function Compose() {
         };
         if (back[d.mode]) setEvMode(back[d.mode]);
       }
-      if (d.allocation === 'lichen') setEntrust(true);
+      if (d.allocation === 'lichen') setEvMode('lichen');
       if (typeof d.location === 'string') setLocation(d.location);
       const g = d.geo as { lat?: number; lng?: number } | undefined;
       if (g && typeof g.lat === 'number' && typeof g.lng === 'number') setLocGeo({ lat: g.lat, lng: g.lng });
@@ -279,11 +278,12 @@ export default function Compose() {
           if (locGeo) details.geo = locGeo;
         }
         if (isMarket) {
-          // Marketplace-compatible mode vocabulary.
-          details.mode = evMode === 'free' ? 'gift'
+          // Marketplace-compatible mode vocabulary. Lichen* = an entrusted
+          // gift: the Lichen Economy Algorithm decides the allocation.
+          details.mode = evMode === 'free' || evMode === 'lichen' ? 'gift'
             : evMode === 'paid' ? (sliding ? 'sliding' : 'sale')
             : evMode;
-          if (evMode === 'free' && entrust) details.allocation = 'lichen';
+          if (evMode === 'lichen') details.allocation = 'lichen';
         }
       }
       if (media.length) details.media = media;
@@ -526,8 +526,17 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
           <div className="cmp__chips">
+            {!isEvent && (
+              <button
+                className={'cmp__chip' + (evMode === 'lichen' ? ' is-on' : '')}
+                onClick={() => setEvMode('lichen')}
+                title="An entrusted gift — the Lichen Economy Algorithm decides where it goes"
+              >
+                Lichen*
+              </button>
+            )}
             <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
             {!isEvent && (
@@ -540,11 +549,12 @@ export default function Compose() {
             )}
             <button className={'cmp__chip' + (evMode === 'paid' ? ' is-on' : '')} onClick={() => setEvMode('paid')}>Paid</button>
           </div>
-          {!isEvent && evMode === 'free' && (
-            <label className="cmp__sliding" title="Instead of choosing a recipient yourself, the network routes this toward the greatest need">
-              <input type="checkbox" checked={entrust} onChange={(e) => setEntrust(e.target.checked)} />
-              {' '}Let Lichen route this — allocated where it&rsquo;s needed most
-            </label>
+          {!isEvent && evMode === 'lichen' && (
+            <p className="cmp__hint-ev cmp__lichen-hint">
+              * The Lichen Economy Algorithm assesses how to optimize your
+              contribution — allocated where it closes the most need.{' '}
+              <a href="/donate/how#economy" target="_blank" rel="noopener">Learn more</a>
+            </p>
           )}
           {evMode === 'paid' && (
             <label className="cmp__sliding">

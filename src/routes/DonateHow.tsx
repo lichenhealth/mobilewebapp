@@ -232,7 +232,7 @@ export default function DonateHow() {
         </section>
 
         <section id="scenarios" className="donate__how-sec">
-          <h2 className="donate__give-title">Three true-to-life scenarios</h2>
+          <h2 className="donate__give-title">True-to-life scenarios</h2>
           <p>
             <strong>The directed donor.</strong> A donor gives $2,750,
             writing <em>&ldquo;for subsidized care through Melanie&rsquo;s
@@ -258,6 +258,19 @@ export default function DonateHow() {
             deduction, no tax event for the family, and the table&rsquo;s
             story — seven hours at the workbench, fifty years of ponderosa —
             travels with it.
+          </p>
+          <p>
+            <strong>The entrusted offering.</strong> A member lists a
+            handcrafted bench and chooses <em>Lichen*</em> — no recipient, no
+            price, no decisions. The algorithm reads the network: an open ask
+            whose words and style match, a well-resourced member who admires
+            the maker&rsquo;s work, a family short on groceries this month.
+            Sometimes it proposes the simple route — bench to the ask. And
+            sometimes a chain: the admirer receives the bench at its full
+            value, that value flows onward as food subsidy, and a second
+            bench meets the original ask — one offering, two needs closed.
+            The giver&rsquo;s only decision was trust, and the story of where
+            it landed comes back to them.
           </p>
         </section>
 
