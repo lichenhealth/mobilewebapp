@@ -600,38 +600,40 @@ export default function EventComposer() {
                   <p className="evav__note">A quiet nudge on your calendar that day — it never blocks your availability.</p>
                 )}
               </div>
+              {/* Nudge others rides in the right column beside the tall calendar —
+                  fills the gap, keeps the form above the fold (founder design rule). */}
+              <div className="cedit__field cedit__nudge">
+                <span className="cedit__label">Nudge others (optional)</span>
+                <p className="cedit__hint-ev">A shared nudge reminds the people you name too — no RSVP, and it never marks anyone busy.</p>
+                {recipients.length > 0 && (
+                  <div className="cedit__chips">
+                    {recipients.map((r) => (
+                      <span className="cedit__chip" key={r.type + r.id}>
+                        {r.name}
+                        <button aria-label={`Remove ${r.name}`} onClick={() => setRecipients((cur) => cur.filter((x) => !(x.type === r.type && x.id === r.id)))}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <input
+                  className="cedit__input" value={recQ}
+                  onChange={(e) => setRecQ(e.target.value)}
+                  placeholder="Add a person, group, or org…"
+                />
+                {recHits.length > 0 && (
+                  <div className="cedit__rec-hits">
+                    {recHits.map((h) => (
+                      <button
+                        className="cedit__rec-hit" key={h.type + h.id}
+                        onClick={() => { setRecipients((cur) => [...cur, h]); setRecQ(''); setRecHits([]); }}
+                      >
+                        {h.name}<em>{h.type === 'space' ? 'Group' : 'Person'}</em>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="cedit__field cedit__nudge">
-            <span className="cedit__label">Nudge others (optional)</span>
-            <p className="cedit__hint-ev">A shared nudge reminds the people you name too — no RSVP, and it never marks anyone busy.</p>
-            {recipients.length > 0 && (
-              <div className="cedit__chips">
-                {recipients.map((r) => (
-                  <span className="cedit__chip" key={r.type + r.id}>
-                    {r.name}
-                    <button aria-label={`Remove ${r.name}`} onClick={() => setRecipients((cur) => cur.filter((x) => !(x.type === r.type && x.id === r.id)))}>×</button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <input
-              className="cedit__input" value={recQ}
-              onChange={(e) => setRecQ(e.target.value)}
-              placeholder="Add a person, group, or org…"
-            />
-            {recHits.length > 0 && (
-              <div className="cedit__rec-hits">
-                {recHits.map((h) => (
-                  <button
-                    className="cedit__rec-hit" key={h.type + h.id}
-                    onClick={() => { setRecipients((cur) => [...cur, h]); setRecQ(''); setRecHits([]); }}
-                  >
-                    {h.name}<em>{h.type === 'space' ? 'Group' : 'Person'}</em>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -426,11 +426,13 @@
 .cedit__body { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-4); }
 .cedit__field { display: flex; flex-direction: column; gap: var(--s-2); }
 
-/* Reminder composer: calendar left, repeat + alert fill the space beside it
-   on wider screens so more sits above the fold. Stacks on narrow. */
+/* Reminder composer: calendar left, repeat + alert + nudge fill the space
+   beside it so more sits above the fold. Two columns only where the app-shell
+   actually widens (>=1024px, the desktop sidebar layout) — below that the shell
+   is capped ~430px, so a 2-col grid there would collapse the right column. */
 .cedit__rem-grid { display: grid; grid-template-columns: 1fr; gap: var(--s-5); }
 .cedit__rem-side { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
-@media (min-width: 720px) {
+@media (min-width: 1024px) {
   .cedit__rem-grid { grid-template-columns: minmax(300px, 360px) 1fr; align-items: start; }
 }
 .cedit__label { font-size: 12px; font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em; }
@@ -1256,7 +1258,9 @@
 .conc__team-msg { font-size: 12px; color: var(--ink-soft); margin-top: var(--s-2); }
 
 /* Reminder shared-nudge recipient picker */
-.cedit__nudge { margin-top: var(--s-3); }
+/* Nudge others now rides inside the reminder's right column — the flex gap
+   handles spacing, so no extra top margin. */
+.cedit__nudge { margin-top: 0; }
 .cedit__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .cedit__chip {
   display: inline-flex; align-items: center; gap: 6px;
