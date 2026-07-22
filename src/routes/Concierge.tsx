@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
 import ChatConversation from '../components/ChatConversation';
@@ -566,6 +566,9 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
 
 export default function Concierge() {
   const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
+  const [searchParams] = useSearchParams();
+  // Arrived from Profile's "Set up my care team" door — offer the way back.
+  const fromProfile = searchParams.get('from') === 'profile';
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -726,8 +729,12 @@ export default function Concierge() {
   return (
     <div className="conc">
       <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
-        {isClientView && (
+        {isClientView ? (
           <button className="conc__back" onClick={() => navigate('/caregiver')} aria-label="Back to clients">
+            <Icon name="arrow-left" size={18} />
+          </button>
+        ) : fromProfile && (
+          <button className="conc__back" onClick={() => navigate('/profile')} aria-label="Back to profile">
             <Icon name="arrow-left" size={18} />
           </button>
         )}

@@ -86,7 +86,6 @@ export default function Profile() {
   const [pendingCats, setPendingCats] = useState(0);
   const [care, setCare] = useState<CareRow[]>([]);
   const [invites, setInvites] = useState<{ id: string; email: string; role: 'caregiver' | 'patient' }[]>([]);
-  const [caregiverEmail, setCaregiverEmail] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
   const [careMsg, setCareMsg] = useState('');
   const [careBusy, setCareBusy] = useState(false);
@@ -175,7 +174,7 @@ export default function Profile() {
     setCareBusy(false);
     setCareMsg(res.message);
     if (res.ok) {
-      if (role === 'caregiver') setCaregiverEmail(''); else setPatientEmail('');
+      if (role === 'patient') setPatientEmail('');
       loadCare();
     }
   }
@@ -486,47 +485,15 @@ export default function Profile() {
       <section className="prof__section">
         <h2 className="prof__h2">Your care team</h2>
         <p className="prof__care-lead">People who help care for you. They approve before joining.</p>
-        {myTeam.length === 0 && <p className="prof__empty">No one on your care team yet.</p>}
-        <div className="prof__care-list">
-          {myTeam.map((c) => {
-            const incoming = c.status === 'pending' && c.initiated_by !== meId;
-            return (
-              <div className="prof__care-row" key={c.id}>
-                <div className="prof__care-id">
-                  <span className="prof__care-name">{c.caregiverName}</span>
-                  {c.status === 'pending' && (
-                    <span className="prof__care-tag">{incoming ? 'wants to join' : 'invited · awaiting'}</span>
-                  )}
-                </div>
-                <div className="prof__care-actions">
-                  {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
-                  {c.status === 'active' && <button className="prof__care-btn" onClick={() => messageMember(c.caregiver_id)}>Message</button>}
-                  <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Remove' : incoming ? 'Decline' : 'Cancel'}</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {invites.filter((i) => i.role === 'caregiver').map((i) => (
-          <div className="prof__care-row prof__care-row--invite" key={i.id}>
-            <div className="prof__care-id">
-              <span className="prof__care-name">{i.email}</span>
-              <span className="prof__care-tag">invited to Lichen</span>
-            </div>
-            <div className="prof__care-actions">
-              <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email, 'caregiver')}>Send email</button>
-              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy</button>
-              <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
-            </div>
-          </div>
-        ))}
-        <div className="prof__add-row">
-          <input className="prof__input" type="email" value={caregiverEmail}
-            onChange={(e) => { setCaregiverEmail(e.target.value); setCareMsg(''); }}
-            placeholder="Add a caregiver by email" />
-          <button className="btn btn-primary" onClick={() => inviteCare('caregiver', caregiverEmail)}
-            disabled={careBusy || !caregiverEmail.trim()}>Invite</button>
-        </div>
+        <p className="prof__empty">
+          {myTeam.length === 0
+            ? 'No one on your care team yet.'
+            : `${myTeam.length} ${myTeam.length === 1 ? 'person' : 'people'} on your care team.`}
+        </p>
+        <button className="prof__care-dash" onClick={() => navigate('/concierge/team?from=profile')}>
+          Set up my care team
+          <span aria-hidden="true"> →</span>
+        </button>
       </section>
 
       <section className="prof__section">
