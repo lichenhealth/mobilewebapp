@@ -10,6 +10,7 @@ export interface AwakeMember {
   full_name: string | null;
   avatar_url: string | null;
   headline: string | null;
+  lit?: boolean;   // candle hand-lit = "present, open to connect"; else "around"
 }
 
 /** Network members awake now who opted in — [] until the migration runs. */
