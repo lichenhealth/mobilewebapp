@@ -494,39 +494,46 @@ export default function EventComposer() {
             className="cedit__input" placeholder="Remind me to… (e.g. Pay rent)"
             value={title} onChange={(e) => setTitle(e.target.value)}
           />
-          <div className="cedit__field">
-            <span className="cedit__label">Date</span>
-            <DateRangeCalendar
-              value={{ start: range.start, end: range.start }}
-              onChange={(r) => setRange({ start: r.start, end: r.start })}
-            />
-            <RecurrenceSelect
-              anchor={anchor} recurrence={recurrence}
-              onChange={(r) => setRecurrence(r)}
-            />
-            <p className="rec__summary">
-              {recurrence ? recurrenceLabel(recurrence, anchor) : `Once, on ${formatDateShort(anchor)}`}
-            </p>
-          </div>
-          <div className="cedit__field">
-            <span className="cedit__label">Alert</span>
-            <label className="rec__radio">
-              <input type="checkbox" checked={remHasTime} onChange={(e) => setRemHasTime(e.target.checked)} /> At a time
-            </label>
-            {remHasTime ? (
-              <div className="rec__row">
-                <TimeField value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
-                <select className="rec__select rec__select--inline" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))} aria-label="How early to alert">
-                  <option value={0}>on time</option>
-                  <option value={10}>10 mins before</option>
-                  <option value={30}>30 mins before</option>
-                  <option value={60}>1 hour before</option>
-                  <option value={1440}>1 day before</option>
-                </select>
+          <div className="cedit__rem-grid">
+            <div className="cedit__field">
+              <span className="cedit__label">Date</span>
+              <DateRangeCalendar
+                value={{ start: range.start, end: range.start }}
+                onChange={(r) => setRange({ start: r.start, end: r.start })}
+              />
+            </div>
+            <div className="cedit__rem-side">
+              <div className="cedit__field">
+                <span className="cedit__label">Repeat</span>
+                <RecurrenceSelect
+                  anchor={anchor} recurrence={recurrence}
+                  onChange={(r) => setRecurrence(r)}
+                />
+                <p className="rec__summary">
+                  {recurrence ? recurrenceLabel(recurrence, anchor) : `Once, on ${formatDateShort(anchor)}`}
+                </p>
               </div>
-            ) : (
-              <p className="evav__note">A quiet nudge on your calendar that day — it never blocks your availability.</p>
-            )}
+              <div className="cedit__field">
+                <span className="cedit__label">Alert</span>
+                <label className="rec__radio">
+                  <input type="checkbox" checked={remHasTime} onChange={(e) => setRemHasTime(e.target.checked)} /> At a time
+                </label>
+                {remHasTime ? (
+                  <div className="rec__row">
+                    <TimeField value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
+                    <select className="rec__select rec__select--inline" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))} aria-label="How early to alert">
+                      <option value={0}>on time</option>
+                      <option value={10}>10 mins before</option>
+                      <option value={30}>30 mins before</option>
+                      <option value={60}>1 hour before</option>
+                      <option value={1440}>1 day before</option>
+                    </select>
+                  </div>
+                ) : (
+                  <p className="evav__note">A quiet nudge on your calendar that day — it never blocks your availability.</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

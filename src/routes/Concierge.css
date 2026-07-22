@@ -423,6 +423,14 @@
 }
 .cedit__body { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-4); }
 .cedit__field { display: flex; flex-direction: column; gap: var(--s-2); }
+
+/* Reminder composer: calendar left, repeat + alert fill the space beside it
+   on wider screens so more sits above the fold. Stacks on narrow. */
+.cedit__rem-grid { display: grid; grid-template-columns: 1fr; gap: var(--s-5); }
+.cedit__rem-side { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
+@media (min-width: 720px) {
+  .cedit__rem-grid { grid-template-columns: minmax(300px, 360px) 1fr; align-items: start; }
+}
 .cedit__label { font-size: 12px; font-weight: 500; color: var(--ink-soft); letter-spacing: 0.01em; }
 .cedit__hint { font-size: 11px; font-weight: 300; color: var(--ink-faint); }
 .cedit__hint code { font-family: var(--font-mono); font-size: 10px; background: var(--bone-warm); padding: 1px 4px; border-radius: 3px; }
