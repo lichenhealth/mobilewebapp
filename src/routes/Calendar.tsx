@@ -572,6 +572,31 @@ export default function Calendar() {
             ))}
           </div>
         )}
+        {/* All-day + reminders ride INSIDE the pin so they stay frozen with
+            the day header — reminders are top-matter you keep in view. */}
+        {view !== 'month' && view !== 'schedule' && hasAllDayRow && (
+          <div className="calp__alldays" style={gridCols}>
+            <span className="calp__gutter-head" />
+            {days.map((iso) => (
+              <div className="calp__allday-col" key={iso}>
+                {remsOn(iso).map((r) => {
+                  const done = remDone.has(remKey(r, iso));
+                  return (
+                    <button
+                      className={'calp__chip calp__chip--rem' + (done ? ' is-done' : '')}
+                      key={'rem:' + r.id} onClick={() => toggleRem(r, iso)}
+                    >
+                      {done ? '✓ ' : ''}{r.title}
+                    </button>
+                  );
+                })}
+                {allDayOn(iso).map((e) => (
+                  <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {view === 'schedule' ? (
@@ -665,30 +690,6 @@ export default function Calendar() {
       ) : (
         /* ── Time grid (Day / 3 Days / Week) — day header lives in the pin ── */
         <div className="calp__card calp__card--flush">
-          {hasAllDayRow && (
-            <div className="calp__alldays" style={gridCols}>
-              <span className="calp__gutter-head" />
-              {days.map((iso) => (
-                <div className="calp__allday-col" key={iso}>
-                  {remsOn(iso).map((r) => {
-                    const done = remDone.has(remKey(r, iso));
-                    return (
-                      <button
-                        className={'calp__chip calp__chip--rem' + (done ? ' is-done' : '')}
-                        key={'rem:' + r.id} onClick={() => toggleRem(r, iso)}
-                      >
-                        {done ? '✓ ' : ''}{r.title}
-                      </button>
-                    );
-                  })}
-                  {allDayOn(iso).map((e) => (
-                    <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="calp__grid" ref={gridRef}>
             <div className="calp__grid-inner" style={{ height: 24 * HOUR_PX, ...gridCols }}>
               <div className="calp__gutter">

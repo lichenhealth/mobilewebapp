@@ -120,6 +120,15 @@
 .calp__day-num.is-today { background: var(--peach); color: #fff; font-weight: 600; }
 
 .calp__alldays { padding: 3px 0; }
+/* Inside the pin the all-day/reminder band continues the card edges below the
+   day header, staying frozen while the hour grid scrolls under it. */
+.calp__pin .calp__alldays {
+  margin: 0 calc(var(--s-3) - var(--s-5));
+  background: var(--bone-warm);
+  border-left: 1px solid var(--bone-edge);
+  border-right: 1px solid var(--bone-edge);
+  border-top: 0;
+}
 .calp__allday-col { display: flex; flex-direction: column; gap: 2px; padding: 0 2px; min-width: 0; }
 .calp__chip {
   background: var(--peach); color: #fff; border-radius: 6px; font-size: 9px; font-weight: 500;
