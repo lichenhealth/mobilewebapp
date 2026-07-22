@@ -16,6 +16,11 @@ verify_jwt = false
 [functions.send-notification-email]
 verify_jwt = false
 
+# Second Database Webhook on notifications INSERT — the Web Push (phone) channel.
+# Same shared-secret header as send-notification-email.
+[functions.send-push]
+verify_jwt = false
+
 # Donors may be signed OUT — the donate page works for the public. The
 # function validates its own inputs; Stripe handles the money.
 [functions.donate-checkout]
