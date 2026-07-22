@@ -1,0 +1,11 @@
+.offer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.offer-chip {
+  font-size: 11px; font-weight: 500; line-height: 1;
+  padding: 5px 9px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink-soft);
+  white-space: nowrap;
+}
+/* Gentle accents so the eye can scan level vs price vs format at a glance. */
+.offer-chip--level  { border-color: var(--peach); color: var(--rust); background: var(--peach-tint); }
+.offer-chip--price  { border-color: var(--green-deep); color: var(--green-deep); background: var(--green-tint); }
+.offer-chip--format { color: var(--ink); }
