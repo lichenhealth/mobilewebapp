@@ -39,6 +39,11 @@
 .top-bar__icon:active { transform: scale(0.94); }
 .top-bar__icon:hover { background: rgb(18 24 28 / 0.05); }
 
+/* Presence candle — dim border when unlit, peach glow when lit. */
+.top-bar__candle { font-size: 16px; line-height: 1; border-color: var(--bone-edge); }
+.top-bar__candle:not(.is-lit) { filter: grayscale(0.85) opacity(0.55); }
+.top-bar__candle.is-lit { border-color: var(--peach); background: var(--peach-tint); }
+
 .top-bar__logo {
   display: flex;
   align-items: center;

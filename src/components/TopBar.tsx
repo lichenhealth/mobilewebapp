@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
@@ -8,6 +8,7 @@ import { useActing } from '../acting/ActingProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
+import { myPresence, setAlwaysPresent } from '../lib/presenceApi';
 import Avatar from './Avatar';
 import { scopeForPath } from '../lib/sections';
 import NotificationPanel from '../notifications/NotificationPanel';
@@ -70,6 +71,21 @@ export default function TopBar({
   const notificationCount = unreadForScope(scope);
   const [panelOpen, setPanelOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  // The candle — a persistent "I'm present, open to connecting" toggle you can
+  // light/snuff from anywhere. No fade: it stays until you unclick it.
+  const [candleOn, setCandleOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!user) { setCandleOn(null); return; }
+    let live = true;
+    void myPresence(user.id).then((p) => { if (live) setCandleOn(p ? p.alwaysPresent : null); });
+    return () => { live = false; };
+  }, [user]);
+  const toggleCandle = () => {
+    if (!user || candleOn === null) return;
+    const next = !candleOn;
+    setCandleOn(next);
+    void setAlwaysPresent(user.id, next).catch(() => setCandleOn(!next));
+  };
 
   async function signOut() {
     setSwitchOpen(false);
@@ -180,6 +196,17 @@ export default function TopBar({
           </>
         )}
         </div>
+        {candleOn !== null && (
+          <button
+            className={'top-bar__icon top-bar__candle' + (candleOn ? ' is-lit' : '')}
+            onClick={toggleCandle}
+            aria-pressed={candleOn}
+            title={candleOn ? 'Present — open to connecting. Tap to snuff.' : 'Light your candle — show you’re present'}
+            aria-label={candleOn ? 'Snuff your presence candle' : 'Light your presence candle'}
+          >
+            <span aria-hidden="true">🕯️</span>
+          </button>
+        )}
         <button
           className="top-bar__icon top-bar__bell"
           onClick={() => setPanelOpen((o) => !o)}

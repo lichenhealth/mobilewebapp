@@ -7,8 +7,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
 import {
-  awakeList, myPresence, setPresenceVisible, setAlwaysPresent,
-  lightPresence, snuffPresence, candleLit,
+  awakeList, myPresence, setPresenceVisible,
   type MyPresence,
 } from '../lib/presenceApi';
 import './MyceliumDirectory.css';
@@ -228,47 +227,11 @@ export default function MyceliumDirectory() {
               Show that I&rsquo;m around when I&rsquo;m online
             </label>
 
-            {/* PRESENT — the candle. Always-on-when-online, or lit by hand. */}
-            <label className="mycdir__presence-row">
-              <input
-                type="checkbox" checked={myPres.alwaysPresent}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  setMyPres((cur) => cur && ({ ...cur, alwaysPresent: on }));
-                  if (user) void setAlwaysPresent(user.id, on).catch(console.error);
-                }}
-              />
-              <span aria-hidden="true">🕯️</span>
-              Always show I&rsquo;m present &amp; open to connecting
-            </label>
-            {!myPres.alwaysPresent && (
-              candleLit(myPres) ? (
-                <button
-                  className="mycdir__candle is-lit"
-                  onClick={() => {
-                    setMyPres((cur) => cur && ({ ...cur, litUntil: null }));
-                    if (user) void snuffPresence(user.id).catch(console.error);
-                  }}
-                  title="Your candle is lit — tap to snuff it early"
-                >
-                  🕯️ Present · fades {new Date(myPres.litUntil!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                </button>
-              ) : (
-                <button
-                  className="mycdir__candle"
-                  onClick={async () => {
-                    if (!user) return;
-                    try {
-                      const until = await lightPresence(user.id);
-                      setMyPres((cur) => cur && ({ ...cur, litUntil: until }));
-                    } catch (e) { console.error(e); }
-                  }}
-                  title="Light your candle for the next few hours"
-                >
-                  🕯️ Light my presence now
-                </button>
-              )
-            )}
+            {/* PRESENT — the candle lives in the top bar now: light it there,
+                anywhere, and it stays lit until you snuff it (no fade). */}
+            <span className="mycdir__presence-note">
+              🕯️ Light the candle in the top bar to show you&rsquo;re present &amp; open to connecting.
+            </span>
             <span className="mycdir__presence-creed">Presence is a gift, not a status.</span>
           </div>
         )}
