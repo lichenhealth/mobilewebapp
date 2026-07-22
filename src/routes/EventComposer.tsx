@@ -41,7 +41,7 @@ export default function EventComposer() {
     params.get('kind') === 'reminder' || reminderId ? 'reminder' : 'event');
   const [remHasTime, setRemHasTime] = useState(false);
   const [remAtMin, setRemAtMin] = useState(9 * 60);
-  const [remLead, setRemLead] = useState(10);   // default nudge: 10 mins before
+  const [remLead, setRemLead] = useState(0);   // default: alert exactly at the set time
   // Shared nudge: recipients (people/orgs/groups) who also get this reminder.
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [recQ, setRecQ] = useState('');
@@ -590,7 +590,7 @@ export default function EventComposer() {
                   <div className="rec__row">
                     <TimeInput value={remAtMin} onChange={setRemAtMin} ariaLabel="Reminder time" />
                     <select className="rec__select rec__select--inline" value={remLead} onChange={(e) => setRemLead(Number(e.target.value))} aria-label="How early to alert">
-                      <option value={0}>on time</option>
+                      <option value={0}>exactly</option>
                       <option value={10}>10 mins before</option>
                       <option value={30}>30 mins before</option>
                       <option value={60}>1 hour before</option>
