@@ -8,7 +8,7 @@
    always reserved so every select lines up; the × only renders on rules you can
    remove (not the Everyone default). */
 .homeloc__row {
-  display: grid; grid-template-columns: 1fr 144px 26px;
+  display: grid; grid-template-columns: 1fr 144px 60px;
   align-items: center; gap: var(--s-2);
   padding: 6px 0;
 }
@@ -27,12 +27,14 @@
   background-repeat: no-repeat; background-position: right 12px center;
 }
 .homeloc__remove {
-  display: inline-flex; justify-self: center; padding: 6px; border-radius: var(--r-full);
+  display: inline-flex; justify-self: start; padding: 6px; border-radius: var(--r-full);
   background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
 }
 .homeloc__remove:hover { color: #c0564f; }
-/* Add row shares the same select column so its dropdown lines up with the rows. */
-.homeloc__add { display: grid; grid-template-columns: 1fr 144px auto; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+/* Add row shares the same three columns, so its dropdown AND the Add button line
+   up with the rule rows' select + action columns. */
+.homeloc__add { display: grid; grid-template-columns: 1fr 144px 60px; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+.homeloc__add-btn { width: 100%; padding-left: 0; padding-right: 0; }
 .homeloc__grow { width: 100%; }
 .homeloc__add-btn { flex-shrink: 0; }
 .homeloc__pick {
