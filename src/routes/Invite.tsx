@@ -27,6 +27,28 @@ export default function Invite() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
+  // Email invites send from our server (Resend). Phone invites can't be
+  // server-sent without an SMS provider, so the inviter texts it themselves —
+  // a prefilled Messages link + a copy fallback (the Care Team pattern).
+  const isEmail = (s: string) => /\S+@\S+\.\S+/.test(s.trim());
+  const isPhone = (s: string) => /^[\d\s()+.-]{7,}$/.test(s.trim());
+  const recipient = email.trim();
+  const channel: 'email' | 'phone' | '' = isEmail(recipient) ? 'email' : isPhone(recipient) ? 'phone' : '';
+
+  const inviteMessage = () => {
+    const who = fullName.trim() || 'A friend';
+    const lead = `${who} invited you to Lichen — a slower, more considered community. Join: https://lichen.healthcare/signup`;
+    return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
+  };
+  const smsHref = `sms:${recipient}?&body=${encodeURIComponent(inviteMessage())}`;
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(inviteMessage());
+      setMsg('Copied — paste it into a text or DM.');
+    } catch { setError('Couldn’t copy automatically — long-press the message to copy it.'); }
+  }
+
   useEffect(() => {
     if (!loading && !user) { navigate('/login', { replace: true }); return; }
     if (!user) return;
@@ -102,15 +124,22 @@ export default function Invite() {
       {msg && <p className="invite__msg">{msg}</p>}
 
       <div className="invite__form">
-        <label className="invite__label" htmlFor="invite-email">Their email</label>
+        <label className="invite__label" htmlFor="invite-email">Their email or phone</label>
         <input
           id="invite-email"
           className="invite__input"
-          type="email"
-          placeholder="friend@example.com"
+          type="text"
+          autoComplete="off"
+          autoCapitalize="off"
+          placeholder="friend@example.com  or  (555) 123-4567"
           value={email}
           onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
         />
+        {channel === 'phone' && (
+          <p className="invite__hint">
+            We’ll open your Messages with the invite ready to send — free, straight from your phone.
+          </p>
+        )}
 
         <label className="invite__label" htmlFor="invite-note">Add a note (optional)</label>
         <textarea
@@ -122,7 +151,10 @@ export default function Invite() {
           onChange={(e) => setNote(e.target.value)}
         />
 
-        {isAdmin && (
+        {isAdmin && channel === 'phone' && (
+          <p className="invite__hint">To attach a gifted membership, invite by email — gifts are keyed to an email address.</p>
+        )}
+        {isAdmin && channel !== 'phone' && (
           <div className="invite__gift">
             <label className="invite__gift-toggle">
               <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
@@ -170,9 +202,16 @@ export default function Invite() {
           </div>
         )}
 
-        <button className="btn btn-primary invite__send" onClick={send} disabled={busy || !email.trim()}>
-          {busy ? 'Sending…' : 'Send invitation'}
-        </button>
+        {channel === 'phone' ? (
+          <div className="invite__phone-actions">
+            <a className="btn btn-primary invite__send" href={smsHref}>Text the invite</a>
+            <button type="button" className="btn invite__send" onClick={() => void copyInvite()}>Copy invite</button>
+          </div>
+        ) : (
+          <button className="btn btn-primary invite__send" onClick={send} disabled={busy || channel !== 'email'}>
+            {busy ? 'Sending…' : 'Send invitation'}
+          </button>
+        )}
 
         <p className="invite__give">
           Another way to grow Lichen —{' '}
