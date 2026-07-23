@@ -62,9 +62,11 @@
   min-width: 0;
 }
 
-/* Narrow phones (iPhone 16-class widths and smaller): five labeled actions
-   can't share ~390px — the labels bow out and the icons carry the row. */
-@media (max-width: 430px) {
+/* The app content column is capped at ~430px until the desktop layout kicks in
+   at 1024px, so five labeled actions crowd on ALL phones/tablets (Pro Max
+   viewports are ~440px yet the column is still 430px). Icons carry the row
+   below 1024; labels return once the shell actually widens. */
+@media (max-width: 1023px) {
   .engage__action span { display: none; }
   .engage__action { gap: 0; padding: 10px 4px; }
   .engage__actions { gap: 2px; }
