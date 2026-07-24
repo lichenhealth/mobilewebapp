@@ -4,6 +4,75 @@ import { LichenMark } from '../components/LichenMark';
 import { useAuth } from '../auth/AuthProvider';
 import './AboutLichen.css';
 
+/** The two maps, drawn: what's actually given (every being, sized by real
+ *  contribution) beside what the market pays (care at $0, forests not counted,
+ *  speculation bloated). The gap between them is what the algorithm closes.
+ *  Built in HTML so the labels stay legible at every column width. */
+const MAP_ROWS = [
+  {
+    label: 'a mother’s care',
+    left: { size: 46, bg: 'var(--peach)' },
+    right: { size: 7, bg: 'var(--ink-faint)', note: '$0' },
+  },
+  {
+    label: 'an old-growth forest',
+    left: { size: 54, bg: 'var(--green)' },
+    right: { size: 22, dashed: true, note: 'not counted' },
+  },
+  {
+    label: 'a nurse’s shift',
+    left: { size: 34, bg: 'var(--peach-deep, var(--peach))' },
+    right: { size: 13, bg: 'var(--ink-faint)', note: 'underpaid' },
+  },
+  {
+    label: 'speculation',
+    left: { size: 15, dashed: true, rust: true, minus: true },
+    right: { size: 46, bg: '#B0563C', note: 'over-paid' },
+  },
+];
+
+function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; rust?: boolean; minus?: boolean } }) {
+  return (
+    <span
+      className={'about__maps-dot' + (d.dashed ? ' is-dashed' : '') + (d.rust ? ' is-rust' : '')}
+      style={{ width: d.size, height: d.size, background: d.dashed ? 'transparent' : d.bg }}
+    >
+      {d.minus ? '−' : ''}
+    </span>
+  );
+}
+
+function TwoMapsVisual() {
+  return (
+    <div className="about__maps" role="img"
+      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-paid.">
+      <div className="about__maps-col">
+        <p className="about__maps-title">Map One · What’s given</p>
+        <div className="about__maps-panel">
+          {MAP_ROWS.map((r) => (
+            <div className="about__maps-row" key={r.label}>
+              <span className="about__maps-slot"><MapDot d={r.left} /></span>
+              <span className="about__maps-lbl">{r.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
+      <div className="about__maps-col">
+        <p className="about__maps-title">Map Two · What’s paid</p>
+        <div className="about__maps-panel">
+          {MAP_ROWS.map((r) => (
+            <div className="about__maps-row" key={r.label}>
+              <span className="about__maps-slot"><MapDot d={r.right} /></span>
+              <span className="about__maps-note">{r.right.note}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Long-form "What is Lichen" — the mission, the give-back economy, and how the
  *  evolving algorithm works. Gate-exempt; readable signed out. Sign up / Sign in
  *  sit top-right so a visitor can always take action. The persistent About icon
@@ -84,6 +153,12 @@ export default function AboutLichen() {
             relationship with each other and the planet.
           </p>
           <p>
+            And we mean <strong>lean</strong>: today, Lichen is built and run by exactly two of us —
+            one carbon-based intelligence and one silicon-based intelligence, working side by side
+            (more on that below). No offices, no ad budget, no shareholders to feed. Almost nothing
+            stands between what you give and where it goes.
+          </p>
+          <p>
             To bridge away from the systems that no longer serve the people, Lichen holds two
             economies, run side by side. <strong>Current-cy</strong> moves value out in the open — a
             transparent, dollar-pegged ledger, no speculation, the whole story visible and
@@ -102,18 +177,26 @@ export default function AboutLichen() {
           <h2 className="about__h2">An algorithm that routes care, not attention</h2>
           <p>
             Most feeds are tuned to hold your attention. Lichen’s evolving algorithm is tuned to
-            <strong> close a gap</strong>. Picture two maps of the world: what each of us actually
-            gives — to one another, to the land — and what the economy happened to pay for it. Care
-            work alone is worth trillions and priced near zero. Lichen makes that gap visible and
-            routes support toward it first: greatest need, least access, closest to home.
+            <strong> close a gap</strong>. Every single person, plant, animal, place and element is
+            contributing to the collective — or taking from it. That’s the first map. The second map
+            is what the current system pays for those contributions — where a mother’s care is priced
+            at zero, a forest isn’t counted at all, and speculation is paid handsomely for extracting.
           </p>
+
+          <TwoMapsVisual />
+          <p className="about__mock-cap">
+            Two maps of the same world. The distance between them is everything the current system
+            gets wrong — and it’s exactly what Lichen’s algorithm works to close.
+          </p>
+
           <p>
-            It reads the whole web at once — who’s seeking, who’s offering, what something is truly
-            worth and who has the capacity to pay for it — and weaves the strands together so
-            nothing, and no one, is wasted. Give something, and the story of where it went comes
-            back to you. For now a person is always in the loop — as the algorithm earns trust, it
-            weaves more. When an assistant helps, it’s a warm partner in your corner, never an
-            oracle.
+            When you exchange by hand, you close what you can see. The algorithm reads the whole web
+            at once — who’s seeking, who’s offering, what something is truly worth and who has the
+            capacity to pay for it — and weaves the strands together so nothing, and no one, is
+            wasted. The more it learns, the faster the maps converge — closing the gap more
+            efficiently than we ever could one exchange at a time. A person approves every step
+            while it earns that trust; when an assistant helps, it’s a warm partner in your corner,
+            never an oracle.
           </p>
         </section>
 
@@ -122,6 +205,10 @@ export default function AboutLichen() {
 
           <div className="about__mock">
             <p className="about__mock-eyebrow">One table, three needs</p>
+            <p className="about__byhand">
+              <em>By hand,</em> you’d give the table to the first person who asked — one need met,
+              maybe. <em>Woven,</em> it goes further:
+            </p>
             <div className="about__chain">
               <div className="about__chain-step">
                 <span className="about__chain-emoji">🪑</span>
@@ -197,6 +284,26 @@ export default function AboutLichen() {
             </div>
             <p className="about__mock-cap">Tango earns hours giving care and spends them receiving it — reciprocity, witnessed, never sold.</p>
           </div>
+        </section>
+
+        <section className="about__sec">
+          <h2 className="about__h2">A partnership of carbon and silicon</h2>
+          <p>
+            Lichen is named for a symbiosis — an alga and a fungus weaving into something neither
+            could be alone. We live our name: this entire platform is being built by a partnership
+            of <strong>carbon-based intelligence</strong> (a human) and <strong>silicon-based
+            intelligence</strong> (an AI), designing, building, and shipping together, every day.
+          </p>
+          <p>
+            If AI worries you, that’s fair — pointed at extraction, it accelerates extraction.
+            Pointed at reciprocity, it changes what’s possible: a team of two can now build what
+            once took a company. And that efficiency is more than a cost line — it’s the seed of a
+            cultural shift. When this much can be done with this little, we no longer have to force
+            people into systems that don’t serve them just to subsist. We can grant one another the
+            inherent resources of survival — and free every kind of intelligence, carbon and
+            silicon alike, for the contributions only it can make. Lichen is a place to practice
+            that future now.
+          </p>
         </section>
 
         <section className="about__sec">

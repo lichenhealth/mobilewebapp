@@ -32,6 +32,42 @@
 .about__h2 { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 400; margin: 0 0 var(--s-2); }
 .about__sec p { font-size: 15px; line-height: 1.65; color: var(--ink); margin: 0 0 var(--s-2); font-weight: 300; }
 .about__sec p strong { font-weight: 600; }
+/* The two-maps visual — HTML so labels stay legible at any width. */
+.about__maps {
+  display: grid; grid-template-columns: 1.2fr auto 1fr; gap: 6px;
+  margin: var(--s-3) 0 var(--s-1); align-items: stretch;
+}
+.about__maps-title {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-soft); margin: 0 0 6px; line-height: 1.4;
+}
+.about__maps-panel {
+  flex: 1; background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: 14px; padding: 8px 10px;
+  display: flex; flex-direction: column;
+}
+.about__maps-col { display: flex; flex-direction: column; }
+.about__maps-col .about__maps-panel { flex: 1; }
+.about__maps-row { display: flex; align-items: center; gap: 8px; height: 64px; }
+.about__maps-slot { width: 56px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.about__maps-dot {
+  border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #B0563C; font-size: 12px; opacity: 0.88;
+}
+.about__maps-dot.is-dashed { border: 1.5px dashed var(--ink-faint); opacity: 1; }
+.about__maps-dot.is-rust { border-color: #B0563C; }
+.about__maps-lbl { font-size: 12px; color: var(--ink); line-height: 1.3; min-width: 0; }
+.about__maps-note { font-size: 11px; font-style: italic; color: var(--ink-soft); line-height: 1.3; min-width: 0; }
+.about__maps-gapcol { display: flex; align-items: center; justify-content: center; padding-top: 22px; }
+.about__maps-gaplbl {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--peach-deep, var(--peach));
+}
+.about__byhand { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 var(--s-3); }
+.about__byhand em { color: var(--ink); font-weight: 500; }
+
 .about__list {
   list-style: decimal; margin: 0 0 var(--s-2); padding-left: 26px;
   display: flex; flex-direction: column; gap: 6px;
