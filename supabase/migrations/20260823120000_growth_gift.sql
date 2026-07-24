@@ -1,8 +1,10 @@
 -- GROWTH-PHASE AUTO-GIFT (founder 2026-07-23): while we populate the platform,
--- every member gets 3 months of Community free — granted the first time they'd
--- otherwise hit the paywall (the App gate calls this before redirecting to
--- /membership). Reuses the gift lifecycle: the "gifted by Lichen · through
--- {date}" card, the ending-soon bell (notice_gift_ending), and convert-to-paid.
+-- every member gets 3 months of CONCIERGE free — the full tier, so they can try
+-- everything and see the value. Granted the first time they'd otherwise hit the
+-- paywall (the App gate calls this before redirecting to /membership). Reuses the
+-- gift lifecycle: the "gifted by Lichen · through {date}" card, the ending-soon
+-- bell (notice_gift_ending), and convert-to-paid. At month 3 they choose the plan
+-- that fits (Community or Concierge) on /membership.
 --
 -- ONE-TIME per member: it inserts only when NO subscription row exists, so after
 -- the 3 months lapse the (now-expired) row remains and it never re-grants — they
@@ -15,7 +17,7 @@ declare uid uuid := auth.uid(); n int;
 begin
   if uid is null then return false; end if;
   insert into public.subscriptions (profile_id, tier, source, status, current_period_end, granted_at)
-  values (uid, 'community', 'gift', 'active', now() + interval '3 months', now())
+  values (uid, 'concierge', 'gift', 'active', now() + interval '3 months', now())
   on conflict (profile_id) do nothing;   -- never clobbers a paid/existing sub
   get diagnostics n = row_count;
   return n > 0;
