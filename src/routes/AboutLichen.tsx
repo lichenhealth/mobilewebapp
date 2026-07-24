@@ -121,9 +121,7 @@ function TwoMapsVisual() {
           {MAP_ROWS.map((r) => (
             <div className="about__maps-row" key={r.label}>
               <span className="about__maps-slot"><MapDot d={r.right} /></span>
-              <span className="about__maps-lbl">
-                {r.label} <span className="about__maps-note">{r.right.note}</span>
-              </span>
+              <span className="about__maps-lbl">{r.label}</span>
             </div>
           ))}
         </div>
@@ -143,6 +141,7 @@ function TwoMapsVisual() {
           {MAP_ROWS.map((r) => (
             <div className="about__maps-row" key={r.label}>
               <span className="about__maps-slot"><MapDot d={r.left} /></span>
+              <span className="about__maps-note">{r.right.note}</span>
             </div>
           ))}
         </div>
