@@ -111,7 +111,23 @@ function TwoMapsVisual() {
     <div className="about__maps" role="img"
       aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-paid.">
       <div className="about__maps-col">
-        <p className="about__maps-title">Map One · What’s given</p>
+        <p className="about__maps-title">The current economy</p>
+        <div className="about__maps-panel">
+          <Globe variant="paid" />
+          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
+          {MAP_ROWS.map((r) => (
+            <div className="about__maps-row" key={r.label}>
+              <span className="about__maps-slot"><MapDot d={r.right} /></span>
+              <span className="about__maps-lbl">
+                {r.label} <span className="about__maps-note">{r.right.note}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
+      <div className="about__maps-col">
+        <p className="about__maps-title">The Lichen economy</p>
         <div className="about__maps-panel">
           <Globe variant="given" />
           <div className="about__maps-legend" aria-hidden="true">
@@ -124,21 +140,6 @@ function TwoMapsVisual() {
           {MAP_ROWS.map((r) => (
             <div className="about__maps-row" key={r.label}>
               <span className="about__maps-slot"><MapDot d={r.left} /></span>
-              <span className="about__maps-lbl">{r.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
-      <div className="about__maps-col">
-        <p className="about__maps-title">Map Two · What’s paid</p>
-        <div className="about__maps-panel">
-          <Globe variant="paid" />
-          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
-          {MAP_ROWS.map((r) => (
-            <div className="about__maps-row" key={r.label}>
-              <span className="about__maps-slot"><MapDot d={r.right} /></span>
-              <span className="about__maps-note">{r.right.note}</span>
             </div>
           ))}
         </div>

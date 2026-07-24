@@ -34,7 +34,7 @@
 .about__sec p strong { font-weight: 600; }
 /* The two-maps visual — HTML so labels stay legible at any width. */
 .about__maps {
-  display: grid; grid-template-columns: 1.2fr auto 1fr; gap: 6px;
+  display: grid; grid-template-columns: 1.45fr auto 0.9fr; gap: 6px;
   margin: var(--s-3) 0 var(--s-1); align-items: stretch;
 }
 .about__maps-title {
