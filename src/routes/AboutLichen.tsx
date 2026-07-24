@@ -351,13 +351,18 @@ export default function AboutLichen() {
         </section>
 
         <section className="about__sec">
-          <h2 className="about__h2">An algorithm that routes care, not attention</h2>
+          <h2 className="about__h2">An algorithm designed to rebalance and reconnect</h2>
           <p>
-            Most feeds are tuned to hold your attention. Lichen’s evolving algorithm is tuned to
-            <strong> close a gap</strong>. Every single person, plant, animal, place and element is
-            contributing to the collective — or taking from it. That’s the Current Economy — where a
-            mother’s care is priced at zero, a forest isn’t counted at all, and speculative
-            investors are paid handsomely.
+            Every system is perfectly designed to get the results it gets. Feeds tuned to maximize
+            attention harvest fear and consumption — comfort that never quite relieves — and deepen
+            our disconnection. Lichen’s evolving algorithm is designed for different results: it
+            reads need and contribution, <strong>rebalances resources through reciprocity</strong>,
+            and <strong>reconnects us</strong> — to ourselves, each other, and the planet.
+          </p>
+          <p>
+            Every single person, plant, animal, place and element is contributing to the collective
+            — or taking from it. That’s the Current Economy — where a mother’s care is priced at
+            zero, a forest isn’t counted at all, and speculative investors are paid handsomely.
           </p>
 
           <TwoMapsVisual />
