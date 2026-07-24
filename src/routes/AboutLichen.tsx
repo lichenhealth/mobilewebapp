@@ -93,16 +93,21 @@ function Globe({ variant }: { variant: 'given' | 'paid' }) {
 /** The table's journey as a map path: every contributor a waypoint — the tree,
  *  the artisan, the delivery already driving that way — joined by the route
  *  Lichen weaves, ending at the family's kitchen. */
-const JOURNEY_STOPS = [
+interface JourneyStop {
+  emoji: string; x: number; y: number;
+  name: string; sub: string; sub2?: string;
+  lx: number; ly: number; anchor: 'start' | 'end' | 'middle';
+}
+const JOURNEY_STOPS: JourneyStop[] = [
   // Labels sit clear of the dashed route — above, below, or beside their node,
   // never jammed against the path.
   { emoji: '🌳', x: 44, y: 44, name: 'the tree', sub: '50 years of growing', lx: 46, ly: 78, anchor: 'middle' },
   { emoji: '🪚', x: 200, y: 58, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 54, anchor: 'start' },
   { emoji: '🥕', x: 120, y: 128, name: 'the farm', sub: 'clean food loaded in', lx: 98, ly: 124, anchor: 'end' },
   { emoji: '🏠', x: 240, y: 150, name: 'a neighbor', sub: 'pays for produce', lx: 262, ly: 134, anchor: 'start' },
-  { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', lx: 98, ly: 200, anchor: 'end' },
+  { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', sub2: 'plants trees in return', lx: 98, ly: 200, anchor: 'end' },
   { emoji: '🏡', x: 284, y: 258, name: 'the family’s kitchen', sub: 'the table, earned by the drive', lx: 272, ly: 288, anchor: 'middle' },
-] as const;
+];
 
 function TableJourney() {
   return (
@@ -115,14 +120,21 @@ function TableJourney() {
       {/* the woven route — driven by the family's truck */}
       <path d="M44,44 C90,14 152,32 200,58 C232,78 160,96 120,128 C90,152 190,142 240,150 C288,178 170,180 120,210 C96,228 210,236 284,258"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
-      {/* the family's truck, riding its own route */}
-      <text x="168" y="98" fontSize="13" textAnchor="middle">🚚</text>
+      {/* the family's truck, home at the end of the drive */}
+      <text x="246" y="250" fontSize="13" textAnchor="middle">🚚</text>
+      {/* the loop closes: the subsidized family volunteers, planting the next trees */}
+      <path d="M120,210 C148,166 148,86 60,48"
+        fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.85" />
+      <text x="158" y="134" fontSize="11" textAnchor="middle">🌱</text>
       {JOURNEY_STOPS.map((s) => (
         <g key={s.name}>
           <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
           <text x={s.x} y={s.y + 5} fontSize="14" textAnchor="middle">{s.emoji}</text>
           <text x={s.lx} y={s.ly} fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor={s.anchor}>{s.name}</text>
           <text x={s.lx} y={s.ly + 12} fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor={s.anchor}>{s.sub}</text>
+          {s.sub2 && (
+            <text x={s.lx} y={s.ly + 24} fontSize="9" fontStyle="italic" fill={KIND.plants} textAnchor={s.anchor}>{s.sub2}</text>
+          )}
         </g>
       ))}
     </svg>
@@ -335,9 +347,11 @@ export default function AboutLichen() {
             <p className="about__mock-cap">
               One route, the whole economy. The family couldn’t afford the table — so they earn it
               with their truck, delivering it along with clean food for the neighborhood: one
-              neighbor pays for their produce; donations and membership revenue cover the other’s.
-              Lichen remembers every contributor — the tree’s fifty years, the artisan’s hours, the
-              family’s miles — and the story returns to each of them. A person approves every step.
+              neighbor pays for their produce; donations and membership revenue cover the other’s —
+              and that family gives back too, volunteering to plant the next trees. Everyone
+              contributes what they can. Lichen remembers every contributor — the tree’s fifty
+              years, the artisan’s hours, the family’s miles — and the story returns to each of
+              them. A person approves every step.
             </p>
           </div>
 
