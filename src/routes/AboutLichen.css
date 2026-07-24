@@ -105,7 +105,11 @@
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--ink-faint); margin-bottom: var(--s-3);
 }
-.about__mock-cap { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-top: var(--s-3); font-style: italic; }
+/* .about__sec p's margin shorthand would zero this — match its specificity. */
+.about__mock-cap, .about__sec p.about__mock-cap {
+  font-size: 13px; color: var(--ink-soft); line-height: 1.5;
+  margin-top: var(--s-5); font-style: italic;
+}
 
 /* Allocation chain — the entrusted table's journey */
 .about__chain { display: flex; flex-direction: column; gap: 8px; }
