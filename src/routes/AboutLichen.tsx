@@ -93,27 +93,6 @@ export default function AboutLichen() {
             the world as it could be.
           </p>
 
-          <div className="about__mock">
-            <p className="about__mock-eyebrow">Example · an entrusted offering</p>
-            <div className="about__chain">
-              <div className="about__chain-step">
-                <span className="about__chain-emoji">🪑</span>
-                <span><span className="about__chain-t">A hand-made table, entrusted to Lichen</span><br /><span className="about__chain-s">“Route it where it’s needed most.”</span></span>
-              </div>
-              <span className="about__chain-arrow">↓</span>
-              <div className="about__chain-step">
-                <span className="about__chain-emoji">💛</span>
-                <span><span className="about__chain-t">Sold to someone who’ll treasure it</span><br /><span className="about__chain-s">Its value freed, no need lost</span></span>
-              </div>
-              <span className="about__chain-arrow">↓</span>
-              <div className="about__chain-step is-out">
-                <span className="about__chain-emoji">🥕</span>
-                <span><span className="about__chain-t">A week of groceries for a family in Fairplay</span><br /><span className="about__chain-s">+ a second table, gifted to their kitchen</span></span>
-              </div>
-            </div>
-            <p className="about__mock-cap">One gift, two needs closed — and the story of where it went comes back to you.</p>
-          </div>
-
           <button className="about__link" onClick={() => navigate('/donate/how')}>
             How giving works <Icon name="arrow-right" size={13} />
           </button>
@@ -129,14 +108,46 @@ export default function AboutLichen() {
             routes support toward it first: greatest need, least access, closest to home.
           </p>
           <p>
-            Say what you’re looking for and it matches you with what people near you are offering;
-            give something, and the story of where it went comes back to you. For now a person is
-            always in the loop — as the algorithm earns trust, it weaves more. When an assistant
-            helps, it’s a warm partner in your corner, never an oracle.
+            It reads the whole web at once — who’s seeking, who’s offering, what something is truly
+            worth and who has the capacity to pay for it — and weaves the strands together so
+            nothing, and no one, is wasted. Give something, and the story of where it went comes
+            back to you. For now a person is always in the loop — as the algorithm earns trust, it
+            weaves more. When an assistant helps, it’s a warm partner in your corner, never an
+            oracle.
           </p>
+        </section>
+
+        <section className="about__sec">
+          <h2 className="about__h2">The economy in action</h2>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Example · need meets offer</p>
+            <p className="about__mock-eyebrow">One table, three needs</p>
+            <div className="about__chain">
+              <div className="about__chain-step">
+                <span className="about__chain-emoji">🪑</span>
+                <span><span className="about__chain-t">A woodworker entrusts a hand-built walnut table</span><br /><span className="about__chain-s">“Route it — or convert it, if that helps more.”</span></span>
+              </div>
+              <span className="about__chain-arrow">↓</span>
+              <div className="about__chain-step">
+                <span className="about__chain-emoji">🔍</span>
+                <span><span className="about__chain-t">The algorithm reads the web</span><br /><span className="about__chain-s">A family in Fairplay seeking a dining table · a designer in Boulder searching for exactly this craftsmanship, glad to pay its worth · a grocery gap at the family’s door</span></span>
+              </div>
+              <span className="about__chain-arrow">↓</span>
+              <div className="about__chain-step">
+                <span className="about__chain-emoji">🤝</span>
+                <span><span className="about__chain-t">It weaves a chain instead of a swap</span><br /><span className="about__chain-s">The designer buys the table at full value; a simpler table, offered by a neighbor, goes to the family</span></span>
+              </div>
+              <span className="about__chain-arrow">↓</span>
+              <div className="about__chain-step is-out">
+                <span className="about__chain-emoji">🥕</span>
+                <span><span className="about__chain-t">The proceeds fill the family’s pantry for a month</span><br /><span className="about__chain-s">And the story returns to the woodworker: your table furnished a home and fed it.</span></span>
+              </div>
+            </div>
+            <p className="about__mock-cap">Craft, need, and capacity each found their match — one offering, woven three ways. A person approves every step.</p>
+          </div>
+
+          <div className="about__mock">
+            <p className="about__mock-eyebrow">Need meets offer</p>
             <div className="about__match">
               <div className="about__match-card">
                 <p className="about__match-k">In search of</p>
@@ -152,7 +163,7 @@ export default function AboutLichen() {
           </div>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Example · a warm partner in the thread</p>
+            <p className="about__mock-eyebrow">A warm partner in the thread</p>
             <div className="about__asst">
               <span className="about__asst-glyph"><LichenMark size={16} /></span>
               <div className="about__asst-bubble">
