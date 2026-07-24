@@ -8,27 +8,91 @@ import './AboutLichen.css';
  *  contribution) beside what the market pays (care at $0, forests not counted,
  *  speculation bloated). The gap between them is what the algorithm closes.
  *  Built in HTML so the labels stay legible at every column width. */
+/* The strand palette — one color per kind of being, tuned to sit with peach. */
+const KIND = {
+  people: 'var(--peach)',
+  plants: 'var(--green)',
+  animals: '#D9A441',   // warm ochre
+  elements: '#7FA8C9',  // river blue
+  places: '#A78BBA',    // lichen mauve
+  extraction: '#B0563C',
+};
+
 const MAP_ROWS = [
   {
     label: 'a mother’s care',
-    left: { size: 46, bg: 'var(--peach)' },
+    left: { size: 46, bg: KIND.people },
     right: { size: 7, bg: 'var(--ink-faint)', note: '$0' },
   },
   {
     label: 'an old-growth forest',
-    left: { size: 54, bg: 'var(--green)' },
+    left: { size: 54, bg: KIND.plants },
     right: { size: 22, dashed: true, note: 'not counted' },
   },
   {
-    label: 'a nurse’s shift',
+    label: 'a paramedic’s shift',
     left: { size: 34, bg: 'var(--peach-deep, var(--peach))' },
     right: { size: 13, bg: 'var(--ink-faint)', note: 'underpaid' },
   },
   {
-    label: 'speculation',
+    label: 'a hedge-fund manager',
     left: { size: 15, dashed: true, rust: true, minus: true },
-    right: { size: 46, bg: '#B0563C', note: 'over-paid' },
+    right: { size: 46, bg: KIND.extraction, note: 'over-paid' },
   },
+];
+
+/** A small on-brand globe: bone sphere + faint graticule; the colored strands
+ *  are the kinds of beings contributing (people, plants, animals, elements,
+ *  places). The market variant shows the same world with most strands missing —
+ *  only the money-recognized ones remain. */
+function Globe({ variant }: { variant: 'given' | 'paid' }) {
+  return (
+    <svg className="about__maps-globe" viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="60" cy="60" r="52" fill="var(--bone)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      {/* graticule */}
+      <ellipse cx="60" cy="60" rx="24" ry="52" fill="none" stroke="var(--bone-edge)" strokeWidth="0.8" />
+      <ellipse cx="60" cy="60" rx="42" ry="52" fill="none" stroke="var(--bone-edge)" strokeWidth="0.7" opacity="0.7" />
+      <ellipse cx="60" cy="60" rx="52" ry="20" fill="none" stroke="var(--bone-edge)" strokeWidth="0.8" />
+      <ellipse cx="60" cy="60" rx="52" ry="40" fill="none" stroke="var(--bone-edge)" strokeWidth="0.7" opacity="0.7" />
+      {variant === 'given' ? (
+        <g strokeWidth="2" strokeLinecap="round" fill="none">
+          <path d="M16,72 Q58,22 104,54" stroke={KIND.plants} />
+          <path d="M22,42 Q64,88 100,74" stroke={KIND.people} />
+          <path d="M32,96 Q58,58 92,28" stroke={KIND.animals} />
+          <path d="M14,56 Q48,44 78,16" stroke={KIND.elements} />
+          <path d="M42,106 Q76,82 106,66" stroke={KIND.places} />
+          <g stroke="none">
+            <circle cx="16" cy="72" r="3" fill={KIND.plants} /><circle cx="104" cy="54" r="3" fill={KIND.plants} />
+            <circle cx="22" cy="42" r="3" fill={KIND.people} /><circle cx="100" cy="74" r="3" fill={KIND.people} />
+            <circle cx="32" cy="96" r="3" fill={KIND.animals} /><circle cx="92" cy="28" r="3" fill={KIND.animals} />
+            <circle cx="14" cy="56" r="3" fill={KIND.elements} /><circle cx="78" cy="16" r="3" fill={KIND.elements} />
+            <circle cx="42" cy="106" r="3" fill={KIND.places} /><circle cx="106" cy="66" r="3" fill={KIND.places} />
+          </g>
+        </g>
+      ) : (
+        <g strokeLinecap="round" fill="none">
+          {/* the one strand money sees clearly — bloated */}
+          <path d="M24,86 Q60,44 100,70" stroke={KIND.extraction} strokeWidth="5" opacity="0.85" />
+          {/* people, barely priced */}
+          <path d="M22,42 Q64,88 100,74" stroke={KIND.people} strokeWidth="1.2" opacity="0.35" />
+          {/* the rest: missing — faint remnants */}
+          <path d="M16,72 Q38,50 58,40" stroke="var(--ink-faint)" strokeWidth="1" strokeDasharray="2 5" opacity="0.5" />
+          <path d="M60,96 Q78,74 92,60" stroke="var(--ink-faint)" strokeWidth="1" strokeDasharray="2 5" opacity="0.5" />
+          <g stroke="none">
+            <circle cx="24" cy="86" r="3.4" fill={KIND.extraction} /><circle cx="100" cy="70" r="3.4" fill={KIND.extraction} />
+          </g>
+        </g>
+      )}
+    </svg>
+  );
+}
+
+const LEGEND: { label: string; color: string }[] = [
+  { label: 'people', color: KIND.people },
+  { label: 'plants', color: KIND.plants },
+  { label: 'animals', color: KIND.animals },
+  { label: 'elements', color: KIND.elements },
+  { label: 'places', color: KIND.places },
 ];
 
 function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; rust?: boolean; minus?: boolean } }) {
@@ -49,6 +113,14 @@ function TwoMapsVisual() {
       <div className="about__maps-col">
         <p className="about__maps-title">Map One · What’s given</p>
         <div className="about__maps-panel">
+          <Globe variant="given" />
+          <div className="about__maps-legend" aria-hidden="true">
+            {LEGEND.map((l) => (
+              <span className="about__maps-key" key={l.label}>
+                <span className="about__maps-swatch" style={{ background: l.color }} />{l.label}
+              </span>
+            ))}
+          </div>
           {MAP_ROWS.map((r) => (
             <div className="about__maps-row" key={r.label}>
               <span className="about__maps-slot"><MapDot d={r.left} /></span>
@@ -61,6 +133,8 @@ function TwoMapsVisual() {
       <div className="about__maps-col">
         <p className="about__maps-title">Map Two · What’s paid</p>
         <div className="about__maps-panel">
+          <Globe variant="paid" />
+          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
           {MAP_ROWS.map((r) => (
             <div className="about__maps-row" key={r.label}>
               <span className="about__maps-slot"><MapDot d={r.right} /></span>

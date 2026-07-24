@@ -59,6 +59,14 @@
 .about__maps-dot.is-rust { border-color: #B0563C; }
 .about__maps-lbl { font-size: 12px; color: var(--ink); line-height: 1.3; min-width: 0; }
 .about__maps-note { font-size: 11px; font-style: italic; color: var(--ink-soft); line-height: 1.3; min-width: 0; }
+.about__maps-globe { display: block; width: 100%; max-width: 132px; margin: 2px auto 6px; height: auto; }
+.about__maps-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; margin-bottom: 8px; }
+.about__maps-key { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: var(--ink-soft); }
+.about__maps-swatch { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
+.about__maps-missing {
+  text-align: center; font-size: 10px; font-style: italic; color: var(--ink-faint);
+  margin: 0 0 8px;
+}
 .about__maps-gapcol { display: flex; align-items: center; justify-content: center; padding-top: 22px; }
 .about__maps-gaplbl {
   writing-mode: vertical-rl; transform: rotate(180deg);
