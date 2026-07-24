@@ -402,22 +402,6 @@ export default function AboutLichen() {
           </div>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Need meets offer</p>
-            <div className="about__match">
-              <div className="about__match-card">
-                <p className="about__match-k">In search of</p>
-                <p className="about__match-v">After-school care, Tuesdays</p>
-              </div>
-              <span className="about__match-link">→</span>
-              <div className="about__match-card">
-                <p className="about__match-k">Matched · 0.4 mi</p>
-                <p className="about__match-v">Maya — offering childcare, as a gift</p>
-              </div>
-            </div>
-            <p className="about__mock-cap">The Lichen economy answers first — before the outside market ever has to.</p>
-          </div>
-
-          <div className="about__mock">
             <p className="about__mock-eyebrow">A warm partner in the thread</p>
             <div className="about__asst">
               <span className="about__asst-glyph"><LichenMark size={16} /></span>
