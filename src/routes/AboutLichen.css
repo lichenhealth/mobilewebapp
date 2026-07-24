@@ -81,6 +81,7 @@
   text-transform: uppercase; color: var(--peach-deep, var(--peach));
 }
 .about__byhand { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 var(--s-3); }
+.about__journey { display: block; width: 100%; max-width: 480px; height: auto; margin: var(--s-2) auto; }
 .about__byhand em { color: var(--ink); font-weight: 500; }
 
 .about__list {

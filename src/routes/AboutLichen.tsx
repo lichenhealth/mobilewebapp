@@ -90,6 +90,39 @@ function Globe({ variant }: { variant: 'given' | 'paid' }) {
   );
 }
 
+/** The table's journey as a map path: every contributor a waypoint — the tree,
+ *  the artisan, the delivery already driving that way — joined by the route
+ *  Lichen weaves, ending at the family's kitchen. */
+const JOURNEY_STOPS = [
+  { emoji: '🌳', x: 44, y: 50, name: 'the tree', sub: '50 years of growing', lx: 66, ly: 46, anchor: 'start' },
+  { emoji: '🪚', x: 200, y: 66, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 62, anchor: 'start' },
+  { emoji: '🚚', x: 150, y: 150, name: 'the delivery', sub: 'already driving that way', lx: 128, ly: 146, anchor: 'end' },
+  { emoji: '🏡', x: 284, y: 196, name: 'the family’s kitchen', sub: 'Fairplay, Colorado', lx: 262, ly: 192, anchor: 'end' },
+] as const;
+
+function TableJourney() {
+  return (
+    <svg className="about__journey" viewBox="0 0 340 240" role="img"
+      aria-label="A map path from the tree that grew the wood, to the artisan who crafted the table, to a delivery woven into a trip already heading that way, ending at a family’s kitchen in Fairplay.">
+      {/* faint map contours */}
+      <path d="M-10,104 q45,-14 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.55" />
+      <path d="M-10,132 q45,12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.45" />
+      <path d="M-10,214 q45,-10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      {/* the woven route */}
+      <path d="M44,50 C96,18 156,34 200,66 C240,96 200,122 150,150 C120,168 210,168 284,196"
+        fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {JOURNEY_STOPS.map((s) => (
+        <g key={s.name}>
+          <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+          <text x={s.x} y={s.y + 5} fontSize="14" textAnchor="middle">{s.emoji}</text>
+          <text x={s.lx} y={s.ly} fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor={s.anchor}>{s.name}</text>
+          <text x={s.lx} y={s.ly + 12} fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor={s.anchor}>{s.sub}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 const LEGEND: { label: string; color: string }[] = [
   { label: 'people', color: KIND.people },
   { label: 'plants', color: KIND.plants },
@@ -281,33 +314,17 @@ export default function AboutLichen() {
           <h2 className="about__h2">The economy in action</h2>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">One table, three needs</p>
+            <p className="about__mock-eyebrow">The table’s journey</p>
             <p className="about__byhand">
               <em>By hand,</em> you’d give the table to the first person who asked — one need met,
-              maybe. <em>Woven,</em> it goes further:
+              maybe. <em>Woven,</em> every contributor is part of the route:
             </p>
-            <div className="about__chain">
-              <div className="about__chain-step">
-                <span className="about__chain-emoji">🪑</span>
-                <span><span className="about__chain-t">A woodworker entrusts a hand-built walnut table</span><br /><span className="about__chain-s">“Route it — or convert it, if that helps more.”</span></span>
-              </div>
-              <span className="about__chain-arrow">↓</span>
-              <div className="about__chain-step">
-                <span className="about__chain-emoji">🔍</span>
-                <span><span className="about__chain-t">The algorithm reads the web</span><br /><span className="about__chain-s">A family in Fairplay seeking a dining table · a designer in Boulder searching for exactly this craftsmanship, glad to pay its worth · a grocery gap at the family’s door</span></span>
-              </div>
-              <span className="about__chain-arrow">↓</span>
-              <div className="about__chain-step">
-                <span className="about__chain-emoji">🤝</span>
-                <span><span className="about__chain-t">It weaves a chain instead of a swap</span><br /><span className="about__chain-s">The designer buys the table at full value; a simpler table, offered by a neighbor, goes to the family</span></span>
-              </div>
-              <span className="about__chain-arrow">↓</span>
-              <div className="about__chain-step is-out">
-                <span className="about__chain-emoji">🥕</span>
-                <span><span className="about__chain-t">The proceeds fill the family’s pantry for a month</span><br /><span className="about__chain-s">And the story returns to the woodworker: your table furnished a home and fed it.</span></span>
-              </div>
-            </div>
-            <p className="about__mock-cap">Craft, need, and capacity each found their match — one offering, woven three ways. A person approves every step.</p>
+            <TableJourney />
+            <p className="about__mock-cap">
+              Lichen remembers every contributor — the tree’s fifty years, the artisan’s hours, the
+              neighbors already driving that way — and weaves the shortest honest route between
+              them. The story returns to each of them. A person approves every step.
+            </p>
           </div>
 
           <div className="about__mock">
