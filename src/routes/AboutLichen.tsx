@@ -310,9 +310,9 @@ export default function AboutLichen() {
             at once — who’s seeking, who’s offering, what something is truly worth and who has the
             capacity to pay for it — and weaves the strands together so nothing, and no one, is
             wasted. The more it learns, the faster the maps converge — closing the gap more
-            efficiently than we ever could one exchange at a time. A person approves every step
-            while it earns that trust; when an assistant helps, it’s a warm partner in your corner,
-            never an oracle.
+            efficiently than we ever could one exchange at a time. Carbon-based intelligence
+            approves every step while the silicon-based mycelium earns our trust; a caring partner
+            in your corner, never an oracle.
           </p>
         </section>
 
