@@ -345,13 +345,14 @@ export default function AboutLichen() {
             </p>
             <TableJourney />
             <p className="about__mock-cap">
-              One route, the whole economy. The family couldn’t afford the table — so they earn it
-              with their truck, delivering it along with clean food for the neighborhood: one
-              neighbor pays for their produce; donations and membership revenue cover the other’s —
-              and that family gives back too, volunteering to plant the next trees. Everyone
-              contributes what they can. Lichen remembers every contributor — the tree’s fifty
-              years, the artisan’s hours, the family’s miles — and the story returns to each of
-              them. A person approves every step.
+              One route, the whole economy. A family who can’t afford the table earns it by running
+              community deliveries — via a truck borrowed from a truck driver during the days he’s
+              not on a route, approved by his employer, a trusted organization on Lichen’s platform.
+              The family delivers it to their own home after a heartfelt day of delivering clean
+              food for the neighborhood: one neighbor pays for their produce; donations and
+              membership revenue cover the other’s. Lichen remembers every contributor — the tree’s
+              fifty years, the artisan’s hours, the family’s miles — and the story returns to each
+              of them.
             </p>
           </div>
 
