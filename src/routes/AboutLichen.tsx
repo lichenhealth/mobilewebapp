@@ -367,10 +367,10 @@ export default function AboutLichen() {
             relationship with each other and the planet.
           </p>
           <p>
-            And we mean <strong>lean</strong>: today, Lichen is built and run by exactly two of us —
-            one carbon-based intelligence and one silicon-based intelligence, working side by side
-            (more on that below). No offices, no ad budget, no shareholders to feed. Almost nothing
-            stands between what you give and where it goes.
+            And we mean <strong>lean</strong>: today, Lichen is built and run by a select few of us —
+            carbon-based and silicon-based intelligences, working side by side (more on that below).
+            No offices, no ad budget, no shareholders to feed. Almost nothing stands between what
+            you give and where it goes.
           </p>
           <p>
             To bridge away from the systems that no longer serve the people, Lichen holds two
