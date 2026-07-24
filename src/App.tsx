@@ -19,6 +19,7 @@ import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
 import Giving from './routes/Giving';
 import Saved from './routes/Saved';
+import Organize from './routes/Organize';
 import PostPage from './routes/PostPage';
 import CollectionPage from './routes/CollectionPage';
 
@@ -160,6 +161,7 @@ export default function App() {
           <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/posts/:postId" element={<PostPage />} />
           <Route path="/saved"     element={<Saved />} />
+          <Route path="/organize"  element={<Organize />} />
           <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/maps"      element={
             <Suspense fallback={<div className="scroll-view"><p style={{ padding: 'var(--s-6)', color: 'var(--ink-muted)' }}>Loading map…</p></div>}>

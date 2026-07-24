@@ -121,9 +121,9 @@ export default function Saved() {
                 <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
                 <span className="myc__kind-label">New folder</span>
               </button>
-              {/* Organize: an ORDERED collection — arrange saved pieces into a
-                  sequence, publishable to the Library (founder 2026-07-24). */}
-              <button className="myc__kind" onClick={() => { setNewKind('path'); setNewFolderOpen(true); }}>
+              {/* Organize: the studio — create ordered collections, arrange
+                  them, move pieces between them (founder 2026-07-24). */}
+              <button className="myc__kind" onClick={() => navigate('/organize')}>
                 <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
                 <span className="myc__kind-label">Organize</span>
               </button>
