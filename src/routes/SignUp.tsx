@@ -65,6 +65,9 @@ export default function SignUp() {
           </button>
         </form>
         <p className="auth__switch">
+          New to Lichen? <Link to="/about">Learn what it’s all about</Link> first.
+        </p>
+        <p className="auth__switch">
           Already have an account? <Link to="/login">Log in</Link>
         </p>
       </div>
