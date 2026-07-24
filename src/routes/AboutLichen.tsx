@@ -145,6 +145,42 @@ function TableJourney() {
   );
 }
 
+/** Tango's exchange as a map: risky, skilled labor that flat time can't price —
+ *  carried by Current-cy instead. She absorbs a child's heavy energy, her
+ *  bodyworker clears her and is paid from Tango's Current-cy, then cashes out
+ *  to dollars in the wider world. */
+const TANGO_STOPS: JourneyStop[] = [
+  { emoji: '🧒', x: 44, y: 48, name: 'a hurting child', sub: 'releases what’s heavy', lx: 46, ly: 82, anchor: 'middle' },
+  { emoji: '🐴', x: 190, y: 64, name: 'Tango', sub: 'takes on the heavy energy', lx: 212, ly: 60, anchor: 'start' },
+  { emoji: '💆', x: 110, y: 140, name: 'the bodyworker', sub: 'clears Tango’s load', sub2: 'paid in Current-cy', lx: 88, ly: 136, anchor: 'end' },
+  { emoji: '🛒', x: 256, y: 204, name: 'the wider world', sub: 'Current-cy cashed out to dollars', lx: 250, ly: 236, anchor: 'middle' },
+];
+
+function TangoJourney() {
+  return (
+    <svg className="about__journey" viewBox="0 0 340 250" role="img"
+      aria-label="A map route: a hurting child releases what’s heavy, Tango the therapy horse takes it on, her bodyworker clears her and is paid in Current-cy, and cashes out to dollars in the wider world.">
+      <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
+      <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      <path d="M44,48 C92,20 148,36 190,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
+        fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* the energy moving from the child into Tango's keeping */}
+      <text x="140" y="26" fontSize="11" textAnchor="middle">✨</text>
+      {TANGO_STOPS.map((s) => (
+        <g key={s.name}>
+          <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+          <text x={s.x} y={s.y + 5} fontSize="14" textAnchor="middle">{s.emoji}</text>
+          <text x={s.lx} y={s.ly} fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor={s.anchor}>{s.name}</text>
+          <text x={s.lx} y={s.ly + 12} fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor={s.anchor}>{s.sub}</text>
+          {s.sub2 && (
+            <text x={s.lx} y={s.ly + 24} fontSize="9" fontStyle="italic" fill="var(--peach-deep, var(--peach))" textAnchor={s.anchor}>{s.sub2}</text>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 const LEGEND: { label: string; color: string }[] = [
   { label: 'people', color: KIND.people },
   { label: 'plants', color: KIND.plants },
@@ -404,18 +440,16 @@ export default function AboutLichen() {
           </p>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Example · Tango’s reciprocity</p>
-            <div className="about__ledger">
-              <div className="about__ledger-row">
-                <span className="about__ledger-who">🐴 Tango <span className="about__ledger-what">— therapy sessions given</span></span>
-                <span className="about__ledger-amt is-earn">+3 hrs</span>
-              </div>
-              <div className="about__ledger-row">
-                <span className="about__ledger-who">🐴 Tango <span className="about__ledger-what">— energy work received</span></span>
-                <span className="about__ledger-amt is-spend">−2 hrs</span>
-              </div>
-            </div>
-            <p className="about__mock-cap">Tango earns hours giving care and spends them receiving it — reciprocity, witnessed, never sold.</p>
+            <p className="about__mock-eyebrow">Tango’s exchange</p>
+            <TangoJourney />
+            <p className="about__mock-cap">
+              Not everything can be measured in hours — a trade carries years of training, and some
+              work spends the body itself. Tango’s does: absorbing what a hurting child releases is
+              skilled, risky labor, and Current-cy is how it’s honored. The session pays into
+              Tango’s care, held by her steward; her bodyworker is paid from it to clear her; and
+              what the bodyworker earns cashes out to dollars in the wider world. A being who can’t
+              hold money just moved real value through three lives.
+            </p>
           </div>
         </section>
 
