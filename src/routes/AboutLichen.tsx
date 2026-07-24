@@ -118,12 +118,6 @@ function TwoMapsVisual() {
         <div className="about__maps-panel">
           <Globe variant="paid" />
           <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
-          {MAP_ROWS.map((r) => (
-            <div className="about__maps-row" key={r.label}>
-              <span className="about__maps-slot"><MapDot d={r.right} /></span>
-              <span className="about__maps-lbl">{r.label}</span>
-            </div>
-          ))}
         </div>
       </div>
       <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
@@ -138,13 +132,20 @@ function TwoMapsVisual() {
               </span>
             ))}
           </div>
-          {MAP_ROWS.map((r) => (
-            <div className="about__maps-row" key={r.label}>
-              <span className="about__maps-slot"><MapDot d={r.left} /></span>
-              <span className="about__maps-note">{r.right.note}</span>
-            </div>
-          ))}
         </div>
+      </div>
+      {/* Paired rows spanning both economies: the same being on one line —
+          its current-economy dot and its Lichen dot joined by a dotted bridge. */}
+      <div className="about__maps-rows">
+        {MAP_ROWS.map((r) => (
+          <div className="about__maps-xrow" key={r.label}>
+            <span className="about__maps-xlbl">{r.label}</span>
+            <span className="about__maps-slot"><MapDot d={r.right} /></span>
+            <span className="about__maps-conn" aria-hidden="true" />
+            <span className="about__maps-slot"><MapDot d={r.left} /></span>
+            <span className="about__maps-xnote">{r.right.note}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
