@@ -31,7 +31,6 @@ import Events from './routes/Events';
 import EventPage from './routes/EventPage';
 import GuestEvent from './routes/GuestEvent';
 import AboutLichen from './routes/AboutLichen';
-import { Icon } from './components/Icon';
 import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
@@ -255,11 +254,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
-      {!isChatThread && !isAuth && !isGuest && !isAbout && (
-        <button className="about-fab" onClick={() => navigate('/about')} aria-label="About Lichen" title="About Lichen">
-          <Icon name="info" size={18} />
-        </button>
-      )}
       {!isChatThread && !isAuth && !isGuest && !isAbout && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {!isChatThread && !isAuth && <InstallPrompt />}

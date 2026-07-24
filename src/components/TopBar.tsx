@@ -107,13 +107,23 @@ export default function TopBar({
 
   return (
     <header className="top-bar">
-      <button
-        className="top-bar__icon"
-        onClick={onMenu}
-        aria-label="Open menu"
-      >
-        <Icon name="menu" size={20} />
-      </button>
+      <div className="top-bar__left">
+        <button
+          className="top-bar__icon"
+          onClick={onMenu}
+          aria-label="Open menu"
+        >
+          <Icon name="menu" size={20} />
+        </button>
+        <button
+          className="top-bar__icon"
+          onClick={() => navigate('/about')}
+          aria-label="About Lichen"
+          title="About Lichen"
+        >
+          <Icon name="info" size={18} />
+        </button>
+      </div>
 
       <div className="top-bar__logo">
         {section ? (

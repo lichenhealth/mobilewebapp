@@ -33,17 +33,19 @@ export default function AboutLichen() {
         <p className="about__eyebrow">What is Lichen?</p>
         <h1 className="about__title">A better way of being <span className="display-italic">together.</span></h1>
         <p className="about__lede">
-          Lichen is a <strong>corrective social network</strong> — one trusted web for the whole of a
+          Lichen is a <strong>corrective social network</strong> — one trusted web for your whole
           life. Not a place to perform, but a place to actually be in relationship.
         </p>
 
         <section className="about__sec">
-          <h2 className="about__h2">The whole of a life, in one place</h2>
+          <h2 className="about__h2">Your whole life, in one place</h2>
           <p>
             Most networks slice you into a feed and sell your attention. Lichen holds the whole of
             you instead — your care and healing, your work and the things you offer, the events you
-            gather for, the places you love, jobs, and a fairer economy — woven into a single web of
-            people you trust. Everything in one place, because a life isn’t lived in silos.
+            gather for, the places you love, the jobs that give you purpose and fund your livelihood,
+            and a fairer economy that values all things, not just human contributions — woven into a
+            single web of people, plants, animals, elements, spaces, communities, groups and
+            organizations you trust. Everything in one place, because a life isn’t lived in silos.
           </p>
         </section>
 

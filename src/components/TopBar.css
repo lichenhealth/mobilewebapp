@@ -30,6 +30,8 @@
   background: var(--bone);
 }
 .top-bar > * { pointer-events: auto; }
+/* Left group: menu + About, top-aligned together in the left cell. */
+.top-bar__left { display: inline-flex; align-items: flex-start; gap: 8px; }
 
 .top-bar__icon {
   width: 38px;
