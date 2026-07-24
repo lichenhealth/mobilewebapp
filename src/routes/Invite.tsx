@@ -157,9 +157,13 @@ export default function Invite() {
         )}
         {isAdmin && channel !== 'phone' && (
           <div className="invite__gift">
+            <p className="invite__gift-auto">
+              Every new member automatically gets <strong>3 months of Concierge, free</strong> — no
+              gift needed. This is for extending that welcome.
+            </p>
             <label className="invite__gift-toggle">
               <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
-              <span>Gift membership</span>
+              <span>Gift a longer membership</span>
             </label>
             {gift && (
               <div className="invite__gift-tiers">
@@ -197,7 +201,8 @@ export default function Invite() {
             )}
             {gift && (
               <p className="invite__gift-hint">
-                Their membership activates the moment they sign up with this email — no paywall.
+                This replaces the standard 3-month welcome — it activates the moment they sign up
+                with this email, no paywall.
               </p>
             )}
           </div>

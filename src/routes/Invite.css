@@ -45,6 +45,8 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 }
 .invite__gift-tier.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone); }
 .invite__gift-hint { font-size: 12px; color: var(--ink-soft); margin: 0; }
+.invite__gift-auto { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 var(--s-2); }
+.invite__gift-auto strong { color: var(--ink); }
 .invite__gift-span { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .invite__gift-stepper {
   display: inline-flex; align-items: center; gap: 2px;
