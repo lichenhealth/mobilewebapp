@@ -535,7 +535,7 @@ export default function AboutLichen() {
               books a nearby community healing center, and lifts every ounce of retreat
               coordination off the healers — who arrive simply to heal. A donor’s large gift funds
               the services; the commons carries the rest. One big gift can heal whole crews — care
-              is the honest repayment for a body spent.
+              is the honest repayment for sacred sacrifices given.
             </p>
           </div>
         </section>
