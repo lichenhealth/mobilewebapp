@@ -147,14 +147,6 @@ function TwoMapsVisual() {
     <div className="about__maps" role="img"
       aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-paid.">
       <div className="about__maps-col">
-        <p className="about__maps-title">The current economy</p>
-        <div className="about__maps-panel">
-          <Globe variant="paid" />
-          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
-        </div>
-      </div>
-      <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
-      <div className="about__maps-col">
         <p className="about__maps-title">The Lichen economy</p>
         <div className="about__maps-panel">
           <Globe variant="given" />
@@ -167,15 +159,23 @@ function TwoMapsVisual() {
           </div>
         </div>
       </div>
-      {/* Paired rows spanning both economies: the same being on one line —
-          its current-economy dot and its Lichen dot joined by a dotted bridge. */}
+      <div className="about__maps-gapcol" aria-hidden="true"><span className="about__maps-gaplbl">the gap</span></div>
+      <div className="about__maps-col">
+        <p className="about__maps-title">The current economy</p>
+        <div className="about__maps-panel">
+          <Globe variant="paid" />
+          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
+        </div>
+      </div>
+      {/* Paired rows spanning both economies: the same being on one line — its
+          true-size Lichen dot, then what the current economy shrinks it to. */}
       <div className="about__maps-rows">
         {MAP_ROWS.map((r) => (
           <div className="about__maps-xrow" key={r.label}>
             <span className="about__maps-xlbl">{r.label}</span>
-            <span className="about__maps-slot"><MapDot d={r.right} /></span>
-            <span className="about__maps-conn" aria-hidden="true" />
             <span className="about__maps-slot"><MapDot d={r.left} /></span>
+            <span className="about__maps-conn" aria-hidden="true" />
+            <span className="about__maps-slot"><MapDot d={r.right} /></span>
             <span className="about__maps-xnote">{r.right.note}</span>
           </div>
         ))}
