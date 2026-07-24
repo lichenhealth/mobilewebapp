@@ -10,6 +10,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
+import ListingTile from '../components/ListingTile';
 import { loadFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
@@ -71,6 +72,11 @@ export default function Marketplace() {
   const [activeChips, setActiveChips] = useState<Chip[]>(ALL_CHIPS);   // lenses default all-on
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
+  // Browse (photo-first tile grid) is the default; the trust-lens card feed
+  // stays one toggle away. The choice sticks per device.
+  const [view, setView] = useState<'browse' | 'feed'>(
+    () => (localStorage.getItem('mkt-view') === 'feed' ? 'feed' : 'browse'));
+  const pickView = (v: 'browse' | 'feed') => { setView(v); localStorage.setItem('mkt-view', v); };
 
   useEffect(() => {
     let live = true;
@@ -187,21 +193,62 @@ export default function Marketplace() {
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
+        <span className="mkt__views" role="tablist" aria-label="View">
+          <button
+            className={'mkt__viewbtn' + (view === 'browse' ? ' is-on' : '')}
+            onClick={() => pickView('browse')}
+            aria-label="Browse grid" title="Browse"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+              <rect x="1.5" y="1.5" width="5" height="5" rx="1" /><rect x="9.5" y="1.5" width="5" height="5" rx="1" />
+              <rect x="1.5" y="9.5" width="5" height="5" rx="1" /><rect x="9.5" y="9.5" width="5" height="5" rx="1" />
+            </svg>
+          </button>
+          <button
+            className={'mkt__viewbtn' + (view === 'feed' ? ' is-on' : '')}
+            onClick={() => pickView('feed')}
+            aria-label="Card feed" title="Feed"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+              <rect x="1.5" y="2" width="13" height="4.6" rx="1" /><rect x="1.5" y="9.4" width="13" height="4.6" rx="1" />
+            </svg>
+          </button>
+        </span>
       </p>
 
-      <section className="mkt__list">
-        {!ready && <p className="mkt__empty-sub">Loading…</p>}
-        {ready && filtered.length === 0 && (
-          <div className="mkt__empty">
-            <Icon name="store" size={20} />
-            <p><span className="display-italic">Nothing here yet.</span></p>
-            <p className="mkt__empty-sub">
-              {posts.length === 0
-                ? 'Be the first — tap List and offer something to the network.'
-                : 'Try clearing a filter or searching differently.'}
-            </p>
-          </div>
-        )}
+      {!ready && <p className="mkt__empty-sub">Loading…</p>}
+      {ready && filtered.length === 0 && (
+        <div className="mkt__empty">
+          <Icon name="store" size={20} />
+          <p><span className="display-italic">Nothing here yet.</span></p>
+          <p className="mkt__empty-sub">
+            {posts.length === 0
+              ? 'Be the first — tap List and offer something to the network.'
+              : 'Try clearing a filter or searching differently.'}
+          </p>
+        </div>
+      )}
+
+      {/* Browse: the photo-first grid — thumbs know this idiom already. */}
+      {ready && view === 'browse' && filtered.length > 0 && (
+        <section className="tile-grid">
+          {filtered.map((p) => {
+            const eyebrow = postToCard(p, me || undefined).eyebrow;
+            const ov = overlays[p.id];
+            return (
+              <ListingTile
+                key={p.id}
+                post={p}
+                offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
+                endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
+                onOpen={() => navigate(postOpenPath(p))}
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {view === 'feed' && <section className="mkt__list">
         {filtered.map((p) => (
           <FeedCard
             key={p.id}
@@ -226,7 +273,7 @@ export default function Marketplace() {
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
-      </section>
+      </section>}
 
       <footer className="mkt__end">
         <span className="eyebrow">End of market</span>

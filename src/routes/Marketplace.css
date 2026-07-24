@@ -431,3 +431,18 @@
   font-family: inherit; color: var(--ink);
 }
 .afeed__create-btn { flex-shrink: 0; padding: 9px 18px; font-size: 13px; }
+
+/* Browse/feed view toggle, riding the count row's right edge */
+.mkt__count { display: flex; align-items: center; }
+.mkt__views { margin-left: auto; display: inline-flex; gap: 4px; }
+.mkt__viewbtn {
+  width: 26px; height: 26px; border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent;
+  color: var(--ink-faint); cursor: pointer; padding: 0;
+}
+.mkt__viewbtn.is-on {
+  color: var(--peach-deep, var(--peach));
+  border-color: var(--bone-edge); background: var(--bone-warm);
+}
+.mkt__viewbtn svg { display: block; }
