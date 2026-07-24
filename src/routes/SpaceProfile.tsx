@@ -687,7 +687,7 @@ export default function SpaceProfile() {
                 </button>
                 {canManage && (
                   <button
-                    className="btn sprof__invite-btn"
+                    className="sprof__rolebtn"
                     title="Change what this member stewards"
                     onClick={() => {
                       if (manage?.id === m.profile_id) { setManage(null); return; }
@@ -697,7 +697,7 @@ export default function SpaceProfile() {
                       setMDuties(m.duties ?? []);
                     }}
                   >
-                    Role
+                    Role <Icon name="chevron-right" size={12} />
                   </button>
                 )}
               </div>

@@ -163,3 +163,13 @@
 .sprof__duties { display: flex; flex-direction: column; gap: 6px; }
 .sprof__duty { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; }
 .sprof__duty em { font-style: normal; font-size: 11px; color: var(--ink-faint); margin-left: 2px; }
+
+/* Role door: boxed like the member rows beside it (founder 2026-07-24) */
+.sprof__rolebtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  align-self: stretch; padding: 8px 12px; flex-shrink: 0;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  font: inherit; font-size: 13px; color: var(--ink-soft); cursor: pointer;
+}
+.sprof__rolebtn:hover { border-color: var(--peach); color: var(--ink); }
+.sprof__rolebtn svg { color: var(--peach-deep, var(--peach)); }
