@@ -199,9 +199,11 @@
 /* Inline badge (override the floating bottom-nav positioning) */
 .side-menu__badge { position: static; top: auto; right: auto; margin-left: 4px; }
 
-/* Hide on mobile/tablet — the bottom nav covers these there */
+/* On mobile/tablet, hide only the items the bottom nav already covers — keep
+   Events / Invite / Help / Membership / Public profile, which have no bottom-nav
+   home and would otherwise be unreachable from a phone. */
 @media (max-width: 1023px) {
-  .side-menu__primary { display: none; }
+  .side-menu__primary-item--dup { display: none; }
 }
 
 /* Thin break between "you" (Profile/Public profile) and the platform doors
