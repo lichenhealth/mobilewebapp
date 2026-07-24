@@ -94,25 +94,29 @@ function Globe({ variant }: { variant: 'given' | 'paid' }) {
  *  the artisan, the delivery already driving that way — joined by the route
  *  Lichen weaves, ending at the family's kitchen. */
 const JOURNEY_STOPS = [
-  // Labels sit clear of the dashed route: the tree's below its node, the
-  // kitchen's below its node — never jammed against the path.
-  { emoji: '🌳', x: 44, y: 50, name: 'the tree', sub: '50 years of growing', lx: 46, ly: 84, anchor: 'middle' },
-  { emoji: '🪚', x: 200, y: 66, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 62, anchor: 'start' },
-  { emoji: '🚚', x: 150, y: 150, name: 'the delivery', sub: 'already driving that way', lx: 128, ly: 146, anchor: 'end' },
-  { emoji: '🏡', x: 284, y: 196, name: 'the family’s kitchen', sub: 'Fairplay, Colorado', lx: 282, ly: 226, anchor: 'middle' },
+  // Labels sit clear of the dashed route — above, below, or beside their node,
+  // never jammed against the path.
+  { emoji: '🌳', x: 44, y: 44, name: 'the tree', sub: '50 years of growing', lx: 46, ly: 78, anchor: 'middle' },
+  { emoji: '🪚', x: 200, y: 58, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 54, anchor: 'start' },
+  { emoji: '🥕', x: 120, y: 128, name: 'the farm', sub: 'clean food loaded in', lx: 98, ly: 124, anchor: 'end' },
+  { emoji: '🏠', x: 240, y: 150, name: 'a neighbor', sub: 'pays for produce', lx: 262, ly: 134, anchor: 'start' },
+  { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', lx: 98, ly: 200, anchor: 'end' },
+  { emoji: '🏡', x: 284, y: 258, name: 'the family’s kitchen', sub: 'the table, earned by the drive', lx: 272, ly: 288, anchor: 'middle' },
 ] as const;
 
 function TableJourney() {
   return (
-    <svg className="about__journey" viewBox="0 0 340 250" role="img"
-      aria-label="A map path from the tree that grew the wood, to the artisan who crafted the table, to a delivery woven into a trip already heading that way, ending at a family’s kitchen in Fairplay.">
+    <svg className="about__journey" viewBox="0 0 340 310" role="img"
+      aria-label="A map route: from the tree that grew the wood, to the artisan who crafted the table, to the farm where clean food is loaded in, to one neighbor who pays for produce and another covered by the commons, ending at the family’s kitchen — the table earned by the drive.">
       {/* faint map contours */}
       <path d="M-10,104 q45,-14 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.55" />
-      <path d="M-10,132 q45,12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.45" />
-      <path d="M-10,214 q45,-10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
-      {/* the woven route */}
-      <path d="M44,50 C96,18 156,34 200,66 C240,96 200,122 150,150 C120,168 210,168 284,196"
+      <path d="M-10,168 q45,12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.45" />
+      <path d="M-10,238 q45,-10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      {/* the woven route — driven by the family's truck */}
+      <path d="M44,44 C90,14 152,32 200,58 C232,78 160,96 120,128 C90,152 190,142 240,150 C288,178 170,180 120,210 C96,228 210,236 284,258"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* the family's truck, riding its own route */}
+      <text x="168" y="98" fontSize="13" textAnchor="middle">🚚</text>
       {JOURNEY_STOPS.map((s) => (
         <g key={s.name}>
           <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
@@ -327,9 +331,11 @@ export default function AboutLichen() {
             </p>
             <TableJourney />
             <p className="about__mock-cap">
+              One route, the whole economy. The family couldn’t afford the table — so they earn it
+              with their truck, delivering it along with clean food for the neighborhood: one
+              neighbor pays for their produce; donations and membership revenue cover the other’s.
               Lichen remembers every contributor — the tree’s fifty years, the artisan’s hours, the
-              neighbors already driving that way — and weaves the shortest honest route between
-              them. The story returns to each of them. A person approves every step.
+              family’s miles — and the story returns to each of them. A person approves every step.
             </p>
           </div>
 
