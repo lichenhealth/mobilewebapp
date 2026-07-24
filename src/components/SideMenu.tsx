@@ -42,10 +42,12 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
 /** The Lichen support account answers help chats — it doesn't open one with itself. */
 const SUPPORT_EMAIL = 'connect@lichen.health';
 
-/** Items ALSO in the bottom nav — hidden from the mobile menu (redundant there).
- *  Everything else (Events, Invite, Help, Membership, Public profile) has no
- *  bottom-nav home, so it MUST stay reachable from the menu on phones. */
-const BOTTOM_NAV = new Set(['/home', '/concierge', '/chat', '/calendar', '/saved', '/maps', '/profile']);
+/** Hidden from the MOBILE menu: bottom-nav duplicates, plus Events (lives under
+ *  Calendar) and Public profile (reachable from the Profile page) — founder
+ *  2026-07-24. The platform doors (Invite/Help/Membership) stay: they have no
+ *  other mobile home. Desktop sidebar shows everything. */
+const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/saved', '/maps', '/profile', '/events']);
+const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/members/');
 
 /** The four space sections' sub-items are the member's REAL memberships,
  *  fetched when the menu opens. Mycelium has no sub-items — its kind lenses
@@ -147,7 +149,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   onClick={onClose}
                   className={({ isActive }) =>
                     'side-menu__primary-item' + (isActive ? ' is-active' : '')
-                    + (BOTTOM_NAV.has(p.to) ? ' side-menu__primary-item--dup' : '')
+                    + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '')
                   }
                 >
                   <Icon name={p.icon} size={20} />
