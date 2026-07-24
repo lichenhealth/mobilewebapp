@@ -54,11 +54,11 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
     `We're building something different — a corrective social network. One trusted web for the whole of a life: `
     + `care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually `
     + `be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — `
-    + `shape it, test it, ship it — the beginnings of a new world.`;
+    + `shape it, test it, ship it — the beginning of a better world.`;
   // Everyone gets 3 months free on signup (growth phase) — framed as a
   // co-creation window, not a trial. A specific admin gift supersedes it.
   const trial = giftLine ? '' :
-    `Your first 3 months are on us. Use them to make Lichen yours — tell us what you need, help us build it out, and be part of the beginnings of a new world.`;
+    `Your first 3 months are on us. Use them to make Lichen yours — tell us what you need, help us build it out, and be part of the beginning of a better world.`;
 
   const parts = [intro, mission];
   if (note) parts.push(`They added a note:\n"${note}"`);
@@ -66,7 +66,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   else if (trial) parts.push(trial);
   const text = parts.join('\n\n') + `\n\nJoin here:\n${signup}\n\n— Lichen`;
 
-  const missionHtml = `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">We're building something different — a <em>corrective</em> social network. One trusted web for the whole of a life: care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — shape it, test it, ship it — the beginnings of a new world.</p>`;
+  const missionHtml = `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">We're building something different — a <em>corrective</em> social network. One trusted web for the whole of a life: care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — shape it, test it, ship it — the beginning of a better world.</p>`;
   const noteHtml = note
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#fff;border-radius:12px;color:#4a463f">${esc(note)}</p>`
     : '';
