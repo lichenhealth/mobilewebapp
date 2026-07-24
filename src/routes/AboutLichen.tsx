@@ -94,15 +94,17 @@ function Globe({ variant }: { variant: 'given' | 'paid' }) {
  *  the artisan, the delivery already driving that way — joined by the route
  *  Lichen weaves, ending at the family's kitchen. */
 const JOURNEY_STOPS = [
-  { emoji: '🌳', x: 44, y: 50, name: 'the tree', sub: '50 years of growing', lx: 66, ly: 46, anchor: 'start' },
+  // Labels sit clear of the dashed route: the tree's below its node, the
+  // kitchen's below its node — never jammed against the path.
+  { emoji: '🌳', x: 44, y: 50, name: 'the tree', sub: '50 years of growing', lx: 46, ly: 84, anchor: 'middle' },
   { emoji: '🪚', x: 200, y: 66, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 62, anchor: 'start' },
   { emoji: '🚚', x: 150, y: 150, name: 'the delivery', sub: 'already driving that way', lx: 128, ly: 146, anchor: 'end' },
-  { emoji: '🏡', x: 284, y: 196, name: 'the family’s kitchen', sub: 'Fairplay, Colorado', lx: 262, ly: 192, anchor: 'end' },
+  { emoji: '🏡', x: 284, y: 196, name: 'the family’s kitchen', sub: 'Fairplay, Colorado', lx: 282, ly: 226, anchor: 'middle' },
 ] as const;
 
 function TableJourney() {
   return (
-    <svg className="about__journey" viewBox="0 0 340 240" role="img"
+    <svg className="about__journey" viewBox="0 0 340 250" role="img"
       aria-label="A map path from the tree that grew the wood, to the artisan who crafted the table, to a delivery woven into a trip already heading that way, ending at a family’s kitchen in Fairplay.">
       {/* faint map contours */}
       <path d="M-10,104 q45,-14 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.55" />
