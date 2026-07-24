@@ -129,7 +129,7 @@ function TableJourney() {
           trees — sweeping around the left margin back to the tree */}
       <path d="M110,198 C50,184 10,160 10,112 C10,72 18,52 38,46"
         fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.85" />
-      <text x="34" y="170" fontSize="11" textAnchor="middle">🌱</text>
+      <text x="52" y="186" fontSize="11" textAnchor="middle">🌱</text>
       {JOURNEY_STOPS.map((s) => (
         <g key={s.name}>
           <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
