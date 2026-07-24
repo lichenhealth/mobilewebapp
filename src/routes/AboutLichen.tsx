@@ -225,16 +225,20 @@ function CrystalJourney() {
 function FirefighterJourney() {
   return (
     <svg className="about__journey" viewBox="0 0 340 265" role="img"
-      aria-label="A map route: first responders carrying risk for all of us; the assistant weaves their shift rotations into a shared window; a Lichen place offers a retreat close by; the healers arrive free to heal, coordination lifted, covered by the commons.">
+      aria-label="A map route: first responders — risk taken, vicarious trauma carried; the assistant weaves their shift rotations into a shared window; a Community Healing Center offers a retreat close by; the healers arrive free to heal, coordination lifted; a donor's large gift funds the services and the commons carries the rest.">
       <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
       <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       <path d="M44,48 C92,20 148,36 200,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* the donor's gift, flowing into the retreat */}
+      <path d="M280,153 C288,172 272,186 262,192"
+        fill="none" stroke="#D9A441" strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
       {/* the crew */}
       <circle cx="44" cy="48" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="44" y="53" fontSize="14" textAnchor="middle">🚒</text>
-      <text x="46" y="82" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">first responders</text>
-      <text x="46" y="94" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">risk carried for all of us</text>
+      <text x="58" y="82" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">first responders</text>
+      <text x="58" y="94" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">risk taken,</text>
+      <text x="58" y="106" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">vicarious trauma carried</text>
       {/* the assistant */}
       <circle cx="200" cy="64" r="16" fill="var(--peach-tint, var(--bone-warm))" stroke="var(--peach)" strokeWidth="1.2" />
       <g transform="translate(191,55)" style={{ color: 'var(--peach-deep, var(--peach))' }}>
@@ -242,11 +246,17 @@ function FirefighterJourney() {
       </g>
       <text x="222" y="60" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="start">the assistant</text>
       <text x="222" y="72" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="start">finds the shared window</text>
-      {/* a Lichen place */}
+      {/* a Community Healing Center */}
       <circle cx="110" cy="140" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="110" y="145" fontSize="14" textAnchor="middle">🏞️</text>
-      <text x="88" y="136" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a Lichen place</text>
-      <text x="88" y="148" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="end">a retreat, close by</text>
+      <text x="88" y="130" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a Community</text>
+      <text x="88" y="142" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">Healing Center</text>
+      <text x="88" y="154" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="end">a retreat, close by</text>
+      {/* the donor */}
+      <circle cx="282" cy="136" r="16" fill="var(--bone-warm)" stroke="#D9A441" strokeWidth="1.2" />
+      <text x="282" y="141" fontSize="14" textAnchor="middle">💝</text>
+      <text x="282" y="96" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">a donor</text>
+      <text x="282" y="108" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">one big gift, many healed</text>
       {/* the healers */}
       <circle cx="256" cy="204" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="256" y="209" fontSize="14" textAnchor="middle">🌿</text>
@@ -521,9 +531,11 @@ export default function AboutLichen() {
             <p className="about__mock-cap">
               First responders spend their bodies for the rest of us — work the current economy
               calls “underpaid.” Lichen answers risk with care: the assistant reads a whole
-              station’s shift rotations, finds the shared window, books a nearby Lichen place, and
-              lifts every ounce of retreat coordination off the healers — who arrive simply to
-              heal. The commons covers it. Care is the honest repayment for a body spent.
+              station’s shift rotations, finds the shared window, books a nearby Community Healing
+              Center, and lifts every ounce of retreat coordination off the healers — who arrive
+              simply to heal. A donor’s large gift funds the services; the commons carries the
+              rest. One big gift can heal whole crews — care is the honest repayment for a body
+              spent.
             </p>
           </div>
         </section>
