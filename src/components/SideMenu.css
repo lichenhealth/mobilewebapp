@@ -169,6 +169,8 @@
   transition: color var(--d-fast) var(--ease-out);
 }
 .side-menu__donate:hover { color: var(--peach-deep); }
+/* About sits at the very top — no inherited top margin, a little air below. */
+.side-menu__about { margin-top: 0; margin-bottom: var(--s-3); }
 
 /* ─── Primary destinations (desktop sidebar only) ───────────────────── */
 .side-menu__primary {

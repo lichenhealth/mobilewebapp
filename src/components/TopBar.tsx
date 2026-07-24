@@ -107,24 +107,13 @@ export default function TopBar({
 
   return (
     <header className="top-bar">
-      <div className="top-bar__left">
-        <button
-          className="top-bar__icon"
-          onClick={onMenu}
-          aria-label="Open menu"
-        >
-          <Icon name="menu" size={20} />
-        </button>
-        {/* "i" for information — the dot is the lichen mark itself. */}
-        <button
-          className="top-bar__about"
-          onClick={() => navigate('/about')}
-          aria-label="About Lichen"
-        >
-          <LichenMark size={14} />
-          <span className="top-bar__about-stem" aria-hidden="true" />
-        </button>
-      </div>
+      <button
+        className="top-bar__icon"
+        onClick={onMenu}
+        aria-label="Open menu"
+      >
+        <Icon name="menu" size={20} />
+      </button>
 
       <div className="top-bar__logo">
         {section ? (

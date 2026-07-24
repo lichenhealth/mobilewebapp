@@ -135,6 +135,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         </button>
 
         <nav className="side-menu__nav">
+          {/* About — the story of Lichen, peach like Give (founder 2026-07-24). */}
+          <button className="side-menu__donate side-menu__about" onClick={() => go('/about')}>
+            About
+          </button>
+
           <div className="side-menu__primary">
             {primary.map((p) => {
               const count = p.to === '/home'
