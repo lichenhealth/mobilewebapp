@@ -37,7 +37,7 @@ export default function Invite() {
 
   const inviteMessage = () => {
     const who = fullName.trim() || 'A friend';
-    const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; come help us build, test, and ship it. You’ll get 3 months free. Join: https://lichen.healthcare/signup`;
+    const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginnings of a new world. Join: https://lichen.healthcare/signup`;
     return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
   };
   const smsHref = `sms:${recipient}?&body=${encodeURIComponent(inviteMessage())}`;
@@ -116,8 +116,8 @@ export default function Invite() {
       <header className="invite__head">
         <h1 className="invite__title">Invite to Lichen</h1>
         <p className="invite__sub">
-          Know someone who belongs here? They’ll get 3 months free to explore — and a hand in
-          building a more humane way of being together.
+          Know someone who belongs here? Their first 3 months are on us — an invitation to help
+          build out a new way of being together.
         </p>
       </header>
 
