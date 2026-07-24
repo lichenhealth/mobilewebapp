@@ -39,6 +39,9 @@ export default function Saved() {
   const [collections, setCollections] = useState<CollectionRow[]>([]);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  // What the inline input creates: a plain folder, or an ORDERED collection
+  // ('path' kind — Organize) that opens ready to arrange.
+  const [newKind, setNewKind] = useState<'collection' | 'path'>('collection');
 
   const [content, setContent] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
@@ -76,7 +79,8 @@ export default function Saved() {
     const nm = newFolderName.trim();
     if (!nm) return;
     try {
-      await createCollection(nm);
+      const id = await createCollection(nm, newKind);
+      if (newKind === 'path') { navigate(`/collections/${id}`); return; }
       setCollections(await listMyCollections());
       setNewFolderOpen(false); setNewFolderName('');
     } catch (e) { console.error(e); }
@@ -112,10 +116,18 @@ export default function Saved() {
             </button>
           ))}
           {!newFolderOpen ? (
-            <button className="myc__kind" onClick={() => setNewFolderOpen(true)}>
-              <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
-              <span className="myc__kind-label">New folder</span>
-            </button>
+            <>
+              <button className="myc__kind" onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}>
+                <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
+                <span className="myc__kind-label">New folder</span>
+              </button>
+              {/* Organize: an ORDERED collection — arrange saved pieces into a
+                  sequence, publishable to the Library (founder 2026-07-24). */}
+              <button className="myc__kind" onClick={() => { setNewKind('path'); setNewFolderOpen(true); }}>
+                <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
+                <span className="myc__kind-label">Organize</span>
+              </button>
+            </>
           ) : (
             <span className="saved__newfolder">
               <input
@@ -123,7 +135,7 @@ export default function Saved() {
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void makeFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
-                placeholder="Folder name"
+                placeholder={newKind === 'path' ? 'Name your collection…' : 'Folder name'}
               />
               <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
             </span>

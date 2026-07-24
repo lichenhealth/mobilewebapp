@@ -203,17 +203,31 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
         </button>
         <button
-          className={'mkt__action' + (addOpen || createOpen ? ' is-active' : '')}
+          className={'mkt__action' + (addOpen || (createOpen && structuredKind === 'course') ? ' is-active' : '')}
           aria-label={addLabel}
           title={addLabel}
           onClick={() => {
-            if (!canCreate) { navigate(composeHref); return; }
+            // Courses: the + carries creation too (chooser). Library keeps its
+            // own Organize door (founder 2026-07-24) — + goes straight to
+            // Contribute there.
+            if (structuredKind !== 'course' || !canCreate) { navigate(composeHref); return; }
             if (createOpen) { setCreateOpen(false); setAddOpen(false); return; }
             setAddOpen((o) => !o);
           }}
         >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
         </button>
+        {/* Library's third door: Organize, visible and labeled — collections
+            deserve their own front door, not a hiding spot in the +. */}
+        {structuredKind === 'path' && canCreate && (
+          <button
+            className={'mkt__action' + (createOpen ? ' is-active' : '')}
+            onClick={() => setCreateOpen((o) => !o)}
+          >
+            <span className="mkt__action-circle"><Icon name={icon} size={14} /></span>
+            <span className="mkt__action-label">Organize</span>
+          </button>
+        )}
         {mediaLenses && (
           <>
             <div className="mkt__action-spacer" />
@@ -252,8 +266,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         </div>
       )}
 
-      {/* The + chooser: share a post, or create the structured thing. */}
-      {addOpen && !createOpen && canCreate && (
+      {/* The + chooser (Courses): share a post, or create the structured thing. */}
+      {addOpen && !createOpen && canCreate && structuredKind === 'course' && (
         <div className="afeed__create afeed__addmenu">
           <button className="afeed__addmenu-row" onClick={() => navigate(composeHref)}>
             <span className="afeed__addmenu-title">{addLabel}</span>
