@@ -112,9 +112,10 @@ export default function App() {
         ok = ((claimed as number | null) ?? 0) > 0;
       }
       if (!ok) {
-        // Growth phase (founder 2026-07-23): auto-gift 3 months of Community the
-        // first time a member would hit the paywall. Grants once (never re-grants
-        // after it lapses — the sub row stays), so month 3 lands on /membership.
+        // Growth phase (founder 2026-07-23): auto-gift 3 months of Concierge (the
+        // full tier) the first time a member would hit the paywall. Grants once
+        // (never re-grants after it lapses — the sub row stays), so month 3 lands
+        // on /membership to pick a plan.
         const { data: granted } = await supabase.rpc('grant_growth_gift');
         ok = granted === true;
       }
