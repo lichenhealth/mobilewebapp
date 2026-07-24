@@ -101,9 +101,9 @@ interface JourneyStop {
 const JOURNEY_STOPS: JourneyStop[] = [
   // Labels sit clear of the dashed route — above, below, or beside their node,
   // never jammed against the path.
-  { emoji: '🌳', x: 44, y: 44, name: 'the tree', sub: '50 years of growing', lx: 46, ly: 78, anchor: 'middle' },
+  { emoji: '🌳', x: 44, y: 44, name: 'the tree', sub: '50 years of growing', lx: 66, ly: 46, anchor: 'start' },
   { emoji: '🪚', x: 200, y: 58, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 54, anchor: 'start' },
-  { emoji: '🥕', x: 120, y: 128, name: 'the farm', sub: 'clean food loaded in', lx: 98, ly: 124, anchor: 'end' },
+  { emoji: '🥕', x: 120, y: 128, name: 'the farm', sub: 'clean food loaded', lx: 98, ly: 124, anchor: 'end' },
   { emoji: '🏠', x: 240, y: 150, name: 'a neighbor', sub: 'pays for produce', lx: 262, ly: 134, anchor: 'start' },
   { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', sub2: 'plants trees in return', lx: 98, ly: 200, anchor: 'end' },
   { emoji: '🏡', x: 284, y: 258, name: 'the family’s kitchen', sub: 'the table, earned by the drive', lx: 272, ly: 288, anchor: 'middle' },
@@ -118,14 +118,18 @@ function TableJourney() {
       <path d="M-10,168 q45,12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.45" />
       <path d="M-10,238 q45,-10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       {/* the woven route — driven by the family's truck */}
-      <path d="M44,44 C90,14 152,32 200,58 C232,78 160,96 120,128 C90,152 190,142 240,150 C288,178 170,180 120,210 C96,228 210,236 284,258"
+      <path d="M44,44 C90,14 152,32 200,58 C232,78 160,96 120,128 C90,152 190,142 240,150 C288,178 170,180 120,210 C96,226 180,232 232,246"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
-      {/* the family's truck, home at the end of the drive */}
-      <text x="246" y="250" fontSize="13" textAnchor="middle">🚚</text>
-      {/* the loop closes: the subsidized family volunteers, planting the next trees */}
-      <path d="M120,210 C148,166 148,86 60,48"
+      {/* the family's truck lays the route behind it, facing home (emoji faces
+          left natively — mirrored to point at the house) */}
+      <g transform="translate(248,251) scale(-1,1)">
+        <text x="0" y="0" fontSize="13" textAnchor="middle">🚚</text>
+      </g>
+      {/* the loop closes: the subsidized family volunteers, planting the next
+          trees — sweeping around the left margin back to the tree */}
+      <path d="M110,198 C50,184 10,160 10,112 C10,72 18,52 38,46"
         fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.85" />
-      <text x="158" y="134" fontSize="11" textAnchor="middle">🌱</text>
+      <text x="24" y="162" fontSize="11" textAnchor="middle">🌱</text>
       {JOURNEY_STOPS.map((s) => (
         <g key={s.name}>
           <circle cx={s.x} cy={s.y} r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
@@ -189,16 +193,21 @@ function TwoMapsVisual() {
           <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
         </div>
       </div>
-      {/* Paired rows spanning both economies: the same being on one line — its
-          true-size Lichen dot, then what the current economy shrinks it to. */}
+      {/* Paired rows spanning both economies — each half sits INSIDE its
+          panel's box (the boxes run all the way down), the dotted bridge
+          crossing the gap between them. */}
       <div className="about__maps-rows">
         {MAP_ROWS.map((r) => (
           <div className="about__maps-xrow" key={r.label}>
-            <span className="about__maps-xlbl">{r.label}</span>
-            <span className="about__maps-slot"><MapDot d={r.left} /></span>
-            <span className="about__maps-conn" aria-hidden="true" />
-            <span className="about__maps-slot"><MapDot d={r.right} /></span>
-            <span className="about__maps-xnote">{r.right.note}</span>
+            <div className="about__maps-xleft">
+              <span className="about__maps-xlbl">{r.label}</span>
+              <span className="about__maps-slot"><MapDot d={r.left} /></span>
+            </div>
+            <div className="about__maps-xmid" aria-hidden="true"><span className="about__maps-conn" /></div>
+            <div className="about__maps-xright">
+              <span className="about__maps-slot"><MapDot d={r.right} /></span>
+              <span className="about__maps-xnote">{r.right.note}</span>
+            </div>
           </div>
         ))}
       </div>
