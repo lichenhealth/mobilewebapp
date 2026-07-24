@@ -361,8 +361,8 @@ export default function AboutLichen() {
           </p>
           <p>
             Every single person, plant, animal, place and element is contributing to the collective
-            — or taking from it. That’s the Current Economy — where a mother’s care is priced at
-            zero, a forest isn’t counted at all, and speculative investors are paid handsomely.
+            — or taking from it. That’s what the Current Economy misses: a mother’s care is priced
+            at zero, a forest isn’t counted at all, and speculative investors are paid handsomely.
           </p>
 
           <TwoMapsVisual />
