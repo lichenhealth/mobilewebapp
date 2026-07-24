@@ -63,9 +63,10 @@
 .about__maps-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; margin-bottom: 8px; }
 .about__maps-key { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: var(--ink-soft); }
 .about__maps-swatch { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
-.about__maps-missing {
-  text-align: center; font-size: 10px; font-style: italic; color: var(--ink-faint);
-  margin: 0 0 8px;
+/* Match the legend keys' size — .about__sec p would otherwise inflate it. */
+.about__maps-missing, .about__sec p.about__maps-missing {
+  text-align: center; font-size: 9.5px; font-style: italic; color: var(--ink-faint);
+  line-height: 1.4; margin: 0 0 8px;
 }
 .about__maps-gapcol { display: flex; align-items: center; justify-content: center; padding-top: 22px; }
 /* Paired rows below the globes: each half lives INSIDE its economy's box (the

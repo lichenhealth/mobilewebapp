@@ -26,6 +26,11 @@ verify_jwt = false
 [functions.fire-reminders]
 verify_jwt = false
 
+# The assistant's chat voice — invoked by the assistant_on_message trigger
+# (pg_net). Same shared-secret header.
+[functions.claude-chat]
+verify_jwt = false
+
 # Donors may be signed OUT — the donate page works for the public. The
 # function validates its own inputs; Stripe handles the money.
 [functions.donate-checkout]
