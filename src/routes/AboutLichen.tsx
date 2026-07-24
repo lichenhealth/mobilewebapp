@@ -226,7 +226,7 @@ function TwoMapsVisual() {
         <p className="about__maps-title">The current economy</p>
         <div className="about__maps-panel">
           <Globe variant="paid" />
-          <p className="about__maps-missing" aria-hidden="true">most strands missing</p>
+          <p className="about__maps-missing" aria-hidden="true">most threads missing</p>
         </div>
       </div>
       {/* Paired rows spanning both economies — each half sits INSIDE its
