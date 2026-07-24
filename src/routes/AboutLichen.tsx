@@ -529,13 +529,13 @@ export default function AboutLichen() {
             <p className="about__mock-eyebrow">Chronically undervalued · the firefighters’ retreat</p>
             <FirefighterJourney />
             <p className="about__mock-cap">
-              First responders spend their bodies for the rest of us — work the current economy
-              calls “underpaid.” Lichen answers risk with care: the assistant reads a whole
-              station’s shift rotations, finds the shared window, books a nearby community healing
-              center, and lifts every ounce of retreat coordination off the healers — who arrive
-              simply to heal. A donor’s large gift funds the services; the commons carries the
-              rest. One big gift can heal whole crews — care is the honest repayment for a body
-              spent.
+              First responders put their mind, body and soul on the line for the rest of us — work
+              the current economy under-values and fails to support. Lichen’s Economy closes the
+              gap: the assistant reads a whole station’s shift rotations, finds the shared window,
+              books a nearby community healing center, and lifts every ounce of retreat
+              coordination off the healers — who arrive simply to heal. A donor’s large gift funds
+              the services; the commons carries the rest. One big gift can heal whole crews — care
+              is the honest repayment for a body spent.
             </p>
           </div>
         </section>
