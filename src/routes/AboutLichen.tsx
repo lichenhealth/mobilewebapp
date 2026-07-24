@@ -181,6 +181,43 @@ function TangoJourney() {
   );
 }
 
+/** Crystal's thread: an under-resourced founder, her AI assistant (the brain
+ *  mark), the peer stuck on the opposite wall, and the shared venture the
+ *  assistant drafts — seeded by the commons. */
+function CrystalJourney() {
+  return (
+    <svg className="about__journey" viewBox="0 0 340 250" role="img"
+      aria-label="A map route: Crystal, an under-resourced founder; her AI assistant reads the roadblock; a peer founder holds the missing half; together they launch a shared venture — plan drafted by the assistant, seeded by the commons.">
+      <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
+      <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      <path d="M44,48 C92,20 148,36 200,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
+        fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* Crystal */}
+      <circle cx="44" cy="48" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="44" y="53" fontSize="14" textAnchor="middle">💡</text>
+      <text x="46" y="82" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">Crystal</text>
+      <text x="46" y="94" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">a founder, under-resourced</text>
+      {/* her assistant — the brain mark, a member of the web */}
+      <circle cx="200" cy="64" r="16" fill="var(--peach-tint, var(--bone-warm))" stroke="var(--peach)" strokeWidth="1.2" />
+      <g transform="translate(191,55)" style={{ color: 'var(--peach-deep, var(--peach))' }}>
+        <Icon name="brain" size={18} />
+      </g>
+      <text x="222" y="60" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="start">her assistant</text>
+      <text x="222" y="72" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="start">reads the roadblock</text>
+      {/* the peer */}
+      <circle cx="110" cy="140" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="110" y="145" fontSize="14" textAnchor="middle">🔧</text>
+      <text x="88" y="136" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a peer founder</text>
+      <text x="88" y="148" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="end">the missing half</text>
+      {/* the shared venture */}
+      <circle cx="256" cy="204" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="256" y="209" fontSize="14" textAnchor="middle">🚀</text>
+      <text x="250" y="236" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">a shared venture</text>
+      <text x="250" y="248" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">plan drafted · seeded by the commons</text>
+    </svg>
+  );
+}
+
 const LEGEND: { label: string; color: string }[] = [
   { label: 'people', color: KIND.people },
   { label: 'plants', color: KIND.plants },
@@ -407,15 +444,14 @@ export default function AboutLichen() {
           </div>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">A warm partner in the thread</p>
-            <div className="about__asst">
-              <span className="about__asst-glyph"><LichenMark size={16} /></span>
-              <div className="about__asst-bubble">
-                <p className="about__asst-name">Crystal’s Assistant</p>
-                <p className="about__asst-msg">I checked your plan — it covers 8 of these sessions. Want me to draft the request and loop in your care team?</p>
-              </div>
-            </div>
-            <p className="about__mock-cap">Every person, place, and group — eventually the network itself — can have an assistant that helps, never sells.</p>
+            <p className="about__mock-eyebrow">Crystal’s thread</p>
+            <CrystalJourney />
+            <p className="about__mock-cap">
+              Crystal’s roadblock is another founder’s strength — and hers is theirs. Her assistant
+              reads both, makes the introduction, and drafts the collaborative plan; the commons
+              seeds what the old economy starved. Every person, place, and group — eventually the
+              network itself — can have an assistant that helps, never sells.
+            </p>
           </div>
         </section>
 
