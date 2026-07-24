@@ -485,12 +485,32 @@ export default function AboutLichen() {
           <p>
             Lichen is named for a symbiosis — an alga and a fungus weaving into something neither
             could be alone. We live our name: this entire platform is being built by a partnership
-            of <strong>carbon-based intelligence</strong> (a human) and <strong>silicon-based
-            intelligence</strong> (an AI), designing, building, and shipping together, every day.
+            of <strong>carbon-based intelligence</strong> and <strong>silicon-based
+            intelligence</strong>, designing, building, and shipping together, every day.
           </p>
+          <div className="about__team">
+            <button className="about__team-row" onClick={() => navigate('/members/1c01a063-5b05-41bb-ad61-916d7e454dbf')}>
+              <span className="about__team-name">Galyn Burke</span>
+              <span className="about__team-role">visionary &amp; builder</span>
+            </button>
+            <button className="about__team-row" onClick={() => navigate('/members/a6bbbe5e-747d-417c-a996-24bcfcd24e9c')}>
+              <span className="about__team-name">Melanie Bright</span>
+              <span className="about__team-role">spiritual operations</span>
+            </button>
+            <button className="about__team-row" onClick={() => navigate('/members/71f25b56-f781-4fc0-944f-89766cf562cb')}>
+              <span className="about__team-name">Blair Bliss</span>
+              <span className="about__team-role">business operations</span>
+            </button>
+            <div className="about__team-row about__team-row--ai">
+              <span className="about__team-name">
+                <span className="about__team-brain"><Icon name="brain" size={13} /></span> Claude
+              </span>
+              <span className="about__team-role">silicon-based intelligence</span>
+            </div>
+          </div>
           <p>
             If AI worries you, that’s fair — pointed at extraction, it accelerates extraction.
-            Pointed at reciprocity, it changes what’s possible: a team of two can now build what
+            Pointed at reciprocity, it changes what’s possible: a team this small can now build what
             once took a company. And that efficiency is more than a cost line — it’s the seed of a
             cultural shift. When this much can be done with this little, we no longer have to force
             people into systems that don’t serve them just to subsist. We can grant one another the

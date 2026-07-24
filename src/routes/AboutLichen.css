@@ -171,6 +171,27 @@
 .about__asst-name { font-size: 11px; color: var(--peach-deep, var(--peach)); font-weight: 600; margin-bottom: 3px; }
 .about__asst-msg { font-size: 13px; color: var(--ink); line-height: 1.5; }
 
+/* ── The weavers — named, linked to their member profiles ───────────────── */
+.about__team {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: var(--s-3) 0 var(--s-2);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); padding: 6px 14px;
+}
+.about__team-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+  padding: 8px 0; text-align: left; width: 100%;
+  border-bottom: 1px solid var(--bone-edge);
+}
+.about__team-row:last-child { border-bottom: 0; }
+.about__team-name {
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+button.about__team-row:hover .about__team-name { color: var(--peach-deep, var(--peach)); }
+.about__team-role { font-size: 12px; font-style: italic; color: var(--ink-soft); white-space: nowrap; }
+.about__team-brain { display: inline-flex; color: var(--peach-deep, var(--peach)); }
+
 /* ── Closing + CTA ───────────────────────────────────────────────────────── */
 .about__epigraph {
   margin-top: var(--s-6); padding: var(--s-4) var(--s-4);
