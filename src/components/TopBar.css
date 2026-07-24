@@ -32,12 +32,17 @@
 .top-bar > * { pointer-events: auto; }
 /* Left group: menu + About, top-aligned together in the left cell. */
 .top-bar__left { display: inline-flex; align-items: flex-start; gap: 8px; }
-/* About — a warm peach-tinted pill (style B), height-matched to the menu circle. */
+/* About — an orange info bubble whose "i" is dotted with the lichen mark. */
 .top-bar__about {
-  height: 36px; padding: 0 14px; border-radius: var(--r-full);
+  width: 36px; height: 36px; padding: 0; border-radius: var(--r-full);
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
   background: var(--peach-tint, var(--bone-warm));
-  border: 1px solid var(--peach); color: var(--peach-deep, var(--peach));
-  font-size: 13px; font-weight: 600; font-family: inherit;
+  border: 1px solid var(--peach);
+}
+.top-bar__about-stem {
+  width: 3px; height: 9px; border-radius: 2px;
+  background: var(--peach-deep, var(--peach));
 }
 .top-bar__about:active { transform: scale(0.96); }
 

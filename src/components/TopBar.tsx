@@ -115,12 +115,14 @@ export default function TopBar({
         >
           <Icon name="menu" size={20} />
         </button>
+        {/* "i" for information — the dot is the lichen mark itself. */}
         <button
           className="top-bar__about"
           onClick={() => navigate('/about')}
           aria-label="About Lichen"
         >
-          About
+          <LichenMark size={14} />
+          <span className="top-bar__about-stem" aria-hidden="true" />
         </button>
       </div>
 
