@@ -32,6 +32,14 @@
 .top-bar > * { pointer-events: auto; }
 /* Left group: menu + About, top-aligned together in the left cell. */
 .top-bar__left { display: inline-flex; align-items: flex-start; gap: 8px; }
+/* About — a warm peach-tinted pill (style B), height-matched to the menu circle. */
+.top-bar__about {
+  height: 36px; padding: 0 14px; border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm));
+  border: 1px solid var(--peach); color: var(--peach-deep, var(--peach));
+  font-size: 13px; font-weight: 600; font-family: inherit;
+}
+.top-bar__about:active { transform: scale(0.96); }
 
 .top-bar__icon {
   width: 38px;

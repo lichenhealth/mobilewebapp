@@ -116,12 +116,11 @@ export default function TopBar({
           <Icon name="menu" size={20} />
         </button>
         <button
-          className="top-bar__icon"
+          className="top-bar__about"
           onClick={() => navigate('/about')}
           aria-label="About Lichen"
-          title="About Lichen"
         >
-          <Icon name="info" size={18} />
+          About
         </button>
       </div>
 

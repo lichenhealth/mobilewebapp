@@ -187,10 +187,15 @@ export default function AboutLichen() {
           curriculum, and reconnection is the medicine.
         </p>
 
-        {!user && (
+        {!user ? (
           <div className="about__cta">
             <button className="btn btn-primary about__cta-join" onClick={() => navigate('/signup')}>Join Lichen</button>
             <p className="about__cta-sub">Already have an account? <button className="about__inline" onClick={() => navigate('/login')}>Sign in</button></p>
+          </div>
+        ) : (
+          <div className="about__cta">
+            <button className="btn btn-primary about__cta-join" onClick={() => navigate('/invite')}>Invite someone to Lichen</button>
+            <p className="about__cta-sub">You’re already here — bring someone who belongs.</p>
           </div>
         )}
 
