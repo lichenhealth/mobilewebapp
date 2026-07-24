@@ -326,8 +326,10 @@ export default function AboutLichen() {
           <div className="about__mock">
             <p className="about__mock-eyebrow">The table’s journey</p>
             <p className="about__byhand">
-              <em>By hand,</em> you’d give the table to the first person who asked — one need met,
-              maybe. <em>Woven,</em> every contributor is part of the route:
+              <em>In the current economy,</em> you’d give the table to the first person willing to
+              pay what you are asking for it — one need met. <em>In the Lichen Economy,</em> the web
+              of need and contribution is matched to minimize waste, balance resources and maximize
+              quality of life for all living beings.
             </p>
             <TableJourney />
             <p className="about__mock-cap">
