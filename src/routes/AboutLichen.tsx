@@ -561,7 +561,7 @@ export default function AboutLichen() {
           <div className="about__team">
             <button className="about__team-row" onClick={() => navigate('/members/1c01a063-5b05-41bb-ad61-916d7e454dbf')}>
               <span className="about__team-name">Galyn Burke</span>
-              <span className="about__team-role">visionary &amp; builder</span>
+              <span className="about__team-role">visionary</span>
             </button>
             <button className="about__team-row" onClick={() => navigate('/members/a6bbbe5e-747d-417c-a996-24bcfcd24e9c')}>
               <span className="about__team-name">Melanie Bright</span>
@@ -575,7 +575,7 @@ export default function AboutLichen() {
               <span className="about__team-name">
                 <span className="about__team-brain"><Icon name="brain" size={13} /></span> Claude
               </span>
-              <span className="about__team-role">silicon-based intelligence</span>
+              <span className="about__team-role">builder</span>
             </div>
           </div>
           <p>
