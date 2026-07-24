@@ -73,6 +73,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
+  // Inline create panel for a structured course/path (no browser prompt).
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -123,11 +127,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
   // Create a structured course/path, then open it (owner drops into edit mode).
   async function createStructured() {
-    if (!structuredKind || !me) return;
-    const nm = window.prompt(`Name your ${structuredKind}`)?.trim();
-    if (!nm) return;
+    const nm = createName.trim();
+    if (!structuredKind || !me || !nm || creating) return;
+    setCreating(true);
     try { navigate(`/collections/${await createCollection(nm, structuredKind)}`); }
-    catch (e) { console.error(e); }
+    catch (e) { console.error(e); setCreating(false); }
   }
 
   return (
@@ -163,7 +167,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span className="mkt__action-label">{addLabel}</span>
         </button>
         {structuredKind && me && (
-          <button className="mkt__action" onClick={() => void createStructured()}>
+          <button
+            className={'mkt__action' + (createOpen ? ' is-active' : '')}
+            onClick={() => setCreateOpen((o) => !o)}
+          >
             <span className="mkt__action-circle"><Icon name={icon} size={14} /></span>
             <span className="mkt__action-label">{createLabel ?? `New ${structuredKind}`}</span>
           </button>
@@ -203,6 +210,34 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               <Icon name="close" size={12} />
             </button>
           )}
+        </div>
+      )}
+
+      {/* Inline create for a course/path — explains the shape, no browser prompt. */}
+      {createOpen && structuredKind && (
+        <div className="afeed__create">
+          <p className="afeed__create-hint">
+            {structuredKind === 'course'
+              ? 'A course is an ordered set of lessons you teach — members enroll, follow along, and track their progress. You’ll add lessons and details on the next screen.'
+              : 'A path is an ordered trail through the Library — pieces arranged to be read, watched, or heard in sequence. You’ll add the pieces and details on the next screen.'}
+          </p>
+          <div className="afeed__create-row">
+            <input
+              autoFocus
+              className="afeed__create-input"
+              placeholder={structuredKind === 'course' ? 'Name your course…' : 'Name your path…'}
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void createStructured(); }}
+            />
+            <button
+              className="btn btn-primary afeed__create-btn"
+              disabled={!createName.trim() || creating}
+              onClick={() => void createStructured()}
+            >
+              {creating ? 'Creating…' : 'Create'}
+            </button>
+          </div>
         </div>
       )}
 
