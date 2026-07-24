@@ -117,8 +117,7 @@ export default function AboutLichen() {
             give you purpose and fund your livelihood, and a fairer economy that values all things,
             not just human contributions — woven into a single web of people, plants, animals,
             elements, spaces, communities, groups and organizations you trust. Everything in one
-            place, because life isn’t lived in silos. Our goal is to support you in living your best
-            life, most of which will be off our platform.
+            place, because your best life isn’t lived in silos — or on a technology platform.
           </p>
         </section>
 
