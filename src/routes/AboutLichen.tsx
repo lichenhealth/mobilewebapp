@@ -60,7 +60,7 @@ export default function AboutLichen() {
         </section>
 
         <section className="about__sec">
-          <h2 className="about__h2">An economy that gives back</h2>
+          <h2 className="about__h2">A reciprocal economy, architected to restore balance</h2>
           <p>
             Lichen is a nonprofit at heart. Membership and gifts keep the platform running — and
             <strong> everything beyond that flows back to the people the current system leaves
