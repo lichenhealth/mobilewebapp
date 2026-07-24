@@ -16,6 +16,7 @@ import {
   type FeedPost,
 } from '../lib/postsApi';
 import { postToCard } from '../lib/feedMapping';
+import { loadEventGuests, inviteEventGuest, type EventGuest } from '../lib/eventGuestsApi';
 import './EventPage.css';
 
 type Tab = 'About' | 'Updates' | 'Chat' | 'RSVP' | 'Book';
@@ -37,6 +38,12 @@ export default function EventPage() {
   const [chatId, setChatId] = useState<string | null>(null);
   const [chatErr, setChatErr] = useState(false);
   const chatAsked = useRef(false);
+  // Host: invite people outside Lichen (external guests).
+  const [guests, setGuests] = useState<EventGuest[]>([]);
+  const [gName, setGName] = useState('');
+  const [gEmail, setGEmail] = useState('');
+  const [gBusy, setGBusy] = useState(false);
+  const [gMsg, setGMsg] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +59,27 @@ export default function EventPage() {
     setLoading(false);
   }, [postId]);
   useEffect(() => { load(); }, [load]);
+
+  // Load external guests once we know the viewer is the host.
+  useEffect(() => {
+    if (!post || post.author_id !== me || !post.linked_event_id) { setGuests([]); return; }
+    let live = true;
+    loadEventGuests(post.linked_event_id).then((g) => { if (live) setGuests(g); });
+    return () => { live = false; };
+  }, [post, me]);
+
+  async function sendGuestInvite() {
+    if (!post?.linked_event_id || !gName.trim() || !gEmail.trim() || gBusy) return;
+    setGBusy(true); setGMsg('');
+    try {
+      await inviteEventGuest(post.linked_event_id, gName.trim(), gEmail.trim());
+      setGMsg(`Invite sent to ${gEmail.trim()}.`);
+      setGName(''); setGEmail('');
+      setGuests(await loadEventGuests(post.linked_event_id));
+    } catch (e) {
+      setGMsg((e as Error).message || 'Could not send the invite.');
+    } finally { setGBusy(false); }
+  }
 
   // Everything hook-shaped must live ABOVE the early returns — React requires
   // the same hook sequence on every render. (A trailing effect below the
@@ -274,6 +302,32 @@ export default function EventPage() {
               </div>
             ))}
           </div>
+
+          {isHost && post.linked_event_id && (
+            <div className="evp__guests">
+              <h3 className="evp__guests-h">Invite someone outside Lichen</h3>
+              <p className="evp__guests-sub">We’ll email them the details. No account needed — they can add it to their calendar or RSVP as a guest.</p>
+              <div className="evp__guests-form">
+                <input className="evp__guests-input" placeholder="Their name" value={gName} onChange={(e) => setGName(e.target.value)} />
+                <input className="evp__guests-input" type="email" placeholder="Their email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} />
+                <button className="btn btn-primary evp__guests-send" onClick={sendGuestInvite}
+                  disabled={gBusy || !gName.trim() || !gEmail.trim()}>
+                  {gBusy ? 'Sending…' : 'Send invite'}
+                </button>
+              </div>
+              {gMsg && <p className="evp__guests-msg">{gMsg}</p>}
+              {guests.length > 0 && (
+                <ul className="evp__guests-list">
+                  {guests.map((g) => (
+                    <li key={g.id} className="evp__guest">
+                      <span className="evp__guest-name">{g.name}</span>
+                      <span className="evp__guest-status">{g.status === 'invited' ? 'invited' : g.status === 'going' ? 'going' : g.status === 'tentative' ? 'maybe' : "can't"}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 
