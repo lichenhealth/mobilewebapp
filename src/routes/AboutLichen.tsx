@@ -16,13 +16,16 @@ const KIND = {
   elements: '#7FA8C9',  // river blue
   places: '#A78BBA',    // lichen mauve
   extraction: '#B0563C',
+  /* Human contributions as the current economy renders them — drained of their
+     color, but still human: beige, not machine grey. */
+  humanFaded: '#D6BC94',
 };
 
 const MAP_ROWS = [
   {
     label: 'a mother’s care',
     left: { size: 46, bg: KIND.people },
-    right: { size: 7, bg: 'var(--ink-faint)', note: '$0' },
+    right: { size: 7, bg: KIND.humanFaded, note: '$0' },
   },
   {
     label: 'an old-growth forest',
@@ -32,7 +35,7 @@ const MAP_ROWS = [
   {
     label: 'a paramedic’s shift',
     left: { size: 34, bg: 'var(--peach-deep, var(--peach))' },
-    right: { size: 13, bg: 'var(--ink-faint)', note: 'underpaid' },
+    right: { size: 13, bg: KIND.humanFaded, note: 'underpaid' },
   },
   {
     label: 'a hedge-fund manager',
