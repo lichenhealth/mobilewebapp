@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { listSpacesByKind, createSpaceWithLocation, type SpaceDirectoryRow, type SpaceKind } from '../lib/spacesApi';
+import { listSpacesByKind, createSpaceWithLocation, holdsDuty, type SpaceDirectoryRow, type SpaceKind, type SpaceRole } from '../lib/spacesApi';
 import './SpacesDirectory.css';
 
 /** The real Communities / Groups / Organizations / Places sections: every
@@ -42,7 +42,11 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
 
   const [rows, setRows] = useState<SpaceDirectoryRow[]>([]);
   const [mine, setMine] = useState<Set<string>>(new Set());
-  const [pending, setPending] = useState<Set<string>>(new Set());
+  // Direction matters (founder 2026-07-24, 'what does Pending specify?'):
+  // asked = my join request awaits their admins; invited = a real invite
+  // awaits ME. Bare member suggestions show NOTHING (PR #58 doctrine).
+  const [asked, setAsked] = useState<Set<string>>(new Set());
+  const [invited, setInvited] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
   const [q, setQ] = useState('');
   // Standalone group creation (founder, 2026-07-17): groups don't NEED a
@@ -59,13 +63,34 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
         listSpacesByKind(kind),
         me ? supabase.from('space_members').select('space_id').eq('profile_id', me)
           : Promise.resolve({ data: [] }),
-        me ? supabase.from('space_membership_requests').select('space_id').eq('profile_id', me)
+        me ? supabase.from('space_membership_requests').select('space_id, initiated_by').eq('profile_id', me)
           : Promise.resolve({ data: [] }),
       ]);
+      const reqs = ((reqRes.data as { space_id: string; initiated_by: string }[] | null) ?? []);
+      const others = reqs.filter((r) => r.initiated_by !== me);
+      // A row someone ELSE opened is an invite only if they hold the members
+      // duty there; otherwise it's a suggestion — invisible to me.
+      let invitedIds: string[] = [];
+      if (others.length) {
+        const { data: inits } = await supabase
+          .from('space_members').select('space_id, profile_id, role, duties')
+          .in('space_id', others.map((r) => r.space_id))
+          .in('profile_id', others.map((r) => r.initiated_by));
+        const byPair = new Map(
+          ((inits as { space_id: string; profile_id: string; role: SpaceRole; duties: string[] | null }[] | null) ?? [])
+            .map((i) => [`${i.space_id}:${i.profile_id}`, i]));
+        invitedIds = others
+          .filter((r) => {
+            const i = byPair.get(`${r.space_id}:${r.initiated_by}`);
+            return !!i && holdsDuty(i.role, i.duties ?? null, 'members');
+          })
+          .map((r) => r.space_id);
+      }
       if (!live) return;
       setRows(list);
       setMine(new Set(((memRes.data as { space_id: string }[] | null) ?? []).map((r) => r.space_id)));
-      setPending(new Set(((reqRes.data as { space_id: string }[] | null) ?? []).map((r) => r.space_id)));
+      setAsked(new Set(reqs.filter((r) => r.initiated_by === me).map((r) => r.space_id)));
+      setInvited(new Set(invitedIds));
       setReady(true);
     })();
     return () => { live = false; };
@@ -160,7 +185,8 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
               {s.description && <span className="sdir__desc">{s.description}</span>}
             </span>
             {mine.has(s.id) && <span className="sdir__chip sdir__chip--in">Member ✓</span>}
-            {!mine.has(s.id) && pending.has(s.id) && <span className="sdir__chip">Pending</span>}
+            {!mine.has(s.id) && asked.has(s.id) && <span className="sdir__chip">Asked to join</span>}
+            {!mine.has(s.id) && invited.has(s.id) && <span className="sdir__chip sdir__chip--in">Invited — respond</span>}
             <Icon name="chevron-right" size={14} />
           </button>
         ))}

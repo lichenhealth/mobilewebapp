@@ -12,6 +12,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, listSpaceCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
 import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
 import ListingTile from '../components/ListingTile';
+import ListingRow from '../components/ListingRow';
 import ViewToggle from '../components/ViewToggle';
 import OfferingChips from '../components/OfferingChips';
 import { setHidden } from '../lib/hiddenApi';
@@ -32,7 +33,7 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, browse }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, browse, browseStyle = 'tiles' }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -49,6 +50,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   structuredKind?: CollectionKind;
   /** Browse-first section: cover-tile grid default, card feed one toggle away. */
   browse?: boolean;
+  /** Browse renderer: 'tiles' (cover grid — marketplace idiom) or 'rows'
+   *  (job-board rows — Work). Default tiles. */
+  browseStyle?: 'tiles' | 'rows';
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -360,22 +364,22 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         </div>
       )}
 
-      {/* Browse: cover-tile grid — pieces read as things on a shelf, not a
-          timeline. Typographic covers keep text pieces beautiful. */}
+      {/* Browse: cover-tile grid (things on a shelf) or job-board rows (Work)
+          — pieces read as what they are, not a timeline. */}
       {ready && view === 'browse' && filtered.length > 0 && (
-        <section className="tile-grid">
+        <section className={browseStyle === 'rows' ? 'row-list' : 'tile-grid'}>
           {filtered.map((p) => {
             const eyebrow = postToCard(p, me || undefined).eyebrow;
-            const ov = overlays[p.id];
-            return (
-              <ListingTile
-                key={p.id}
-                post={p}
-                offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
-                endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
-                onOpen={() => navigate(postOpenPath(p))}
-              />
-            );
+            const shared = {
+              post: p,
+              offer: eyebrow === 'Mycelium' ? undefined : eyebrow,
+              endorsed: !!overlays[p.id]
+                && ((overlays[p.id].trusted?.length ?? 0) + (overlays[p.id].recommended?.length ?? 0) > 0),
+              onOpen: () => navigate(postOpenPath(p)),
+            };
+            return browseStyle === 'rows'
+              ? <ListingRow key={p.id} {...shared} />
+              : <ListingTile key={p.id} {...shared} />;
           })}
         </section>
       )}

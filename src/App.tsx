@@ -216,7 +216,8 @@ export default function App() {
             <AreaFeed area="work" icon="briefcase" crumb="Work"
               title="Lichen" italic="Work."
               sub="Help wanted, help offered. Hourly, project-based, and apprenticeships."
-              addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help." />
+              addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help."
+              browse browseStyle="rows" />
           } />
           <Route path="/art"      element={
             <AreaFeed area="art" icon="palette" crumb="Art"

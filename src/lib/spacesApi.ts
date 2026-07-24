@@ -302,7 +302,16 @@ export async function loadMyRequestFor(spaceId: string, me: string): Promise<MyR
     .maybeSingle();
   if (error) { console.warn('loadMyRequestFor:', error.message); return null; }
   if (!data) return null;
-  return (data as { initiated_by: string }).initiated_by === me ? 'requested' : 'invited';
+  const initiator = (data as { initiated_by: string }).initiated_by;
+  if (initiator === me) return 'requested';
+  // Only a members-duty holder's row is a real INVITE. Anything else is a
+  // member SUGGESTION — invisible to the suggested person until endorsed
+  // (PR #58 doctrine: the suggested person hears nothing).
+  const { data: init } = await supabase
+    .from('space_members').select('role, duties')
+    .eq('space_id', spaceId).eq('profile_id', initiator).maybeSingle();
+  const i = init as { role: SpaceRole; duties: string[] | null } | null;
+  return i && holdsDuty(i.role, i.duties ?? null, 'members') ? 'invited' : null;
 }
 
 export async function requestToJoin(spaceId: string, me: string): Promise<void> {
