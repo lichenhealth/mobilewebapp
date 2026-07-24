@@ -29,6 +29,7 @@ import EventComposer from './routes/EventComposer';
 import CalendarSettings from './routes/CalendarSettings';
 import Events from './routes/Events';
 import EventPage from './routes/EventPage';
+import GuestEvent from './routes/GuestEvent';
 import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
@@ -56,7 +57,7 @@ import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
-const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate'];
+const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e'];
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -71,6 +72,7 @@ export default function App() {
   const { pathname } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
+  const isGuest = pathname.startsWith('/e/');   // external guest landing — no app chrome
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
   const { user, loading, onboarded, isAdmin } = useAuth();
@@ -127,8 +129,8 @@ export default function App() {
     <div className="app-shell">
       <ScrollToTop />
       <ReminderAlerts />
-      {!isChatThread && !isAuth && <TopBar onMenu={() => setMenuOpen(true)} />}
-      <main className="scroll-view" style={isChatThread || isAuth || isMaps ? { padding: 0, minHeight: 0 } : undefined}>
+      {!isChatThread && !isAuth && !isGuest && <TopBar onMenu={() => setMenuOpen(true)} />}
+      <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest ? { padding: 0, minHeight: 0 } : undefined}>
         <Routes>
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
@@ -222,6 +224,7 @@ export default function App() {
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />
           <Route path="/events/:postId" element={<EventPage />} />
+          <Route path="/e/:token" element={<GuestEvent />} />
           <Route path="/courses"  element={
             <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
               title="Lichen" italic="Courses."
@@ -240,7 +243,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
-      {!isChatThread && !isAuth && <BottomNav />}
+      {!isChatThread && !isAuth && !isGuest && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {!isChatThread && !isAuth && <InstallPrompt />}
     </div>
