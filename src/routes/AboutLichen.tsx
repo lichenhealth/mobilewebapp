@@ -116,7 +116,7 @@ function TableJourney() {
       {/* faint map contours */}
       <path d="M-10,104 q45,-14 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.55" />
       <path d="M-10,168 q45,12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.45" />
-      <path d="M-10,238 q45,-10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      <path d="M-10,268 q45,-8 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       {/* the woven route — driven by the family's truck */}
       <path d="M44,44 C90,14 152,32 200,58 C232,78 160,96 120,128 C90,152 190,142 240,150 C288,178 170,180 120,210 C96,226 180,232 232,246"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
@@ -225,8 +225,8 @@ function CrystalJourney() {
 function FirefighterJourney() {
   return (
     <svg className="about__journey" viewBox="0 0 340 265" role="img"
-      aria-label="A map route: first responders — risk taken, vicarious trauma carried; the assistant weaves their shift rotations into a shared window; a Community Healing Center offers a retreat close by; the healers arrive free to heal, coordination lifted; a donor's large gift funds the services and the commons carries the rest.">
-      <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
+      aria-label="A map route: first responders — risk taken, vicarious trauma carried; the assistant weaves their shift rotations into a shared window; a community healing center offers a retreat close by; the healers arrive free to heal, coordination lifted; a donor's large gift funds the services and the commons carries the rest.">
+      <path d="M-10,116 q45,-8 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
       <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       <path d="M44,48 C92,20 148,36 200,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
@@ -249,8 +249,8 @@ function FirefighterJourney() {
       {/* a Community Healing Center */}
       <circle cx="110" cy="140" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="110" y="145" fontSize="14" textAnchor="middle">🏞️</text>
-      <text x="88" y="130" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a Community</text>
-      <text x="88" y="142" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">Healing Center</text>
+      <text x="88" y="130" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a community</text>
+      <text x="88" y="142" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">healing center</text>
       <text x="88" y="154" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="end">a retreat, close by</text>
       {/* the donor */}
       <circle cx="282" cy="136" r="16" fill="var(--bone-warm)" stroke="#D9A441" strokeWidth="1.2" />
@@ -514,7 +514,7 @@ export default function AboutLichen() {
           </div>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Under-resourced innovators · Crystal’s thread</p>
+            <p className="about__mock-eyebrow">Under-resourced innovators · Crystal’s startup</p>
             <CrystalJourney />
             <p className="about__mock-cap">
               Crystal’s roadblock is another founder’s strength — and hers is theirs. Her assistant
@@ -531,8 +531,8 @@ export default function AboutLichen() {
             <p className="about__mock-cap">
               First responders spend their bodies for the rest of us — work the current economy
               calls “underpaid.” Lichen answers risk with care: the assistant reads a whole
-              station’s shift rotations, finds the shared window, books a nearby Community Healing
-              Center, and lifts every ounce of retreat coordination off the healers — who arrive
+              station’s shift rotations, finds the shared window, books a nearby community healing
+              center, and lifts every ounce of retreat coordination off the healers — who arrive
               simply to heal. A donor’s large gift funds the services; the commons carries the
               rest. One big gift can heal whole crews — care is the honest repayment for a body
               spent.
@@ -571,12 +571,14 @@ export default function AboutLichen() {
               <span className="about__team-name">Blair Bliss</span>
               <span className="about__team-role">business operations</span>
             </button>
-            <div className="about__team-row about__team-row--ai">
+            {/* Claude is a Lichen member — stewarded by Galyn, bio links to
+                claude.com for anyone who wants to work with the silicon half. */}
+            <button className="about__team-row about__team-row--ai" onClick={() => navigate('/members/85c04e7a-5a47-4c0e-85a4-0b35ff67a682')}>
               <span className="about__team-name">
                 <span className="about__team-brain"><Icon name="brain" size={13} /></span> Claude
               </span>
               <span className="about__team-role">builder</span>
-            </div>
+            </button>
           </div>
           <p>
             If AI worries you, that’s fair — pointed at extraction, it accelerates extraction.
