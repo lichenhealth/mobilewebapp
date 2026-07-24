@@ -319,9 +319,9 @@ export default function AboutLichen() {
           <p>
             Most feeds are tuned to hold your attention. Lichen’s evolving algorithm is tuned to
             <strong> close a gap</strong>. Every single person, plant, animal, place and element is
-            contributing to the collective — or taking from it. That’s the first map. The second map
-            is what the current system pays for those contributions — where a mother’s care is priced
-            at zero, a forest isn’t counted at all, and speculation is paid handsomely for extracting.
+            contributing to the collective — or taking from it. That’s the Current Economy — where a
+            mother’s care is priced at zero, a forest isn’t counted at all, and speculative
+            investors are paid handsomely.
           </p>
 
           <TwoMapsVisual />
