@@ -144,9 +144,9 @@
 .feed-card__cat-icon--door:hover { background: var(--peach-tint); color: var(--peach-deep); }
 
 /* Outlined circles, matching the chat/menu buttons — one family across the
-   card header (founder 2026-07-24). */
+   card header, ALL the same 30px (founder 2026-07-24). */
 .feed-card__cat-icon {
-  width: 24px; height: 24px;
+  width: 30px; height: 30px;
   border-radius: var(--r-full);
   background: transparent;
   border: 1px solid var(--bone-edge);
@@ -155,6 +155,13 @@
   justify-content: center;
   color: var(--ink-soft);
 }
+/* The weave mark joins the family: same 30px circle, and when the entity is
+   in your web the peach border sits at the circle's EDGE (founder). */
+.feed-card__head-actions .weave-mark {
+  width: 30px; height: 30px;
+  border: 1px solid var(--bone-edge);
+}
+.feed-card__head-actions .weave-mark.is-on { border-color: var(--peach); }
 
 .feed-card__body {
   display: grid;

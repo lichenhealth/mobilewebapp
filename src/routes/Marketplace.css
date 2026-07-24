@@ -394,6 +394,7 @@
 .afeed__shelf-label {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--ink-faint); margin: var(--s-3) 0 var(--s-2);
+  padding: 0 var(--s-5);   /* breathe off the margin, in step with the gutter'd shelf */
 }
 .afeed__courses { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
 .afeed__course {

@@ -245,7 +245,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       {structuredKind && structuredCols.length > 0 && (
         <>
           <p className="afeed__shelf-label">{structuredKind === 'course' ? 'Courses to follow' : 'Organized collections'}</p>
-          <ScrollHintRow className="afeed__courses h-scroll">
+          <ScrollHintRow className="afeed__courses h-scroll" gutter>
             {structuredCols.map((c) => (
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
                 <span className="afeed__course-name">{c.name}</span>
@@ -264,7 +264,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
       {/* Published playlists & anthologies — curation as contribution. */}
       {collections && publicCols.length > 0 && (
-        <ScrollHintRow className="afeed__cols h-scroll">
+        <ScrollHintRow className="afeed__cols h-scroll" gutter>
           {publicCols.map((c) => (
             <button key={c.id} className="afeed__col" onClick={() => navigate(`/collections/${c.id}`)}>
               <span className="afeed__col-name">{c.name}</span>
