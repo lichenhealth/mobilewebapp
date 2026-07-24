@@ -218,6 +218,45 @@ function CrystalJourney() {
   );
 }
 
+/** The firefighters' retreat (from the deck): chronically undervalued,
+ *  risk-carrying work answered with care — the assistant reads a station's
+ *  shift rotations, finds the shared window, books a nearby Lichen place, and
+ *  lifts all coordination off the healers. */
+function FirefighterJourney() {
+  return (
+    <svg className="about__journey" viewBox="0 0 340 265" role="img"
+      aria-label="A map route: first responders carrying risk for all of us; the assistant weaves their shift rotations into a shared window; a Lichen place offers a retreat close by; the healers arrive free to heal, coordination lifted, covered by the commons.">
+      <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
+      <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
+      <path d="M44,48 C92,20 148,36 200,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
+        fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* the crew */}
+      <circle cx="44" cy="48" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="44" y="53" fontSize="14" textAnchor="middle">🚒</text>
+      <text x="46" y="82" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">first responders</text>
+      <text x="46" y="94" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">risk carried for all of us</text>
+      {/* the assistant */}
+      <circle cx="200" cy="64" r="16" fill="var(--peach-tint, var(--bone-warm))" stroke="var(--peach)" strokeWidth="1.2" />
+      <g transform="translate(191,55)" style={{ color: 'var(--peach-deep, var(--peach))' }}>
+        <Icon name="brain" size={18} />
+      </g>
+      <text x="222" y="60" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="start">the assistant</text>
+      <text x="222" y="72" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="start">finds the shared window</text>
+      {/* a Lichen place */}
+      <circle cx="110" cy="140" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="110" y="145" fontSize="14" textAnchor="middle">🏞️</text>
+      <text x="88" y="136" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="end">a Lichen place</text>
+      <text x="88" y="148" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="end">a retreat, close by</text>
+      {/* the healers */}
+      <circle cx="256" cy="204" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
+      <text x="256" y="209" fontSize="14" textAnchor="middle">🌿</text>
+      <text x="250" y="232" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">the healers</text>
+      <text x="250" y="244" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">free to heal, not coordinate</text>
+      <text x="250" y="256" fontSize="9" fontStyle="italic" fill="var(--peach-deep, var(--peach))" textAnchor="middle">covered by the commons</text>
+    </svg>
+  );
+}
+
 const LEGEND: { label: string; color: string }[] = [
   { label: 'people', color: KIND.people },
   { label: 'plants', color: KIND.plants },
@@ -421,6 +460,11 @@ export default function AboutLichen() {
 
         <section className="about__sec">
           <h2 className="about__h2">The economy in action</h2>
+          <p>
+            Lichen serves three groups the current system leaves behind — those carrying wounds,
+            under-resourced innovators, and the chronically undervalued. Three stories, one web —
+            and an assistant weaving every route.
+          </p>
 
           <div className="about__mock">
             <p className="about__mock-eyebrow">The table’s journey</p>
@@ -439,33 +483,13 @@ export default function AboutLichen() {
               food for the neighborhood: one neighbor pays for their produce; donations and
               membership revenue cover the other’s. Lichen remembers every contributor — the tree’s
               fifty years, the artisan’s hours, the family’s miles — and the story returns to each
-              of them.
+              of them. The route itself? Drawn by the assistant — the fewest miles, the smallest
+              carbon footprint.
             </p>
           </div>
 
           <div className="about__mock">
-            <p className="about__mock-eyebrow">Crystal’s thread</p>
-            <CrystalJourney />
-            <p className="about__mock-cap">
-              Crystal’s roadblock is another founder’s strength — and hers is theirs. Her assistant
-              reads both, makes the introduction, and drafts the collaborative plan; the commons
-              seeds what the old economy starved. Every person, place, and group — eventually the
-              network itself — can have an assistant that helps, never sells.
-            </p>
-          </div>
-        </section>
-
-        <section className="about__sec">
-          <h2 className="about__h2">A web that’s more than human</h2>
-          <p>
-            Lichen honors non-human people. The beings we’re in relationship with are members too —
-            a therapy horse, a sacred plant medicine, a river — stewarded by humans, their
-            contributions are witnessed and valued. Those who can’t hold money can still
-            participate in the real exchange of value.
-          </p>
-
-          <div className="about__mock">
-            <p className="about__mock-eyebrow">Tango’s exchange</p>
+            <p className="about__mock-eyebrow">Carrying wounds · Tango’s exchange</p>
             <TangoJourney />
             <p className="about__mock-cap">
               Not everything can be measured in hours — a trade carries years of training, and some
@@ -478,6 +502,40 @@ export default function AboutLichen() {
               new variables reveal themselves.
             </p>
           </div>
+
+          <div className="about__mock">
+            <p className="about__mock-eyebrow">Under-resourced innovators · Crystal’s thread</p>
+            <CrystalJourney />
+            <p className="about__mock-cap">
+              Crystal’s roadblock is another founder’s strength — and hers is theirs. Her assistant
+              reads both, makes the introduction, and drafts the collaborative plan; the commons
+              seeds what the old economy starved. Radical collaboration instead of competition — an
+              edge the venture-funded can’t buy. Every person, place, and group — eventually the
+              network itself — can have an assistant that helps, never sells.
+            </p>
+          </div>
+
+          <div className="about__mock">
+            <p className="about__mock-eyebrow">Chronically undervalued · the firefighters’ retreat</p>
+            <FirefighterJourney />
+            <p className="about__mock-cap">
+              First responders spend their bodies for the rest of us — work the current economy
+              calls “underpaid.” Lichen answers risk with care: the assistant reads a whole
+              station’s shift rotations, finds the shared window, books a nearby Lichen place, and
+              lifts every ounce of retreat coordination off the healers — who arrive simply to
+              heal. The commons covers it. Care is the honest repayment for a body spent.
+            </p>
+          </div>
+        </section>
+
+        <section className="about__sec">
+          <h2 className="about__h2">A web that’s more than human</h2>
+          <p>
+            Lichen honors non-human people. The beings we’re in relationship with are members too —
+            a therapy horse, a sacred plant medicine, a river — stewarded by humans, their
+            contributions are witnessed and valued. Those who can’t hold money can still
+            participate in the real exchange of value.
+          </p>
         </section>
 
         <section className="about__sec">

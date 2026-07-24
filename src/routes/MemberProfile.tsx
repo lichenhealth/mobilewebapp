@@ -89,12 +89,15 @@ export default function MemberProfile() {
       <div className="prof">
         {!me ? (
           <div className="sprof__signin">
-            <p className="mprof__muted">Sign in to see this page.</p>
+            <p className="mprof__muted">Sign in to see full profile details.</p>
             <button
               className="btn btn-primary"
               onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}
             >
               Sign in
+            </button>
+            <button className="btn" onClick={() => navigate('/signup')}>
+              Join Lichen — 3 months free
             </button>
           </div>
         ) : (
