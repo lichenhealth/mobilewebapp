@@ -16,26 +16,26 @@ const KIND = {
   elements: '#7FA8C9',  // river blue
   places: '#A78BBA',    // lichen mauve
   extraction: '#B0563C',
-  /* Human contributions as the current economy renders them — drained of their
-     color, but still human: beige, not machine grey. */
-  humanFaded: '#D6BC94',
 };
 
+/* Within each row the pair differs ONLY in size/presence — never in color:
+   the same Lichen peach for every human dot, green for the forest, rust for
+   the extractive one. */
 const MAP_ROWS = [
   {
     label: 'a mother’s care',
     left: { size: 46, bg: KIND.people },
-    right: { size: 7, bg: KIND.humanFaded, note: '$0' },
+    right: { size: 7, bg: KIND.people, note: '$0' },
   },
   {
     label: 'an old-growth forest',
     left: { size: 54, bg: KIND.plants },
-    right: { size: 22, dashed: true, note: 'not counted' },
+    right: { size: 22, dashed: true, stroke: KIND.plants, note: 'not counted' },
   },
   {
     label: 'a paramedic’s shift',
-    left: { size: 34, bg: 'var(--peach-deep, var(--peach))' },
-    right: { size: 13, bg: KIND.humanFaded, note: 'underpaid' },
+    left: { size: 34, bg: KIND.people },
+    right: { size: 13, bg: KIND.people, note: 'underpaid' },
   },
   {
     label: 'a hedge-fund manager',
@@ -133,11 +133,15 @@ const LEGEND: { label: string; color: string }[] = [
   { label: 'places', color: KIND.places },
 ];
 
-function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; rust?: boolean; minus?: boolean } }) {
+function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; stroke?: string; rust?: boolean; minus?: boolean } }) {
   return (
     <span
       className={'about__maps-dot' + (d.dashed ? ' is-dashed' : '') + (d.rust ? ' is-rust' : '')}
-      style={{ width: d.size, height: d.size, background: d.dashed ? 'transparent' : d.bg }}
+      style={{
+        width: d.size, height: d.size,
+        background: d.dashed ? 'transparent' : d.bg,
+        ...(d.stroke ? { borderColor: d.stroke } : {}),
+      }}
     >
       {d.minus ? '−' : ''}
     </span>
