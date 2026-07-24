@@ -351,7 +351,7 @@ export default function AboutLichen() {
         </section>
 
         <section className="about__sec">
-          <h2 className="about__h2">An algorithm designed to rebalance and reconnect</h2>
+          <h2 className="about__h2">Designed for reciprocity. Tuned for reconnection.</h2>
           <p>
             Every system is perfectly designed to get the results it gets. Feeds tuned to maximize
             attention harvest fear and consumption — comfort that never quite relieves — and deepen
