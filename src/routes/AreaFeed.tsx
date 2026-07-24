@@ -11,6 +11,8 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, listSpaceCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
 import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
+import ListingTile from '../components/ListingTile';
+import ViewToggle from '../components/ViewToggle';
 import OfferingChips from '../components/OfferingChips';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
@@ -30,7 +32,7 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, browse }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -45,6 +47,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   collections?: boolean;
   /** Structured offerings shelf + create chooser: 'course' (Courses) or 'path' (Library). */
   structuredKind?: CollectionKind;
+  /** Browse-first section: cover-tile grid default, card feed one toggle away. */
+  browse?: boolean;
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -80,6 +84,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [creating, setCreating] = useState(false);
   // Space-scoped sections: do I steward this space's library/courses?
   const [spaceDuty, setSpaceDuty] = useState(false);
+  // Browse grid default (per-device choice persists), feed one toggle away.
+  const [view, setView] = useState<'browse' | 'feed'>(
+    () => (browse && localStorage.getItem(`view-${area}`) !== 'feed' ? 'browse' : 'feed'));
+  const pickView = (v: 'browse' | 'feed') => { setView(v); localStorage.setItem(`view-${area}`, v); };
 
   useEffect(() => {
     let live = true;
@@ -297,8 +305,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               ? `${memberName}’s ${structuredKind === 'course' ? 'courses' : 'organized collections'}`
               : structuredKind === 'course' ? 'Courses to follow' : 'Organized collections'}
           </p>
-          <ScrollHintRow className="afeed__courses h-scroll" gutter>
-            {structuredCols.map((c) => (
+          {(() => {
+            const cards = structuredCols.map((c) => (
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
                 <span className="afeed__course-name">{c.name}</span>
                 <span className="afeed__course-by">
@@ -309,8 +317,13 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
                 </span>
                 <OfferingChips meta={c.details} lessonCount={c.item_count} itemWord={structuredKind === 'course' ? 'lesson' : 'piece'} />
               </button>
-            ))}
-          </ScrollHintRow>
+            ));
+            // Browse mode, Courses: the Skillshare idiom — offerings WRAP as a
+            // grid, they ARE the page. Library keeps the shelf (Spotify rows).
+            return view === 'browse' && structuredKind === 'course'
+              ? <div className="afeed__courses-grid">{cards}</div>
+              : <ScrollHintRow className="afeed__courses h-scroll" gutter>{cards}</ScrollHintRow>;
+          })()}
         </>
       )}
 
@@ -331,21 +344,43 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'post' : 'posts'}
+        {browse && <ViewToggle view={view} onChange={pickView} />}
       </p>
 
-      <section className="mkt__list">
-        {!ready && <p className="mkt__empty-sub">Loading…</p>}
-        {ready && filtered.length === 0 && (
-          <div className="mkt__empty">
-            <Icon name={icon} size={20} />
-            <p><span className="display-italic">Nothing here yet.</span></p>
-            <p className="mkt__empty-sub">
-              {posts.length === 0 ? emptyHint
-                : mediaLenses && media.length === 0 ? 'All lenses are off — tap one to see that kind of piece.'
-                : 'Try a different search or turn a lens back on.'}
-            </p>
-          </div>
-        )}
+      {!ready && <p className="mkt__empty-sub">Loading…</p>}
+      {ready && filtered.length === 0 && (
+        <div className="mkt__empty">
+          <Icon name={icon} size={20} />
+          <p><span className="display-italic">Nothing here yet.</span></p>
+          <p className="mkt__empty-sub">
+            {posts.length === 0 ? emptyHint
+              : mediaLenses && media.length === 0 ? 'All lenses are off — tap one to see that kind of piece.'
+              : 'Try a different search or turn a lens back on.'}
+          </p>
+        </div>
+      )}
+
+      {/* Browse: cover-tile grid — pieces read as things on a shelf, not a
+          timeline. Typographic covers keep text pieces beautiful. */}
+      {ready && view === 'browse' && filtered.length > 0 && (
+        <section className="tile-grid">
+          {filtered.map((p) => {
+            const eyebrow = postToCard(p, me || undefined).eyebrow;
+            const ov = overlays[p.id];
+            return (
+              <ListingTile
+                key={p.id}
+                post={p}
+                offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
+                endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
+                onOpen={() => navigate(postOpenPath(p))}
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {view === 'feed' && <section className="mkt__list">
         {filtered.map((p) => (
           <FeedCard
             key={p.id}
@@ -370,7 +405,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />
         ))}
-      </section>
+      </section>}
 
       <footer className="mkt__end">
         <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>

@@ -241,14 +241,14 @@ export default function App() {
               title="Lichen" italic="Courses."
               sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
               addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training."
-              mediaLenses structuredKind="course" />
+              mediaLenses structuredKind="course" browse />
           } />
           <Route path="/library"  element={
             <AreaFeed area="library" icon="book" crumb="Library"
               title="Lichen" italic="Library."
               sub="Essays, field guides, and zines on land, food, and care."
               addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
-              mediaLenses collections structuredKind="path" />
+              mediaLenses collections structuredKind="path" browse />
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
