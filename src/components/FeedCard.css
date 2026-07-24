@@ -161,7 +161,10 @@
   width: 30px; height: 30px;
   border: 1px solid var(--bone-edge);
 }
-.feed-card__head-actions .weave-mark.is-on { border-color: var(--peach); }
+.feed-card__head-actions .weave-mark.is-on {
+  border-color: var(--peach);
+  background: transparent;   /* the ring alone says woven — no inner fill */
+}
 
 .feed-card__body {
   display: grid;

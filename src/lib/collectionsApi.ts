@@ -26,56 +26,94 @@ export interface CollectionRow {
   details: OfferingMeta;
   created_at: string;
   owner: { full_name: string | null } | null;
+  /** Space-owned collection (a group's Library/Courses) — duty-holders organize it. */
+  space_id: string | null;
+  space: { name: string | null } | null;
   item_count: number;
 }
 
-type RawRow = Omit<CollectionRow, 'item_count' | 'owner' | 'details'> & {
+type RawRow = Omit<CollectionRow, 'item_count' | 'owner' | 'details' | 'space'> & {
   details: OfferingMeta | null;
   owner: { full_name: string | null } | null;
+  space?: { name: string | null } | null;
   collection_items: { count: number }[];
 };
 
 const COLLECTION_SELECT =
+  'id, owner_id, name, description, is_public, kind, details, created_at, space_id, space:spaces!collections_space_id_fkey(name), owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
+// pre-migration fallback (no space_id column yet)
+const COLLECTION_SELECT_LEGACY =
   'id, owner_id, name, description, is_public, kind, details, created_at, owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
 
 function shape(r: RawRow): CollectionRow {
-  return { ...r, details: r.details ?? {}, item_count: r.collection_items?.[0]?.count ?? 0 };
+  return {
+    ...r, details: r.details ?? {}, item_count: r.collection_items?.[0]?.count ?? 0,
+    space_id: r.space_id ?? null, space: r.space ?? null,
+  };
 }
 
-/** My folders/playlists, newest first. */
+/** Run a collections query, retrying without the space fields when the
+ *  migration hasn't landed yet (graceful pre-migration degrade). */
+async function queryCollections(
+  run: (select: string, hasSpace: boolean) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<RawRow[]> {
+  let { data, error } = await run(COLLECTION_SELECT, true);
+  if (error) ({ data, error } = await run(COLLECTION_SELECT_LEGACY, false));
+  if (error) { console.warn('collections:', error.message); return []; }
+  return (data as RawRow[] | null) ?? [];
+}
+
+/** My PERSONAL folders/playlists, newest first (space-owned excluded — those
+ *  live on their space's sections, not the Saved shelf). */
 export async function listMyCollections(): Promise<CollectionRow[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
-  const { data, error } = await supabase
-    .from('collections')
-    .select(COLLECTION_SELECT)
-    .eq('owner_id', user.id)
-    .order('created_at', { ascending: false });
-  if (error) { console.warn('listMyCollections:', error.message); return []; }
-  return (((data as unknown as RawRow[] | null) ?? []).map(shape));
+  const rows = await queryCollections((sel, hasSpace) => {
+    let q = supabase.from('collections').select(sel)
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false });
+    if (hasSpace) q = q.is('space_id', null);
+    return q;
+  });
+  return rows.map(shape);
 }
 
 /** Published collections for the Library strip, newest first. Optionally scoped
- *  to a kind ('course' | 'path') for the section shelves. */
-export async function listPublicCollections(limit = 12, kind?: CollectionKind): Promise<CollectionRow[]> {
-  let q = supabase
-    .from('collections')
-    .select(COLLECTION_SELECT)
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (kind) q = q.eq('kind', kind);
-  const { data, error } = await q;
-  if (error) { console.warn('listPublicCollections:', error.message); return []; }
-  return (((data as unknown as RawRow[] | null) ?? []).map(shape));
+ *  to a kind ('course' | 'path') for the section shelves, or to one owner
+ *  (member-scoped sections: "Melanie's courses to follow"). */
+export async function listPublicCollections(limit = 12, kind?: CollectionKind, ownerId?: string): Promise<CollectionRow[]> {
+  const rows = await queryCollections((sel) => {
+    let q = supabase.from('collections').select(sel)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (kind) q = q.eq('kind', kind);
+    if (ownerId) q = q.eq('owner_id', ownerId);
+    return q;
+  });
+  return rows.map(shape);
 }
 
-export async function createCollection(name: string, kind: CollectionKind = 'collection'): Promise<string> {
+/** A space's own collections (its Library/Courses). RLS shows members the
+ *  private ones too; everyone else sees only the published. */
+export async function listSpaceCollections(spaceId: string, kind?: CollectionKind): Promise<CollectionRow[]> {
+  const rows = await queryCollections((sel, hasSpace) => {
+    if (!hasSpace) return Promise.resolve({ data: [], error: null });
+    let q = supabase.from('collections').select(sel)
+      .eq('space_id', spaceId)
+      .order('created_at', { ascending: false });
+    if (kind) q = q.eq('kind', kind);
+    return q;
+  });
+  return rows.map(shape);
+}
+
+export async function createCollection(name: string, kind: CollectionKind = 'collection', spaceId?: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('collections')
-    .insert({ owner_id: user.id, name: name.trim(), kind })
+    .insert({ owner_id: user.id, name: name.trim(), kind, ...(spaceId ? { space_id: spaceId } : {}) })
     .select('id').single();
   if (error) throw error;
   return (data as { id: string }).id;
@@ -137,6 +175,55 @@ export async function setLessonDone(collectionId: string, postId: string, done: 
   }
 }
 
+// ── Suggestions: members propose a piece or an organizational note; the
+//    curators (owner + duty-holding space admins) accept or decline. ──────────
+
+export interface CollectionSuggestionRow {
+  id: string;
+  collection_id: string;
+  post_id: string | null;   // null = a free-text organizational note
+  note: string | null;
+  suggested_by: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+  suggester: { full_name: string | null } | null;
+}
+
+/** Suggest an addition (postId) and/or an organizational change (note). */
+export async function suggestToCollection(
+  collectionId: string, opts: { postId?: string; note?: string },
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('collection_suggestions').insert({
+    collection_id: collectionId,
+    post_id: opts.postId ?? null,
+    note: opts.note?.trim() || null,
+    suggested_by: user.id,
+  });
+  if (error) throw error;
+}
+
+/** Pending suggestions on a collection — curators see all, others their own. */
+export async function listPendingSuggestions(collectionId: string): Promise<CollectionSuggestionRow[]> {
+  const { data, error } = await supabase
+    .from('collection_suggestions')
+    .select('id, collection_id, post_id, note, suggested_by, status, created_at, suggester:profiles!collection_suggestions_suggested_by_fkey(full_name)')
+    .eq('collection_id', collectionId)
+    .eq('status', 'pending')
+    .order('created_at');
+  if (error) { console.warn('listPendingSuggestions:', error.message); return []; }
+  return ((data as unknown as CollectionSuggestionRow[] | null) ?? []);
+}
+
+/** Curator accepts (piece appended) or declines (quietly). */
+export async function resolveSuggestion(id: string, accept: boolean): Promise<void> {
+  const { error } = await supabase.rpc('resolve_collection_suggestion', {
+    p_id: id, p_accept: accept,
+  });
+  if (error) throw error;
+}
+
 /** Deleting a collection frees its posts (they stay saved/published). */
 export async function deleteCollection(id: string): Promise<void> {
   const { error } = await supabase.from('collections').delete().eq('id', id);
@@ -165,11 +252,15 @@ export async function removeFromCollection(collectionId: string, postId: string)
 
 /** A collection with its posts in curated order. Null when private + not mine. */
 export async function loadCollection(id: string): Promise<{ meta: CollectionRow; posts: FeedPost[] } | null> {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('collections')
     .select(COLLECTION_SELECT)
     .eq('id', id)
     .maybeSingle();
+  if (error) {
+    ({ data, error } = await supabase
+      .from('collections').select(COLLECTION_SELECT_LEGACY).eq('id', id).maybeSingle());
+  }
   if (error || !data) return null;
   const meta = shape(data as unknown as RawRow);
   const { data: items } = await supabase

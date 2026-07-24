@@ -93,21 +93,73 @@ export type SpaceRole = 'super_admin' | 'admin' | 'member';
 export interface SpaceMemberRow {
   profile_id: string;
   role: SpaceRole;
+  /** Scoped stewardship (founder 2026-07-24): null = a full admin (everything);
+   *  a subset = exactly what this admin tends. Meaningless for members. */
+  duties: string[] | null;
   profile: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+/** The named duties a super admin can scope an admin to. Only duties with
+ *  real teeth are listed — events/chat join when those powers exist. */
+export const SPACE_DUTIES: { key: string; label: string; hint: string }[] = [
+  { key: 'library', label: 'Library', hint: 'organize the collections' },
+  { key: 'courses', label: 'Courses', hint: 'co-teach: lessons & details' },
+  { key: 'members', label: 'Members', hint: 'approve, invite, endorse' },
+];
+
+/** Does this role+duties combination steward the given duty? */
+export function holdsDuty(
+  role: SpaceRole | undefined, duties: string[] | null | undefined, duty: string,
+): boolean {
+  if (role === 'super_admin') return true;
+  if (role !== 'admin') return false;
+  return !duties || duties.includes(duty);
 }
 
 const ROLE_ORDER: Record<SpaceRole, number> = { super_admin: 0, admin: 1, member: 2 };
 
 export async function loadSpaceMembers(id: string): Promise<SpaceMemberRow[]> {
-  const { data, error } = await supabase
+  let { data, error } = (await supabase
     .from('space_members')
-    .select('profile_id, role, profile:profiles(full_name, avatar_url)')
-    .eq('space_id', id);
+    .select('profile_id, role, duties, profile:profiles(full_name, avatar_url)')
+    .eq('space_id', id)) as { data: unknown; error: { message: string } | null };
+  if (error) {
+    // pre-migration (no duties column yet): fall back so the list never blanks
+    ({ data, error } = (await supabase
+      .from('space_members')
+      .select('profile_id, role, profile:profiles(full_name, avatar_url)')
+      .eq('space_id', id)) as { data: unknown; error: { message: string } | null });
+  }
   if (error) { console.warn('loadSpaceMembers:', error.message); return []; }
   return (((data as unknown as SpaceMemberRow[] | null) ?? []))
+    .map((m) => ({ ...m, duties: m.duties ?? null }))
     .sort((a, b) =>
       ROLE_ORDER[a.role] - ROLE_ORDER[b.role]
       || (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? ''));
+}
+
+/** My role + duties in a space (null = not a member). Pre-migration safe. */
+export async function myDutiesIn(spaceId: string): Promise<{ role: SpaceRole; duties: string[] | null } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('space_members').select('role, duties')
+    .eq('space_id', spaceId).eq('profile_id', user.id).maybeSingle();
+  if (!error) return (data as { role: SpaceRole; duties: string[] | null } | null) ?? null;
+  const { data: legacy } = await supabase
+    .from('space_members').select('role')
+    .eq('space_id', spaceId).eq('profile_id', user.id).maybeSingle();
+  return legacy ? { role: (legacy as { role: SpaceRole }).role, duties: null } : null;
+}
+
+/** Super admin grants/edits/revokes admin — duties null = stewards everything. */
+export async function setMemberRole(
+  spaceId: string, profileId: string, role: 'admin' | 'member', duties: string[] | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_member_role', {
+    p_space: spaceId, p_profile: profileId, p_role: role, p_duties: duties,
+  });
+  if (error) throw error;
 }
 
 /** The space's chat room id (every space gets one at creation via trigger).

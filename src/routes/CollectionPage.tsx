@@ -6,17 +6,19 @@ import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { deletePost, loadAuthorFeed, type FeedPost } from '../lib/postsApi';
+import { deletePost, loadAuthorFeed, loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
+import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
 import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
   addToCollection, loadProgress, enroll, setLessonDone,
-  type CollectionRow, type OfferingMeta,
+  suggestToCollection, listPendingSuggestions, resolveSuggestion,
+  type CollectionRow, type OfferingMeta, type CollectionSuggestionRow,
 } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import './CollectionPage.css';
@@ -58,11 +60,19 @@ export default function CollectionPage() {
   const [form, setForm] = useState<OfferingMeta>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  // owner lesson picker (add your own posts as lessons)
+  // curator lesson picker (add your own posts as lessons) — doubles as the
+  // SUGGEST picker for everyone else (their pick becomes a pending suggestion)
   const [pickOpen, setPickOpen] = useState(false);
   const [myPosts, setMyPosts] = useState<FeedPost[]>([]);
   const [picksLoaded, setPicksLoaded] = useState(false);
   const [pickQ, setPickQ] = useState('');
+  // scoped stewardship: a space collection is editable by its duty-holders
+  const [spaceDuty, setSpaceDuty] = useState(false);
+  // member suggestions (pieces + organizational notes)
+  const [suggestions, setSuggestions] = useState<CollectionSuggestionRow[]>([]);
+  const [suggPosts, setSuggPosts] = useState<FeedPost[]>([]);
+  const [suggNote, setSuggNote] = useState('');
+  const [suggSent, setSuggSent] = useState(false);
 
   const load = useCallback(async () => {
     setReady(false);
@@ -71,15 +81,27 @@ export default function CollectionPage() {
     ]);
     if (!col) { setMeta(null); setReady(true); return; }
     const ov = await loadEndorsements(col.posts, myc);
+    let duty = false;
+    if (col.meta.space_id && me) {
+      const mine = await myDutiesIn(col.meta.space_id);
+      duty = holdsDuty(mine?.role, mine?.duties, col.meta.kind === 'course' ? 'courses' : 'library');
+    }
+    const suggs = me ? await listPendingSuggestions(id) : [];
+    const suggIds = suggs.map((s) => s.post_id).filter((p): p is string => !!p);
+    setSuggestions(suggs);
+    setSuggPosts(suggIds.length ? await loadPostsByIds(suggIds) : []);
+    setSpaceDuty(duty);
     setMeta(col.meta); setPosts(col.posts);
     setName(col.meta.name); setDescription(col.meta.description ?? ''); setForm(col.meta.details ?? {});
     setEnrolled(prog.enrolled); setDone(prog.done);
     setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
     setReady(true);
-  }, [id]);
+  }, [id, me]);
   useEffect(() => { void load(); }, [load]);
 
   const isOwner = !!me && meta?.owner_id === me;
+  // The curators: the human who made it + any space admin stewarding this duty.
+  const canEdit = isOwner || spaceDuty;
   const structured = meta?.kind === 'course' || meta?.kind === 'path';
   const firstUnfinished = useMemo(() => posts.find((p) => !done.has(p.id)) ?? posts[0], [posts, done]);
   const pct = posts.length ? Math.round((done.size / posts.length) * 100) : 0;
@@ -119,7 +141,8 @@ export default function CollectionPage() {
     void reorderItems(id, next.map((p) => p.id)).catch((e) => { console.error(e); void load(); });
   }
 
-  // Owner: pull your own posts in as lessons.
+  // Curator: pull your own posts in as lessons. Non-curators use the same
+  // picker to SUGGEST a piece instead.
   async function openLessonPicker() {
     const opening = !pickOpen;
     setPickOpen(opening);
@@ -129,20 +152,41 @@ export default function CollectionPage() {
     }
   }
   const inCourse = useMemo(() => new Set(posts.map((p) => p.id)), [posts]);
+  const suggested = useMemo(
+    () => new Set(suggestions.filter((s) => s.post_id).map((s) => s.post_id as string)),
+    [suggestions]);
   const pickable = useMemo(() => {
     const q = pickQ.trim().toLowerCase();
-    return myPosts.filter((p) => !inCourse.has(p.id)
+    return myPosts.filter((p) => !inCourse.has(p.id) && !suggested.has(p.id)
       && (!q || (p.title ?? '').toLowerCase().includes(q) || p.body.toLowerCase().includes(q)));
-  }, [myPosts, inCourse, pickQ]);
+  }, [myPosts, inCourse, suggested, pickQ]);
   async function addLesson(p: FeedPost) {
-    await addToCollection(id, p.id);
-    setPosts((cur) => [...cur, p]);
+    if (canEdit) {
+      await addToCollection(id, p.id);
+      setPosts((cur) => [...cur, p]);
+    } else {
+      await suggestToCollection(id, { postId: p.id });
+      setSuggSent(true);
+      void load();
+    }
   }
+  async function sendNote() {
+    if (!suggNote.trim()) return;
+    await suggestToCollection(id, { note: suggNote });
+    setSuggNote(''); setSuggSent(true);
+    void load();
+  }
+  async function decideSuggestion(sid: string, accept: boolean) {
+    await resolveSuggestion(sid, accept);
+    setSuggestions((cur) => cur.filter((s) => s.id !== sid));
+    if (accept) void load();
+  }
+  const suggPostOf = (pid: string | null) => suggPosts.find((p) => p.id === pid);
 
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
 
-  const editing = isOwner && editOpen;
+  const editing = canEdit && editOpen;
 
   return (
     <div className="colp">
@@ -156,6 +200,9 @@ export default function CollectionPage() {
         </p>
         <h1 className="colp__title display-italic">{meta.name}</h1>
         <p className="colp__by">
+          {meta.space_id && (
+            <><Link to={`/spaces/${meta.space_id}`}>{meta.space?.name ?? 'a space'}</Link>{' · '}</>
+          )}
           {meta.kind === 'course' ? 'led by' : meta.kind === 'path' ? 'organized by' : 'curated by'}{' '}
           <Link to={`/members/${meta.owner_id}`}>{meta.owner?.full_name ?? 'a member'}</Link>
           {' · '}{posts.length} {itemWord(meta.kind)}{posts.length === 1 ? '' : 's'}
@@ -166,8 +213,8 @@ export default function CollectionPage() {
 
       {error && <p className="colp__error">{error}</p>}
 
-      {/* Learner loop: enroll + progress (structured, signed-in non-owners, has lessons). */}
-      {structured && !isOwner && me && posts.length > 0 && (
+      {/* Learner loop: enroll + progress (structured, signed-in non-curators, has lessons). */}
+      {structured && !canEdit && me && posts.length > 0 && (
         <div className="colp__learn">
           {enrolled && (
             <div className="colp__progress">
@@ -181,7 +228,17 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {isOwner && (
+      {/* Members who don't curate can SUGGEST — a piece from their posts, or a note. */}
+      {me && !canEdit && (
+        <div className="colp__controls">
+          <button className="btn colp__btn" onClick={() => void openLessonPicker()}>
+            {pickOpen ? 'Close' : 'Suggest a piece or a change'}
+          </button>
+          {suggSent && <span className="colp__muted">Sent — the organizers will review it.</span>}
+        </div>
+      )}
+
+      {canEdit && (
         <div className="colp__controls">
           <button className="btn colp__btn" onClick={() => setEditOpen((o) => !o)}>
             {editOpen ? 'Done' : 'Edit'}
@@ -278,11 +335,25 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {isOwner && pickOpen && (
+      {me && pickOpen && (
         <div className="colp__picker">
+          {!canEdit && (
+            <textarea
+              className="prof__textarea colp__sugg-note"
+              placeholder="Suggest a change — ordering, gaps, anything the organizers should hear…"
+              value={suggNote}
+              onChange={(e) => setSuggNote(e.target.value)}
+            />
+          )}
+          {!canEdit && suggNote.trim() && (
+            <button className="btn btn-primary colp__btn" disabled={busy}
+              onClick={() => void act(sendNote)}>Send suggestion</button>
+          )}
           <input
             className="prof__input"
-            placeholder={`Search your posts to add as ${itemWord(meta.kind)}s…`}
+            placeholder={canEdit
+              ? `Search your posts to add as ${itemWord(meta.kind)}s…`
+              : 'Or search your posts to suggest a piece…'}
             value={pickQ}
             onChange={(e) => setPickQ(e.target.value)}
           />
@@ -297,7 +368,7 @@ export default function CollectionPage() {
           ) : (
             <div className="colp__picker-list">
               {pickable.map((p) => (
-                <button key={p.id} className="colp__picker-row" onClick={() => void addLesson(p)}>
+                <button key={p.id} className="colp__picker-row" onClick={() => void act(() => addLesson(p))}>
                   <span className="colp__picker-title">{p.title || p.body.slice(0, 64)}</span>
                   <Icon name="plus" size={15} />
                 </button>
@@ -307,11 +378,46 @@ export default function CollectionPage() {
         </div>
       )}
 
+      {/* Pending suggestions — the curators decide, quietly. */}
+      {canEdit && suggestions.length > 0 && (
+        <div className="colp__suggs">
+          <p className="colp__suggs-label">Suggested by members</p>
+          {suggestions.map((s) => (
+            <div className="colp__sugg" key={s.id}>
+              <span className="colp__sugg-text">
+                <em>{s.suggester?.full_name ?? 'A member'}</em>
+                {s.post_id ? (
+                  <button className="colp__sugg-title"
+                    onClick={() => { const p = suggPostOf(s.post_id); if (p) navigate(postOpenPath(p)); }}>
+                    {suggPostOf(s.post_id)?.title || suggPostOf(s.post_id)?.body.slice(0, 64) || 'a piece'}
+                  </button>
+                ) : (
+                  <span className="colp__sugg-noteview">&ldquo;{s.note}&rdquo;</span>
+                )}
+              </span>
+              <span className="colp__sugg-actions">
+                {s.post_id && (
+                  <button className="btn btn-primary colp__btn" disabled={busy}
+                    onClick={() => void act(() => decideSuggestion(s.id, true))}>Add</button>
+                )}
+                {!s.post_id && (
+                  <button className="btn btn-primary colp__btn" disabled={busy}
+                    title="Mark taken on board — the suggester hears a thank-you"
+                    onClick={() => void act(() => decideSuggestion(s.id, true))}>Noted</button>
+                )}
+                <button className="btn colp__btn" disabled={busy}
+                  onClick={() => void act(() => decideSuggestion(s.id, false))}>Decline</button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <section className="colp__list">
         {posts.length === 0 && (
           <p className="colp__muted">
             {structured ? `No ${itemWord(meta.kind)}s yet` : 'Nothing here yet'}
-            {isOwner ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
+            {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}
         {posts.map((p, i) => {
@@ -330,7 +436,7 @@ export default function CollectionPage() {
               onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
               extraMenuItems={[
                 ...(me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : []),
-                ...(isOwner ? [{
+                ...(canEdit ? [{
                   label: 'Remove from this collection',
                   onClick: () => {
                     void removeFromCollection(id, p.id)
@@ -353,7 +459,7 @@ export default function CollectionPage() {
           return (
             <div className={'colp__lesson' + (done.has(p.id) ? ' is-done' : '')} key={p.id}>
               <div className="colp__lesson-rail">
-                {me && !isOwner && (
+                {me && !canEdit && (
                   <button className="colp__tick" onClick={() => toggleLesson(p.id)}
                     aria-pressed={done.has(p.id)} aria-label={done.has(p.id) ? 'Mark not done' : 'Mark done'}>
                     {done.has(p.id) ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}

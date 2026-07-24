@@ -381,7 +381,9 @@
 .evav__score { margin-left: 6px; font-size: 10px; color: var(--peach-deep, var(--peach)); }
 
 /* Back-to-events chip (shown only when you arrived from Events) */
-.calp__backchip { margin: var(--s-2) var(--s-5) 0; align-self: flex-start; }
+/* flex-shrink 0: .calp is a height-capped column — without it the tall grid
+   squashes the chip to a sliver on desktop (founder 2026-07-24) */
+.calp__backchip { margin: var(--s-2) var(--s-5) 0; align-self: flex-start; flex-shrink: 0; }
 
 /* Per-imported-calendar title consent (busy-only by default) */
 .cset__titletoggle {

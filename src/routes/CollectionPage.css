@@ -99,3 +99,24 @@
 }
 .colp__reorder button:disabled { opacity: 0.35; }
 .colp__reorder-down :where(svg) { transform: rotate(180deg); }
+
+/* ── Member suggestions (pieces + organizational notes) ─────────────────── */
+.colp__suggs {
+  margin: 0 0 var(--s-3); padding: var(--s-3);
+  background: var(--peach-tint); border: 1px solid var(--peach); border-radius: var(--r-lg);
+  display: flex; flex-direction: column; gap: var(--s-2);
+}
+.colp__suggs-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-muted); margin: 0;
+}
+.colp__sugg { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.colp__sugg-text { flex: 1; min-width: 180px; font-size: 13px; color: var(--ink); }
+.colp__sugg-text em { font-style: normal; font-weight: 500; margin-right: 6px; }
+.colp__sugg-title {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: var(--peach-deep); text-decoration: underline; text-align: left;
+}
+.colp__sugg-noteview { font-style: italic; color: var(--ink-soft); }
+.colp__sugg-actions { display: flex; gap: 6px; }
+.colp__sugg-note { min-height: 64px; }

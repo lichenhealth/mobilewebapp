@@ -13,7 +13,7 @@ import {
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
   approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
-  suggestMember, endorseSuggestion,
+  suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
   type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
@@ -70,6 +70,11 @@ export default function SpaceProfile() {
   const [proposeName, setProposeName] = useState('');
   // the + circle asks WHAT you're adding (Figma 286-14250)
   const [plusOpen, setPlusOpen] = useState(false);
+  // super admin's role editor: pick admin/member + the duties they steward
+  const [manage, setManage] = useState<{ id: string; name: string } | null>(null);
+  const [mAdmin, setMAdmin] = useState(false);
+  const [mAll, setMAll] = useState(true);
+  const [mDuties, setMDuties] = useState<string[]>([]);
   const [parentQ, setParentQ] = useState('');
   const [parentHits, setParentHits] = useState<{ id: string; name: string; kind: string }[]>([]);
 
@@ -142,10 +147,14 @@ export default function SpaceProfile() {
     try { await setRecommend('space', id, next); } catch (e) { console.error(e); setRecommended(!next); }
   }
 
-  const myRole = members.find((m) => m.profile_id === me)?.role;
+  const myRow = members.find((m) => m.profile_id === me);
+  const myRole = myRow?.role;
   const isMember = !!myRole;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
   const adminTools = isAdmin && !publicView;
+  // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
+  // to admins holding the 'members' duty; full admins hold everything.
+  const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && !publicView;
 
   useEffect(() => {
     if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
@@ -603,7 +612,7 @@ export default function SpaceProfile() {
       />
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
-      {adminTools && pendingReqs.length > 0 && (
+      {memberTools && pendingReqs.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Waiting at the door</h2>
           {pendingReqs.map((r) => {
@@ -654,32 +663,102 @@ export default function SpaceProfile() {
         <h2 className="prof__h2">Members</h2>
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
-          {members.map((m) => (
-            <button
-              className="sprof__member"
-              key={m.profile_id}
-              onClick={() => navigate(`/members/${m.profile_id}`)}
-            >
-              <Avatar
-                id={m.profile_id}
-                name={m.profile?.full_name ?? 'Member'}
-                url={m.profile?.avatar_url}
-                size={34}
-              />
-              <span className="sprof__member-name">{m.profile?.full_name ?? 'Member'}</span>
-              <span className="sprof__member-role">{ROLE_LABEL[m.role] ?? m.role}</span>
-            </button>
-          ))}
+          {members.map((m) => {
+            // A scoped admin's label says what they steward ("admin · Library")
+            const roleLabel = m.role === 'admin' && m.duties
+              ? 'admin · ' + m.duties.map((d) => SPACE_DUTIES.find((x) => x.key === d)?.label ?? d).join(', ')
+              : ROLE_LABEL[m.role] ?? m.role;
+            const canManage = adminTools && myRole === 'super_admin'
+              && m.role !== 'super_admin' && m.profile_id !== me;
+            return (
+              <div className="sprof__grouprow" key={m.profile_id}>
+                <button
+                  className="sprof__member"
+                  onClick={() => navigate(`/members/${m.profile_id}`)}
+                >
+                  <Avatar
+                    id={m.profile_id}
+                    name={m.profile?.full_name ?? 'Member'}
+                    url={m.profile?.avatar_url}
+                    size={34}
+                  />
+                  <span className="sprof__member-name">{m.profile?.full_name ?? 'Member'}</span>
+                  <span className="sprof__member-role">{roleLabel}</span>
+                </button>
+                {canManage && (
+                  <button
+                    className="btn sprof__invite-btn"
+                    title="Change what this member stewards"
+                    onClick={() => {
+                      if (manage?.id === m.profile_id) { setManage(null); return; }
+                      setManage({ id: m.profile_id, name: m.profile?.full_name ?? 'this member' });
+                      setMAdmin(m.role === 'admin');
+                      setMAll(!m.duties);
+                      setMDuties(m.duties ?? []);
+                    }}
+                  >
+                    Role
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
-        {(adminTools || (isMember && !publicView)) && (
+        {/* Super admin's stewardship editor: admin or member, and WHICH duties
+            (founder 2026-07-24 — "one admin curates the library, another TAs
+            a course"). Null duties = a full admin, exactly as before. */}
+        {manage && adminTools && myRole === 'super_admin' && (
+          <div className="sprof__rolebox">
+            <p className="sprof__rolebox-title">What does {manage.name} steward?</p>
+            <div className="sprof__rolepills">
+              <button className={'sprof__rolepill' + (!mAdmin ? ' is-on' : '')} onClick={() => setMAdmin(false)}>Member</button>
+              <button className={'sprof__rolepill' + (mAdmin ? ' is-on' : '')} onClick={() => setMAdmin(true)}>Admin</button>
+            </div>
+            {mAdmin && (
+              <div className="sprof__duties">
+                <label className="sprof__duty">
+                  <input type="checkbox" checked={mAll} onChange={(e) => setMAll(e.target.checked)} />
+                  <span>Everything <em>a full admin</em></span>
+                </label>
+                {!mAll && SPACE_DUTIES.map((d) => (
+                  <label className="sprof__duty" key={d.key}>
+                    <input
+                      type="checkbox"
+                      checked={mDuties.includes(d.key)}
+                      onChange={(e) => setMDuties((cur) =>
+                        e.target.checked ? [...cur, d.key] : cur.filter((x) => x !== d.key))}
+                    />
+                    <span>{d.label} <em>{d.hint}</em></span>
+                  </label>
+                ))}
+                <p className="prof__hint">Scoped admins steward just their areas; editing this page stays with all admins.</p>
+              </div>
+            )}
+            <div className="sprof__rolepills">
+              <button
+                className="btn btn-primary sprof__invite-btn"
+                disabled={memBusy || (mAdmin && !mAll && mDuties.length === 0)}
+                onClick={() => void act(async () => {
+                  await setMemberRole(id, manage.id, mAdmin ? 'admin' : 'member', mAdmin && !mAll ? mDuties : null);
+                  setManage(null);
+                  await load();
+                })}
+              >
+                Save
+              </button>
+              <button className="btn sprof__invite-btn" onClick={() => setManage(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {(memberTools || (isMember && !publicView)) && (
           <div className="sprof__invitebox">
             <input
               className="prof__input"
               value={invQ}
               onChange={(e) => setInvQ(e.target.value)}
-              placeholder={adminTools ? 'Invite a member by name…' : 'Suggest a member to the admins…'}
+              placeholder={memberTools ? 'Invite a member by name…' : 'Suggest a member to the admins…'}
             />
-            {!adminTools && invQ.trim().length >= 2 && (
+            {!memberTools && invQ.trim().length >= 2 && (
               <p className="prof__hint">The admins review suggestions before anyone is invited.</p>
             )}
             {invHits.length > 0 && (
@@ -688,9 +767,9 @@ export default function SpaceProfile() {
                   <button key={h.id} className="sprof__invhit" disabled={memBusy}
                     onClick={() => {
                       setInvQ('');
-                      void act(() => adminTools ? inviteMember(id, me, h.id) : suggestMember(id, me, h.id));
+                      void act(() => memberTools ? inviteMember(id, me, h.id) : suggestMember(id, me, h.id));
                     }}>
-                    {h.full_name ?? 'Member'} <em>{adminTools ? 'Invite' : 'Suggest'}</em>
+                    {h.full_name ?? 'Member'} <em>{memberTools ? 'Invite' : 'Suggest'}</em>
                   </button>
                 ))}
               </div>

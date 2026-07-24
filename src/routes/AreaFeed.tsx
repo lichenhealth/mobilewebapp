@@ -9,7 +9,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
-import { listPublicCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
+import { listPublicCollections, listSpaceCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
+import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
 import OfferingChips from '../components/OfferingChips';
 import { setHidden } from '../lib/hiddenApi';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
@@ -29,7 +30,7 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, createLabel }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -42,10 +43,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   mediaLenses?: boolean;
   /** Published collections strip (Library): playlists & anthologies. */
   collections?: boolean;
-  /** Structured offerings shelf + create door: 'course' (Courses) or 'path' (Library). */
+  /** Structured offerings shelf + create chooser: 'course' (Courses) or 'path' (Library). */
   structuredKind?: CollectionKind;
-  /** The + label for creating a structured offering, e.g. "New course". */
-  createLabel?: string;
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -73,10 +72,14 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
-  // Inline create panel for a structured course/path (no browser prompt).
+  // The + opens a two-way chooser (share a post / create a course-collection);
+  // picking create reveals the inline panel (no browser prompt).
+  const [addOpen, setAddOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [creating, setCreating] = useState(false);
+  // Space-scoped sections: do I steward this space's library/courses?
+  const [spaceDuty, setSpaceDuty] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -94,7 +97,20 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         if (live) setMemberName((data as { name: string | null } | null)?.name ?? '');
       }
       if (collections && !scoped) setPublicCols(await listPublicCollections(12, 'collection'));
-      if (structuredKind && !scoped) setStructuredCols(await listPublicCollections(12, structuredKind));
+      if (structuredKind) {
+        // The shelf follows the scope: a space's own collections (private ones
+        // included for its members via RLS), a member's published ones, or the
+        // whole platform's.
+        if (space) setStructuredCols(await listSpaceCollections(space, structuredKind));
+        else if (member) setStructuredCols(await listPublicCollections(12, structuredKind, member));
+        else setStructuredCols(await listPublicCollections(12, structuredKind));
+      }
+      if (space && structuredKind && me) {
+        const mine = await myDutiesIn(space);
+        if (live) setSpaceDuty(holdsDuty(mine?.role, mine?.duties, structuredKind === 'course' ? 'courses' : 'library'));
+      } else {
+        setSpaceDuty(false);
+      }
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
@@ -125,14 +141,23 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     catch (e) { console.error(e); }
   }
 
-  // Create a structured course/path, then open it (owner drops into edit mode).
+  // In a space's section, a duty-holder creates FOR the space; anywhere else
+  // the collection is personal.
+  const createForSpace = !!space && spaceDuty;
+  // Who may create here: personal contexts = any signed-in member; a space's
+  // section = only its duty-holders (members suggest instead).
+  const canCreate = !!structuredKind && !!me && (!space || spaceDuty);
+
+  // Create a structured course/collection, then open it (curator drops into edit mode).
   async function createStructured() {
     const nm = createName.trim();
     if (!structuredKind || !me || !nm || creating) return;
     setCreating(true);
-    try { navigate(`/collections/${await createCollection(nm, structuredKind)}`); }
+    try { navigate(`/collections/${await createCollection(nm, structuredKind, createForSpace ? space! : undefined)}`); }
     catch (e) { console.error(e); setCreating(false); }
   }
+
+  const composeHref = `/compose?area=${area}${space ? `&space=${space}` : ''}`;
 
   return (
     <div className="mkt">
@@ -154,27 +179,29 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         {!scoped && <p className="mkt__sub">{sub}</p>}
       </header>
 
+      {/* Icon-only Search and + — the home-feed vocabulary (founder 2026-07-24);
+          the + carries creation too via the chooser below. */}
       <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses" gutter>
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
+          aria-label="Search"
+          title="Search"
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
         >
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
-          <span className="mkt__action-label">Search</span>
         </button>
-        <button className="mkt__action" onClick={() => navigate(`/compose?area=${area}`)}>
+        <button
+          className={'mkt__action' + (addOpen || createOpen ? ' is-active' : '')}
+          aria-label={addLabel}
+          title={addLabel}
+          onClick={() => {
+            if (!canCreate) { navigate(composeHref); return; }
+            if (createOpen) { setCreateOpen(false); setAddOpen(false); return; }
+            setAddOpen((o) => !o);
+          }}
+        >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
-          <span className="mkt__action-label">{addLabel}</span>
         </button>
-        {structuredKind && me && (
-          <button
-            className={'mkt__action' + (createOpen ? ' is-active' : '')}
-            onClick={() => setCreateOpen((o) => !o)}
-          >
-            <span className="mkt__action-circle"><Icon name={icon} size={14} /></span>
-            <span className="mkt__action-label">{createLabel ?? `New ${structuredKind}`}</span>
-          </button>
-        )}
         {mediaLenses && (
           <>
             <div className="mkt__action-spacer" />
@@ -213,13 +240,34 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         </div>
       )}
 
-      {/* Inline create for a course/path — explains the shape, no browser prompt. */}
+      {/* The + chooser: share a post, or create the structured thing. */}
+      {addOpen && !createOpen && canCreate && (
+        <div className="afeed__create afeed__addmenu">
+          <button className="afeed__addmenu-row" onClick={() => navigate(composeHref)}>
+            <span className="afeed__addmenu-title">{addLabel}</span>
+            <span className="afeed__addmenu-hint">share a post{space ? ' with this space' : ''}</span>
+          </button>
+          <button className="afeed__addmenu-row" onClick={() => { setAddOpen(false); setCreateOpen(true); }}>
+            <span className="afeed__addmenu-title">
+              {structuredKind === 'course' ? 'New course' : 'Organize'}
+            </span>
+            <span className="afeed__addmenu-hint">
+              {structuredKind === 'course'
+                ? (createForSpace ? 'ordered lessons, taught for this space' : 'ordered lessons you teach')
+                : (createForSpace ? 'an ordered collection for this space' : 'an ordered collection, like a reading list')}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Inline create for a course/collection — explains the shape, no browser prompt. */}
       {createOpen && structuredKind && (
         <div className="afeed__create">
           <p className="afeed__create-hint">
             {structuredKind === 'course'
               ? 'A course is an ordered set of lessons you teach — members enroll, follow along, and track their progress. You’ll add lessons and details on the next screen.'
               : 'Organize pieces of the Library into an ordered collection — things to read, watch, or listen to in sequence, like a reading list. You’ll add the pieces and details on the next screen.'}
+            {createForSpace && <> It will belong to <strong>{memberName || 'this space'}</strong> — its stewards organize it together.</>}
           </p>
           <div className="afeed__create-row">
             <input
@@ -244,7 +292,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       {/* Structured offerings — courses (Courses) / paths (Library). */}
       {structuredKind && structuredCols.length > 0 && (
         <>
-          <p className="afeed__shelf-label">{structuredKind === 'course' ? 'Courses to follow' : 'Organized collections'}</p>
+          <p className="afeed__shelf-label">
+            {scoped && memberName
+              ? `${memberName}’s ${structuredKind === 'course' ? 'courses' : 'organized collections'}`
+              : structuredKind === 'course' ? 'Courses to follow' : 'Organized collections'}
+          </p>
           <ScrollHintRow className="afeed__courses h-scroll" gutter>
             {structuredCols.map((c) => (
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>

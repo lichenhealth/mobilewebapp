@@ -409,11 +409,20 @@
 .afeed__course-by { font-size: 11px; color: var(--ink-soft); }
 .afeed__course .offer-chips { margin-top: 2px; }
 
-/* Inline course/path create panel */
+/* Inline course/collection create panel (+ the two-way add chooser) */
 .afeed__create {
-  margin: var(--s-2) 0 var(--s-3); padding: var(--s-3);
+  margin: var(--s-2) var(--s-5) var(--s-3); padding: var(--s-3);
   background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
 }
+.afeed__addmenu { display: flex; flex-direction: column; gap: 2px; padding: 6px; }
+.afeed__addmenu-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 9px 12px; border-radius: var(--r-sm); text-align: left;
+  background: transparent; border: 0; cursor: pointer;
+}
+.afeed__addmenu-row:hover { background: var(--bone); }
+.afeed__addmenu-title { font-size: 13.5px; color: var(--ink); }
+.afeed__addmenu-hint { font-size: 11px; color: var(--ink-faint); }
 .afeed__create-hint { font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; margin: 0 0 var(--s-2); }
 .afeed__create-row { display: flex; gap: var(--s-2); }
 .afeed__create-input {
