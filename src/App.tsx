@@ -248,7 +248,7 @@ export default function App() {
               title="Lichen" italic="Library."
               sub="Essays, field guides, and zines on land, food, and care."
               addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
-              mediaLenses collections structuredKind="path" createLabel="New path" />
+              mediaLenses collections structuredKind="path" createLabel="Organize" />
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

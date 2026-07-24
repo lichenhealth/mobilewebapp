@@ -24,7 +24,11 @@ import './CollectionPage.css';
 const LEVELS = ['Intro', 'Deepening', 'Advanced'];
 const FORMATS = ['Live', 'Self-paced', 'Mixed'];
 
-const kindWord = (k: CollectionRow['kind']) => (k === 'course' ? 'Course' : k === 'path' ? 'Path' : 'Collection');
+// "Path" retired member-facing (founder 2026-07-24 — the Library trio is
+// Search / Contribute / Organize): kind 'path' reads as an ordered collection.
+const kindWord = (k: CollectionRow['kind']) => (k === 'course' ? 'Course' : k === 'path' ? 'Ordered collection' : 'Collection');
+/** What one entry is called: course lessons vs collection pieces. */
+const itemWord = (k: CollectionRow['kind']) => (k === 'course' ? 'lesson' : 'piece');
 
 /** A collection — a private folder, a published playlist, or (with kind
  *  course/path) a structured offering: ordered lessons, a legible header, and
@@ -152,12 +156,12 @@ export default function CollectionPage() {
         </p>
         <h1 className="colp__title display-italic">{meta.name}</h1>
         <p className="colp__by">
-          {structured ? 'led by' : 'curated by'}{' '}
+          {meta.kind === 'course' ? 'led by' : meta.kind === 'path' ? 'organized by' : 'curated by'}{' '}
           <Link to={`/members/${meta.owner_id}`}>{meta.owner?.full_name ?? 'a member'}</Link>
-          {' · '}{posts.length} {structured ? (posts.length === 1 ? 'lesson' : 'lessons') : (posts.length === 1 ? 'piece' : 'pieces')}
+          {' · '}{posts.length} {itemWord(meta.kind)}{posts.length === 1 ? '' : 's'}
         </p>
         {meta.description && <p className="colp__desc">{meta.description}</p>}
-        {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} />}
+        {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} itemWord={itemWord(meta.kind)} />}
       </header>
 
       {error && <p className="colp__error">{error}</p>}
@@ -172,7 +176,7 @@ export default function CollectionPage() {
             </div>
           )}
           <button className="btn btn-primary colp__start" onClick={() => void act(startOrContinue)} disabled={busy}>
-            {!enrolled ? `Start ${kindWord(meta.kind).toLowerCase()}` : pct === 100 ? 'Revisit' : 'Continue'}
+            {!enrolled ? (meta.kind === 'course' ? 'Start course' : 'Start') : pct === 100 ? 'Revisit' : 'Continue'}
           </button>
         </div>
       )}
@@ -184,7 +188,7 @@ export default function CollectionPage() {
           </button>
           {structured && (
             <button className="btn colp__btn" onClick={() => void openLessonPicker()}>
-              {pickOpen ? 'Close' : 'Add lessons'}
+              {pickOpen ? 'Close' : `Add ${itemWord(meta.kind)}s`}
             </button>
           )}
           <button
@@ -243,7 +247,7 @@ export default function CollectionPage() {
                     onClick={() => setForm((f) => ({ ...f, format: f.format === l ? undefined : l }))}>{l}</button>
                 ))}
               </div>
-              <input className="prof__input" value={form.length ?? ''} placeholder="Length (e.g. 6 weeks, 4 lessons)"
+              <input className="prof__input" value={form.length ?? ''} placeholder={`Length (e.g. 6 weeks, 4 ${itemWord(meta.kind)}s)`}
                 onChange={(e) => setForm((f) => ({ ...f, length: e.target.value || undefined }))} />
               <input className="prof__input" value={form.forWhom ?? ''} placeholder="Who it's for (e.g. new practitioners)"
                 onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
@@ -264,7 +268,10 @@ export default function CollectionPage() {
           </button>
           {structured && (
             <p className="colp__addhint">
-              Add lessons: open any of your posts (or make one via <Link to="/compose?area=courses">Teach</Link>),
+              Add {itemWord(meta.kind)}s: open any of your posts (or make one via{' '}
+              {meta.kind === 'course'
+                ? <Link to="/compose?area=courses">Teach</Link>
+                : <Link to="/compose?area=library">Contribute</Link>}),
               tap ⋯ → “Add to collection…”, and pick this {kindWord(meta.kind).toLowerCase()}.
             </p>
           )}
@@ -275,7 +282,7 @@ export default function CollectionPage() {
         <div className="colp__picker">
           <input
             className="prof__input"
-            placeholder="Search your posts to add as lessons…"
+            placeholder={`Search your posts to add as ${itemWord(meta.kind)}s…`}
             value={pickQ}
             onChange={(e) => setPickQ(e.target.value)}
           />
@@ -283,7 +290,9 @@ export default function CollectionPage() {
             <p className="colp__muted">
               {!picksLoaded
                 ? 'Loading your posts…'
-                : <>No posts to add — create one via <Link to="/compose?area=courses">Teach</Link>.</>}
+                : meta.kind === 'course'
+                  ? <>No posts to add — create one via <Link to="/compose?area=courses">Teach</Link>.</>
+                  : <>No posts to add — create one via <Link to="/compose?area=library">Contribute</Link>.</>}
             </p>
           ) : (
             <div className="colp__picker-list">
@@ -301,7 +310,7 @@ export default function CollectionPage() {
       <section className="colp__list">
         {posts.length === 0 && (
           <p className="colp__muted">
-            {structured ? 'No lessons yet' : 'Nothing here yet'}
+            {structured ? `No ${itemWord(meta.kind)}s yet` : 'Nothing here yet'}
             {isOwner ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}

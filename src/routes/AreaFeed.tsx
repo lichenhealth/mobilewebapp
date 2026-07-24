@@ -219,13 +219,13 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <p className="afeed__create-hint">
             {structuredKind === 'course'
               ? 'A course is an ordered set of lessons you teach — members enroll, follow along, and track their progress. You’ll add lessons and details on the next screen.'
-              : 'A path is an ordered trail through the Library — pieces arranged to be read, watched, or heard in sequence. You’ll add the pieces and details on the next screen.'}
+              : 'Organize pieces of the Library into an ordered collection — things to read, watch, or listen to in sequence, like a reading list. You’ll add the pieces and details on the next screen.'}
           </p>
           <div className="afeed__create-row">
             <input
               autoFocus
               className="afeed__create-input"
-              placeholder={structuredKind === 'course' ? 'Name your course…' : 'Name your path…'}
+              placeholder={structuredKind === 'course' ? 'Name your course…' : 'Name your collection…'}
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void createStructured(); }}
@@ -244,15 +244,18 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       {/* Structured offerings — courses (Courses) / paths (Library). */}
       {structuredKind && structuredCols.length > 0 && (
         <>
-          <p className="afeed__shelf-label">{structuredKind === 'course' ? 'Courses' : 'Paths'} to follow</p>
+          <p className="afeed__shelf-label">{structuredKind === 'course' ? 'Courses to follow' : 'Organized collections'}</p>
           <ScrollHintRow className="afeed__courses h-scroll">
             {structuredCols.map((c) => (
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
                 <span className="afeed__course-name">{c.name}</span>
                 <span className="afeed__course-by">
-                  {c.owner?.full_name ?? 'a member'} · {c.item_count} {c.item_count === 1 ? 'lesson' : 'lessons'}
+                  {c.owner?.full_name ?? 'a member'} · {c.item_count}{' '}
+                  {structuredKind === 'course'
+                    ? (c.item_count === 1 ? 'lesson' : 'lessons')
+                    : (c.item_count === 1 ? 'piece' : 'pieces')}
                 </span>
-                <OfferingChips meta={c.details} lessonCount={c.item_count} />
+                <OfferingChips meta={c.details} lessonCount={c.item_count} itemWord={structuredKind === 'course' ? 'lesson' : 'piece'} />
               </button>
             ))}
           </ScrollHintRow>
