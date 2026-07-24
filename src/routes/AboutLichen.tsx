@@ -105,7 +105,7 @@ const JOURNEY_STOPS: JourneyStop[] = [
   { emoji: '🪚', x: 200, y: 58, name: 'the artisan', sub: '7 hours of craft', lx: 222, ly: 54, anchor: 'start' },
   { emoji: '🥕', x: 120, y: 128, name: 'the farm', sub: 'clean food loaded', lx: 98, ly: 124, anchor: 'end' },
   { emoji: '🏠', x: 240, y: 150, name: 'a neighbor', sub: 'pays for produce', lx: 262, ly: 134, anchor: 'start' },
-  { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', sub2: 'plants trees in return', lx: 98, ly: 200, anchor: 'end' },
+  { emoji: '🏠', x: 120, y: 210, name: 'another neighbor', sub: 'covered by the commons', sub2: 'plants trees in return', lx: 98, ly: 214, anchor: 'end' },
   { emoji: '🏡', x: 284, y: 258, name: 'the family’s kitchen', sub: 'the table, earned by the drive', lx: 272, ly: 288, anchor: 'middle' },
 ];
 
@@ -397,9 +397,10 @@ export default function AboutLichen() {
         <section className="about__sec">
           <h2 className="about__h2">A web that’s more than human</h2>
           <p>
-            A life is lived among more than people. On Lichen, the beings we’re in relationship with
-            can be members too — a therapy horse, a garden, a river — stewarded by a person, their
-            contributions witnessed. Even those who can’t hold money genuinely hold <em>time</em>.
+            Lichen honors non-human people. The beings we’re in relationship with are members too —
+            a therapy horse, a sacred plant medicine, a river — stewarded by humans, their
+            contributions are witnessed and valued. Those who can’t hold money can still
+            participate in the real exchange of value.
           </p>
 
           <div className="about__mock">
