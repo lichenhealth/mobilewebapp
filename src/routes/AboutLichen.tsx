@@ -448,7 +448,9 @@ export default function AboutLichen() {
               skilled, risky labor, and Current-cy is how it’s honored. The session pays into
               Tango’s care, held by her steward; her bodyworker is paid from it to clear her; and
               what the bodyworker earns cashes out to dollars in the wider world. A being who can’t
-              hold money just moved real value through three lives.
+              hold money just moved real value through three lives. And this model is young, on
+              purpose — we give ourselves space to learn, adding nuance as the mycelium grows and
+              new variables reveal themselves.
             </p>
           </div>
         </section>
