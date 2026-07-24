@@ -34,18 +34,22 @@ export default function AboutLichen() {
         <h1 className="about__title">A better way of being <span className="display-italic">together.</span></h1>
         <p className="about__lede">
           Lichen is a <strong>corrective social network</strong> — one trusted web for your whole
-          life. Not a place to perform, but a place to actually be in relationship.
+          life. Not a place to perform, but a place to actually be in reciprocal relationship with
+          each other and the planet.
         </p>
 
         <section className="about__sec">
           <h2 className="about__h2">Your whole life, in one place</h2>
           <p>
-            Most networks slice you into a feed and sell your attention. Lichen holds the whole of
-            you instead — your care and healing, your work and the things you offer, the events you
-            gather for, the places you love, the jobs that give you purpose and fund your livelihood,
-            and a fairer economy that values all things, not just human contributions — woven into a
-            single web of people, plants, animals, elements, spaces, communities, groups and
-            organizations you trust. Everything in one place, because a life isn’t lived in silos.
+            Most networks slice you into a feed and sell your attention to those who want to keep
+            you scared, stuck in constant consumption that temporarily abates your suffering without
+            resolving it. Lichen holds the whole of you instead — your care and healing, your work
+            and the things you offer, the events you gather for, the places you love, the jobs that
+            give you purpose and fund your livelihood, and a fairer economy that values all things,
+            not just human contributions — woven into a single web of people, plants, animals,
+            elements, spaces, communities, groups and organizations you trust. Everything in one
+            place, because life isn’t lived in silos. Our goal is to support you in living your best
+            life, most of which will be off our platform.
           </p>
         </section>
 
@@ -62,19 +66,31 @@ export default function AboutLichen() {
         <section className="about__sec">
           <h2 className="about__h2">A reciprocal economy, architected to restore balance</h2>
           <p>
-            Lichen is a nonprofit at heart. Membership and gifts keep the platform running — and
-            <strong> everything beyond that flows back to the people the current system leaves
-            behind</strong>: those carrying wounds, those whose work is undervalued, under-resourced
-            innovators, and children still becoming. Philanthropy <em>pays only the gap</em>, until
-            the community’s own economy can hold everyone. Money dedicated to the commons here can
-            never turn back into private profit — you’re not the product; the point is care that
-            reaches further.
+            Lichen is a nonprofit with the vision, strategy and operations of a lean technology
+            startup. Membership and gifts keep the platform running — <strong>everything beyond
+            that flows back into the network to restore balance</strong>. Our algorithm identifies
+            those that the current system leaves behind: the people, plants, animals and places who
+            are
+          </p>
+          <ol className="about__list">
+            <li>Carrying wounds that need healing</li>
+            <li>Chronically undervalued by the current system</li>
+            <li>Deliberately under-resourced to stall innovation that will ensure a better world for future generations</li>
+          </ol>
+          <p>
+            Philanthropy <em>pays only the gap</em>, until the community’s own economy can hold
+            everyone. Money dedicated to the commons here can never turn back into private profit —
+            you’re not the product; you’re a contributing member to a better way of being in
+            relationship with each other and the planet.
           </p>
           <p>
-            Two economies run side by side. <strong>Current-cy</strong> moves value out in the open —
-            a transparent, dollar-pegged ledger, no speculation, the whole story visible.
-            <strong> Offerings</strong> move care that’s freely given and never counted. One bridges
-            the world as it is; the other builds the world as it could be.
+            To bridge away from the systems that no longer serve the people, Lichen holds two
+            economies, run side by side. <strong>Current-cy</strong> moves value out in the open — a
+            transparent, dollar-pegged ledger, no speculation, the whole story visible and
+            transferable into the incumbent economy to which we are all still beholden to some
+            degree. <strong>Offerings</strong> broker value exchange within the ecosystem — value
+            that’s freely exchanged without money. One bridges the world as it is; the other builds
+            the world as it could be.
           </p>
 
           <div className="about__mock">
