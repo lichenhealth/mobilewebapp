@@ -71,6 +71,14 @@
   .engage__action { gap: 0; padding: 10px 4px; }
   .engage__actions { gap: 2px; }
 }
+/* Belt and braces: whatever the viewport, if the FOOTER ITSELF is tight
+   (narrow columns, embeds), labels give way to icons. */
+.engage { container-type: inline-size; }
+@container (max-width: 559px) {
+  .engage__action span { display: none; }
+  .engage__action { gap: 0; padding: 10px 4px; }
+  .engage__actions { gap: 2px; }
+}
 
 .engage__action {
   flex: 1;

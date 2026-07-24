@@ -83,14 +83,16 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const toggleArea = (a: ServiceArea) =>
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
-  // A member's area icon opens the REAL section, scoped to them ("Melanie's
-  // Courses"); AreaFeed-backed areas get their full section, the rest a scoped
-  // browse. Space profiles keep the inline filter.
+  // An entity's area icon opens the REAL section, scoped to it ("Melanie's
+  // Courses", "WAG's Library" — founder 2026-07-24: spaces too, no more inline
+  // sub-feeds); AreaFeed-backed areas get their full section, the rest a
+  // scoped browse.
   const AREAFEED = new Set<ServiceArea>(['courses', 'library', 'work', 'art', 'food']);
+  const scopeQS = profileId ? `member=${profileId}` : `space=${spaceId}`;
   const areaDest = (a: ServiceArea) =>
-    AREAFEED.has(a) ? `/${a}?member=${profileId}` : `/search?member=${profileId}&area=${a}`;
+    AREAFEED.has(a) ? `/${a}?${scopeQS}` : `/search?${scopeQS}&area=${a}`;
   const onArea = (a: ServiceArea) => {
-    if (profileId) navigate(areaDest(a));
+    if (profileId || spaceId) navigate(areaDest(a));
     else toggleArea(a);
   };
 

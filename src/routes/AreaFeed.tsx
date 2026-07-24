@@ -49,9 +49,12 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  // Member-scoped section (founder 2026-07-22): /courses?member=<id> = the
-  // full Courses section, but just this member's — "Melanie's Courses".
+  // Scoped sections: /courses?member=<id> = "Melanie's Courses" (founder
+  // 2026-07-22); /courses?space=<id> = "WAG's Courses" (founder 2026-07-24 —
+  // space area icons open the REAL section, not an inline sub-feed).
   const member = params.get('member');
+  const space = params.get('space');
+  const scoped = member || space;
   const [memberName, setMemberName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
@@ -75,21 +78,26 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     let live = true;
     setReady(false);
     (async () => {
-      const raw = member ? await loadAuthorFeed({ profileId: member }) : await loadFeed(200);
+      const raw = member ? await loadAuthorFeed({ profileId: member })
+        : space ? await loadAuthorFeed({ spaceId: space })
+        : await loadFeed(200);
       const feed = raw.filter((p) => postAreas(p).includes(area));
       if (member) {
         const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
         if (live) setMemberName((data as { full_name: string | null } | null)?.full_name ?? '');
+      } else if (space) {
+        const { data } = await supabase.from('spaces').select('name').eq('id', space).maybeSingle();
+        if (live) setMemberName((data as { name: string | null } | null)?.name ?? '');
       }
-      if (collections && !member) setPublicCols(await listPublicCollections(12, 'collection'));
-      if (structuredKind && !member) setStructuredCols(await listPublicCollections(12, structuredKind));
+      if (collections && !scoped) setPublicCols(await listPublicCollections(12, 'collection'));
+      if (structuredKind && !scoped) setStructuredCols(await listPublicCollections(12, structuredKind));
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, [area, member]);
+  }, [area, member, space]);
 
   const filtered = useMemo(() => {
     let list = posts;
@@ -125,8 +133,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   return (
     <div className="mkt">
       <header className="mkt__head">
-        {member && (
-          <button className="cmp__back mkt__memberback" onClick={() => navigate(`/members/${member}`)}>
+        {scoped && (
+          <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
             <Icon name="arrow-left" size={14} /> {memberName || 'Back'}
           </button>
         )}
@@ -135,11 +143,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
-          {member
+          {scoped
             ? <>{memberName}&rsquo;s <span className="display-italic">{crumb}</span></>
             : <>{title} <span className="display-italic">{italic}</span></>}
         </h1>
-        {!member && <p className="mkt__sub">{sub}</p>}
+        {!scoped && <p className="mkt__sub">{sub}</p>}
       </header>
 
       <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Tools and lenses" gutter>
