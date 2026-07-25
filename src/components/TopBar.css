@@ -11,10 +11,10 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: start;
   gap: var(--s-3);
-  background: linear-gradient(to bottom,
-    var(--bone) 0%,
-    var(--bone) 70%,
-    rgb(240 238 233 / 0) 100%);
+  /* SOLID bone, no fade (founder, 2026-07-25): the old bottom-fade gradient
+     let scrolling content ghost through the frozen header — messy under the
+     iOS time/battery. Content now clips cleanly at the bar's bottom edge. */
+  background: var(--bone);
   z-index: 50;
   pointer-events: none;
 }
