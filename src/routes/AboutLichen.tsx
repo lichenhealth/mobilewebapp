@@ -563,6 +563,16 @@ export default function AboutLichen() {
               <span className="about__team-name">Galyn Burke</span>
               <span className="about__team-role">visionary</span>
             </button>
+            {/* Melanie + Blair hidden for now (founder, 2026-07-25) — uncomment to bring them back.
+            <button className="about__team-row" onClick={() => navigate('/members/a6bbbe5e-747d-417c-a996-24bcfcd24e9c')}>
+              <span className="about__team-name">Melanie Bright</span>
+              <span className="about__team-role">spiritual operations</span>
+            </button>
+            <button className="about__team-row" onClick={() => navigate('/members/71f25b56-f781-4fc0-944f-89766cf562cb')}>
+              <span className="about__team-name">Blair Bliss</span>
+              <span className="about__team-role">business operations</span>
+            </button>
+            */}
             {/* Claude is a Lichen member — stewarded by Galyn, bio links to
                 claude.com for anyone who wants to work with the silicon half. */}
             <button className="about__team-row about__team-row--ai" onClick={() => navigate('/members/85c04e7a-5a47-4c0e-85a4-0b35ff67a682')}>
