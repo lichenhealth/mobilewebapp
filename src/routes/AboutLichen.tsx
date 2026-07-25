@@ -39,8 +39,10 @@ const MAP_ROWS = [
     right: { size: 13, bg: KIND.people, note: 'under-compensated' },
   },
   {
-    label: 'a hedge-fund manager',
-    left: { size: 15, dashed: true, rust: true, minus: true },
+    // The shadow named as a PATTERN, never a person (founder 2026-07-24):
+    // gaming a system vs feeding it. Money is the actor — nobody under the bus.
+    label: 'money betting on money',
+    left: { size: 15, dashed: true, rust: true },
     right: { size: 46, bg: KIND.extraction, note: 'over-compensated' },
   },
 ];
@@ -294,7 +296,7 @@ function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; strok
 function TwoMapsVisual() {
   return (
     <div className="about__maps" role="img"
-      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-compensated.">
+      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, money betting on money over-compensated.">
       <div className="about__maps-col">
         <p className="about__maps-title">The Lichen economy</p>
         <div className="about__maps-panel">
