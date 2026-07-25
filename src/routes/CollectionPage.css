@@ -120,3 +120,12 @@
 .colp__sugg-noteview { font-style: italic; color: var(--ink-soft); }
 .colp__sugg-actions { display: flex; gap: 6px; }
 .colp__sugg-note { min-height: 64px; }
+
+/* Inline delete confirm — replaces the browser dialog */
+.colp__confirm {
+  margin: 0 0 var(--s-3); padding: var(--s-3);
+  background: var(--bone-warm); border: 1px solid #c0564f; border-radius: var(--r-lg);
+  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+}
+.colp__confirm-text { flex: 1; min-width: 200px; font-size: 13px; color: var(--ink); }
+.colp__confirm-text em { font-style: italic; font-family: var(--font-display); }

@@ -381,9 +381,17 @@
 .evav__score { margin-left: 6px; font-size: 10px; color: var(--peach-deep, var(--peach)); }
 
 /* Back-to-events chip (shown only when you arrived from Events) */
-/* flex-shrink 0: .calp is a height-capped column — without it the tall grid
-   squashes the chip to a sliver on desktop (founder 2026-07-24) */
-.calp__backchip { margin: var(--s-2) var(--s-5) 0; align-self: flex-start; flex-shrink: 0; }
+/* flex-shrink 0: .calp is a height-capped column that would squash the chip.
+   The 38px bottom margin clears the pin's -36px bone box-shadow (the TopBar
+   gap-plug) — anything closer to the toolbar gets PAINTED OVER by it even
+   though layout says it's there. COMPOUND selector: .cmp__back's own
+   margin-bottom ties this rule's specificity and import order decides —
+   the .icon-row.h-scroll lesson, again (founder 2026-07-24, twice). */
+.cmp__back.calp__backchip {
+  margin: var(--s-2) var(--s-5) 38px;
+  align-self: flex-start; flex-shrink: 0;
+  position: relative; z-index: 11;   /* paint above the pin's bone shadow */
+}
 
 /* Per-imported-calendar title consent (busy-only by default) */
 .cset__titletoggle {

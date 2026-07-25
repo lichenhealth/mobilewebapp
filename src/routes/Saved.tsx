@@ -115,19 +115,12 @@ export default function Saved() {
               <span className="myc__kind-label">{c.name} · {c.item_count}</span>
             </button>
           ))}
+          {/* Only the New-folder chip swaps for its input — Organize stays put. */}
           {!newFolderOpen ? (
-            <>
-              <button className="myc__kind" onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}>
-                <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
-                <span className="myc__kind-label">New folder</span>
-              </button>
-              {/* Organize: the studio — create ordered collections, arrange
-                  them, move pieces between them (founder 2026-07-24). */}
-              <button className="myc__kind" onClick={() => navigate('/organize')}>
-                <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
-                <span className="myc__kind-label">Organize</span>
-              </button>
-            </>
+            <button className="myc__kind" onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}>
+              <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
+              <span className="myc__kind-label">New folder</span>
+            </button>
           ) : (
             <span className="saved__newfolder">
               <input
@@ -140,6 +133,12 @@ export default function Saved() {
               <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
             </span>
           )}
+          {/* Organize: the studio — create ordered collections, arrange them,
+              move pieces between them (founder 2026-07-24). */}
+          <button className="myc__kind" onClick={() => navigate('/organize')}>
+            <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
+            <span className="myc__kind-label">Organize</span>
+          </button>
         </div>
       )}
 

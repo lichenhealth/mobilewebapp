@@ -55,6 +55,7 @@ export default function CollectionPage() {
   const [done, setDone] = useState<Set<string>>(new Set());
   // owner editing
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [form, setForm] = useState<OfferingMeta>({});
@@ -261,14 +262,27 @@ export default function CollectionPage() {
           <button
             className="btn colp__btn colp__btn--danger"
             disabled={busy}
-            onClick={() => {
-              if (window.confirm(`Delete "${meta.name}"? The posts themselves are untouched.`)) {
-                void act(async () => { await deleteCollection(id); navigate('/saved'); });
-              }
-            }}
+            onClick={() => setConfirmDelete((c) => !c)}
           >
             Delete
           </button>
+        </div>
+      )}
+
+      {/* Inline delete confirm — no browser dialog (founder 2026-07-24). */}
+      {canEdit && confirmDelete && (
+        <div className="colp__confirm">
+          <span className="colp__confirm-text">
+            Delete <em>&ldquo;{meta.name}&rdquo;</em>? The pieces themselves are untouched.
+          </span>
+          <button
+            className="btn colp__btn colp__btn--danger"
+            disabled={busy}
+            onClick={() => void act(async () => { await deleteCollection(id); navigate('/saved'); })}
+          >
+            Yes, delete
+          </button>
+          <button className="btn colp__btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
         </div>
       )}
 

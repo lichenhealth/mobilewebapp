@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
@@ -344,6 +345,14 @@ function TwoMapsVisual() {
 export default function AboutLichen() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Saving/bookmarking /about carries the full tagline (founder 2026-07-24);
+  // the rest of the app keeps the short title.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = 'Lichen — a community that heals, grows and creates a better future, together';
+    return () => { document.title = prev; };
+  }, []);
 
   return (
     <div className="about">
