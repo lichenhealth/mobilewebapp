@@ -39,11 +39,15 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], entityName }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], trailing = [], entityName }: {
   profileId?: string;
   spaceId?: string;
   me: string;
   leading?: { icon: IconName; label: string; onClick: () => void }[];
+  /** Far-right action circles AFTER the area icons — Members sits at the end
+   *  of every space row, mirroring Home's Directory-at-the-far-right
+   *  (founder 2026-07-25). */
+  trailing?: { icon: IconName; label: string; onClick: () => void }[];
   /** The entity's display name — lets a single area lens read as a PLACE:
    *  tap Library on Melanie's profile and the feed declares "Melanie's
    *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
@@ -73,11 +77,18 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     return () => { live = false; };
   }, [profileId, spaceId]);
 
-  // Only offer toggles for areas this entity actually contributes to.
+  // Only offer toggles for areas this entity actually contributes to —
+  // an icon appears the moment the first post lands in that area — and in
+  // HOME's icon-row order, so every profile reads the same (founder
+  // 2026-07-25): Marketplace · Events · Work · Education · Food · Creative ·
+  // Places · Library.
+  const HOME_ORDER: ServiceArea[] = ['marketplace', 'events', 'work', 'courses', 'food', 'art', 'places', 'library', 'people'];
   const areasPresent = useMemo(() => {
     const present = new Set<ServiceArea>();
     posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
-    return SERVICE_AREAS.filter((a) => present.has(a.value));
+    return SERVICE_AREAS.filter((a) => present.has(a.value))
+      .sort((a, b) => HOME_ORDER.indexOf(a.value) - HOME_ORDER.indexOf(b.value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts]);
 
   const toggleArea = (a: ServiceArea) =>
@@ -123,7 +134,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     <div className="cfeed">
       {posts.length > 0 && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
-      {(leading.length > 0 || areasPresent.length > 0) && (
+      {(leading.length > 0 || trailing.length > 0 || areasPresent.length > 0) && (
         <div className="cfeed__areas h-scroll">
           {leading.map((l) => (
             <button key={l.label} className="cfeed__area" onClick={l.onClick}>
@@ -131,7 +142,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
               <span className="cfeed__area-label">{l.label}</span>
             </button>
           ))}
-          {leading.length > 0 && areasPresent.length > 0 && <span className="cfeed__area-gap" />}
+          {leading.length > 0 && (areasPresent.length > 0 || trailing.length > 0) && <span className="cfeed__area-gap" />}
           {areasPresent.map((a) => (
             <button
               key={a.value}
@@ -140,6 +151,12 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             >
               <span className="cfeed__area-circle"><Icon name={a.icon} size={14} /></span>
               <span className="cfeed__area-label">{a.label}</span>
+            </button>
+          ))}
+          {trailing.map((l) => (
+            <button key={l.label} className="cfeed__area" onClick={l.onClick}>
+              <span className="cfeed__area-circle"><Icon name={l.icon} size={14} /></span>
+              <span className="cfeed__area-label">{l.label}</span>
             </button>
           ))}
         </div>

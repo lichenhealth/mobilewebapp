@@ -598,16 +598,21 @@ export default function SpaceProfile() {
         entityName={space.name}
         leading={[
           // Every section carries its own doors: + posts INTO this space,
-          // Search searches WITHIN it (Figma 286-11770).
-          { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
+          // Search searches WITHIN it (Figma 286-11770). Search-then-+ mirrors
+          // Home's icon row (founder 2026-07-25 — one order everywhere).
           { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
+          { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
           ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
-          { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+        ]}
+        trailing={[
           // The founder's Marketplace-icon analogy: a Groups door appears only
           // when this space actually has groups nested under it.
           ...(childGroups.length > 0
             ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
             : []),
+          // Members closes the row — the space's Directory, far right like
+          // Home's (founder 2026-07-25).
+          { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
         ]}
       />
 
