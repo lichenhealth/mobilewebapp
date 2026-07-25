@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -9,10 +9,11 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import {
-  loadFeed, postAreas, loadMyRsvpStatuses, rsvpToEvent, unRsvp,
+  loadFeed, loadAuthorFeed, postAreas, loadMyRsvpStatuses, rsvpToEvent, unRsvp,
   EVENT_CATEGORIES, EVENT_MODES,
   type FeedPost, type EventCategory, type EventMode, type MyRsvpStatus,
 } from '../lib/postsApi';
+import { supabase } from '../lib/supabase';
 import { minToLabel } from '../lib/calendarApi';
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
@@ -44,6 +45,15 @@ export default function Events() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // Scoped events: /events?space=<id> = "Pine Valley Grange's Events"
+  // (founder 2026-07-25 — area doors open the REAL section, not search);
+  // /events?member=<id> likewise. Scoped views browse only (My Events is
+  // personal, reachable via the plain tabs).
+  const member = params.get('member');
+  const space = params.get('space');
+  const scoped = member || space;
+  const [scopeName, setScopeName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
 
@@ -59,14 +69,24 @@ export default function Events() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   const load = useCallback(async () => {
-    const feed = (await loadFeed()).filter((p) => postAreas(p).includes('events'));
+    const raw = member ? await loadAuthorFeed({ profileId: member })
+      : space ? await loadAuthorFeed({ spaceId: space })
+      : await loadFeed();
+    const feed = raw.filter((p) => postAreas(p).includes('events'));
+    if (member) {
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
+      setScopeName((data as { full_name: string | null } | null)?.full_name ?? '');
+    } else if (space) {
+      const { data } = await supabase.from('spaces').select('name').eq('id', space).maybeSingle();
+      setScopeName((data as { name: string | null } | null)?.name ?? '');
+    }
     const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
     const ov = await loadEndorsements(feed, myc);
     const rsvps = me
       ? await loadMyRsvpStatuses(feed.map((p) => p.linked_event_id).filter((id): id is string => !!id), me)
       : new Map<string, MyRsvpStatus>();
     setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setStatuses(rsvps);
-  }, [me]);
+  }, [me, member, space]);
   useEffect(() => { load(); }, [load]);
 
   /** Am I actively attending (going or maybe)? */
@@ -185,24 +205,37 @@ export default function Events() {
 
   return (
     <div className="evt">
-      {/* Screen nav: Events · My Events · My Calendar (Figma 286-11251) */}
-      <div className="evt__tabs">
-        <button
-          className={'evt__tab' + (view === 'browse' ? ' is-active' : '')}
-          onClick={() => navigate('/events')}
-        >
-          Events
-        </button>
-        <button
-          className={'evt__tab' + (view === 'mine' ? ' is-active' : '')}
-          onClick={() => navigate('/events/mine')}
-        >
-          My Events
-        </button>
-        <button className="evt__tab" onClick={() => navigate('/calendar?from=events')}>
-          My Calendar
-        </button>
-      </div>
+      {/* Scoped: a slim header in place of the personal tabs — back to the
+          entity, "{Name}'s Events". */}
+      {scoped ? (
+        <header className="mkt__head">
+          <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
+            <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
+          </button>
+          <h1 className="mkt__title">
+            {scopeName}&rsquo;s <span className="display-italic">Events</span>
+          </h1>
+        </header>
+      ) : (
+        /* Screen nav: Events · My Events · My Calendar (Figma 286-11251) */
+        <div className="evt__tabs">
+          <button
+            className={'evt__tab' + (view === 'browse' ? ' is-active' : '')}
+            onClick={() => navigate('/events')}
+          >
+            Events
+          </button>
+          <button
+            className={'evt__tab' + (view === 'mine' ? ' is-active' : '')}
+            onClick={() => navigate('/events/mine')}
+          >
+            My Events
+          </button>
+          <button className="evt__tab" onClick={() => navigate('/calendar?from=events')}>
+            My Calendar
+          </button>
+        </div>
+      )}
 
       {view === 'browse' && (
         <>
@@ -210,11 +243,14 @@ export default function Events() {
 
           {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
           <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters" gutter>
-            <button className="evt__action" onClick={() => navigate('/search?area=events')}>
+            <button
+              className="evt__action"
+              onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
+            >
               <span className="evt__action-circle"><Icon name="search" size={14} /></span>
               <span className="evt__action-label">Search</span>
             </button>
-            <button className="evt__action" onClick={() => navigate('/compose?area=events')}>
+            <button className="evt__action" onClick={() => navigate(`/compose?area=events${space ? `&space=${space}` : ''}`)}>
               <span className="evt__action-circle">
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                   <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
 import FeedCard from '../components/FeedCard';
@@ -12,7 +12,8 @@ import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import ListingTile from '../components/ListingTile';
 import ViewToggle from '../components/ViewToggle';
-import { loadFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
+import { supabase } from '../lib/supabase';
+import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -59,6 +60,14 @@ function postMode(p: FeedPost): Mode | null {
  *  listing anything via Compose. */
 export default function Marketplace() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // Scoped market: /market?space=<id> = "Pine Valley Grange's Marketplace"
+  // (founder 2026-07-25 — space/member area doors open the REAL marketplace,
+  // not a search hand-off); /market?member=<id> likewise.
+  const member = params.get('member');
+  const space = params.get('space');
+  const scoped = member || space;
+  const [scopeName, setScopeName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -81,15 +90,26 @@ export default function Marketplace() {
 
   useEffect(() => {
     let live = true;
+    setReady(false);
     (async () => {
-      const feed = (await loadFeed(200)).filter((p) => postAreas(p).includes('marketplace'));
+      const raw = member ? await loadAuthorFeed({ profileId: member })
+        : space ? await loadAuthorFeed({ spaceId: space })
+        : await loadFeed(200);
+      const feed = raw.filter((p) => postAreas(p).includes('marketplace'));
+      if (member) {
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
+        if (live) setScopeName((data as { full_name: string | null } | null)?.full_name ?? '');
+      } else if (space) {
+        const { data } = await supabase.from('spaces').select('name').eq('id', space).maybeSingle();
+        if (live) setScopeName((data as { name: string | null } | null)?.name ?? '');
+      }
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, []);
+  }, [member, space]);
 
   const filtered = useMemo(() => {
     const wanted = new Set(activeChips.flatMap((c) => CHIP_MODES[c]));
@@ -121,17 +141,26 @@ export default function Marketplace() {
   return (
     <div className="mkt">
       <header className="mkt__head">
+        {scoped && (
+          <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
+            <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
+          </button>
+        )}
         <p className="mkt__crumb">
           <Icon name="store" size={11} />
           <span>Marketplace</span>
         </p>
         <h1 className="mkt__title">
-          What members are <span className="display-italic">offering &amp; seeking.</span>
+          {scoped
+            ? <>{scopeName}&rsquo;s <span className="display-italic">Marketplace</span></>
+            : <>What members are <span className="display-italic">offering &amp; seeking.</span></>}
         </h1>
-        <p className="mkt__sub">
-          Goods, services, and things people are looking for.
-          Trust the trader, not the platform.
-        </p>
+        {!scoped && (
+          <p className="mkt__sub">
+            Goods, services, and things people are looking for.
+            Trust the trader, not the platform.
+          </p>
+        )}
       </header>
 
       {/* Action chips: search & list something, then the offer-mode filters */}
@@ -143,7 +172,7 @@ export default function Marketplace() {
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
           <span className="mkt__action-label">Search</span>
         </button>
-        <button className="mkt__action" onClick={() => navigate('/compose?area=marketplace')}>
+        <button className="mkt__action" onClick={() => navigate(`/compose?area=marketplace${space ? `&space=${space}` : ''}`)}>
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
           <span className="mkt__action-label">List</span>
         </button>
@@ -152,7 +181,7 @@ export default function Marketplace() {
             the algorithm does better than any of us could alone. */}
         <button
           className="mkt__action mkt__action--lichen"
-          onClick={() => navigate('/compose?area=marketplace&entrust=1')}
+          onClick={() => navigate(`/compose?area=marketplace&entrust=1${space ? `&space=${space}` : ''}`)}
           title="Offer something and let Lichen route it where it's needed most"
         >
           <span className="mkt__action-circle"><LichenMark size={22} label="" /></span>
@@ -180,7 +209,10 @@ export default function Marketplace() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="mkt__search-smartlink" onClick={() => navigate('/search?area=marketplace')}>
+          <button
+            className="mkt__search-smartlink"
+            onClick={() => navigate(`/search?area=marketplace${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
+          >
             <Icon name="sliders" size={12} /> Smart
           </button>
           {query && (

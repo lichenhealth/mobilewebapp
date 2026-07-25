@@ -62,16 +62,20 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     : '@' + (p.author?.handle || name.toLowerCase().replace(/\s+/g, '-'));
   // Every area the post lives in -> a DOOR, top-right: tap the Library icon
   // on Melanie's post and land in Melanie's Library — the real section scoped
-  // to her presence (founder 2026-07-24), not a search page. Areas without a
-  // section of their own keep the author-scoped search (PR #53).
+  // to her presence (founder 2026-07-24; marketplace/events joined 2026-07-25),
+  // never a search page. Only sectionless areas (places) keep the
+  // author-scoped search (PR #53).
   const scope = p.author_space_id ? `space=${p.author_space_id}` : `member=${p.author_id}`;
-  const AREAFEED_DOORS = new Set(['courses', 'library', 'work', 'art', 'food']);
+  const SECTION_DOORS: Record<string, string> = {
+    courses: '/courses', library: '/library', work: '/work', art: '/art',
+    food: '/food', marketplace: '/market', events: '/events',
+  };
   const areaDoors = postAreas(p)
     .map((a) => {
       const icon = serviceAreaIcon(a);
       if (!icon) return null;
       const areaLabel = SERVICE_AREAS.find((s) => s.value === a)?.label ?? a;
-      const to = AREAFEED_DOORS.has(a) ? `/${a}?${scope}` : `/search?${scope}&area=${a}`;
+      const to = SECTION_DOORS[a] ? `${SECTION_DOORS[a]}?${scope}` : `/search?${scope}&area=${a}`;
       return { icon, to, label: `${name}'s ${areaLabel}` };
     })
     .filter((d): d is { icon: IconName; to: string; label: string } => d != null);

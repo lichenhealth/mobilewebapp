@@ -84,13 +84,18 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
   // An entity's area icon opens the REAL section, scoped to it ("Melanie's
-  // Courses", "WAG's Library" — founder 2026-07-24: spaces too, no more inline
-  // sub-feeds); AreaFeed-backed areas get their full section, the rest a
-  // scoped browse.
-  const AREAFEED = new Set<ServiceArea>(['courses', 'library', 'work', 'art', 'food']);
+  // Courses", "Pine Valley Grange's Marketplace" — founder 2026-07-24/25:
+  // every area with a section of its own opens that section, never a search
+  // hand-off; only sectionless areas (places) fall back to scoped search.
+  const SECTION_ROUTES: Partial<Record<ServiceArea, string>> = {
+    courses: '/courses', library: '/library', work: '/work', art: '/art',
+    food: '/food', marketplace: '/market', events: '/events',
+  };
   const scopeQS = profileId ? `member=${profileId}` : `space=${spaceId}`;
-  const areaDest = (a: ServiceArea) =>
-    AREAFEED.has(a) ? `/${a}?${scopeQS}` : `/search?${scopeQS}&area=${a}`;
+  const areaDest = (a: ServiceArea) => {
+    const route = SECTION_ROUTES[a];
+    return route ? `${route}?${scopeQS}` : `/search?${scopeQS}&area=${a}`;
+  };
   const onArea = (a: ServiceArea) => {
     if (profileId || spaceId) navigate(areaDest(a));
     else toggleArea(a);
