@@ -7,13 +7,15 @@ import './ListingTile.css';
  *  serif on bone — little book covers, not gray placeholders). The only
  *  overlay is the trust lens: a peach shield when someone YOU trust endorsed
  *  it. No counts, no ranks — relevance over volume, same as everywhere. */
-export default function ListingTile({ post, offer, endorsed, onOpen }: {
+export default function ListingTile({ post, offer, endorsed, onOpen, onHide }: {
   post: FeedPost;
   /** The offer line ("Rent · $20/day", "Gift") — omitted when unlabeled. */
   offer?: string;
   /** Someone in your mycelium trusted/recommended this. */
   endorsed?: boolean;
   onOpen: () => void;
+  /** The example bubble's × — hides this post for the viewer (hidden_posts). */
+  onHide?: () => void;
 }) {
   const media = Array.isArray(post.details?.media)
     ? (post.details.media as { type: string; url: string }[]) : [];
@@ -22,12 +24,29 @@ export default function ListingTile({ post, offer, endorsed, onOpen }: {
   const by = post.author_space?.name || post.author?.full_name || 'Member';
   const demo = post.details?.demo === true;
   return (
-    <button className="ltile" onClick={onOpen}>
+    <button className={'ltile' + (demo ? ' ltile--demo' : '')} onClick={onOpen}>
+      {/* Half-out example bubble, same as feed cards (founder 2026-07-25). */}
+      {demo && (
+        <span className={'ex-bubble' + (onHide ? '' : ' ex-bubble--static')}>
+          <span title="Example content — here to show how Lichen works">example</span>
+          {onHide && (
+            <span
+              role="button" tabIndex={0}
+              className="ex-bubble__x"
+              aria-label="Remove this example post"
+              title="Remove this example post"
+              onClick={(e) => { e.stopPropagation(); onHide(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onHide(); } }}
+            >
+              ×
+            </span>
+          )}
+        </span>
+      )}
       <span className={'ltile__media' + (photo ? '' : ' ltile__media--cover')}>
         {photo
           ? <img src={photo} alt="" loading="lazy" />
           : <span className="ltile__cover-title">{title}</span>}
-        {demo && <span className="demo-badge ltile__demo" title="Example content — here to show how Lichen works">example</span>}
         {endorsed && (
           <span className="ltile__shield" title="Endorsed by someone you trust">
             <Icon name="shield-user" size={11} />

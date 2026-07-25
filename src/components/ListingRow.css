@@ -8,7 +8,10 @@
   width: 100%; padding: 12px 14px; min-width: 0;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   border-radius: var(--r-md); text-align: left; cursor: pointer; font: inherit;
+  position: relative;   /* anchors the half-out example bubble */
 }
+/* Clearance so the bubble's top half isn't clipped against the row above */
+.lrow--demo { margin-top: 6px; }
 .lrow:hover { border-color: var(--peach); }
 .lrow:active { opacity: 0.85; }
 .lrow__thumb {

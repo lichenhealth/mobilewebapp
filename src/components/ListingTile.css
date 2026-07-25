@@ -4,7 +4,10 @@
   display: flex; flex-direction: column; gap: 2px;
   min-width: 0; padding: 0; border: 0; background: transparent;
   text-align: left; cursor: pointer; font: inherit;
+  position: relative;   /* anchors the half-out example bubble */
 }
+/* Clearance so the bubble's top half isn't clipped by the grid row above */
+.ltile--demo { margin-top: 9px; }
 .ltile__media {
   position: relative; display: block;
   aspect-ratio: 1; border-radius: var(--r-md); overflow: hidden;
@@ -23,13 +26,6 @@
   font-family: var(--font-display); font-style: italic;
   font-size: 15px; line-height: 1.35; color: var(--ink); text-align: center;
   display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
-}
-
-/* Example-content badge rides the media's lower-left; bone backing keeps it
-   readable over photos */
-.ltile__demo {
-  position: absolute; bottom: 6px; left: 6px; margin-left: 0;
-  background: var(--bone-warm);
 }
 
 /* Trust-lens shield: someone you trust endorsed this */

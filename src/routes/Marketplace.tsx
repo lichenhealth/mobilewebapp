@@ -223,6 +223,7 @@ export default function Marketplace() {
                 offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
                 endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
                 onOpen={() => navigate(postOpenPath(p))}
+                onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               />
             );
           })}
