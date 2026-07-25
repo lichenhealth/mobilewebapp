@@ -253,14 +253,16 @@ export default function Calendar() {
     });
   };
 
-  // Open time views scrolled to the working morning (the PAGE scrolls).
+  // Open time views scrolled to the working morning. #root is the app's
+  // scroller (the document is pinned — see global.css).
   useEffect(() => {
-    if (view === 'month' || view === 'schedule' || view === 'todo') { window.scrollTo({ top: 0 }); return; }
+    const scroller = document.getElementById('root');
+    if (view === 'month' || view === 'schedule' || view === 'todo') { (scroller ?? window).scrollTo({ top: 0 }); return; }
     const el = gridRef.current;
     if (!el) return;
     // Land 7am just below the pinned toolbar+day-header stack.
-    const y = el.getBoundingClientRect().top + window.scrollY + 7 * HOUR_PX - 210;
-    if (y > 0) window.scrollTo({ top: y });
+    const y = el.getBoundingClientRect().top + (scroller?.scrollTop ?? window.scrollY) + 7 * HOUR_PX - 210;
+    if (y > 0) (scroller ?? window).scrollTo({ top: y });
   }, [view]);
 
   // Search pulls a wide window once, then filters live.

@@ -8,6 +8,22 @@
 
 html, body, #root { height: 100%; }
 
+/* The DOCUMENT never scrolls — all scrolling happens inside #root.
+   Why: iOS (standalone PWA especially) rubber-bands the root scroller and
+   fills the overscroll gap above with a stretched ghost of the SCROLLED
+   CONTENT, ignoring fixed overlays — scrolled posts smeared across the
+   status bar no matter how solid the top bar was (founder screenshots,
+   2026-07-25). With the root pinned, the bounce happens inside #root and
+   stays UNDER the fixed top bar. Bonus: Safari's translucent chrome now
+   shows solid theme-color instead of ghosted content. */
+html, body { overflow: hidden; }
+#root {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;

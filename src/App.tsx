@@ -64,7 +64,9 @@ const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/me
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    // #root is the app's scroller (the document itself is pinned — see
+    // global.css); fall back to window for safety.
+    (document.getElementById('root') ?? window).scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [pathname]);
   return null;
 }
