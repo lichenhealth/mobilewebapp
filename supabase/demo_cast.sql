@@ -172,7 +172,7 @@ values
  'Riverbank trail day',
  'Loppers, gloves, and good company — we clear the flood debris before fall. An example event to try RSVP on.',
  'actionable', true, false, '{}', 'public', '{events}', 'events',
- 'work', 'free', 'de300003-0000-4000-a000-000000000002', '{"demo": true}'::jsonb),
+ 'work_charity', 'free', 'de300003-0000-4000-a000-000000000002', '{"demo": true}'::jsonb),
 ('de300001-0000-4000-a000-000000000001', null,
  'Herb walk with Rosa',
  'Two slow miles, twelve plants, all of them medicine. An example event to try RSVP on.',
