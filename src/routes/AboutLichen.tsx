@@ -26,7 +26,7 @@ const MAP_ROWS = [
   {
     label: 'a mother’s care',
     left: { size: 46, bg: KIND.people },
-    right: { size: 7, bg: KIND.people, note: '$0' },
+    right: { size: 7, bg: KIND.people, note: 'not compensated' },
   },
   {
     label: 'an old-growth forest',
@@ -459,7 +459,7 @@ export default function AboutLichen() {
           <p>
             Every single person, plant, animal, place and element is contributing to the collective
             — or taking from it. That’s what the Current Economy misses: a mother’s care is priced
-            at zero, a forest isn’t counted at all, and speculative investors are paid handsomely.
+            at zero, a forest isn’t counted at all, and money betting on money is paid handsomely.
           </p>
 
           <TwoMapsVisual />
