@@ -1,6 +1,5 @@
 /* ─── Feed card ─────────────────────────────────────────────────────── */
 .feed-card {
-  position: relative;   /* anchors the example bubble at the card's edge */
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
   border-radius: var(--r-md);
@@ -17,8 +16,12 @@
 /* ── Example bubble — half in, half out of the card's top-right corner
    (founder 2026-07-25): a little white pill that labels the post as demo
    content. The × removes the example for this viewer (hidden_posts).
-   Vertical overflow is visible on the card (overflow-x clip only), so the
-   half-out top renders fine; the card gains top margin for clearance. */
+   It hangs off .feed-card-shell — an UNCLIPPED wrapper — because iOS
+   Safari clips both axes of the rounded, overflow-clipped card itself
+   (the bubble's top half was getting sliced off on the founder's phone). */
+.feed-card-shell { position: relative; }
+/* Clearance for the half-out bubble — only cards that wear it. */
+.feed-card-shell--demo { margin-top: 9px; }
 .feed-card__demo {
   position: absolute;
   top: -10px;
@@ -54,8 +57,6 @@
   cursor: pointer;
 }
 .feed-card__demo-x:hover { color: var(--peach-deep); background: var(--peach-tint); }
-/* Clearance for the half-out bubble — only cards that wear it. */
-.feed-card:has(> .feed-card__demo) { margin-top: 9px; }
 
 /* Whole card opens the post/event page (inner buttons/links keep their jobs) */
 .feed-card--clickable { cursor: pointer; }
@@ -154,6 +155,7 @@
 
 .feed-card__eyebrow {
   color: var(--ink-faint);
+  margin-left: 3px;   /* flex trims the leading space before the '·' */
   /* Never two lines: the offer detail ("Offered freely", "Rent · $20/day")
      stays on one line and ellipsizes if the row runs out of room. */
   white-space: nowrap;

@@ -132,7 +132,11 @@ export default function FeedCard({
   );
 
   return (
-    <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '') + (expanded ? ' feed-card--expanded' : '')} onClick={onCardClick}>
+    // The shell exists for the example bubble: the card itself clips overflow
+    // (overflow-x: clip + border-radius), and iOS Safari clips BOTH axes on
+    // such a box — a half-out child gets its top sliced off. The bubble
+    // therefore lives on an unclipped wrapper, not inside the card.
+    <div className={'feed-card-shell' + (demo ? ' feed-card-shell--demo' : '')}>
       {/* EXAMPLE bubble — straddles the card's top-right edge (half in, half
           out — founder 2026-07-25) so demo content reads as a label ON the
           post, not part of it. The × hides the example for this viewer via
@@ -152,6 +156,7 @@ export default function FeedCard({
           )}
         </div>
       )}
+    <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '') + (expanded ? ' feed-card--expanded' : '')} onClick={onCardClick}>
       {/* HEADER — identity (avatar + handle) opens the author's profile; the
           TITLE opens the post itself. It used to sit inside the author button,
           so tapping a post's title landed on the profile instead of the post. */}
@@ -345,6 +350,7 @@ export default function FeedCard({
         onSave={onSave}
       />
     </article>
+    </div>
   );
 }
 
