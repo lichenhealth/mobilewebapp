@@ -80,9 +80,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
-  // The + opens a two-way chooser (share a post / create a course-collection);
-  // picking create reveals the inline panel (no browser prompt).
-  const [addOpen, setAddOpen] = useState(false);
+  // The + shares a post; Organize (both structured sections — founder
+  // 2026-07-25: Courses gets the door too) reveals the inline create panel.
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -203,23 +202,17 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
         </button>
         <button
-          className={'mkt__action' + (addOpen || (createOpen && structuredKind === 'course') ? ' is-active' : '')}
+          className="mkt__action"
           aria-label={addLabel}
           title={addLabel}
-          onClick={() => {
-            // Courses: the + carries creation too (chooser). Library keeps its
-            // own Organize door (founder 2026-07-24) — + goes straight to
-            // Contribute there.
-            if (structuredKind !== 'course' || !canCreate) { navigate(composeHref); return; }
-            if (createOpen) { setCreateOpen(false); setAddOpen(false); return; }
-            setAddOpen((o) => !o);
-          }}
+          onClick={() => navigate(composeHref)}
         >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
         </button>
-        {/* Library's third door: Organize, visible and labeled — collections
-            deserve their own front door, not a hiding spot in the +. */}
-        {structuredKind === 'path' && canCreate && (
+        {/* The third door: Organize, visible and labeled — creation deserves
+            its own front door, not a hiding spot in the + (Library 2026-07-24;
+            Courses joined 2026-07-25, retiring the +'s two-way chooser). */}
+        {structuredKind && canCreate && (
           <button
             className={'mkt__action' + (createOpen ? ' is-active' : '')}
             onClick={() => setCreateOpen((o) => !o)}
@@ -263,26 +256,6 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               <Icon name="close" size={12} />
             </button>
           )}
-        </div>
-      )}
-
-      {/* The + chooser (Courses): share a post, or create the structured thing. */}
-      {addOpen && !createOpen && canCreate && structuredKind === 'course' && (
-        <div className="afeed__create afeed__addmenu">
-          <button className="afeed__addmenu-row" onClick={() => navigate(composeHref)}>
-            <span className="afeed__addmenu-title">{addLabel}</span>
-            <span className="afeed__addmenu-hint">share a post{space ? ' with this space' : ''}</span>
-          </button>
-          <button className="afeed__addmenu-row" onClick={() => { setAddOpen(false); setCreateOpen(true); }}>
-            <span className="afeed__addmenu-title">
-              {structuredKind === 'course' ? 'New course' : 'Organize'}
-            </span>
-            <span className="afeed__addmenu-hint">
-              {structuredKind === 'course'
-                ? (createForSpace ? 'ordered lessons, taught for this space' : 'ordered lessons you teach')
-                : (createForSpace ? 'an ordered collection for this space' : 'an ordered collection, like a reading list')}
-            </span>
-          </button>
         </div>
       )}
 
