@@ -133,6 +133,25 @@ export default function FeedCard({
 
   return (
     <article className={'feed-card' + (onOpen ? ' feed-card--clickable' : '') + (expanded ? ' feed-card--expanded' : '')} onClick={onCardClick}>
+      {/* EXAMPLE bubble — straddles the card's top-right edge (half in, half
+          out — founder 2026-07-25) so demo content reads as a label ON the
+          post, not part of it. The × hides the example for this viewer via
+          the same hidden_posts mechanism as "Hide this post". */}
+      {demo && (
+        <div className="feed-card__demo" onClick={(e: MouseEvent) => e.stopPropagation()}>
+          <span title="Example content — here to show how Lichen works">example</span>
+          {onHide && !viewerIsAuthor && (
+            <button
+              className="feed-card__demo-x"
+              onClick={onHide}
+              aria-label="Remove this example post"
+              title="Remove this example post"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       {/* HEADER — identity (avatar + handle) opens the author's profile; the
           TITLE opens the post itself. It used to sit inside the author button,
           so tapping a post's title landed on the profile instead of the post. */}
@@ -156,7 +175,6 @@ export default function FeedCard({
             ) : (
               <span className="feed-card__handle">{handle}</span>
             )}
-            {demo && <span className="demo-badge" title="Example content — here to show how Lichen works">example</span>}
             {eyebrow && (
               <span className="feed-card__eyebrow">
                 {' · '}

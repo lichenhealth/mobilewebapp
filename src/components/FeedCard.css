@@ -1,5 +1,6 @@
 /* ─── Feed card ─────────────────────────────────────────────────────── */
 .feed-card {
+  position: relative;   /* anchors the example bubble at the card's edge */
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
   border-radius: var(--r-md);
@@ -12,6 +13,49 @@
               transform var(--d-base) var(--ease-out);
 }
 .feed-card:hover { box-shadow: var(--sh-card); }
+
+/* ── Example bubble — half in, half out of the card's top-right corner
+   (founder 2026-07-25): a little white pill that labels the post as demo
+   content. The × removes the example for this viewer (hidden_posts).
+   Vertical overflow is visible on the card (overflow-x clip only), so the
+   half-out top renders fine; the card gains top margin for clearance. */
+.feed-card__demo {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px 2px 9px;
+  background: var(--bone-warm);
+  border: 1px dashed var(--peach);
+  border-radius: var(--r-full);
+  box-shadow: var(--sh-soft);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--peach-deep, var(--peach));
+}
+.feed-card__demo-x {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--r-full);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.feed-card__demo-x:hover { color: var(--peach-deep); background: var(--peach-tint); }
+/* Clearance for the half-out bubble — only cards that wear it. */
+.feed-card:has(> .feed-card__demo) { margin-top: 9px; }
 
 /* Whole card opens the post/event page (inner buttons/links keep their jobs) */
 .feed-card--clickable { cursor: pointer; }
@@ -58,7 +102,10 @@
   display: grid;
   grid-template-columns: 40px 1fr auto;
   gap: var(--s-3);
-  align-items: center;
+  /* start, not center: the avatar stays a FIXED distance from the card's
+     top-left no matter how many lines the title wraps to (founder
+     2026-07-25 — centering slid it down the card on long posts). */
+  align-items: start;
   padding: var(--s-3) var(--s-4) 0;
 }
 /* Weave mark leads the actions cluster; hairline gap sets it apart from
@@ -107,6 +154,12 @@
 
 .feed-card__eyebrow {
   color: var(--ink-faint);
+  /* Never two lines: the offer detail ("Offered freely", "Rent · $20/day")
+     stays on one line and ellipsizes if the row runs out of room. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .feed-card__head-actions {
