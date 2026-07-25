@@ -622,8 +622,14 @@ export default function AboutLichen() {
           <p>
             It’s early, and that’s the invitation. Every new member gets <strong>3 months of full
             access, free</strong> — time to make Lichen yours, tell us what you need, and help shape
-            the beginning of a better world. Then you choose the plan that fits; your membership
-            keeps the commons alive.
+            the beginning of a better world. Then you choose the plan that fits:{' '}
+            <strong>Community at $29/month</strong>, or <strong>Concierge at $99/month</strong>.
+          </p>
+          <p>
+            Your subscription isn’t enriching a company or its shareholders — there are none to
+            enrich. It flows back into supporting this new way of being in local and global
+            community. Every membership keeps the commons alive: you’re being the change, and
+            investing in positive change.
           </p>
         </section>
 
