@@ -35,12 +35,12 @@ const MAP_ROWS = [
   {
     label: 'a paramedic’s shift',
     left: { size: 34, bg: KIND.people },
-    right: { size: 13, bg: KIND.people, note: 'underpaid' },
+    right: { size: 13, bg: KIND.people, note: 'under-compensated' },
   },
   {
     label: 'a hedge-fund manager',
     left: { size: 15, dashed: true, rust: true, minus: true },
-    right: { size: 46, bg: KIND.extraction, note: 'over-paid' },
+    right: { size: 46, bg: KIND.extraction, note: 'over-compensated' },
   },
 ];
 
@@ -293,7 +293,7 @@ function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; strok
 function TwoMapsVisual() {
   return (
     <div className="about__maps" role="img"
-      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-paid.">
+      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculation over-compensated.">
       <div className="about__maps-col">
         <p className="about__maps-title">The Lichen economy</p>
         <div className="about__maps-panel">

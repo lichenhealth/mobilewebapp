@@ -86,8 +86,14 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     gift: 'Gift', sale: 'For sale', sliding: 'For sale',
     trade: 'Trade', rent: 'Rent', lend: 'Lend', borrow: 'Looking to borrow', iso: 'In search of',
   };
+  // Work speaks work (founder 2026-07-24): a paid gig says "Pays $30/hr",
+  // never "For sale"; freely-offered work reads as what it is.
+  const WORK_MODE_LABEL: Record<string, string> = {
+    ...MODE_LABEL, sale: 'Pays', sliding: 'Pays', gift: 'Offered freely',
+  };
   const rawMode = typeof p.details?.mode === 'string' ? (p.details.mode as string) : undefined;
-  const mode = rawMode ? MODE_LABEL[rawMode] : undefined;
+  const isWork = postAreas(p).includes('work');
+  const mode = rawMode ? (isWork ? WORK_MODE_LABEL[rawMode] : MODE_LABEL[rawMode]) : undefined;
   const rawPrice = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
   const price = rawMode === 'sliding' && rawPrice
     ? 'sliding ' + rawPrice.replace(/^sliding scale\s*/i, '')
@@ -108,6 +114,9 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     avatar: p.author_space ? undefined : (p.author?.avatar_url ?? undefined),
     avatarMonogram: name.charAt(0).toUpperCase(),
     body: p.body,
+    // Example content wears a small badge so nobody mistakes it for the real
+    // economy (founder 2026-07-24 — demo posts teach how the platform works).
+    demo: p.details?.demo === true,
     areaDoors,
     eyebrow: offerLine ?? ((p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined),
     media,

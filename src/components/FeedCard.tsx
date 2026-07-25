@@ -17,6 +17,9 @@ export interface FeedCardProps {
   /** Live area doors, upper-right: tap the Library icon on Melanie's post to
    *  browse Melanie's Library (author-scoped search). Wins over categoryIcons. */
   areaDoors?: { icon: IconName; to: string; label: string }[];
+  /** Example content (details.demo) — wears a small badge so nobody mistakes
+   *  it for the real economy; it's there to teach how the platform works. */
+  demo?: boolean;
   body: string;
   // Image-badge column on the right
   image?: {
@@ -74,6 +77,7 @@ export default function FeedCard({
   handle,
   categoryIcons = [],
   areaDoors = [],
+  demo,
   body,
   image,
   mycelium,
@@ -152,6 +156,7 @@ export default function FeedCard({
             ) : (
               <span className="feed-card__handle">{handle}</span>
             )}
+            {demo && <span className="demo-badge" title="Example content — here to show how Lichen works">example</span>}
             {eyebrow && (
               <span className="feed-card__eyebrow">
                 {' · '}

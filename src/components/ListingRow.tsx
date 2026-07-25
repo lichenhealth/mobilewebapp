@@ -28,11 +28,15 @@ export default function ListingRow({ post, offer, endorsed, onOpen }: {
   const title = post.title || (post.body.length > 72 ? post.body.slice(0, 69) + '…' : post.body);
   const by = post.author_space?.name || post.author?.full_name || 'Member';
   const loc = typeof post.details?.location === 'string' ? (post.details.location as string) : '';
+  const demo = post.details?.demo === true;
   return (
     <button className="lrow" onClick={onOpen}>
       {photo && <span className="lrow__thumb"><img src={photo} alt="" loading="lazy" /></span>}
       <span className="lrow__main">
-        <span className="lrow__title">{title}</span>
+        <span className="lrow__title">
+          {title}
+          {demo && <span className="demo-badge" title="Example content — here to show how Lichen works">example</span>}
+        </span>
         <span className="lrow__by">{by}{loc ? ` · ${loc}` : ''}</span>
         {offer && <span className="lrow__offer">{offer}</span>}
       </span>

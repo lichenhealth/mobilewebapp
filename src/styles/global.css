@@ -270,3 +270,15 @@ input, textarea, select { font: inherit; color: inherit; }
     align-items: start;
   }
 }
+
+/* ── Example-content badge (details.demo) — shared by cards, tiles, rows.
+   Dashed = clearly a stand-in; teaches the platform without polluting the
+   real economy. ─────────────────────────────────────────────────────────── */
+.demo-badge {
+  display: inline-flex; align-items: center; flex-shrink: 0;
+  margin-left: 6px; padding: 1px 7px;
+  border: 1px dashed var(--peach); border-radius: var(--r-full);
+  font-family: var(--font-mono); font-size: 8.5px; font-style: normal;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--peach-deep, var(--peach)); background: transparent;
+}

@@ -20,12 +20,14 @@ export default function ListingTile({ post, offer, endorsed, onOpen }: {
   const photo = media.find((m) => m.type === 'photo')?.url;
   const title = post.title || (post.body.length > 64 ? post.body.slice(0, 61) + '…' : post.body);
   const by = post.author_space?.name || post.author?.full_name || 'Member';
+  const demo = post.details?.demo === true;
   return (
     <button className="ltile" onClick={onOpen}>
       <span className={'ltile__media' + (photo ? '' : ' ltile__media--cover')}>
         {photo
           ? <img src={photo} alt="" loading="lazy" />
           : <span className="ltile__cover-title">{title}</span>}
+        {demo && <span className="demo-badge ltile__demo" title="Example content — here to show how Lichen works">example</span>}
         {endorsed && (
           <span className="ltile__shield" title="Endorsed by someone you trust">
             <Icon name="shield-user" size={11} />
