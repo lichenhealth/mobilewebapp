@@ -39,9 +39,10 @@ const MAP_ROWS = [
     right: { size: 13, bg: KIND.people, note: 'under-compensated' },
   },
   {
-    // The shadow named as a PATTERN, never a person (founder 2026-07-24):
-    // gaming a system vs feeding it. Money is the actor — nobody under the bus.
-    label: 'money betting on money',
+    // The shadow named as a PATTERN, not a profession (founder 2026-07-25):
+    // 'speculative investors' is behavior-defined — concrete without calling
+    // out anyone's job title. Matches the prose above the visual.
+    label: 'speculative investors',
     left: { size: 15, dashed: true, rust: true },
     right: { size: 46, bg: KIND.extraction, note: 'over-compensated' },
   },
@@ -157,16 +158,25 @@ const TANGO_STOPS: JourneyStop[] = [
   { emoji: '🐴', x: 190, y: 64, name: 'Tango', sub: 'takes on the heavy energy', lx: 212, ly: 60, anchor: 'start' },
   { emoji: '💆', x: 110, y: 140, name: 'the bodyworker', sub: 'clears Tango’s load', sub2: 'paid in Current-cy', lx: 88, ly: 136, anchor: 'end' },
   { emoji: '🛒', x: 256, y: 204, name: 'the wider world', sub: 'Current-cy cashed out to dollars', lx: 250, ly: 236, anchor: 'middle' },
+  // The body's own loop (founder 2026-07-25 — as many synchronicities as we
+  // can show): manure feeds the farm; the farm feeds the steward.
+  { emoji: '🥕', x: 300, y: 130, name: 'the organic farm', sub: 'her manure feeds the soil', lx: 278, ly: 126, anchor: 'end' },
+  { emoji: '🤲', x: 64, y: 204, name: 'Tango’s steward', sub: 'fresh produce comes back', lx: 64, ly: 232, anchor: 'middle' },
 ];
 
 function TangoJourney() {
   return (
     <svg className="about__journey" viewBox="0 0 340 250" role="img"
-      aria-label="A map route: a hurting child releases what’s heavy, Tango the therapy horse takes it on, her bodyworker clears her and is paid in Current-cy, and cashes out to dollars in the wider world.">
+      aria-label="A map route: a hurting child releases what’s heavy, Tango the therapy horse takes it on, her bodyworker clears her and is paid in Current-cy, and cashes out to dollars in the wider world. A green loop closes alongside: Tango’s manure feeds the organic farm, and fresh produce comes back to her steward.">
       <path d="M-10,108 q45,-12 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
       <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       <path d="M44,48 C92,20 148,36 190,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
         fill="none" stroke="var(--peach)" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />
+      {/* the green loop: Tango → farm (manure) → steward (produce) */}
+      <path d="M204,74 C246,88 284,100 298,116"
+        fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.85" />
+      <path d="M290,142 C258,192 160,222 80,208"
+        fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.85" />
       {/* the energy moving from the child into Tango's keeping */}
       <text x="140" y="26" fontSize="11" textAnchor="middle">✨</text>
       {TANGO_STOPS.map((s) => (
@@ -296,7 +306,7 @@ function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; strok
 function TwoMapsVisual() {
   return (
     <div className="about__maps" role="img"
-      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, money betting on money over-compensated.">
+      aria-label="Two maps side by side: what each being actually gives, versus what the market pays — care at zero, forests not counted, speculative investors over-compensated.">
       <div className="about__maps-col">
         <p className="about__maps-title">The Lichen economy</p>
         <div className="about__maps-panel">
@@ -518,7 +528,9 @@ export default function AboutLichen() {
               skilled, risky labor, and Current-cy is how it’s honored. The session pays into
               Tango’s care, held by her steward; her bodyworker is paid from it to clear her; and
               what the bodyworker earns cashes out to dollars in the wider world. A being who can’t
-              hold money just moved real value through three lives. And this model is young, on
+              hold money just moved real value through three lives. Her body feeds a quieter loop
+              too: manure to the organic farm down the road, fresh produce back to her steward’s
+              table — nothing wasted, everything counted. And this model is young, on
               purpose — we give ourselves space to learn, adding nuance as the mycelium grows and
               new variables reveal themselves.
             </p>
