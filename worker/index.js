@@ -65,7 +65,7 @@ function transcode(src, outDir, srcHeight) {
   );
   execFileSync('ffmpeg', args, { stdio: 'inherit' });
   // Poster: a frame from one second in.
-  execFileSync('ffmpeg', ['-y', '-ss', '1', '-i', src, '-frames:v', '1', '-vf', 'scale=-2:720', path.join(outDir, 'poster.jpg')]);
+  execFileSync('ffmpeg', ['-y', '-ss', '1', '-i', src, '-frames:v', '1', '-update', '1', '-vf', 'scale=-2:720', path.join(outDir, 'poster.jpg')]);
 }
 
 async function uploadDir(dir, prefix) {
