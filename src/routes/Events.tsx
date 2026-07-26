@@ -216,30 +216,47 @@ export default function Events() {
             {scopeName}&rsquo;s <span className="display-italic">Events</span>
           </h1>
         </header>
+      ) : view === 'mine' ? (
+        /* My Events is a MANAGEMENT page now (founder 2026-07-26): back chip
+           home to Events, same as the calendar's. */
+        <header className="mkt__head">
+          <button className="cmp__back mkt__memberback" onClick={() => navigate('/events')}>
+            <Icon name="arrow-left" size={14} /> Events
+          </button>
+          <h1 className="mkt__title">
+            My <span className="display-italic">Events</span>
+          </h1>
+        </header>
       ) : (
-        /* Screen nav: Events · My Events · My Calendar (Figma 286-11251) */
-        <div className="evt__tabs">
-          <button
-            className={'evt__tab' + (view === 'browse' ? ' is-active' : '')}
-            onClick={() => navigate('/events')}
-          >
-            Events
-          </button>
-          <button
-            className={'evt__tab' + (view === 'mine' ? ' is-active' : '')}
-            onClick={() => navigate('/events/mine')}
-          >
-            My Events
-          </button>
-          <button className="evt__tab" onClick={() => navigate('/calendar?from=events')}>
-            My Calendar
-          </button>
+        /* One full-width row (the Concierge idiom): category tabs spread the
+           page, with the two personal doors — My Events / My Calendar — on
+           the right (founder 2026-07-26; the old 3-tab header is gone). */
+        <div className="evt__nav">
+          <div className="evt__nav-tabs">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                className={'evt__navtab' + (tab === t ? ' is-active' : '')}
+                onClick={() => setTab(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <span className="evt__nav-doors">
+            <button className="evt__navdoor" onClick={() => navigate('/events/mine')} title="My Events">
+              <Icon name="rsvp" size={13} /><span>My Events</span>
+            </button>
+            <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} title="My Calendar">
+              <Icon name="calendar" size={13} /><span>My Calendar</span>
+            </button>
+          </span>
         </div>
       )}
 
       {view === 'browse' && (
         <>
-          <FilterRow options={TABS} value={tab} onChange={setTab} />
+          {scoped && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
           {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
           <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters" gutter>

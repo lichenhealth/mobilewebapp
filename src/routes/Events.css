@@ -59,3 +59,49 @@
 @media (min-width: 1024px) {
   .evt__feed { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
 }
+
+/* ── One-row nav (founder 2026-07-26): category tabs spread the full page
+   (the Concierge idiom) with the personal doors on the right. ───────────── */
+.evt__nav {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--bone-edge-soft, var(--bone-edge));
+}
+.evt__nav-tabs {
+  flex: 1; min-width: 0;
+  display: flex; justify-content: space-around; gap: var(--s-2);
+  overflow-x: auto; scrollbar-width: none;
+}
+.evt__nav-tabs::-webkit-scrollbar { display: none; }
+.evt__navtab {
+  flex: 0 0 auto; padding: 6px 2px;
+  background: transparent; border: 0; cursor: pointer;
+  font-family: inherit; font-size: 15px; font-weight: 300;
+  letter-spacing: -0.005em; color: var(--ink-muted);
+  position: relative; white-space: nowrap;
+}
+.evt__navtab:hover { color: var(--ink); }
+.evt__navtab.is-active { color: var(--peach); font-weight: 400; }
+.evt__navtab.is-active::after {
+  content: ''; position: absolute; bottom: -4px; left: 0; right: 0;
+  height: 2px; background: var(--peach); border-radius: var(--r-full);
+}
+.evt__nav-doors { display: inline-flex; gap: 6px; flex-shrink: 0; }
+.evt__navdoor {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-family: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer;
+  white-space: nowrap;
+}
+.evt__navdoor:hover { border-color: var(--peach); color: var(--ink); }
+.evt__navdoor svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
+/* Phones: the doors go icon-only circles; tabs shrink a notch to fit. */
+@media (max-width: 700px) {
+  .evt__navdoor span { display: none; }
+  .evt__navdoor { width: 30px; height: 30px; padding: 0; justify-content: center; }
+  .evt__navtab { font-size: 12.5px; }
+}
+
+/* Back chip on the management pages hugs the left, like the calendar's. */
+.mkt__head .mkt__memberback { align-self: flex-start; }
