@@ -5,6 +5,7 @@ import { Icon, IconName } from './Icon';
 import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import { LinkifiedText, CarePreview } from './CarePostCard';
 import { WeaveMark } from './WeaveMark';
+import VideoPlayer from './VideoPlayer';
 import './FeedCard.css';
 
 export interface FeedCardProps {
@@ -41,7 +42,7 @@ export interface FeedCardProps {
   // Eyebrow tag (optional)
   eyebrow?: string;
   // Inline media (photos / videos / audio uploaded with a post)
-  media?: { type: 'photo' | 'video' | 'audio'; url: string }[];
+  media?: { type: 'photo' | 'video' | 'audio'; url: string; jobId?: string }[];
   // Message the author (omit / undefined hides the button — e.g. your own post)
   onMessage?: () => void;
   /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
@@ -330,7 +331,8 @@ export default function FeedCard({
             m.type === 'photo' ? (
               <img key={i} src={m.url} alt="" />
             ) : m.type === 'video' ? (
-              <video key={i} src={m.url} controls playsInline />
+              // Lichen-hosted: adaptive HLS once the worker transcodes it
+              <VideoPlayer key={i} url={m.url} jobId={m.jobId} />
             ) : (
               <audio key={i} src={m.url} controls />
             )

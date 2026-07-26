@@ -1,0 +1,13 @@
+{
+  "name": "lichen-video-worker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-run video transcoding for Lichen — ffmpeg to adaptive HLS.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --env-file=.env index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

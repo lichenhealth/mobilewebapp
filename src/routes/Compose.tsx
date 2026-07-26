@@ -8,6 +8,9 @@ import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
   createPost, updatePost, loadPost, postAreas, uploadMedia,
+} from '../lib/postsApi';
+import { uploadVideo } from '../lib/videoApi';
+import {
   CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
@@ -23,7 +26,7 @@ import './Compose.css';
 
 
 type MediaType = 'photo' | 'video' | 'audio';
-type Attached = { type: MediaType; url: string };
+type Attached = { type: MediaType; url: string; jobId?: string };
 
 export default function Compose() {
   const { loading, user } = useAuth();
@@ -216,8 +219,15 @@ export default function Compose() {
   async function addMedia(file: Blob, ext: string, type: MediaType) {
     setUploading(true); setError('');
     try {
-      const url = await uploadMedia(file, ext);
-      setMedia((m) => [...m, { type, url }]);
+      if (type === 'video') {
+        // Lichen-hosted video: original to the videos bucket + a transcode
+        // job for the self-run worker (adaptive HLS lands when it's done).
+        const { url, jobId } = await uploadVideo(file, ext);
+        setMedia((m) => [...m, { type, url, jobId }]);
+      } else {
+        const url = await uploadMedia(file, ext);
+        setMedia((m) => [...m, { type, url }]);
+      }
     } catch {
       setError('Upload failed — please try again.');
     }
