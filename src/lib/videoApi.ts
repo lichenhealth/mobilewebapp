@@ -19,7 +19,17 @@ export function videoPublicUrl(path: string): string {
 
 /** Upload an original + queue its transcode. Returns the public URL of the
  *  original (immediate playback fallback) and the job id. */
+/** Melanie's cap (2026-07-26): phones produce huge raw files; the worker
+ *  compresses everything anyway, but originals above this just burn storage
+ *  and upload time. Friendly ceiling with a helpful message. */
+const MAX_VIDEO_MB = 500;
+
 export async function uploadVideo(file: Blob, ext: string): Promise<{ url: string; jobId: string }> {
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+    throw new Error(
+      `That video is ${Math.round(file.size / 1024 / 1024)}MB — the limit is ${MAX_VIDEO_MB}MB. ` +
+      'Try a shorter clip, or export at 1080p (Lichen compresses it for streaming either way).');
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const path = `${user.id}/${crypto.randomUUID()}.${ext}`;

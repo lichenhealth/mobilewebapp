@@ -14,6 +14,12 @@ export interface OfferingMeta {
   length?: string;   // "6 weeks", "4 lessons"
   forWhom?: string;  // "New practitioners"
   price?: string;    // "Free", "$120", "Sliding $40–$120"
+  /** Canvas-style modules: named groups of lesson post ids, in order.
+   *  Lessons not named in any module render under the default group. */
+  modules?: { title: string; ids: string[] }[];
+  /** The course's circle — a real Lichen GROUP (chat, events, find-a-time
+   *  ride along for free). Set when the owner creates it. */
+  circleId?: string;
 }
 
 export interface CollectionRow {

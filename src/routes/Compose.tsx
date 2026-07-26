@@ -10,6 +10,7 @@ import {
   createPost, updatePost, loadPost, postAreas, uploadMedia,
 } from '../lib/postsApi';
 import { uploadVideo } from '../lib/videoApi';
+import { listMyCollections, createCollection, addToCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
   CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
@@ -92,6 +93,11 @@ export default function Compose() {
 
   // media
   const [media, setMedia] = useState<Attached[]>([]);
+  // Organize-into (courses/library): file this post straight into one of your
+  // courses/collections — or start a new one — right from Compose.
+  const [myCols, setMyCols] = useState<CollectionRow[]>([]);
+  const [organizeInto, setOrganizeInto] = useState<string | null>(null);
+  const [newColName, setNewColName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -211,6 +217,19 @@ export default function Compose() {
 
   const isMarket = areas.has('marketplace');
   const isEvent = areas.has('events');
+  // Courses & Library posts are "targeted feed stories" (founder + Melanie,
+  // 2026-07-26): no Type row (they're educational by nature), an Organize-into
+  // picker, and — everything being an exchange — the offer block.
+  const isCourse = areas.has('courses');
+  const isLibrary = areas.has('library');
+  useEffect(() => {
+    if (!isCourse && !isLibrary) { setOrganizeInto(null); return; }
+    let live = true;
+    void listMyCollections().then((cols) => {
+      if (live) setMyCols(cols.filter((c) => c.kind === (isCourse ? 'course' : 'path')));
+    });
+    return () => { live = false; };
+  }, [isCourse, isLibrary]);
   // Events narrow the mode set — clamp lend/rent if events joins the areas.
   useEffect(() => {
     if (isEvent && (evMode === 'lend' || evMode === 'rent')) setEvMode('paid');
@@ -228,8 +247,8 @@ export default function Compose() {
         const url = await uploadMedia(file, ext);
         setMedia((m) => [...m, { type, url }]);
       }
-    } catch {
-      setError('Upload failed — please try again.');
+    } catch (e) {
+      setError((e as Error)?.message || 'Upload failed — please try again.');
     }
     setUploading(false);
   }
@@ -275,8 +294,12 @@ export default function Compose() {
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
+      // "Everything is an exchange": a course offered for pay/trade/Lichen*
+      // belongs in the Marketplace too (founder + Melanie, 2026-07-26).
+      const effAreas = new Set(areas);
+      if (isCourse && ['paid', 'trade', 'lichen'].includes(evMode)) effAreas.add('marketplace');
       const details: Record<string, unknown> = {};
-      if (isMarket || isEvent) {
+      if (isMarket || isEvent || isCourse) {
         if (evMode === 'paid') {
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
             details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
@@ -291,7 +314,7 @@ export default function Compose() {
           details.location = location.trim();
           if (locGeo) details.geo = locGeo;
         }
-        if (isMarket) {
+        if (isMarket || isCourse) {
           // Marketplace-compatible mode vocabulary. Lichen* = an entrusted
           // gift: the Lichen Economy Algorithm decides the allocation.
           details.mode = evMode === 'free' || evMode === 'lichen' ? 'gift'
@@ -335,9 +358,9 @@ export default function Compose() {
           }
         }
         await updatePost(editPostId, {
-          body, title, content_type: isEvent ? 'actionable' : contentType,
+          body, title, content_type: isEvent ? 'actionable' : (isCourse || isLibrary) ? 'educational' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
-          serviceAreas: [...areas],
+          serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
           eventCategory: isEvent ? evCategory : null,
           eventMode: isEvent ? (evMode as EventMode) : null,
@@ -370,9 +393,9 @@ export default function Compose() {
       }
       try {
         const created = await createPost({
-          body, title, content_type: isEvent ? 'actionable' : contentType,
+          body, title, content_type: isEvent ? 'actionable' : (isCourse || isLibrary) ? 'educational' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
-          serviceAreas: [...areas],
+          serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
           eventCategory: isEvent ? evCategory : null,
           eventMode: isEvent ? (evMode as EventMode) : null,
@@ -403,6 +426,15 @@ export default function Compose() {
                 .eq('id', postId);
             })
             .then(() => {}, () => {});
+        }
+        // Organize-into: file the fresh post as a piece of the chosen (or
+        // brand-new) course/collection. Post never fails over this.
+        if (created?.id && (isCourse || isLibrary) && (organizeInto || newColName.trim())) {
+          try {
+            const target = organizeInto
+              ?? await createCollection(newColName.trim(), isCourse ? 'course' : 'path');
+            await addToCollection(target, created.id);
+          } catch (e) { console.error('organize-into:', e); }
         }
       } catch (postErr) {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
@@ -459,8 +491,9 @@ export default function Compose() {
       </div>
 
       {/* Type is a posts concept — an event's type IS its category (and an
-          event post files as 'actionable' automatically). */}
-      {!isEvent && (
+          event post files as 'actionable' automatically). Courses & Library
+          have no social/Q&A split — they file as educational, no row shown. */}
+      {!isEvent && !isCourse && !isLibrary && (
         <>
           <label className="cmp__label">Type</label>
           <div className="cmp__chips">
@@ -497,6 +530,32 @@ export default function Compose() {
             </label>
           ))}
         </div>
+      )}
+
+      {(isCourse || isLibrary) && (
+        <>
+          <label className="cmp__label">Organize into (optional)</label>
+          <div className="cmp__chips">
+            {myCols.map((c) => (
+              <button
+                key={c.id}
+                className={'cmp__chip' + (organizeInto === c.id ? ' is-on' : '')}
+                onClick={() => { setOrganizeInto((cur) => (cur === c.id ? null : c.id)); setNewColName(''); }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <input
+            className="cmp__input"
+            value={newColName}
+            onChange={(e) => { setNewColName(e.target.value); if (e.target.value.trim()) setOrganizeInto(null); }}
+            placeholder={isCourse ? 'Or start a new course…' : 'Or start a new collection…'}
+          />
+          <p className="cmp__hint-ev">
+            This post becomes a piece of that {isCourse ? 'course — you\u2019ll arrange lessons on its page' : 'collection — you\u2019ll arrange the order on its page'}.
+          </p>
+        </>
       )}
 
       <label className="cmp__label" htmlFor="cmp-title">Title (optional)</label>
@@ -537,9 +596,9 @@ export default function Compose() {
         </div>
       )}
 
-      {(isEvent || isMarket) && (
+      {(isEvent || isMarket || isCourse) && (
         <div className="cmp__market">
-          <p className="cmp__market-head">{isEvent ? 'Event details' : 'Marketplace details'}</p>
+          <p className="cmp__market-head">{isEvent ? 'Event details' : isCourse && !isMarket ? 'The exchange' : 'Marketplace details'}</p>
           {isEvent && (
             <>
               <label className="cmp__label">Category</label>
@@ -551,7 +610,7 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : isCourse && !isMarket ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
           <div className="cmp__chips">
             {!isEvent && (
               <button
@@ -564,7 +623,7 @@ export default function Compose() {
             )}
             <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
-            {!isEvent && (
+            {!isEvent && (isMarket || !isCourse) && (
               <>
                 <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => { setEvMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
                 <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>

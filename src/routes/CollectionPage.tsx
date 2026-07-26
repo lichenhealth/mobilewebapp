@@ -13,7 +13,7 @@ import {
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
-import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
+import { myDutiesIn, holdsDuty, createSpaceWithLocation } from '../lib/spacesApi';
 import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
   addToCollection, loadProgress, enroll, setLessonDone,
@@ -56,6 +56,7 @@ export default function CollectionPage() {
   // owner editing
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newModuleName, setNewModuleName] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [form, setForm] = useState<OfferingMeta>({});
@@ -103,6 +104,64 @@ export default function CollectionPage() {
   const isOwner = !!me && meta?.owner_id === me;
   // The curators: the human who made it + any space admin stewarding this duty.
   const canEdit = isOwner || spaceDuty;
+
+  // ── Canvas-style modules (founder + Melanie 2026-07-26): named groups of
+  // lessons, stored in details.modules — display groups + owner assignment.
+  const lessonGroups = useMemo(() => {
+    const mods = meta?.details.modules ?? [];
+    if (meta?.kind !== 'course' || mods.length === 0) {
+      return [{ title: 'Lessons', posts }];
+    }
+    const byId = new Map(posts.map((p) => [p.id, p]));
+    const used = new Set<string>();
+    const gs = mods.map((m) => {
+      const inMod = m.ids.map((pid) => byId.get(pid)).filter((p): p is FeedPost => !!p);
+      inMod.forEach((p) => used.add(p.id));
+      return { title: m.title, posts: inMod };
+    });
+    const rest = posts.filter((p) => !used.has(p.id));
+    if (rest.length) gs.push({ title: 'More lessons', posts: rest });
+    return gs.filter((g) => g.posts.length > 0 || true);
+  }, [posts, meta]);
+  const showModules = meta?.kind === 'course' && (meta?.details.modules?.length ?? 0) > 0;
+
+  async function saveDetails(next: OfferingMeta) {
+    await updateCollection(id, { details: next });
+    setMeta((m) => (m ? { ...m, details: next } : m));
+    setForm(next);
+  }
+  const moduleOf = (pid: string): string =>
+    (meta?.details.modules ?? []).find((m) => m.ids.includes(pid))?.title ?? '';
+  async function setLessonModule(pid: string, title: string) {
+    if (!meta) return;
+    const mods = (meta.details.modules ?? []).map((m) => ({
+      title: m.title,
+      ids: m.ids.filter((x) => x !== pid),
+    }));
+    if (title) mods.find((m) => m.title === title)?.ids.push(pid);
+    await saveDetails({ ...meta.details, modules: mods });
+  }
+  async function addModule() {
+    const nm = newModuleName.trim();
+    if (!nm || !meta) return;
+    if ((meta.details.modules ?? []).some((m) => m.title === nm)) { setNewModuleName(''); return; }
+    await saveDetails({ ...meta.details, modules: [...(meta.details.modules ?? []), { title: nm, ids: [] }] });
+    setNewModuleName('');
+  }
+  async function removeModule(title: string) {
+    if (!meta) return;
+    await saveDetails({
+      ...meta.details,
+      modules: (meta.details.modules ?? []).filter((m) => m.title !== title),
+    });
+  }
+  // The course circle: a REAL Lichen group — chat, events, and find-a-time
+  // come along for free; joining runs through the group's own consent flow.
+  async function createCircle() {
+    if (!meta || !me) return;
+    const gid = await createSpaceWithLocation(me, `${meta.name} Circle`, 'group', '', null);
+    await saveDetails({ ...meta.details, circleId: gid });
+  }
   const structured = meta?.kind === 'course' || meta?.kind === 'path';
   const firstUnfinished = useMemo(() => posts.find((p) => !done.has(p.id)) ?? posts[0], [posts, done]);
   const pct = posts.length ? Math.round((done.size / posts.length) * 100) : 0;
@@ -214,6 +273,19 @@ export default function CollectionPage() {
 
       {error && <p className="colp__error">{error}</p>}
 
+      {/* The course circle: chat, cohort, and scheduling — the integrated
+          platform showing up inside the course (founder + Melanie 2026-07-26). */}
+      {meta.kind === 'course' && meta.details.circleId && (
+        <div className="colp__circle">
+          <button className="colp__circle-door" onClick={() => navigate(`/spaces/${meta.details.circleId}`)}>
+            <Icon name="groups" size={14} /> Course circle <em>chat &amp; cohort</em>
+          </button>
+          <button className="colp__circle-door" onClick={() => navigate('/calendar')}>
+            <Icon name="calendar" size={14} /> Find a time <em>calendars, woven</em>
+          </button>
+        </div>
+      )}
+
       {/* Learner loop: enroll + progress (structured, signed-in non-curators, has lessons). */}
       {structured && !canEdit && me && posts.length > 0 && (
         <div className="colp__learn">
@@ -247,6 +319,13 @@ export default function CollectionPage() {
           {structured && (
             <button className="btn colp__btn" onClick={() => void openLessonPicker()}>
               {pickOpen ? 'Close' : `Add ${itemWord(meta.kind)}s`}
+            </button>
+          )}
+          {meta.kind === 'course' && !meta.details.circleId && (
+            <button className="btn colp__btn" disabled={busy}
+              title="A real Lichen group for this course — chat, events, and find-a-time come with it"
+              onClick={() => void act(createCircle)}>
+              Create course circle
             </button>
           )}
           <button
@@ -324,6 +403,31 @@ export default function CollectionPage() {
                 onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
               <input className="prof__input" value={form.price ?? ''} placeholder="Price / access (e.g. Free, $120, Sliding $40–$120)"
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value || undefined }))} />
+              {meta.kind === 'course' && (
+                <>
+                  <span className="colp__meta-label">Modules</span>
+                  {(meta.details.modules ?? []).length > 0 && (
+                    <div className="colp__chips">
+                      {(meta.details.modules ?? []).map((m) => (
+                        <span key={m.title} className="colp__chip is-on colp__modchip">
+                          {m.title}
+                          <button className="colp__modchip-x" aria-label={`Remove module ${m.title}`}
+                            onClick={() => void act(() => removeModule(m.title))}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="colp__modadd">
+                    <input className="prof__input" value={newModuleName}
+                      onChange={(e) => setNewModuleName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void act(addModule); }}
+                      placeholder="New module (e.g. Week 1 — Foundations)" />
+                    <button className="btn colp__btn" disabled={busy || !newModuleName.trim()}
+                      onClick={() => void act(addModule)}>Add module</button>
+                  </div>
+                  <p className="colp__addhint">Assign each lesson to a module with the selector beside it below.</p>
+                </>
+              )}
             </div>
           )}
           <button
@@ -434,7 +538,16 @@ export default function CollectionPage() {
             {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}
-        {posts.map((p, i) => {
+        {lessonGroups.map((g) => (
+          <div key={g.title} className="colp__modgroup">
+            {showModules && (
+              <div className="colp__module">
+                <span className="colp__module-title">{g.title}</span>
+                <span className="colp__module-count">{g.posts.length} {g.posts.length === 1 ? 'lesson' : 'lessons'}</span>
+              </div>
+            )}
+            {g.posts.map((p, i) => {
+          const gi = posts.indexOf(p);
           const card = (
             <FeedCard
               key={p.id}
@@ -480,17 +593,32 @@ export default function CollectionPage() {
                   </button>
                 )}
                 <span className="colp__lesson-n">{i + 1}</span>
+                {editing && meta.kind === 'course' && (meta.details.modules?.length ?? 0) > 0 && (
+                  <select
+                    className="colp__modsel"
+                    value={moduleOf(p.id)}
+                    onChange={(e) => void act(() => setLessonModule(p.id, e.target.value))}
+                    aria-label="Module"
+                  >
+                    <option value="">— module —</option>
+                    {(meta.details.modules ?? []).map((m) => (
+                      <option key={m.title} value={m.title}>{m.title}</option>
+                    ))}
+                  </select>
+                )}
                 {editing && (
                   <span className="colp__reorder">
-                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><Icon name="arrow-up" size={13} /></button>
-                    <button className="colp__reorder-down" onClick={() => move(i, 1)} disabled={i === posts.length - 1} aria-label="Move down"><Icon name="arrow-up" size={13} /></button>
+                    <button onClick={() => move(gi, -1)} disabled={gi === 0} aria-label="Move up"><Icon name="arrow-up" size={13} /></button>
+                    <button className="colp__reorder-down" onClick={() => move(gi, 1)} disabled={gi === posts.length - 1} aria-label="Move down"><Icon name="arrow-up" size={13} /></button>
                   </span>
                 )}
               </div>
               <div className="colp__lesson-body">{card}</div>
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </section>
     </div>
   );

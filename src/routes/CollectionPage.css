@@ -129,3 +129,34 @@
 }
 .colp__confirm-text { flex: 1; min-width: 200px; font-size: 13px; color: var(--ink); }
 .colp__confirm-text em { font-style: italic; font-family: var(--font-display); }
+
+/* ── Modules (the Canvas idiom) + the course circle ─────────────────────── */
+.colp__module {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: var(--s-4) 0 var(--s-2); padding-bottom: 6px;
+  border-bottom: 2px solid var(--peach);
+}
+.colp__modgroup:first-child .colp__module { margin-top: 0; }
+.colp__module-title { font-family: var(--font-display); font-style: italic; font-size: 18px; color: var(--ink); }
+.colp__module-count { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
+.colp__modsel {
+  max-width: 110px; font-size: 10px; padding: 3px 4px; border-radius: 6px;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink-soft);
+}
+.colp__modchip { display: inline-flex; align-items: center; gap: 6px; }
+.colp__modchip-x {
+  border: 0; background: transparent; color: inherit; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 0;
+}
+.colp__modadd { display: flex; gap: var(--s-2); }
+.colp__modadd .prof__input { flex: 1; }
+.colp__circle { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-bottom: var(--s-3); }
+.colp__circle-door {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 14px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--peach);
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.colp__circle-door:hover { background: var(--peach-tint); }
+.colp__circle-door svg { color: var(--peach-deep); }
+.colp__circle-door em { font-style: normal; font-size: 11px; color: var(--ink-faint); }
