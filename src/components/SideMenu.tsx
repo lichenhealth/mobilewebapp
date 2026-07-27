@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
-import { listMyMemberSpaces, type MappableSpace } from '../lib/spacesApi';
+import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type AdminDesk } from '../lib/spacesApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
@@ -73,7 +73,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     .flatMap((p) => (p.to === '/profile' && user
       ? [p, { to: `/members/${user.id}`, label: 'Public profile', icon: 'globe' as IconName }]
       : [p]));
-  const { countsBySection, totalUnread } = useNotifications();
+  const { countsBySection, countsBySpace, totalUnread } = useNotifications();
+  // Admin view (founder 2026-07-27): flip the space lists from engagement
+  // (peach unreads) to stewardship — only the spaces you manage, blue badges
+  // counting what waits at each desk, taps landing backstage. Blue = tending
+  // the structure; peach = life inside it.
+  const [adminView, setAdminView] = useState(() => localStorage.getItem('menu-admin-view') === '1');
+  const [desk, setDesk] = useState<AdminDesk>({ ids: new Set(), counts: {} });
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
@@ -87,17 +93,32 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     if (!user) return;
     let live = true;
     (async () => {
-      const rows = await listMyMemberSpaces(user.id);
-      if (live) setMySpaces(rows);
+      const [rows, d] = await Promise.all([
+        listMyMemberSpaces(user.id), listMyAdminDeskCounts(user.id),
+      ]);
+      if (live) { setMySpaces(rows); setDesk(d); }
     })();
     return () => { live = false; };
   }, [open, user]);
 
-  const itemsFor = (key: string): { label: string; href: string }[] => {
+  const itemsFor = (key: string): { label: string; href: string; count: number; admin: boolean }[] => {
     const kind = SPACE_SECTIONS.find((s) => s.key === key)?.kind;
     if (!kind) return [];
     return mySpaces.filter((s) => s.kind === kind)
-      .map((s) => ({ label: s.name, href: `/spaces/${s.id}` }));
+      .filter((s) => !adminView || desk.ids.has(s.id))
+      .map((s) => ({
+        label: s.name,
+        href: adminView ? `/spaces/${s.id}?manage=1` : `/spaces/${s.id}`,
+        count: adminView ? (desk.counts[s.id] ?? 0) : (countsBySpace[s.id] ?? 0),
+        admin: desk.ids.has(s.id),
+      }));
+  };
+  const deskTotal = Object.values(desk.counts).reduce((a, b) => a + b, 0);
+  const flipAdminView = () => {
+    setAdminView((v) => {
+      localStorage.setItem('menu-admin-view', v ? '' : '1');
+      return !v;
+    });
   };
 
   // Lock body scroll + close on Escape
@@ -166,8 +187,23 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             })}
           </div>
 
+          {desk.ids.size > 0 && (
+            <button
+              className={'side-menu__adminview' + (adminView ? ' is-on' : '')}
+              onClick={flipAdminView}
+              title={adminView
+                ? 'Back to the regular menu'
+                : 'See the spaces you manage and what needs your attention'}
+            >
+              <Icon name="settings" size={15} />
+              <span>Admin view</span>
+              {deskTotal > 0 && <span className="side-menu__deskbadge">{deskTotal > 9 ? '9+' : deskTotal}</span>}
+            </button>
+          )}
+
           {SECTIONS.map((s) => {
             const items = itemsFor(s.key);
+            if (adminView && (s.key === 'mycelium' || items.length === 0)) return null;
             return (
               <div key={s.key} className="side-menu__section">
                 <button
@@ -186,7 +222,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                     />
                   )}
                 </button>
-                {expanded[s.key] && items.length > 0 && (
+                {(expanded[s.key] || adminView) && items.length > 0 && (
                   <ul className="side-menu__sub-list">
                     {items.map((item) => (
                       <li key={item.href}>
@@ -195,6 +231,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                           onClick={() => go(item.href)}
                         >
                           {item.label}
+                          {item.count > 0 && (
+                            <span className={'side-menu__deskbadge' + (adminView ? '' : ' side-menu__deskbadge--peach')}>
+                              {item.count > 9 ? '9+' : item.count}
+                            </span>
+                          )}
                         </button>
                       </li>
                     ))}

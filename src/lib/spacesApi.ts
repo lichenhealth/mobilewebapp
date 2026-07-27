@@ -488,3 +488,40 @@ export async function decideSectionShare(
   });
   if (error) throw error;
 }
+
+// ─── The steward's ledger: what's waiting across every space you admin ──────
+// Batched (4 queries total, not per-space) so the side menu can wear blue
+// admin badges without hammering the API. Duty-scoped: a Library-only admin
+// only counts library shares; membership requests need the 'members' duty.
+export interface AdminDesk { ids: Set<string>; counts: Record<string, number> }
+export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
+  const { data: mine } = await supabase.from('space_members')
+    .select('space_id, role, duties')
+    .eq('profile_id', me).in('role', ['admin', 'super_admin']);
+  const rows = (mine as { space_id: string; role: string; duties: string[] | null }[] | null) ?? [];
+  const ids = rows.map((r) => r.space_id);
+  const desk: AdminDesk = { ids: new Set(ids), counts: {} };
+  if (!ids.length) return desk;
+  const dutyOf = new Map(rows.map((r) => [r.space_id, { role: r.role, duties: r.duties }]));
+  const has = (sid: string, duty: string) => {
+    const d = dutyOf.get(sid);
+    return !!d && holdsDuty(d.role as SpaceRole, d.duties, duty);
+  };
+  const bump = (sid: string) => { desk.counts[sid] = (desk.counts[sid] ?? 0) + 1; };
+  const [shares, reqs, nests] = await Promise.all([
+    supabase.from('space_section_shares').select('space_id, area')
+      .eq('status', 'pending').in('space_id', ids),
+    supabase.from('space_membership_requests').select('space_id, profile_id')
+      .in('space_id', ids),
+    supabase.from('space_nesting_requests').select('parent_id')
+      .in('parent_id', ids),
+  ]);
+  for (const r of (shares.data as { space_id: string; area: string }[] | null) ?? []) {
+    if (has(r.space_id, r.area === 'courses' ? 'courses' : 'library')) bump(r.space_id);
+  }
+  for (const r of (reqs.data as { space_id: string }[] | null) ?? []) {
+    if (has(r.space_id, 'members')) bump(r.space_id);
+  }
+  for (const r of (nests.data as { parent_id: string }[] | null) ?? []) bump(r.parent_id);
+  return desk;
+}

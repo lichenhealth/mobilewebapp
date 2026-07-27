@@ -472,7 +472,7 @@ export default function SpaceProfile() {
 
       {isAdmin && !backstage && (
         <div className="sprof__manage">
-          <button className="sprof__edit-btn" onClick={() => setSearchParams({ manage: '1' })}>
+          <button className="sprof__edit-btn sprof__edit-btn--admin" onClick={() => setSearchParams({ manage: '1' })}>
             Manage this {kindLabel.toLowerCase()}
             {deskCount > 0 && <span className="sprof__managebadge">{deskCount}</span>}
           </button>
