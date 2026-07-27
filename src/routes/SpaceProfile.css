@@ -176,6 +176,8 @@
 
 /* ── Shelf-share queue ──────────────────────────────────────────────────── */
 .sprof__sharereq { flex-wrap: wrap; }
+/* The sentence takes the full row; the three decisions drop beneath it. */
+.sprof__sharereq .sprof__req-name { flex: 1 1 100%; }
 .sprof__share-title {
   background: transparent; border: 0; padding: 0; font: inherit; cursor: pointer;
   color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px;
@@ -189,12 +191,7 @@
   border-radius: 9px; background: var(--blue); color: #fff;
   font-size: 11px; font-weight: 700; line-height: 1;
 }
-/* Blue ring = stewardship door (matches the side menu's Admin view). */
-.sprof__edit-btn--admin {
-  border-color: var(--blue);
-  color: var(--blue-deep);
-}
-.sprof__edit-btn--admin:hover { background: var(--blue-tint); border-color: var(--blue-deep); color: var(--blue-deep); }
+
 .sprof__desknotes { display: grid; gap: 6px; }
 .sprof__desknote { margin: 0; font-size: 13.5px; color: var(--ink-muted); }
 .sprof__desknote.is-new { color: var(--ink); font-weight: 600; }

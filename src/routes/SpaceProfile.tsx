@@ -360,7 +360,31 @@ export default function SpaceProfile() {
   const pinned = space.lat != null && space.lng != null;
 
   return (
-    <div className="prof">
+    <div className={'prof' + (backstage ? ' is-adminview' : '')}>
+      {isAdmin && (
+        <div className="view-toggle-row">
+          <span className="view-toggle" role="group" aria-label="View">
+            <button
+              className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
+              onClick={() => { setEditOpen(false); setSearchParams({}); }}
+            >
+              Member view
+            </button>
+            <button
+              className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
+              onClick={() => setSearchParams({ manage: '1' })}
+            >
+              Admin view
+              {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
+            </button>
+          </span>
+          {backstage && (
+            <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
+              {editOpen ? 'Done editing' : 'Edit profile'}
+            </button>
+          )}
+        </div>
+      )}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
           {space.avatar_url ? (
@@ -467,29 +491,6 @@ export default function SpaceProfile() {
             onClick={() => void act(() => acceptInvite(id))}>Accept</button>
           <button className="btn sprof__invite-btn" disabled={memBusy}
             onClick={() => void act(() => removeRequest(id, me))}>Decline</button>
-        </div>
-      )}
-
-      {isAdmin && !backstage && (
-        <div className="sprof__manage">
-          <button className="sprof__edit-btn sprof__edit-btn--admin" onClick={() => setSearchParams({ manage: '1' })}>
-            Manage this {kindLabel.toLowerCase()}
-            {deskCount > 0 && <span className="sprof__managebadge">{deskCount}</span>}
-          </button>
-        </div>
-      )}
-
-      {backstage && (
-        <div className="sprof__manage">
-          <button
-            className="sprof__edit-btn"
-            onClick={() => { setEditOpen(false); setSearchParams({}); }}
-          >
-            ← Back to profile
-          </button>
-          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
-            {editOpen ? 'Done editing' : 'Edit profile'}
-          </button>
         </div>
       )}
 

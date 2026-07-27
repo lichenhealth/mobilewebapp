@@ -134,3 +134,17 @@
 /* Lichen* — the entrusted mode's footnote */
 .cmp__lichen-hint { margin: 2px 0 0; }
 .cmp__lichen-hint a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── The choice point: Social vs Actionable (founder + Melanie 2026-07-27) ── */
+.cmp__faces { display: flex; gap: 10px; margin-bottom: var(--s-3); }
+.cmp__face {
+  flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  padding: 12px 14px; border-radius: var(--r-md, 12px);
+  background: var(--bone-warm); border: 1.5px solid var(--bone-edge);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.cmp__face strong { font-size: 15px; font-weight: 600; color: var(--ink); }
+.cmp__face em { font-style: normal; font-size: 12px; color: var(--ink-muted); }
+.cmp__face.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.cmp__face.is-on strong { color: var(--peach-deep); }
+.cmp__face:disabled { opacity: 0.55; cursor: default; }

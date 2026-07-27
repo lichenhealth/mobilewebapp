@@ -66,7 +66,7 @@ const SECTIONS: NavSection[] = [
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin: platformAdmin } = useAuth();
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
     // "Public profile" = see yourself as other members do (/members/<me>).
@@ -199,6 +199,29 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               <span>Admin view</span>
               {deskTotal > 0 && <span className="side-menu__deskbadge">{deskTotal > 9 ? '9+' : deskTotal}</span>}
             </button>
+          )}
+
+          {adminView && platformAdmin && (
+            <div className="side-menu__section">
+              <button className="side-menu__header" aria-expanded>
+                <span className="side-menu__header-label">Lichen</span>
+              </button>
+              <ul className="side-menu__sub-list">
+                <li>
+                  <button className="side-menu__sub-item" onClick={() => go('/admin/supporters')}>
+                    Memberships &amp; gifts
+                  </button>
+                </li>
+                <li>
+                  <button className="side-menu__sub-item" onClick={() => go('/admin/categories')}>
+                    Review categories
+                    {(countsBySection['profile'] ?? 0) > 0 && (
+                      <span className="side-menu__deskbadge">{countsBySection['profile']}</span>
+                    )}
+                  </button>
+                </li>
+              </ul>
+            </div>
           )}
 
           {SECTIONS.map((s) => {

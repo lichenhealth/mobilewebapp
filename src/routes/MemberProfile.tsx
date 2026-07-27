@@ -138,11 +138,17 @@ export default function MemberProfile() {
   return (
     <div className="prof">
       {isSelf && (
-        <div className="mprof__selfbar">
-          <span>This is your public profile — how other members see you.</span>
-          <button className="mprof__selfbar-edit" onClick={() => navigate('/profile')}>
-            Edit profile <Icon name="chevron-right" size={12} />
-          </button>
+        <div className="view-toggle-row">
+          <span className="view-toggle" role="group" aria-label="View">
+            <button className="view-toggle__side is-on">Public view</button>
+            <button
+              className="view-toggle__side view-toggle__side--admin"
+              onClick={() => navigate('/profile')}
+            >
+              Admin view
+            </button>
+          </span>
+          <span className="mprof__selfhint">How other members see you.</span>
         </div>
       )}
       <div className="prof__head">

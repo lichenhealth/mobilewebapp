@@ -12,7 +12,7 @@ import {
 import { uploadVideo } from '../lib/videoApi';
 import { listMyCollections, createCollection, addToCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
-  CONTENT_TYPES, SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
+  SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
@@ -43,18 +43,16 @@ export default function Compose() {
   const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
   const [myAdminSpaces, setMyAdminSpaces] = useState<Set<string>>(new Set());
-  // Picking a Where suggests the natural Type (marketplace listing = something
-  // to act on; a course = educational) — but never overrides a type the
-  // member chose by hand.
-  const AREA_TYPE: Partial<Record<ServiceArea, ContentType>> = {
-    marketplace: 'actionable', events: 'actionable', work: 'actionable',
-    courses: 'educational', library: 'educational', art: 'creative',
-  };
-  const [contentType, setContentType] = useState<ContentType>(() => {
-    const a = params.get('area') as ServiceArea | null;
-    return (a && AREA_TYPE[a]) || 'social';
-  });
-  const [typeTouched, setTypeTouched] = useState(false);
+  // The choice point (founder + Melanie, 2026-07-27): every post is either
+  // SOCIAL — it flows through a Space feed — or ACTIONABLE — it flows through
+  // the Lichen Economy (every actionable post rides the Marketplace; a gift
+  // is simply an offer open to anyone). The old five-way Type row is gone;
+  // legacy content_types survive on old posts (contentType preserves them
+  // through an edit unless the member taps a face).
+  const [face, setFace] = useState<'social' | 'actionable'>(() =>
+    params.get('area') ? 'actionable' : 'social');
+  const [contentType, setContentType] = useState<ContentType>(() =>
+    params.get('area') ? 'actionable' : 'social');
   // "Where": a post can live in several areas at once.
   const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
     const a = params.get('area') as ServiceArea | null;
@@ -146,7 +144,7 @@ export default function Compose() {
       setToMycelium(p.to_mycelium);
       setAudienceSpaces(new Set(p.audience_space_ids ?? []));
       setContentType(p.content_type);
-      setTypeTouched(true);
+      setFace(p.content_type === 'actionable' || postAreas(p).length > 0 ? 'actionable' : 'social');
       setAreas(new Set(postAreas(p)));
       setTitle(p.title ?? '');
       setBody(p.body ?? '');
@@ -219,8 +217,16 @@ export default function Compose() {
     // Editing an event post: it's anchored to a real calendar event, so
     // 'events' can't be unchecked (cancel the event instead).
     if (editing && a === 'events' && areas.has('events') && editLinkedEvent.current) return;
-    if (!areas.has(a) && !typeTouched && AREA_TYPE[a]) setContentType(AREA_TYPE[a]!);
     setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
+  };
+  const pickSocial = () => {
+    // An event post can't demote to social — its calendar event anchors it.
+    if (editing && editLinkedEvent.current) return;
+    setFace('social'); setContentType('social'); setAreas(new Set()); setWhereOpen(false);
+  };
+  const pickActionable = () => {
+    setFace('actionable'); setContentType('actionable');
+    if (areas.size === 0) setWhereOpen(true);
   };
   const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
 
@@ -319,9 +325,12 @@ export default function Compose() {
       // "Everything is an exchange": a course offered for pay/trade/Lichen*
       // belongs in the Marketplace too (founder + Melanie, 2026-07-26).
       const effAreas = new Set(areas);
-      if (isCourse && ['paid', 'trade', 'lichen'].includes(evMode)) effAreas.add('marketplace');
+      // Everything actionable flows through the Marketplace (founder
+      // 2026-07-27): a gift is an offer open to anyone; paid library content
+      // is the paywall; the mode chips are the lens that sorts it all.
+      if (face === 'actionable') effAreas.add('marketplace');
       const details: Record<string, unknown> = {};
-      if (isMarket || isEvent || isCourse) {
+      if (face === 'actionable') {
         if (evMode === 'paid') {
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
             details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
@@ -336,7 +345,7 @@ export default function Compose() {
           details.location = location.trim();
           if (locGeo) details.geo = locGeo;
         }
-        if (isMarket || isCourse) {
+        if (!isEvent) {
           // Marketplace-compatible mode vocabulary. Lichen* = an entrusted
           // gift: the Lichen Economy Algorithm decides the allocation.
           details.mode = evMode === 'free' || evMode === 'lichen' ? 'gift'
@@ -380,7 +389,7 @@ export default function Compose() {
           }
         }
         await updatePost(editPostId, {
-          body, title, content_type: isEvent ? 'actionable' : (isCourse || isLibrary) ? 'educational' : contentType,
+          body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
@@ -415,7 +424,7 @@ export default function Compose() {
       }
       try {
         const created = await createPost({
-          body, title, content_type: isEvent ? 'actionable' : (isCourse || isLibrary) ? 'educational' : contentType,
+          body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
@@ -512,24 +521,33 @@ export default function Compose() {
         ))}
       </div>
 
-      {/* Type is a posts concept — an event's type IS its category (and an
-          event post files as 'actionable' automatically). Courses & Library
-          have no social/Q&A split — they file as educational, no row shown. */}
-      {!isEvent && !isCourse && !isLibrary && (
-        <>
-          <label className="cmp__label">Type</label>
-          <div className="cmp__chips">
-            {CONTENT_TYPES.map((t) => (
-              <button key={t.value} className={'cmp__chip' + (contentType === t.value ? ' is-on' : '')}
-                onClick={() => { setContentType(t.value); setTypeTouched(true); }}>{t.label}</button>
-            ))}
-          </div>
-        </>
-      )}
+      {/* The choice point: a post is Social (a feed story) or Actionable
+          (an exchange — it enters the Lichen Economy and rides the
+          Marketplace). Where-to-post lives beneath the actionable door. */}
+      <label className="cmp__label">What is this?</label>
+      <div className="cmp__faces">
+        <button
+          className={'cmp__face' + (face === 'social' ? ' is-on' : '')}
+          onClick={pickSocial}
+          disabled={editing && !!editLinkedEvent.current}
+          title={editing && editLinkedEvent.current ? 'An event post stays actionable — cancel the event to retire it' : undefined}
+        >
+          <strong>Social</strong>
+          <em>Flows through a Space feed</em>
+        </button>
+        <button
+          className={'cmp__face' + (face === 'actionable' ? ' is-on' : '')}
+          onClick={pickActionable}
+        >
+          <strong>Actionable</strong>
+          <em>Flows through the Lichen Economy</em>
+        </button>
+      </div>
 
-      <label className="cmp__label">Where (optional)</label>
+      {face === 'actionable' && (<>
+      <label className="cmp__label">Where</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
-        {areas.size === 0 ? <span className="cmp__where-none">— Anywhere (just a post) —</span> : (
+        {areas.size === 0 ? <span className="cmp__where-none">— The Marketplace (every offer starts there) —</span> : (
           <span className="cmp__where-sel">
             {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
               <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
@@ -553,6 +571,7 @@ export default function Compose() {
           ))}
         </div>
       )}
+      </>)}
 
       {(isCourse || isLibrary) && (
         <>
@@ -618,9 +637,9 @@ export default function Compose() {
         </div>
       )}
 
-      {(isEvent || isMarket || isCourse) && (
+      {face === 'actionable' && (
         <div className="cmp__market">
-          <p className="cmp__market-head">{isEvent ? 'Event details' : isCourse && !isMarket ? 'The exchange' : 'Marketplace details'}</p>
+          <p className="cmp__market-head">{isEvent ? 'Event details' : 'The exchange'}</p>
           {isEvent && (
             <>
               <label className="cmp__label">Category</label>
@@ -632,7 +651,7 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : isCourse && !isMarket ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : (isCourse || isLibrary) && !isMarket ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
           <div className="cmp__chips">
             {!isEvent && (
               <button
@@ -645,7 +664,7 @@ export default function Compose() {
             )}
             <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
-            {!isEvent && (isMarket || !isCourse) && (
+            {!isEvent && (isMarket || (!isCourse && !isLibrary)) && (
               <>
                 <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => { setEvMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
                 <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>

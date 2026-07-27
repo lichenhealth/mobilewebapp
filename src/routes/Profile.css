@@ -223,3 +223,5 @@
   font-size: 11px; font-weight: 600;
 }
 .prof__admin-go { margin-left: auto; color: var(--ink-faint); }
+
+.prof__selfhint { font-size: 12px; color: var(--ink-muted); }

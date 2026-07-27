@@ -327,7 +327,19 @@ export default function Profile() {
   const iCareFor = care.filter((c) => c.caregiver_id === meId); // people I care for
 
   return (
-    <div className="prof">
+    <div className="prof is-adminview">
+      <div className="view-toggle-row">
+        <span className="view-toggle" role="group" aria-label="View">
+          <button
+            className="view-toggle__side"
+            onClick={() => navigate(`/members/${user?.id}`)}
+          >
+            Public view
+          </button>
+          <button className="view-toggle__side view-toggle__side--admin is-on">Admin view</button>
+        </span>
+        <span className="prof__selfhint">Your profile's backend — only you see this page.</span>
+      </div>
       <div className="prof__head">
         <button
           className="prof__avatar-btn"
@@ -351,12 +363,6 @@ export default function Profile() {
             {tier.source === 'gift' ? ' · gifted' : ''}
           </span>
         )}
-      </div>
-
-      <div className="prof__public-row">
-        <button className="prof__public-btn" onClick={() => navigate(`/members/${user?.id}`)}>
-          View public profile <Icon name="chevron-right" size={12} />
-        </button>
       </div>
 
       {error && <p className="prof__error">{error}</p>}
