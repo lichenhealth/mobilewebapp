@@ -95,6 +95,11 @@ export default function Compose() {
   const [body, setBody] = useState('');
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
+  // Where it happens (founder 2026-07-27): Online and In person are
+  // CHECKBOXES — a hybrid offering carries a meeting link AND an address.
+  const [online, setOnline] = useState(false);
+  const [inPerson, setInPerson] = useState(false);
+  const [meetingUrl, setMeetingUrl] = useState('');
   // Coordinates from a picked LocationField suggestion (null = text-only).
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
 
@@ -185,7 +190,17 @@ export default function Compose() {
         }
       }
       if (typeof d.giftTo === 'string') setGiftTo(d.giftTo);
-      if (typeof d.location === 'string') setLocation(d.location);
+      if (typeof d.meetingUrl === 'string' && d.meetingUrl) { setMeetingUrl(d.meetingUrl); setOnline(true); }
+      if (typeof d.online === 'boolean') setOnline(d.online);
+      if (typeof d.inPerson === 'boolean') setInPerson(d.inPerson);
+      if (typeof d.location === 'string' && d.location) {
+        if (/^https?:\/\//i.test(d.location) && !d.meetingUrl) {
+          // Legacy posts kept the video link IN the location field.
+          setMeetingUrl(d.location); setOnline(true);
+        } else {
+          setLocation(d.location); setInPerson(true);
+        }
+      }
       const g = d.geo as { lat?: number; lng?: number } | undefined;
       if (g && typeof g.lat === 'number' && typeof g.lng === 'number') setLocGeo({ lat: g.lat, lng: g.lng });
       if (typeof d.bookingUrl === 'string') setBookingUrl(d.bookingUrl);
@@ -363,6 +378,10 @@ export default function Compose() {
       // only) — no silent re-add here.
       const effAreas = new Set(areas);
       const details: Record<string, unknown> = {};
+      // Events' calendar rows show ONE location line — the address when in
+      // person, else the meeting link (SmartLocation renders links as Join).
+      const effLocation = inPerson && location.trim() ? location.trim()
+        : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
       if (face === 'actionable') {
         if (hasMode('paid')) {
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
@@ -374,9 +393,16 @@ export default function Compose() {
           if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (hasMode('trade') && tradeFor.trim()) details.trade = tradeFor.trim();
-        if (location.trim()) {
+        if (online) details.online = true;
+        if (inPerson) details.inPerson = true;
+        if (online && meetingUrl.trim()) details.meetingUrl = meetingUrl.trim();
+        if (inPerson && location.trim()) {
           details.location = location.trim();
           if (locGeo) details.geo = locGeo;
+        } else if (online && meetingUrl.trim()) {
+          // Older surfaces render location — an online-only offer shows its
+          // Join link there (SmartLocation already turns it into a button).
+          details.location = meetingUrl.trim();
         }
         if (!isEvent) {
           // Marketplace vocabulary, PLURAL: details.modes = every selected
@@ -408,7 +434,7 @@ export default function Compose() {
           const evFields = {
             title: title.trim() || body.trim().slice(0, 60) || 'Event',
             description: body.trim(),
-            location: location.trim(),
+            location: effLocation,
             lat: locGeo?.lat ?? null,
             lng: locGeo?.lng ?? null,
             startDate: evRange.start,
@@ -449,7 +475,7 @@ export default function Compose() {
           ownerSpaceId: actor.type === 'space' ? actor.id : undefined,
           title: title.trim() || body.trim().slice(0, 60) || 'Event',
           description: body.trim(),
-          location: location.trim(),
+          location: effLocation,
           lat: locGeo?.lat ?? null,
           lng: locGeo?.lng ?? null,
           startDate: evRange.start,
@@ -765,9 +791,9 @@ export default function Compose() {
             <button className={'cmp__chip' + (hasMode('trade') ? ' is-on' : '')} onClick={() => toggleMode('trade')}>Trade</button>
             {!isEvent && !isCourse && (
               <>
-                <button className={'cmp__chip' + (hasMode('lend') ? ' is-on' : '')} onClick={() => { toggleMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
+                <button className={'cmp__chip' + (hasMode('lend') ? ' is-on' : '')} onClick={() => toggleMode('lend')}>Lend</button>
                 <button className={'cmp__chip' + (hasMode('rent') ? ' is-on' : '')} onClick={() => toggleMode('rent')}>Rent</button>
-                <button className={'cmp__chip' + (hasMode('borrow') ? ' is-on' : '')} onClick={() => { toggleMode('borrow'); if (!price.trim()) setPrice('Free'); }}>Borrow</button>
+                <button className={'cmp__chip' + (hasMode('borrow') ? ' is-on' : '')} onClick={() => toggleMode('borrow')}>Borrow</button>
                 <button className={'cmp__chip' + (hasMode('iso') ? ' is-on' : '')} onClick={() => toggleMode('iso')} title="In search of — you're looking to buy or find this">ISO</button>
               </>
             )}
@@ -824,13 +850,33 @@ export default function Compose() {
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
 
-          <label className="cmp__label">Location</label>
-          <LocationField
-            className="cmp__input"
-            value={location}
-            geo={locGeo}
-            onChange={(text, g) => { setLocation(text); setLocGeo(g); }}
-          />
+          <label className="cmp__label">Where it happens</label>
+          <div className="cmp__attend">
+            <label className="cmp__sliding">
+              <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} />
+              {' '}Online <em className="cmp__attend-hint">Zoom, Meet, a call</em>
+            </label>
+            <label className="cmp__sliding">
+              <input type="checkbox" checked={inPerson} onChange={(e) => setInPerson(e.target.checked)} />
+              {' '}In person
+            </label>
+          </div>
+          {online && (
+            <input
+              className="cmp__input"
+              value={meetingUrl}
+              onChange={(e) => setMeetingUrl(e.target.value)}
+              placeholder="Meeting link (https://zoom.us/… — optional, can come later)"
+            />
+          )}
+          {inPerson && (
+            <LocationField
+              className="cmp__input"
+              value={location}
+              geo={locGeo}
+              onChange={(text, g) => { setLocation(text); setLocGeo(g); }}
+            />
+          )}
 
           {isEvent && (
             <>

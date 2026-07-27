@@ -254,6 +254,9 @@ export interface SpaceHit {
   id: string; name: string; kind: string; location: string | null;
   lat: number | null; lng: number | null; distanceMi: number | null;
   recommenders: string[]; trusted: boolean;
+  /** The query matched this space's ADDRESS, not its name — present it
+   *  address-first: "320 Rustlers Rd, Bailey — LICHEN HQ" (founder 2026-07-27). */
+  addressMatch: boolean;
 }
 
 export interface SmartResults {
@@ -576,8 +579,26 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   }
 
   // ── Spaces ──────────────────────────────────────────────────────────────────
+  // Address recognition (founder 2026-07-27): "320 Rustlers Rd, Bailey" often
+  // parses into the ANCHOR, not terms — so match address tokens from both
+  // against each space's stored location. Two token hits (one, if it's all we
+  // have) reads as "you typed this place's address".
+  const addrTokens = [...new Set([
+    ...c.terms,
+    ...((c.anchorText ?? '').toLowerCase().split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 2 || /^\d+$/.test(t))),
+  ])];
+  const looksLikeAddress = (loc: string | null, name: string): boolean => {
+    if (!loc || addrTokens.length === 0) return false;
+    const hay = loc.toLowerCase();
+    const hits = addrTokens.filter((t) => hay.includes(t)).length;
+    if (hits === 0) return false;
+    if (hasText([name], addrTokens)) return false;   // name matches = a name hit
+    return hits >= Math.min(2, addrTokens.length);
+  };
   let spaceHits: SpaceHit[] = spaces.map((s) => ({
     id: s.id, name: s.name, kind: s.kind, location: s.location,
+    addressMatch: looksLikeAddress(s.location, s.name),
     lat: s.lat, lng: s.lng,
     distanceMi: anchor && s.lat != null && s.lng != null
       ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
@@ -599,14 +620,16 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     if (anchor && c.radiusMiles != null) {
       if (s.distanceMi == null || s.distanceMi > c.radiusMiles) return false;
     }
-    if (!hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
+    if (!s.addressMatch
+      && !hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
     return true;
   });
   const wantsSpaces = !c.authorScope && (c.who.includes('organizations') || c.spaceScope.length > 0
     || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly));
-  if (!wantsSpaces) spaceHits = [];
+  if (!wantsSpaces) spaceHits = spaceHits.filter((h) => h.addressMatch);
   spaceHits.sort((a, b) =>
-    (b.recommenders.length - a.recommenders.length)
+    (Number(b.addressMatch) - Number(a.addressMatch))
+    || (b.recommenders.length - a.recommenders.length)
     || ((a.distanceMi ?? 1e9) - (b.distanceMi ?? 1e9))
     || a.name.localeCompare(b.name));
 
