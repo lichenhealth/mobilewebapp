@@ -78,6 +78,12 @@ export default function Compose() {
   const [modes, setModes] = useState<Set<OfferMode>>(
     () => new Set([params.get('entrust') === '1' ? 'lichen' : 'free'] as OfferMode[]));
   const [giftTo, setGiftTo] = useState('');
+  // Lend/rent/borrow/ISO each keep their own terms line (they used to fight
+  // over one shared field). details.modeNotes carries the map.
+  const [modeNotes, setModeNotes] = useState<Record<string, string>>({});
+  // A SET term freezes into a sentence that follows the post (founder
+  // 2026-07-27) — presentation only; typed values save either way.
+  const [setTerms, setSetTerms] = useState<Set<OfferMode>>(new Set());
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
   const [evStartMin, setEvStartMin] = useState(18 * 60);
@@ -190,6 +196,7 @@ export default function Compose() {
         }
       }
       if (typeof d.giftTo === 'string') setGiftTo(d.giftTo);
+      if (d.modeNotes && typeof d.modeNotes === 'object') setModeNotes(d.modeNotes as Record<string, string>);
       if (typeof d.meetingUrl === 'string' && d.meetingUrl) { setMeetingUrl(d.meetingUrl); setOnline(true); }
       if (typeof d.online === 'boolean') setOnline(d.online);
       if (typeof d.inPerson === 'boolean') setInPerson(d.inPerson);
@@ -258,7 +265,10 @@ export default function Compose() {
     setModes((cur) => {
       const n = new Set(cur);
       if (n.has(m)) {
-        if (n.size > 1) n.delete(m);          // an offer keeps at least one mode
+        if (n.size > 1) {
+          n.delete(m);          // an offer keeps at least one mode
+          setSetTerms((c) => { const t = new Set(c); t.delete(m); return t; });
+        }
       } else {
         if (m === 'lichen') return new Set(['lichen'] as OfferMode[]);
         n.delete('lichen');                    // Lichen* doesn't combine
@@ -405,6 +415,17 @@ export default function Compose() {
           details.location = meetingUrl.trim();
         }
         if (!isEvent) {
+          const notes = Object.fromEntries(
+            (['lend', 'rent', 'borrow', 'iso'] as OfferMode[])
+              .filter((m) => modes.has(m) && modeNotes[m]?.trim())
+              .map((m) => [m, modeNotes[m].trim()]));
+          if (Object.keys(notes).length) details.modeNotes = notes;
+          // Older surfaces show ONE terms line via details.price — keep it
+          // when Paid didn't already claim it.
+          if (!hasMode('paid') && !details.price) {
+            const firstNote = Object.values(notes)[0];
+            if (firstNote) details.price = firstNote;
+          }
           // Marketplace vocabulary, PLURAL: details.modes = every selected
           // mode; details.mode = the primary (gift-first — the Lichen economy
           // answers first) so older surfaces and the matcher keep working.
@@ -802,51 +823,128 @@ export default function Compose() {
           {!isEvent && modes.size > 1 && (
             <p className="cmp__hint-ev">One offer, several doors — a gift for some can be paid or traded for others.</p>
           )}
-          {!isEvent && (hasMode('free') || hasMode('lichen')) && (
-            <input
-              className="cmp__input"
-              value={giftTo}
-              onChange={(e) => setGiftTo(e.target.value)}
-              placeholder="Gift to… a person, group, or identity — Veterans, First Responders (optional)"
-            />
-          )}
-          {!isEvent && hasMode('lichen') && (
-            <p className="cmp__hint-ev cmp__lichen-hint">
-              * The Lichen Economy Algorithm assesses how to optimize your
-              contribution — allocated where it closes the most need.{' '}
-              <a href="/donate/how#economy" target="_blank" rel="noopener">Learn more</a>
-            </p>
-          )}
-          {!isEvent && hasMode('lichen') && (
-            <label className="cmp__sliding" title="Ownership passes to Lichen Health, a 501(c)(3) — once a steward accepts, your donation acknowledgment is emailed for your tax records">
-              <input type="checkbox" checked={inkind} onChange={(e) => setInkind(e.target.checked)} />
-              {' '}Donate it to Lichen — tax-deductible; a donation receipt follows when accepted
-            </label>
-          )}
-          {hasMode('paid') && (
+          {!isEvent && (() => {
+            const TERM_LABEL: Partial<Record<OfferMode, string>> = {
+              lichen: 'Lichen*', free: 'Gift', trade: 'Trade', lend: 'Lend',
+              rent: 'Rent', borrow: 'Borrow', iso: 'ISO', paid: 'Paid',
+            };
+            const order: OfferMode[] = ['lichen', 'free', 'trade', 'lend', 'rent', 'borrow', 'iso', 'paid'];
+            const sentence = (m: OfferMode): string => {
+              if (m === 'lichen') return 'routing entrusted to the Lichen Economy Algorithm';
+              if (m === 'free') return giftTo.trim() ? `to ${giftTo.trim()}` : 'freely, to anyone';
+              if (m === 'trade') return tradeFor.trim() ? `for ${tradeFor.trim()}` : 'open to offers';
+              if (m === 'paid') {
+                if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
+                return price.trim() || 'price to discuss';
+              }
+              return modeNotes[m]?.trim()
+                || (m === 'rent' ? 'rate to discuss' : m === 'borrow' ? 'timing to arrange'
+                  : m === 'iso' ? 'open budget' : 'terms to arrange');
+            };
+            const PLACEHOLDER: Partial<Record<OfferMode, string>> = {
+              free: 'to whom? — a person, a group, or an identity: Veterans, First Responders',
+              trade: 'for what? — e.g. eggs, firewood, bodywork',
+              lend: 'terms — e.g. return within a week',
+              rent: 'rate — e.g. $20/day',
+              borrow: 'for how long? — e.g. just the weekend',
+              iso: 'budget — e.g. up to $200',
+            };
+            const commit = (m: OfferMode) => setSetTerms((c) => new Set(c).add(m));
+            const uncommit = (m: OfferMode) => setSetTerms((c) => { const t = new Set(c); t.delete(m); return t; });
+            const onKey = (m: OfferMode) => (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(m); }
+            };
+            return (
+              <div className="cmp__terms">
+                {order.filter((m) => modes.has(m)).map((m) => (
+                  <div className={'cmp__term' + (setTerms.has(m) || m === 'lichen' ? ' is-set' : '')} key={m}>
+                    <span className="cmp__term-mode">{TERM_LABEL[m]}</span>
+                    {setTerms.has(m) || m === 'lichen' ? (
+                      <button className="cmp__term-frozen" onClick={() => m !== 'lichen' && uncommit(m)}
+                        title={m === 'lichen' ? undefined : 'Tap to edit this term'}>
+                        {sentence(m)}
+                        {m !== 'lichen' && <span className="cmp__term-editmark">✎</span>}
+                      </button>
+                    ) : (
+                      <>
+                        {m === 'free' && (
+                          <input className="cmp__term-input" value={giftTo} onKeyDown={onKey(m)}
+                            onChange={(e) => setGiftTo(e.target.value)} placeholder={PLACEHOLDER[m]} />
+                        )}
+                        {m === 'trade' && (
+                          <input className="cmp__term-input" value={tradeFor} onKeyDown={onKey(m)}
+                            onChange={(e) => setTradeFor(e.target.value)} placeholder={PLACEHOLDER[m]} />
+                        )}
+                        {(m === 'lend' || m === 'rent' || m === 'borrow' || m === 'iso') && (
+                          <input className="cmp__term-input" value={modeNotes[m] ?? ''} onKeyDown={onKey(m)}
+                            onChange={(e) => setModeNotes((c) => ({ ...c, [m]: e.target.value }))}
+                            placeholder={PLACEHOLDER[m]} />
+                        )}
+                        {m === 'paid' && (
+                          <span className="cmp__term-paid">
+                            {!sliding ? (
+                              <input className="cmp__term-input" value={price} onKeyDown={onKey(m)}
+                                onChange={(e) => setPrice(e.target.value)} placeholder="price — e.g. $45" />
+                            ) : (
+                              <>
+                                <input className="cmp__term-input" value={slideLow} onKeyDown={onKey(m)}
+                                  onChange={(e) => setSlideLow(e.target.value)} placeholder="from $" />
+                                <input className="cmp__term-input" value={slideHigh} onKeyDown={onKey(m)}
+                                  onChange={(e) => setSlideHigh(e.target.value)} placeholder="to $" />
+                              </>
+                            )}
+                            <label className="cmp__term-slide">
+                              <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> sliding
+                            </label>
+                          </span>
+                        )}
+                        <button className="cmp__term-btn" onClick={() => commit(m)}
+                          title="Set this term — it follows the post wherever it goes">
+                          Set ⏎
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+                {modes.has('lichen') && (
+                  <>
+                    <p className="cmp__hint-ev cmp__lichen-hint">
+                      * The Lichen Economy Algorithm assesses how to optimize your
+                      contribution — allocated where it closes the most need.{' '}
+                      <a href="/donate/how#economy" target="_blank" rel="noopener">Learn more</a>
+                    </p>
+                    <label className="cmp__sliding" title="Ownership passes to Lichen Health, a 501(c)(3) — once a steward accepts, your donation acknowledgment is emailed for your tax records">
+                      <input type="checkbox" checked={inkind} onChange={(e) => setInkind(e.target.checked)} />
+                      {' '}Donate it to Lichen — tax-deductible; a donation receipt follows when accepted
+                    </label>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Events keep the simple single-mode fields. */}
+          {isEvent && evMode === 'paid' && (
             <label className="cmp__sliding">
               <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
             </label>
           )}
-          {hasMode('paid') && !sliding && (
+          {isEvent && evMode === 'paid' && !sliding && (
             <div className="cmp__row">
               <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45)" />
-              {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
+              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
             </div>
           )}
-          {hasMode('paid') && sliding && (
+          {isEvent && evMode === 'paid' && sliding && (
             <>
               <div className="cmp__row">
                 <input className="cmp__input" value={slideLow} onChange={(e) => setSlideLow(e.target.value)} placeholder="From (e.g. $20)" />
                 <input className="cmp__input" value={slideHigh} onChange={(e) => setSlideHigh(e.target.value)} placeholder="To (e.g. $60)" />
               </div>
-              {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
+              <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />
             </>
           )}
-          {!hasMode('paid') && (hasMode('lend') || hasMode('rent') || hasMode('borrow') || hasMode('iso')) && (
-            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={hasMode('rent') ? 'Rate (e.g. $20/day)' : hasMode('borrow') ? 'For how long? (e.g. just the weekend)' : hasMode('iso') ? 'Budget (optional — e.g. up to $200)' : 'Terms (e.g. return within a week)'} />
-          )}
-          {hasMode('trade') && (
+          {isEvent && evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
 

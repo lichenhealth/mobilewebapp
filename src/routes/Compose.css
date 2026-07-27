@@ -181,3 +181,35 @@
 
 .cmp__attend { display: flex; gap: 18px; align-items: center; margin-bottom: 6px; }
 .cmp__attend-hint { font-style: normal; font-size: 11.5px; color: var(--ink-faint); margin-left: 4px; }
+
+/* ── Exchange term rows: frozen mode left, condition right, Set locks it ── */
+.cmp__terms { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
+.cmp__term { display: flex; align-items: center; gap: 8px; }
+.cmp__term-mode {
+  flex-shrink: 0; min-width: 64px; text-align: center;
+  padding: 7px 12px; border-radius: var(--r-full);
+  background: var(--peach-tint); border: 1px solid var(--peach-light);
+  font-size: 13px; font-weight: 600; color: var(--peach-deep);
+}
+.cmp__term-input {
+  flex: 1; min-width: 0; padding: 9px 12px;
+  border: 1px solid var(--bone-edge); border-radius: 10px;
+  background: var(--bone-warm); font-family: inherit; font-size: 13.5px; color: var(--ink);
+}
+.cmp__term-btn {
+  flex-shrink: 0; padding: 7px 12px; border-radius: var(--r-full);
+  background: transparent; border: 1.5px solid var(--peach);
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--peach-deep); cursor: pointer; white-space: nowrap;
+}
+.cmp__term-btn:hover { background: var(--peach-tint); }
+.cmp__term-frozen {
+  flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border: 1px solid var(--peach-light); border-radius: 10px;
+  background: var(--bone); font-family: inherit; font-size: 13.5px; font-style: italic;
+  color: var(--ink-soft); cursor: pointer; text-align: left;
+}
+.cmp__term.is-set .cmp__term-mode { background: var(--peach); color: #fff; border-color: var(--peach); }
+.cmp__term-paid { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cmp__term-slide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+.cmp__term-editmark { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-faint); }
