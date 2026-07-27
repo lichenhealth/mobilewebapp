@@ -225,3 +225,8 @@
 .prof__admin-go { margin-left: auto; color: var(--ink-faint); }
 
 .prof__selfhint { font-size: 12px; color: var(--ink-muted); }
+
+/* Self-gifted by a platform admin: a stewardship fact wears blue. */
+.prof__tier--admin {
+  color: var(--blue-deep); background: var(--blue-tint); border-color: var(--blue);
+}

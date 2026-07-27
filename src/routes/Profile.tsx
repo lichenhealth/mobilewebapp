@@ -328,18 +328,6 @@ export default function Profile() {
 
   return (
     <div className="prof is-adminview">
-      <div className="view-toggle-row">
-        <span className="view-toggle" role="group" aria-label="View">
-          <button
-            className="view-toggle__side"
-            onClick={() => navigate(`/members/${user?.id}`)}
-          >
-            Public view
-          </button>
-          <button className="view-toggle__side view-toggle__side--admin is-on">Admin view</button>
-        </span>
-        <span className="prof__selfhint">Your profile's backend — only you see this page.</span>
-      </div>
       <div className="prof__head">
         <button
           className="prof__avatar-btn"
@@ -358,11 +346,24 @@ export default function Profile() {
         <h1 className="prof__name">{fullName || 'Your profile'}</h1>
         <p className="prof__email">{email}</p>
         {tier && (
-          <span className="prof__tier">
+          <span className={'prof__tier' + (isAdmin && tier.source === 'gift' ? ' prof__tier--admin' : '')}>
             {tier.tier === 'concierge' ? 'Concierge' : 'Community'} member
             {tier.source === 'gift' ? ' · gifted' : ''}
           </span>
         )}
+      </div>
+
+      <div className="view-toggle-row view-toggle-row--center">
+        <span className="view-toggle" role="group" aria-label="View">
+          <button
+            className="view-toggle__side"
+            onClick={() => navigate(`/members/${user?.id}`)}
+          >
+            Public view
+          </button>
+          <button className="view-toggle__side view-toggle__side--admin is-on">Admin view</button>
+        </span>
+        <span className="prof__selfhint">Your profile's backend — only you see this page.</span>
       </div>
 
       {error && <p className="prof__error">{error}</p>}

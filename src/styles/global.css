@@ -352,3 +352,5 @@ input, textarea, select { font: inherit; color: inherit; }
 /* Inside an admin view, decisions are blue — approvals, saves, role grants. */
 .is-adminview .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
 .is-adminview .btn-primary:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
+
+.view-toggle-row--center { justify-content: center; flex-wrap: wrap; text-align: center; }
