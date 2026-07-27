@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
+import { getIdentityTags } from '../lib/meansApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
 import {
@@ -82,6 +83,12 @@ export default function MemberProfile() {
   }, [id, me]);
 
   const isSelf = !!me && id === me;
+  const [idTags, setIdTags] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void getIdentityTags(id).then((t) => { if (live) setIdTags(t); });
+    return () => { live = false; };
+  }, [id]);
 
   if (loading) return <div className="prof"><p className="mprof__muted">Loading…</p></div>;
   if (!member) {
@@ -155,6 +162,11 @@ export default function MemberProfile() {
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
+        {idTags.length > 0 && (
+          <p className="mprof__idtags">
+            {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
+          </p>
+        )}
         {homeSpot?.place && (
           <p className="mprof__loc">
             <Icon name="location" size={12} />{' '}

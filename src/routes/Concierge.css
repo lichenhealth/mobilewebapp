@@ -1284,3 +1284,26 @@
 }
 .cedit__rec-hit:hover { background: var(--bone-warm); }
 .cedit__rec-hit em { font-style: normal; font-size: 11px; color: var(--ink-muted); margin-left: auto; }
+
+/* ── Financial position (the Economic aspect of the WOW) ─────────────── */
+.means { margin: var(--s-3) 0; border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px); background: var(--bone-warm); }
+.means__row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 14px; background: transparent; border: 0;
+  font-family: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left;
+}
+.means__title { font-weight: 600; }
+.means__state { margin-left: auto; font-size: 12px; color: var(--ink-muted); }
+.means__body { padding: 0 14px 14px; }
+.means__hint { margin: 0 0 10px; font-size: 12.5px; color: var(--ink-muted); line-height: 1.45; }
+.means__label { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--ink-muted); }
+.means__input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--bone-edge);
+  border-radius: 10px; background: var(--bone); font-family: inherit; font-size: 14px; color: var(--ink);
+}
+.means__words { min-height: 72px; resize: vertical; }
+.means__save { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.means__msg { font-size: 12.5px; color: var(--ink-muted); }
+.means__ro { margin: 6px 0; font-size: 14px; }
+.means__ro em { font-style: normal; font-size: 12px; color: var(--ink-muted); margin-right: 8px; }
+.means__ro-words { color: var(--ink-soft); line-height: 1.5; }

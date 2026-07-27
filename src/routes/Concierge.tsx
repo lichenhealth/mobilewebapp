@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
+import { getFinancialPosition, saveFinancialPosition, INCOME_BANDS, bandLabel, type FinancialPosition } from '../lib/meansApi';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
@@ -384,6 +385,91 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
       </aside>
 
       {errNote && <div className="mkt__toast">{errNote}</div>}
+    </div>
+  );
+}
+
+/** The Economic aspect of the Web of Wellbeing (founder 2026-07-27): the
+ *  member's honest financial picture. Owner edits; the active care team reads
+ *  (RLS enforces it). Never a score, never counted, never compared — it
+ *  informs subsidies and means-aware pricing in the exchange algorithm. */
+function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
+  const own = subjectId === me;
+  const [open, setOpen] = useState(false);
+  const [row, setRow] = useState<FinancialPosition | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [band, setBand] = useState<string>('');
+  const [household, setHousehold] = useState('');
+  const [words, setWords] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    let live = true;
+    void getFinancialPosition(subjectId).then((r) => {
+      if (!live) return;
+      setRow(r); setLoaded(true);
+      if (r) { setBand(r.income_band ?? ''); setHousehold(r.household_size?.toString() ?? ''); setWords(r.circumstances ?? ''); }
+    });
+    return () => { live = false; };
+  }, [subjectId]);
+  if (!loaded) return null;
+  const shared = !!row && (row.income_band || row.household_size || row.circumstances);
+  return (
+    <div className="means">
+      <button className="means__row" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <Icon name="dollar" size={15} />
+        <span className="means__title">Financial position</span>
+        <span className="means__state">{shared ? 'shared with your care team' : own ? 'not shared yet' : 'not shared'}</span>
+        <Icon name="chevron-right" size={13} />
+      </button>
+      {open && own && (
+        <div className="means__body">
+          <p className="means__hint">
+            Only you and your active care team can see this — never a score, never public.
+            An honest picture is what lets the network subsidize care fairly.
+          </p>
+          <label className="means__label">Household income</label>
+          <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>
+            <option value="">Prefer not to say</option>
+            {INCOME_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+          </select>
+          <label className="means__label">People in your household</label>
+          <input className="means__input" type="number" min={1} max={20} value={household}
+            onChange={(e) => setHousehold(e.target.value)} placeholder="e.g. 3" />
+          <label className="means__label">In your own words (optional)</label>
+          <textarea className="means__input means__words" value={words} onChange={(e) => setWords(e.target.value)}
+            placeholder="Anything that shapes your financial picture — care costs, seasonal work, supporting family…" />
+          <div className="means__save">
+            <button className="btn btn-primary" disabled={saving}
+              onClick={() => {
+                setSaving(true); setMsg('');
+                void saveFinancialPosition({
+                  income_band: (band || null) as FinancialPosition['income_band'],
+                  household_size: household ? Number(household) : null,
+                  circumstances: words.trim() || null,
+                }).then(() => setMsg('Saved — visible to you and your care team.'))
+                  .catch((e) => setMsg((e as Error).message))
+                  .finally(() => setSaving(false));
+              }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {msg && <span className="means__msg">{msg}</span>}
+          </div>
+        </div>
+      )}
+      {open && !own && (
+        <div className="means__body">
+          {shared ? (
+            <>
+              {row?.income_band && <p className="means__ro"><em>Household income</em> {bandLabel(row.income_band)}</p>}
+              {row?.household_size != null && <p className="means__ro"><em>Household</em> {row.household_size} {row.household_size === 1 ? 'person' : 'people'}</p>}
+              {row?.circumstances && <p className="means__ro means__ro-words">{row.circumstances}</p>}
+            </>
+          ) : (
+            <p className="means__hint">They haven&rsquo;t shared a financial picture yet.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -919,6 +1005,9 @@ export default function Concierge() {
                   ))}
                 </div>
               </>
+            )}
+            {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (
+              <MeansCard subjectId={subjectId} me={me} />
             )}
             {canAuthor && (
               <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)} aria-label="Post to Web of Wellbeing">

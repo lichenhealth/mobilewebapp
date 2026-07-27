@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getIdentityTags, saveIdentityTags } from '../lib/meansApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -67,6 +68,10 @@ export default function Profile() {
   const [phone, setPhone] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
+  // Public identity tags ("Firefighter, Veteran") — comma-entered, chip-shown;
+  // what gift-targeted offers will one day match against. Fetched separately
+  // so the page keeps working before the column migration runs.
+  const [identity, setIdentity] = useState('');
   const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
   const [pushState, setPushState] = useState<PushState>('off');
   const [pushBusy, setPushBusy] = useState(false);
@@ -133,6 +138,7 @@ export default function Profile() {
       setLastName(p.last_name ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
+      void getIdentityTags(user.id).then((tags) => setIdentity(tags.join(', ')));
       setNotifPref(p.notification_pref ?? 'in_app');
     }
     setPhone(myPhone);
@@ -216,6 +222,8 @@ export default function Profile() {
         bio: bio.trim() || null,
       })
       .eq('id', user.id);
+    // Identity tags ride the same Save — quietly skipped pre-migration.
+    await saveIdentityTags(identity.split(',').map((t) => t.trim()).filter(Boolean));
     setSavingProfile(false);
     if (e) { setError(e.message); return; }
     setFullName(`${firstName.trim()} ${lastName.trim()}`.trim());
@@ -438,6 +446,16 @@ export default function Profile() {
         <div className="prof__field">
           <label className="prof__label">Bio</label>
           <textarea className="prof__textarea" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you and your work" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Identity</label>
+          <input
+            className="prof__input"
+            value={identity}
+            onChange={(e) => setIdentity(e.target.value)}
+            placeholder="Public identities, comma-separated — Firefighter, Veteran, Nurse…"
+          />
+          <p className="prof__hint">Shown on your public profile. Offers gifted to an identity (&ldquo;Gift to First Responders&rdquo;) will find you through these.</p>
         </div>
         <div className="prof__save-row">
           <button className="btn btn-primary" onClick={saveProfile} disabled={savingProfile}>
