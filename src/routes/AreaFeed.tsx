@@ -301,7 +301,15 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
                 <span className="afeed__course-name">{c.name}</span>
                 <span className="afeed__course-by">
-                  {c.owner?.full_name ?? 'a member'} · {c.item_count}{' '}
+                  <span
+                    role="link" tabIndex={0}
+                    className="afeed__course-author"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/members/${c.owner_id}`); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); navigate(`/members/${c.owner_id}`); } }}
+                  >
+                    {c.owner?.full_name ?? 'a member'}
+                  </span>
+                  {' · '}{c.item_count}{' '}
                   {structuredKind === 'course'
                     ? (c.item_count === 1 ? 'lesson' : 'lessons')
                     : (c.item_count === 1 ? 'piece' : 'pieces')}

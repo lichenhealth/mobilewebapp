@@ -458,3 +458,7 @@
 @media (min-width: 1024px) {
   .afeed__courses-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
+
+/* Course creator is a door to their profile (founder 2026-07-26) */
+.afeed__course-author { color: var(--peach-deep); cursor: pointer; }
+.afeed__course-author:hover { text-decoration: underline; }
