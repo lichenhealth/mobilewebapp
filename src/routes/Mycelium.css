@@ -48,7 +48,7 @@
   margin-top: var(--s-2);
   padding: 0 var(--s-5);
 }
-.myc__count-n { color: var(--peach); font-weight: 600; }
+.myc__count-n { color: var(--peach); font-weight: 600; margin-right: 6px; }
 
 /* ─── Entity-kind chips (multi-select) ──────────────────────────────── */
 .myc__kinds {

@@ -281,7 +281,9 @@
   text-transform: uppercase;
   color: var(--ink-faint);
 }
-.mkt__count-n { color: var(--peach); font-weight: 700; }
+/* margin, not a space char: the count row is a flex container (the view
+   toggle rides it) and flex eats whitespace-only text nodes */
+.mkt__count-n { color: var(--peach); font-weight: 700; margin-right: 6px; }
 
 /* ─── List ──────────────────────────────────────────────────────────── */
 .mkt__list {
