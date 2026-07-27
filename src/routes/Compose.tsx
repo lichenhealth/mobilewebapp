@@ -56,7 +56,10 @@ export default function Compose() {
   // "Where": a post can live in several areas at once.
   const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
     const a = params.get('area') as ServiceArea | null;
-    return new Set(a ? [a] : []);
+    // The Marketplace is the Commons' catch-all — pre-checked wherever an
+    // offer starts, but a CHECKBOX: deselect it to keep goods off the open
+    // square and shelve them only in Courses/Library/etc (founder 2026-07-27).
+    return new Set(a ? (a === 'marketplace' ? [a] : [a, 'marketplace']) : []);
   });
   const [whereOpen, setWhereOpen] = useState(false);
 
@@ -230,7 +233,8 @@ export default function Compose() {
   };
   const pickActionable = () => {
     setFace('actionable'); setContentType('actionable');
-    if (areas.size === 0) setWhereOpen(true);
+    setAreas((cur) => (cur.size === 0 ? new Set(['marketplace' as ServiceArea]) : cur));
+    setWhereOpen(true);
   };
   const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
 
@@ -328,11 +332,10 @@ export default function Compose() {
     try {
       // "Everything is an exchange": a course offered for pay/trade/Lichen*
       // belongs in the Marketplace too (founder + Melanie, 2026-07-26).
+      // The checkboxes are the truth: Marketplace arrives pre-checked with
+      // every offer, but deselecting it is a real choice (quieter shelves
+      // only) — no silent re-add here.
       const effAreas = new Set(areas);
-      // Everything actionable flows through the Marketplace (founder
-      // 2026-07-27): a gift is an offer open to anyone; paid library content
-      // is the paywall; the mode chips are the lens that sorts it all.
-      if (face === 'actionable') effAreas.add('marketplace');
       const details: Record<string, unknown> = {};
       if (face === 'actionable') {
         if (evMode === 'paid') {
@@ -551,7 +554,7 @@ export default function Compose() {
       {face === 'actionable' && (<>
       <label className="cmp__label">Where</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
-        {areas.size === 0 ? <span className="cmp__where-none">The Commons — where resources are managed, collectively</span> : (
+        {areas.size === 0 ? <span className="cmp__where-none">Nowhere yet — it would only flow through feeds</span> : (
           <span className="cmp__where-sel">
             {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
               <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
@@ -560,6 +563,18 @@ export default function Compose() {
         )}
         <span className={'cmp__where-caret' + (whereOpen ? ' is-open' : '')}><Icon name="chevron-right" size={14} /></span>
       </button>
+      {(() => {
+        const others = SERVICE_AREAS.filter((a) => a.value !== 'marketplace' && areas.has(a.value)).map((a) => a.label);
+        const inMkt = areas.has('marketplace');
+        const hint = inMkt && others.length
+          ? `In the open Marketplace, plus ${others.join(' and ')}.`
+          : inMkt
+          ? 'The Marketplace is the Commons\u2019 open square \u2014 check Courses, Library, or others to shelve this there too.'
+          : others.length
+          ? `Skipping the open Marketplace \u2014 this lives only in ${others.join(' and ')}.`
+          : 'Not placed anywhere \u2014 consider the Marketplace, or a quieter shelf.';
+        return <p className="cmp__hint cmp__where-hint">{hint}</p>;
+      })()}
       {whereOpen && (
         <div className="cmp__where-list">
           {SERVICE_AREAS.map((a) => (
@@ -704,7 +719,7 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : (isCourse || isLibrary) && !isMarket ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : isCourse ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
           <div className="cmp__chips">
             {!isEvent && (
               <button
@@ -717,7 +732,7 @@ export default function Compose() {
             )}
             <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
             <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
-            {!isEvent && (isMarket || (!isCourse && !isLibrary)) && (
+            {!isEvent && !isCourse && (
               <>
                 <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => { setEvMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
                 <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>
