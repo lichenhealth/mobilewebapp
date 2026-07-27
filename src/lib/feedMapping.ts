@@ -96,14 +96,24 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
     ...MODE_LABEL, sale: 'Pays', sliding: 'Pays', gift: 'Offered freely',
   };
   const rawMode = typeof p.details?.mode === 'string' ? (p.details.mode as string) : undefined;
+  // Multi-mode offers (founder 2026-07-27): details.modes lists every door —
+  // "Gift to Veterans · For sale · $40". Singles fall back to details.mode.
+  const rawModes: string[] = Array.isArray(p.details?.modes)
+    ? (p.details.modes as unknown[]).filter((m): m is string => typeof m === 'string')
+    : rawMode ? [rawMode] : [];
   const isWork = postAreas(p).includes('work');
-  const mode = rawMode ? (isWork ? WORK_MODE_LABEL[rawMode] : MODE_LABEL[rawMode]) : undefined;
+  const giftTo = typeof p.details?.giftTo === 'string' ? (p.details.giftTo as string) : undefined;
+  const labels = [...new Set(rawModes.map((m) => {
+    const base = isWork ? WORK_MODE_LABEL[m] : MODE_LABEL[m];
+    return m === 'gift' && giftTo ? `${base} to ${giftTo}` : base;
+  }).filter(Boolean))];
+  const mode = labels.length ? labels.join(' · ') : undefined;
   const rawPrice = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
-  const price = rawMode === 'sliding' && rawPrice
+  const price = rawModes.includes('sliding') && rawPrice
     ? 'sliding ' + rawPrice.replace(/^sliding scale\s*/i, '')
     : rawPrice;
   // Entrusted gifts say so: the giver handed allocation to the mycelium.
-  const entrusted = rawMode === 'gift' && p.details?.allocation === 'lichen';
+  const entrusted = rawModes.includes('gift') && p.details?.allocation === 'lichen';
   const offerLine = mode
     ? (price ? `${mode} · ${price}` : entrusted ? `${mode} · Lichen routes` : mode)
     : undefined;

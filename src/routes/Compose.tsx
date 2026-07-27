@@ -73,6 +73,11 @@ export default function Compose() {
   type OfferMode = EventMode | 'lend' | 'rent' | 'borrow' | 'iso' | 'lichen';
   const [evMode, setEvMode] = useState<OfferMode>(
     params.get('entrust') === '1' ? 'lichen' : 'free');
+  // Multi-select modes (non-event offers): one thing can be a gift to some
+  // and paid for others. Lichen* stays exclusive — it hands allocation over.
+  const [modes, setModes] = useState<Set<OfferMode>>(
+    () => new Set([params.get('entrust') === '1' ? 'lichen' : 'free'] as OfferMode[]));
+  const [giftTo, setGiftTo] = useState('');
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
   const [evStartMin, setEvStartMin] = useState(18 * 60);
@@ -165,15 +170,21 @@ export default function Compose() {
         if (ev.end_min != null) setEvEndMin(ev.end_min);
       }
       const d = p.details ?? {};
-      if (!p.event_mode && typeof d.mode === 'string') {
-        // Marketplace listings carry their mode in details.mode only.
-        const back: Record<string, OfferMode> = {
-          gift: 'free', sale: 'paid', sliding: 'paid',
-          trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow', iso: 'iso',
-        };
-        if (back[d.mode]) setEvMode(back[d.mode]);
+      const back: Record<string, OfferMode> = {
+        gift: 'free', sale: 'paid', sliding: 'paid',
+        trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow', iso: 'iso',
+      };
+      if (!p.event_mode) {
+        const stored = Array.isArray(d.modes)
+          ? (d.modes as string[]).map((m) => back[m]).filter(Boolean)
+          : typeof d.mode === 'string' && back[d.mode] ? [back[d.mode]] : [];
+        if (d.allocation === 'lichen') {
+          setModes(new Set(['lichen'] as OfferMode[])); setEvMode('lichen');
+        } else if (stored.length) {
+          setModes(new Set(stored)); setEvMode(stored[0]);
+        }
       }
-      if (d.allocation === 'lichen') setEvMode('lichen');
+      if (typeof d.giftTo === 'string') setGiftTo(d.giftTo);
       if (typeof d.location === 'string') setLocation(d.location);
       const g = d.geo as { lat?: number; lng?: number } | undefined;
       if (g && typeof g.lat === 'number' && typeof g.lng === 'number') setLocGeo({ lat: g.lat, lng: g.lng });
@@ -225,6 +236,21 @@ export default function Compose() {
     // 'events' can't be unchecked (cancel the event instead).
     if (editing && a === 'events' && areas.has('events') && editLinkedEvent.current) return;
     setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
+  };
+  const hasMode = (m: OfferMode) => (isEvent ? evMode === m : modes.has(m));
+  const toggleMode = (m: OfferMode) => {
+    if (isEvent) { setEvMode(m); return; }
+    setModes((cur) => {
+      const n = new Set(cur);
+      if (n.has(m)) {
+        if (n.size > 1) n.delete(m);          // an offer keeps at least one mode
+      } else {
+        if (m === 'lichen') return new Set(['lichen'] as OfferMode[]);
+        n.delete('lichen');                    // Lichen* doesn't combine
+        n.add(m);
+      }
+      return n;
+    });
   };
   const pickSocial = () => {
     // An event post can't demote to social — its calendar event anchors it.
@@ -338,7 +364,7 @@ export default function Compose() {
       const effAreas = new Set(areas);
       const details: Record<string, unknown> = {};
       if (face === 'actionable') {
-        if (evMode === 'paid') {
+        if (hasMode('paid')) {
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
             details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
             details.sliding = true;
@@ -347,19 +373,24 @@ export default function Compose() {
           }
           if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
-        if (evMode === 'trade' && tradeFor.trim()) details.trade = tradeFor.trim();
+        if (hasMode('trade') && tradeFor.trim()) details.trade = tradeFor.trim();
         if (location.trim()) {
           details.location = location.trim();
           if (locGeo) details.geo = locGeo;
         }
         if (!isEvent) {
-          // Marketplace-compatible mode vocabulary. Lichen* = an entrusted
-          // gift: the Lichen Economy Algorithm decides the allocation.
-          details.mode = evMode === 'free' || evMode === 'lichen' ? 'gift'
-            : evMode === 'paid' ? (sliding ? 'sliding' : 'sale')
-            : evMode;
-          if (evMode === 'lichen') details.allocation = 'lichen';
-          if (evMode === 'lichen' && inkind) details.inkind = true;
+          // Marketplace vocabulary, PLURAL: details.modes = every selected
+          // mode; details.mode = the primary (gift-first — the Lichen economy
+          // answers first) so older surfaces and the matcher keep working.
+          const canon = (m: OfferMode) => m === 'free' || m === 'lichen' ? 'gift'
+            : m === 'paid' ? (sliding ? 'sliding' : 'sale') : m;
+          const order: OfferMode[] = ['lichen', 'free', 'trade', 'lend', 'rent', 'borrow', 'iso', 'paid'];
+          const chosen = order.filter((m) => modes.has(m));
+          details.modes = [...new Set(chosen.map(canon))];
+          details.mode = canon(chosen[0]);
+          if ((modes.has('free') || modes.has('lichen')) && giftTo.trim()) details.giftTo = giftTo.trim();
+          if (modes.has('lichen')) details.allocation = 'lichen';
+          if (modes.has('lichen') && inkind) details.inkind = true;
         }
       }
       if (media.length) details.media = media;
@@ -707,7 +738,7 @@ export default function Compose() {
 
       {face === 'actionable' && (
         <div className="cmp__market">
-          <p className="cmp__market-head">{isEvent ? 'Event details' : 'The exchange'}</p>
+          <p className="cmp__market-head">{isEvent ? 'Event details' : 'Modes of exchange'}</p>
           {isEvent && (
             <>
               <label className="cmp__label">Category</label>
@@ -719,54 +750,65 @@ export default function Compose() {
               </div>
             </>
           )}
-          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : isCourse ? 'Lichen, gift, trade — or paid?' : 'Lichen, gift, trade, lend, rent, borrow, paid — or in search of?'}</label>
+          <label className="cmp__label">{isEvent ? 'Free, trade, or paid?' : isCourse ? 'Lichen, gift, trade, paid — every mode that applies' : 'Lichen, gift, trade, lend, rent, borrow, paid, ISO — every mode that applies'}</label>
           <div className="cmp__chips">
             {!isEvent && (
               <button
-                className={'cmp__chip' + (evMode === 'lichen' ? ' is-on' : '')}
-                onClick={() => setEvMode('lichen')}
-                title="An entrusted gift — the Lichen Economy Algorithm decides where it goes"
+                className={'cmp__chip' + (hasMode('lichen') ? ' is-on' : '')}
+                onClick={() => toggleMode('lichen')}
+                title="An entrusted gift — the Lichen Economy Algorithm decides where it goes (doesn't combine with other modes)"
               >
                 Lichen*
               </button>
             )}
-            <button className={'cmp__chip' + (evMode === 'free' ? ' is-on' : '')} onClick={() => setEvMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
-            <button className={'cmp__chip' + (evMode === 'trade' ? ' is-on' : '')} onClick={() => setEvMode('trade')}>Trade</button>
+            <button className={'cmp__chip' + (hasMode('free') ? ' is-on' : '')} onClick={() => toggleMode('free')}>{isEvent ? 'Free' : 'Gift'}</button>
+            <button className={'cmp__chip' + (hasMode('trade') ? ' is-on' : '')} onClick={() => toggleMode('trade')}>Trade</button>
             {!isEvent && !isCourse && (
               <>
-                <button className={'cmp__chip' + (evMode === 'lend' ? ' is-on' : '')} onClick={() => { setEvMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
-                <button className={'cmp__chip' + (evMode === 'rent' ? ' is-on' : '')} onClick={() => setEvMode('rent')}>Rent</button>
-                <button className={'cmp__chip' + (evMode === 'borrow' ? ' is-on' : '')} onClick={() => { setEvMode('borrow'); if (!price.trim()) setPrice('Free'); }}>Borrow</button>
-                <button className={'cmp__chip' + (evMode === 'iso' ? ' is-on' : '')} onClick={() => setEvMode('iso')} title="In search of — you're looking to buy or find this">ISO</button>
+                <button className={'cmp__chip' + (hasMode('lend') ? ' is-on' : '')} onClick={() => { toggleMode('lend'); if (!price.trim()) setPrice('Free'); }}>Lend</button>
+                <button className={'cmp__chip' + (hasMode('rent') ? ' is-on' : '')} onClick={() => toggleMode('rent')}>Rent</button>
+                <button className={'cmp__chip' + (hasMode('borrow') ? ' is-on' : '')} onClick={() => { toggleMode('borrow'); if (!price.trim()) setPrice('Free'); }}>Borrow</button>
+                <button className={'cmp__chip' + (hasMode('iso') ? ' is-on' : '')} onClick={() => toggleMode('iso')} title="In search of — you're looking to buy or find this">ISO</button>
               </>
             )}
-            <button className={'cmp__chip' + (evMode === 'paid' ? ' is-on' : '')} onClick={() => setEvMode('paid')}>Paid</button>
+            <button className={'cmp__chip' + (hasMode('paid') ? ' is-on' : '')} onClick={() => toggleMode('paid')}>Paid</button>
           </div>
-          {!isEvent && evMode === 'lichen' && (
+          {!isEvent && modes.size > 1 && (
+            <p className="cmp__hint-ev">One offer, several doors — a gift for some can be paid or traded for others.</p>
+          )}
+          {!isEvent && (hasMode('free') || hasMode('lichen')) && (
+            <input
+              className="cmp__input"
+              value={giftTo}
+              onChange={(e) => setGiftTo(e.target.value)}
+              placeholder="Gift to… a person, group, or identity — Veterans, First Responders (optional)"
+            />
+          )}
+          {!isEvent && hasMode('lichen') && (
             <p className="cmp__hint-ev cmp__lichen-hint">
               * The Lichen Economy Algorithm assesses how to optimize your
               contribution — allocated where it closes the most need.{' '}
               <a href="/donate/how#economy" target="_blank" rel="noopener">Learn more</a>
             </p>
           )}
-          {!isEvent && evMode === 'lichen' && (
+          {!isEvent && hasMode('lichen') && (
             <label className="cmp__sliding" title="Ownership passes to Lichen Health, a 501(c)(3) — once a steward accepts, your donation acknowledgment is emailed for your tax records">
               <input type="checkbox" checked={inkind} onChange={(e) => setInkind(e.target.checked)} />
               {' '}Donate it to Lichen — tax-deductible; a donation receipt follows when accepted
             </label>
           )}
-          {evMode === 'paid' && (
+          {hasMode('paid') && (
             <label className="cmp__sliding">
               <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> Sliding scale
             </label>
           )}
-          {evMode === 'paid' && !sliding && (
+          {hasMode('paid') && !sliding && (
             <div className="cmp__row">
               <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (e.g. $45)" />
               {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
             </div>
           )}
-          {evMode === 'paid' && sliding && (
+          {hasMode('paid') && sliding && (
             <>
               <div className="cmp__row">
                 <input className="cmp__input" value={slideLow} onChange={(e) => setSlideLow(e.target.value)} placeholder="From (e.g. $20)" />
@@ -775,10 +817,10 @@ export default function Compose() {
               {isEvent && <input className="cmp__input" value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking link (https://…)" />}
             </>
           )}
-          {(evMode === 'lend' || evMode === 'rent' || evMode === 'borrow' || evMode === 'iso') && (
-            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={evMode === 'rent' ? 'Rate (e.g. $20/day)' : evMode === 'borrow' ? 'For how long? (e.g. just the weekend)' : evMode === 'iso' ? 'Budget (optional — e.g. up to $200)' : 'Terms (e.g. return within a week)'} />
+          {!hasMode('paid') && (hasMode('lend') || hasMode('rent') || hasMode('borrow') || hasMode('iso')) && (
+            <input className="cmp__input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={hasMode('rent') ? 'Rate (e.g. $20/day)' : hasMode('borrow') ? 'For how long? (e.g. just the weekend)' : hasMode('iso') ? 'Budget (optional — e.g. up to $200)' : 'Terms (e.g. return within a week)'} />
           )}
-          {evMode === 'trade' && (
+          {hasMode('trade') && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
 

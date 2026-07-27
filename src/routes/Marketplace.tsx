@@ -45,13 +45,20 @@ const MODES: { chip: Chip; label: string; icon: IconName }[] = [
 const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
-function postMode(p: FeedPost): Mode | null {
+/** Every mode a listing carries — multi-mode offers match EVERY door they
+ *  open, not just the primary (a gift-to-veterans-or-paid listing shows under
+ *  both the Gift and For Sale lenses). */
+function postModes(p: FeedPost): Mode[] {
+  const arr = Array.isArray(p.details?.modes)
+    ? (p.details.modes as unknown[]).filter((m): m is Mode => typeof m === 'string' && ALL_MODES.includes(m as Mode))
+    : [];
+  if (arr.length) return arr;
   const m = p.details?.mode;
-  if (typeof m === 'string' && ALL_MODES.includes(m as Mode)) return m as Mode;
-  if (p.event_mode === 'free') return 'gift';
-  if (p.event_mode === 'trade') return 'trade';
-  if (p.event_mode === 'paid') return 'sale';
-  return null;
+  if (typeof m === 'string' && ALL_MODES.includes(m as Mode)) return [m as Mode];
+  if (p.event_mode === 'free') return ['gift'];
+  if (p.event_mode === 'trade') return ['trade'];
+  if (p.event_mode === 'paid') return ['sale'];
+  return [];
 }
 
 /** The real Marketplace: every post shared to the marketplace area, under the
@@ -116,8 +123,8 @@ export default function Marketplace() {
     // Unlabeled listings stay visible while any lens is on — only an
     // explicit mode can be filtered away.
     let list = posts.filter((p) => {
-      const m = postMode(p);
-      return m == null ? activeChips.length > 0 : wanted.has(m);
+      const ms = postModes(p);
+      return ms.length === 0 ? activeChips.length > 0 : ms.some((m) => wanted.has(m));
     });
     if (query.trim()) {
       const q = query.trim().toLowerCase();
