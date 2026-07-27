@@ -53,3 +53,28 @@ export async function getVideoJob(id: string): Promise<VideoJob | null> {
   if (error) { console.warn('getVideoJob:', error.message); return null; }
   return (data as VideoJob | null);
 }
+
+export interface ReadyVideo {
+  id: string;
+  hls_path: string;
+  poster_path: string | null;
+  duration_secs: number | null;
+  created_at: string;
+}
+
+/** Videos of mine the worker already finished — including big files ingested
+ *  straight from the studio Mac (worker/ingest.js), which never pass through
+ *  the browser at all. Compose's Video button offers these for attaching. */
+export async function listMyReadyVideos(): Promise<ReadyVideo[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from('video_jobs')
+    .select('id, hls_path, poster_path, duration_secs, created_at')
+    .eq('profile_id', user.id)
+    .eq('status', 'ready')
+    .order('created_at', { ascending: false })
+    .limit(60);
+  if (error) { console.warn('listMyReadyVideos:', error.message); return []; }
+  return ((data as ReadyVideo[] | null) ?? []).filter((r) => r.hls_path);
+}

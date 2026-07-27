@@ -31,3 +31,20 @@ worker is safe (jobs are claimed atomically).
 - Storage: originals + renditions ≈ 2× original size in the `videos` bucket.
 - When egress bills grow teeth, move the bucket to zero-egress object storage
   (Cloudflare R2) — the worker only changes its upload target.
+
+## Ingesting big files (Zoom recordings)
+
+Browser uploads are capped (~50MB on Supabase's free tier), but the studio
+Mac isn't. `ingest.js` transcodes locally and uploads only the small HLS
+segments — any size source works, no plan upgrade needed:
+
+```bash
+cd worker
+node --env-file=.env ingest.js "~/Downloads/Class 1 - Zoom Recording.mp4"
+```
+
+Multiple files fine (they queue). Owner defaults to
+`INGEST_OWNER_PROFILE_ID` in `.env`; pass `--owner <profile-uuid>` to ingest
+for another member. When it prints ✓ ready, the video appears in
+Compose → Video → "From my videos" — attach it to a lesson post like any
+other clip.

@@ -148,3 +148,33 @@
 .cmp__face.is-on { border-color: var(--peach); background: var(--peach-tint); }
 .cmp__face.is-on strong { color: var(--peach-deep); }
 .cmp__face:disabled { opacity: 0.55; cursor: default; }
+
+/* ── Video picker: device upload or an already-ingested Lichen video ── */
+.cmp__vidpick {
+  margin-top: var(--s-2); padding: 12px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md, 12px);
+}
+.cmp__vidpick-upload {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: var(--r-full);
+  background: transparent; border: 1.5px solid var(--peach);
+  font-family: inherit; font-size: 13.5px; font-weight: 500;
+  color: var(--peach-deep); cursor: pointer;
+}
+.cmp__vidpick-hint { margin: 10px 0 8px; font-size: 12.5px; color: var(--ink-muted); }
+.cmp__vidpick-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px;
+}
+.cmp__vidpick-item {
+  position: relative; padding: 0; border: 1px solid var(--bone-edge);
+  border-radius: 8px; overflow: hidden; background: var(--bone-deep);
+  aspect-ratio: 16 / 9; cursor: pointer;
+}
+.cmp__vidpick-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp__vidpick-item em {
+  position: absolute; right: 4px; bottom: 4px; padding: 1px 6px;
+  border-radius: 6px; background: rgba(0,0,0,0.65); color: #fff;
+  font-style: normal; font-size: 10.5px; font-weight: 600;
+}
+.cmp__vidpick-blank { display: block; width: 100%; height: 100%; }

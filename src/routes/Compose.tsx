@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import {
   createPost, updatePost, loadPost, postAreas, uploadMedia,
 } from '../lib/postsApi';
-import { uploadVideo } from '../lib/videoApi';
+import { uploadVideo, listMyReadyVideos, videoPublicUrl, type ReadyVideo } from '../lib/videoApi';
 import { listMyCollections, createCollection, addToCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
@@ -98,6 +98,10 @@ export default function Compose() {
   const [organizeInto, setOrganizeInto] = useState<string | null>(null);
   const [newColName, setNewColName] = useState('');
   const [uploading, setUploading] = useState(false);
+  // Video picker: upload from this device, or attach a big file the studio
+  // Mac already ingested (worker/ingest.js — Zoom recordings skip the cap).
+  const [vidPickOpen, setVidPickOpen] = useState(false);
+  const [readyVids, setReadyVids] = useState<ReadyVideo[] | null>(null);
   const [recording, setRecording] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
@@ -613,13 +617,62 @@ export default function Compose() {
         <button className="cmp__media-btn" onClick={() => photoRef.current?.click()} disabled={uploading}>
           <Icon name="image" size={20} /><span>Photo</span>
         </button>
-        <button className="cmp__media-btn" onClick={() => videoRef.current?.click()} disabled={uploading}>
+        <button
+          className="cmp__media-btn"
+          disabled={uploading}
+          onClick={() => {
+            if (vidPickOpen) { setVidPickOpen(false); return; }
+            if (readyVids === null) {
+              void listMyReadyVideos().then((v) => {
+                setReadyVids(v);
+                if (v.length) setVidPickOpen(true); else videoRef.current?.click();
+              });
+            } else if (readyVids.length) {
+              setVidPickOpen(true);
+            } else {
+              videoRef.current?.click();
+            }
+          }}
+        >
           <Icon name="video" size={20} /><span>Video</span>
         </button>
         <button className={'cmp__media-btn' + (recording ? ' is-recording' : '')} onClick={toggleRecord} disabled={uploading && !recording}>
           <Icon name="mic" size={20} /><span>{recording ? 'Stop' : 'Audio'}</span>
         </button>
       </div>
+      {vidPickOpen && (
+        <div className="cmp__vidpick">
+          <button
+            className="cmp__vidpick-upload"
+            onClick={() => { setVidPickOpen(false); videoRef.current?.click(); }}
+          >
+            <Icon name="video" size={16} /> Upload from this device
+          </button>
+          <p className="cmp__vidpick-hint">Or attach a video Lichen already compressed:</p>
+          <div className="cmp__vidpick-grid">
+            {(readyVids ?? []).map((v) => (
+              <button
+                key={v.id}
+                className="cmp__vidpick-item"
+                onClick={() => {
+                  setMedia((m) => [...m, { type: 'video', url: videoPublicUrl(v.hls_path), jobId: v.id }]);
+                  setVidPickOpen(false);
+                }}
+              >
+                {v.poster_path
+                  ? <img src={videoPublicUrl(v.poster_path)} alt="" />
+                  : <span className="cmp__vidpick-blank" />}
+                <em>
+                  {v.duration_secs
+                    ? `${Math.floor(v.duration_secs / 60)}:${String(v.duration_secs % 60).padStart(2, '0')}`
+                    : 'video'}
+                </em>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
       <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
 
