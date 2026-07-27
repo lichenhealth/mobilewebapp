@@ -14,11 +14,13 @@ import {
   approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
+  listPendingSectionShares, decideSectionShare, type SectionShareRow, type SectionArea,
   type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
+import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
 import './Profile.css';
 import './SpaceProfile.css';
@@ -72,6 +74,9 @@ export default function SpaceProfile() {
   const [plusOpen, setPlusOpen] = useState(false);
   // super admin's role editor: pick admin/member + the duties they steward
   const [manage, setManage] = useState<{ id: string; name: string } | null>(null);
+  // Curated-section shares awaiting stewards (courses/library)
+  const [shares, setShares] = useState<SectionShareRow[]>([]);
+  const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
   const [mAdmin, setMAdmin] = useState(false);
   const [mAll, setMAll] = useState(true);
   const [mDuties, setMDuties] = useState<string[]>([]);
@@ -147,6 +152,23 @@ export default function SpaceProfile() {
     try { await setRecommend('space', id, next); } catch (e) { console.error(e); setRecommended(!next); }
   }
 
+  async function decideShare(r: SectionShareRow, approve: boolean, promote = false) {
+    await decideSectionShare(id, r.post_id, r.area as SectionArea, approve);
+    if (approve && promote) {
+      // Course-provider on-ramp: grant the sharer this section's duty.
+      const m = members.find((x) => x.profile_id === r.requested_by);
+      if (m && m.role !== 'super_admin' && !(m.role === 'admin' && m.duties === null)) {
+        const duty = r.area === 'courses' ? 'courses' : 'library';
+        const duties = m.role === 'admin'
+          ? [...new Set([...(m.duties ?? []), duty])]
+          : [duty];
+        await setMemberRole(id, r.requested_by, 'admin', duties);
+      }
+    }
+    setShares((cur) => cur.filter((x) => !(x.post_id === r.post_id && x.area === r.area)));
+    if (approve) await load();
+  }
+
   const myRow = members.find((m) => m.profile_id === me);
   const myRole = myRow?.role;
   const isMember = !!myRole;
@@ -160,12 +182,14 @@ export default function SpaceProfile() {
     if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
     let live = true;
     (async () => {
-      const [rows, props] = await Promise.all([
+      const [rows, props, shr] = await Promise.all([
         listPendingRequests(id),
         (space?.kind === 'community' || space?.kind === 'organization')
           ? listNestingProposals(id) : Promise.resolve([]),
+        listPendingSectionShares(id),
       ]);
-      if (live) { setPendingReqs(rows); setProposals(props); }
+      const shrPosts = shr.length ? await loadPostsByIds(shr.map((r) => r.post_id)) : [];
+      if (live) { setPendingReqs(rows); setProposals(props); setShares(shr); setSharePosts(shrPosts); }
     })();
     return () => { live = false; };
   }, [id, isAdmin, members.length, space?.kind]);
@@ -617,6 +641,45 @@ export default function SpaceProfile() {
       />
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
+      {/* Member shares awaiting the shelves (courses/library) — stewards
+          approve, and can promote the sharer into a section admin. */}
+      {!publicView && shares.some((r) => holdsDuty(myRole, myRow?.duties, r.area)) && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Shared for the shelves</h2>
+          {shares.filter((r) => holdsDuty(myRole, myRow?.duties, r.area)).map((r) => {
+            const post = sharePosts.find((p) => p.id === r.post_id);
+            const isMember = members.some((m) => m.profile_id === r.requested_by);
+            const alreadySteward = (() => {
+              const m = members.find((x) => x.profile_id === r.requested_by);
+              return !!m && holdsDuty(m.role, m.duties, r.area);
+            })();
+            return (
+              <div className="sprof__req sprof__sharereq" key={`${r.post_id}:${r.area}`}>
+                <span className="sprof__req-name">
+                  {r.requester?.full_name ?? 'A member'} shared a {r.area === 'courses' ? 'course' : 'library piece'}:{' '}
+                  <button className="sprof__share-title" onClick={() => navigate(`/posts/${r.post_id}`)}>
+                    {post?.title || post?.body.slice(0, 48) || 'a post'}
+                  </button>
+                </span>
+                <span className="sprof__req-actions sprof__share-actions">
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => decideShare(r, true))}>Approve</button>
+                  {isMember && !alreadySteward && (
+                    <button className="btn sprof__invite-btn" disabled={memBusy}
+                      title={`Approve AND make them a ${r.area === 'courses' ? 'Courses' : 'Library'} admin of this space`}
+                      onClick={() => void act(() => decideShare(r, true, true))}>
+                      Approve + make {r.area === 'courses' ? 'Courses' : 'Library'} admin
+                    </button>
+                  )}
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => decideShare(r, false))}>Decline</button>
+                </span>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       {memberTools && pendingReqs.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Waiting at the door</h2>

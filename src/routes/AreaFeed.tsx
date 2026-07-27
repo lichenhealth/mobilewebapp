@@ -10,7 +10,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, listSpaceCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
-import { myDutiesIn, holdsDuty } from '../lib/spacesApi';
+import { myDutiesIn, holdsDuty, listApprovedSectionShares } from '../lib/spacesApi';
 import ListingTile from '../components/ListingTile';
 import ListingRow from '../components/ListingRow';
 import ViewToggle from '../components/ViewToggle';
@@ -99,7 +99,16 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       const raw = member ? await loadAuthorFeed({ profileId: member })
         : space ? await loadAuthorFeed({ spaceId: space })
         : await loadFeed(200);
-      const feed = raw.filter((p) => postAreas(p).includes(area));
+      let feed = raw.filter((p) => postAreas(p).includes(area));
+      // Curated sections are stewarded (founder 2026-07-26): a space's
+      // Courses/Library show its own voice + APPROVED member shares only.
+      // (Pre-migration the query errors and we keep the open wall.)
+      if (space && (area === 'courses' || area === 'library')) {
+        const approved = await listApprovedSectionShares(space, area);
+        if (approved.ok) {
+          feed = feed.filter((p) => p.author_space_id === space || approved.ids.has(p.id));
+        }
+      }
       if (member) {
         const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
         if (live) setMemberName((data as { full_name: string | null } | null)?.full_name ?? '');

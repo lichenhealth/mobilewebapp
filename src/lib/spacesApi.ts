@@ -442,3 +442,49 @@ export async function ejectGroup(groupId: string): Promise<void> {
   const { error } = await supabase.rpc('eject_group', { p_group: groupId });
   if (error) throw error;
 }
+
+// ── Curated-section shares (founder 2026-07-26): a space's Courses/Library
+//    show only space-authored posts + duty-holder-APPROVED member shares. ─────
+
+export type SectionArea = 'courses' | 'library';
+export interface SectionShareRow {
+  space_id: string;
+  post_id: string;
+  area: SectionArea;
+  status: 'pending' | 'approved' | 'declined';
+  requested_by: string;
+  requester: { full_name: string | null } | null;
+}
+
+/** Approved post ids for a space's curated section. `ok:false` = the
+ *  migration hasn't run — callers keep today's unfiltered behavior. */
+export async function listApprovedSectionShares(
+  spaceId: string, area: SectionArea,
+): Promise<{ ok: boolean; ids: Set<string> }> {
+  const { data, error } = await supabase
+    .from('space_section_shares')
+    .select('post_id')
+    .eq('space_id', spaceId).eq('area', area).eq('status', 'approved');
+  if (error) return { ok: false, ids: new Set() };
+  return { ok: true, ids: new Set(((data as { post_id: string }[] | null) ?? []).map((r) => r.post_id)) };
+}
+
+/** Pending shares awaiting this space's stewards. */
+export async function listPendingSectionShares(spaceId: string): Promise<SectionShareRow[]> {
+  const { data, error } = await supabase
+    .from('space_section_shares')
+    .select('space_id, post_id, area, status, requested_by, requester:profiles!space_section_shares_requested_by_fkey(full_name)')
+    .eq('space_id', spaceId).eq('status', 'pending')
+    .order('created_at');
+  if (error) { console.warn('listPendingSectionShares:', error.message); return []; }
+  return ((data as unknown as SectionShareRow[] | null) ?? []);
+}
+
+export async function decideSectionShare(
+  spaceId: string, postId: string, area: SectionArea, approve: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc('decide_section_share', {
+    p_space: spaceId, p_post: postId, p_area: area, p_approve: approve,
+  });
+  if (error) throw error;
+}

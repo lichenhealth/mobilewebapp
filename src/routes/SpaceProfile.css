@@ -173,3 +173,11 @@
 }
 .sprof__rolebtn:hover { border-color: var(--peach); color: var(--ink); }
 .sprof__rolebtn svg { color: var(--peach-deep, var(--peach)); }
+
+/* ── Shelf-share queue ──────────────────────────────────────────────────── */
+.sprof__sharereq { flex-wrap: wrap; }
+.sprof__share-title {
+  background: transparent; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px;
+}
+.sprof__share-actions { flex-wrap: wrap; gap: 6px; }

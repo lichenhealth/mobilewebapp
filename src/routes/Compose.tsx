@@ -42,6 +42,7 @@ export default function Compose() {
   const [toMycelium, setToMycelium] = useState(false);
   const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
+  const [myAdminSpaces, setMyAdminSpaces] = useState<Set<string>>(new Set());
   // Picking a Where suggests the natural Type (marketplace listing = something
   // to act on; a course = educational) — but never overrides a type the
   // member chose by hand.
@@ -194,16 +195,24 @@ export default function Compose() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase.from('space_members').select('spaces(id, name)').eq('profile_id', user.id);
-      setMySpaces(((data as unknown as { spaces: { id: string; name: string } | null }[] | null) ?? [])
-        .map((r) => r.spaces).filter((s): s is { id: string; name: string } => !!s));
+      const { data } = await supabase.from('space_members').select('role, spaces(id, name)').eq('profile_id', user.id);
+      const rows = (data as unknown as { role: string; spaces: { id: string; name: string } | null }[] | null) ?? [];
+      setMySpaces(rows.map((r) => r.spaces).filter((s): s is { id: string; name: string } => !!s));
+      setMyAdminSpaces(new Set(rows.filter((r) => r.spaces && (r.role === 'admin' || r.role === 'super_admin'))
+        .map((r) => r.spaces!.id)));
     })();
   }, [user]);
 
-  const pickEveryone = () => { setIsPublic(true); setToMycelium(false); setAudienceSpaces(new Set()); };
+  // Courses/Library: 'Everyone' and space chips COEXIST — a public course can
+  // still land on a space's shelf (audience ids drive the curated sections).
+  const curated = areas.has('courses') || areas.has('library');
+  const pickEveryone = () => {
+    if (curated) { setIsPublic((v) => !v); return; }
+    setIsPublic(true); setToMycelium(false); setAudienceSpaces(new Set());
+  };
   const toggleMycelium = () => { setIsPublic(false); setToMycelium((v) => !v); };
   const toggleSpace = (id: string) => {
-    setIsPublic(false);
+    if (!curated) setIsPublic(false);
     setAudienceSpaces((cur) => { const n = new Set(cur); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
   const toggleArea = (a: ServiceArea) => {
@@ -222,6 +231,19 @@ export default function Compose() {
   // picker, and — everything being an exchange — the offer block.
   const isCourse = areas.has('courses');
   const isLibrary = areas.has('library');
+  // Default a fresh course/library story to Everyone + the spaces you ADMIN
+  // (founder: "when Melanie posts a course it goes to her own profile, the
+  // Communities and Groups she runs, and the whole network"). Chips stay
+  // removable; sharing into a space you DON'T steward files a request.
+  const curatedDefaultDone = useRef(false);
+  useEffect(() => {
+    if (!(isCourse || isLibrary) || curatedDefaultDone.current) return;
+    if (editing || presetSpace) { curatedDefaultDone.current = true; return; }
+    if (myAdminSpaces.size === 0) return; // admin list may still be loading
+    curatedDefaultDone.current = true;
+    setIsPublic(true);
+    setAudienceSpaces((cur) => new Set([...cur, ...myAdminSpaces]));
+  }, [isCourse, isLibrary, editing, presetSpace, myAdminSpaces]);
   useEffect(() => {
     if (!isCourse && !isLibrary) { setOrganizeInto(null); return; }
     let live = true;
