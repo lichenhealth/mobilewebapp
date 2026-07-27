@@ -21,6 +21,14 @@ import {
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
+import {
+  listSpaceResources, createResource, deleteResource, resourceBusy,
+  requestResourceBooking, listPendingResourceBookings, decideResourceBooking,
+  resourceSpanContact, type ResourceRow, type ResourceBusySpan, type ResourceBookingRow,
+} from '../lib/resourcesApi';
+import { ensureDirectChat } from '../lib/chatApi';
+import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
+import { todayISO } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import './Profile.css';
@@ -80,6 +88,19 @@ export default function SpaceProfile() {
   // Curated-section shares awaiting stewards (courses/library)
   const [shares, setShares] = useState<SectionShareRow[]>([]);
   const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
+  // Rooms & things: the space's bookable resources + the steward queue.
+  const [resources, setResources] = useState<ResourceRow[]>([]);
+  const [resBookings, setResBookings] = useState<ResourceBookingRow[]>([]);
+  const [bookOpen, setBookOpen] = useState<string | null>(null);       // resource id
+  const [bookRange, setBookRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
+  const [bookNote, setBookNote] = useState('');
+  const [bookBusy, setBookBusy] = useState<ResourceBusySpan[]>([]);
+  const [bookMsg, setBookMsg] = useState('');
+  const [newResOpen, setNewResOpen] = useState(false);
+  const [newResName, setNewResName] = useState('');
+  const [newResKind, setNewResKind] = useState<'room' | 'thing'>('room');
+  const [newResDesc, setNewResDesc] = useState('');
+  const [newResInstant, setNewResInstant] = useState(false);
   const [mAdmin, setMAdmin] = useState(false);
   const [mAll, setMAll] = useState(true);
   const [mDuties, setMDuties] = useState<string[]>([]);
@@ -111,6 +132,7 @@ export default function SpaceProfile() {
       listChildGroups(id),
     ]);
     setMyProposal(s?.kind === 'group' ? await loadNestingFor(id) : null);
+    setResources(await listSpaceResources(id));
     setSpace(s);
     setMembers(m);
     setChatId(c);
@@ -171,6 +193,24 @@ export default function SpaceProfile() {
     if (approve) await load();
   }
 
+  async function openBooking(r: ResourceRow) {
+    if (bookOpen === r.id) { setBookOpen(null); return; }
+    setBookOpen(r.id); setBookMsg(''); setBookNote('');
+    setBookRange({ start: todayISO(), end: todayISO() });
+    setBookBusy(await resourceBusy(r.id));
+  }
+  async function sendBooking(r: ResourceRow) {
+    if (!bookRange.start) return;
+    try {
+      await requestResourceBooking(r.id, bookRange.start, bookRange.end ?? bookRange.start, bookNote);
+      setBookMsg(r.approval === 'instant' ? 'Booked — it\u2019s on your calendar.' : 'Asked — the steward will confirm.');
+    } catch (e) { setBookMsg((e as Error).message); }
+  }
+  async function messageHolder(r: ResourceRow, date: string) {
+    const who = await resourceSpanContact(r.id, date);
+    if (who) navigate(`/chat/${await ensureDirectChat(who)}`);
+  }
+
   const myRow = members.find((m) => m.profile_id === me);
   const myRole = myRow?.role;
   const isMember = !!myRole;
@@ -190,20 +230,21 @@ export default function SpaceProfile() {
   });
   const deskCount = sharesForMe.length
     + (holdsDuty(myRole, myRow?.duties, 'members') ? actionableReqs.length : 0)
-    + proposals.length;
+    + proposals.length + resBookings.length;
 
   useEffect(() => {
     if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
     let live = true;
     (async () => {
-      const [rows, props, shr] = await Promise.all([
+      const [rows, props, shr, rbk] = await Promise.all([
         listPendingRequests(id),
         (space?.kind === 'community' || space?.kind === 'organization')
           ? listNestingProposals(id) : Promise.resolve([]),
         listPendingSectionShares(id),
+        listPendingResourceBookings(id),
       ]);
       const shrPosts = shr.length ? await loadPostsByIds(shr.map((r) => r.post_id)) : [];
-      if (live) { setPendingReqs(rows); setProposals(props); setShares(shr); setSharePosts(shrPosts); }
+      if (live) { setPendingReqs(rows); setProposals(props); setShares(shr); setSharePosts(shrPosts); setResBookings(rbk); }
     })();
     return () => { live = false; };
   }, [id, isAdmin, members.length, space?.kind]);
@@ -708,6 +749,84 @@ export default function SpaceProfile() {
         </section>
       )}
 
+      {backstage && resBookings.length > 0 && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Booking requests</h2>
+          {resBookings.map((b) => (
+            <div className="sprof__req sprof__sharereq" key={b.id}>
+              <span className="sprof__req-name">
+                {b.requester?.full_name ?? 'A member'} asked for <strong>{b.resource?.name}</strong>
+                {' · '}{b.start_date === b.end_date ? b.start_date : `${b.start_date} – ${b.end_date}`}
+                {b.note && <em className="sprof__req-tag"> — {b.note}</em>}
+              </span>
+              <span className="sprof__req-actions sprof__share-actions">
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                  onClick={() => void act(async () => { await decideResourceBooking(b.id, true); setResBookings((c) => c.filter((x) => x.id !== b.id)); })}>Approve</button>
+                <button className="btn sprof__invite-btn" disabled={memBusy}
+                  onClick={() => void act(async () => { await decideResourceBooking(b.id, false); setResBookings((c) => c.filter((x) => x.id !== b.id)); })}>Decline</button>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {backstage && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Rooms &amp; things</h2>
+          {resources.length === 0 && !newResOpen && (
+            <p className="sprof__muted">Nothing listed yet — a room, a tool, the dinner plates. Anything members can book.</p>
+          )}
+          <div className="sprof__members">
+            {resources.map((r) => (
+              <div className="sprof__grouprow" key={r.id}>
+                <span className="sprof__res-main">
+                  <Icon name={r.kind === 'room' ? 'location' : 'store'} size={16} />
+                  <span className="sprof__res-name">{r.name}</span>
+                  <span className="sprof__res-desc">{r.approval === 'instant' ? 'books instantly' : 'requests need a yes'}</span>
+                </span>
+                <button className="btn sprof__invite-btn" disabled={memBusy}
+                  onClick={() => {
+                    if (window.confirm(`Remove ${r.name}? Its calendar and pending requests go with it.`)) {
+                      void act(async () => { await deleteResource(r.id); setResources((c) => c.filter((x) => x.id !== r.id)); });
+                    }
+                  }}>Remove</button>
+              </div>
+            ))}
+          </div>
+          {newResOpen ? (
+            <div className="sprof__res-new">
+              <div className="sprof__rolepills">
+                <button className={'sprof__rolepill' + (newResKind === 'room' ? ' is-on' : '')} onClick={() => setNewResKind('room')}>Room</button>
+                <button className={'sprof__rolepill' + (newResKind === 'thing' ? ' is-on' : '')} onClick={() => setNewResKind('thing')}>Thing</button>
+              </div>
+              <input className="prof__input" value={newResName} onChange={(e) => setNewResName(e.target.value)}
+                placeholder={newResKind === 'room' ? 'e.g. The pavilion' : 'e.g. Formal dinner plates (service for 24)'} autoFocus />
+              <input className="prof__input" value={newResDesc} onChange={(e) => setNewResDesc(e.target.value)}
+                placeholder="A few words — capacity, condition, care instructions (optional)" />
+              <label className="sprof__duty">
+                <input type="checkbox" checked={newResInstant} onChange={(e) => setNewResInstant(e.target.checked)} />
+                <span>Book instantly <em>no approval step — first come, first served</em></span>
+              </label>
+              <div className="sprof__rolepills">
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newResName.trim()}
+                  onClick={() => void act(async () => {
+                    await createResource({
+                      space_id: id, name: newResName.trim(), kind: newResKind,
+                      description: newResDesc.trim() || undefined,
+                      approval: newResInstant ? 'instant' : 'request',
+                    });
+                    setResources(await listSpaceResources(id));
+                    setNewResOpen(false); setNewResName(''); setNewResDesc(''); setNewResInstant(false);
+                  })}>Add</button>
+                <button className="btn sprof__invite-btn" onClick={() => setNewResOpen(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn sprof__invite-btn" onClick={() => setNewResOpen(true)}>+ Add a room or thing</button>
+          )}
+        </section>
+      )}
+
       {memberTools && pendingReqs.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Waiting at the door</h2>
@@ -957,6 +1076,62 @@ export default function SpaceProfile() {
               </div>
             )
           ) : null}
+        </section>
+      )}
+
+      {!backstage && (resources.length > 0) && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Rooms &amp; things</h2>
+          <div className="sprof__members">
+            {resources.map((r) => (
+              <div className="sprof__resource" key={r.id}>
+                <div className="sprof__grouprow">
+                  <span className="sprof__res-main">
+                    <Icon name={r.kind === 'room' ? 'location' : 'store'} size={16} />
+                    <span className="sprof__res-name">{r.name}</span>
+                    {r.description && <span className="sprof__res-desc">{r.description}</span>}
+                  </span>
+                  {r.bookable && me && (
+                    <button className="btn sprof__invite-btn" onClick={() => void openBooking(r)}>
+                      {bookOpen === r.id ? 'Close' : r.approval === 'instant' ? 'Book' : 'Request'}
+                    </button>
+                  )}
+                </div>
+                {bookOpen === r.id && (
+                  <div className="sprof__res-book">
+                    {bookBusy.length > 0 && (
+                      <p className="prof__hint">
+                        Booked:{' '}
+                        {bookBusy.slice(0, 6).map((b, i) => (
+                          <button
+                            key={i}
+                            className="sprof__res-busy"
+                            title="Message whoever holds these dates — they may be open to another time"
+                            onClick={() => void messageHolder(r, b.start_date)}
+                          >
+                            {b.start_date === b.end_date ? b.start_date : `${b.start_date} – ${b.end_date}`}
+                          </button>
+                        ))}
+                      </p>
+                    )}
+                    <DateRangeCalendar value={bookRange} onChange={setBookRange} />
+                    <input
+                      className="prof__input"
+                      value={bookNote}
+                      onChange={(e) => setBookNote(e.target.value)}
+                      placeholder="What for? (optional — helps the steward say yes)"
+                    />
+                    <div className="sprof__rolepills">
+                      <button className="btn btn-primary sprof__invite-btn" onClick={() => void sendBooking(r)}>
+                        {r.approval === 'instant' ? 'Book it' : 'Ask for these dates'}
+                      </button>
+                      {bookMsg && <span className="prof__msg">{bookMsg}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
