@@ -551,7 +551,7 @@ export default function Compose() {
       {face === 'actionable' && (<>
       <label className="cmp__label">Where</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
-        {areas.size === 0 ? <span className="cmp__where-none">— The Marketplace (every offer starts there) —</span> : (
+        {areas.size === 0 ? <span className="cmp__where-none">The Commons — where resources are managed, collectively</span> : (
           <span className="cmp__where-sel">
             {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
               <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
