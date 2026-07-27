@@ -511,7 +511,7 @@ export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
   const [shares, reqs, nests] = await Promise.all([
     supabase.from('space_section_shares').select('space_id, area')
       .eq('status', 'pending').in('space_id', ids),
-    supabase.from('space_membership_requests').select('space_id, profile_id')
+    supabase.from('space_membership_requests').select('space_id, profile_id, initiated_by')
       .in('space_id', ids),
     supabase.from('space_nesting_requests').select('parent_id')
       .in('parent_id', ids),
@@ -519,8 +519,23 @@ export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
   for (const r of (shares.data as { space_id: string; area: string }[] | null) ?? []) {
     if (has(r.space_id, r.area === 'courses' ? 'courses' : 'library')) bump(r.space_id);
   }
-  for (const r of (reqs.data as { space_id: string }[] | null) ?? []) {
-    if (has(r.space_id, 'members')) bump(r.space_id);
+  // Classify: self-initiated = join request (actionable); initiated by an
+  // admin = an INVITE awaiting the invitee (not our move — no badge);
+  // initiated by a plain member = a suggestion (actionable).
+  const reqRows = (reqs.data as { space_id: string; profile_id: string; initiated_by: string }[] | null) ?? [];
+  const initiators = [...new Set(reqRows.filter((r) => r.initiated_by !== r.profile_id).map((r) => r.initiated_by))];
+  const adminInit = new Set<string>();
+  if (initiators.length) {
+    const { data: irows } = await supabase.from('space_members')
+      .select('space_id, profile_id').in('space_id', ids)
+      .in('profile_id', initiators).in('role', ['admin', 'super_admin']);
+    for (const r of (irows as { space_id: string; profile_id: string }[] | null) ?? []) {
+      adminInit.add(`${r.space_id}:${r.profile_id}`);
+    }
+  }
+  for (const r of reqRows) {
+    const isInvite = r.initiated_by !== r.profile_id && adminInit.has(`${r.space_id}:${r.initiated_by}`);
+    if (!isInvite && has(r.space_id, 'members')) bump(r.space_id);
   }
   for (const r of (nests.data as { parent_id: string }[] | null) ?? []) bump(r.parent_id);
   return desk;

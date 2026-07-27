@@ -182,8 +182,14 @@ export default function SpaceProfile() {
   const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && backstage;
   const sharesForMe = shares.filter((r) => holdsDuty(myRole, myRow?.duties, r.area));
   // What's waiting on this admin — the Manage button wears it as a badge.
+  // Only what's OURS to decide: invites awaiting the invitee don't badge.
+  const actionableReqs = pendingReqs.filter((r) => {
+    if (r.initiated_by === r.profile_id) return true;      // join request
+    const initRole = members.find((m) => m.profile_id === r.initiated_by)?.role;
+    return !(initRole === 'admin' || initRole === 'super_admin'); // suggestion
+  });
   const deskCount = sharesForMe.length
-    + (holdsDuty(myRole, myRow?.duties, 'members') ? pendingReqs.length : 0)
+    + (holdsDuty(myRole, myRow?.duties, 'members') ? actionableReqs.length : 0)
     + proposals.length;
 
   useEffect(() => {
