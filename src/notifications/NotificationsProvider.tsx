@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import type { Scope } from '../lib/sections';
 import {
   NotificationRow, loadNotifications, markNotificationRead, markScopeReadRemote, rowsForScope,
+  isDeskRow,
 } from '../lib/notificationsApi';
 
 interface NotificationsState {
@@ -15,11 +16,14 @@ interface NotificationsState {
   rowsForScope: (scope: Scope) => NotificationRow[];
   markRead: (id: string) => void;
   markScopeRead: (scope: Scope) => void;
+  /** Admin-desk rows for one space — surfaced on its Manage page, not the bell. */
+  deskRowsForSpace: (spaceId: string) => NotificationRow[];
 }
 
 const NotificationsContext = createContext<NotificationsState>({
   rows: [], countsBySection: {}, countsBySpace: {}, totalUnread: 0,
   unreadForScope: () => 0, rowsForScope: () => [], markRead: () => {}, markScopeRead: () => {},
+  deskRowsForSpace: () => [],
 });
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
@@ -57,7 +61,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const spc: Record<string, number> = {};
     let total = 0;
     for (const r of rows) {
-      if (r.read_at) continue;
+      if (r.read_at || isDeskRow(r)) continue;
       total += 1;
       if (r.space_id) spc[r.space_id] = (spc[r.space_id] ?? 0) + 1;
       else sec[r.section] = (sec[r.section] ?? 0) + 1;
@@ -84,8 +88,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const value: NotificationsState = {
     rows, countsBySection, countsBySpace, totalUnread, unreadForScope,
-    rowsForScope: (scope) => rowsForScope(rows, scope),
+    rowsForScope: (scope) => rowsForScope(rows, scope).filter((r) => !isDeskRow(r)),
     markRead, markScopeRead,
+    deskRowsForSpace: (spaceId) => rows.filter((r) => r.space_id === spaceId && isDeskRow(r)),
   };
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }

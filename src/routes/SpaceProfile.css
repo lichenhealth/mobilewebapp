@@ -181,3 +181,15 @@
   color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px;
 }
 .sprof__share-actions { flex-wrap: wrap; gap: 6px; }
+
+/* ── Backstage (the Manage room) ────────────────────────────────────────── */
+.sprof__managebadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; margin-left: 8px; padding: 0 5px;
+  border-radius: 9px; background: var(--peach); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1;
+}
+.sprof__desknotes { display: grid; gap: 6px; }
+.sprof__desknote { margin: 0; font-size: 13.5px; color: var(--ink-muted); }
+.sprof__desknote.is-new { color: var(--ink); font-weight: 600; }
+.sprof__desknote em { font-style: normal; font-weight: 400; color: var(--ink-muted); }

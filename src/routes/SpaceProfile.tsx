@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
@@ -22,6 +22,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
+import { useNotifications } from '../notifications/NotificationsProvider';
 import './Profile.css';
 import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
@@ -39,6 +40,8 @@ const ROLE_LABEL: Record<string, string> = {
 export default function SpaceProfile() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { deskRowsForSpace } = useNotifications();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -92,11 +95,10 @@ export default function SpaceProfile() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
-  // View-first: everyone (admins included) lands on the public presentation;
-  // editing is an explicit step. publicView lets admins preview the page
-  // exactly as non-admins see it (no admin affordances at all).
+  // View-first: everyone (admins included) lands on the public presentation.
+  // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
+  // 2026-07-27: queues and edit tools on the public page are distracting).
   const [editOpen, setEditOpen] = useState(false);
-  const [publicView, setPublicView] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -173,10 +175,16 @@ export default function SpaceProfile() {
   const myRole = myRow?.role;
   const isMember = !!myRole;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
-  const adminTools = isAdmin && !publicView;
+  const backstage = isAdmin && searchParams.get('manage') === '1';
+  const adminTools = backstage;
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
   // to admins holding the 'members' duty; full admins hold everything.
-  const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && !publicView;
+  const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && backstage;
+  const sharesForMe = shares.filter((r) => holdsDuty(myRole, myRow?.duties, r.area));
+  // What's waiting on this admin — the Manage button wears it as a badge.
+  const deskCount = sharesForMe.length
+    + (holdsDuty(myRole, myRow?.duties, 'members') ? pendingReqs.length : 0)
+    + proposals.length;
 
   useEffect(() => {
     if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
@@ -404,7 +412,7 @@ export default function SpaceProfile() {
             )}
           </p>
         )}
-        {me && (
+        {me && !backstage && (
           <div className="mprof__actions">
             {myRequest !== 'invited' && (
               <button
@@ -452,7 +460,7 @@ export default function SpaceProfile() {
 
       {error && <p className="prof__error">{error}</p>}
 
-      {myRequest === 'invited' && (
+      {myRequest === 'invited' && !backstage && (
         <div className="sprof__invite">
           <span>You&rsquo;re invited to join {space.name}.</span>
           <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
@@ -462,27 +470,25 @@ export default function SpaceProfile() {
         </div>
       )}
 
-      {isAdmin && publicView && (
+      {isAdmin && !backstage && (
         <div className="sprof__manage">
-          <button
-            className="sprof__edit-btn sprof__edit-btn--on"
-            onClick={() => setPublicView(false)}
-          >
-            Viewing as public — tap to exit
+          <button className="sprof__edit-btn" onClick={() => setSearchParams({ manage: '1' })}>
+            Manage this {kindLabel.toLowerCase()}
+            {deskCount > 0 && <span className="sprof__managebadge">{deskCount}</span>}
           </button>
         </div>
       )}
 
-      {adminTools && (
+      {backstage && (
         <div className="sprof__manage">
-          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
-            {editOpen ? 'Done' : 'Edit profile'}
-          </button>
           <button
             className="sprof__edit-btn"
-            onClick={() => { setPublicView(true); setEditOpen(false); }}
+            onClick={() => { setEditOpen(false); setSearchParams({}); }}
           >
-            View as public
+            ← Back to profile
+          </button>
+          <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
+            {editOpen ? 'Done editing' : 'Edit profile'}
           </button>
         </div>
       )}
@@ -561,7 +567,7 @@ export default function SpaceProfile() {
       )}
 
       {/* + menu: what are you adding to this space? (Figma 286-14250) */}
-      {plusOpen && (
+      {plusOpen && !backstage && (
         <div className="sprof__plus">
           <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}`)}>
             <Icon name="sparkle" size={14} /> Post to {space.name}
@@ -588,12 +594,13 @@ export default function SpaceProfile() {
             <Icon name="palette" size={14} /> Art
           </button>
           {(space.kind === 'community' || space.kind === 'organization') && me && (
-            adminTools ? (
+            isAdmin ? (
               <button
                 className="sprof__plus-row"
                 onClick={() => {
-                  setPlusOpen(false); setNewGroupOpen(true);
-                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                  // Creation is admin work — it happens backstage.
+                  setPlusOpen(false); setNewGroupOpen(true); setSearchParams({ manage: '1' });
+                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
                 }}
               >
                 <Icon name="user-multiple" size={14} /> New group
@@ -616,7 +623,7 @@ export default function SpaceProfile() {
       {/* The profile IS a feed — the space's wall (posted AS it or TO it),
           with the space-anatomy circles (Chat for members, Members) leading
           the icon row. Identical for all four kinds. */}
-      <ContributionsFeed
+      {!backstage && <ContributionsFeed
         spaceId={space.id}
         me={me}
         entityName={space.name}
@@ -638,15 +645,29 @@ export default function SpaceProfile() {
           // Home's (founder 2026-07-25).
           { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
         ]}
-      />
+      />}
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
       {/* Member shares awaiting the shelves (courses/library) — stewards
           approve, and can promote the sharer into a section admin. */}
-      {!publicView && shares.some((r) => holdsDuty(myRole, myRow?.duties, r.area)) && (
+      {backstage && deskRowsForSpace(id).length > 0 && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Notifications</h2>
+          <div className="sprof__desknotes">
+            {deskRowsForSpace(id).slice(0, 10).map((n) => (
+              <p className={'sprof__desknote' + (n.read_at ? '' : ' is-new')} key={n.id}>
+                {n.title}{n.body ? <em> — {n.body}</em> : null}
+              </p>
+            ))}
+          </div>
+          <p className="prof__hint">These stay off your main bell — everything actionable is in the queues below.</p>
+        </section>
+      )}
+
+      {backstage && sharesForMe.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Shared for the shelves</h2>
-          {shares.filter((r) => holdsDuty(myRole, myRow?.duties, r.area)).map((r) => {
+          {sharesForMe.map((r) => {
             const post = sharePosts.find((p) => p.id === r.post_id);
             const isMember = members.some((m) => m.profile_id === r.requested_by);
             const alreadySteward = (() => {
@@ -818,7 +839,7 @@ export default function SpaceProfile() {
             </div>
           </div>
         )}
-        {(memberTools || (isMember && !publicView)) && (
+        {(memberTools || (isMember && !backstage && !holdsDuty(myRole, myRow?.duties, 'members'))) && (
           <div className="sprof__invitebox">
             <input
               className="prof__input"
@@ -932,7 +953,7 @@ export default function SpaceProfile() {
         </section>
       )}
 
-      {pinned && (
+      {pinned && !backstage && (
         <section className="prof__section">
           <button className="btn btn-primary sprof__map-btn" onClick={() => navigate('/maps')}>
             <Icon name="maps" size={15} /> See it on Maps

@@ -15,6 +15,15 @@ export interface NotificationRow {
   created_at: string;
 }
 
+/** Space-stewarding chatter (someone knocking, sharing, proposing). These stay
+ *  OUT of the main bell — they live on the space's Manage page instead
+ *  (founder 2026-07-27: admin notifications on the public pages are
+ *  distracting; the backend is where admins tend the space). */
+export const ADMIN_DESK_TYPES = new Set([
+  'space_join_request', 'space_member_suggested', 'group_nesting_request', 'section_share_request',
+]);
+export const isDeskRow = (r: NotificationRow) => ADMIN_DESK_TYPES.has(r.type);
+
 export const NOTIFICATION_COLS =
   'id, recipient_id, section, space_id, type, title, body, link, actor_id, read_at, created_at';
 
