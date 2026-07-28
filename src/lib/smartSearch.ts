@@ -568,8 +568,11 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       const g = postGeo(p);
       if (!g || milesBetween(anchor, g) > c.radiusMiles) return false;
     }
+    const taggedCats = Array.isArray(p.details?.categories)
+      ? (p.details.categories as unknown[]).filter((x): x is string => typeof x === 'string') : [];
     if (!hasText([p.title, p.body, p.author?.full_name], c.terms)
-      && !c.categories.some((cat) => hasText([p.title, p.body], [cat.name.toLowerCase()]))) return false;
+      && !c.categories.some((cat) =>
+        taggedCats.includes(cat.id) || hasText([p.title, p.body], [cat.name.toLowerCase()]))) return false;
     return true;
   });
   if (c.who.length && !c.who.includes('organizations') && (c.who.includes('people') || wantProviders)

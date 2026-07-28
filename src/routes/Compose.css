@@ -213,3 +213,17 @@
 .cmp__term-paid { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .cmp__term-slide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
 .cmp__term-editmark { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-faint); }
+
+/* ── Listing details (Figma 286-4961) ───────────────────────────────────── */
+.cmp__label-soft { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink-faint); font-size: 11.5px; }
+.cmp__avail-row { align-items: center; }
+.cmp__avail-row .cmp__input { flex: 1; }
+.cmp__fulfill { flex-wrap: wrap; gap: 12px 18px; }
+.cmp__radius-row { align-items: center; gap: 8px; }
+.cmp__radius-input { max-width: 90px; }
+.cmp__tags-toggle {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
+  background: transparent; border: 0; padding: 4px 0;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+}
+.cmp__tags-pickers { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }

@@ -21,6 +21,7 @@ import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
 import { parseBodyUrls } from '../lib/linkify';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import TimeField from '../components/TimeField';
 import { todayISO } from '../lib/conciergeApi';
 import './Compose.css';
@@ -84,6 +85,22 @@ export default function Compose() {
   // A SET term freezes into a sentence that follows the post (founder
   // 2026-07-27) — presentation only; typed values save either way.
   const [setTerms, setSetTerms] = useState<Set<OfferMode>>(new Set());
+  // Listing details (Figma 286-4961): the physical facts of a thing offered.
+  const [condition, setCondition] = useState<Set<string>>(new Set());
+  const [availFrom, setAvailFrom] = useState('');
+  const [availTo, setAvailTo] = useState('');
+  const [fulfillment, setFulfillment] = useState<Set<string>>(new Set());
+  const [deliverRadius, setDeliverRadius] = useState('');
+  const [paymentPlan, setPaymentPlan] = useState('');
+  // Category tags — the real 63-category taxonomy, loaded when opened.
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [allCats, setAllCats] = useState<Category[] | null>(null);
+  const [catTags, setCatTags] = useState<string[]>([]);
+  useEffect(() => {
+    if (!tagsOpen || allCats !== null) return;
+    void supabase.from('categories').select('id, domain, name, sort').order('sort')
+      .then(({ data }) => setAllCats((data as Category[] | null) ?? []));
+  }, [tagsOpen, allCats]);
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
   const [evAllDay, setEvAllDay] = useState(false);
   const [evStartMin, setEvStartMin] = useState(18 * 60);
@@ -197,6 +214,13 @@ export default function Compose() {
       }
       if (typeof d.giftTo === 'string') setGiftTo(d.giftTo);
       if (d.modeNotes && typeof d.modeNotes === 'object') setModeNotes(d.modeNotes as Record<string, string>);
+      if (Array.isArray(d.condition)) setCondition(new Set(d.condition as string[]));
+      if (typeof d.availFrom === 'string') setAvailFrom(d.availFrom);
+      if (typeof d.availTo === 'string') setAvailTo(d.availTo);
+      if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment as string[]));
+      if (d.deliverRadiusMi != null) setDeliverRadius(String(d.deliverRadiusMi));
+      if (typeof d.paymentPlan === 'string') setPaymentPlan(d.paymentPlan);
+      if (Array.isArray(d.categories)) { setCatTags(d.categories as string[]); }
       if (typeof d.meetingUrl === 'string' && d.meetingUrl) { setMeetingUrl(d.meetingUrl); setOnline(true); }
       if (typeof d.online === 'boolean') setOnline(d.online);
       if (typeof d.inPerson === 'boolean') setInPerson(d.inPerson);
@@ -436,6 +460,20 @@ export default function Compose() {
           details.modes = [...new Set(chosen.map(canon))];
           details.mode = canon(chosen[0]);
           if ((modes.has('free') || modes.has('lichen')) && giftTo.trim()) details.giftTo = giftTo.trim();
+          if (condition.size) details.condition = [...condition];
+          if (availFrom) details.availFrom = availFrom;
+          if (availTo) details.availTo = availTo;
+          if (fulfillment.size) details.fulfillment = [...fulfillment];
+          if (fulfillment.has('deliver') && deliverRadius.trim()) {
+            const mi = Number(deliverRadius);
+            if (Number.isFinite(mi) && mi > 0) details.deliverRadiusMi = mi;
+          }
+          if (modes.has('paid') && paymentPlan.trim()) details.paymentPlan = paymentPlan.trim();
+          if (catTags.length) details.categories = catTags;
+          if (modes.has('trade') && tradeFor.trim()) {
+            const tags = tradeFor.split(',').map((t) => t.trim()).filter(Boolean);
+            if (tags.length > 1) details.tradeTags = tags;
+          }
           if (modes.has('lichen')) details.allocation = 'lichen';
           if (modes.has('lichen') && inkind) details.inkind = true;
         }
@@ -947,6 +985,62 @@ export default function Compose() {
           {isEvent && evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
+
+          {/* Listing details (Figma 286-4961) — the physical facts. Shown for
+              Marketplace listings; courses/library/events don't have a
+              condition or a shipping option. */}
+          {isMarket && !isEvent && (<>
+            <label className="cmp__label">Condition <span className="cmp__label-soft">(for things — pick what applies, or what you'd accept)</span></label>
+            <div className="cmp__chips">
+              {([['new', 'New'], ['like_new', 'Used — like new'], ['good', 'Used — good'], ['fair', 'Used — fair']] as const).map(([v, l]) => (
+                <button key={v} className={'cmp__chip' + (condition.has(v) ? ' is-on' : '')}
+                  onClick={() => setCondition((cur) => { const n = new Set(cur); n.has(v) ? n.delete(v) : n.add(v); return n; })}>{l}</button>
+              ))}
+            </div>
+            {modes.has('paid') && (
+              <input className="cmp__input" value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)}
+                placeholder="Payment plan (optional — e.g. 6 monthly payments)" />
+            )}
+            <label className="cmp__label">When <span className="cmp__label-soft">(optional — available between, or needed by)</span></label>
+            <div className="cmp__row cmp__avail-row">
+              <input className="cmp__input" type="date" value={availFrom} onChange={(e) => setAvailFrom(e.target.value)} aria-label="Available from" />
+              <span className="cmp__to">to</span>
+              <input className="cmp__input" type="date" value={availTo} onChange={(e) => setAvailTo(e.target.value)} aria-label="Available until" />
+            </div>
+            <label className="cmp__label">How it changes hands</label>
+            <div className="cmp__attend cmp__fulfill">
+              {([['pickup', 'Pickup'], ['deliver', 'Deliver'], ['ship', 'Ship'], ['in_store', 'In store']] as const).map(([v, l]) => (
+                <label className="cmp__sliding" key={v}>
+                  <input type="checkbox" checked={fulfillment.has(v)}
+                    onChange={() => setFulfillment((cur) => { const n = new Set(cur); n.has(v) ? n.delete(v) : n.add(v); return n; })} />
+                  {' '}{l}
+                </label>
+              ))}
+            </div>
+            {fulfillment.has('deliver') && (
+              <div className="cmp__row cmp__radius-row">
+                <span className="cmp__label-soft">within</span>
+                <input className="cmp__input cmp__radius-input" type="number" min={1} value={deliverRadius}
+                  onChange={(e) => setDeliverRadius(e.target.value)} placeholder="20" />
+                <span className="cmp__label-soft">miles</span>
+              </div>
+            )}
+            <button className="cmp__tags-toggle" onClick={() => setTagsOpen((o) => !o)} aria-expanded={tagsOpen}>
+              Category tags {catTags.length > 0 && `· ${catTags.length}`}{' '}
+              <span className="cmp__label-soft">— help search find this</span>
+              <Icon name="chevron-right" size={12} />
+            </button>
+            {tagsOpen && (allCats === null ? (
+              <p className="cmp__hint-ev">Loading categories…</p>
+            ) : (
+              <div className="cmp__tags-pickers">
+                <CategoryPicker domain="good" categories={allCats} selected={catTags}
+                  onChange={setCatTags} />
+                <CategoryPicker domain="service" categories={allCats} selected={catTags}
+                  onChange={setCatTags} />
+              </div>
+            ))}
+          </>)}
 
           <label className="cmp__label">Where it happens</label>
           <div className="cmp__attend">
