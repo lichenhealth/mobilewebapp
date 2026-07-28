@@ -40,7 +40,7 @@ const MODES: { chip: Chip; label: string; icon: IconName }[] = [
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
   { chip: 'lend',       label: 'Lend',        icon: 'lend' },
-  { chip: 'borrow',     label: 'Borrow',      icon: 'reply' },
+  { chip: 'borrow',     label: 'Borrow',      icon: 'repeat' },
   { chip: 'sale',       label: 'For Sale',    icon: 'dollar' },
   { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
@@ -49,7 +49,7 @@ const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
 const MODE_ICON: Record<Mode, IconName> = {
   gift: 'heart-line', trade: 'trade', rent: 'rent', lend: 'lend',
-  borrow: 'reply', sale: 'dollar', sliding: 'dollar', iso: 'search',
+  borrow: 'repeat', sale: 'dollar', sliding: 'dollar', iso: 'search',
 };
 /** Every mode a listing carries — multi-mode offers match EVERY door they
  *  open, not just the primary (a gift-to-veterans-or-paid listing shows under
