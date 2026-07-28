@@ -94,6 +94,8 @@ export default function Compose() {
   const [paymentPlan, setPaymentPlan] = useState('');
   // Category tags — the real 63-category taxonomy, loaded when opened.
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState('');
   const [allCats, setAllCats] = useState<Category[] | null>(null);
   const [catTags, setCatTags] = useState<string[]>([]);
   useEffect(() => {
@@ -301,6 +303,45 @@ export default function Compose() {
       return n;
     });
   };
+  // The mockup's AI toggle (Figma 286-4961): Claude reads the words and
+  // pre-checks category tags, condition, and trade tags — every suggestion
+  // stays an ordinary chip the member can uncheck. Never blocks anything.
+  async function suggestDetails() {
+    if (aiBusy) return;
+    setAiBusy(true); setAiNote('');
+    try {
+      let cats = allCats;
+      if (cats === null) {
+        const { data } = await supabase.from('categories').select('id, domain, name, sort').order('sort');
+        cats = (data as Category[] | null) ?? [];
+        setAllCats(cats);
+      }
+      const { data, error } = await supabase.functions.invoke('listing-autofill', {
+        body: { title: title.trim(), text: body.trim(), categories: cats.map((c) => ({ id: c.id, name: c.name })) },
+      });
+      if (error) throw error;
+      const d = (data ?? {}) as { categories?: string[]; condition?: string[]; tradeTags?: string[] };
+      let touched = 0;
+      if (d.categories?.length) {
+        setCatTags((cur) => [...new Set([...cur, ...d.categories!])]);
+        setTagsOpen(true); touched += d.categories.length;
+      }
+      if (d.condition?.length) {
+        setCondition((cur) => new Set([...cur, ...d.condition!]));
+        touched += d.condition.length;
+      }
+      if (d.tradeTags?.length && modes.has('trade') && !tradeFor.trim()) {
+        setTradeFor(d.tradeTags.join(', ')); touched += d.tradeTags.length;
+      }
+      setAiNote(touched
+        ? 'Suggested — uncheck anything that\u2019s wrong.'
+        : 'Nothing to suggest from the words so far.');
+    } catch {
+      setAiNote('Couldn\u2019t suggest right now — fill by hand.');
+    }
+    setAiBusy(false);
+  }
+
   const pickSocial = () => {
     // An event post can't demote to social — its calendar event anchors it.
     if (editing && editLinkedEvent.current) return;
@@ -990,6 +1031,17 @@ export default function Compose() {
               Marketplace listings; courses/library/events don't have a
               condition or a shipping option. */}
           {isMarket && !isEvent && (<>
+            <div className="cmp__ai-row">
+              <button
+                className="cmp__ai-btn"
+                onClick={() => void suggestDetails()}
+                disabled={aiBusy || (!title.trim() && !body.trim())}
+                title="Claude reads your words and pre-checks the details — you stay the editor"
+              >
+                ✨ {aiBusy ? 'Reading your listing…' : 'Suggest details from my words'}
+              </button>
+              {aiNote && <span className="cmp__ai-note">{aiNote}</span>}
+            </div>
             <label className="cmp__label">Condition <span className="cmp__label-soft">(for things — pick what applies, or what you'd accept)</span></label>
             <div className="cmp__chips">
               {([['new', 'New'], ['like_new', 'Used — like new'], ['good', 'Used — good'], ['fair', 'Used — fair']] as const).map(([v, l]) => (

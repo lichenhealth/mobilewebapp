@@ -227,3 +227,15 @@
   font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
 }
 .cmp__tags-pickers { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+
+.cmp__ai-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 6px; }
+.cmp__ai-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--r-full);
+  background: transparent; border: 1.5px solid var(--peach);
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--peach-deep); cursor: pointer;
+}
+.cmp__ai-btn:hover { background: var(--peach-tint); }
+.cmp__ai-btn:disabled { opacity: 0.5; cursor: default; }
+.cmp__ai-note { font-size: 12.5px; color: var(--ink-muted); }
