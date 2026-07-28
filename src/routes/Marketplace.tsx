@@ -12,6 +12,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import ListingTile from '../components/ListingTile';
 import { loadTrustWeb, trustPathTo, namesFor, type TrustWeb } from '../lib/trustPath';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
@@ -107,6 +108,18 @@ export default function Marketplace() {
     () => (localStorage.getItem('mkt-trust') as TrustLens) || 'any');
   const pickLens = (l: TrustLens) => { setTrustLens(l); localStorage.setItem('mkt-trust', l); };
   const [web, setWeb] = useState<TrustWeb | null>(null);
+  // Category dropdowns (founder 2026-07-28, Figma 286-3905): the composer's
+  // pickers as FILTERS — goods, services, places & spaces. A listing passes
+  // when its tags intersect, or its words name the category (untagged
+  // listings aren't invisible just because tagging is new).
+  const [allCats, setAllCats] = useState<Category[]>([]);
+  const [catFilter, setCatFilter] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void supabase.from('categories').select('id, domain, name, sort').order('sort')
+      .then(({ data }) => { if (live) setAllCats((data as Category[] | null) ?? []); });
+    return () => { live = false; };
+  }, []);
   const [viaNames, setViaNames] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     if (!me) return;
@@ -173,6 +186,16 @@ export default function Marketplace() {
       const ms = postModes(p);
       return ms.length === 0 ? activeChips.length > 0 : ms.some((m) => wanted.has(m));
     });
+    if (catFilter.length) {
+      const wantedCats = allCats.filter((c) => catFilter.includes(c.id));
+      list = list.filter((p) => {
+        const tagged = Array.isArray(p.details?.categories)
+          ? (p.details.categories as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+        if (tagged.some((t) => catFilter.includes(t))) return true;
+        const hay = `${p.title ?? ''} ${p.body}`.toLowerCase();
+        return wantedCats.some((c) => hay.includes(c.name.toLowerCase()));
+      });
+    }
     if (trustLens !== 'any') {
       list = list.filter((p) => {
         if (p.author_id === me) return true;
@@ -189,7 +212,7 @@ export default function Marketplace() {
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, activeChips, query, trustLens, sellerPaths, me]);
+  }, [posts, activeChips, query, trustLens, sellerPaths, me, catFilter, allCats]);
 
   const toggleChip = (c: Chip) =>
     setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -284,14 +307,24 @@ export default function Marketplace() {
         </div>
       )}
 
-      {me && (
-        <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
-          {([['any', 'Anyone'], ['second', 'Trusted by someone I trust'], ['mine', 'Someone I trust']] as const).map(([v, l]) => (
-            <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
-              onClick={() => pickLens(v)}>{l}</button>
+      <div className="mkt__filters">
+        <div className="mkt__cats">
+          {(['good', 'service', 'place'] as const).map((d) => (
+            allCats.some((c) => c.domain === d) && (
+              <CategoryPicker key={d} domain={d} categories={allCats}
+                selected={catFilter} onChange={setCatFilter} />
+            )
           ))}
         </div>
-      )}
+        {me && (
+          <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
+            {([['any', 'Anyone'], ['second', 'Trusted by someone I trust'], ['mine', 'Someone I trust']] as const).map(([v, l]) => (
+              <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
+                onClick={() => pickLens(v)}>{l}</button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}

@@ -464,7 +464,12 @@
 .afeed__course-author:hover { text-decoration: underline; }
 
 /* ── The safety lens: who you'll do business with ───────────────────────── */
-.mkt__trustlens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: var(--s-2) var(--s-5) 0; color: var(--ink-muted); }
+.mkt__filters {
+  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  padding: var(--s-2) var(--s-5) 0;
+}
+.mkt__cats { display: flex; flex-direction: column; gap: 6px; flex: 1 1 260px; max-width: 340px; }
+.mkt__trustlens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; color: var(--ink-muted); }
 .mkt__trustlens-chip {
   padding: 5px 12px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);

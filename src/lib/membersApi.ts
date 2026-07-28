@@ -32,7 +32,7 @@ export async function loadMemberOfferings(id: string): Promise<MemberOfferings> 
     .select('categories(name, domain)')
     .eq('profile_id', id);
   if (error) { console.warn('loadMemberOfferings:', error.message); return { services: [], goods: [] }; }
-  const rows = (data as unknown as { categories: { name: string; domain: 'good' | 'service' } | null }[] | null) ?? [];
+  const rows = (data as unknown as { categories: { name: string; domain: 'good' | 'service' | 'place' } | null }[] | null) ?? [];
   const services: string[] = [];
   const goods: string[] = [];
   for (const r of rows) {

@@ -1117,6 +1117,8 @@ export default function Compose() {
                   onChange={setCatTags} />
                 <CategoryPicker domain="service" categories={allCats} selected={catTags}
                   onChange={setCatTags} />
+                <CategoryPicker domain="place" categories={allCats} selected={catTags}
+                  onChange={setCatTags} />
               </div>
             ))}
           </>)}

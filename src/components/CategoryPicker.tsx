@@ -4,7 +4,7 @@ import './CategoryPicker.css';
 
 export type Category = {
   id: string;
-  domain: 'good' | 'service';
+  domain: 'good' | 'service' | 'place';
   name: string;
   sort: number;
 };
@@ -12,7 +12,7 @@ export type Category = {
 type Pending = { id: string; name: string };
 
 type Props = {
-  domain: 'good' | 'service';
+  domain: 'good' | 'service' | 'place';
   categories: Category[];
   selected: string[];
   onChange: (ids: string[]) => void;
@@ -56,7 +56,7 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
 
-  const noun = domain === 'good' ? 'goods' : 'services';
+  const noun = domain === 'good' ? 'goods' : domain === 'service' ? 'services' : 'places & spaces';
   const singular = domain === 'good' ? 'good' : 'service';
 
   const pool = useMemo(
@@ -139,7 +139,7 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
   return (
     <div className="cat">
       <button type="button" className="cat__toggle" onClick={() => setOpen((o) => !o)}>
-        <span>{chosen.length ? `${chosen.length} ${noun} selected` : `Choose ${noun}`}</span>
+        <span>{chosen.length ? `${chosen.length} selected` : noun.charAt(0).toUpperCase() + noun.slice(1)}</span>
         <span className="cat__chev">{open ? '\u25B2' : '\u25BC'}</span>
       </button>
 

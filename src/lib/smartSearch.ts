@@ -13,7 +13,7 @@ import { todayISO } from './conciergeApi';
 // Privacy is inherited, not re-implemented: the runner only reads what the
 // viewer can already see (RLS-scoped posts, per-viewer mappable_members).
 
-export interface SearchCategory { id: string; name: string; domain: 'good' | 'service' }
+export interface SearchCategory { id: string; name: string; domain: 'good' | 'service' | 'place' }
 
 export type SpanKind =
   | 'trust' | 'recommend' | 'price' | 'mode' | 'time' | 'place' | 'area' | 'content' | 'category';
