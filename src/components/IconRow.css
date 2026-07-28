@@ -36,3 +36,9 @@
   width: 16px;
   flex-shrink: 0;
 }
+
+/* The assistant door: peach while it's switched on for you, quiet when off
+   (the .ai-off class is set by Home from the per-section consent flag). */
+.icon-row__btn--ai { border-color: var(--peach); color: var(--peach-deep); }
+.icon-row__btn--ai:hover { background: var(--peach-tint); }
+.icon-row__btn--ai.ai-off { border-color: var(--bone-edge); color: var(--ink-faint); }

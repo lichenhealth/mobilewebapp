@@ -17,6 +17,7 @@ import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import './Home.css';
+import { aiDoorOn } from '../components/AssistantDoor';
 
 // The choice point's vocabulary (founder 2026-07-28): every post is Social
 // or Actionable — legacy creative/educational/qa read as Social.
@@ -44,7 +45,8 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search',      to: '/search' },
   { icon: 'plus',           label: 'Post',        to: '/compose' },
   // Searching, posting, and thinking-with are one family (founder 2026-07-28).
-  { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=home' },
+  { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=home',
+    variant: 'icon-row__btn--ai', size: 22 },
   { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
   { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
@@ -91,7 +93,9 @@ export default function Home() {
     <div className="home">
       <FilterRow options={FILTERS} />
 
-      <IconRow items={CATEGORY_ICONS} />
+      <IconRow items={CATEGORY_ICONS.map((it) => (it.label === 'Assistant'
+        ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
+        : it))} />
 
       <section className="home__greeting">
         <p className="eyebrow">Inward &amp; interwoven</p>
