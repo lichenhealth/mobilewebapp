@@ -629,9 +629,13 @@ export default function AboutLichen() {
         <section className="about__sec">
           <h2 className="about__h2">Come build it with us</h2>
           <p>
-            It’s early, and that’s the invitation. Every new member gets <strong>3 months of full
-            access, free</strong> — time to make Lichen yours, tell us what you need, and help shape
-            the beginning of a better world. Then you choose the plan that fits:{' '}
+            It’s early, and that’s the invitation — literally: <strong>Lichen grows by
+            invitation</strong>. Every member arrives through someone already here, woven into
+            their web from day one. Know someone inside? Ask them for an invite. Don’t know
+            anyone yet? Introduce yourself at the door — a real person reads every note and
+            writes back. Every new member gets <strong>3 months of full access, free</strong> —
+            time to make Lichen yours, tell us what you need, and help shape the beginning of a
+            better world. Then you choose the plan that fits:{' '}
             <strong>Community at $29/month</strong>, or <strong>Concierge at $99/month</strong>.
           </p>
           <p>
@@ -657,6 +661,7 @@ export default function AboutLichen() {
         {!user ? (
           <div className="about__cta">
             <button className="btn btn-primary about__cta-join" onClick={() => navigate('/signup')}>Join Lichen</button>
+            <p className="about__cta-sub">Have an invitation? Use its link. Otherwise, knock — introduce yourself.</p>
             <p className="about__cta-sub">Already have an account? <button className="about__inline" onClick={() => navigate('/login')}>Sign in</button></p>
           </div>
         ) : (
