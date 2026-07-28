@@ -123,7 +123,7 @@ export default function Profile() {
       supabase.from('profiles').select('created_at,full_name,first_name,last_name,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
-      supabase.from('categories').select('id, domain, name, sort').order('sort', { ascending: true }),
+      supabase.from('categories').select('*').order('sort', { ascending: true }),
       supabase.from('profile_categories').select('category_id, categories(domain)').eq('profile_id', user.id),
       supabase.from('subscriptions').select('tier, source').eq('profile_id', user.id).maybeSingle(),
       loadMyPhone(),

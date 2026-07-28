@@ -44,7 +44,7 @@ export default function Onboarding() {
     let active = true;
     supabase
       .from('categories')
-      .select('id, domain, name, sort')
+      .select('*')
       .order('sort', { ascending: true })
       .then(({ data }) => {
         if (active && data) setCategories(data as Category[]);

@@ -100,7 +100,7 @@ export default function Compose() {
   const [catTags, setCatTags] = useState<string[]>([]);
   useEffect(() => {
     if (!tagsOpen || allCats !== null) return;
-    void supabase.from('categories').select('id, domain, name, sort').order('sort')
+    void supabase.from('categories').select('*').order('sort')
       .then(({ data }) => setAllCats((data as Category[] | null) ?? []));
   }, [tagsOpen, allCats]);
   const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
@@ -312,7 +312,7 @@ export default function Compose() {
     try {
       let cats = allCats;
       if (cats === null) {
-        const { data } = await supabase.from('categories').select('id, domain, name, sort').order('sort');
+        const { data } = await supabase.from('categories').select('*').order('sort');
         cats = (data as Category[] | null) ?? [];
         setAllCats(cats);
       }

@@ -7,6 +7,10 @@ export type Category = {
   domain: 'good' | 'service' | 'place';
   name: string;
   sort: number;
+  /** Two labeled worlds (founder 2026-07-28): the healing taxonomy in one
+   *  place — ignorable if you're not a healer — everyday commerce in the
+   *  other. Absent pre-migration → flat list. */
+  section?: 'healing' | 'everyday' | null;
 };
 
 type Pending = { id: string; name: string };
@@ -170,20 +174,33 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
           />
           <div className="cat__list">
             {filtered.length === 0 && <p className="cat__empty">No matches.</p>}
-            {filtered.map((c) => {
-              const on = selectedSet.has(c.id);
+            {(() => {
+              const row = (c: Category) => {
+                const on = selectedSet.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={'cat__item' + (on ? ' is-on' : '')}
+                    onClick={() => toggle(c.id)}
+                  >
+                    <span className="cat__box">{on ? '\u2713' : ''}</span>
+                    <span>{c.name}</span>
+                  </button>
+                );
+              };
+              const everyday = filtered.filter((c) => (c.section ?? 'everyday') !== 'healing');
+              const healing = filtered.filter((c) => c.section === 'healing');
+              if (!everyday.length || !healing.length) return filtered.map(row);
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={'cat__item' + (on ? ' is-on' : '')}
-                  onClick={() => toggle(c.id)}
-                >
-                  <span className="cat__box">{on ? '\u2713' : ''}</span>
-                  <span>{c.name}</span>
-                </button>
+                <>
+                  <p className="cat__section">Everyday</p>
+                  {everyday.map(row)}
+                  <p className="cat__section">Healing &amp; wellness</p>
+                  {healing.map(row)}
+                </>
               );
-            })}
+            })()}
           </div>
 
           {userId && (

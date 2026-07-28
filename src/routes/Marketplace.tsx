@@ -116,7 +116,7 @@ export default function Marketplace() {
   const [catFilter, setCatFilter] = useState<string[]>([]);
   useEffect(() => {
     let live = true;
-    void supabase.from('categories').select('id, domain, name, sort').order('sort')
+    void supabase.from('categories').select('*').order('sort')
       .then(({ data }) => { if (live) setAllCats((data as Category[] | null) ?? []); });
     return () => { live = false; };
   }, []);
