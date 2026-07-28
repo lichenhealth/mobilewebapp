@@ -64,6 +64,7 @@ export default function Directory() {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, headline')
+        .eq('onboarded', true)   // half-created accounts aren't members yet
         .neq('id', me)
         .order('full_name', { ascending: true })
         .limit(500);

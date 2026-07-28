@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import './Auth.css';
+import Turnstile, { TURNSTILE_SITE_KEY } from '../components/Turnstile';
 
 /** Only ever bounce to a place INSIDE the app — an absolute URL in ?next=
  *  would be an open-redirect door. */
@@ -20,6 +21,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   // Remembered destination: a signed-out tap on a notification email lands on
@@ -35,6 +37,7 @@ export default function Login() {
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
+      options: { captchaToken: captchaToken ?? undefined },
     });
     setLoading(false);
     if (signInError) { setError(signInError.message); return; }
@@ -61,6 +64,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password" />
           </label>
           {error && <p className="auth__error">{error}</p>}
+          <Turnstile onToken={setCaptchaToken} />
           <button className="btn btn-primary auth__submit" type="submit" disabled={loading}>
             {loading ? 'Logging in…' : 'Log in'}
           </button>

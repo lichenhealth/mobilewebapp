@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { LichenMark } from '../components/LichenMark';
 import './Auth.css';
+import Turnstile, { TURNSTILE_SITE_KEY } from '../components/Turnstile';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -19,11 +21,12 @@ export default function SignUp() {
     setError(''); setNotice('');
     if (!fullName.trim()) { setError('Please enter your name.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (TURNSTILE_SITE_KEY && !captchaToken) { setError('One moment — verifying you\u2019re human…'); return; }
     setLoading(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: fullName.trim() } },
+      options: { data: { full_name: fullName.trim() }, captchaToken: captchaToken ?? undefined },
     });
     setLoading(false);
     if (signUpError) { setError(signUpError.message); return; }
@@ -60,6 +63,7 @@ export default function SignUp() {
           </label>
           {error && <p className="auth__error">{error}</p>}
           {notice && <p className="auth__notice">{notice}</p>}
+          <Turnstile onToken={setCaptchaToken} />
           <button className="btn btn-primary auth__submit" type="submit" disabled={loading}>
             {loading ? 'Creating…' : 'Create account'}
           </button>
