@@ -395,9 +395,10 @@ export default function AboutLichen() {
         <section className="about__sec">
           <h2 className="about__h2">Your whole life, in one place</h2>
           <p>
-            Most networks slice you into a feed and sell your attention to those who want to keep
-            you scared and stuck in constant consumption that temporarily abates your suffering
-            without resolving it. Lichen holds the whole of you instead — your care and healing, your work
+            Most networks slice you into a feed tuned to maximize attention, harvest fear, and
+            drive the consumption that comforts the dis-ease of disconnection — the very dis-ease
+            the platform relies on to keep us disempowered and suffering. Lichen holds the whole
+            of you instead — your care and healing, your work
             and the things you offer, the events you gather for, the places you love, the jobs that
             give you purpose and fund your livelihood, and a fairer economy that values all things,
             not just human contributions — woven into a single web of people, plants, animals,
