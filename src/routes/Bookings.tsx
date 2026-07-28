@@ -9,12 +9,14 @@ import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
 } from '../lib/bookingApi';
 import './Bookings.css';
+import { useConfirm } from '../components/ConfirmDialog';
 
 /** The bookings hub: requests awaiting your answer, sessions on your books,
  *  and the ones you've asked for. Confirmed bookings live on both calendars
  *  as real events; this page is the lifecycle view. */
 export default function Bookings() {
   const navigate = useNavigate();
+  const confirmDialog = useConfirm();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -140,7 +142,7 @@ export default function Bookings() {
                 <span className="bkg__row-sub">{when(b)}</span>
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
-                if (window.confirm('Cancel this session? They’ll be notified.')) void act(() => cancelBooking(b.id));
+                void confirmDialog({ message: 'Cancel this session? They\u2019ll be notified.', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>
             </div>
           ))}
@@ -160,7 +162,7 @@ export default function Bookings() {
                 <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
-                if (window.confirm('Cancel this session?')) void act(() => cancelBooking(b.id));
+                void confirmDialog({ message: 'Cancel this session?', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>
             </div>
           ))}

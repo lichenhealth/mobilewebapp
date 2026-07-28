@@ -22,6 +22,7 @@ import {
 } from '../lib/bookingApi';
 import './Concierge.css';
 import './Calendar.css';
+import { useConfirm } from '../components/ConfirmDialog';
 
 interface MemberOpt { id: string; full_name: string | null }
 
@@ -46,6 +47,7 @@ export default function CalendarSettings() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  const confirmDialog = useConfirm();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [rules, setRules] = useState<ShareRule[]>([]);
@@ -264,9 +266,9 @@ export default function CalendarSettings() {
               </button>
               {bkEdit.id && (
                 <button className="cedit__add cedit__add--sm" onClick={() => {
-                  if (window.confirm('Delete this session type? Its booking history goes with it.')) {
-                    void act(async () => { await deleteBookingType(me, bkEdit.id!); setBkOpen(false); setBkEdit({}); });
-                  }
+                  void confirmDialog({ message: 'Delete this session type? Its booking history goes with it.', confirmLabel: 'Delete', danger: true }).then((ok) => {
+                    if (ok) void act(async () => { await deleteBookingType(me, bkEdit.id!); setBkOpen(false); setBkEdit({}); });
+                  });
                 }}>Delete</button>
               )}
               <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); }}>

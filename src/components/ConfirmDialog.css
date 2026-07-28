@@ -1,0 +1,13 @@
+.cdlg { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.cdlg__scrim { position: absolute; inset: 0; background: rgba(18, 24, 28, 0.28); }
+.cdlg__card {
+  position: relative; width: min(420px, 100%);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 16px); padding: 20px;
+  box-shadow: 0 18px 48px rgba(18, 24, 28, 0.18);
+}
+.cdlg__title { margin: 0 0 6px; font-family: var(--font-display, inherit); font-size: 17px; color: var(--ink); }
+.cdlg__msg { margin: 0 0 16px; font-size: 14.5px; line-height: 1.5; color: var(--ink-soft); }
+.cdlg__row { display: flex; justify-content: flex-end; gap: 10px; }
+.cdlg__btn--danger { background: var(--rust); border-color: var(--rust); color: #fff; }
+.cdlg__btn--danger:hover { background: #a3552f; border-color: #a3552f; }

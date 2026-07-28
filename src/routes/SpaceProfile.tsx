@@ -34,6 +34,7 @@ import { useNotifications } from '../notifications/NotificationsProvider';
 import './Profile.css';
 import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
+import { useConfirm } from '../components/ConfirmDialog';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -48,6 +49,7 @@ const ROLE_LABEL: Record<string, string> = {
 export default function SpaceProfile() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const confirmDialog = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const { deskRowsForSpace } = useNotifications();
   const { user } = useAuth();
@@ -292,10 +294,10 @@ export default function SpaceProfile() {
     setMemBusy(false);
   }
 
-  const onMembershipTap = () => {
+  const onMembershipTap = async () => {
     if (isMember) {
       if (myRole === 'super_admin') return;   // owners can't leave their own space
-      if (window.confirm(`Leave ${space?.name ?? 'this space'}? You'll also leave its chat.`)) {
+      if (await confirmDialog({ message: `Leave ${space?.name ?? 'this space'}? You'll also leave its chat.`, confirmLabel: 'Leave', danger: true })) {
         void act(() => leaveSpace(id, me));
       }
     } else if (myRequest === 'requested') {
@@ -786,9 +788,9 @@ export default function SpaceProfile() {
                 </span>
                 <button className="btn sprof__invite-btn" disabled={memBusy}
                   onClick={() => {
-                    if (window.confirm(`Remove ${r.name}? Its calendar and pending requests go with it.`)) {
-                      void act(async () => { await deleteResource(r.id); setResources((c) => c.filter((x) => x.id !== r.id)); });
-                    }
+                    void confirmDialog({ message: `Remove ${r.name}? Its calendar and pending requests go with it.`, confirmLabel: 'Remove', danger: true }).then((ok) => {
+                      if (ok) void act(async () => { await deleteResource(r.id); setResources((c) => c.filter((x) => x.id !== r.id)); });
+                    });
                   }}>Remove</button>
               </div>
             ))}
@@ -1014,9 +1016,9 @@ export default function SpaceProfile() {
                     disabled={memBusy}
                     title="Release this group — it becomes standalone; nothing else changes"
                     onClick={() => {
-                      if (window.confirm(`Release ${g.name} from ${space.name}? It becomes a standalone group — its members, chat, and posts are untouched.`)) {
-                        void act(() => ejectGroup(g.id));
-                      }
+                      void confirmDialog({ message: `Release ${g.name} from ${space.name}? It becomes a standalone group — its members, chat, and posts are untouched.`, confirmLabel: 'Release' }).then((ok) => {
+                        if (ok) void act(() => ejectGroup(g.id));
+                      });
                     }}
                   >
                     Release

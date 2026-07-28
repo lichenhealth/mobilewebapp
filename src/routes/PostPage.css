@@ -12,13 +12,19 @@
   margin-bottom: var(--s-3);
   box-shadow: 0 -36px 0 0 var(--bone);   /* plug the TopBar's transparent tail */
 }
+/* Back and the area doors are one family: same height, same type, one line
+   (founder 2026-07-28: "same size and position"). */
+.postp__back, .postp__door {
+  height: 34px; display: inline-flex; align-items: center;
+  padding: 0 14px; font-size: 12px;
+}
 .postp__back { margin: 0; flex-shrink: 0; }
-.postp__doors { display: flex; gap: 6px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+.postp__doors { display: flex; align-items: center; gap: 6px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
 .postp__doors::-webkit-scrollbar { display: none; }
 .postp__door {
-  flex-shrink: 0; padding: 6px 12px; border-radius: var(--r-full);
+  flex-shrink: 0; border-radius: var(--r-full);
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
-  font-size: 11px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+  color: var(--ink-soft); cursor: pointer; font-family: inherit;
 }
 .postp__door:hover { border-color: var(--peach); color: var(--ink); }
 .postp__acts { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }

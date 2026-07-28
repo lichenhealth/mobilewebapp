@@ -55,6 +55,7 @@ import InstallPrompt from './components/InstallPrompt';
 import { useAuth } from './auth/AuthProvider';
 import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
+import { ConfirmProvider } from './components/ConfirmDialog';
 import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
@@ -138,6 +139,7 @@ export default function App() {
   }, [user, loading, onboarded, isAdmin, pathname, navigate]);
 
   return (
+    <ConfirmProvider>
     <CollectPromptProvider>
     <div className="app-shell">
       <ScrollToTop />
@@ -264,5 +266,6 @@ export default function App() {
       {!isChatThread && !isAuth && <InstallPrompt />}
     </div>
     </CollectPromptProvider>
+    </ConfirmProvider>
   );
 }

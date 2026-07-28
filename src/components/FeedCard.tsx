@@ -7,6 +7,7 @@ import { LinkifiedText, CarePreview } from './CarePostCard';
 import { WeaveMark } from './WeaveMark';
 import VideoPlayer from './VideoPlayer';
 import './FeedCard.css';
+import { useConfirm } from './ConfirmDialog';
 
 export interface FeedCardProps {
   avatar?: string;       // image URL — falls back to monogram circle
@@ -110,6 +111,7 @@ export default function FeedCard({
   onHide,
 }: FeedCardProps) {
   const navigate = useNavigate();
+  const confirmDialog = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = !!(extraMenuItems && extraMenuItems.length)
     || (viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide);
@@ -276,7 +278,7 @@ export default function FeedCard({
                           className="feed-card__more-danger"
                           onClick={(e) => {
                             e.stopPropagation(); setMenuOpen(false);
-                            if (window.confirm('Delete this post? This can\'t be undone.')) onDelete();
+                            void confirmDialog({ message: 'Delete this post? This can\u2019t be undone.', confirmLabel: 'Delete', danger: true }).then((ok) => { if (ok) onDelete(); });
                           }}
                         >
                           Delete post

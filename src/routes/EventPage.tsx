@@ -18,6 +18,7 @@ import {
 import { postToCard } from '../lib/feedMapping';
 import { loadEventGuests, inviteEventGuest, type EventGuest } from '../lib/eventGuestsApi';
 import './EventPage.css';
+import { useConfirm } from '../components/ConfirmDialog';
 
 type Tab = 'About' | 'Updates' | 'Chat' | 'RSVP' | 'Book';
 
@@ -29,6 +30,7 @@ export default function EventPage() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  const confirmDialog = useConfirm();
 
   const [post, setPost] = useState<FeedPost | null>(null);
   const [calEvent, setCalEvent] = useState<EventRow | null>(null);
@@ -156,9 +158,10 @@ export default function EventPage() {
    *  entries and the event chat room), then the post itself. */
   async function cancelEvent() {
     if (!post || !isHost) return;
-    const ok = window.confirm(
-      "Cancel this event? Guests' calendars and the event chat will be removed too.",
-    );
+    const ok = await confirmDialog({
+      message: "Cancel this event? Guests' calendars and the event chat will be removed too.",
+      confirmLabel: 'Cancel event', cancelLabel: 'Keep it', danger: true,
+    });
     if (!ok) return;
     try {
       if (post.linked_event_id) await deleteEvent(post.linked_event_id);
