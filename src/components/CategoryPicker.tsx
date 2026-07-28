@@ -194,9 +194,9 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
               if (!everyday.length || !healing.length) return filtered.map(row);
               return (
                 <>
-                  <p className="cat__section">Everyday</p>
+                  <p className="cat__section">Commerce</p>
                   {everyday.map(row)}
-                  <p className="cat__section">Healing &amp; wellness</p>
+                  <p className="cat__section">Healing</p>
                   {healing.map(row)}
                 </>
               );
