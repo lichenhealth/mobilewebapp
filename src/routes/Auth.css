@@ -59,3 +59,5 @@
 
 /* Lichen logo mark on auth screens (replaces the seed emoji) */
 .auth__logo { display: flex; justify-content: center; margin-bottom: var(--s-2); }
+
+.auth__story { min-height: 96px; resize: vertical; font-family: inherit; }

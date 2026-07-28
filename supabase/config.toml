@@ -35,3 +35,6 @@ verify_jwt = false
 # function validates its own inputs; Stripe handles the money.
 [functions.donate-checkout]
 verify_jwt = false
+
+[functions.join-request]
+verify_jwt = false

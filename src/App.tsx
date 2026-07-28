@@ -113,6 +113,13 @@ export default function App() {
       const giftAlive = !sub || sub.source !== 'gift'
         || !sub.current_period_end || new Date(sub.current_period_end) > new Date();
       let ok = !!sub && ['active', 'past_due'].includes(sub.status) && giftAlive;
+      // Invite claim (founder 2026-07-28): the signup page parked the token;
+      // claiming weaves inviter and invitee into each other's web. Once.
+      const invTok = localStorage.getItem('lichen-invite-token');
+      if (invTok) {
+        localStorage.removeItem('lichen-invite-token');
+        void supabase.rpc('claim_invite', { p_token: invTok }).then(() => {}, () => {});
+      }
       if (!ok) {
         const { data: claimed } = await supabase.rpc('claim_membership_gift');
         ok = ((claimed as number | null) ?? 0) > 0;

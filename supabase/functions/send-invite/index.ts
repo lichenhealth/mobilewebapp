@@ -10,7 +10,17 @@
 // https://lichen.healthcare). JWT verification stays ON so only logged-in
 // members can trigger sends.
 
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+// Invite-only Lichen (founder 2026-07-28): every emailed invite carries a
+// TOKEN — signup requires one, and claiming it weaves inviter and invitee
+// into each other's mycelium.
+const svc = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  { auth: { persistSession: false } },
+);
 const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 // A real, monitored inbox (lichen.healthcare is send-only, so replies must land on
@@ -32,8 +42,8 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null) {
-  const signup = `${APP_URL}/signup`;
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null) {
+  const signup = token ? `${APP_URL}/signup?invite=${token}` : `${APP_URL}/signup`;
   const subject = `${inviterName} invited you to Lichen`;
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
@@ -120,7 +130,21 @@ Deno.serve(async (req) => {
     return json({ error: 'A valid recipient email is required.' }, 400);
   }
 
-  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths);
+  // Mint the token as the CALLER (verify_jwt guarantees a member).
+  let token: string | null = null;
+  try {
+    const auth = req.headers.get('Authorization') ?? '';
+    const jwt = auth.replace(/^Bearer\s+/i, '');
+    const payload = JSON.parse(atob(jwt.split('.')[1] ?? '')) as { sub?: string };
+    if (payload.sub) {
+      const { data: tok } = await svc.from('invite_tokens')
+        .insert({ created_by: payload.sub, invitee_email: email })
+        .select('token').single();
+      token = (tok as { token: string } | null)?.token ?? null;
+    }
+  } catch (e) { console.error('token mint:', e); }
+
+  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths, token);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

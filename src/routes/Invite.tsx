@@ -42,10 +42,23 @@ export default function Invite() {
   };
   const smsHref = `sms:${recipient}?&body=${encodeURIComponent(inviteMessage())}`;
 
+  /** Lichen is invite-only: the copied message needs a real token so the
+   *  signup door opens. Minted fresh per copy (RLS: created_by = me). */
+  async function tokenedMessage(): Promise<string> {
+    let link = 'https://lichen.healthcare/signup';
+    if (user) {
+      const { data } = await supabase.from('invite_tokens')
+        .insert({ created_by: user.id }).select('token').maybeSingle();
+      const tok = (data as { token: string } | null)?.token;
+      if (tok) link = `https://lichen.healthcare/signup?invite=${tok}`;
+    }
+    return inviteMessage().replace('https://lichen.healthcare/signup', link);
+  }
+
   async function copyInvite() {
     try {
-      await navigator.clipboard.writeText(inviteMessage());
-      setMsg('Copied — paste it into a text or DM.');
+      await navigator.clipboard.writeText(await tokenedMessage());
+      setMsg('Copied — paste it into a text or DM. The link carries their invitation.');
     } catch { setError('Couldn’t copy automatically — long-press the message to copy it.'); }
   }
 
