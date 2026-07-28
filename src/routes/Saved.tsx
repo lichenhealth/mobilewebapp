@@ -18,7 +18,8 @@ import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 import AssistantDoor from '../components/AssistantDoor';
 
-const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
+// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
+const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
 
 /** Saved — your private shelf. Everything you bookmarked, newest first,
  *  under the platform's standard lenses. Nobody else can see it. */
@@ -66,15 +67,24 @@ export default function Saved() {
     return SERVICE_AREAS.filter((a) => present.has(a.value));
   }, [posts]);
 
+  // Your shelf gets its own doors (founder 2026-07-28): search what you kept,
+  // and post something new that lands here as well as wherever you send it.
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState('');
+
   const toggleArea = (a: ServiceArea) =>
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
   const visible = useMemo(() => {
-    const type = CONTENT_TYPES.find((t) => t.label === content)?.value;
+    const q = query.trim().toLowerCase();
     return posts
-      .filter((p) => (content === 'All' || p.content_type === type))
-      .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
-  }, [posts, content, areas]);
+      .filter((p) => (content === 'All'
+        || (content === 'Actionable' ? p.content_type === 'actionable' : p.content_type !== 'actionable')))
+      .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))))
+      .filter((p) => !q
+        || `${p.title ?? ''} ${p.body} ${p.author?.full_name ?? ''} ${p.author_space?.name ?? ''}`
+          .toLowerCase().includes(q));
+  }, [posts, content, areas, query]);
 
   async function makeFolder() {
     const nm = newFolderName.trim();
@@ -136,12 +146,30 @@ export default function Saved() {
           )}
           {/* Organize: the studio — create ordered collections, arrange them,
               move pieces between them (founder 2026-07-24). */}
+          <button className="myc__kind" onClick={() => { setShowSearch((v) => !v); setQuery(''); }}>
+            <span className="myc__kind-circle"><Icon name="search" size={13} /></span>
+            <span className="myc__kind-label">Search</span>
+          </button>
+          <button className="myc__kind" onClick={() => navigate('/compose?save=1')} title="Post something — it lands on your shelf too">
+            <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
+            <span className="myc__kind-label">Post</span>
+          </button>
           <button className="myc__kind" onClick={() => navigate('/organize')}>
             <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
             <span className="myc__kind-label">Organize</span>
           </button>
           <AssistantDoor section="saved" label="Your assistant — what you've been keeping" />
         </div>
+      )}
+
+      {showSearch && (
+        <input
+          className="saved__search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search what you've kept…"
+          autoFocus
+        />
       )}
 
       {posts.length > 0 && <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />}

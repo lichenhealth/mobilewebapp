@@ -151,3 +151,20 @@ export async function sendCareInviteEmail(
   if (error) return 'Couldn’t send automatically yet — use Copy invite to share the link.';
   return `Invite emailed to ${email}.`;
 }
+
+/** Offer to care for someone (founder 2026-07-28): the caregiver side of the
+ *  same consented handshake — they approve before anything is real. The
+ *  insert trigger notifies them: "{You} wants to become a member of your
+ *  care team." */
+export async function offerCareFor(patientId: string): Promise<{ ok: boolean; message: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Not signed in.' };
+  if (patientId === user.id) return { ok: false, message: 'That one is you!' };
+  const { error } = await supabase.from('care_team_members')
+    .insert({ patient_id: patientId, caregiver_id: user.id, initiated_by: user.id, status: 'pending' });
+  if (error) {
+    return { ok: false, message: /duplicate|unique/i.test(error.message)
+      ? 'That care connection already exists.' : error.message };
+  }
+  return { ok: true, message: 'Offered — they’ll approve before it’s real.' };
+}

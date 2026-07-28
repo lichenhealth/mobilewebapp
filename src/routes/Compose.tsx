@@ -10,6 +10,7 @@ import {
   createPost, updatePost, loadPost, postAreas, uploadMedia,
 } from '../lib/postsApi';
 import { uploadVideo, listMyReadyVideos, videoPublicUrl, type ReadyVideo } from '../lib/videoApi';
+import { setSaved } from '../lib/savedApi';
 import { listMyCollections, createCollection, addToCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
@@ -624,6 +625,11 @@ export default function Compose() {
         }
         // Organize-into: file the fresh post as a piece of the chosen (or
         // brand-new) course/collection. Post never fails over this.
+        // Posted from your shelf (?save=1): it lands there too, without
+        // changing where else you sent it (founder 2026-07-28).
+        if (created?.id && params.get('save') === '1') {
+          await setSaved('post', created.id, true).catch(console.error);
+        }
         if (created?.id && (isCourse || isLibrary) && (organizeInto || newColName.trim())) {
           try {
             const target = organizeInto

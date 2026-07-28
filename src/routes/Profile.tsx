@@ -21,6 +21,7 @@ import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
 import { useLocation } from 'react-router-dom';
+import { offerCareFor } from '../lib/careTeamApi';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
@@ -215,6 +216,23 @@ export default function Profile() {
   // A #fragment lands you at the section you came for (the caregiver
   // dashboard's "Manage who you care for" → #care-for). React Router leaves
   // fragments alone, so scroll once the section exists.
+  // Offer to care for someone (founder 2026-07-28) — they approve first.
+  const [offerQ, setOfferQ] = useState('');
+  const [offerHits, setOfferHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [offerMsg, setOfferMsg] = useState('');
+  useEffect(() => {
+    const q = offerQ.trim();
+    if (q.length < 2) { setOfferHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name').ilike('full_name', `%${q}%`).eq('onboarded', true).limit(6);
+      if (live) setOfferHits(((data as { id: string; full_name: string | null }[] | null) ?? [])
+        .filter((m) => m.id !== user?.id));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [offerQ, user?.id]);
+
   const { hash } = useLocation();
   useEffect(() => {
     if (!hash) return;
@@ -610,6 +628,37 @@ export default function Profile() {
           Open caregiver dashboard
           <span aria-hidden="true"> →</span>
         </button>
+        <div className="prof__offer">
+          <input
+            className="prof__input"
+            value={offerQ}
+            onChange={(e) => { setOfferQ(e.target.value); setOfferMsg(''); }}
+            placeholder="Offer to care for someone — type their name…"
+          />
+          {offerHits.length > 0 && (
+            <div className="prof__offer-hits">
+              {offerHits.map((h) => (
+                <button
+                  key={h.id}
+                  className="prof__offer-hit"
+                  onClick={() => {
+                    setOfferQ(''); setOfferHits([]);
+                    void offerCareFor(h.id).then((r) => {
+                      setOfferMsg(r.message);
+                      if (r.ok) void loadCare();
+                    });
+                  }}
+                >
+                  {h.full_name ?? 'Member'} <em>Offer</em>
+                </button>
+              ))}
+            </div>
+          )}
+          {offerMsg && <p className="prof__hint">{offerMsg}</p>}
+          <p className="prof__hint">
+            They decide — an offer arrives as &ldquo;wants to become a member of your care team.&rdquo;
+          </p>
+        </div>
         {iCareFor.length === 0 && <p className="prof__empty">You’re not on anyone’s care team yet.</p>}
         <div className="prof__care-list">
           {iCareFor.map((c) => {

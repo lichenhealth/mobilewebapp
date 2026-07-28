@@ -230,3 +230,14 @@
 .prof__tier--admin {
   color: var(--blue-deep); background: var(--blue-tint); border-color: var(--blue);
 }
+
+/* Offer to care for someone — the caregiver side of the handshake. */
+.prof__offer { margin: var(--s-3) 0 var(--s-2); }
+.prof__offer-hits { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.prof__offer-hit {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: var(--bone-warm); font-family: inherit; font-size: 14px;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+.prof__offer-hit em { font-style: normal; font-size: 12px; color: var(--peach-deep); }
