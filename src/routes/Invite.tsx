@@ -14,6 +14,35 @@ const spanText = (m: number | null) =>
 
 export default function Invite() {
   const { loading, user, isAdmin } = useAuth();
+  // The ledger: my invitations (RLS: created_by = me) + the knocks (admins).
+  type InviteRow = { token: string; invitee_email: string | null; claimed_by: string | null; created_at: string; claimed_name?: string };
+  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string };
+  const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [knocks, setKnocks] = useState<KnockRow[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void (async () => {
+      const { data } = await supabase.from('invite_tokens')
+        .select('token, invitee_email, claimed_by, created_at')
+        .eq('created_by', user.id).order('created_at', { ascending: false }).limit(100);
+      const rows = (data as InviteRow[] | null) ?? [];
+      const claimedIds = rows.map((r) => r.claimed_by).filter((x): x is string => !!x);
+      if (claimedIds.length) {
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', claimedIds);
+        const names = new Map(((profs as { id: string; full_name: string | null }[] | null) ?? [])
+          .map((p) => [p.id, p.full_name ?? 'a member']));
+        rows.forEach((r) => { if (r.claimed_by) r.claimed_name = names.get(r.claimed_by); });
+      }
+      if (live) setInvites(rows);
+      if (isAdmin) {
+        const { data: k } = await supabase.from('join_requests')
+          .select('id, name, email, story, status').order('created_at', { ascending: false }).limit(50);
+        if (live) setKnocks((k as KnockRow[] | null) ?? []);
+      }
+    })();
+    return () => { live = false; };
+  }, [user, isAdmin]);
   const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -123,6 +152,7 @@ export default function Invite() {
   }
 
   if (loading) return <div className="invite"><p className="invite__muted">Loading…</p></div>;
+
 
   return (
     <div className="invite">
@@ -239,6 +269,65 @@ export default function Invite() {
           </a>.
         </p>
       </div>
+
+      {/* Who's in, who's still out — your own invitations, and (for admins)
+          everyone knocking at the door. */}
+      <section className="invite__ledger">
+        <h2 className="invite__h2">
+          Your invitations
+          {invites.length > 0 && (
+            <span className="invite__tally">
+              {invites.filter((i) => !i.claimed_by).length} open · {invites.filter((i) => i.claimed_by).length} joined
+            </span>
+          )}
+        </h2>
+        {invites.length === 0 ? (
+          <p className="invite__muted">None yet — every invitation you send shows up here.</p>
+        ) : (
+          <ul className="invite__list">
+            {invites.map((i) => (
+              <li className="invite__row" key={i.token}>
+                <span className="invite__row-who">
+                  {i.invitee_email ?? 'a shared link'}
+                  {i.claimed_name && <em> — now {i.claimed_name}</em>}
+                </span>
+                <span className={'invite__pill' + (i.claimed_by ? ' is-in' : '')}>
+                  {i.claimed_by ? 'joined' : 'open'}
+                </span>
+                <span className="invite__row-when">{i.created_at.slice(0, 10)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {isAdmin && (
+          <>
+            <h2 className="invite__h2">
+              At the door
+              {knocks.length > 0 && <span className="invite__tally">{knocks.filter((k) => k.status === 'new').length} waiting</span>}
+            </h2>
+            {knocks.length === 0 ? (
+              <p className="invite__muted">Nobody knocking right now.</p>
+            ) : (
+              <ul className="invite__list">
+                {knocks.map((k) => (
+                  <li className="invite__row invite__row--knock" key={k.id}>
+                    <span className="invite__row-who">
+                      <strong>{k.name}</strong> · {k.email}
+                      {k.story && <em className="invite__story">{k.story}</em>}
+                    </span>
+                    <span className={'invite__pill' + (k.status !== 'new' ? ' is-in' : '')}>{k.status}</span>
+                    {k.status === 'new' && (
+                      <button className="btn invite__use" onClick={() => { setEmail(k.email); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                        Invite them
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

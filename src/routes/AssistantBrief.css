@@ -1,6 +1,9 @@
 .abrief { padding: var(--s-4) var(--s-5); max-width: 640px; margin: 0 auto; }
 .abrief__head { display: flex; gap: 14px; align-items: center; margin: var(--s-3) 0 var(--s-4); }
-.abrief__avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--peach-tint); padding: 8px; }
+.abrief__avatar {
+  width: 52px; height: 52px; border-radius: 50%; padding: 9px;
+  background: transparent; border: 1px solid var(--peach);
+}
 .abrief__title { margin: 0; font-family: var(--font-display, inherit); font-size: 24px; }
 .abrief__sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-muted); }
 .abrief__card {
