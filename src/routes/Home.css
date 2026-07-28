@@ -50,6 +50,3 @@
 }
 .home__awake:hover { color: var(--peach-deep); }
 .home__awake-chev { color: var(--peach); margin-left: 4px; vertical-align: baseline; }
-
-.home__greeting { position: relative; }
-.home__greeting .ai-door { position: absolute; right: 0; top: 0; }
