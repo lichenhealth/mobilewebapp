@@ -17,6 +17,7 @@ import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import './Home.css';
+import AssistantDoor from '../components/AssistantDoor';
 
 // The choice point's vocabulary (founder 2026-07-28): every post is Social
 // or Actionable — legacy creative/educational/qa read as Social.
@@ -92,6 +93,7 @@ export default function Home() {
       <IconRow items={CATEGORY_ICONS} />
 
       <section className="home__greeting">
+        <AssistantDoor section="home" label="Your assistant — the whole-life briefing" />
         <p className="eyebrow">Inward &amp; interwoven</p>
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}

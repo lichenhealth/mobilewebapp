@@ -21,6 +21,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import './Marketplace.css';
+import AssistantDoor from '../components/AssistantDoor';
 
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
@@ -329,6 +330,7 @@ export default function Marketplace() {
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
+        <AssistantDoor section="market" label="Your assistant — offers, seeks, and what moved" />
         <ViewToggle view={view} onChange={pickView} />
       </p>
 

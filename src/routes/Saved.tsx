@@ -16,6 +16,7 @@ import { listMyCollections, createCollection, type CollectionRow } from '../lib/
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
+import AssistantDoor from '../components/AssistantDoor';
 
 const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
 
@@ -139,6 +140,7 @@ export default function Saved() {
             <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
             <span className="myc__kind-label">Organize</span>
           </button>
+          <AssistantDoor section="saved" label="Your assistant — what you've been keeping" />
         </div>
       )}
 

@@ -3,9 +3,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
-import { listMyAdminDeskCounts, listMyMemberSpaces } from '../lib/spacesApi';
+import {
+  listMyAdminDeskCounts, listMyMemberSpaces,
+  listPendingRequests, listPendingSectionShares,
+} from '../lib/spacesApi';
+import { listPendingResourceBookings } from '../lib/resourcesApi';
+import { listReminders, remindersOn } from '../lib/remindersApi';
+import { occursOn } from '../lib/recurrence';
 import { ensureDirectChat } from '../lib/chatApi';
-import { scopeForPath, type Scope } from '../lib/sections';
+import { type Scope } from '../lib/sections';
+import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 
 // The assistant on every page (founder 2026-07-28): tap the brain, get the
@@ -26,6 +33,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them.' },
   events: { title: 'Events', frame: 'You help them gather: invitations, RSVPs, what is coming up.' },
   membership: { title: 'Membership', frame: 'You help them steward their stake in the commons.' },
+  saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
 };
 
@@ -39,6 +47,7 @@ export default function AssistantBrief() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { rows } = useNotifications();
+  const [doorOn, setDoorOn] = useState(() => aiDoorOn(section));
   const [brief, setBrief] = useState<string | null>(cache.get(section) ?? null);
   const [state, setState] = useState<'thinking' | 'ready' | 'quietly-unavailable' | 'capped'>(
     cache.has(section) ? 'ready' : 'thinking');
@@ -60,7 +69,7 @@ export default function AssistantBrief() {
   }, [rows, section]);
 
   useEffect(() => {
-    if (!me || cache.has(section)) return;
+    if (!me || !doorOn || cache.has(section)) return;
     let live = true;
     void (async () => {
       // Stewarding load joins the snapshot (duty-scoped, invites excluded).
@@ -76,12 +85,102 @@ export default function AssistantBrief() {
             .map((s) => [s.id, s.name]));
         }
       } catch { /* snapshot stays lighter */ }
+
+      // ── Stage 2 (founder 2026-07-28): each section's brain gets real eyes.
+      //    Every extra is best-effort — a failed read just means a lighter
+      //    brief, never a broken one. All reads are RLS-scoped as the member.
+      const extras: Record<string, unknown> = {};
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        if (section === 'market' || section === 'home') {
+          const { data: mine } = await supabase.from('posts')
+            .select('title, body, details, created_at')
+            .eq('author_id', me)
+            .contains('service_areas', ['marketplace'])
+            .order('created_at', { ascending: false }).limit(8);
+          const listings = ((mine as { title: string | null; body: string; details: Record<string, unknown> | null; created_at: string }[] | null) ?? [])
+            .map((p) => ({
+              title: p.title || p.body.slice(0, 48),
+              modes: (p.details?.modes as string[] | undefined) ?? [p.details?.mode as string ?? 'unlabeled'],
+              since: p.created_at.slice(0, 10),
+            }));
+          if (listings.length) extras.my_open_listings_and_seeks = listings;
+          const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+          const { count } = await supabase.from('posts')
+            .select('id', { count: 'exact', head: true })
+            .contains('service_areas', ['marketplace'])
+            .neq('author_id', me)
+            .gte('created_at', weekAgo);
+          if (count) extras.new_marketplace_listings_this_week = count;
+        }
+        if (section === 'calendar' || section === 'home') {
+          // Recurring events keep their FIRST occurrence in start/end_date —
+          // expand with the real engine, don't date-range them (the booking
+          // board's lesson).
+          const { data: evs } = await supabase.from('events')
+            .select('*')
+            .or(`end_date.gte.${today},recurrence.not.is.null`)
+            .limit(200);
+          const rows3 = (evs as ({ title: string; start_date: string; end_date: string } & Record<string, unknown>)[] | null) ?? [];
+          const coming: { title: string; on: string }[] = [];
+          for (let d = 0; d < 14 && coming.length < 15; d++) {
+            const iso = new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
+            for (const e of rows3) {
+              if (coming.length >= 15) break;
+              const hit = e.recurrence
+                ? occursOn(e as never, iso)
+                : (e.start_date <= iso && e.end_date >= iso && d === 0) || e.start_date === iso;
+              if (hit && !coming.some((c) => c.title === e.title && c.on === iso)) {
+                coming.push({ title: e.title, on: iso });
+              }
+            }
+          }
+          if (coming.length) extras.next_two_weeks = coming;
+          if (section === 'calendar') {
+            const rem = await listReminders(me);
+            const due = remindersOn(rem, today).map((r) => r.title).slice(0, 8);
+            if (due.length) extras.reminders_today = due;
+          }
+        }
+        if (section === 'chat' || section === 'home') {
+          const { data: unread } = await supabase.rpc('chat_unread_counts');
+          const rows2 = (unread as { chat_id: string; unread: number }[] | null) ?? [];
+          const waiting = rows2.filter((r) => r.unread > 0);
+          if (waiting.length) {
+            extras.conversations_waiting = {
+              conversations: waiting.length,
+              messages: waiting.reduce((a, b) => a + b.unread, 0),
+            };
+          }
+        }
+        if ((section === 'communities' || section === 'groups') && desk && deskNames) {
+          // The actual queue rows, for up to three busiest desks.
+          const busiest = Object.entries(desk).sort((a, b) => b[1] - a[1]).slice(0, 3);
+          const queues: unknown[] = [];
+          for (const [sid] of busiest) {
+            const [reqs, shares, bookings] = await Promise.all([
+              listPendingRequests(sid).catch(() => []),
+              listPendingSectionShares(sid).catch(() => []),
+              listPendingResourceBookings(sid).catch(() => []),
+            ]);
+            queues.push({
+              space: deskNames[sid] ?? 'a space',
+              at_the_door: reqs.filter((r) => r.initiated_by === r.profile_id)
+                .map((r) => r.profile?.full_name ?? 'a member').slice(0, 6),
+              shelf_shares: shares.map((r) => `${r.requester?.full_name ?? 'a member'} (${r.area})`).slice(0, 6),
+              booking_requests: bookings.map((b) => `${b.requester?.full_name ?? 'someone'} wants ${b.resource?.name ?? 'a resource'}`).slice(0, 6),
+            });
+          }
+          if (queues.length) extras.desk_queues = queues;
+        }
+      } catch { /* lighter brief */ }
       const { data, error } = await supabase.functions.invoke('assistant-brief', {
         body: {
           section,
           frame: (FRAMES[section] ?? FRAMES.home).frame,
           snapshot: {
             ...snapshot,
+            ...extras,
             stewarding: desk && deskNames
               ? Object.entries(desk).map(([id, n]) => ({ space: deskNames[id] ?? 'a space', waiting: n }))
               : undefined,
@@ -98,7 +197,7 @@ export default function AssistantBrief() {
     })();
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, section]);
+  }, [me, section, doorOn]);
 
   async function talkToClaude() {
     if (!me) return;
@@ -117,15 +216,36 @@ export default function AssistantBrief() {
       </div>
 
       <div className="abrief__card">
-        {state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
-        {state === 'ready' && <p className="abrief__text">{brief}</p>}
-        {state === 'capped' && (
+        {!doorOn && (
+          <p className="abrief__text">
+            The assistant is <strong>off</strong> for this part of your Lichen life — nothing
+            here is gathered or shared with it. You lose its briefings and help in this
+            section; everything still lives in your bell and queues. Your choice, always.
+          </p>
+        )}
+        {doorOn && state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
+        {doorOn && state === 'ready' && <p className="abrief__text">{brief}</p>}
+        {doorOn && state === 'capped' && (
           <p className="abrief__text">You&rsquo;ve leaned on me a lot today — which I love. The briefing rests until tomorrow; everything&rsquo;s still in your bell and queues.</p>
         )}
-        {state === 'quietly-unavailable' && (
+        {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
       </div>
+
+      <label className="abrief__consent">
+        <input
+          type="checkbox"
+          checked={doorOn}
+          onChange={(e) => {
+            const on = e.target.checked;
+            setAiDoor(section, on);
+            setDoorOn(on);
+            if (!on) cache.delete(section);
+          }}
+        />
+        <span>Let the assistant see this section <em>— off means its data never reaches the assistant</em></span>
+      </label>
 
       <div className="abrief__acts">
         <button className="btn btn-primary" onClick={() => void talkToClaude()}>

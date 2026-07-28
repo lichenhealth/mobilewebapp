@@ -12,3 +12,9 @@
 .abrief__text { margin: 0; font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-wrap; }
 .abrief__acts { display: flex; gap: 10px; flex-wrap: wrap; }
 .abrief__foot { margin-top: var(--s-4); font-size: 12px; color: var(--ink-faint); font-style: italic; }
+
+/* The Back chip shares the card's left edge (founder nit 2026-07-28). */
+.abrief .cmp__back.calp__backchip { margin: var(--s-2) 0 var(--s-3); }
+.abrief__consent { display: flex; align-items: flex-start; gap: 8px; margin-bottom: var(--s-3); font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+.abrief__consent input { margin-top: 2px; }
+.abrief__consent em { font-style: normal; color: var(--ink-faint); }

@@ -1,0 +1,12 @@
+.ai-door {
+  position: relative; width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone-warm); border: 1px solid var(--peach);
+  color: var(--peach-deep); cursor: pointer;
+}
+.ai-door:hover { background: var(--peach-tint); }
+.ai-door.is-off { border-color: var(--bone-edge); color: var(--ink-faint); }
+.ai-door__slash {
+  position: absolute; width: 22px; height: 1.5px; background: var(--ink-faint);
+  transform: rotate(-45deg); border-radius: 1px;
+}

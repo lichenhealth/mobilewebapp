@@ -43,6 +43,7 @@ import {
 } from '../lib/calendarApi';
 import TodoView from '../components/TodoView';
 import './Calendar.css';
+import AssistantDoor from '../components/AssistantDoor';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -496,6 +497,7 @@ export default function Calendar() {
           <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Sessions & requests">
             <Icon name="member-heart" size={15} />
           </button>
+          <AssistantDoor section="calendar" label="Your assistant — what's coming, what's unanswered" />
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
             <Icon name="settings" size={15} />
           </button>
