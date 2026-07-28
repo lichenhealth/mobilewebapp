@@ -419,7 +419,16 @@ function postPrice(p: FeedPost): number | null {
   return m ? parseFloat(m[1]) : null;
 }
 
+/** EVERY term must appear (founder 2026-07-28: "fresh produce" was surfacing
+ *  a chainsaw whose body says "fresh bar oil" — a single shared word isn't a
+ *  match). Multi-word searches read as one thing, not a list of alternatives. */
 const hasText = (hay: (string | null | undefined)[], terms: string[]) => {
+  if (terms.length === 0) return true;
+  const s = hay.filter(Boolean).join(' ').toLowerCase();
+  return terms.every((t) => s.includes(t));
+};
+/** Any-term match — used only to offer near-misses when nothing matched at all. */
+const hasAnyText = (hay: (string | null | undefined)[], terms: string[]) => {
   if (terms.length === 0) return true;
   const s = hay.filter(Boolean).join(' ').toLowerCase();
   return terms.some((t) => s.includes(t));
@@ -645,7 +654,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     const hay = loc.toLowerCase();
     const hits = addrTokens.filter((t) => hay.includes(t)).length;
     if (hits === 0) return false;
-    if (hasText([name], addrTokens)) return false;   // name matches = a name hit
+    // A name sharing ANY token means this is a name hit, not an address hit.
+    if (hasAnyText([name], addrTokens)) return false;
     return hits >= Math.min(2, addrTokens.length);
   };
   let spaceHits: SpaceHit[] = spaces.map((s) => ({
