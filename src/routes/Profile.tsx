@@ -20,6 +20,7 @@ import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
+import { useLocation } from 'react-router-dom';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
@@ -210,6 +211,22 @@ export default function Profile() {
     setCareMsg('Sending…');
     setCareMsg(await sendCareInviteEmail(email, role, fullName));
   }
+
+  // A #fragment lands you at the section you came for (the caregiver
+  // dashboard's "Manage who you care for" → #care-for). React Router leaves
+  // fragments alone, so scroll once the section exists.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const id = hash.slice(1);
+    let tries = 0;
+    const tick = window.setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.clearInterval(tick); }
+      if (++tries > 20) window.clearInterval(tick);
+    }, 100);
+    return () => window.clearInterval(tick);
+  }, [hash]);
 
   async function saveProfile() {
     if (!user) return;
@@ -587,7 +604,7 @@ export default function Profile() {
       </section>
 
       <section className="prof__section">
-        <h2 className="prof__h2">People you care for</h2>
+        <h2 className="prof__h2" id="care-for">People you care for</h2>
         <p className="prof__care-lead">Members who’ve added you as a caregiver, or whom you’ve offered to help.</p>
         <button className="prof__care-dash" onClick={() => navigate('/caregiver')}>
           Open caregiver dashboard

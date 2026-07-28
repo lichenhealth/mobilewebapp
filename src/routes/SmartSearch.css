@@ -272,3 +272,13 @@
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; color: var(--peach);
 }
+
+/* Second tier — near misses, clearly labeled so precision stays honest. */
+.ssrch__near-head {
+  margin: var(--s-4) 0 var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--bone-edge-soft);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.ssrch__near-lead { margin: 0 0 var(--s-2); font-size: 13px; color: var(--ink-muted); }

@@ -341,7 +341,33 @@ export default function SmartSearch() {
     { label: 'Places', kind: 'place' },
   ];
 
-  const total = results ? results.people.length + results.posts.length + results.spaces.length : 0;
+  const total = results
+    ? results.people.length + results.posts.length + results.spaces.length + results.nearPosts.length
+    : 0;
+
+  const postRow = (p: FeedPost) => (
+    <button
+      key={p.id}
+      className="ssrch__hit"
+      onClick={() => navigate(p.linked_event_id
+        ? `/events/${p.id}`
+        : p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
+    >
+      <span className="ssrch__hit-icon">
+        <Icon name={postAreas(p).includes('events') ? 'rsvp' : 'sparkle'} size={16} />
+      </span>
+      <span className="ssrch__hit-body">
+        <span className="ssrch__hit-name">{p.title || p.body.slice(0, 60)}</span>
+        <span className="ssrch__hit-sub">
+          {(p.author_space?.name || p.author?.full_name) ?? 'A member'}
+          {whenLine(p) && ` · ${whenLine(p)}`}
+          {p.event_mode && ` · ${p.event_mode === 'free' ? 'Free' : p.event_mode === 'trade' ? 'Trade' : 'Paid'}`}
+        </span>
+        {p.title && p.body && <span className="ssrch__hit-loc">{p.body.slice(0, 90)}</span>}
+      </span>
+      <Icon name="chevron-right" size={14} />
+    </button>
+  );
 
   const endorsePicker = (
     which: 'trust' | 'rec',
@@ -814,32 +840,23 @@ export default function SmartSearch() {
         </section>
       )}
 
-      {results && results.posts.length > 0 && (
+      {results && (results.posts.length > 0 || results.nearPosts.length > 0) && (
         <section className="ssrch__sec">
           <h2 className="ssrch__h2">Happenings & posts</h2>
-          {results.posts.map((p) => (
-            <button
-              key={p.id}
-              className="ssrch__hit"
-              onClick={() => navigate(p.linked_event_id
-                ? `/events/${p.id}`
-                : p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-            >
-              <span className="ssrch__hit-icon">
-                <Icon name={postAreas(p).includes('events') ? 'rsvp' : 'sparkle'} size={16} />
-              </span>
-              <span className="ssrch__hit-body">
-                <span className="ssrch__hit-name">{p.title || p.body.slice(0, 60)}</span>
-                <span className="ssrch__hit-sub">
-                  {(p.author_space?.name || p.author?.full_name) ?? 'A member'}
-                  {whenLine(p) && ` · ${whenLine(p)}`}
-                  {p.event_mode && ` · ${p.event_mode === 'free' ? 'Free' : p.event_mode === 'trade' ? 'Trade' : 'Paid'}`}
-                </span>
-                {p.title && p.body && <span className="ssrch__hit-loc">{p.body.slice(0, 90)}</span>}
-              </span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          ))}
+          {results.posts.map(postRow)}
+          {results.posts.length === 0 && (
+            <p className="ssrch__near-lead">Nothing matched every word — here&rsquo;s what came close.</p>
+          )}
+          {/* Second tier: matched some of your words, not all (founder
+              2026-07-28) — precision first, adjacency still offered. */}
+          {results.nearPosts.length > 0 && (
+            <>
+              <p className="ssrch__near-head">
+                Close, but not everything you asked for
+              </p>
+              {results.nearPosts.map(postRow)}
+            </>
+          )}
         </section>
       )}
 

@@ -311,6 +311,10 @@ export interface SpaceHit {
 export interface SmartResults {
   people: PersonHit[];
   posts: FeedPost[];
+  /** Near misses (founder 2026-07-28): matched SOME of your words, not all.
+   *  Listed under the direct hits, best-matched first — precision without
+   *  losing what's adjacent. */
+  nearPosts: FeedPost[];
   spaces: SpaceHit[];
   anchor: GeoPoint | null;        // resolved center of the radius filter
   anchorMissing: boolean;         // a radius was asked for but no center resolved
@@ -597,6 +601,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
 
   // ── Posts ───────────────────────────────────────────────────────────────────
   const postAreaFilter: ServiceArea[] = c.areas.filter((a) => a !== 'people');
+  const nearIds = new Set<string>();
   let postHits = posts.filter((p) => {
     if (c.authorScope && !(p.author_id === c.authorScope && !p.author_space_id)) return false;
     if (postAreaFilter.length && !postAreas(p).some((a) => postAreaFilter.includes(a))) return false;
@@ -628,15 +633,31 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     }
     const taggedCats = Array.isArray(p.details?.categories)
       ? (p.details.categories as unknown[]).filter((x): x is string => typeof x === 'string') : [];
-    if (!hasText([p.title, p.body, p.author?.full_name], c.terms)
-      && !c.categories.some((cat) =>
-        taggedCats.includes(cat.id) || hasText([p.title, p.body], [cat.name.toLowerCase()]))) return false;
-    return true;
+    const direct = hasText([p.title, p.body, p.author?.full_name], c.terms)
+      || c.categories.some((cat) =>
+        taggedCats.includes(cat.id) || hasText([p.title, p.body], [cat.name.toLowerCase()]));
+    if (direct) return true;
+    // Not every word — but some. Keep it as a near miss (multi-word searches
+    // only; with one word there's no such thing as "partly").
+    if (c.terms.length > 1 && hasAnyText([p.title, p.body, p.author?.full_name], c.terms)) {
+      nearIds.add(p.id);
+      return true;
+    }
+    return false;
   });
+  // Split the tiers; near misses rank by how much of the search they matched.
+  const termHits = (p: FeedPost) => {
+    const hay = [p.title, p.body, p.author?.full_name].filter(Boolean).join(' ').toLowerCase();
+    return c.terms.filter((t) => hay.includes(t)).length;
+  };
+  let nearHits = postHits.filter((p) => nearIds.has(p.id))
+    .sort((a, b) => termHits(b) - termHits(a));
+  postHits = postHits.filter((p) => !nearIds.has(p.id));
   if (c.who.length && !c.who.includes('organizations') && (c.who.includes('people') || wantProviders)
     && !postAreaFilter.length && !c.contentTypes.length) {
     // pure Who=People searches read as a member directory — keep posts out
     postHits = [];
+    nearHits = [];
   }
 
   // ── Spaces ──────────────────────────────────────────────────────────────────
@@ -698,6 +719,7 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   return {
     people: people.slice(0, 25),
     posts: postHits.slice(0, 25),
+    nearPosts: nearHits.slice(0, 12),
     spaces: spaceHits.slice(0, 25),
     anchor, anchorMissing,
   };

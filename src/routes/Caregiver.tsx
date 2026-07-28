@@ -67,7 +67,9 @@ export default function Caregiver() {
             When someone adds you to their care team (or you offer to care for them and they accept),
             they'll appear here.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/profile')}>Manage care</button>
+          <button className="btn btn-primary" onClick={() => navigate('/profile#care-for')}>
+            Manage who you care for
+          </button>
         </div>
       )}
 
