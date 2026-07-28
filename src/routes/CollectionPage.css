@@ -160,3 +160,12 @@
 .colp__circle-door:hover { background: var(--peach-tint); }
 .colp__circle-door svg { color: var(--peach-deep); }
 .colp__circle-door em { font-style: normal; font-size: 11px; color: var(--ink-faint); }
+
+/* Starting a new turn of a course. */
+.colp__cohortnew { display: flex; flex-direction: column; gap: 8px; margin: var(--s-3) 0; }
+.colp__input {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md, 12px); background: var(--bone-warm);
+  font-family: inherit; font-size: 14px; color: var(--ink);
+}
+.colp__hint { margin: 0; font-size: 12.5px; color: var(--ink-muted); line-height: 1.5; }

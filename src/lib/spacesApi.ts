@@ -540,3 +540,39 @@ export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
   for (const r of (nests.data as { parent_id: string }[] | null) ?? []) bump(r.parent_id);
   return desk;
 }
+
+// ─── Cohorts: a GROUP that runs one turn of a course ────────────────────────
+// (founder 2026-07-28 — "Cohort versus circle, keeping it in the group
+// family"). Not a new space_kind: a group carrying `cohort_of` + `term`
+// DISPLAYS as a cohort and keeps every group capability for free.
+export interface CohortRow {
+  id: string; name: string; term: string | null; member_count?: number;
+}
+
+export async function listCohorts(collectionId: string): Promise<CohortRow[]> {
+  const { data, error } = await supabase.from('spaces')
+    .select('id, name, term').eq('cohort_of', collectionId).order('created_at');
+  if (error) return [];                       // pre-migration → no cohorts yet
+  return (data as CohortRow[] | null) ?? [];
+}
+
+/** Start a new turn of a course: a real group, tagged with its term. */
+export async function createCohort(
+  me: string, collectionId: string, courseName: string, term: string,
+): Promise<string> {
+  const name = term.trim() ? `${courseName} · ${term.trim()}` : `${courseName} Cohort`;
+  const id = await createSpaceWithLocation(me, name, 'group', '', null);
+  const { error } = await supabase.from('spaces')
+    .update({ cohort_of: collectionId, term: term.trim() || null }).eq('id', id);
+  if (error) console.warn('createCohort tag:', error.message);
+  return id;
+}
+
+/** Is this group a cohort, and of what? (null pre-migration or plain groups) */
+export async function cohortInfo(spaceId: string): Promise<{ term: string | null; courseId: string } | null> {
+  const { data, error } = await supabase.from('spaces')
+    .select('term, cohort_of').eq('id', spaceId).maybeSingle();
+  if (error) return null;
+  const row = data as { term: string | null; cohort_of: string | null } | null;
+  return row?.cohort_of ? { term: row.term, courseId: row.cohort_of } : null;
+}

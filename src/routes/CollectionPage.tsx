@@ -13,7 +13,10 @@ import {
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
-import { myDutiesIn, holdsDuty, createSpaceWithLocation } from '../lib/spacesApi';
+import {
+  myDutiesIn, holdsDuty, createSpaceWithLocation,
+  listCohorts, createCohort, type CohortRow,
+} from '../lib/spacesApi';
 import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
   addToCollection, loadProgress, enroll, setLessonDone,
@@ -162,6 +165,25 @@ export default function CollectionPage() {
     const gid = await createSpaceWithLocation(me, `${meta.name} Circle`, 'group', '', null);
     await saveDetails({ ...meta.details, circleId: gid });
   }
+  // Cohorts: many turns of one course, each a real group with its own chat,
+  // calendar and consented membership (founder 2026-07-28).
+  const [cohorts, setCohorts] = useState<CohortRow[]>([]);
+  const [cohortOpen, setCohortOpen] = useState(false);
+  const [cohortTerm, setCohortTerm] = useState('');
+  useEffect(() => {
+    if (!id) return;
+    let live = true;
+    void listCohorts(id).then((c) => { if (live) setCohorts(c); });
+    return () => { live = false; };
+  }, [id]);
+  async function startCohort() {
+    if (!meta || !me) return;
+    const gid = await createCohort(me, id, meta.name, cohortTerm);
+    setCohortOpen(false); setCohortTerm('');
+    setCohorts(await listCohorts(id));
+    navigate(`/spaces/${gid}`);
+  }
+
   const structured = meta?.kind === 'course' || meta?.kind === 'path';
   const firstUnfinished = useMemo(() => posts.find((p) => !done.has(p.id)) ?? posts[0], [posts, done]);
   const pct = posts.length ? Math.round((done.size / posts.length) * 100) : 0;
@@ -275,14 +297,42 @@ export default function CollectionPage() {
 
       {/* The course circle: chat, cohort, and scheduling — the integrated
           platform showing up inside the course (founder + Melanie 2026-07-26). */}
-      {meta.kind === 'course' && meta.details.circleId && (
+      {meta.kind === 'course' && (cohorts.length > 0 || meta.details.circleId) && (
         <div className="colp__circle">
-          <button className="colp__circle-door" onClick={() => navigate(`/spaces/${meta.details.circleId}`)}>
-            <Icon name="groups" size={14} /> Course circle <em>chat &amp; cohort</em>
-          </button>
+          {cohorts.map((co) => (
+            <button className="colp__circle-door" key={co.id} onClick={() => navigate(`/spaces/${co.id}`)}>
+              <Icon name="groups" size={14} /> {co.term || 'Cohort'} <em>chat &amp; calendar</em>
+            </button>
+          ))}
+          {/* The original single circle, still honored where one exists. */}
+          {meta.details.circleId && cohorts.length === 0 && (
+            <button className="colp__circle-door" onClick={() => navigate(`/spaces/${meta.details.circleId}`)}>
+              <Icon name="groups" size={14} /> Course circle <em>chat &amp; calendar</em>
+            </button>
+          )}
           <button className="colp__circle-door" onClick={() => navigate('/calendar')}>
             <Icon name="calendar" size={14} /> Find a time <em>calendars, woven</em>
           </button>
+        </div>
+      )}
+
+      {cohortOpen && canEdit && (
+        <div className="colp__cohortnew">
+          <input
+            className="colp__input"
+            value={cohortTerm}
+            onChange={(e) => setCohortTerm(e.target.value)}
+            placeholder="Name this turn — e.g. Colorado Kapulli 2026, Fall 2026, New hires Q3"
+            autoFocus
+          />
+          <button className="btn btn-primary colp__btn" disabled={busy} onClick={() => void act(startCohort)}>
+            Start it
+          </button>
+          <p className="colp__hint">
+            A cohort is a real group: its own chat, calendar and find-a-time. Members join
+            through the group&rsquo;s own consent flow, and the course keeps running after
+            this cohort finishes.
+          </p>
         </div>
       )}
 
@@ -321,11 +371,11 @@ export default function CollectionPage() {
               {pickOpen ? 'Close' : `Add ${itemWord(meta.kind)}s`}
             </button>
           )}
-          {meta.kind === 'course' && !meta.details.circleId && (
+          {meta.kind === 'course' && (
             <button className="btn colp__btn" disabled={busy}
-              title="A real Lichen group for this course — chat, events, and find-a-time come with it"
-              onClick={() => void act(createCircle)}>
-              Create course circle
+              title="A cohort is a real Lichen group — chat, events and find-a-time come with it"
+              onClick={() => setCohortOpen((o) => !o)}>
+              {cohortOpen ? 'Cancel' : cohorts.length ? 'New cohort' : 'Start a cohort'}
             </button>
           )}
           <button
