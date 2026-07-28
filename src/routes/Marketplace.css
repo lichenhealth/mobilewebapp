@@ -462,3 +462,12 @@
 /* Course creator is a door to their profile (founder 2026-07-26) */
 .afeed__course-author { color: var(--peach-deep); cursor: pointer; }
 .afeed__course-author:hover { text-decoration: underline; }
+
+/* ── The safety lens: who you'll do business with ───────────────────────── */
+.mkt__trustlens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0 2px; color: var(--ink-muted); }
+.mkt__trustlens-chip {
+  padding: 5px 12px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-family: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.mkt__trustlens-chip.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); font-weight: 600; }

@@ -11,6 +11,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import ListingTile from '../components/ListingTile';
+import { loadTrustWeb, trustPathTo, namesFor, type TrustWeb } from '../lib/trustPath';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
@@ -94,6 +95,48 @@ export default function Marketplace() {
   const [view, setView] = useState<'browse' | 'feed'>(
     () => (localStorage.getItem('mkt-view') === 'feed' ? 'feed' : 'browse'));
   const pickView = (v: 'browse' | 'feed') => { setView(v); localStorage.setItem('mkt-view', v); };
+  // THE SAFETY LENS (founder 2026-07-28): narrow the whole market to sellers
+  // your web vouches for. 'any' stays the default — the lens is a choice,
+  // never a wall. Vocabulary is the trust ladder, viewer-relative always.
+  type TrustLens = 'any' | 'second' | 'mine';
+  const [trustLens, setTrustLens] = useState<TrustLens>(
+    () => (localStorage.getItem('mkt-trust') as TrustLens) || 'any');
+  const pickLens = (l: TrustLens) => { setTrustLens(l); localStorage.setItem('mkt-trust', l); };
+  const [web, setWeb] = useState<TrustWeb | null>(null);
+  const [viaNames, setViaNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadTrustWeb(me).then((w) => { if (live) setWeb(w); });
+    return () => { live = false; };
+  }, [me]);
+  // Seller paths, viewer-relative: postId → my path to its author.
+  const sellerPaths = useMemo(() => {
+    if (!web) return new Map<string, { degree: 'mine' | 'second'; via: string | null }>();
+    const m = new Map<string, { degree: 'mine' | 'second'; via: string | null }>();
+    for (const p of posts) {
+      const hit = p.author_space_id
+        ? trustPathTo(web, 'space', p.author_space_id)
+        : trustPathTo(web, 'profile', p.author_id);
+      if (hit) m.set(p.id, hit);
+    }
+    return m;
+  }, [web, posts]);
+  useEffect(() => {
+    const vias = [...sellerPaths.values()].map((h) => h.via).filter((v): v is string => !!v);
+    if (!vias.length) return;
+    let live = true;
+    void namesFor(vias).then((n) => { if (live) setViaNames(n); });
+    return () => { live = false; };
+  }, [sellerPaths]);
+  const sellerLine = (postId: string): string | undefined => {
+    const hit = sellerPaths.get(postId);
+    if (!hit) return undefined;
+    if (hit.degree === 'mine') return 'Someone you trust';
+    return hit.via && viaNames.get(hit.via)
+      ? `Trusted by ${viaNames.get(hit.via)} — someone you trust`
+      : 'Trusted by someone you trust';
+  };
 
   useEffect(() => {
     let live = true;
@@ -126,6 +169,13 @@ export default function Marketplace() {
       const ms = postModes(p);
       return ms.length === 0 ? activeChips.length > 0 : ms.some((m) => wanted.has(m));
     });
+    if (trustLens !== 'any') {
+      list = list.filter((p) => {
+        if (p.author_id === me) return true;
+        const hit = sellerPaths.get(p.id);
+        return !!hit && (trustLens === 'second' || hit.degree === 'mine');
+      });
+    }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter((p) =>
@@ -135,7 +185,7 @@ export default function Marketplace() {
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, activeChips, query]);
+  }, [posts, activeChips, query, trustLens, sellerPaths, me]);
 
   const toggleChip = (c: Chip) =>
     setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -230,6 +280,16 @@ export default function Marketplace() {
         </div>
       )}
 
+      {me && (
+        <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
+          <Icon name="shield-user" size={14} />
+          {([['any', 'Anyone'], ['second', 'Trusted by someone I trust'], ['mine', 'Someone I trust']] as const).map(([v, l]) => (
+            <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
+              onClick={() => pickLens(v)}>{l}</button>
+          ))}
+        </div>
+      )}
+
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
@@ -244,6 +304,8 @@ export default function Marketplace() {
           <p className="mkt__empty-sub">
             {posts.length === 0
               ? 'Be the first — tap List and offer something to the network.'
+              : trustLens !== 'any'
+              ? 'Nobody in your trust web is offering this yet — widen to Anyone, or weave more people in.'
               : 'Try clearing a filter or searching differently.'}
           </p>
         </div>
@@ -261,6 +323,7 @@ export default function Marketplace() {
                 post={p}
                 offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
                 endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
+                trustLine={sellerLine(p.id)}
                 onOpen={() => navigate(postOpenPath(p))}
                 onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               />
@@ -272,6 +335,7 @@ export default function Marketplace() {
       {view === 'feed' && <section className="mkt__list">
         {filtered.map((p) => (
           <FeedCard
+            trustLine={sellerLine(p.id)}
             key={p.id}
             {...postToCard(p, me || undefined)}
             {...weaveProps(p, myWebSet, me || undefined)}

@@ -55,3 +55,4 @@
 @media (min-width: 1024px) {
   .tile-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
+.ltile__trust { display: block; margin-top: 1px; font-size: 10.5px; color: var(--peach-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -395,3 +395,9 @@
   font-style: normal; font-size: 11px; color: var(--ink-faint);
 }
 .feed-card__more-danger { color: #c0564f !important; }
+
+/* The viewer's path to this author — the mutual-friend line. */
+.feed-card__trustline {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
+  font-size: 11.5px; color: var(--peach-deep);
+}

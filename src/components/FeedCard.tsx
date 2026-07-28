@@ -41,6 +41,9 @@ export interface FeedCardProps {
   onSave?: (active: boolean) => void;
   // Eyebrow tag (optional)
   eyebrow?: string;
+  /** The viewer's PATH to this author — "Trusted by Melanie Bright — someone
+   *  you trust". Viewer-relative, never a score (founder 2026-07-28). */
+  trustLine?: string;
   // Inline media (photos / videos / audio uploaded with a post)
   media?: { type: 'photo' | 'video' | 'audio'; url: string; jobId?: string }[];
   // Message the author (omit / undefined hides the button — e.g. your own post)
@@ -89,7 +92,7 @@ export default function FeedCard({
   onTrust,
   onRecommend,
   onSave,
-  eyebrow,
+  eyebrow, trustLine,
   media,
   onMessage,
   onBadgeAction,
@@ -193,6 +196,11 @@ export default function FeedCard({
               </span>
             )}
           </div>
+          {trustLine && (
+            <span className="feed-card__trustline">
+              <Icon name="shield-user" size={11} /> {trustLine}
+            </span>
+          )}
         </div>
         {(onWeave || categoryIcons.length > 0 || areaDoors.length > 0 || onMessage || hasMenu) && (
           <div className="feed-card__head-actions">

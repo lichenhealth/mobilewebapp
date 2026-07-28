@@ -7,12 +7,14 @@ import './ListingTile.css';
  *  serif on bone — little book covers, not gray placeholders). The only
  *  overlay is the trust lens: a peach shield when someone YOU trust endorsed
  *  it. No counts, no ranks — relevance over volume, same as everywhere. */
-export default function ListingTile({ post, offer, endorsed, onOpen, onHide }: {
+export default function ListingTile({ post, offer, endorsed, trustLine, onOpen, onHide }: {
   post: FeedPost;
   /** The offer line ("Rent · $20/day", "Gift") — omitted when unlabeled. */
   offer?: string;
   /** Someone in your mycelium trusted/recommended this. */
   endorsed?: boolean;
+  /** The viewer's path to the SELLER ("Trusted by Melanie — someone you trust"). */
+  trustLine?: string;
   onOpen: () => void;
   /** The example bubble's × — hides this post for the viewer (hidden_posts). */
   onHide?: () => void;
@@ -47,8 +49,8 @@ export default function ListingTile({ post, offer, endorsed, onOpen, onHide }: {
         {photo
           ? <img src={photo} alt="" loading="lazy" />
           : <span className="ltile__cover-title">{title}</span>}
-        {endorsed && (
-          <span className="ltile__shield" title="Endorsed by someone you trust">
+        {(endorsed || trustLine) && (
+          <span className="ltile__shield" title={trustLine ?? 'Endorsed by someone you trust'}>
             <Icon name="shield-user" size={11} />
           </span>
         )}
@@ -56,6 +58,7 @@ export default function ListingTile({ post, offer, endorsed, onOpen, onHide }: {
       {offer && <span className="ltile__offer">{offer}</span>}
       <span className="ltile__title">{title}</span>
       <span className="ltile__by">{by}</span>
+      {trustLine && <span className="ltile__trust">{trustLine}</span>}
     </button>
   );
 }

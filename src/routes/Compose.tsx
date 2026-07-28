@@ -1069,6 +1069,12 @@ export default function Compose() {
                 </label>
               ))}
             </div>
+            {(fulfillment.has('pickup') || fulfillment.has('in_store')) && (
+              <p className="cmp__hint-ev">
+                Meeting someone new? A <a href="/places" target="_blank" rel="noopener">Lichen place</a> —
+                a known community spot — makes good ground for the handoff.
+              </p>
+            )}
             {fulfillment.has('deliver') && (
               <div className="cmp__row cmp__radius-row">
                 <span className="cmp__label-soft">within</span>

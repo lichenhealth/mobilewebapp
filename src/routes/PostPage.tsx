@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
+import { loadTrustWeb, trustPathTo, namesFor } from '../lib/trustPath';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -31,6 +32,8 @@ export default function PostPage() {
   const { postId = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  // The mutual-friend line at the decision moment (founder 2026-07-28).
+  const [trustLine, setTrustLine] = useState<string | undefined>(undefined);
   const me = user?.id ?? '';
   const { promptSaved, openPicker } = useCollect();
 
@@ -41,6 +44,25 @@ export default function PostPage() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlay, setOverlay] = useState<MyceliumSignals | undefined>(undefined);
+
+  useEffect(() => {
+    if (!user?.id || !post) { setTrustLine(undefined); return; }
+    let live = true;
+    void (async () => {
+      const web = await loadTrustWeb(user.id);
+      const hit = post.author_space_id
+        ? trustPathTo(web, 'space', post.author_space_id)
+        : trustPathTo(web, 'profile', post.author_id);
+      if (!hit || !live) return;
+      if (hit.degree === 'mine') { setTrustLine(post.author_id === user.id ? undefined : 'Someone you trust'); return; }
+      const names = hit.via ? await namesFor([hit.via]) : new Map();
+      if (live) setTrustLine(hit.via && names.get(hit.via)
+        ? `Trusted by ${names.get(hit.via)} — someone you trust`
+        : 'Trusted by someone you trust');
+    })();
+    return () => { live = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, post?.id]);
 
   useEffect(() => {
     let live = true;
@@ -140,6 +162,7 @@ export default function PostPage() {
 
       <FeedCard
         {...postToCard(p, me || undefined)}
+        trustLine={trustLine}
         {...weaveProps(p, myWebSet, me || undefined)}
         expanded
         trusted={myMyc.has('profile:' + p.author_id)}
