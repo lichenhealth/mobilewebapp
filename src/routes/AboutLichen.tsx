@@ -488,7 +488,7 @@ export default function AboutLichen() {
           </p>
 
           <p>
-            When you exchange manually, you close what you can see. The algorithm reads the whole web
+            When you exchange manually, you close the gap that you can see. The algorithm reads the whole web
             at once — who’s seeking, who’s offering, what something is truly worth and who has the
             capacity to pay for it — and weaves the strands together so nothing, and no one, is
             wasted. The more it learns, the faster the maps converge — closing the gap more
