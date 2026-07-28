@@ -252,7 +252,7 @@ export default function CalendarSettings() {
               <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="everyone">Anyone on Lichen</option>
-                <option value="mycelium">My mycelium only</option>
+                <option value="mycelium">My-celium only</option>
               </select>
               <button
                 className="cedit__add cedit__add--sm"

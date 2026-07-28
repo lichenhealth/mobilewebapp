@@ -204,7 +204,7 @@ export default function MyceliumDirectory() {
         </button>
         <p className="mycdir__crumb">
           <Icon name="sparkle" size={11} />
-          <span>Mycelium · Directory</span>
+          <span>My-celium · Directory</span>
         </p>
         <h1 className="mycdir__title">Your web</h1>
         <p className="mycdir__sub">
@@ -297,7 +297,7 @@ export default function MyceliumDirectory() {
         <div className="mycdir__empty">
           <span className="display-italic">Nothing woven yet.</span>
           <p>
-            Tap the mycelium mark beside a name — on posts, in search, on
+            Tap the my-celium mark beside a name — on posts, in search, on
             profiles — and they&rsquo;ll appear here.
           </p>
         </div>

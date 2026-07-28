@@ -504,9 +504,9 @@ export default function SpaceProfile() {
             <button
               className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
               onClick={toggleWeb}
-              title={inWeb ? 'In your mycelium — its doings flow to you' : 'Weave it into your mycelium (no trust implied)'}
+              title={inWeb ? 'In your my-celium — its doings flow to you' : 'Weave it into your my-celium (no trust implied)'}
             >
-              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your Mycelium ✓' : 'Add to Mycelium'}
+              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
             </button>
             {space.kind !== 'place' ? (
               /* Trust is for relationships: people, orgs, communities, groups. */

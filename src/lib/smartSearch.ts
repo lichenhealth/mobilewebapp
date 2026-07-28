@@ -26,7 +26,9 @@ export interface ParsedSpan { start: number; end: number; kind: SpanKind }
  *  'mine' = someone I trust · 'second' = someone trusted by someone I trust ·
  *  'any' = anyone on the platform · personId = one specific member.
  *  Founder vocabulary (2026-07-14): never say "my mycelium" as a trust
- *  degree — mycelium is your network, trust is a private per-person signal. */
+ *  degree — my-celium is your network, trust is a private per-person signal.
+ *  The grammar accepts both spellings ("my-celium" is the member-facing name
+ *  since 2026-07-25). */
 export type EndorseDegree = 'any' | 'mine' | 'second';
 export interface EndorseFilter { degree: EndorseDegree | null; personId: string | null }
 const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
@@ -144,13 +146,13 @@ export function parseQuery(
 
   // Longest, most specific phrases first — order matters. The recommend-second
   // phrase CONTAINS the trust-second phrase, so it must scan before it.
-  scan(/\brecommended by (?:(?:someone|people|members|those|folks) trusted by (?:someone|people|members|those|folks) i trust|people trusted by my mycelium|(?:people|members|those|folks) my mycelium trusts?)\b/g,
+  scan(/\brecommended by (?:(?:someone|people|members|those|folks) trusted by (?:someone|people|members|those|folks) i trust|people trusted by my my-?celium|(?:people|members|those|folks) my my-?celium trusts?)\b/g,
     'recommend', () => { c.rec.degree = 'second'; });
-  scan(/\btrusted by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium)\b/g,
+  scan(/\btrusted by (?:(?:people|members|those|folks|someone|anyone) i trust|my my-?celium)\b/g,
     'trust', () => { c.trust.degree = 'second'; });
-  scan(/\brecommended(?: by (?:(?:people|members|those|folks|someone|anyone) i trust|my mycelium|people in my mycelium))?\b/g,
+  scan(/\brecommended(?: by (?:(?:people|members|those|folks|someone|anyone) i trust|my my-?celium|people in my my-?celium))?\b/g,
     'recommend', () => { c.rec.degree ??= 'mine'; });
-  scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy mycelium\b|\btrusted\b/g,
+  scan(/\b(?:(?:people|members|folks|those|providers|practitioners)\s+)?(?:that\s+|whom?\s+)?i trust\b|\bmy my-?celium\b|\btrusted\b/g,
     'trust', () => { c.trust.degree ??= 'mine'; });
 
   scan(/\bfree or low[- ]?cost\b|\blow[- ]?cost\b|\bfree\b|\binexpensive\b/g, 'price', () => {

@@ -662,7 +662,7 @@ export default function Compose() {
         <p className="cmp__sub">
           {editing
             ? 'Changes save in place — guests keep their RSVPs.'
-            : 'Share with the whole network, or just your mycelium.'}
+            : 'Share with the whole network, or just your My-celium.'}
         </p>
       </header>
 
@@ -678,7 +678,7 @@ export default function Compose() {
       <label className="cmp__label">Audience</label>
       <div className="cmp__chips">
         <button className={'cmp__chip' + (isPublic ? ' is-on' : '')} onClick={pickEveryone}>Everyone</button>
-        <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')} onClick={toggleMycelium}>My Mycelium</button>
+        <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')} onClick={toggleMycelium}>My-celium</button>
         {mySpaces.length <= 6 && mySpaces.map((sp) => (
           <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
             onClick={() => toggleSpace(sp.id)}>{sp.name}</button>

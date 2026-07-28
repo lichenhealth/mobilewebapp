@@ -196,9 +196,9 @@ export default function MemberProfile() {
             <button
               className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
               onClick={toggleWeb}
-              title={inWeb ? 'In your mycelium — their doings flow to you' : 'Weave them into your mycelium (no trust implied)'}
+              title={inWeb ? 'In your my-celium — their doings flow to you' : 'Weave them into your my-celium (no trust implied)'}
             >
-              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your Mycelium ✓' : 'Add to Mycelium'}
+              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
             </button>
             <button
               className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}

@@ -410,7 +410,7 @@ export default function AboutLichen() {
         <section className="about__sec">
           <h2 className="about__h2">Trust you can’t game</h2>
           <p>
-            What you see is filtered through your <em>mycelium</em> — the people you genuinely trust.
+            What you see is filtered through your <em>My-celium</em> — the people you genuinely trust.
             Trust and recommendations are private, person-to-person signals: no follower counts, no
             leaderboards, nothing to perform for. Quality over volume, by design. When something is
             surfaced to you, it’s because someone you trust stands behind it.

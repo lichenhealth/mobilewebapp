@@ -8,7 +8,7 @@ interface MyceliumMarkProps {
   label?: string;
 }
 
-export function MyceliumMark({ size = 64, label = 'Mycelium' }: MyceliumMarkProps) {
+export function MyceliumMark({ size = 64, label = 'My-celium' }: MyceliumMarkProps) {
   return (
     <svg
       viewBox="0 0 50 50"

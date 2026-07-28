@@ -138,9 +138,12 @@ export default function Mycelium() {
       <header className="myc__head">
         <p className="myc__crumb">
           <Icon name="sparkle" size={11} />
-          <span>Mycelium</span>
+          {/* "My-celium" (founder 2026-07-25): the name carries the point —
+              this is YOUR specific network. Display-only; routes and DB
+              tables keep the plain spelling. */}
+          <span>My-celium</span>
         </p>
-        <h1 className="myc__title">Your Mycelium</h1>
+        <h1 className="myc__title">Your My-celium</h1>
         <p className="myc__sub">
           What your web is sharing — filter by kind, area, or content.
         </p>

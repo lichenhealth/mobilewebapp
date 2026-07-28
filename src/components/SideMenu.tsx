@@ -60,7 +60,7 @@ const SPACE_SECTIONS: { key: string; title: string; href: string; kind: Mappable
   { key: 'places', title: 'Places', href: '/places', kind: 'place' },
 ];
 const SECTIONS: NavSection[] = [
-  { key: 'mycelium', title: 'Mycelium', href: '/mycelium', items: [], defaultExpanded: false },
+  { key: 'mycelium', title: 'My-celium', href: '/mycelium', items: [], defaultExpanded: false },
   ...SPACE_SECTIONS.map((s) => ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false })),
 ];
 

@@ -190,9 +190,10 @@ export default function FeedCard({
               <span className="feed-card__eyebrow">
                 {' · '}
                 {eyebrow === 'Mycelium' ? (
-                  // the lens the post reached you through — YOUR mycelium's door
+                  // the lens the post reached you through — YOUR my-celium's
+                  // door ('Mycelium' stays the internal sentinel value)
                   <button className="feed-card__eyebrow-link" onClick={() => navigate('/mycelium')}>
-                    Mycelium
+                    My-celium
                   </button>
                 ) : eyebrow}
               </span>

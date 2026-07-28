@@ -32,7 +32,7 @@ interface SectionLogo {
 
 const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/market',      label: 'Marketplace', icon: 'store'         },
-  { prefix: '/mycelium',    label: 'Mycelium',    custom: true          },
+  { prefix: '/mycelium',    label: 'My-celium',   custom: true          },
   { prefix: '/communities', label: 'Communities', icon: 'user-multiple' },
   { prefix: '/community',   label: 'Communities', icon: 'user-multiple' },
   { prefix: '/groups',      label: 'Groups',      icon: 'user-multiple' },
