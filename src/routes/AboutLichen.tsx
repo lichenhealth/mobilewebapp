@@ -414,6 +414,14 @@ export default function AboutLichen() {
             leaderboards, nothing to perform for. Quality over volume, by design. When something is
             surfaced to you, it’s because someone you trust stands behind it.
           </p>
+          <p>
+            That same web is your safety when things change hands. Star ratings can be farmed;
+            a path through <em>your</em> relationships can’t be faked. Browse the whole
+            marketplace, or narrow it to <em>people you trust</em> — or people <em>they</em>{' '}
+            trust — and every listing shows you your path to the person behind it:{' '}
+            <em>&ldquo;Trusted by Melanie — someone you trust.&rdquo;</em> The mutual friend you’d
+            want before meeting a stranger, built into the ground you walk on.
+          </p>
         </section>
 
         <section className="about__sec">
@@ -630,6 +638,13 @@ export default function AboutLichen() {
             enrich. It flows back into supporting this new way of being in local and global
             community. Every membership keeps the commons alive: you’re being the change, and
             investing in positive change.
+          </p>
+          <p>
+            So the invitation is simple. If you want a social and commerce ecosystem better than
+            the ones you have now, <strong>invest in it</strong>: put your content here, where it
+            builds a commons instead of a corporation — and pay for the infrastructure that lets
+            this new society collaborate, exchange, and innovate. Not a subscription to someone
+            else’s platform. A stake in your own.
           </p>
         </section>
 

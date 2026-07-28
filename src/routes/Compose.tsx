@@ -42,7 +42,7 @@ export default function Compose() {
   const [isPublic, setIsPublic] = useState(!presetSpace);
   const [toMycelium, setToMycelium] = useState(false);
   const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
-  const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
+  const [mySpaces, setMySpaces] = useState<{ id: string; name: string; kind: string }[]>([]);
   const [myAdminSpaces, setMyAdminSpaces] = useState<Set<string>>(new Set());
   // The choice point (founder + Melanie, 2026-07-27): every post is either
   // SOCIAL — it flows through a Space feed — or ACTIONABLE — it flows through
@@ -259,9 +259,9 @@ export default function Compose() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase.from('space_members').select('role, spaces(id, name)').eq('profile_id', user.id);
-      const rows = (data as unknown as { role: string; spaces: { id: string; name: string } | null }[] | null) ?? [];
-      setMySpaces(rows.map((r) => r.spaces).filter((s): s is { id: string; name: string } => !!s));
+      const { data } = await supabase.from('space_members').select('role, spaces(id, name, kind)').eq('profile_id', user.id);
+      const rows = (data as unknown as { role: string; spaces: { id: string; name: string; kind: string } | null }[] | null) ?? [];
+      setMySpaces(rows.map((r) => r.spaces).filter((s): s is { id: string; name: string; kind: string } => !!s));
       setMyAdminSpaces(new Set(rows.filter((r) => r.spaces && (r.role === 'admin' || r.role === 'super_admin'))
         .map((r) => r.spaces!.id)));
     })();
@@ -679,11 +679,32 @@ export default function Compose() {
       <div className="cmp__chips">
         <button className={'cmp__chip' + (isPublic ? ' is-on' : '')} onClick={pickEveryone}>Everyone</button>
         <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')} onClick={toggleMycelium}>My Mycelium</button>
-        {mySpaces.map((sp) => (
+        {mySpaces.length <= 6 && mySpaces.map((sp) => (
           <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
             onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
         ))}
       </div>
+      {mySpaces.length > 6 && (
+        <div className="cmp__aud-groups">
+          {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
+            .map(([kind, label]) => {
+              const of = mySpaces.filter((sp) => sp.kind === kind);
+              if (!of.length) return null;
+              return (
+                <div className="cmp__aud-group" key={kind}>
+                  <span className="cmp__aud-kind">{label}</span>
+                  {of.map((sp) => (
+                    <label className="cmp__aud-row" key={sp.id}>
+                      <input type="checkbox" checked={audienceSpaces.has(sp.id)}
+                        onChange={() => toggleSpace(sp.id)} />
+                      <span>{sp.name}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       {/* The choice point: a post is Social (a feed story) or Actionable
           (an exchange — it enters the Lichen Economy and rides the
