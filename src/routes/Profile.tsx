@@ -81,6 +81,7 @@ export default function Profile() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceCats, setServiceCats] = useState<string[]>([]);
   const [goodCats, setGoodCats] = useState<string[]>([]);
+  const [placeCats, setPlaceCats] = useState<string[]>([]);
   const [tier, setTier] = useState<{ tier: string; source: string } | null>(null);
 
   const [loadingData, setLoadingData] = useState(true);
@@ -149,9 +150,10 @@ export default function Profile() {
       id: r.spaces!.id, name: r.spaces!.name, kind: r.spaces!.kind, role: r.role,
     })));
     setCategories(((catRes.data as Category[] | null) ?? []));
-    const pcRows = (pcRes.data as { category_id: string; categories: { domain: 'good' | 'service' } | null }[] | null) ?? [];
+    const pcRows = (pcRes.data as { category_id: string; categories: { domain: 'good' | 'service' | 'place' } | null }[] | null) ?? [];
     setServiceCats(pcRows.filter((r) => r.categories?.domain === 'service').map((r) => r.category_id));
     setGoodCats(pcRows.filter((r) => r.categories?.domain === 'good').map((r) => r.category_id));
+    setPlaceCats(pcRows.filter((r) => r.categories?.domain === 'place').map((r) => r.category_id));
     setTier((subRes.data as { tier: string; source: string } | null) ?? null);
     setLoadingData(false);
   }, [user]);
@@ -272,13 +274,15 @@ export default function Profile() {
   }
 
   // Persist category changes immediately (added -> upsert, removed -> delete)
-  async function setCatsForDomain(domain: 'good' | 'service', ids: string[]) {
+  async function setCatsForDomain(domain: 'good' | 'service' | 'place', ids: string[]) {
     if (!user) return;
     setError('');
-    const prev = domain === 'service' ? serviceCats : goodCats;
+    const prev = domain === 'service' ? serviceCats : domain === 'good' ? goodCats : placeCats;
     const added = ids.filter((x) => !prev.includes(x));
     const removed = prev.filter((x) => !ids.includes(x));
-    if (domain === 'service') setServiceCats(ids); else setGoodCats(ids);
+    if (domain === 'service') setServiceCats(ids);
+    else if (domain === 'good') setGoodCats(ids);
+    else setPlaceCats(ids);
     if (added.length) {
       const rows = added.map((category_id) => ({ profile_id: user.id, category_id }));
       const { error: e } = await supabase.from('profile_categories')
@@ -545,6 +549,21 @@ export default function Profile() {
               categories={categories}
               selected={goodCats}
               onChange={(ids) => setCatsForDomain('good', ids)}
+              userId={user.id}
+            />
+          </div>
+        )}
+        {/* Places & spaces need no capability chip — stewarding a venue or
+            land is its own kind of offering (founder 2026-07-28). Renders
+            only once place categories exist. */}
+        {categories.some((c) => c.domain === 'place') && (
+          <div className="prof__picker">
+            <p className="prof__picker-lead">Places &amp; spaces you steward</p>
+            <CategoryPicker
+              domain="place"
+              categories={categories}
+              selected={placeCats}
+              onChange={(ids) => setCatsForDomain('place', ids)}
               userId={user.id}
             />
           </div>
