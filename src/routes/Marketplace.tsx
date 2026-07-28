@@ -282,7 +282,6 @@ export default function Marketplace() {
 
       {me && (
         <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
-          <Icon name="shield-user" size={14} />
           {([['any', 'Anyone'], ['second', 'Trusted by someone I trust'], ['mine', 'Someone I trust']] as const).map(([v, l]) => (
             <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
               onClick={() => pickLens(v)}>{l}</button>

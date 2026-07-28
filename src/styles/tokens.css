@@ -5,6 +5,7 @@
 
 :root {
   /* ─── Color ─────────────────────────────────────────────────────── */
+  --wall-gutter: 8px;         /* the mandatory minimum indent from the app's walls */
   --bone:        #F0EEE9;     /* primary canvas — matches wireframe */
   --bone-warm:   #FFFFFF;     /* lifted surfaces / cards */
   --bone-deep:   #E6E2DA;     /* recessed */

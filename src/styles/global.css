@@ -123,6 +123,10 @@ input, textarea, select { font: inherit; color: inherit; }
   min-height: 100dvh;
   padding-top: calc(var(--top-h) + var(--safe-top));
   padding-bottom: calc(var(--nav-h) + var(--safe-bot) + var(--s-6));
+  /* Mandatory breathing room from the app's walls (founder 2026-07-28):
+     no rendering may press against the edge, even when a section forgets
+     its own gutter. Full-bleed screens opt out via their inline padding:0. */
+  padding-inline: var(--wall-gutter);
 }
 
 /* ─── Atoms ────────────────────────────────────────────────────────── */
