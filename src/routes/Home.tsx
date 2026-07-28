@@ -63,8 +63,8 @@ export default function Home() {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
 
-  async function messageAuthor(authorId: string) {
-    try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
+  async function messageAuthor(authorId: string, aboutPostId?: string) {
+    try { navigate(`/chat/${await ensureDirectChat(authorId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -135,7 +135,7 @@ export default function Home() {
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
             onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={user ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id) : undefined}
+            onMessage={p.author_id !== user?.id ? () => messageAuthor(p.author_id, p.id) : undefined}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />

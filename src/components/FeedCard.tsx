@@ -236,9 +236,10 @@ export default function FeedCard({
               <button
                 className="feed-card__message"
                 onClick={onMessage}
-                aria-label={`Message ${title}`}
+                aria-label={`Chat about "${title}"`}
+                title={`Chat about this — the post comes with you`}
               >
-                <Icon name="message" size={16} />
+                <Icon name="chat-about" size={16} />
               </button>
             )}
             {hasMenu && (

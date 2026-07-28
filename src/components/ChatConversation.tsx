@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   MessageRow, MemberInfo, ChatKind, ReactionRow, Attachment, MediaType,
@@ -10,6 +10,7 @@ import {
   markChatRead,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
+import { loadPost } from '../lib/postsApi';
 import '../routes/ChatThread.css';
 
 interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; }
@@ -37,6 +38,21 @@ export default function ChatConversation({
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [draft, setDraft] = useState('');
+  // "Chat about this post": the card's two-bubble door carries the post here
+  // (?about=<id>) so the conversation starts with what it's about — the
+  // member still writes their own words; we only set the opening line.
+  const [params] = useSearchParams();
+  const aboutPost = params.get('about');
+  const aboutDone = useRef(false);
+  useEffect(() => {
+    if (!aboutPost || aboutDone.current) return;
+    aboutDone.current = true;
+    void loadPost(aboutPost).then((p) => {
+      if (!p) return;
+      const label = p.title || p.body.slice(0, 60);
+      setDraft(`About "${label}" — ${window.location.origin}/posts/${p.id}\n\n`);
+    });
+  }, [aboutPost]);
   const [pending, setPending] = useState<Pending[]>([]);
   const [uploading, setUploading] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);

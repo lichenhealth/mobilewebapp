@@ -15,6 +15,7 @@ export type IconName =
   | 'book'
   | 'bookmark'
   | 'brain'
+  | 'chat-about'
   | 'briefcase'
   | 'calendar'
   | 'chat'
@@ -332,6 +333,13 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '185 524 10 10',
     strokeWidth: 0.62,
     content: <><path d="M192.456 529.714C191.821 529.714 191.306 529.199 191.306 528.564C191.306 527.929 191.821 527.414 192.456 527.414C193.091 527.414 193.606 527.929 193.606 528.564C193.606 529.199 193.091 529.714 192.456 529.714Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M190.785 531.489C190.943 531.322 191.127 531.179 191.329 531.065C191.673 530.872 192.061 530.77 192.456 530.77C192.85 530.77 193.238 530.872 193.582 531.065C193.731 531.148 193.869 531.248 193.995 531.361" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M188.735 529.345C187.948 529.345 187.31 528.707 187.31 527.92C187.31 527.133 187.948 526.495 188.735 526.495C189.522 526.495 190.16 527.133 190.16 527.92C190.16 528.707 189.522 529.345 188.735 529.345Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M191.405 533.415C191.334 532.564 191.121 532.004 191.005 531.807C190.758 531.386 190.41 531.038 189.995 530.797C189.58 530.556 189.112 530.429 188.636 530.429C188.16 530.429 187.692 530.556 187.277 530.797C186.946 530.99 186.657 531.25 186.429 531.562L186.283 531.779" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M190 533.643C187.436 533.643 185.357 531.564 185.357 529C185.357 526.436 187.436 524.357 190 524.357C192.564 524.357 194.643 526.436 194.643 529C194.643 531.564 192.564 533.643 190 533.643Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // Two bubbles — a conversation ABOUT something (founder 2026-07-28):
+  // distinct from 'message', which opens the entity's own chat.
+  'chat-about': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <><path d="M8.5 5.5h9a3 3 0 013 3v4a3 3 0 01-3 3h-1.2l-2.8 3v-3H8.5a3 3 0 01-3-3v-4a3 3 0 013-3z" stroke="currentColor" strokeLinejoin="round"/><path d="M5.5 9.5H4a2.5 2.5 0 00-2.5 2.5v3A2.5 2.5 0 004 17.5h.8v2.6l2.4-2.6h3.3" stroke="currentColor" strokeLinejoin="round"/><circle cx="10.5" cy="10.5" r="1" fill="currentColor"/><circle cx="13.5" cy="10.5" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></>,
   },
   'brain': {
     viewBox: '0 0 24 24',

@@ -179,7 +179,7 @@ export default function PostPage() {
         onDelete={() => { void deletePost(p.id).then(back).catch(console.error); }}
         onHide={me ? () => { void setHidden(p.id, true).then(back).catch(console.error); } : undefined}
         onMessage={me && p.author_id !== me ? async () => {
-          try { navigate(`/chat/${await ensureDirectChat(p.author_id)}`); } catch (e) { console.error(e); }
+          try { navigate(`/chat/${await ensureDirectChat(p.author_id)}?about=${p.id}`); } catch (e) { console.error(e); }
         } : undefined}
         onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
       />
