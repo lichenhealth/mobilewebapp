@@ -1,4 +1,4 @@
-import { Icon } from './Icon';
+import { Icon, IconName } from './Icon';
 import type { FeedPost } from '../lib/postsApi';
 import './ListingTile.css';
 
@@ -7,7 +7,7 @@ import './ListingTile.css';
  *  serif on bone — little book covers, not gray placeholders). The only
  *  overlay is the trust lens: a peach shield when someone YOU trust endorsed
  *  it. No counts, no ranks — relevance over volume, same as everywhere. */
-export default function ListingTile({ post, offer, endorsed, trustLine, onOpen, onHide }: {
+export default function ListingTile({ post, offer, endorsed, trustLine, modeIcons, onOpen, onHide }: {
   post: FeedPost;
   /** The offer line ("Rent · $20/day", "Gift") — omitted when unlabeled. */
   offer?: string;
@@ -15,6 +15,9 @@ export default function ListingTile({ post, offer, endorsed, trustLine, onOpen, 
   endorsed?: boolean;
   /** The viewer's path to the SELLER ("Trusted by Melanie — someone you trust"). */
   trustLine?: string;
+  /** Every exchange door this listing opens — small glyphs, top-left, for
+   *  scanning (founder 2026-07-28). */
+  modeIcons?: IconName[];
   onOpen: () => void;
   /** The example bubble's × — hides this post for the viewer (hidden_posts). */
   onHide?: () => void;
@@ -22,7 +25,12 @@ export default function ListingTile({ post, offer, endorsed, trustLine, onOpen, 
   const media = Array.isArray(post.details?.media)
     ? (post.details.media as { type: string; url: string }[]) : [];
   const photo = media.find((m) => m.type === 'photo')?.url;
-  const title = post.title || (post.body.length > 64 ? post.body.slice(0, 61) + '…' : post.body);
+  let title = post.title || (post.body.length > 64 ? post.body.slice(0, 61) + '…' : post.body);
+  // The offer line already says "In search of" — don't say it twice.
+  if (offer?.toLowerCase().includes('in search of')) {
+    const stripped = title.replace(/^in search of\s+/i, '');
+    if (stripped !== title && stripped) title = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  }
   const by = post.author_space?.name || post.author?.full_name || 'Member';
   const demo = post.details?.demo === true;
   return (
@@ -46,6 +54,13 @@ export default function ListingTile({ post, offer, endorsed, trustLine, onOpen, 
         </span>
       )}
       <span className={'ltile__media' + (photo ? '' : ' ltile__media--cover')}>
+        {modeIcons && modeIcons.length > 0 && (
+          <span className="ltile__modes" aria-hidden>
+            {modeIcons.slice(0, 3).map((ic) => (
+              <span className="ltile__mode" key={ic}><Icon name={ic} size={11} /></span>
+            ))}
+          </span>
+        )}
         {photo
           ? <img src={photo} alt="" loading="lazy" />
           : <span className="ltile__cover-title">{title}</span>}

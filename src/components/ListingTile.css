@@ -56,3 +56,12 @@
   .tile-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
 .ltile__trust { display: block; margin-top: 1px; font-size: 10.5px; color: var(--peach-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Exchange-door glyphs, top-left — the scanning identifier. */
+.ltile__modes { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; }
+.ltile__mode {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.92); color: var(--peach-deep);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}

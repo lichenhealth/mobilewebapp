@@ -46,6 +46,10 @@ const MODES: { chip: Chip; label: string; icon: IconName }[] = [
 const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
+const MODE_ICON: Record<Mode, IconName> = {
+  gift: 'heart-line', trade: 'trade', rent: 'rent', lend: 'lend',
+  borrow: 'reply', sale: 'store', sliding: 'store', iso: 'search',
+};
 /** Every mode a listing carries — multi-mode offers match EVERY door they
  *  open, not just the primary (a gift-to-veterans-or-paid listing shows under
  *  both the Gift and For Sale lenses). */
@@ -323,6 +327,7 @@ export default function Marketplace() {
                 offer={eyebrow === 'Mycelium' ? undefined : eyebrow}
                 endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
                 trustLine={sellerLine(p.id)}
+                modeIcons={[...new Set(postModes(p).map((m) => MODE_ICON[m]))]}
                 onOpen={() => navigate(postOpenPath(p))}
                 onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               />
