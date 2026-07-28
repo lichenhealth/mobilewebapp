@@ -363,6 +363,7 @@ export default function Marketplace() {
                 endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
                 trustLine={sellerLine(p.id)}
                 modeIcons={[...new Set(postModes(p).map((m) => MODE_ICON[m]))]}
+                recommended={myRecs.has('post:' + p.id)}
                 onOpen={() => navigate(postOpenPath(p))}
                 onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               />

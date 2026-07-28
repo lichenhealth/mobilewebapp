@@ -7,7 +7,7 @@ import './ListingTile.css';
  *  serif on bone — little book covers, not gray placeholders). The only
  *  overlay is the trust lens: a peach shield when someone YOU trust endorsed
  *  it. No counts, no ranks — relevance over volume, same as everywhere. */
-export default function ListingTile({ post, offer, endorsed, trustLine, modeIcons, onOpen, onHide }: {
+export default function ListingTile({ post, offer, endorsed, trustLine, modeIcons, recommended, onOpen, onHide }: {
   post: FeedPost;
   /** The offer line ("Rent · $20/day", "Gift") — omitted when unlabeled. */
   offer?: string;
@@ -18,6 +18,9 @@ export default function ListingTile({ post, offer, endorsed, trustLine, modeIcon
   /** Every exchange door this listing opens — small glyphs, top-left, for
    *  scanning (founder 2026-07-28). */
   modeIcons?: IconName[];
+  /** YOU recommended this — the tile remembers your endorsement (founder
+   *  2026-07-28), same signal the feed card's thumb carries. */
+  recommended?: boolean;
   onOpen: () => void;
   /** The example bubble's × — hides this post for the viewer (hidden_posts). */
   onHide?: () => void;
@@ -67,6 +70,11 @@ export default function ListingTile({ post, offer, endorsed, trustLine, modeIcon
         {(endorsed || trustLine) && (
           <span className="ltile__shield" title={trustLine ?? 'Endorsed by someone you trust'}>
             <Icon name="shield-user" size={11} />
+          </span>
+        )}
+        {recommended && (
+          <span className="ltile__rec" title="You recommended this">
+            <Icon name="thumbs-up" size={11} />
           </span>
         )}
       </span>

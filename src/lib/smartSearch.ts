@@ -16,7 +16,8 @@ import { todayISO } from './conciergeApi';
 export interface SearchCategory { id: string; name: string; domain: 'good' | 'service' | 'place' }
 
 export type SpanKind =
-  | 'trust' | 'recommend' | 'price' | 'mode' | 'time' | 'place' | 'area' | 'content' | 'category';
+  | 'trust' | 'recommend' | 'price' | 'mode' | 'time' | 'place' | 'area' | 'content' | 'category'
+  | 'person';   // a named member — "from melanie bright", "recommended by galyn" 
 
 /** A recognized phrase inside the raw query — drives the peach highlighting. */
 export interface ParsedSpan { start: number; end: number; kind: SpanKind }
@@ -113,7 +114,12 @@ function addMonths(iso: string, months: number): string {
 }
 
 /** Parse a natural sentence into criteria + the spans that were understood. */
-export function parseQuery(raw: string, categories: SearchCategory[]): {
+/** A member the sentence can name (founder 2026-07-28). */
+export interface NamedMember { id: string; full_name: string | null }
+
+export function parseQuery(
+  raw: string, categories: SearchCategory[], people: NamedMember[] = [],
+): {
   criteria: SearchCriteria; spans: ParsedSpan[];
 } {
   const c = emptyCriteria();
@@ -223,6 +229,47 @@ export function parseQuery(raw: string, categories: SearchCategory[]): {
   for (const [re, ct] of CONTENT_WORDS) scan(re, 'content', () => {
     if (!c.contentTypes.includes(ct)) c.contentTypes.push(ct);
   });
+
+  // ── Named members ────────────────────────────────────────────────────────
+  // "from melanie bright" → her contributions; a name trailing a trust or
+  // recommend phrase BINDS that filter to her instead of a degree. Longest
+  // names first so "melanie bright" wins over "melanie".
+  const named = people
+    .filter((p) => (p.full_name ?? '').trim().length > 2)
+    .map((p) => ({ id: p.id, name: (p.full_name ?? '').toLowerCase().trim() }))
+    .sort((a, b) => b.name.length - a.name.length);
+  for (const person of named) {
+    const first = person.name.split(/\s+/)[0];
+    for (const variant of [person.name, first]) {
+      if (variant.length < 3) continue;
+      let from = 0;
+      let bound = false;
+      while (!bound) {
+        const at = q.indexOf(variant, from);
+        if (at < 0) break;
+        from = at + variant.length;
+        const end = at + variant.length;
+        const beforeOk = at === 0 || !/[a-z0-9]/.test(q[at - 1]);
+        const afterOk = end >= q.length || !/[a-z0-9]/.test(q[end]);
+        if (!beforeOk || !afterOk) continue;
+        let free = true;
+        for (let i = at; i < end; i++) if (consumed[i]) { free = false; break; }
+        if (!free) continue;
+        // What precedes the name decides what it means.
+        const before = q.slice(0, at);
+        const nearRec = /recommend(?:ed|s)?(?:\s+by)?\s*$/.test(before)
+          || spans.some((sp) => sp.kind === 'recommend' && at >= sp.end && at - sp.end <= 4);
+        const nearTrust = /trusted\s+by\s*$/.test(before)
+          || spans.some((sp) => sp.kind === 'trust' && at >= sp.end && at - sp.end <= 4);
+        if (nearRec) { c.rec.personId = person.id; c.rec.degree = null; }
+        else if (nearTrust) { c.trust.personId = person.id; c.trust.degree = null; }
+        else c.authorScope = person.id;
+        claim(at, end, 'person');
+        bound = true;
+      }
+      if (bound) break;
+    }
+  }
 
   // Leftover words → free-text terms
   let word = ''; let start = -1;

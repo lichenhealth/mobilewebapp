@@ -206,8 +206,8 @@ export default function SmartSearch() {
   }, [me]);
 
   const { criteria: parsed, spans } = useMemo(
-    () => (q.trim() ? parseQuery(q, cats) : { criteria: emptyCriteria(), spans: [] as ParsedSpan[] }),
-    [q, cats],
+    () => (q.trim() ? parseQuery(q, cats, members) : { criteria: emptyCriteria(), spans: [] as ParsedSpan[] }),
+    [q, cats, members],
   );
   const criteria = useMemo(() => {
     const c = merge(parsed, extras, cats);
@@ -300,6 +300,9 @@ export default function SmartSearch() {
     if (c.online && !c.inPerson) out.push('online');
     if (c.inPerson && !c.online) out.push('in person');
     if (c.online && c.inPerson) out.push('online + in person');
+    if (c.authorScope && !scopeMemberId) {
+      out.push(`from ${members.find((m) => m.id === c.authorScope)?.full_name ?? 'a member'}`);
+    }
     for (const w of c.who) out.push(w);
     for (const id of c.spaceScope) out.push(`in ${spaceName(id)}`);
     if (c.radiusMiles != null) {
