@@ -56,6 +56,7 @@ import { useAuth } from './auth/AuthProvider';
 import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
+import AssistantBrief from './routes/AssistantBrief';
 import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
@@ -172,6 +173,7 @@ export default function App() {
           <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/posts/:postId" element={<PostPage />} />
           <Route path="/saved"     element={<Saved />} />
+          <Route path="/assistant" element={<AssistantBrief />} />
           <Route path="/organize"  element={<Organize />} />
           <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/maps"      element={

@@ -8,7 +8,7 @@ import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import { minToLabel } from '../lib/calendarApi';
 import {
-  loadAuthorFeed, deletePost, postAreas, CONTENT_TYPES, SERVICE_AREAS,
+  loadAuthorFeed, deletePost, postAreas, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
@@ -19,7 +19,8 @@ import type { MyceliumSignals } from './EngagementFooter';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
 
-const TABS = ['All', ...CONTENT_TYPES.map((t) => t.label)];
+// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
+const TABS = ['All', 'Social', 'Actionable'];
 
 /** "when" eyebrow for event posts (same rendering as the Events feed). */
 function whenLabel(p: FeedPost): string | undefined {
@@ -113,9 +114,9 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   };
 
   const visible = useMemo(() => {
-    const type = CONTENT_TYPES.find((t) => t.label === tab)?.value;
     return posts
-      .filter((p) => (tab === 'All' || p.content_type === type))
+      .filter((p) => (tab === 'All'
+        || (tab === 'Actionable' ? p.content_type === 'actionable' : p.content_type !== 'actionable')))
       .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
   }, [posts, tab, areas]);
 

@@ -207,6 +207,16 @@ export default function TopBar({
             <span aria-hidden="true">🕯️</span>
           </button>
         )}
+        {user && (
+          <button
+            className="top-bar__icon top-bar__assistant"
+            onClick={() => navigate(`/assistant?section=${scope.kind === 'section' ? scope.section : 'home'}`)}
+            aria-label="Your assistant's briefing"
+            title="Your assistant — a briefing for this part of your Lichen life"
+          >
+            <Icon name="brain" size={18} />
+          </button>
+        )}
         <button
           className="top-bar__icon top-bar__bell"
           onClick={() => setPanelOpen((o) => !o)}

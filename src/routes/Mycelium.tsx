@@ -5,7 +5,7 @@ import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import {
-  loadFeed, deletePost, postAreas, CONTENT_TYPES, SERVICE_AREAS,
+  loadFeed, deletePost, postAreas, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
@@ -31,8 +31,9 @@ const URL_TO_KIND: Record<string, Kind | undefined> = {
   people: 'person', providers: 'provider', organizations: 'organization', places: 'place',
 };
 
-const CONTENT_FILTERS = ['All', ...CONTENT_TYPES.map((c) => c.label)];
-const CT_LABEL: Record<string, string> = Object.fromEntries(CONTENT_TYPES.map((c) => [c.value, c.label]));
+// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
+const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
+const CT_LABEL: Record<string, string> = { actionable: 'Actionable' };
 
 type Item = {
   key: string;

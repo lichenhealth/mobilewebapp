@@ -18,7 +18,9 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import './Home.css';
 
-const FILTERS = ['All', 'Social', 'Creative', 'Educational', 'Actionable', 'Q&A'];
+// The choice point's vocabulary (founder 2026-07-28): every post is Social
+// or Actionable — legacy creative/educational/qa read as Social.
+const FILTERS = ['All', 'Social', 'Actionable'];
 
 // The greeting tells the truth now (founder, 2026-07-16): a time-aware
 // salutation + the real count of network members active in the last 12 hours.
