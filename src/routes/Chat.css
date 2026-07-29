@@ -373,3 +373,8 @@
   font-size: 13.5px; color: var(--ink-soft); line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+
+/* Head row holds the assistant door beside New message. */
+.chat__head-row { gap: 10px; }
+.chat__head-row .ai-door { margin-left: auto; }
+.chat__head-row .chat__new { margin-left: 0; }

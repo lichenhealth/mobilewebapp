@@ -14,6 +14,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { type Scope } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
+import { loadChatList } from '../lib/chatApi';
 
 // The assistant on every page (founder 2026-07-28): tap the brain, get the
 // back-from-vacation briefing for WHERE YOU ARE — organized highlights,
@@ -27,7 +28,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   home: { title: 'Your Lichen life', frame: 'The whole-life view: surface the biggest things across care, exchanges, groups and calendar.' },
   market: { title: 'The Marketplace', frame: 'You help them offer, seek, buy, sell, trade and gift within the web of people they trust.' },
   calendar: { title: 'Your calendar', frame: 'You help them tend time: what is coming, what is unanswered, what needs scheduling.' },
-  chat: { title: 'Conversations', frame: 'You help them stay in real relationship: who is waiting on a reply.' },
+  chat: { title: 'Conversations', frame: 'You help them stay in real relationship: who is waiting on a reply, and roughly what about. Name people and rooms; never recount what was confided, and never quote at length.' },
   concierge: { title: 'Care', frame: 'You help them tend care — their own and the people they care for.' },
   communities: { title: 'Your communities', frame: 'You help them tend belonging: what their groups and communities need from them.' },
   groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them.' },
@@ -151,6 +152,22 @@ export default function AssistantBrief() {
               conversations: waiting.length,
               messages: waiting.reduce((a, b) => a + b.unread, 0),
             };
+            // WHO is waiting and on WHAT — the last line only, never the
+            // history (founder 2026-07-28: the assistant reads what's on top
+            // of the pile, not what people confided underneath it).
+            if (section === 'chat') {
+              const vms = await loadChatList(me).catch(() => []);
+              const byId = new Map(vms.map((v) => [v.id, v]));
+              extras.waiting_on_you = waiting.slice(0, 10).map((w) => {
+                const room = byId.get(w.chat_id);
+                return {
+                  room: room?.title ?? 'a conversation',
+                  unread: w.unread,
+                  last_line: (room?.last?.body ?? '').slice(0, 160),
+                  last_at: room?.last?.created_at?.slice(0, 10),
+                };
+              });
+            }
           }
         }
         if ((section === 'communities' || section === 'groups') && desk && deskNames) {

@@ -9,6 +9,7 @@ import {
 } from '../lib/chatApi';
 import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
+import AssistantDoor from '../components/AssistantDoor';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
@@ -60,6 +61,7 @@ export default function Chat() {
               <span className="display-italic">Messages</span>
             </h1>
           </div>
+          <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
           <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
