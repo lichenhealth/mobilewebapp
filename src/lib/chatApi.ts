@@ -325,3 +325,37 @@ export async function toggleReaction(
       .eq('message_id', messageId).eq('profile_id', me).eq('emoji', emoji);
   }
 }
+
+// ─── Searching your conversations (founder 2026-07-28) ──────────────────────
+// The inbox already matches names and the latest line; this reaches back
+// through message HISTORY. RLS does the scoping: is_chat_member() means you
+// can only ever search rooms you're in.
+export interface MessageHit {
+  id: string;
+  chat_id: string;
+  body: string;
+  created_at: string;
+  sender_id: string;
+  senderName?: string;
+}
+
+export async function searchMessages(query: string, limit = 30): Promise<MessageHit[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('id, chat_id, body, created_at, sender_id')
+    .ilike('body', `%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) { console.warn('searchMessages:', error.message); return []; }
+  const rows = (data as MessageHit[] | null) ?? [];
+  const ids = [...new Set(rows.map((r) => r.sender_id))];
+  if (ids.length) {
+    const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', ids);
+    const names = new Map(((profs as { id: string; full_name: string | null }[] | null) ?? [])
+      .map((p) => [p.id, p.full_name ?? 'A member']));
+    rows.forEach((r) => { r.senderName = names.get(r.sender_id); });
+  }
+  return rows;
+}

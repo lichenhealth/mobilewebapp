@@ -8,6 +8,7 @@ import {
   colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM,
 } from '../lib/chatApi';
 import './Chat.css';
+import { searchMessages, type MessageHit } from '../lib/chatApi';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
@@ -15,6 +16,18 @@ export default function Chat() {
   const [unread, setUnread] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
+  // Searching message HISTORY, not just the latest line (founder 2026-07-28).
+  // RLS scopes it to rooms you're in; debounced so typing stays cheap.
+  const [msgHits, setMsgHits] = useState<MessageHit[]>([]);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setMsgHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(() => {
+      void searchMessages(q).then((r) => { if (live) setMsgHits(r); });
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [query]);
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
@@ -84,11 +97,34 @@ export default function Chat() {
           </div>
         )}
 
-        {!loading && chats.length > 0 && hits.length === 0 && (
+        {!loading && chats.length > 0 && hits.length === 0 && msgHits.length === 0 && (
           <div className="chat__empty">
             <Icon name="search" size={20} />
             <p>No matches for &ldquo;{query}&rdquo;</p>
             <p className="chat__empty-sub">Try a different word, or a person's name.</p>
+          </div>
+        )}
+
+        {msgHits.length > 0 && (
+          <div className="chat__msghits">
+            <p className="chat__msghits-head">In messages</p>
+            {msgHits.map((m) => {
+              const room = chats.find((c) => c.id === m.chat_id);
+              return (
+                <button
+                  key={m.id}
+                  className="chat__msghit"
+                  onClick={() => navigate(`/chat/${m.chat_id}`)}
+                >
+                  <span className="chat__msghit-top">
+                    <strong>{m.senderName ?? 'A member'}</strong>
+                    {room && <em> · {room.title}</em>}
+                    <span className="chat__msghit-when">{formatRelative(m.created_at)}</span>
+                  </span>
+                  <span className="chat__msghit-body">{m.body}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
