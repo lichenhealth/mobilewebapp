@@ -32,6 +32,22 @@
   background: var(--ppage-accent); color: #fff; text-decoration: none;
   font-size: 15px; font-weight: 600;
 }
+/* Hero nav — section doors as clickable text on the left, the one action far
+   right (founder 2026-07-29). Same selection idiom as the rest of the
+   platform: text with a text-width underline, no chrome. */
+.ppage__nav {
+  display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap;
+  padding: 2px var(--s-2) var(--s-4); /* .ppage__sec's border-top draws the rule below */
+}
+.ppage__nav-link {
+  font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--ink-soft); text-decoration: none;
+  border-bottom: 2px solid transparent; padding-bottom: 2px;
+}
+.ppage__nav-link:hover, .ppage__nav-link:focus-visible {
+  color: var(--ink); border-bottom-color: var(--ppage-accent);
+}
+.ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; }
 .ppage__sec { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--bone-edge-soft); }
 .ppage__h2 {
   margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 10px;
