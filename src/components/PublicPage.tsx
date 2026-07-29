@@ -39,6 +39,10 @@ export interface PageMeta {
   team?: { name: string; role?: string; note?: string }[];
   /** A few more images, shown as a quiet strip under the story. */
   photos?: string[];
+  /** Images woven INTO the story (founder 2026-07-29): each renders after
+   *  its 1-based paragraph number, so the picture sits beside the words
+   *  that tell it. A template feature for every public page. */
+  storyImages?: { after: number; src: string }[];
   showPosts?: boolean;
 }
 
@@ -178,7 +182,15 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           {flavor('about')}
           <div className="ppage__story">
-            {story.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+            {story.split(/\n{2,}/).map((para, i) => (
+              <div key={i}>
+                <p>{para}</p>
+                {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
+                  <img className="ppage__story-img" src={si.src} alt="" loading="lazy"
+                    key={si.src} onClick={() => setLightbox(si.src)} />
+                ))}
+              </div>
+            ))}
           </div>
         </section>
       )}
