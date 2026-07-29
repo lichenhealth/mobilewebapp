@@ -19,8 +19,9 @@
 @media (min-width: 900px) {
   .ppage__cover { aspect-ratio: 16 / 9; }
   /* The whole page is one centered column on wide screens — the hero cover
-     sits a touch wider than the text, never WAY wider (founder 2026-07-29). */
+     matches the content measure exactly (founder 2026-07-29). */
   .ppage { max-width: 860px; margin-inline: auto; }
+  .ppage__cover { max-width: 720px; margin-inline: auto; }
   /* One shared measure on wide screens: text, images and lists all live in
      the same centered column — no more full-bleed images beside narrow text
      (founder 2026-07-29). */
@@ -28,9 +29,11 @@
     max-width: 760px; margin-inline: auto;
   }
   .ppage__nav { padding-inline: var(--s-5); }
-  /* higher specificity — the base 62ch rule sits later in this file */
-  .ppage .ppage__story p { max-width: none; }
+  /* higher specificity — the base 62ch rule sits later in this file.
+     Body type steps up so the wide column reads comfortably. */
+  .ppage .ppage__story p { max-width: none; font-size: 17px; }
   .ppage .ppage__offers { max-width: none; }
+  .ppage__lead { font-size: 25px; }
 }
 .ppage__hero-body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -90,7 +93,7 @@
 .ppage__lead {
   margin: 0 0 var(--s-3); font-family: var(--font-display, inherit);
   font-size: 22px; font-weight: 600; line-height: 1.35;
-  color: var(--ink); max-width: 30ch;
+  color: var(--ink);
 }
 .ppage__sec-img {
   display: block; width: 100%; max-height: 420px; object-fit: cover;
