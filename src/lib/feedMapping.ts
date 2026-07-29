@@ -52,7 +52,9 @@ export function weaveProps(
 }
 
 // Map a real DB post into the existing FeedCard shape. Shared by Home + Mycelium.
-export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
+export function postToCard(
+  p: FeedPost, viewerId?: string, spaceNames?: Map<string, string>,
+): FeedCardProps {
   // Attribution: a space-authored post ("acting as") displays as the entity.
   // Your own nameless posts read "Me", never the anonymous "Member".
   const isMine = !p.author_space && viewerId != null && p.author_id === viewerId;
@@ -120,9 +122,24 @@ export function postToCard(p: FeedPost, viewerId?: string): FeedCardProps {
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;
+  // ── Provenance (founder 2026-07-28): who made it, and where they put it.
+  //    "Melanie Bright → Melanie Bright Community". Acting AS the space you
+  //    posted into is redundant — the identity row already says it, so the
+  //    route stays silent. A second admin posting into a space they steward
+  //    still shows their own name beside it, and so does a member whose
+  //    suggestion was approved onto the shelf: attribution follows the person.
+  const routeIds = (p.audience_space_ids ?? []).filter((id) => id !== p.author_space_id);
+  const routeNames = spaceNames
+    ? routeIds.map((id) => spaceNames.get(id)).filter((n): n is string => !!n)
+    : [];
+  const route = routeNames.length
+    ? { to: routeIds.find((id) => spaceNames?.get(id)) ?? '', names: routeNames.slice(0, 2) }
+    : undefined;
+
   return {
     title,
     handle,
+    route,
     // Personal posts show the author's photo when they have one; space-authored
     // posts keep the monogram until spaces get their own images.
     avatar: p.author_space ? undefined : (p.author?.avatar_url ?? undefined),

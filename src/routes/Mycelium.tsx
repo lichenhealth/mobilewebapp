@@ -18,6 +18,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
+import { loadSpaceNames } from '../lib/postsApi';
 
 // Entity kinds — multi-select, like the marketplace mode filters.
 type Kind = 'person' | 'provider' | 'organization' | 'place';
@@ -55,6 +56,7 @@ export default function Mycelium() {
   }
 
   const [content, setContent] = useState('All');
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   // Lenses default ALL-ON (founder, 2026-07-16, media-lens grammar): you see
   // everything until you deselect to narrow. A /mycelium/<kind> URL starts
   // narrowed to that kind.
@@ -65,6 +67,14 @@ export default function Mycelium() {
   const [areas, setAreas] = useState<ServiceArea[]>(() => SERVICE_AREAS.map((a) => a.value));
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  // Provenance names: the spaces these posts were routed into.
+  useEffect(() => {
+    const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
+    if (!ids.length) { setSpaceNames(new Map()); return; }
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [posts]);
   const [myWeb, setMyWeb] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
@@ -96,7 +106,7 @@ export default function Mycelium() {
         contentLabel: CT_LABEL[p.content_type] ?? 'Social',
         areas: postAreas(p),
         card: {
-          ...postToCard(p, user?.id),
+          ...postToCard(p, user?.id, spaceNames),
           ...weaveProps(p, myWeb, user?.id),
           trusted: myMyc.has('profile:' + p.author_id),
           recommended: myRecs.has('post:' + p.id),

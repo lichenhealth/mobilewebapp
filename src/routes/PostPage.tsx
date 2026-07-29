@@ -17,6 +17,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import './PostPage.css';
+import { loadSpaceNames } from '../lib/postsApi';
 
 /** Where each service area lives — the frozen bar's "relevant places" doors. */
 const AREA_HOME: Partial<Record<ServiceArea, string>> = {
@@ -34,10 +35,19 @@ export default function PostPage() {
   const { user } = useAuth();
   // The mutual-friend line at the decision moment (founder 2026-07-28).
   const [trustLine, setTrustLine] = useState<string | undefined>(undefined);
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const me = user?.id ?? '';
   const { promptSaved, openPicker } = useCollect();
 
   const [post, setPost] = useState<FeedPost | null>(null);
+  // Provenance names for this one post.
+  useEffect(() => {
+    const ids = post?.audience_space_ids ?? [];
+    if (!ids.length) return;
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [post?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [ready, setReady] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -161,7 +171,7 @@ export default function PostPage() {
       </div>
 
       <FeedCard
-        {...postToCard(p, me || undefined)}
+        {...postToCard(p, me || undefined, spaceNames)}
         trustLine={trustLine}
         {...weaveProps(p, myWebSet, me || undefined)}
         expanded

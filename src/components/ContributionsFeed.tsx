@@ -18,6 +18,7 @@ import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from './EngagementFooter';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
+import { loadSpaceNames } from '../lib/postsApi';
 
 // Social or Actionable (founder 2026-07-28) — legacy types read as Social.
 const TABS = ['All', 'Social', 'Actionable'];
@@ -57,6 +58,16 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
+
+  // Provenance names: the spaces these posts were routed into.
+  useEffect(() => {
+    const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
+    if (!ids.length) { setSpaceNames(new Map()); return; }
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [posts]);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
@@ -177,9 +188,9 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
         {visible.map((p) => (
           <FeedCard
             key={p.id}
-            {...postToCard(p, me)}
+            {...postToCard(p, me, spaceNames)}
             {...weaveProps(p, myWebSet, me)}
-            eyebrow={whenLabel(p) ?? postToCard(p, me).eyebrow}
+            eyebrow={whenLabel(p) ?? postToCard(p, me, spaceNames).eyebrow}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             trusted={myMyc.has('profile:' + p.author_id)}

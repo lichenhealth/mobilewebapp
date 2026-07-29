@@ -45,6 +45,9 @@ export interface FeedCardProps {
   /** The viewer's PATH to this author — "Trusted by Melanie Bright — someone
    *  you trust". Viewer-relative, never a score (founder 2026-07-28). */
   trustLine?: string;
+  /** Where this went: the space(s) it was posted INTO, when that differs from
+   *  who posted it. Silent when acting-as-the-space you posted to. */
+  route?: { to: string; names: string[] };
   // Inline media (photos / videos / audio uploaded with a post)
   media?: { type: 'photo' | 'video' | 'audio'; url: string; jobId?: string }[];
   // Message the author (omit / undefined hides the button — e.g. your own post)
@@ -93,7 +96,7 @@ export default function FeedCard({
   onTrust,
   onRecommend,
   onSave,
-  eyebrow, trustLine,
+  eyebrow, trustLine, route,
   media,
   onMessage,
   onBadgeAction,
@@ -185,6 +188,17 @@ export default function FeedCard({
               </button>
             ) : (
               <span className="feed-card__handle">{handle}</span>
+            )}
+            {route && route.names.length > 0 && (
+              <span className="feed-card__route">
+                <span className="feed-card__route-arrow" aria-hidden>→</span>
+                <button
+                  className="feed-card__route-link"
+                  onClick={(e) => { e.stopPropagation(); if (route.to) navigate(`/spaces/${route.to}`); }}
+                >
+                  {route.names.join(', ')}
+                </button>
+              </span>
             )}
             {eyebrow && (
               <span className="feed-card__eyebrow">

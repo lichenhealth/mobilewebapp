@@ -253,3 +253,12 @@ export async function loadFeed(limit = 50): Promise<FeedPost[]> {
   if (error) { console.error('loadFeed', error); return []; }
   return (((data as unknown as FeedPost[]) ?? []).filter((p) => !hidden.has(p.id)));
 }
+
+/** Names for a batch of spaces — the provenance line's "where it went"
+ *  (founder 2026-07-28). One query per feed load, ids the viewer can read. */
+export async function loadSpaceNames(ids: string[]): Promise<Map<string, string>> {
+  const uniq = [...new Set(ids)].filter(Boolean);
+  if (!uniq.length) return new Map();
+  const { data } = await supabase.from('spaces').select('id, name').in('id', uniq);
+  return new Map(((data as { id: string; name: string }[] | null) ?? []).map((s) => [s.id, s.name]));
+}

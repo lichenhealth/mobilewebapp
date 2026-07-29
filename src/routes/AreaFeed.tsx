@@ -22,6 +22,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import './Marketplace.css';   // shares the mkt__ section vocabulary
+import { loadSpaceNames } from '../lib/postsApi';
 
 /** A real service-area section (Courses, Library, …): every post shared to
  *  the area, standard feed cards under the trust lens, its own Add + Search
@@ -63,11 +64,20 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const space = params.get('space');
   const scoped = member || space;
   const [memberName, setMemberName] = useState('');
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  // Provenance names: the spaces these posts were routed into.
+  useEffect(() => {
+    const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
+    if (!ids.length) { setSpaceNames(new Map()); return; }
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [posts]);
   const [ready, setReady] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -376,7 +386,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       {ready && view === 'browse' && filtered.length > 0 && (
         <section className={browseStyle === 'rows' ? 'row-list' : 'tile-grid'}>
           {filtered.map((p) => {
-            const eyebrow = postToCard(p, me || undefined).eyebrow;
+            const eyebrow = postToCard(p, me || undefined, spaceNames).eyebrow;
             const shared = {
               post: p,
               offer: eyebrow === 'Mycelium' ? undefined : eyebrow,
@@ -398,7 +408,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         {filtered.map((p) => (
           <FeedCard
             key={p.id}
-            {...postToCard(p, me || undefined)}
+            {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}

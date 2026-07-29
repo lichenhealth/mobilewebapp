@@ -22,6 +22,7 @@ import {
 } from '../lib/myceliumApi';
 import './Marketplace.css';
 import AssistantDoor from '../components/AssistantDoor';
+import { loadSpaceNames } from '../lib/postsApi';
 
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
@@ -82,11 +83,20 @@ export default function Marketplace() {
   const space = params.get('space');
   const scoped = member || space;
   const [scopeName, setScopeName] = useState('');
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  // Provenance names: the spaces these posts were routed into.
+  useEffect(() => {
+    const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
+    if (!ids.length) { setSpaceNames(new Map()); return; }
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [posts]);
   const [ready, setReady] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -353,7 +363,7 @@ export default function Marketplace() {
       {ready && view === 'browse' && filtered.length > 0 && (
         <section className="tile-grid">
           {filtered.map((p) => {
-            const eyebrow = postToCard(p, me || undefined).eyebrow;
+            const eyebrow = postToCard(p, me || undefined, spaceNames).eyebrow;
             const ov = overlays[p.id];
             return (
               <ListingTile
@@ -377,7 +387,7 @@ export default function Marketplace() {
           <FeedCard
             trustLine={sellerLine(p.id)}
             key={p.id}
-            {...postToCard(p, me || undefined)}
+            {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}

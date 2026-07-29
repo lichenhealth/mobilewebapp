@@ -17,6 +17,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
 import AssistantDoor from '../components/AssistantDoor';
+import { loadSpaceNames } from '../lib/postsApi';
 
 // Social or Actionable (founder 2026-07-28) — legacy types read as Social.
 const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
@@ -30,6 +31,16 @@ export default function Saved() {
   const me = user?.id ?? '';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
+
+  // Provenance names: the spaces these posts were routed into.
+  useEffect(() => {
+    const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
+    if (!ids.length) { setSpaceNames(new Map()); return; }
+    let live = true;
+    void loadSpaceNames(ids).then((m) => { if (live) setSpaceNames(m); });
+    return () => { live = false; };
+  }, [posts]);
   const [ready, setReady] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -218,7 +229,7 @@ export default function Saved() {
         {visible.map((p) => (
           <FeedCard
             key={p.id}
-            {...postToCard(p, me || undefined)}
+            {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
             recommended={myRecs.has('post:' + p.id)}
