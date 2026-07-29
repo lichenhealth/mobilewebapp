@@ -166,7 +166,12 @@ export default function App() {
           </Routes>
         ) : (
         <Routes>
-          <Route path="/"          element={<Navigate to="/home" replace />} />
+          {/* THE FRONT DOOR (founder 2026-07-29): a signed-out visitor at the
+              root gets Lichen's own public page — the same template every
+              member's site uses; members go straight to Home. */}
+          <Route path="/" element={
+            loading ? <div /> : user ? <Navigate to="/home" replace /> : <SpaceByHandle handle="lichen" />
+          } />
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />
           <Route path="/concierge/client/:patientId"           element={<Concierge />} />
