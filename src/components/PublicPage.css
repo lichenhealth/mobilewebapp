@@ -12,7 +12,10 @@
 .ppage__cover {
   display: block; width: 100%; aspect-ratio: 4 / 3;
   object-fit: cover; object-position: 50% 28%; max-height: 72vh;
+  /* Soft corners, same vocabulary as every card on the platform. */
+  border-radius: var(--r-lg, 16px);
 }
+.ppage__hero { padding: var(--s-3) var(--s-5) 0; }
 @media (min-width: 900px) {
   .ppage__cover { aspect-ratio: 16 / 9; }
 }
