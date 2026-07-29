@@ -20,6 +20,8 @@ export interface OfferingMeta {
   /** The course's circle — a real Lichen GROUP (chat, events, find-a-time
    *  ride along for free). Set when the owner creates it. */
   circleId?: string;
+  /** Hero image for the course room and the shelf (founder 2026-07-28). */
+  coverUrl?: string;
 }
 
 export interface CollectionRow {

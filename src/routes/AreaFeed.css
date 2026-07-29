@@ -1,0 +1,6 @@
+
+/* Cover art on the course shelf cards. */
+.afeed__course-cover {
+  display: block; width: 100%; aspect-ratio: 9 / 5; object-fit: cover;
+  border-radius: var(--r-md, 12px); margin-bottom: 8px; background: var(--bone-deep);
+}

@@ -308,6 +308,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           {(() => {
             const cards = structuredCols.map((c) => (
               <button key={c.id} className="afeed__course" onClick={() => navigate(`/collections/${c.id}`)}>
+                {c.details?.coverUrl && (
+                  <img className="afeed__course-cover" src={c.details.coverUrl} alt="" loading="lazy" />
+                )}
                 <span className="afeed__course-name">{c.name}</span>
                 <span className="afeed__course-by">
                   <span

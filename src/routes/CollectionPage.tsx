@@ -273,6 +273,9 @@ export default function CollectionPage() {
   return (
     <div className="colp">
       <header className="colp__head">
+        {meta.details.coverUrl && (
+          <img className="colp__cover" src={meta.details.coverUrl} alt="" />
+        )}
         <p className="colp__crumb">
           <Icon name={meta.kind === 'course' ? 'book' : 'bookmark'} size={11} />
           <span>{kindWord(meta.kind)}</span>
