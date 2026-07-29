@@ -45,3 +45,14 @@
 .ppage__join-lead { margin: 0 0 4px; font-size: 15px; }
 .ppage__join-sub { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
 .ppage__join-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* A quiet photo strip, and the people behind the place. */
+.ppage__strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px; }
+.ppage__strip-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.ppage__team { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.ppage__person-name { margin: 0; font-size: 16px; font-weight: 600; color: var(--ink); }
+.ppage__person-role {
+  margin: 1px 0 4px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ppage-accent);
+}
+.ppage__person-note { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-soft); }

@@ -21,6 +21,10 @@ export interface PageMeta {
    *  ("Private lessons · 45 min · $60"). Members' offerings come from their
    *  categories instead. */
   offerings?: string[];
+  /** The people behind it — a barn, a practice, a farm is its people. */
+  team?: { name: string; role?: string; note?: string }[];
+  /** A few more images, shown as a quiet strip under the story. */
+  photos?: string[];
   showPosts?: boolean;
 }
 
@@ -93,6 +97,15 @@ export default function PublicPage(props: PublicPageProps) {
         </section>
       )}
 
+      {/* 2b · A few more images, if there are any */}
+      {(page.photos?.length ?? 0) > 0 && (
+        <div className="ppage__strip">
+          {page.photos!.slice(0, 4).map((src) => (
+            <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src} />
+          ))}
+        </div>
+      )}
+
       {/* 3 · Offerings — straight from Lichen, so it never goes stale */}
       {offerings.length > 0 && (
         <section className="ppage__sec">
@@ -111,6 +124,22 @@ export default function PublicPage(props: PublicPageProps) {
           {page.practical?.bring && <p className="ppage__note"><strong>What to bring</strong> {page.practical.bring}</p>}
           {page.practical?.parking && <p className="ppage__note"><strong>Parking</strong> {page.practical.parking}</p>}
           {page.practical?.access && <p className="ppage__note"><strong>Accessibility</strong> {page.practical.access}</p>}
+        </section>
+      )}
+
+      {/* 4b · The people */}
+      {(page.team?.length ?? 0) > 0 && (
+        <section className="ppage__sec">
+          <h2 className="ppage__h2">The people</h2>
+          <div className="ppage__team">
+            {page.team!.map((t) => (
+              <div className="ppage__person" key={t.name}>
+                <p className="ppage__person-name">{t.name}</p>
+                {t.role && <p className="ppage__person-role">{t.role}</p>}
+                {t.note && <p className="ppage__person-note">{t.note}</p>}
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
