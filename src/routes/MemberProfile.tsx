@@ -15,6 +15,10 @@ import { BookingType, listBookableTypes } from '../lib/bookingApi';
 import '../routes/Bookings.css';
 import './Profile.css';
 import './MemberProfile.css';
+import PublicPage, { type PageMeta } from '../components/PublicPage';
+import { type ContactInfo } from '../components/ContactFields';
+import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 /** A member's public profile — the Provider face of a person: who they are,
  *  what they offer, and the two ways to connect (Trust into your mycelium,
@@ -84,6 +88,19 @@ export default function MemberProfile() {
 
   const isSelf = !!me && id === me;
   const [idTags, setIdTags] = useState<string[]>([]);
+  // The open web (and the owner previewing) sees the shared page template.
+  const [params] = useSearchParams();
+  const previewing = params.get('preview') === '1';
+  const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
+  useEffect(() => {
+    let live = true;
+    void supabase.from('profiles').select('contact, page, public_page').eq('id', id).maybeSingle()
+      .then(({ data }: { data: unknown }) => {
+        const r = data as { contact?: ContactInfo | null; page?: PageMeta | null; public_page?: boolean } | null;
+        if (live && r) setPub({ contact: r.contact ?? {}, page: r.page ?? {}, on: !!r.public_page });
+      });
+    return () => { live = false; };
+  }, [id]);
   useEffect(() => {
     let live = true;
     void getIdentityTags(id).then((t) => { if (live) setIdTags(t); });
@@ -140,6 +157,23 @@ export default function MemberProfile() {
     try {
       navigate(`/chat/${await ensureDirectChat(id)}`);
     } catch (e) { console.error('message', e); setBusy(false); }
+  }
+
+  // Signed-out visitors — and the owner hitting Preview — get the template.
+  if ((!me || previewing) && pub && (pub.on || previewing)) {
+    return (
+      <PublicPage
+        id={id}
+        name={name}
+        kindLabel={member.headline ?? undefined}
+        avatarUrl={member.avatar_url}
+        description={member.bio}
+        offerings={[...offerings.services, ...offerings.goods]}
+        contact={pub.contact}
+        page={pub.page}
+        preview={previewing}
+      />
+    );
   }
 
   return (

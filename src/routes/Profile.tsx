@@ -23,6 +23,7 @@ import './Profile.css';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
 import ContactFields, { type ContactInfo } from '../components/ContactFields';
+import { type PageMeta } from '../components/PublicPage';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
@@ -235,19 +236,25 @@ export default function Profile() {
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(false);
   const [webMsg, setWebMsg] = useState('');
+  const [pageMeta, setPageMeta] = useState<PageMeta>({});
+  const setPage = (patch: Partial<PageMeta>) => setPageMeta((m) => ({ ...m, ...patch }));
   useEffect(() => {
     if (!user) return;
-    void supabase.from('profiles').select('contact, public_page').eq('id', user.id).maybeSingle()
+    void supabase.from('profiles').select('contact, public_page, page').eq('id', user.id).maybeSingle()
       .then(({ data }) => {
-        const r = data as { contact?: ContactInfo | null; public_page?: boolean } | null;
-        if (r) { setContact(r.contact ?? {}); setPublicPage(!!r.public_page); }
+        const r = data as { contact?: ContactInfo | null; public_page?: boolean; page?: PageMeta | null } | null;
+        if (r) { setContact(r.contact ?? {}); setPublicPage(!!r.public_page); setPageMeta(r.page ?? {}); }
       });
   }, [user]);
   async function saveWebPage() {
     if (!user) return;
     setWebMsg('');
     const { error: e } = await supabase.from('profiles')
-      .update({ contact: Object.keys(contact).length ? contact : null, public_page: publicPage })
+      .update({
+        contact: Object.keys(contact).length ? contact : null,
+        public_page: publicPage,
+        page: Object.keys(pageMeta).length ? pageMeta : null,
+      })
       .eq('id', user.id);
     setWebMsg(e ? e.message : 'Saved.');
   }
@@ -488,6 +495,49 @@ export default function Profile() {
             </span>
           </label>
 
+          <p className="prof__privacy-sub">Your page</p>
+          <div className="prof__field">
+            <label className="prof__label">One line — what you do, for whom</label>
+            <input className="prof__input" value={pageMeta.tagline ?? ''}
+              onChange={(e) => setPage({ tagline: e.target.value })}
+              placeholder="Equine-assisted healing in the Colorado foothills" />
+          </div>
+          <div className="prof__field">
+            <label className="prof__label">Your story</label>
+            <textarea className="prof__textarea prof__story" value={pageMeta.story ?? ''}
+              onChange={(e) => setPage({ story: e.target.value })}
+              placeholder="Write it the way you'd tell a neighbor. A few short paragraphs is plenty." />
+            <p className="prof__hint">
+              Rather talk it through?{' '}
+              <button className="prof__inline-link" onClick={() => navigate('/assistant?section=profile')}>
+                Draft it with Claude
+              </button>{' '}
+              — say it out loud, and edit what comes back.
+            </p>
+          </div>
+          <div className="prof__field">
+            <label className="prof__label">The one thing you want visitors to do</label>
+            <div className="cmp__chips">
+              {([['none', 'Nothing yet'], ['call', 'Call'], ['book', 'Book'], ['email', 'Email'], ['visit', 'Visit']] as const)
+                .map(([kind, label]) => (
+                  <button key={kind}
+                    className={'cmp__chip' + ((pageMeta.action?.kind ?? 'none') === kind ? ' is-on' : '')}
+                    onClick={() => setPage({ action: { kind } })}>{label}</button>
+                ))}
+            </div>
+            <p className="prof__hint">One action, not five — it's what makes a page feel calm.</p>
+          </div>
+          <div className="prof__field">
+            <label className="prof__label">Look</label>
+            <div className="cmp__chips">
+              {([['tint', 'Tinted'], ['photo', 'Photo cover'], ['plain', 'Plain']] as const).map(([v, label]) => (
+                <button key={v}
+                  className={'cmp__chip' + ((pageMeta.coverStyle ?? 'tint') === v ? ' is-on' : '')}
+                  onClick={() => setPage({ coverStyle: v })}>{label}</button>
+              ))}
+            </div>
+          </div>
+
           <p className="prof__privacy-sub">Contact &amp; hours</p>
           <ContactFields
             value={contact}
@@ -497,7 +547,7 @@ export default function Profile() {
 
           <div className="prof__save-row">
             <button className="btn btn-primary" onClick={() => void saveWebPage()}>Save</button>
-            <button className="btn" onClick={() => window.open(`/members/${user?.id}`, '_blank')}>
+            <button className="btn" onClick={() => window.open(`/members/${user?.id}?preview=1`, '_blank')}>
               Preview
             </button>
             {publicPage && (

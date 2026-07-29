@@ -36,6 +36,7 @@ import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
 import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
+import PublicPage, { type PageMeta } from '../components/PublicPage';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -118,6 +119,7 @@ export default function SpaceProfile() {
   // Public-page facts (founder 2026-07-28): a space's profile IS its website.
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(true);
+  const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -156,6 +158,7 @@ export default function SpaceProfile() {
       const sx = s as unknown as { contact?: ContactInfo | null; public_page?: boolean };
       setContact(sx.contact ?? {});
       setPublicPage(sx.public_page !== false);
+      setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
     }
     setLoading(false);
   }, [id, me]);
@@ -432,6 +435,34 @@ export default function SpaceProfile() {
 
   const kindLabel = KIND_LABEL[space.kind];
   const pinned = space.lat != null && space.lng != null;
+
+  // The open web (and the owner previewing) sees the shared page template —
+  // one structure across every Lichen site (founder 2026-07-28).
+  const previewing = searchParams.get('preview') === '1';
+  if (!me || previewing) {
+    return (
+      <PublicPage
+        id={space.id}
+        name={space.name}
+        kindLabel={kindLabel}
+        avatarUrl={space.avatar_url}
+        description={space.description}
+        location={space.location}
+        contact={contact}
+        page={pageMeta}
+        preview={previewing}
+      >
+        {childGroups.length > 0 && (
+          <section className="ppage__sec">
+            <h2 className="ppage__h2">Groups</h2>
+            <div className="ppage__chips">
+              {childGroups.map((g) => <span className="ppage__chip" key={g.id}>{g.name}</span>)}
+            </div>
+          </section>
+        )}
+      </PublicPage>
+    );
+  }
 
   return (
     <div className={'prof' + (backstage ? ' is-adminview' : '')}>
