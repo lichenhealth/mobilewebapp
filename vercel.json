@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/spaces/:id", "destination": "/api/page" },
+    { "source": "/members/:id", "destination": "/api/page" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

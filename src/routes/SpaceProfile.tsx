@@ -497,6 +497,31 @@ export default function SpaceProfile() {
             )}
           </p>
         )}
+        {!me && (
+          <div className="sprof__guest">
+            <p className="sprof__guest-lead">
+              This page lives on <strong>Lichen</strong> — a member-run network for care,
+              work and a fairer economy.
+            </p>
+            <p className="sprof__guest-sub">
+              To recommend {space.name}, book a time, message them, or join their events,
+              you&rsquo;ll need a Lichen account. Lichen grows by invitation — introduce
+              yourself and a real person writes back.
+            </p>
+            <div className="sprof__guest-acts">
+              <button className="btn btn-primary" onClick={() => navigate('/signup')}>
+                Request an invitation
+              </button>
+              <button className="btn" onClick={() => navigate('/about')}>What is Lichen?</button>
+            </div>
+            <p className="sprof__guest-sub">
+              Already a member?{' '}
+              <button className="prof__inline-link" onClick={() => navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`)}>
+                Sign in
+              </button>
+            </p>
+          </div>
+        )}
         {me && !backstage && (
           <div className="mprof__actions">
             {myRequest !== 'invited' && (

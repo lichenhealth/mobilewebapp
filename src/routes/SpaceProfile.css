@@ -211,3 +211,13 @@
 }
 .sprof__res-busy:hover { border-color: var(--peach); }
 .sprof__res-new { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+/* A signed-out visitor is a guest of a public page, not a locked-out member. */
+.sprof__guest {
+  margin: var(--s-4) var(--s-5); padding: 16px 18px;
+  border: 1px solid var(--peach-light); border-radius: var(--r-lg, 16px);
+  background: var(--peach-tint);
+}
+.sprof__guest-lead { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+.sprof__guest-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+.sprof__guest-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
