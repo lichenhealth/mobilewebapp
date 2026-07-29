@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import Avatar from './Avatar';
@@ -25,6 +25,11 @@ export interface PageMeta {
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
   sections?: Partial<Record<'about' | 'services' | 'facilities', { lead?: string; image?: string }>>;
+  /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
+   *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
+   *  line — for pages whose owner prefers to invite people themselves once
+   *  they've vetted them. */
+  join?: 'full' | 'quiet';
   /** Services with their terms, for entities without Lichen categories yet
    *  ("Private lessons · 45 min · $60"). Members' offerings come from their
    *  categories instead. */
@@ -88,6 +93,18 @@ export default function PublicPage(props: PublicPageProps) {
   const tabbed = navItems.length > 0;
   const show = (id: string) => !tabbed || tab === id;
 
+  // Tap any image for a closer, uncropped look (founder 2026-07-29).
+  const [lightbox, setLightbox] = useState<string | null>(null);
+
+  // A visitor from the open web isn't an app user — no Lichen top bar, no
+  // bottom tabs (founder 2026-07-29). PublicPage only ever renders for
+  // signed-out visitors or an owner's preview, so marking the shell here is
+  // correct by construction; global.css hides the chrome.
+  useEffect(() => {
+    document.documentElement.classList.add('is-public-page');
+    return () => document.documentElement.classList.remove('is-public-page');
+  }, []);
+
   // Uniform door anatomy: summary sentence, then an image, then the body.
   const flavor = (id: 'about' | 'services' | 'facilities') => {
     const s = page.sections?.[id];
@@ -95,7 +112,10 @@ export default function PublicPage(props: PublicPageProps) {
     return (
       <>
         {s.lead && <p className="ppage__lead">{s.lead}</p>}
-        {s.image && <img className="ppage__sec-img" src={s.image} alt="" loading="lazy" />}
+        {s.image && (
+          <img className="ppage__sec-img" src={s.image} alt="" loading="lazy"
+            onClick={() => setLightbox(s.image!)} />
+        )}
       </>
     );
   };
@@ -108,7 +128,9 @@ export default function PublicPage(props: PublicPageProps) {
 
       {/* 1 · Hero */}
       <header className="ppage__hero">
-        {page.cover && <img className="ppage__cover" src={page.cover} alt="" />}
+        {page.cover && (
+          <img className="ppage__cover" src={page.cover} alt="" onClick={() => setLightbox(page.cover!)} />
+        )}
         <div className="ppage__hero-body">
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={64} />
           <h1 className="ppage__name">{name}</h1>
@@ -156,7 +178,8 @@ export default function PublicPage(props: PublicPageProps) {
       {(page.photos?.length ?? 0) > 0 && show('about') && (
         <div className="ppage__strip">
           {page.photos!.slice(0, 6).map((src) => (
-            <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src} />
+            <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src}
+              onClick={() => setLightbox(src)} />
           ))}
         </div>
       )}
@@ -225,20 +248,40 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 5 · Presence — events, posts (passed in by the host page) */}
       {props.children}
 
-      {/* 6 · Join — every visit is a soft invitation */}
-      <section className="ppage__join">
-        <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
-        <p className="ppage__join-sub">
-          A member-run network for care, work, offerings and a fairer economy — where trust is
-          a path through real relationships, not a star rating. To recommend {name}, book, message,
-          or join their events, you'll need an account. Lichen grows by invitation; introduce
-          yourself and a real person writes back.
+      {/* Closer look — tap anywhere (or Esc) to close */}
+      {lightbox && (
+        <button
+          className="ppage__lightbox" type="button" autoFocus
+          onClick={() => setLightbox(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setLightbox(null); }}
+          aria-label="Close image"
+        >
+          <img className="ppage__lightbox-img" src={lightbox} alt="" />
+        </button>
+      )}
+
+      {/* 6 · Join — every visit is a soft invitation. Some owners prefer to
+          extend it themselves; their pages carry one quiet line instead. */}
+      {page.join === 'quiet' ? (
+        <p className="ppage__join-quiet">
+          This page lives on <button className="ppage__join-quiet-link" onClick={() => navigate('/about')}>Lichen</button>
+          {' '}· members <button className="ppage__join-quiet-link" onClick={() => navigate('/login')}>sign in</button>
         </p>
-        <div className="ppage__join-acts">
-          <button className="btn btn-primary" onClick={() => navigate('/signup')}>Request an invitation</button>
-          <button className="btn" onClick={() => navigate('/about')}>What is Lichen?</button>
-        </div>
-      </section>
+      ) : (
+        <section className="ppage__join">
+          <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
+          <p className="ppage__join-sub">
+            A member-run network for care, work, offerings and a fairer economy — where trust is
+            a path through real relationships, not a star rating. To recommend {name}, book, message,
+            or join their events, you'll need an account. Lichen grows by invitation; introduce
+            yourself and a real person writes back.
+          </p>
+          <div className="ppage__join-acts">
+            <button className="btn btn-primary" onClick={() => navigate('/signup')}>Request an invitation</button>
+            <button className="btn" onClick={() => navigate('/about')}>What is Lichen?</button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

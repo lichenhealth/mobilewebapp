@@ -358,3 +358,10 @@ input, textarea, select { font: inherit; color: inherit; }
 .is-adminview .btn-primary:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
 
 .view-toggle-row--center { justify-content: center; flex-wrap: wrap; text-align: center; }
+
+/* PUBLIC PAGES ARE THE OPEN WEB (founder 2026-07-29): a visitor who isn't a
+   Lichen member sees a website, not an app — PublicPage stamps this class on
+   the root while mounted (visitors and owner previews only). */
+.is-public-page .top-bar,
+.is-public-page .bottom-nav { display: none; }
+.is-public-page .scroll-view { padding: 0; min-height: 0; }
