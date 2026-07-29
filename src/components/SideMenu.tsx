@@ -70,9 +70,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
     // "Public profile" = see yourself as other members do (/members/<me>).
-    .flatMap((p) => (p.to === '/profile' && user
-      ? [p, { to: `/members/${user.id}`, label: 'Public profile', icon: 'globe' as IconName }]
-      : [p]));
+    // 'Public profile' retired from the nav (founder 2026-07-28): the three
+    // views live as tabs INSIDE Profile — Admin · In Lichen · Web page.
+    ;
   const { countsBySection, countsBySpace, totalUnread } = useNotifications();
   // Admin view (founder 2026-07-27): flip the space lists from engagement
   // (peach unreads) to stewardship — only the spaces you manage, blue badges

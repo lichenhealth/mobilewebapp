@@ -20,8 +20,9 @@ import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
+import ContactFields, { type ContactInfo } from '../components/ContactFields';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type SpaceRole = 'super_admin' | 'admin' | 'member';
@@ -227,6 +228,29 @@ export default function Profile() {
   // Consent travels with your words (founder 2026-07-28): may other members'
   // assistants read what you wrote in shared conversations?
   const [assistantReadable, setAssistantReadable] = useState(true);
+  // Your page on the open web (founder 2026-07-28): three views of one
+  // profile — Admin, In Lichen, and this one.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get('view');
+  const [contact, setContact] = useState<ContactInfo>({});
+  const [publicPage, setPublicPage] = useState(false);
+  const [webMsg, setWebMsg] = useState('');
+  useEffect(() => {
+    if (!user) return;
+    void supabase.from('profiles').select('contact, public_page').eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        const r = data as { contact?: ContactInfo | null; public_page?: boolean } | null;
+        if (r) { setContact(r.contact ?? {}); setPublicPage(!!r.public_page); }
+      });
+  }, [user]);
+  async function saveWebPage() {
+    if (!user) return;
+    setWebMsg('');
+    const { error: e } = await supabase.from('profiles')
+      .update({ contact: Object.keys(contact).length ? contact : null, public_page: publicPage })
+      .eq('id', user.id);
+    setWebMsg(e ? e.message : 'Saved.');
+  }
   async function updateAssistantReadable(next: boolean) {
     if (!user) return;
     setAssistantReadable(next);
@@ -421,15 +445,81 @@ export default function Profile() {
       <div className="view-toggle-row view-toggle-row--center">
         <span className="view-toggle" role="group" aria-label="View">
           <button
-            className="view-toggle__side"
-            onClick={() => navigate(`/members/${user?.id}`)}
+            className={'view-toggle__side view-toggle__side--admin' + (!view ? ' is-on' : '')}
+            onClick={() => setSearchParams({})}
           >
-            Public view
+            Admin
           </button>
-          <button className="view-toggle__side view-toggle__side--admin is-on">Admin view</button>
+          <button className="view-toggle__side" onClick={() => navigate(`/members/${user?.id}`)}>
+            In Lichen
+          </button>
+          <button
+            className={'view-toggle__side' + (view === 'web' ? ' is-on' : '')}
+            onClick={() => setSearchParams({ view: 'web' })}
+          >
+            Web page
+          </button>
         </span>
-        <span className="prof__selfhint">Your profile's backend — only you see this page.</span>
+        <span className="prof__selfhint">
+          {view === 'web'
+            ? 'Your page on the open web \u2014 no Lichen account needed to read it.'
+            : 'Your profile\u2019s backend \u2014 only you see this page.'}
+        </span>
       </div>
+
+      {view === 'web' && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Your page on the open web</h2>
+          <p className="prof__care-lead">
+            This is what someone finds when they search your name or follow a link — no Lichen
+            account needed. Everything deeper (recommending you, booking, messaging, your
+            events) invites them to join.
+          </p>
+
+          <label className="prof__consent">
+            <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
+            <span>
+              <strong>Publish my page to the open web</strong>
+              <em>
+                Off by default. When on, your name, headline, story, offerings and the contact
+                details below can be read by anyone — including search engines. Your location,
+                calendar, messages and everything else stay exactly as private as they are now.
+              </em>
+            </span>
+          </label>
+
+          <p className="prof__privacy-sub">Contact &amp; hours</p>
+          <ContactFields
+            value={contact}
+            onChange={setContact}
+            lead="How someone reaches you without joining Lichen. Leave a field empty to keep it off the page."
+          />
+
+          <div className="prof__save-row">
+            <button className="btn btn-primary" onClick={() => void saveWebPage()}>Save</button>
+            <button className="btn" onClick={() => window.open(`/members/${user?.id}`, '_blank')}>
+              Preview
+            </button>
+            {publicPage && (
+              <button
+                className="btn"
+                onClick={() => {
+                  void navigator.clipboard.writeText(`${window.location.origin}/members/${user?.id}`)
+                    .then(() => setWebMsg('Link copied.'));
+                }}
+              >
+                Copy link
+              </button>
+            )}
+            {webMsg && <span className="prof__msg">{webMsg}</span>}
+          </div>
+
+          <p className="prof__hint">
+            Your headline, story and offerings come from the <strong>Admin</strong> tab — they
+            appear here too. A richer page builder is coming; tell Claude what you want it to say.
+          </p>
+        </section>
+      )}
 
       {error && <p className="prof__error">{error}</p>}
 
