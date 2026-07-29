@@ -522,6 +522,66 @@ export default function Profile() {
         </div>
       </section>
 
+      {/* Privacy: the one place that answers "who can see what, and what can
+          AI assist with" (founder 2026-07-28). Settings whose subject lives
+          elsewhere keep living there — this hub owns the homeless ones and
+          points at the rest, so nothing is hidden and nothing is duplicated. */}
+      <section className="prof__section" id="privacy">
+        <h2 className="prof__h2">Privacy</h2>
+        <p className="prof__care-lead">
+          Who can see what, and what the assistant may help with. Almost everything is
+          on by default and yours to switch off.
+        </p>
+
+        <p className="prof__privacy-sub">What the assistant may read</p>
+        <label className="prof__consent">
+          <input
+            type="checkbox"
+            checked={assistantReadable}
+            onChange={(e) => void updateAssistantReadable(e.target.checked)}
+          />
+          <span>
+            <strong>Let other members&rsquo; assistants read my messages</strong>
+            <em>
+              When someone you talk with asks their assistant to brief them, it reads
+              recent messages in that conversation — including yours. Switch this off and
+              your words stay out of everyone else&rsquo;s briefings; they&rsquo;ll still see
+              that you wrote, and can still read you in the app. Your own assistant is
+              unaffected.
+            </em>
+          </span>
+        </label>
+        <p className="prof__hint">
+          Your own assistant switches on and off per section — the brain icon on Home,
+          Marketplace, Calendar, Chat and your shelf each carry their own choice.
+        </p>
+
+        <p className="prof__privacy-sub">Who can see what</p>
+        <div className="prof__privacy-doors">
+          {([
+            ['Your public profile', 'How other members see you', `/members/${user?.id}`],
+            ['Calendar sharing', 'Busy blocks, full details, or nothing — per audience', '/calendar/settings'],
+            ['Presence', 'Around, present, or neither', '/mycelium/directory'],
+            ['Financial position', 'Care-team only, never a score', '/concierge'],
+          ] as [string, string, string][]).map(([label, sub, to]) => (
+            <button key={label} className="prof__privacy-door" onClick={() => navigate(to)}>
+              <span>
+                <strong>{label}</strong>
+                <em>{sub}</em>
+              </span>
+              <Icon name="chevron-right" size={13} />
+            </button>
+          ))}
+        </div>
+        <p className="prof__hint">
+          New here?{' '}
+          <button className="prof__inline-link" onClick={() => navigate('/collections/de300007-0000-4000-a000-000000000001')}>
+            Settings 101
+          </button>{' '}
+          walks every switch in five minutes.
+        </p>
+      </section>
+
       {user && <HomeLocationSection me={user.id} />}
 
       <section className="prof__section">
@@ -543,24 +603,6 @@ export default function Profile() {
             </button>
           ))}
         </div>
-
-        <label className="prof__consent">
-          <input
-            type="checkbox"
-            checked={assistantReadable}
-            onChange={(e) => void updateAssistantReadable(e.target.checked)}
-          />
-          <span>
-            <strong>Let other members&rsquo; assistants read my messages</strong>
-            <em>
-              When someone you talk with asks their assistant to brief them, it reads
-              recent messages in that conversation — including yours. Switch this off and
-              your words stay out of everyone else&rsquo;s briefings; they&rsquo;ll still see
-              that you wrote, and can still read you in the app. Your own assistant is
-              unaffected.
-            </em>
-          </span>
-        </label>
 
         <div className="prof__push">
           <div className="prof__push-row">

@@ -255,3 +255,28 @@
   display: block; margin-top: 3px; font-style: normal;
   font-size: 12.5px; line-height: 1.5; color: var(--ink-muted);
 }
+
+/* Privacy hub: the homeless settings, plus doors to the ones that live
+   next to their subject. */
+.prof__privacy-sub {
+  margin: var(--s-3) 0 var(--s-1);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.prof__privacy-doors { display: flex; flex-direction: column; gap: 6px; }
+.prof__privacy-door {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 14px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md, 12px); background: var(--bone-warm);
+  font-family: inherit; text-align: left; cursor: pointer; color: var(--ink);
+}
+.prof__privacy-door:hover { border-color: var(--peach); }
+.prof__privacy-door strong { display: block; font-size: 14px; font-weight: 600; }
+.prof__privacy-door em {
+  display: block; font-style: normal; margin-top: 2px;
+  font-size: 12.5px; color: var(--ink-muted);
+}
+.prof__inline-link {
+  background: transparent; border: 0; padding: 0; font: inherit;
+  color: var(--peach-deep); text-decoration: underline; cursor: pointer;
+}
