@@ -17,6 +17,10 @@ export interface PageMeta {
   accent?: string;
   action?: { kind: 'call' | 'book' | 'email' | 'visit' | 'none'; label?: string; href?: string };
   practical?: { bring?: string; parking?: string; access?: string };
+  /** Services with their terms, for entities without Lichen categories yet
+   *  ("Private lessons · 45 min · $60"). Members' offerings come from their
+   *  categories instead. */
+  offerings?: string[];
   showPosts?: boolean;
 }
 
@@ -38,7 +42,8 @@ export interface PublicPageProps {
 
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
-  const { name, kindLabel, avatarUrl, description, location, offerings = [], contact, page } = props;
+  const { name, kindLabel, avatarUrl, description, location, contact, page } = props;
+  const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
   const accent = page.accent || 'var(--peach)';
   const story = (page.story || description || '').trim();
 
