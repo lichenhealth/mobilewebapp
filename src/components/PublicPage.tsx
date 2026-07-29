@@ -138,7 +138,7 @@ export default function PublicPage(props: PublicPageProps) {
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
         <div className="ppage__hero-body ppage__hero-body--top">
-          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={64} />
+          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={96} />
           <h1 className="ppage__name">{name}</h1>
           {(page.tagline || kindLabel) && (
             <p className="ppage__tagline">{page.tagline || kindLabel}</p>

@@ -81,10 +81,12 @@
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   font-size: 13px; color: var(--ink-soft);
 }
-/* Door anatomy: summary sentence, then an image, then the body. */
+/* Door anatomy: summary sentence, then an image, then the body. The lead
+   reads as a section TITLE — bigger and bolder than the copy (founder). */
 .ppage__lead {
-  margin: 0 0 var(--s-3); font-size: 16.5px; line-height: 1.55;
-  color: var(--ink); max-width: 56ch;
+  margin: 0 0 var(--s-3); font-family: var(--font-display, inherit);
+  font-size: 22px; font-weight: 600; line-height: 1.35;
+  color: var(--ink); max-width: 30ch;
 }
 .ppage__sec-img {
   display: block; width: 100%; max-height: 420px; object-fit: cover;
