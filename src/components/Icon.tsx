@@ -341,7 +341,7 @@ const ICONS: Record<IconName, IconEntry> = {
   'plane': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.4,
-    content: <path d="M21 15.2l-7.6-2.1V7.4c0-1-.6-1.9-1.4-1.9s-1.4.9-1.4 1.9v5.7L3 15.2v1.6l7.6-1.6v3.3l-2 1.2v1.1l3.4-.8 3.4.8v-1.1l-2-1.2v-3.3l7.6 1.6z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
+    content: <path d="M22 14.6l-8.6-2.4V5.4c0-1.2-.6-2.2-1.4-2.2s-1.4 1-1.4 2.2v6.8L2 14.6v1.9l8.6-1.8v3.8L8.2 20v1.2l3.8-.9 3.8.9V20l-2.4-1.5v-3.8l8.6 1.8z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
   },
   'chat-about': {
     viewBox: '0 0 24 24',
