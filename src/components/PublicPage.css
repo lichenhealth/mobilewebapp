@@ -40,14 +40,23 @@
   padding: 2px var(--s-2) var(--s-4); /* .ppage__sec's border-top draws the rule below */
 }
 .ppage__nav-link {
-  font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+  background: none; border: none; cursor: pointer; padding: 0 0 2px;
+  font: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
   color: var(--ink-soft); text-decoration: none;
-  border-bottom: 2px solid transparent; padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
 }
-.ppage__nav-link:hover, .ppage__nav-link:focus-visible {
-  color: var(--ink); border-bottom-color: var(--ppage-accent);
+.ppage__nav-link:hover, .ppage__nav-link:focus-visible { color: var(--ink); }
+/* The active door — text-width peach underline, the platform selection idiom. */
+.ppage__nav-link--on { color: var(--ink); border-bottom-color: var(--ppage-accent); }
+.ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; white-space: nowrap; }
+/* Below the desktop sidebar the app-shell caps near 430px regardless of
+   viewport (the 1024 shell rule) — compact so one row still holds
+   doors-left, action-right. */
+@media (max-width: 1023px) {
+  .ppage__nav { gap: 11px; }
+  .ppage__nav-link { font-size: 13px; }
+  .ppage__cta--nav { padding: 8px 13px; font-size: 13px; }
 }
-.ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; }
 .ppage__sec { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--bone-edge-soft); }
 .ppage__h2 {
   margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 10px;

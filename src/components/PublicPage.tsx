@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import Avatar from './Avatar';
@@ -69,7 +70,9 @@ export default function PublicPage(props: PublicPageProps) {
 
   // Hero nav (founder 2026-07-29): section doors as clickable text on the
   // left, the one primary action far right — the same learn-once-read-all
-  // structure on every Lichen site. Only doors whose section exists render.
+  // structure on every Lichen site. Doors are PAGES, not scroll anchors:
+  // only the active section renders below the hero. Only doors whose
+  // section exists render; with no doors, everything shows inline.
   const hasContact = Object.keys(contact).length > 0 || !!page.practical;
   const navItems = [
     story ? { id: 'about', label: 'About' } : null,
@@ -77,10 +80,9 @@ export default function PublicPage(props: PublicPageProps) {
     page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
     hasContact ? { id: 'contact', label: 'Contact' } : null,
   ].filter((n): n is { id: string; label: string } => !!n);
-  const jump = (id: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    document.getElementById('ppage-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const [tab, setTab] = useState(navItems[0]?.id ?? 'about');
+  const tabbed = navItems.length > 0;
+  const show = (id: string) => !tabbed || tab === id;
 
   return (
     <div className={'ppage ppage--' + (page.coverStyle ?? 'tint')} style={{ ['--ppage-accent' as string]: accent }}>
@@ -107,9 +109,12 @@ export default function PublicPage(props: PublicPageProps) {
         {navItems.length > 0 && (
           <nav className="ppage__nav">
             {navItems.map((n) => (
-              <a className="ppage__nav-link" href={'#ppage-' + n.id} onClick={jump(n.id)} key={n.id}>
+              <button
+                className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
+                onClick={() => setTab(n.id)} key={n.id} type="button"
+              >
                 {n.label}
-              </a>
+              </button>
             ))}
             {act && actHref && (
               <a className="ppage__cta ppage__cta--nav" href={actHref}
@@ -122,8 +127,8 @@ export default function PublicPage(props: PublicPageProps) {
       </header>
 
       {/* 2 · Story */}
-      {story && (
-        <section className="ppage__sec" id="ppage-about">
+      {story && show('about') && (
+        <section className="ppage__sec">
           <div className="ppage__story">
             {story.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
           </div>
@@ -131,7 +136,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 2b · A few more images, if there are any */}
-      {(page.photos?.length ?? 0) > 0 && (
+      {(page.photos?.length ?? 0) > 0 && show('about') && (
         <div className="ppage__strip">
           {page.photos!.slice(0, 6).map((src) => (
             <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src} />
@@ -140,8 +145,8 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 3 · Offerings — straight from Lichen, so it never goes stale */}
-      {offerings.length > 0 && (
-        <section className="ppage__sec" id="ppage-services">
+      {offerings.length > 0 && show('services') && (
+        <section className="ppage__sec">
           <h2 className="ppage__h2">What we offer</h2>
           <div className="ppage__chips">
             {offerings.map((o) => <span className="ppage__chip" key={o}>{o}</span>)}
@@ -150,8 +155,8 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 3b · Facilities — the grounds themselves */}
-      {page.facilities && (
-        <section className="ppage__sec" id="ppage-facilities">
+      {page.facilities && show('facilities') && (
+        <section className="ppage__sec">
           <h2 className="ppage__h2">The facilities</h2>
           <div className="ppage__story">
             {page.facilities.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
@@ -160,8 +165,8 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 4 · Practical */}
-      {hasContact && (
-        <section className="ppage__sec" id="ppage-contact">
+      {hasContact && show('contact') && (
+        <section className="ppage__sec">
           <h2 className="ppage__h2">Practical</h2>
           <ContactList contact={contact} />
           {page.practical?.bring && <p className="ppage__note"><strong>What to bring</strong> {page.practical.bring}</p>}
@@ -170,8 +175,8 @@ export default function PublicPage(props: PublicPageProps) {
         </section>
       )}
 
-      {/* 4b · The people */}
-      {(page.team?.length ?? 0) > 0 && (
+      {/* 4b · The people — part of the story, so they live on About */}
+      {(page.team?.length ?? 0) > 0 && show('about') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">The people</h2>
           <div className="ppage__team">
