@@ -48,7 +48,7 @@ const ROLE_LABEL: Record<string, string> = {
 /** A space's own profile — organizations, communities, groups, and places get
  *  the same treatment people do. Everyone sees who/what it is; its admins
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
-export default function SpaceProfile({ spaceId }: { spaceId?: string } = {}) {
+export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: string; forcePublic?: boolean } = {}) {
   const { id: paramId = '' } = useParams();
   const id = spaceId || paramId;
   const navigate = useNavigate();
@@ -440,7 +440,9 @@ export default function SpaceProfile({ spaceId }: { spaceId?: string } = {}) {
   // The open web (and the owner previewing) sees the shared page template —
   // one structure across every Lichen site (founder 2026-07-28).
   const previewing = searchParams.get('preview') === '1';
-  if (!me || previewing) {
+  // forcePublic: on a custom domain (countrymanstables.com) EVERYONE gets
+  // the website — even signed-in members; the app lives on Lichen's domain.
+  if (!me || previewing || forcePublic) {
     return (
       <PublicPage
         id={space.id}

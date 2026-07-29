@@ -58,6 +58,7 @@ import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import AssistantBrief from './routes/AssistantBrief';
 import SpaceByHandle from './routes/SpaceByHandle';
+import { hostSpaceHandle } from './lib/customDomain';
 import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
@@ -80,6 +81,7 @@ export default function App() {
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
   const isGuest = pathname.startsWith('/e/');   // external guest landing — no app chrome
+  const customHandle = hostSpaceHandle();        // this hostname IS a space's website
   const isAbout = pathname === '/about';         // About page has its own header
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
@@ -155,6 +157,14 @@ export default function App() {
       <ReminderAlerts />
       {!isChatThread && !isAuth && !isGuest && !isAbout && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest || isAbout ? { padding: 0, minHeight: 0 } : undefined}>
+        {customHandle ? (
+          /* CUSTOM DOMAIN (founder 2026-07-29): this hostname belongs to a
+             space — every path serves its website; the app lives on Lichen's
+             own domain (PublicPage links cross back via appUrl). */
+          <Routes>
+            <Route path="*" element={<SpaceByHandle handle={customHandle} forcePublic />} />
+          </Routes>
+        ) : (
         <Routes>
           <Route path="/"          element={<Navigate to="/home" replace />} />
           <Route path="/home"      element={<Home />} />
@@ -280,6 +290,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
+        )}
       </main>
       {!isChatThread && !isAuth && !isGuest && !isAbout && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />

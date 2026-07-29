@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { appUrl } from '../lib/customDomain';
 import { Icon } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
@@ -59,6 +60,12 @@ export interface PublicPageProps {
 
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
+  // Lichen doors cross back to Lichen's own origin when this page is served
+  // from a member's custom domain.
+  const go = (path: string) => {
+    const u = appUrl(path);
+    if (u.startsWith('http')) window.location.href = u; else navigate(u);
+  };
   const { name, kindLabel, avatarUrl, description, location, contact, page } = props;
   const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
   const accent = page.accent || 'var(--peach)';
@@ -264,8 +271,8 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead. */}
       {page.join === 'quiet' ? (
         <p className="ppage__join-quiet">
-          This page lives on <button className="ppage__join-quiet-link" onClick={() => navigate('/about')}>Lichen</button>
-          {' '}· members <button className="ppage__join-quiet-link" onClick={() => navigate('/login')}>sign in</button>
+          This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
+          {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>
         </p>
       ) : (
         <section className="ppage__join">
@@ -277,8 +284,8 @@ export default function PublicPage(props: PublicPageProps) {
             yourself and a real person writes back.
           </p>
           <div className="ppage__join-acts">
-            <button className="btn btn-primary" onClick={() => navigate('/signup')}>Request an invitation</button>
-            <button className="btn" onClick={() => navigate('/about')}>What is Lichen?</button>
+            <button className="btn btn-primary" onClick={() => go('/signup')}>Request an invitation</button>
+            <button className="btn" onClick={() => go('/about')}>What is Lichen?</button>
           </div>
         </section>
       )}

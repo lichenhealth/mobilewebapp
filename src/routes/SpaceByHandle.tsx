@@ -5,9 +5,12 @@ import SpaceProfile from './SpaceProfile';
 
 // Clean addresses (founder 2026-07-28): lichen.healthcare/countrymanstables
 // resolves a space by its handle and renders its page AT that URL — the
-// handle is the address, not a redirect to an id.
-export default function SpaceByHandle() {
-  const { handle = '' } = useParams();
+// handle is the address, not a redirect to an id. A custom domain passes the
+// handle (and forcePublic) as props instead — countrymanstables.com serves
+// the barn's website to everyone, member or not.
+export default function SpaceByHandle({ handle: handleProp, forcePublic }: { handle?: string; forcePublic?: boolean } = {}) {
+  const { handle: handleParam = '' } = useParams();
+  const handle = handleProp || handleParam;
   const navigate = useNavigate();
   const [id, setId] = useState<string | null | undefined>(undefined);
 
@@ -30,5 +33,5 @@ export default function SpaceByHandle() {
       </div>
     );
   }
-  return <SpaceProfile spaceId={id} />;
+  return <SpaceProfile spaceId={id} forcePublic={forcePublic} />;
 }
