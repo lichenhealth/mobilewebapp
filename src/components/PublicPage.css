@@ -18,15 +18,19 @@
 .ppage__hero { padding: var(--s-3) var(--s-5) 0; }
 @media (min-width: 900px) {
   .ppage__cover { aspect-ratio: 16 / 9; }
+  /* The whole page is one centered column on wide screens — the hero cover
+     sits a touch wider than the text, never WAY wider (founder 2026-07-29). */
+  .ppage { max-width: 860px; margin-inline: auto; }
   /* One shared measure on wide screens: text, images and lists all live in
      the same centered column — no more full-bleed images beside narrow text
-     (founder 2026-07-29). The hero cover keeps its full width. */
+     (founder 2026-07-29). */
   .ppage__sec, .ppage__strip, .ppage__nav, .ppage__join, .ppage__join-quiet {
     max-width: 760px; margin-inline: auto;
   }
   .ppage__nav { padding-inline: var(--s-5); }
-  .ppage__story p { max-width: none; }
-  .ppage__offers { max-width: none; }
+  /* higher specificity — the base 62ch rule sits later in this file */
+  .ppage .ppage__story p { max-width: none; }
+  .ppage .ppage__offers { max-width: none; }
 }
 .ppage__hero-body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;

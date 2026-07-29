@@ -363,5 +363,11 @@ input, textarea, select { font: inherit; color: inherit; }
    Lichen member sees a website, not an app — PublicPage stamps this class on
    the root while mounted (visitors and owner previews only). */
 .is-public-page .top-bar,
-.is-public-page .bottom-nav { display: none; }
+.is-public-page .bottom-nav,
+.is-public-page .side-menu { display: none; }
 .is-public-page .scroll-view { padding: 0; min-height: 0; }
+/* Desktop: no sidebar column either — the website owns the full shell. */
+@media (min-width: 1024px) {
+  .is-public-page .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .is-public-page .scroll-view { grid-column: 1; grid-row: 1 / -1; }
+}
