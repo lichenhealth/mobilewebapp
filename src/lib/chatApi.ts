@@ -337,6 +337,9 @@ export interface MessageHit {
   created_at: string;
   sender_id: string;
   senderName?: string;
+  /** Did this sender allow other members' assistants to read their words?
+   *  (founder 2026-07-28 — consent travels with what you wrote.) */
+  assistantReadable?: boolean;
 }
 
 export async function searchMessages(query: string, limit = 30): Promise<MessageHit[]> {
@@ -349,6 +352,33 @@ export async function searchMessages(query: string, limit = 30): Promise<Message
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) { console.warn('searchMessages:', error.message); return []; }
+  const rows = (data as MessageHit[] | null) ?? [];
+  const ids = [...new Set(rows.map((r) => r.sender_id))];
+  if (ids.length) {
+    // '*' so this keeps working before the consent column exists.
+    const { data: profs } = await supabase.from('profiles').select('*').in('id', ids);
+    const rowsP = (profs as { id: string; full_name: string | null; assistant_readable?: boolean }[] | null) ?? [];
+    const names = new Map(rowsP.map((p) => [p.id, p.full_name ?? 'A member']));
+    const ok = new Map(rowsP.map((p) => [p.id, p.assistant_readable !== false]));
+    rows.forEach((r) => {
+      r.senderName = names.get(r.sender_id);
+      r.assistantReadable = ok.get(r.sender_id) ?? true;
+    });
+  }
+  return rows;
+}
+
+/** Recent messages across every room you're in — the assistant's deeper read
+ *  of chat (founder 2026-07-28). RLS scopes it to your own conversations;
+ *  newest first, capped, sender names resolved once. */
+export async function recentMessagesAcross(limit = 120): Promise<MessageHit[]> {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('id, chat_id, body, created_at, sender_id')
+    .not('body', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) { console.warn('recentMessagesAcross:', error.message); return []; }
   const rows = (data as MessageHit[] | null) ?? [];
   const ids = [...new Set(rows.map((r) => r.sender_id))];
   if (ids.length) {

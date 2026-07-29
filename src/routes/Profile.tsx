@@ -143,6 +143,13 @@ export default function Profile() {
       setBio(p.bio ?? '');
       void getIdentityTags(user.id).then((tags) => setIdentity(tags.join(', ')));
       setNotifPref(p.notification_pref ?? 'in_app');
+      // '*' select elsewhere would be heavy; read this one on its own so the
+      // page keeps working before the column exists.
+      void supabase.from('profiles').select('assistant_readable').eq('id', user.id).maybeSingle()
+        .then(({ data: ar }) => {
+          const v = (ar as { assistant_readable?: boolean } | null)?.assistant_readable;
+          if (typeof v === 'boolean') setAssistantReadable(v);
+        });
     }
     setPhone(myPhone);
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
@@ -217,6 +224,17 @@ export default function Profile() {
   // dashboard's "Manage who you care for" → #care-for). React Router leaves
   // fragments alone, so scroll once the section exists.
   // Offer to care for someone (founder 2026-07-28) — they approve first.
+  // Consent travels with your words (founder 2026-07-28): may other members'
+  // assistants read what you wrote in shared conversations?
+  const [assistantReadable, setAssistantReadable] = useState(true);
+  async function updateAssistantReadable(next: boolean) {
+    if (!user) return;
+    setAssistantReadable(next);
+    const { error: e } = await supabase.from('profiles')
+      .update({ assistant_readable: next }).eq('id', user.id);
+    if (e) { setError(e.message); setAssistantReadable(!next); }
+  }
+
   const [offerQ, setOfferQ] = useState('');
   const [offerHits, setOfferHits] = useState<{ id: string; full_name: string | null }[]>([]);
   const [offerMsg, setOfferMsg] = useState('');
@@ -525,6 +543,24 @@ export default function Profile() {
             </button>
           ))}
         </div>
+
+        <label className="prof__consent">
+          <input
+            type="checkbox"
+            checked={assistantReadable}
+            onChange={(e) => void updateAssistantReadable(e.target.checked)}
+          />
+          <span>
+            <strong>Let other members&rsquo; assistants read my messages</strong>
+            <em>
+              When someone you talk with asks their assistant to brief them, it reads
+              recent messages in that conversation — including yours. Switch this off and
+              your words stay out of everyone else&rsquo;s briefings; they&rsquo;ll still see
+              that you wrote, and can still read you in the app. Your own assistant is
+              unaffected.
+            </em>
+          </span>
+        </label>
 
         <div className="prof__push">
           <div className="prof__push-row">
