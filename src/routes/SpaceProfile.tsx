@@ -20,7 +20,7 @@ import {
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
-import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
+import { loadPostsByIds, loadAuthorFeed, postAreas, type FeedPost } from '../lib/postsApi';
 import {
   listSpaceResources, createResource, deleteResource, resourceBusy,
   requestResourceBooking, listPendingResourceBookings, decideResourceBooking,
@@ -228,6 +228,16 @@ export default function SpaceProfile() {
   // Members and Groups open as their own views rather than scrolling the feed
   // to its bottom (founder 2026-07-28: "a directory tab, for consistency").
   const tab = searchParams.get('tab');
+  // The space's own gatherings — what's coming up, then what's past.
+  const [spaceEvents, setSpaceEvents] = useState<FeedPost[]>([]);
+  useEffect(() => {
+    if (tab !== 'events' || !id) return;
+    let live = true;
+    void loadAuthorFeed({ spaceId: id }).then((rows) => {
+      if (live) setSpaceEvents(rows.filter((p) => postAreas(p).includes('events') && p.linked_event));
+    });
+    return () => { live = false; };
+  }, [tab, id]);
   const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
   const adminTools = backstage;
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
@@ -750,6 +760,7 @@ export default function SpaceProfile() {
             : []),
           // Members closes the row — the space's Directory, far right like
           // Home's (founder 2026-07-25).
+          { icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') },
           { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
         ]}
       />}
@@ -937,6 +948,48 @@ export default function SpaceProfile() {
         <button className="cmp__back calp__backchip sprof__tabback" onClick={() => openTab('')}>
           <Icon name="arrow-left" size={14} /> Back to {space.name}
         </button>
+      )}
+
+      {tab === 'events' && (
+        <section className="prof__section">
+          <h2 className="prof__h2">Events</h2>
+          {spaceEvents.length === 0 && (
+            <p className="sprof__muted">
+              Nothing on the calendar yet.{isMember ? ' Add one from the + menu.' : ''}
+            </p>
+          )}
+          <div className="sprof__members">
+            {(() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const when = (p: FeedPost) => p.linked_event?.start_date ?? '';
+              const upcoming = spaceEvents
+                .filter((p) => (p.linked_event?.recurrence ? true : (p.linked_event?.end_date ?? when(p)) >= today))
+                .sort((a, b) => when(a).localeCompare(when(b)));
+              const past = spaceEvents
+                .filter((p) => !upcoming.includes(p))
+                .sort((a, b) => when(b).localeCompare(when(a)));
+              const row = (p: FeedPost, dim: boolean) => (
+                <button className={'sprof__member' + (dim ? ' is-past' : '')} key={p.id}
+                  onClick={() => navigate(`/events/${p.id}`)}>
+                  <span className="sprof__ev-date">
+                    {p.linked_event?.recurrence ? 'repeats' : when(p).slice(5)}
+                  </span>
+                  <span className="sprof__member-name">{p.title || p.body.slice(0, 48)}</span>
+                  <span className="sprof__member-role">
+                    {p.event_mode === 'free' ? 'Free' : p.event_mode === 'trade' ? 'Trade' : p.event_mode === 'paid' ? 'Paid' : ''}
+                  </span>
+                </button>
+              );
+              return (
+                <>
+                  {upcoming.map((p) => row(p, false))}
+                  {past.length > 0 && <p className="sprof__past-head">Past</p>}
+                  {past.slice(0, 10).map((p) => row(p, true))}
+                </>
+              );
+            })()}
+          </div>
+        </section>
       )}
 
       {(tab === 'members' || backstage) && (

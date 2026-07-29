@@ -222,3 +222,15 @@
 .sprof__guest-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
 .sprof__guest-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .sprof__tabback { margin: var(--s-2) var(--s-5) var(--s-1); }
+
+/* The space's events tab. */
+.sprof__ev-date {
+  flex: 0 0 52px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.04em; color: var(--peach-deep); text-transform: uppercase;
+}
+.sprof__member.is-past { opacity: 0.6; }
+.sprof__past-head {
+  margin: var(--s-3) 0 var(--s-1);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
