@@ -27,7 +27,7 @@ export const SERVICE_AREAS: { value: ServiceArea; label: string; icon: IconName 
   { value: 'library', label: 'Library', icon: 'book' },
   { value: 'people', label: 'People', icon: 'user-multiple' },
   // Travel (founder 2026-07-28): stays, rides, and getting there together.
-  { value: 'travel', label: 'Travel', icon: 'maps' },
+  { value: 'travel', label: 'Travel', icon: 'plane' },
 ];
 
 export function serviceAreaIcon(area: ServiceArea | null): IconName | null {

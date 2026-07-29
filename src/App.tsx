@@ -247,7 +247,7 @@ export default function App() {
               addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
           } />
           <Route path="/travel"   element={
-            <AreaFeed area="travel" icon="maps" crumb="Travel"
+            <AreaFeed area="travel" icon="plane" crumb="Travel"
               title="Lichen" italic="Travel."
               sub="Stays, rides, and getting there together — with people your web knows."
               addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse />

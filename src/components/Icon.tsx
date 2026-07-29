@@ -16,6 +16,7 @@ export type IconName =
   | 'bookmark'
   | 'brain'
   | 'chat-about'
+  | 'plane'
   | 'briefcase'
   | 'calendar'
   | 'chat'
@@ -336,6 +337,12 @@ const ICONS: Record<IconName, IconEntry> = {
   },
   // Two bubbles — a conversation ABOUT something (founder 2026-07-28):
   // distinct from 'message', which opens the entity's own chat.
+  // Travel: an airliner in the set's hairline idiom (founder 2026-07-28).
+  'plane': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <path d="M21 15.2l-7.6-2.1V7.4c0-1-.6-1.9-1.4-1.9s-1.4.9-1.4 1.9v5.7L3 15.2v1.6l7.6-1.6v3.3l-2 1.2v1.1l3.4-.8 3.4.8v-1.1l-2-1.2v-3.3l7.6 1.6z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
+  },
   'chat-about': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.4,
