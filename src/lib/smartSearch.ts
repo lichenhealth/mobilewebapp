@@ -90,6 +90,7 @@ const AREA_WORDS: [RegExp, ServiceArea][] = [
   [/\b(food|meals?|nutrition)\b/g, 'food'],
   [/\b(art|artwork)\b/g, 'art'],
   [/\b(places?|venues?)\b/g, 'places'],
+  [/\b(travel|trips?|rides?|ride\s*share|carpool(?:ing)?|lodging|stays?|lodge|accommodations?)\b/g, 'travel'],
   [/\b(library|books?|reading)\b/g, 'library'],
   [/\b(people|members?|providers?|practitioners?|healers?|workers?)\b/g, 'people'],
 ];

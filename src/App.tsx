@@ -246,6 +246,12 @@ export default function App() {
               sub="Meals, harvests, recipes, and nourishment."
               addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
           } />
+          <Route path="/travel"   element={
+            <AreaFeed area="travel" icon="maps" crumb="Travel"
+              title="Lichen" italic="Travel."
+              sub="Stays, rides, and getting there together — with people your web knows."
+              addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse />
+          } />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />

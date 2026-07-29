@@ -159,7 +159,7 @@ export default function Compose() {
   const AREA_HOME: Partial<Record<ServiceArea, string>> = {
     marketplace: '/market', courses: '/courses', library: '/library',
     events: '/events', work: '/work', places: '/places',
-    art: '/art', food: '/food',
+    art: '/art', food: '/food', travel: '/travel',
   };
   function afterPostDestination(isEventPost: boolean): string {
     if (presetSpace) return `/spaces/${presetSpace}`;
@@ -1052,6 +1052,15 @@ export default function Compose() {
           )}
           {isEvent && evMode === 'trade' && (
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
+          )}
+
+          {areas.has('travel') && (
+            <p className="cmp__hint-ev">
+              Travel: a <strong>stay</strong> reads best with dates and what&rsquo;s included;
+              a <strong>ride</strong> with where you&rsquo;re leaving from, where you&rsquo;re headed,
+              and seats. Looking rather than offering? Add the <strong>ISO</strong> mode — the
+              matcher rings people going your way.
+            </p>
           )}
 
           {/* Listing details (Figma 286-4961) — the physical facts. Shown for

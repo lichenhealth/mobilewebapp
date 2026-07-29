@@ -5,7 +5,8 @@ import type { IconName } from '../components/Icon';
 export type Visibility = 'public' | 'mycelium' | 'space';
 export type ContentType = 'social' | 'creative' | 'educational' | 'actionable' | 'qa';
 export type ServiceArea =
-  | 'marketplace' | 'work' | 'courses' | 'food' | 'art' | 'events' | 'places' | 'library' | 'people';
+  | 'marketplace' | 'work' | 'courses' | 'food' | 'art' | 'events' | 'places' | 'library' | 'people'
+  | 'travel';
 
 export const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: 'social', label: 'Social' },
@@ -25,6 +26,8 @@ export const SERVICE_AREAS: { value: ServiceArea; label: string; icon: IconName 
   { value: 'places', label: 'Places', icon: 'location' },
   { value: 'library', label: 'Library', icon: 'book' },
   { value: 'people', label: 'People', icon: 'user-multiple' },
+  // Travel (founder 2026-07-28): stays, rides, and getting there together.
+  { value: 'travel', label: 'Travel', icon: 'maps' },
 ];
 
 export function serviceAreaIcon(area: ServiceArea | null): IconName | null {

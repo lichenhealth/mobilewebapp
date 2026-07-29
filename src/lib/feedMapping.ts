@@ -70,7 +70,7 @@ export function postToCard(
   const scope = p.author_space_id ? `space=${p.author_space_id}` : `member=${p.author_id}`;
   const SECTION_DOORS: Record<string, string> = {
     courses: '/courses', library: '/library', work: '/work', art: '/art',
-    food: '/food', marketplace: '/market', events: '/events',
+    food: '/food', marketplace: '/market', events: '/events', travel: '/travel',
   };
   const areaDoors = postAreas(p)
     .map((a) => {
