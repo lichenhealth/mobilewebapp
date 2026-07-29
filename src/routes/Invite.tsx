@@ -15,7 +15,11 @@ const spanText = (m: number | null) =>
 export default function Invite() {
   const { loading, user, isAdmin } = useAuth();
   // The ledger: my invitations (RLS: created_by = me) + the knocks (admins).
-  type InviteRow = { token: string; invitee_email: string | null; claimed_by: string | null; created_at: string; claimed_name?: string };
+  type InviteRow = {
+    token: string; invitee_email: string | null; claimed_by: string | null;
+    created_at: string; created_by?: string;
+    claimed_name?: string; inviter_name?: string;
+  };
   type KnockRow = { id: string; name: string; email: string; story: string | null; status: string };
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [knocks, setKnocks] = useState<KnockRow[]>([]);
@@ -23,16 +27,25 @@ export default function Invite() {
     if (!user) return;
     let live = true;
     void (async () => {
-      const { data } = await supabase.from('invite_tokens')
-        .select('token, invitee_email, claimed_by, created_at')
-        .eq('created_by', user.id).order('created_at', { ascending: false }).limit(100);
+      // Admins see the whole picture — every invitation, and who sent it.
+      // Members see their own (RLS decides; the query is the same shape).
+      let q = supabase.from('invite_tokens')
+        .select('token, invitee_email, claimed_by, created_at, created_by')
+        .order('created_at', { ascending: false }).limit(200);
+      if (!isAdmin) q = q.eq('created_by', user.id);
+      const { data } = await q;
       const rows = (data as InviteRow[] | null) ?? [];
-      const claimedIds = rows.map((r) => r.claimed_by).filter((x): x is string => !!x);
-      if (claimedIds.length) {
-        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', claimedIds);
+      const people = [...new Set([
+        ...rows.map((r) => r.claimed_by), ...rows.map((r) => r.created_by),
+      ])].filter((x): x is string => !!x);
+      if (people.length) {
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', people);
         const names = new Map(((profs as { id: string; full_name: string | null }[] | null) ?? [])
           .map((p) => [p.id, p.full_name ?? 'a member']));
-        rows.forEach((r) => { if (r.claimed_by) r.claimed_name = names.get(r.claimed_by); });
+        rows.forEach((r) => {
+          if (r.claimed_by) r.claimed_name = names.get(r.claimed_by);
+          if (r.created_by) r.inviter_name = names.get(r.created_by);
+        });
       }
       if (live) setInvites(rows);
       if (isAdmin) {
@@ -274,7 +287,7 @@ export default function Invite() {
           everyone knocking at the door. */}
       <section className="invite__ledger">
         <h2 className="invite__h2">
-          Your invitations
+          {isAdmin ? 'Invitations across Lichen' : 'Your invitations'}
           {invites.length > 0 && (
             <span className="invite__tally">
               {invites.filter((i) => !i.claimed_by).length} open · {invites.filter((i) => i.claimed_by).length} joined
@@ -290,6 +303,9 @@ export default function Invite() {
                 <span className="invite__row-who">
                   {i.invitee_email ?? 'a shared link'}
                   {i.claimed_name && <em> — now {i.claimed_name}</em>}
+                  {isAdmin && i.inviter_name && i.created_by !== user?.id && (
+                    <em className="invite__by">invited by {i.inviter_name}</em>
+                  )}
                 </span>
                 <span className={'invite__pill' + (i.claimed_by ? ' is-in' : '')}>
                   {i.claimed_by ? 'joined' : 'open'}
