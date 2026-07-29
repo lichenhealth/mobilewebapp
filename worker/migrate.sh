@@ -14,10 +14,9 @@ FILE="${1:?usage: migrate.sh <path-to-.sql>}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PSQL="/opt/homebrew/opt/libpq/bin/psql"
 
-set +u
-# shellcheck disable=SC1090
-source <(grep -E '^SUPABASE_DB_URL=' "$ROOT/worker/.env" 2>/dev/null || true)
-set -u
+# Read the URL without `source` — a raw connection string can contain
+# characters a shell would try to interpret.
+SUPABASE_DB_URL="$(grep -E '^SUPABASE_DB_URL=' "$ROOT/worker/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'"'"']//; s/["'"'"']$//')" 
 
 if [ -z "${SUPABASE_DB_URL:-}" ]; then
   echo "SUPABASE_DB_URL is not set in worker/.env — falling back to the clipboard flow." >&2
