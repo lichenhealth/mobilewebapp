@@ -21,6 +21,10 @@ export interface PageMeta {
   /** The grounds themselves — arena, tack room, stalls. Its own section
    *  (and its own hero-nav door) when present. */
   facilities?: string;
+  /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
+   *  an image between it and the body — uniform on every public page.
+   *  Contact stays utilitarian on purpose. */
+  sections?: Partial<Record<'about' | 'services' | 'facilities', { lead?: string; image?: string }>>;
   /** Services with their terms, for entities without Lichen categories yet
    *  ("Private lessons · 45 min · $60"). Members' offerings come from their
    *  categories instead. */
@@ -84,6 +88,18 @@ export default function PublicPage(props: PublicPageProps) {
   const tabbed = navItems.length > 0;
   const show = (id: string) => !tabbed || tab === id;
 
+  // Uniform door anatomy: summary sentence, then an image, then the body.
+  const flavor = (id: 'about' | 'services' | 'facilities') => {
+    const s = page.sections?.[id];
+    if (!s?.lead && !s?.image) return null;
+    return (
+      <>
+        {s.lead && <p className="ppage__lead">{s.lead}</p>}
+        {s.image && <img className="ppage__sec-img" src={s.image} alt="" loading="lazy" />}
+      </>
+    );
+  };
+
   return (
     <div className={'ppage ppage--' + (page.coverStyle ?? 'tint')} style={{ ['--ppage-accent' as string]: accent }}>
       {props.preview && (
@@ -129,6 +145,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 2 · Story */}
       {story && show('about') && (
         <section className="ppage__sec">
+          {flavor('about')}
           <div className="ppage__story">
             {story.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
           </div>
@@ -148,9 +165,22 @@ export default function PublicPage(props: PublicPageProps) {
       {offerings.length > 0 && show('services') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">What we offer</h2>
-          <div className="ppage__chips">
-            {offerings.map((o) => <span className="ppage__chip" key={o}>{o}</span>)}
-          </div>
+          {flavor('services')}
+          {/* A plain list, not chips — to a signed-out visitor these are
+              information, not buttons. The same services become actionable
+              inside Lichen once you're a member of the org (founder rule,
+              2026-07-29: external face informs, the platform transacts). */}
+          <ul className="ppage__offers">
+            {offerings.map((o) => {
+              const [head, ...rest] = o.split(' · ');
+              return (
+                <li className="ppage__offer" key={o}>
+                  <span className="ppage__offer-name">{head}</span>
+                  {rest.length > 0 && <span className="ppage__offer-terms">{rest.join(' · ')}</span>}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
@@ -158,6 +188,7 @@ export default function PublicPage(props: PublicPageProps) {
       {page.facilities && show('facilities') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">The facilities</h2>
+          {flavor('facilities')}
           <div className="ppage__story">
             {page.facilities.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
           </div>
