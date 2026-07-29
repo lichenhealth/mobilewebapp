@@ -35,6 +35,7 @@ import './Profile.css';
 import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
 import { useConfirm } from '../components/ConfirmDialog';
+import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -114,6 +115,9 @@ export default function SpaceProfile() {
   const [description, setDescription] = useState('');
   const [locText, setLocText] = useState('');
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
+  // Public-page facts (founder 2026-07-28): a space's profile IS its website.
+  const [contact, setContact] = useState<ContactInfo>({});
+  const [publicPage, setPublicPage] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -149,6 +153,9 @@ export default function SpaceProfile() {
       setDescription(s.description ?? '');
       setLocText(s.location ?? '');
       setLocGeo(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
+      const sx = s as unknown as { contact?: ContactInfo | null; public_page?: boolean };
+      setContact(sx.contact ?? {});
+      setPublicPage(sx.public_page !== false);
     }
     setLoading(false);
   }, [id, me]);
@@ -361,6 +368,10 @@ export default function SpaceProfile() {
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
       };
+      // Public-page facts ride the same Save (harmless if the columns are new).
+      await supabase.from('spaces')
+        .update({ contact: Object.keys(contact).length ? contact : null, public_page: publicPage })
+        .eq('id', id);
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
         if (!parentPick) {
           patch.parent_space_id = null;   // going standalone is always the group's right
@@ -477,6 +488,7 @@ export default function SpaceProfile() {
           )}
         </p>
         {space.description && <p className="sprof__desc">{space.description}</p>}
+        {!backstage && <ContactList contact={contact} />}
         {space.location && (
           <p className="sprof__loc">
             <SmartLocation loc={space.location} className="sprof__loc-link" />
@@ -607,6 +619,22 @@ export default function SpaceProfile() {
             />
             <p className="prof__hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
           </div>
+          <div className="prof__field">
+            <label className="prof__label">Contact &amp; hours</label>
+            <ContactFields
+              value={contact}
+              onChange={setContact}
+              lead="These appear on the public page — how someone reaches you without joining Lichen."
+            />
+          </div>
+          <label className="sprof__duty">
+            <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
+            <span>
+              Serve this page to the open web
+              <em>Anyone can see the identity, story, contact and hours above — no account needed.
+                Recommending, booking, messaging and events still require joining Lichen.</em>
+            </span>
+          </label>
           <div className="prof__save-row">
             <button className="btn btn-primary" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
