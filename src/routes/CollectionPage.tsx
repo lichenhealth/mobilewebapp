@@ -14,7 +14,7 @@ import {
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
 import {
-  myDutiesIn, holdsDuty, createSpaceWithLocation,
+  myDutiesIn, holdsDuty, createSpaceWithLocation, loadSpaceChatId, loadSpaceMembers,
   listCohorts, createCohort, type CohortRow,
 } from '../lib/spacesApi';
 import {
@@ -176,6 +176,28 @@ export default function CollectionPage() {
     void listCohorts(id).then((c) => { if (live) setCohorts(c); });
     return () => { live = false; };
   }, [id]);
+  // The cohort this learner actually belongs to (or the only one going) —
+  // its chat, calendar and people are the course's real facilities.
+  const [myCohort, setMyCohort] = useState<{ id: string; name: string; chatId: string | null; member: boolean } | null>(null);
+  useEffect(() => {
+    const cid = cohorts[0]?.id ?? meta?.details.circleId;
+    if (!cid) { setMyCohort(null); return; }
+    let live = true;
+    void (async () => {
+      const [chatId, members] = await Promise.all([
+        loadSpaceChatId(cid).catch(() => null),
+        loadSpaceMembers(cid).catch(() => []),
+      ]);
+      if (live) setMyCohort({
+        id: cid,
+        name: cohorts[0]?.term || cohorts[0]?.name || 'Cohort',
+        chatId,
+        member: !!me && members.some((m) => m.profile_id === me),
+      });
+    })();
+    return () => { live = false; };
+  }, [cohorts, meta?.details.circleId, me]);
+
   async function startCohort() {
     if (!meta || !me) return;
     const gid = await createCohort(me, id, meta.name, cohortTerm);
@@ -300,22 +322,38 @@ export default function CollectionPage() {
 
       {/* The course circle: chat, cohort, and scheduling — the integrated
           platform showing up inside the course (founder + Melanie 2026-07-26). */}
-      {meta.kind === 'course' && (cohorts.length > 0 || meta.details.circleId) && (
-        <div className="colp__circle">
-          {cohorts.map((co) => (
-            <button className="colp__circle-door" key={co.id} onClick={() => navigate(`/spaces/${co.id}`)}>
-              <Icon name="groups" size={14} /> {co.term || 'Cohort'} <em>chat &amp; calendar</em>
-            </button>
-          ))}
-          {/* The original single circle, still honored where one exists. */}
-          {meta.details.circleId && cohorts.length === 0 && (
-            <button className="colp__circle-door" onClick={() => navigate(`/spaces/${meta.details.circleId}`)}>
-              <Icon name="groups" size={14} /> Course circle <em>chat &amp; calendar</em>
+      {/* The cohort's facilities, in the platform's own circle vocabulary
+          (founder 2026-07-28) — the same doors a learner meets everywhere
+          else. Calendar/Find-a-time only means something inside the cohort,
+          so it appears for members; everyone can knock on the cohort itself. */}
+      {meta.kind === 'course' && myCohort && (
+        <div className="colp__doors" role="toolbar" aria-label="Cohort">
+          {myCohort.member && myCohort.chatId && (
+            <button className="colp__door" onClick={() => navigate(`/chat/${myCohort.chatId}`)}>
+              <span className="colp__door-circle"><Icon name="chat" size={14} /></span>
+              <span className="colp__door-label">Chat</span>
             </button>
           )}
-          <button className="colp__circle-door" onClick={() => navigate('/calendar')}>
-            <Icon name="calendar" size={14} /> Find a time <em>calendars, woven</em>
+          {myCohort.member && (
+            <button className="colp__door" onClick={() => navigate('/calendar')}>
+              <span className="colp__door-circle"><Icon name="calendar" size={14} /></span>
+              <span className="colp__door-label">Find a time</span>
+            </button>
+          )}
+          <button className="colp__door" onClick={() => navigate(`/spaces/${myCohort.id}?tab=events`)}>
+            <span className="colp__door-circle"><Icon name="rsvp" size={14} /></span>
+            <span className="colp__door-label">Events</span>
           </button>
+          <button className="colp__door" onClick={() => navigate(`/spaces/${myCohort.id}`)}>
+            <span className="colp__door-circle"><Icon name="member-heart" size={14} /></span>
+            <span className="colp__door-label">{cohorts.length > 1 ? myCohort.name : 'Cohort'}</span>
+          </button>
+          {cohorts.length > 1 && cohorts.slice(1).map((co) => (
+            <button className="colp__door" key={co.id} onClick={() => navigate(`/spaces/${co.id}`)}>
+              <span className="colp__door-circle"><Icon name="groups" size={14} /></span>
+              <span className="colp__door-label">{co.term || 'Cohort'}</span>
+            </button>
+          ))}
         </div>
       )}
 

@@ -176,3 +176,28 @@
   object-fit: cover; border-radius: var(--r-lg, 16px);
   margin-bottom: var(--s-3); background: var(--bone-deep);
 }
+
+/* The cohort's doors — the platform's circle vocabulary, same as space
+   profiles and the home icon row. */
+.colp__doors {
+  display: flex; gap: var(--s-3); margin: var(--s-3) 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.colp__doors::-webkit-scrollbar { display: none; }
+.colp__door {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: 0; cursor: pointer; flex-shrink: 0;
+}
+.colp__door-circle {
+  width: 36px; height: 36px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.colp__door:hover .colp__door-circle { border-color: var(--peach); color: var(--peach-deep); }
+.colp__door-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-muted); max-width: 66px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
