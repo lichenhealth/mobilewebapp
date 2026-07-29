@@ -74,7 +74,7 @@ export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | nu
   // CHILDREN direction (an array), not the parent. Fetch the parent by id.
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }

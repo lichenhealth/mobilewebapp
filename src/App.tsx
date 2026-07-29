@@ -57,6 +57,7 @@ import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import AssistantBrief from './routes/AssistantBrief';
+import SpaceByHandle from './routes/SpaceByHandle';
 import ReminderAlerts from './components/ReminderAlerts';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
@@ -174,6 +175,10 @@ export default function App() {
           <Route path="/posts/:postId" element={<PostPage />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/assistant" element={<AssistantBrief />} />
+          {/* Clean addresses: /countrymanstables → that space's page. Static
+              routes outrank this by React Router's own ranking, so it only
+              catches names nothing else claims. */}
+          <Route path="/:handle" element={<SpaceByHandle />} />
           <Route path="/organize"  element={<Organize />} />
           <Route path="/collections/:id" element={<CollectionPage />} />
           <Route path="/maps"      element={

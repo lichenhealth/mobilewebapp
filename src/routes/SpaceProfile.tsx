@@ -48,8 +48,9 @@ const ROLE_LABEL: Record<string, string> = {
 /** A space's own profile — organizations, communities, groups, and places get
  *  the same treatment people do. Everyone sees who/what it is; its admins
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
-export default function SpaceProfile() {
-  const { id = '' } = useParams();
+export default function SpaceProfile({ spaceId }: { spaceId?: string } = {}) {
+  const { id: paramId = '' } = useParams();
+  const id = spaceId || paramId;
   const navigate = useNavigate();
   const confirmDialog = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
