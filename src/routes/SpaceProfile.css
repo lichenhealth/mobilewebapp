@@ -221,3 +221,4 @@
 .sprof__guest-lead { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
 .sprof__guest-sub { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
 .sprof__guest-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.sprof__tabback { margin: var(--s-2) var(--s-5) var(--s-1); }

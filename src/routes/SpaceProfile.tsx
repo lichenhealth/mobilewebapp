@@ -225,6 +225,10 @@ export default function SpaceProfile() {
   const isMember = !!myRole;
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
   const backstage = isAdmin && searchParams.get('manage') === '1';
+  // Members and Groups open as their own views rather than scrolling the feed
+  // to its bottom (founder 2026-07-28: "a directory tab, for consistency").
+  const tab = searchParams.get('tab');
+  const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
   const adminTools = backstage;
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
   // to admins holding the 'members' duty; full admins hold everything.
@@ -726,7 +730,7 @@ export default function SpaceProfile() {
       {/* The profile IS a feed — the space's wall (posted AS it or TO it),
           with the space-anatomy circles (Chat for members, Members) leading
           the icon row. Identical for all four kinds. */}
-      {!backstage && <ContributionsFeed
+      {!backstage && !tab && <ContributionsFeed
         spaceId={space.id}
         me={me}
         entityName={space.name}
@@ -742,11 +746,11 @@ export default function SpaceProfile() {
           // The founder's Marketplace-icon analogy: a Groups door appears only
           // when this space actually has groups nested under it.
           ...(childGroups.length > 0
-            ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }) }]
+            ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => openTab('groups') }]
             : []),
           // Members closes the row — the space's Directory, far right like
           // Home's (founder 2026-07-25).
-          { icon: 'member-heart' as const, label: 'Members', onClick: () => membersRef.current?.scrollIntoView({ behavior: 'smooth' }) },
+          { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
         ]}
       />}
 
@@ -929,6 +933,13 @@ export default function SpaceProfile() {
         </section>
       )}
 
+      {tab && !backstage && (
+        <button className="cmp__back calp__backchip sprof__tabback" onClick={() => openTab('')}>
+          <Icon name="arrow-left" size={14} /> Back to {space.name}
+        </button>
+      )}
+
+      {(tab === 'members' || backstage) && (
       <section className="prof__section" ref={membersRef}>
         <h2 className="prof__h2">Members</h2>
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
@@ -1047,9 +1058,11 @@ export default function SpaceProfile() {
           </div>
         )}
       </section>
+      )}
 
       {/* Nested groups — the community's smaller circles. */}
-      {(space.kind === 'community' || space.kind === 'organization') && (childGroups.length > 0 || !!me) && (
+      {(tab === 'groups' || backstage)
+        && (space.kind === 'community' || space.kind === 'organization') && (childGroups.length > 0 || !!me) && (
         <section className="prof__section" ref={groupsRef}>
           <h2 className="prof__h2">Groups</h2>
           {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
