@@ -116,20 +116,16 @@ export default function PublicPage(props: PublicPageProps) {
     return () => document.documentElement.classList.remove('is-public-page');
   }, []);
 
-  // Uniform door anatomy: summary sentence, then an image, then the body.
+  // Uniform door anatomy (founder 2026-07-29): each door owns the cover
+  // slot — About wears the page cover, every other door wears its own
+  // section image up top; the lead reads as the section's title below it.
   const flavor = (id: 'about' | 'services' | 'facilities') => {
-    const s = page.sections?.[id];
-    if (!s?.lead && !s?.image) return null;
-    return (
-      <>
-        {s.lead && <p className="ppage__lead">{s.lead}</p>}
-        {s.image && (
-          <img className="ppage__sec-img" src={s.image} alt="" loading="lazy"
-            onClick={() => setLightbox(s.image!)} />
-        )}
-      </>
-    );
+    const lead = page.sections?.[id]?.lead;
+    return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
+  const coverSrc = (!tabbed || tab === 'about')
+    ? page.cover
+    : page.sections?.[tab as 'services' | 'facilities']?.image;
 
   return (
     <div className={'ppage ppage--' + (page.coverStyle ?? 'tint')} style={{ ['--ppage-accent' as string]: accent }}>
@@ -172,8 +168,8 @@ export default function PublicPage(props: PublicPageProps) {
             )}
           </nav>
         )}
-        {page.cover && (
-          <img className="ppage__cover" src={page.cover} alt="" onClick={() => setLightbox(page.cover!)} />
+        {coverSrc && (
+          <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
         )}
       </header>
 
