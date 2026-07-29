@@ -6,7 +6,16 @@
   color: var(--blue-deep); font-size: 12.5px; text-align: center;
 }
 .ppage__hero { position: relative; }
-.ppage__cover { display: block; width: 100%; aspect-ratio: 16/7; object-fit: cover; }
+/* Taller than a banner so a squarish photo keeps its subject — horse, rider
+   and the top of the jump (founder 2026-07-28). The crop favours the upper
+   third, where riders' heads live. */
+.ppage__cover {
+  display: block; width: 100%; aspect-ratio: 4 / 3;
+  object-fit: cover; object-position: 50% 28%; max-height: 72vh;
+}
+@media (min-width: 900px) {
+  .ppage__cover { aspect-ratio: 16 / 9; }
+}
 .ppage__hero-body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: var(--s-5) var(--s-5) var(--s-4); text-align: center;
