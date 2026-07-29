@@ -133,12 +133,11 @@ export default function PublicPage(props: PublicPageProps) {
         <p className="ppage__preview">Preview — this is what the open web sees.</p>
       )}
 
-      {/* 1 · Hero */}
+      {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
+          (logo, name, tagline, address), then the nav doors, then the cover
+          image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
-        {page.cover && (
-          <img className="ppage__cover" src={page.cover} alt="" onClick={() => setLightbox(page.cover!)} />
-        )}
-        <div className="ppage__hero-body">
+        <div className="ppage__hero-body ppage__hero-body--top">
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={64} />
           <h1 className="ppage__name">{name}</h1>
           {(page.tagline || kindLabel) && (
@@ -168,6 +167,9 @@ export default function PublicPage(props: PublicPageProps) {
               </a>
             )}
           </nav>
+        )}
+        {page.cover && (
+          <img className="ppage__cover" src={page.cover} alt="" onClick={() => setLightbox(page.cover!)} />
         )}
       </header>
 
