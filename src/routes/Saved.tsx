@@ -16,6 +16,8 @@ import { listMyCollections, createCollection, type CollectionRow } from '../lib/
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
+import './Marketplace.css'; // mkt__action circle-icon vocabulary
+import './Saved.css';
 import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 
@@ -82,6 +84,18 @@ export default function Saved() {
   // and post something new that lands here as well as wherever you send it.
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
+  // The shelf grows folders fast (founder 2026-07-30): + and Search live as
+  // left circle icons (the platform vocabulary; + chooses item-or-folder),
+  // and folders move into a searchable, alphabetical dropdown on the right.
+  const [addOpen, setAddOpen] = useState(false);
+  const [foldersOpen, setFoldersOpen] = useState(false);
+  const [folderQ, setFolderQ] = useState('');
+  const folderList = useMemo(() => {
+    const q = folderQ.trim().toLowerCase();
+    return [...collections]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .filter((c) => !q || c.name.toLowerCase().includes(q));
+  }, [collections, folderQ]);
 
   const toggleArea = (a: ServiceArea) =>
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
@@ -126,51 +140,85 @@ export default function Saved() {
         </p>
       </header>
 
-      {/* Folders — private collections; published ones double as Library playlists. */}
+      {/* Shelf bar (founder 2026-07-30): circle icons left — Search, and a +
+          that chooses item-or-folder — with a searchable, alphabetical
+          folders dropdown on the right. Chips retire; folders scale. */}
       {me && (
-        <div className="myc__kinds h-scroll">
-          {collections.map((c) => (
-            <button key={c.id} className="myc__kind" onClick={() => navigate(`/collections/${c.id}`)}>
-              <span className="myc__kind-circle">
-                <Icon name={c.is_public ? 'book' : 'bookmark'} size={13} />
-              </span>
-              <span className="myc__kind-label">{c.name} · {c.item_count}</span>
+        <div className="saved__bar">
+          <button
+            className={'mkt__action' + (showSearch ? ' is-active' : '')}
+            aria-label="Search" title="Search"
+            onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
+          >
+            <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
+          </button>
+          <div className="saved__add">
+            <button className="mkt__action" aria-label="Add" title="Add"
+              onClick={() => { setAddOpen((v) => !v); setFoldersOpen(false); }}>
+              <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
             </button>
-          ))}
-          {/* Only the New-folder chip swaps for its input — Organize stays put. */}
-          {!newFolderOpen ? (
-            <button className="myc__kind" onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}>
-              <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
-              <span className="myc__kind-label">New folder</span>
-            </button>
-          ) : (
-            <span className="saved__newfolder">
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') void makeFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
-                placeholder={newKind === 'path' ? 'Name your collection…' : 'Folder name'}
-              />
-              <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
-            </span>
-          )}
-          {/* Organize: the studio — create ordered collections, arrange them,
-              move pieces between them (founder 2026-07-24). */}
-          <button className="myc__kind" onClick={() => { setShowSearch((v) => !v); setQuery(''); }}>
-            <span className="myc__kind-circle"><Icon name="search" size={13} /></span>
-            <span className="myc__kind-label">Search</span>
-          </button>
-          <button className="myc__kind" onClick={() => navigate('/compose?save=1')} title="Post something — it lands on your shelf too">
-            <span className="myc__kind-circle"><Icon name="plus" size={13} /></span>
-            <span className="myc__kind-label">Post</span>
-          </button>
-          <button className="myc__kind" onClick={() => navigate('/organize')}>
-            <span className="myc__kind-circle"><Icon name="book" size={13} /></span>
-            <span className="myc__kind-label">Organize</span>
-          </button>
+            {addOpen && (
+              <div className="saved__chooser">
+                <button onClick={() => { setAddOpen(false); navigate('/compose?save=1'); }}>
+                  Post something<span>lands on your shelf too</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); setNewKind('collection'); setNewFolderOpen(true); }}>
+                  New folder<span>a private place to keep things</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); navigate('/organize'); }}>
+                  Organize studio<span>arrange folders &amp; collections</span>
+                </button>
+              </div>
+            )}
+          </div>
           <AssistantDoor section="saved" label="Your assistant — what you've been keeping" />
+          <span className="saved__bar-spacer" />
+          <div className="saved__folders">
+            <button className="saved__folders-btn"
+              onClick={() => { setFoldersOpen((v) => !v); setAddOpen(false); setFolderQ(''); }}>
+              <Icon name="bookmark" size={13} />
+              Folders{collections.length > 0 ? ` · ${collections.length}` : ''}
+              <span className="saved__folders-caret">▾</span>
+            </button>
+            {foldersOpen && (
+              <div className="saved__folders-menu">
+                <input
+                  autoFocus
+                  value={folderQ}
+                  onChange={(e) => setFolderQ(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setFoldersOpen(false); }}
+                  placeholder="Find a folder…"
+                />
+                {folderList.map((c) => (
+                  <button key={c.id} className="saved__folders-row"
+                    onClick={() => { setFoldersOpen(false); navigate(`/collections/${c.id}`); }}>
+                    <Icon name={c.is_public ? 'book' : 'bookmark'} size={13} />
+                    <span className="saved__folders-name">{c.name}</span>
+                    <span className="saved__folders-count">{c.item_count}</span>
+                  </button>
+                ))}
+                {folderList.length === 0 && (
+                  <p className="saved__folders-empty">
+                    {collections.length === 0 ? 'No folders yet — the + makes one.' : 'Nothing matches.'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      )}
+
+      {newFolderOpen && (
+        <span className="saved__newfolder">
+          <input
+            autoFocus
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void makeFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
+            placeholder={newKind === 'path' ? 'Name your collection…' : 'Folder name'}
+          />
+          <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
+        </span>
       )}
 
       {showSearch && (
