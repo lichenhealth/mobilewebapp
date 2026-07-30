@@ -58,6 +58,7 @@ import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import AssistantBrief from './routes/AssistantBrief';
 import SpaceByHandle from './routes/SpaceByHandle';
+import FrontDoor from './routes/FrontDoor';
 import { hostSpaceHandle } from './lib/customDomain';
 import ReminderAlerts from './components/ReminderAlerts';
 
@@ -170,7 +171,7 @@ export default function App() {
               root gets Lichen's own public page — the same template every
               member's site uses; members go straight to Home. */}
           <Route path="/" element={
-            loading ? <div /> : user ? <Navigate to="/home" replace /> : <SpaceByHandle handle="lichen" />
+            loading ? <div /> : user ? <Navigate to="/home" replace /> : <FrontDoor />
           } />
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />

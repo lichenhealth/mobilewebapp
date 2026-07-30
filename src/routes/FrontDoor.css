@@ -1,0 +1,159 @@
+/* The front door as a true website (founder 2026-07-30) — desktop-first,
+   ported from the retired marketing site's layout; mobile stacks. */
+.fdoor { background: var(--bone); }
+.fdoor h1, .fdoor h2, .fdoor h3 { font-family: var(--font-display, inherit); font-weight: 400; }
+
+/* ── Site header ─────────────────────────────────────────────────── */
+.fdoor__head {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 26px;
+  padding: 14px clamp(18px, 4vw, 48px);
+  background: color-mix(in srgb, var(--bone) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--bone-edge-soft);
+}
+.fdoor__brand {
+  display: flex; align-items: center; gap: 9px;
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-family: var(--font-display, inherit); font-size: 21px; color: var(--ink);
+}
+.fdoor__nav { display: flex; gap: 22px; margin-left: 12px; }
+.fdoor__nav a {
+  font-size: 14.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none;
+  border-bottom: 2px solid transparent; padding-bottom: 2px;
+}
+.fdoor__nav a:hover { color: var(--ink); border-bottom-color: var(--peach); }
+.fdoor__ways { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.fdoor__signin {
+  background: none; border: none; cursor: pointer; font: inherit;
+  font-size: 13.5px; font-weight: 500; color: var(--ink-muted);
+}
+.fdoor__signin:hover { color: var(--ink); }
+.fdoor__cta {
+  background: var(--peach); color: #fff; border: 1px solid var(--peach);
+  border-radius: var(--r-full); cursor: pointer; padding: 10px 20px;
+  font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap;
+  transition: background .15s ease;
+}
+.fdoor__cta:hover { background: var(--peach-deep, var(--peach)); }
+.fdoor__ghost {
+  background: none; color: var(--ink); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full); cursor: pointer; padding: 10px 20px;
+  font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.fdoor__ghost:hover { background: var(--bone-warm); }
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+.fdoor__hero {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(24px, 4vw, 56px); align-items: center;
+  max-width: 1200px; margin: 0 auto;
+  padding: clamp(36px, 6vw, 84px) clamp(18px, 4vw, 48px);
+}
+.fdoor__hero-copy h1 {
+  font-size: clamp(32px, 4.4vw, 52px); line-height: 1.12; margin-bottom: 18px;
+}
+.fdoor__hero-copy > p { font-size: 17px; line-height: 1.65; color: var(--ink-soft); max-width: 46ch; }
+.fdoor__hero-acts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.fdoor__hero-note { margin-top: 16px; font-size: 13px; line-height: 1.6; color: var(--ink-muted); max-width: 44ch; }
+.fdoor__hero-img {
+  width: 100%; aspect-ratio: 5 / 4; object-fit: cover; object-position: 50% 20%;
+  border-radius: var(--r-lg, 18px);
+}
+
+/* ── Bands ───────────────────────────────────────────────────────── */
+.fdoor__band {
+  max-width: 1200px; margin: 0 auto;
+  padding: clamp(32px, 5vw, 72px) clamp(18px, 4vw, 48px);
+  border-top: 1px solid var(--bone-edge-soft);
+}
+.fdoor__eyebrow {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--peach-deep, var(--peach)); margin-bottom: 10px;
+}
+.fdoor__band h2 { font-size: clamp(24px, 3vw, 36px); line-height: 1.2; margin-bottom: 14px; }
+.fdoor__band--split {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 64px); align-items: center;
+}
+.fdoor__band--flip .fdoor__band-img { order: 2; }
+.fdoor__band-img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 25%;
+  border-radius: var(--r-lg, 18px);
+}
+.fdoor__band-copy p { font-size: 15.5px; line-height: 1.7; color: var(--ink-soft); max-width: 52ch; }
+.fdoor__band-copy a {
+  display: inline-block; margin-top: 14px; font-size: 14.5px; font-weight: 600;
+  color: var(--peach-deep, var(--peach)); text-decoration: none;
+}
+.fdoor__band-copy a:hover { text-decoration: underline; }
+.fdoor__band-sub { font-size: 15.5px; color: var(--ink-soft); margin-bottom: 8px; }
+
+/* The app — real renderings */
+.fdoor__band--app { text-align: center; }
+.fdoor__band--app .fdoor__band-sub { margin-inline: auto; }
+.fdoor__shots {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: clamp(16px, 2.5vw, 32px); margin-top: 34px;
+}
+.fdoor__shots figure { margin: 0; }
+.fdoor__shots img {
+  width: 100%; border: 1px solid var(--bone-edge); border-radius: 24px;
+  box-shadow: 0 12px 34px rgba(40, 30, 20, .12);
+}
+.fdoor__shots figcaption { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+
+/* Essays / Resources cards */
+.fdoor__band--cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(16px, 2.5vw, 32px);
+}
+.fdoor__card {
+  display: block; text-decoration: none; color: inherit;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-lg, 18px);
+  overflow: hidden; background: var(--bone-warm);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.fdoor__card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(40,30,20,.12); }
+.fdoor__card img { width: 100%; aspect-ratio: 16 / 7; object-fit: cover; }
+.fdoor__card > div { padding: 18px 20px 22px; }
+.fdoor__card h3 { font-size: 21px; margin-bottom: 6px; }
+.fdoor__card p { font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+
+/* Donate band — full-bleed feel inside the column */
+.fdoor__band--donate {
+  border-radius: var(--r-lg, 18px); border-top: none;
+  margin: clamp(24px, 4vw, 48px) auto;
+  max-width: calc(1200px - 2 * clamp(18px, 4vw, 48px));
+  background-size: cover; background-position: center;
+  color: #fff; text-align: center;
+  padding: clamp(48px, 7vw, 96px) clamp(18px, 4vw, 48px);
+}
+.fdoor__band--donate p { color: rgba(255,255,255,.88); max-width: 52ch; margin: 0 auto 22px; font-size: 15.5px; line-height: 1.65; }
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+.fdoor__foot {
+  border-top: 1px solid var(--bone-edge);
+  max-width: 1200px; margin: 0 auto;
+  padding: clamp(28px, 4vw, 48px) clamp(18px, 4vw, 48px) 60px;
+  display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center;
+}
+.fdoor__foot-brand { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-soft); }
+.fdoor__foot-links { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
+.fdoor__foot-links a { font-size: 13.5px; color: var(--ink-muted); text-decoration: none; }
+.fdoor__foot-links a:hover { color: var(--ink); text-decoration: underline; }
+.fdoor__foot-note { font-size: 12.5px; color: var(--ink-faint); }
+
+/* ── Mobile stacks ───────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .fdoor__nav { display: none; }
+  .fdoor__hero, .fdoor__band--split { grid-template-columns: 1fr; }
+  .fdoor__hero-img { order: -1; aspect-ratio: 4 / 3; }
+  .fdoor__band--flip .fdoor__band-img { order: -1; }
+  .fdoor__shots { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .fdoor__ways .fdoor__cta { padding: 8px 14px; font-size: 13px; }
+  .fdoor__shots { grid-template-columns: 1fr; justify-items: center; }
+  .fdoor__shots figure { max-width: 280px; }
+}
