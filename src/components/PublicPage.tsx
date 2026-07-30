@@ -138,14 +138,14 @@ export default function PublicPage(props: PublicPageProps) {
           where the page owner wants it (join !== quiet). */}
       {!props.preview && (
         <div className="ppage__corner">
-          <button className="ppage__corner-signin" type="button" onClick={() => go('/login')}>
-            Sign in
-          </button>
           {page.join !== 'quiet' && (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
               Request an invitation
             </button>
           )}
+          <button className="ppage__corner-signin" type="button" onClick={() => go('/login')}>
+            Sign in
+          </button>
         </div>
       )}
 

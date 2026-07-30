@@ -1,6 +1,8 @@
 /* One structure, every Lichen site. Deliberately few choices: a cover style
    and an accent, nothing more — constrained templates beat builders. */
-.ppage { --ppage-accent: var(--peach); padding-bottom: var(--s-6); position: relative; }
+/* Open space doctrine (founder 2026-07-29): generous air at the top, around
+   the mark, in the margins, and at the foot — the page breathes. */
+.ppage { --ppage-accent: var(--peach); padding-bottom: 72px; position: relative; }
 .ppage__preview {
   margin: 0; padding: 8px var(--s-5); background: var(--blue-tint);
   color: var(--blue-deep); font-size: 12.5px; text-align: center;
@@ -15,7 +17,9 @@
   /* Soft corners, same vocabulary as every card on the platform. */
   border-radius: var(--r-lg, 16px);
 }
-.ppage__hero { padding: var(--s-3) var(--s-5) 0; }
+/* The mark sits well below the corner doors, with air above and beneath. */
+.ppage__hero { padding: calc(var(--safe-top, 0px) + 104px) var(--s-5) 0; }
+.ppage__hero-body--top > :first-child { margin-bottom: 14px; }
 @media (min-width: 900px) {
   .ppage__cover { aspect-ratio: 16 / 9; }
   /* The whole page is one centered column on wide screens — the hero cover
@@ -69,18 +73,21 @@
 /* The active door — text-width peach underline, the platform selection idiom. */
 .ppage__nav-link--on { color: var(--ink); border-bottom-color: var(--ppage-accent); }
 .ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; white-space: nowrap; }
-/* Platform doors, upper right — quiet text for members, a slim outlined
-   pill for the invitation. Design-forward: no heavy fills up here. */
+/* Platform doors, upper right — the invitation pill with a quiet Sign-in
+   bubble beneath it, right-aligned. Design-forward: no heavy fills up here,
+   and plenty of air so nothing feels scrunched (founder 2026-07-29). */
 .ppage__corner {
-  position: absolute; top: calc(var(--safe-top, 0px) + 14px); right: var(--s-5);
-  display: flex; align-items: center; gap: 16px; z-index: 3;
+  position: absolute; top: calc(var(--safe-top, 0px) + 20px); right: var(--s-5);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 3;
 }
 .ppage__corner-signin {
-  background: none; border: none; cursor: pointer; padding: 0;
-  font: inherit; font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
-  color: var(--ink-muted); white-space: nowrap;
+  background: var(--bone-warm); cursor: pointer;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  padding: 6px 14px; font: inherit; font-size: 12.5px; font-weight: 500;
+  letter-spacing: 0.01em; color: var(--ink-soft); white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-.ppage__corner-signin:hover { color: var(--ink); }
+.ppage__corner-signin:hover { color: var(--ink); border-color: var(--ink-faint); }
 .ppage__corner-cta {
   background: none; cursor: pointer; white-space: nowrap;
   border: 1px solid var(--peach); border-radius: var(--r-full);
@@ -98,7 +105,7 @@
   .ppage__nav-link { font-size: 13px; }
   .ppage__cta--nav { padding: 8px 13px; font-size: 13px; }
 }
-.ppage__sec { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--bone-edge-soft); }
+.ppage__sec { padding: var(--s-5) var(--s-6, 28px); border-top: 1px solid var(--bone-edge-soft); }
 .ppage__h2 {
   margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
