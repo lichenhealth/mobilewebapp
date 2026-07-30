@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import SiteHeader from '../components/SiteHeader';
 import { useAuth } from '../auth/AuthProvider';
 import './Donate.css';
 
@@ -122,6 +123,13 @@ export default function Donate() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Signed-out donors read a website, not the app (founder 2026-07-30).
+  useEffect(() => {
+    if (user) return;
+    document.documentElement.classList.add('is-public-page');
+    return () => document.documentElement.classList.remove('is-public-page');
+  }, [user]);
+
   async function donate() {
     setErr(false);
     if (!amount || Number(amount) < 1) {
@@ -165,6 +173,8 @@ export default function Donate() {
   }
 
   return (
+    <>
+    {!user && <SiteHeader />}
     <div className="donate">
       <header className="donate__head">
         <p className="eyebrow">Support Lichen</p>
@@ -478,5 +488,6 @@ export default function Donate() {
         <a href={CALENDLY} target="_blank" rel="noopener">book a time</a> to chat with us via Zoom.
       </p>
     </div>
+    </>
   );
 }

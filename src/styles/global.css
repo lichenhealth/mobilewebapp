@@ -373,8 +373,10 @@ input, textarea, select { font: inherit; color: inherit; }
 @media (min-width: 1024px) {
   .is-public-page .app-shell,
   .is-signed-out .app-shell { grid-template-columns: minmax(0, 1fr); }
+  /* row 2, not 1/-1: the top bar (when present) keeps row 1, so signed-out
+     app pages never slide under it; hidden bars collapse row 1 to zero. */
   .is-public-page .scroll-view,
-  .is-signed-out .scroll-view { grid-column: 1; grid-row: 1 / -1; }
+  .is-signed-out .scroll-view { grid-column: 1; grid-row: 2; }
   .is-public-page .side-menu,
   .is-signed-out .side-menu { display: none; }
   /* The signed-out top bar keeps its hamburger hidden on desktop anyway;
