@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
 import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -198,6 +199,14 @@ export default function CollectionPage() {
     return () => { live = false; };
   }, [cohorts, meta?.details.circleId, me]);
 
+  // Signed-out readers get the website chrome (founder 2026-07-30): the
+  // persistent site nav instead of the app's bars — nobody gets marooned.
+  useEffect(() => {
+    if (me) return;
+    document.documentElement.classList.add('is-public-page');
+    return () => document.documentElement.classList.remove('is-public-page');
+  }, [me]);
+
   async function startCohort() {
     if (!meta || !me) return;
     const gid = await createCohort(me, id, meta.name, cohortTerm);
@@ -293,6 +302,8 @@ export default function CollectionPage() {
   const editing = canEdit && editOpen;
 
   return (
+    <>
+    {!me && <SiteHeader />}
     <div className="colp">
       <header className="colp__head">
         {meta.details.coverUrl && (
@@ -712,5 +723,6 @@ export default function CollectionPage() {
         ))}
       </section>
     </div>
+    </>
   );
 }

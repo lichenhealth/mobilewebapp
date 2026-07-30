@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LichenMark } from '../components/LichenMark';
+import SiteHeader from '../components/SiteHeader';
 import './FrontDoor.css';
 
 // THE FRONT DOOR AS A TRUE WEBSITE (founder 2026-07-30): the marketing
@@ -36,23 +37,8 @@ export default function FrontDoor() {
 
   return (
     <div className="fdoor">
-      {/* Site header — logo left, doors center, ways in right */}
-      <header className="fdoor__head">
-        <button className="fdoor__brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <LichenMark size={34} />
-          <span>Lichen</span>
-        </button>
-        <nav className="fdoor__nav">
-          <a href="/about">About</a>
-          <a href="/collections/02aa2dee-f955-54e9-879e-2542a7552e5f">Essays</a>
-          <a href="/collections/ea4ae9d1-a848-548e-83c6-7022cf81ea54">Resources</a>
-          <a href="/donate">Give</a>
-        </nav>
-        <div className="fdoor__ways">
-          <button className="fdoor__signin" onClick={() => navigate('/login')}>Sign in</button>
-          <button className="fdoor__cta" onClick={() => navigate('/signup')}>Request an invitation</button>
-        </div>
-      </header>
+      {/* Site header — shared across the whole signed-out website */}
+      <SiteHeader />
 
       {/* Hero — the old homepage, image and words side by side */}
       <section className="fdoor__hero">

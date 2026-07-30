@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
+import SiteHeader from '../components/SiteHeader';
 import { useAuth } from '../auth/AuthProvider';
 import './AboutLichen.css';
 
@@ -375,20 +376,18 @@ export default function AboutLichen() {
 
   return (
     <div className="about">
-      <header className="about__bar">
-        <button className="about__brand" onClick={() => navigate(user ? '/home' : '/about')} aria-label="Lichen">
-          <LichenMark size={30} /><span>Lichen</span>
-        </button>
-        {!user && (
-          <div className="about__auth">
-            <button className="about__signin" onClick={() => navigate('/login')}>Sign in</button>
-            <button className="btn btn-primary about__join" onClick={() => navigate('/signup')}>Join</button>
-          </div>
-        )}
-        {user && (
+      {/* Signed-out visitors get the website's persistent nav (founder
+          2026-07-30 — no more being marooned); members keep the close bar. */}
+      {!user ? (
+        <SiteHeader />
+      ) : (
+        <header className="about__bar">
+          <button className="about__brand" onClick={() => navigate('/home')} aria-label="Lichen">
+            <LichenMark size={30} /><span>Lichen</span>
+          </button>
           <button className="about__close" onClick={() => navigate(-1)} aria-label="Back"><Icon name="close" size={18} /></button>
-        )}
-      </header>
+        </header>
+      )}
 
       <div className="about__body">
         <p className="about__eyebrow">What is Lichen?</p>

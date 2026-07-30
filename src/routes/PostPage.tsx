@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
@@ -102,6 +103,13 @@ export default function PostPage() {
     else navigate('/home');
   };
 
+  // Signed-out readers get the website chrome (founder 2026-07-30).
+  useEffect(() => {
+    if (me) return;
+    document.documentElement.classList.add('is-public-page');
+    return () => document.documentElement.classList.remove('is-public-page');
+  }, [me]);
+
   if (!ready) {
     return <div className="postp"><p className="postp__muted">Loading…</p></div>;
   }
@@ -120,6 +128,8 @@ export default function PostPage() {
   const areas = postAreas(p).filter((a) => AREA_HOME[a]);
 
   return (
+    <>
+    {!me && <SiteHeader />}
     <div className="postp">
       {/* Frozen bar: back to where you were + the areas this post lives in +
           its actions — pinned below the TopBar while the body scrolls. */}
@@ -224,5 +234,6 @@ export default function PostPage() {
         </section>
       )}
     </div>
+    </>
   );
 }

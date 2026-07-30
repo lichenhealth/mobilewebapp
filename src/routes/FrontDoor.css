@@ -18,11 +18,12 @@
   font-family: var(--font-display, inherit); font-size: 21px; color: var(--ink);
 }
 .fdoor__nav { display: flex; gap: 22px; margin-left: 12px; }
-.fdoor__nav a {
+.fdoor__nav a, .fdoor__nav button {
+  background: none; border: none; cursor: pointer; font: inherit; padding: 0 0 2px;
   font-size: 14.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none;
   border-bottom: 2px solid transparent; padding-bottom: 2px;
 }
-.fdoor__nav a:hover { color: var(--ink); border-bottom-color: var(--peach); }
+.fdoor__nav a:hover, .fdoor__nav button:hover { color: var(--ink); border-bottom-color: var(--peach); }
 .fdoor__ways { margin-left: auto; display: flex; align-items: center; gap: 16px; }
 .fdoor__signin {
   background: none; border: none; cursor: pointer; font: inherit;
