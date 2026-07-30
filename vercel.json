@@ -1,6 +1,24 @@
 {
   "redirects": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.lichen.health" }],
+      "destination": "https://lichen.health/",
+      "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "lichen.healthcare" }],
+      "destination": "https://lichen.health/",
+      "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.lichen.healthcare" }],
+      "destination": "https://lichen.health/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "www.lichen.health" }],
       "destination": "https://lichen.health/:path*",
