@@ -74,7 +74,8 @@
 .colp__picker-row :where(svg) { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
 .colp__picker-title { font-size: 13px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.colp__list { display: flex; flex-direction: column; gap: var(--s-3); }
+/* Generous air between pieces — stories shouldn't touch (founder 2026-07-30). */
+.colp__list { display: flex; flex-direction: column; gap: var(--s-6, 28px); }
 
 /* Structured lesson row: progress rail + number + reorder, then the card */
 .colp__lesson { display: flex; gap: var(--s-2); align-items: flex-start; }

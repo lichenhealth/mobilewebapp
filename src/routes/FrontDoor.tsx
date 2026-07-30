@@ -126,6 +126,50 @@ export default function FrontDoor() {
         </div>
       </section>
 
+      {/* Real situations — the demo world photographed mid-story */}
+      <section className="fdoor__band fdoor__band--scenes">
+        <p className="fdoor__eyebrow">Real situations</p>
+        <h2>How it actually works</h2>
+        <div className="fdoor__scenes">
+          <div className="fdoor__scene">
+            <img src={`${B}/scene-table.png`} alt="" loading="lazy" />
+            <div>
+              <h3>The table that found its family</h3>
+              <p>
+                June posted "in search of a dining table." The moment a neighbor
+                listed a cedar table — as a gift — Lichen's matcher rang her
+                bell. No feed to scroll, no luck required: the offer found the
+                need, and the economy answered with generosity first.
+              </p>
+            </div>
+          </div>
+          <div className="fdoor__scene">
+            <img src={`${B}/scene-potluck.png`} alt="" loading="lazy" />
+            <div>
+              <h3>The potluck &amp; seed swap</h3>
+              <p>
+                One post becomes a gathering: RSVPs land on everyone's
+                calendar, the event opens its own room for who's-bringing-what,
+                and guests from outside Lichen can be invited by email — no
+                account required to say yes.
+              </p>
+            </div>
+          </div>
+          <div className="fdoor__scene">
+            <img src={`${B}/scene-week.png`} alt="" loading="lazy" />
+            <div>
+              <h3>A week that holds together</h3>
+              <p>
+                Your calendar weaves your own plans with your communities' —
+                the herb walk, the grange potluck, a booked session — and
+                find-a-time reads everyone's real availability without ever
+                exposing anyone's details.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Essays + Resources */}
       <section className="fdoor__band fdoor__band--cards">
         <a className="fdoor__card" href="/collections/02aa2dee-f955-54e9-879e-2542a7552e5f">

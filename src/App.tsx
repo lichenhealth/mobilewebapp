@@ -94,6 +94,14 @@ export default function App() {
     }
   }, [user, loading, onboarded, isAuth, pathname, navigate]);
 
+  // Signed-out visitors are readers, not app users (founder 2026-07-30):
+  // the desktop sidebar hides on EVERY page for them (CSS scopes to >=1024;
+  // the mobile drawer still works via the hamburger).
+  useEffect(() => {
+    document.documentElement.classList.toggle('is-signed-out', !loading && !user);
+    return () => document.documentElement.classList.remove('is-signed-out');
+  }, [user, loading]);
+
   // MEMBERSHIP GATE (2026-07-15, founder): Lichen is a membership — every
   // non-admin needs an active subscription (Stripe, or gifted — either from
   // /admin/supporters or riding an admin's invitation). Checked per

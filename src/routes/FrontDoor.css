@@ -158,3 +158,18 @@
   .fdoor__shots { grid-template-columns: 1fr; justify-items: center; }
   .fdoor__shots figure { max-width: 280px; }
 }
+
+/* Real situations — the demo world photographed mid-story. */
+.fdoor__scenes {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(24px, 3.5vw, 48px); margin-top: 34px;
+}
+.fdoor__scene img {
+  width: 100%; max-width: 300px; margin: 0 auto 18px;
+  /* crop to the lively top of the screen — no empty tails */
+  aspect-ratio: 43 / 56; object-fit: cover; object-position: top;
+  border: 1px solid var(--bone-edge); border-radius: 24px;
+  box-shadow: 0 12px 34px rgba(40, 30, 20, .12);
+}
+.fdoor__scene h3 { font-size: 20px; margin-bottom: 8px; }
+.fdoor__scene p { font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }

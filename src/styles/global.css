@@ -366,10 +366,20 @@ input, textarea, select { font: inherit; color: inherit; }
 .is-public-page .bottom-nav,
 .is-public-page .side-menu { display: none; }
 .is-public-page .scroll-view { padding: 0; min-height: 0; }
-/* Desktop: no sidebar column either — the website owns the full shell. */
+/* Desktop: no sidebar column either — the website owns the full shell.
+   Signed-out visitors are readers everywhere (founder 2026-07-30), so the
+   is-signed-out root class hides the sidebar on every page for them; the
+   mobile drawer (hamburger) is untouched below 1024. */
 @media (min-width: 1024px) {
-  .is-public-page .app-shell { grid-template-columns: minmax(0, 1fr); }
-  .is-public-page .scroll-view { grid-column: 1; grid-row: 1 / -1; }
+  .is-public-page .app-shell,
+  .is-signed-out .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .is-public-page .scroll-view,
+  .is-signed-out .scroll-view { grid-column: 1; grid-row: 1 / -1; }
+  .is-public-page .side-menu,
+  .is-signed-out .side-menu { display: none; }
+  /* The signed-out top bar keeps its hamburger hidden on desktop anyway;
+     center the content column's top row. */
+  .is-signed-out .top-bar { grid-column: 1; }
 }
 
 /* De-branded top bar: the entity's own mark centered (founder 2026-07-30). */

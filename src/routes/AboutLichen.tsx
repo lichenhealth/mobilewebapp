@@ -360,6 +360,13 @@ export default function AboutLichen() {
 
   // Saving/bookmarking /about carries the full tagline (founder 2026-07-24);
   // the rest of the app keeps the short title.
+  // Chrome-free reading (founder 2026-07-30): the app sidebar was leaking in
+  // on desktop — About is a public page; the platform steps back.
+  useEffect(() => {
+    document.documentElement.classList.add('is-public-page');
+    return () => document.documentElement.classList.remove('is-public-page');
+  }, []);
+
   useEffect(() => {
     const prev = document.title;
     document.title = 'Lichen — a community that heals, grows and creates a better future, together';
