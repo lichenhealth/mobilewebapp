@@ -13,7 +13,7 @@ export const config = { runtime: 'nodejs' };
 
 const SUPABASE_URL = 'https://mjqnaevertyzgjlpwynr.supabase.co';
 const ANON = 'sb_publishable_pw5ENFOu9gJSXmULI3BW1A_hcUs-xO6';
-const SITE = 'https://lichen.healthcare';
+const SITE = 'https://lichen.health';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

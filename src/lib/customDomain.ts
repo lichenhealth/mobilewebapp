@@ -15,9 +15,14 @@ export function hostSpaceHandle(): string | null {
   return HOST_SPACES[window.location.hostname] ?? null;
 }
 
+/** Lichen's canonical origin (the 2026-07-29 consolidation: the app lives on
+ *  lichen.health; lichen.healthcare 301s here and keeps only the send-email
+ *  MX). Everything that writes an absolute app link uses this. */
+export const APP_ORIGIN = 'https://lichen.health';
+
 /** App links from a custom domain must cross back to Lichen's own origin —
- *  auth, gate and OAuth are configured for lichen.healthcare, and the barn's
- *  visitors shouldn't wander the app on the barn's address. */
+ *  auth, gate and OAuth are configured for it, and the barn's visitors
+ *  shouldn't wander the app on the barn's address. */
 export function appUrl(path: string): string {
-  return hostSpaceHandle() ? `https://lichen.healthcare${path}` : path;
+  return hostSpaceHandle() ? `${APP_ORIGIN}${path}` : path;
 }

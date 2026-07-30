@@ -17,7 +17,7 @@ const CLIENT_ID = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? '';
 
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/google-oauth-callback`;
-const ALLOWED_RETURNS = ['https://lichen.healthcare', 'http://localhost:5173'];
+const ALLOWED_RETURNS = ['https://lichen.health', 'https://lichen.healthcare', 'http://localhost:5173'];
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

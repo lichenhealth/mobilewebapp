@@ -1,4 +1,18 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "lichen.healthcare" }],
+      "destination": "https://lichen.health/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.lichen.healthcare" }],
+      "destination": "https://lichen.health/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/spaces/:id", "destination": "/api/page" },
     { "source": "/members/:id", "destination": "/api/page" },

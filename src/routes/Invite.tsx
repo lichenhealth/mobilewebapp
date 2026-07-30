@@ -79,7 +79,7 @@ export default function Invite() {
 
   const inviteMessage = () => {
     const who = fullName.trim() || 'A friend';
-    const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.healthcare/signup`;
+    const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
     return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
   };
   const smsHref = `sms:${recipient}?&body=${encodeURIComponent(inviteMessage())}`;
@@ -87,14 +87,14 @@ export default function Invite() {
   /** Lichen is invite-only: the copied message needs a real token so the
    *  signup door opens. Minted fresh per copy (RLS: created_by = me). */
   async function tokenedMessage(): Promise<string> {
-    let link = 'https://lichen.healthcare/signup';
+    let link = 'https://lichen.health/signup';
     if (user) {
       const { data } = await supabase.from('invite_tokens')
         .insert({ created_by: user.id }).select('token').maybeSingle();
       const tok = (data as { token: string } | null)?.token;
-      if (tok) link = `https://lichen.healthcare/signup?invite=${tok}`;
+      if (tok) link = `https://lichen.health/signup?invite=${tok}`;
     }
-    return inviteMessage().replace('https://lichen.healthcare/signup', link);
+    return inviteMessage().replace('https://lichen.health/signup', link);
   }
 
   async function copyInvite() {

@@ -127,7 +127,7 @@ export async function cancelCareInvite(id: string): Promise<void> {
 }
 
 export function careInviteText(email: string): string {
-  return `Join me on Lichen — sign up with this email (${email}) and we'll be connected: https://lichen.healthcare/signup`;
+  return `Join me on Lichen — sign up with this email (${email}) and we'll be connected: https://lichen.health/signup`;
 }
 
 /** Copy the invite blurb; returns the message to show the member. */
