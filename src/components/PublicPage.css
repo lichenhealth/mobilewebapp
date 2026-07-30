@@ -137,6 +137,21 @@
   object-position: 50% 0%; border-radius: var(--r-lg, 16px);
   margin: var(--s-5) 0 var(--s-6); cursor: zoom-in;
 }
+/* Real app renderings — phone-framed screenshots, not mockups. */
+.ppage__shots {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s-5); margin-top: var(--s-5); justify-items: center;
+}
+.ppage__shot { margin: 0; max-width: 260px; }
+.ppage__shot img {
+  display: block; width: 100%; cursor: zoom-in;
+  border: 1px solid var(--bone-edge); border-radius: 26px;
+  box-shadow: 0 10px 30px rgba(40, 30, 20, 0.10);
+}
+.ppage__shot figcaption {
+  margin-top: 10px; text-align: center; font-size: 12.5px;
+  color: var(--ink-soft); line-height: 1.5;
+}
 /* Offerings as a quiet list — information for visitors, not buttons.
    These become actionable inside Lichen once you join the org. */
 .ppage__offers { list-style: none; margin: 0; padding: 0; max-width: 46rem; }

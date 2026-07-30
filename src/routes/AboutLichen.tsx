@@ -429,7 +429,7 @@ export default function AboutLichen() {
           <h2 className="about__h2">A reciprocal economy, architected to restore balance</h2>
           <p>
             Lichen is a nonprofit with the vision, strategy and operations of a lean technology
-            startup. Membership and gifts keep the platform running — <strong>everything beyond
+            startup. Membership and donations keep the platform running — <strong>everything beyond
             that flows back into the network to restore balance</strong>. Our algorithm identifies
             those that the current system leaves behind: the people, plants, animals and places who
             are
@@ -437,7 +437,7 @@ export default function AboutLichen() {
           <ol className="about__list">
             <li>Carrying wounds that need healing</li>
             <li>Chronically undervalued by the current system</li>
-            <li>Deliberately under-resourced to stall innovation that will ensure a better world for future generations</li>
+            <li>Deliberately under-resourced to stall human autonomy and evolution</li>
           </ol>
           <p>
             Philanthropy <em>pays only the gap</em>, until the community’s own economy can hold

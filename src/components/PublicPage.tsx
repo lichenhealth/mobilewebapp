@@ -39,6 +39,9 @@ export interface PageMeta {
   doors?: {
     id: string; label: string; lead?: string; image?: string;
     body?: string; href?: string; contact?: boolean;
+    /** Real renderings of the real app (founder 2026-07-29) — phone-framed
+     *  screenshots with captions, in place of the old site's mockups. */
+    shots?: { src: string; caption?: string }[];
   }[];
   /** Services with their terms, for entities without Lichen categories yet
    *  ("Private lessons · 45 min · $60"). Members' offerings come from their
@@ -171,7 +174,7 @@ export default function PublicPage(props: PublicPageProps) {
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
         <div className="ppage__hero-body ppage__hero-body--top">
-          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={96} />
+          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={128} />
           <h1 className="ppage__name">{name}</h1>
           {(page.tagline || kindLabel) && (
             <p className="ppage__tagline">{page.tagline || kindLabel}</p>
@@ -217,6 +220,16 @@ export default function PublicPage(props: PublicPageProps) {
           {activeDoor.body && (
             <div className="ppage__story">
               {activeDoor.body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+            </div>
+          )}
+          {(activeDoor.shots?.length ?? 0) > 0 && (
+            <div className="ppage__shots">
+              {activeDoor.shots!.map((s) => (
+                <figure className="ppage__shot" key={s.src}>
+                  <img src={s.src} alt="" loading="lazy" onClick={() => setLightbox(s.src)} />
+                  {s.caption && <figcaption>{s.caption}</figcaption>}
+                </figure>
+              ))}
             </div>
           )}
           {activeDoor.contact && <ContactList contact={contact} />}
