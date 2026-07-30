@@ -166,6 +166,13 @@ export default function PublicPage(props: PublicPageProps) {
                 {actLabel}
               </a>
             )}
+            {/* Members need a way in from every public page (founder
+                2026-07-29 — re-adding the app starts signed out). */}
+            {!props.preview && (
+              <button className="ppage__nav-signin" type="button" onClick={() => go('/login')}>
+                Sign in
+              </button>
+            )}
           </nav>
         )}
         {coverSrc && (
@@ -297,6 +304,10 @@ export default function PublicPage(props: PublicPageProps) {
             <button className="btn btn-primary" onClick={() => go('/signup')}>Request an invitation</button>
             <button className="btn" onClick={() => go('/about')}>What is Lichen?</button>
           </div>
+          <p className="ppage__join-member">
+            Already a member?{' '}
+            <button className="ppage__join-quiet-link" onClick={() => go('/login')}>Sign in</button>
+          </p>
         </section>
       )}
     </div>

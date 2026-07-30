@@ -69,6 +69,15 @@
 /* The active door — text-width peach underline, the platform selection idiom. */
 .ppage__nav-link--on { color: var(--ink); border-bottom-color: var(--ppage-accent); }
 .ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; white-space: nowrap; }
+/* Members' quiet door in from every public page. */
+.ppage__nav-signin {
+  background: none; border: none; cursor: pointer; padding: 0 0 2px;
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  color: var(--ink-muted); text-decoration: underline; text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.ppage__nav-signin:hover { color: var(--ink); }
+.ppage__join-member { margin: 10px 0 0; font-size: 13px; color: var(--ink-soft); }
 /* Below the desktop sidebar the app-shell caps near 430px regardless of
    viewport (the 1024 shell rule) — compact so one row still holds
    doors-left, action-right. */
