@@ -57,6 +57,7 @@ export default function FrontDoor() {
       {/* Hero — the old homepage, image and words side by side */}
       <section className="fdoor__hero">
         <div className="fdoor__hero-copy">
+          <div className="fdoor__hero-mark"><LichenMark size={84} /></div>
           <h1>Because healing the world starts with ourselves</h1>
           <p>
             We are a nonprofit on a mission to reduce human suffering and expand human
