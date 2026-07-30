@@ -371,3 +371,6 @@ input, textarea, select { font: inherit; color: inherit; }
   .is-public-page .app-shell { grid-template-columns: minmax(0, 1fr); }
   .is-public-page .scroll-view { grid-column: 1; grid-row: 1 / -1; }
 }
+
+/* De-branded top bar: the entity's own mark centered (founder 2026-07-30). */
+.top-bar__ident { display: flex; align-items: center; justify-content: center; padding-top: 4px; }

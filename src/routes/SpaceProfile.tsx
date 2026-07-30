@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import ContributionsFeed from '../components/ContributionsFeed';
@@ -164,6 +165,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setLoading(false);
   }, [id, me]);
   useEffect(() => { load(); }, [load]);
+
+  // De-branding (founder 2026-07-30): this profile's mark takes the top bar.
+  useEffect(() => {
+    if (!space) return;
+    setTopIdentity({ id: space.id, name: space.name, avatarUrl: space.avatar_url, kind: 'space' });
+    return () => setTopIdentity(null);
+  }, [space]);
 
   async function toggleWeb() {
     if (!me) return;
@@ -593,7 +601,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             >
               <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
             </button>
-            {space.kind !== 'place' ? (
+            {space.kind !== 'place' && (
               /* Trust is for relationships: people, orgs, communities, groups. */
               <button
                 className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
@@ -602,16 +610,17 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               >
                 <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
               </button>
-            ) : (
-              /* Recommend is for things — a place is a thing you point at. */
-              <button
-                className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
-                onClick={toggleRecommend}
-                title={recommended ? 'Recommended to those who trust you' : 'Recommend this place to those who trust you'}
-              >
-                <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
-              </button>
             )}
+            {/* Recommend rides beside trust on EVERY kind (founder 2026-07-30):
+                "I might trust someone but not recommend them" — and the
+                reverse. Independent signals, PR #77 doctrine completed. */}
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
+              onClick={toggleRecommend}
+              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
+            >
+              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
+            </button>
           </div>
         )}
       </div>

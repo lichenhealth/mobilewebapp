@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { myPresence, setAlwaysPresent } from '../lib/presenceApi';
 import Avatar from './Avatar';
+import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
@@ -105,6 +106,8 @@ export default function TopBar({
     setSwitchOpen(false);
   }
 
+  const ident = useTopIdentity();
+
   return (
     <header className="top-bar">
       <button
@@ -116,7 +119,13 @@ export default function TopBar({
       </button>
 
       <div className="top-bar__logo">
-        {section ? (
+        {ident ? (
+          /* De-branding (founder 2026-07-30): on an entity's profile the top
+             bar wears THEIR mark — Lichen steps out of the spotlight. */
+          <div className="top-bar__ident" role="img" aria-label={ident.name} title={ident.name}>
+            <Avatar id={ident.id} name={ident.name} url={ident.avatarUrl ?? undefined} size={48} />
+          </div>
+        ) : section ? (
           section.prefix === '/profile' ? (
             /* No section mark on Profile — the page's own photo IS the identity;
                a duplicate circle above it just pushed content down. */
