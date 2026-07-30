@@ -133,6 +133,22 @@ export default function PublicPage(props: PublicPageProps) {
         <p className="ppage__preview">Preview — this is what the open web sees.</p>
       )}
 
+      {/* Platform doors, upper right — elegant and quiet (founder
+          2026-07-29): Sign in for members everywhere; the invitation only
+          where the page owner wants it (join !== quiet). */}
+      {!props.preview && (
+        <div className="ppage__corner">
+          <button className="ppage__corner-signin" type="button" onClick={() => go('/login')}>
+            Sign in
+          </button>
+          {page.join !== 'quiet' && (
+            <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
+              Request an invitation
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
           (logo, name, tagline, address), then the nav doors, then the cover
           image. The image stays put while doors switch the content below. */}
@@ -165,13 +181,6 @@ export default function PublicPage(props: PublicPageProps) {
                 target={actHref.startsWith('http') ? '_blank' : undefined} rel="noopener">
                 {actLabel}
               </a>
-            )}
-            {/* Members need a way in from every public page (founder
-                2026-07-29 — re-adding the app starts signed out). */}
-            {!props.preview && (
-              <button className="ppage__nav-signin" type="button" onClick={() => go('/login')}>
-                Sign in
-              </button>
             )}
           </nav>
         )}
