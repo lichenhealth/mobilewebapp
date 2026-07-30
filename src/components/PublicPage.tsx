@@ -31,6 +31,15 @@ export interface PageMeta {
    *  line — for pages whose owner prefers to invite people themselves once
    *  they've vetted them. */
   join?: 'full' | 'quiet';
+  /** Custom doors (founder 2026-07-29, the front door): fully data-driven
+   *  pages replacing the built-in About/Services/Facilities/Contact set.
+   *  A door with `href` is a link out (to /about, a collection, /donate);
+   *  a door with `body` renders lead → image → paragraphs; `contact: true`
+   *  renders the contact list. */
+  doors?: {
+    id: string; label: string; lead?: string; image?: string;
+    body?: string; href?: string; contact?: boolean;
+  }[];
   /** Services with their terms, for entities without Lichen categories yet
    *  ("Private lessons · 45 min · $60"). Members' offerings come from their
    *  categories instead. */
@@ -94,15 +103,21 @@ export default function PublicPage(props: PublicPageProps) {
   // only the active section renders below the hero. Only doors whose
   // section exists render; with no doors, everything shows inline.
   const hasContact = Object.keys(contact).length > 0 || !!page.practical;
-  const navItems = [
-    story ? { id: 'about', label: 'About' } : null,
-    offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
-    page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
-    hasContact ? { id: 'contact', label: 'Contact' } : null,
-  ].filter((n): n is { id: string; label: string } => !!n);
-  const [tab, setTab] = useState(navItems[0]?.id ?? 'about');
+  // Custom doors override the built-in section set entirely.
+  const doors = page.doors?.length ? page.doors : null;
+  const navItems = doors
+    ? doors.map((d) => ({ id: d.id, label: d.label }))
+    : [
+      story ? { id: 'about', label: 'About' } : null,
+      offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
+      page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
+      hasContact ? { id: 'contact', label: 'Contact' } : null,
+    ].filter((n): n is { id: string; label: string } => !!n);
+  const firstContentDoor = doors?.find((d) => !d.href)?.id;
+  const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
   const tabbed = navItems.length > 0;
-  const show = (id: string) => !tabbed || tab === id;
+  const show = (id: string) => !doors && (!tabbed || tab === id);
+  const activeDoor = doors?.find((d) => d.id === tab) ?? null;
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -123,9 +138,11 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
-  const coverSrc = (!tabbed || tab === 'about')
-    ? page.cover
-    : page.sections?.[tab as 'services' | 'facilities']?.image;
+  const coverSrc = doors
+    ? activeDoor?.image
+    : (!tabbed || tab === 'about')
+      ? page.cover
+      : page.sections?.[tab as 'services' | 'facilities']?.image;
 
   return (
     <div className={'ppage ppage--' + (page.coverStyle ?? 'tint')} style={{ ['--ppage-accent' as string]: accent }}>
@@ -168,14 +185,17 @@ export default function PublicPage(props: PublicPageProps) {
         </div>
         {navItems.length > 0 && (
           <nav className="ppage__nav">
-            {navItems.map((n) => (
-              <button
-                className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
-                onClick={() => setTab(n.id)} key={n.id} type="button"
-              >
-                {n.label}
-              </button>
-            ))}
+            {navItems.map((n) => {
+              const d = doors?.find((x) => x.id === n.id);
+              return (
+                <button
+                  className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
+                  onClick={() => (d?.href ? go(d.href) : setTab(n.id))} key={n.id} type="button"
+                >
+                  {n.label}
+                </button>
+              );
+            })}
             {act && actHref && (
               <a className="ppage__cta ppage__cta--nav" href={actHref}
                 target={actHref.startsWith('http') ? '_blank' : undefined} rel="noopener">
@@ -188,6 +208,20 @@ export default function PublicPage(props: PublicPageProps) {
           <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
         )}
       </header>
+
+      {/* Custom door content — lead, then paragraphs, then (optionally)
+          the contact list. */}
+      {activeDoor && !activeDoor.href && (
+        <section className="ppage__sec">
+          {activeDoor.lead && <p className="ppage__lead">{activeDoor.lead}</p>}
+          {activeDoor.body && (
+            <div className="ppage__story">
+              {activeDoor.body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+            </div>
+          )}
+          {activeDoor.contact && <ContactList contact={contact} />}
+        </section>
+      )}
 
       {/* 2 · Story */}
       {story && show('about') && (
