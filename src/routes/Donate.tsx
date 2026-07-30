@@ -444,6 +444,35 @@ export default function Donate() {
           <a className="donate__way-cta" href={CALENDLY} target="_blank" rel="noopener">Book a call</a>
         </div>
       </div>
+      {/* Founders Circle — ported from the marketing site (2026-07-29).
+          The tiers anchor the land vision; large gifts begin as conversations. */}
+      <section className="donate__fc">
+        <h2 className="donate__fc-title">The Founders Circle</h2>
+        <p className="donate__fc-sub">
+          For those ready to anchor the forest — founding contributions that
+          build the land, the sanctuary, and the commons underneath everything
+          Lichen does. Tax-deductible; anonymity honored at every tier.
+        </p>
+        <div className="donate__fc-tiers">
+          {[
+            ['Substrate Circle', 'From $5,000', 'An ocean of those who are ready for sea change.'],
+            ['Root Circle', 'From $25,000', 'The hidden architecture that anchors what grows.'],
+            ['Hearth Circle', 'From $75,000', 'Where the fire is tended.'],
+            ['Maloka Circle', 'From $250,000', 'The sacred container itself.'],
+            ['Old Growth Circle', 'From $1,000,000', 'The mother trees that anchor the entire forest.'],
+          ].map(([name, from, essence]) => (
+            <div className="donate__fc-tier" key={name}>
+              <p className="donate__fc-name">{name}</p>
+              <p className="donate__fc-from">{from}</p>
+              <p className="donate__fc-essence">{essence}</p>
+            </div>
+          ))}
+        </div>
+        <a className="donate__way-cta" href={CALENDLY} target="_blank" rel="noopener">
+          Begin the conversation
+        </a>
+      </section>
+
       <p className="donate__connect">
         Would you like to connect before giving? Feel free to{' '}
         <a href={CALENDLY} target="_blank" rel="noopener">book a time</a> to chat with us via Zoom.

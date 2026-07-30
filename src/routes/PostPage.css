@@ -54,3 +54,13 @@
   border-radius: var(--r-full);
   padding: 4px 10px;
 }
+
+/* The growth loop: essays end in an invitation for signed-out readers. */
+.postp__join {
+  margin: var(--s-6) var(--s-5) 0; padding: 18px 20px;
+  border-radius: var(--r-lg, 16px); background: var(--peach-tint);
+  border: 1px solid var(--peach-light);
+}
+.postp__join-lead { margin: 0 0 4px; font-size: 15px; }
+.postp__join-sub { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
+.postp__join-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }

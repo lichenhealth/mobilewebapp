@@ -205,6 +205,24 @@ export default function PostPage() {
           ))}
         </div>
       )}
+
+      {/* The growth loop (founder 2026-07-29): a signed-out reader who
+          liked what they read gets the door, right where they finished. */}
+      {!user && (
+        <section className="postp__join">
+          <p className="postp__join-lead">This lives on <strong>Lichen</strong>.</p>
+          <p className="postp__join-sub">
+            A member-run network for care, work, offerings and a fairer
+            economy — where trust is a path through real relationships, not a
+            star rating. Lichen grows by invitation; introduce yourself and a
+            real person writes back.
+          </p>
+          <div className="postp__join-acts">
+            <button className="btn btn-primary" onClick={() => navigate('/signup')}>Request an invitation</button>
+            <button className="btn" onClick={() => navigate('/about')}>What is Lichen?</button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

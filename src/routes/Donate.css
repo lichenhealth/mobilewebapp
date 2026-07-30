@@ -330,3 +330,22 @@
 .giving__say { font-size: 13px; font-style: italic; color: var(--ink-soft); margin: 4px 0 0; }
 .giving__ref { font-size: 11px; color: var(--ink-faint); margin: 4px 0 0; }
 .donate__head-links { display: flex; gap: var(--s-4); flex-wrap: wrap; }
+
+/* Founders Circle — ported from the marketing site (2026-07-29). */
+.donate__fc {
+  margin-top: var(--s-7, 40px); padding-top: var(--s-5);
+  border-top: 1px solid var(--bone-edge-soft);
+}
+.donate__fc-title { margin: 0 0 6px; font-family: var(--font-display, inherit); font-size: 22px; }
+.donate__fc-sub { margin: 0 0 var(--s-4); font-size: 14px; line-height: 1.6; color: var(--ink-soft); max-width: 56ch; }
+.donate__fc-tiers {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; margin-bottom: var(--s-4);
+}
+.donate__fc-tier {
+  padding: 14px 16px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 16px); background: var(--bone-warm);
+}
+.donate__fc-name { margin: 0; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.donate__fc-from { margin: 1px 0 6px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--peach-deep, var(--peach)); }
+.donate__fc-essence { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); font-style: italic; }
