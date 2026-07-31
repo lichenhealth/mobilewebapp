@@ -205,19 +205,21 @@ export default function App() {
           {/* Legacy marketing-site addresses (retired 2026-07-29) — the
               essays and resources live on as public Library content, so old
               inbound links and search results keep landing somewhere real. */}
-          <Route path="/mission" element={<Navigate to="/posts/73a02456-5ae4-53e2-91fc-a823730322c3" replace />} />
-          <Route path="/vision" element={<Navigate to="/posts/48722e7e-b358-594f-9951-4370f82d555d" replace />} />
-          <Route path="/ourstory" element={<Navigate to="/posts/7d55c163-f273-50b8-9a89-66eb06112469" replace />} />
-          <Route path="/social-networks" element={<Navigate to="/posts/946c1911-bd9a-5c51-b313-b993538be73b" replace />} />
-          <Route path="/care-model" element={<Navigate to="/posts/4acf5c4f-9f80-52ee-a88d-59a50e2363f4" replace />} />
-          <Route path="/safety" element={<Navigate to="/posts/467b134d-2d60-582e-83ed-a6ec14e33e72" replace />} />
-          <Route path="/platform" element={<Navigate to="/posts/dda37ba8-3e35-53d0-846d-67cb4b9e75a9" replace />} />
-          <Route path="/conscious-economy" element={<Navigate to="/posts/7ab21803-0987-5b19-839c-5c78a9cd9db7" replace />} />
-          <Route path="/business" element={<Navigate to="/posts/20edcbb7-a0b3-5a9c-a1e1-ed0537d22bc4" replace />} />
-          <Route path="/opportunity" element={<Navigate to="/posts/a608f350-bbd8-5410-b945-9cf3136b7d25" replace />} />
-          <Route path="/pilot" element={<Navigate to="/posts/c98fadc7-cbd0-5f86-93f2-1a7dc5a9cf07" replace />} />
-          <Route path="/blog" element={<Navigate to="/collections/02aa2dee-f955-54e9-879e-2542a7552e5f" replace />} />
-          <Route path="/resources" element={<Navigate to="/collections/ea4ae9d1-a848-548e-83c6-7022cf81ea54" replace />} />
+          <Route path="/mission" element={<Navigate to="/about" replace />} />
+          <Route path="/vision" element={<Navigate to="/about" replace />} />
+          <Route path="/ourstory" element={<Navigate to="/about" replace />} />
+          <Route path="/social-networks" element={<Navigate to="/about" replace />} />
+          <Route path="/care-model" element={<Navigate to="/about" replace />} />
+          <Route path="/safety" element={<Navigate to="/about" replace />} />
+          <Route path="/platform" element={<Navigate to="/about" replace />} />
+          <Route path="/conscious-economy" element={<Navigate to="/about" replace />} />
+          <Route path="/business" element={<Navigate to="/about" replace />} />
+          <Route path="/opportunity" element={<Navigate to="/about" replace />} />
+          <Route path="/pilot" element={<Navigate to="/about" replace />} />
+          {/* Essays + bookshelf hidden until the Library is ready (founder
+              2026-07-31) — old content links rest on /about meanwhile. */}
+          <Route path="/blog" element={<Navigate to="/about" replace />} />
+          <Route path="/resources" element={<Navigate to="/about" replace />} />
           {/* /founders-circle + /get-involved are REAL static marketing pages
               now (Shape A) — served filesystem-first by Vercel, so no client
               redirects; the SPA never sees those URLs in production. */}

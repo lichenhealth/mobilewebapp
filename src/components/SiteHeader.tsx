@@ -16,9 +16,9 @@ export default function SiteHeader() {
         <span>Lichen</span>
       </button>
       <nav className="fdoor__nav">
+        {/* Essays + Resources hidden until the Library presents them well
+            (founder 2026-07-31) — restore the two buttons then. */}
         <button onClick={() => navigate('/about')}>About</button>
-        <button onClick={() => navigate('/collections/02aa2dee-f955-54e9-879e-2542a7552e5f')}>Essays</button>
-        <button onClick={() => navigate('/collections/ea4ae9d1-a848-548e-83c6-7022cf81ea54')}>Resources</button>
         <button onClick={() => navigate('/donate')}>Give</button>
       </nav>
       <div className="fdoor__ways">
