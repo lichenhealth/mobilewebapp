@@ -2,6 +2,12 @@
   "redirects": [
     {
       "source": "/",
+      "has": [{ "type": "host", "value": "lichen.health" }],
+      "destination": "/welcome/",
+      "permanent": false
+    },
+    {
+      "source": "/",
       "has": [{ "type": "host", "value": "www.lichen.health" }],
       "destination": "https://lichen.health/",
       "permanent": true

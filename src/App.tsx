@@ -218,8 +218,9 @@ export default function App() {
           <Route path="/pilot" element={<Navigate to="/posts/c98fadc7-cbd0-5f86-93f2-1a7dc5a9cf07" replace />} />
           <Route path="/blog" element={<Navigate to="/collections/02aa2dee-f955-54e9-879e-2542a7552e5f" replace />} />
           <Route path="/resources" element={<Navigate to="/collections/ea4ae9d1-a848-548e-83c6-7022cf81ea54" replace />} />
-          <Route path="/founders-circle" element={<Navigate to="/donate" replace />} />
-          <Route path="/get-involved" element={<Navigate to="/about" replace />} />
+          {/* /founders-circle + /get-involved are REAL static marketing pages
+              now (Shape A) — served filesystem-first by Vercel, so no client
+              redirects; the SPA never sees those URLs in production. */}
           <Route path="/:handle" element={<SpaceByHandle />} />
           <Route path="/organize"  element={<Organize />} />
           <Route path="/collections/:id" element={<CollectionPage />} />

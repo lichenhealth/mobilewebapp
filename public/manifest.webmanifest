@@ -2,7 +2,7 @@
   "name": "Lichen — A community that grows together",
   "short_name": "Lichen",
   "description": "A slow, considered space for community, conversation, and connection.",
-  "start_url": "/",
+  "start_url": "/home",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

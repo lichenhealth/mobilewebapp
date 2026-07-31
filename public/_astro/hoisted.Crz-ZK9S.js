@@ -1,0 +1,1 @@
+import"./hoisted.Dhrt3tjn.js";document.querySelectorAll(".check-copy").forEach(t=>{t.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(t.dataset.copy||"");const e=t.textContent;t.textContent="Copied!",setTimeout(()=>t.textContent=e,1500)}catch{}})});

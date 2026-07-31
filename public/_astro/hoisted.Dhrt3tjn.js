@@ -1,0 +1,1 @@
+const t=document.getElementById("fnavToggle"),n=document.getElementById("fnavLinks");t?.addEventListener("click",()=>n?.classList.toggle("open"));document.getElementById("footSub")?.addEventListener("submit",e=>{e.preventDefault(),location.href="/get-involved"});
