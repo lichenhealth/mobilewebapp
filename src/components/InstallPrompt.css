@@ -65,3 +65,27 @@
   justify-content: center;
 }
 .install-prompt__dismiss:hover { color: var(--ink); }
+
+/* The walkthrough sheet — how to plant Lichen on the home screen. */
+.install-sheet {
+  position: fixed; inset: 0; z-index: 85;
+  background: rgba(20, 16, 12, 0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.install-sheet__card {
+  width: min(560px, 100%); margin: 0 10px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 18px); padding: 22px 20px;
+  box-shadow: 0 -12px 40px rgba(40, 30, 20, 0.2);
+}
+.install-sheet__title {
+  font-family: var(--font-display, inherit); font-size: 21px; margin-bottom: 12px;
+}
+.install-sheet__steps { margin: 0 0 14px; padding-left: 20px; list-style: decimal; }
+.install-sheet__steps li { font-size: 14.5px; line-height: 1.6; color: var(--ink-soft); margin-bottom: 8px; }
+.install-sheet__glyph { display: inline-block; transform: rotate(180deg); }
+.install-sheet__already {
+  font-size: 13px; line-height: 1.6; color: var(--ink-muted);
+  border-top: 1px solid var(--bone-edge-soft); padding-top: 12px; margin-bottom: 14px;
+}
+.install-sheet__acts { display: flex; gap: 10px; flex-wrap: wrap; }
