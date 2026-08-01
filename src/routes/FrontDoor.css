@@ -174,3 +174,6 @@
 }
 .fdoor__scene h3 { font-size: 20px; margin-bottom: 8px; }
 .fdoor__scene p { font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+
+/* You-are-here: thin beige line under the current section (founder 2026-07-31). */
+.fdoor__nav a.is-here { color: var(--ink); border-bottom-color: #C9B79C; }

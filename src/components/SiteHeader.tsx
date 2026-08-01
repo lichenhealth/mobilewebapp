@@ -20,6 +20,10 @@ const DOORS: [string, string][] = [
 ];
 
 export default function SiteHeader() {
+  // You-are-here (founder 2026-07-31): thin beige line under the current
+  // section — matches the static pages' header exactly.
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const here = (href: string) => (href === '/' ? path === '/' || path === '/welcome' : path === href);
   return (
     <header className="fdoor__head">
       <a className="fdoor__brand" href="/">
@@ -27,7 +31,10 @@ export default function SiteHeader() {
         <span>Lichen</span>
       </a>
       <nav className="fdoor__nav">
-        {DOORS.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
+        {DOORS.map(([label, href]) => (
+          <a key={href} href={href} className={here(href) ? 'is-here' : undefined}
+            aria-current={here(href) ? 'page' : undefined}>{label}</a>
+        ))}
       </nav>
       <div className="fdoor__ways">
         <a className="fdoor__signin" href="/login">Sign in</a>
