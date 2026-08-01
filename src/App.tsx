@@ -66,6 +66,12 @@ import ReminderAlerts from './components/ReminderAlerts';
 // (a member with a payment problem must be able to reach support).
 const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/about'];
 
+/** Client-side "/" for signed-out visitors → the static marketing homepage. */
+function GoWelcome() {
+  useEffect(() => { window.location.replace('/welcome/'); }, []);
+  return null;
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -178,8 +184,13 @@ export default function App() {
           {/* THE FRONT DOOR (founder 2026-07-29): a signed-out visitor at the
               root gets Lichen's own public page — the same template every
               member's site uses; members go straight to Home. */}
+          {/* Prod "/": the server 307s to /welcome (the static marketing
+              homepage) before the SPA ever loads; this route only fires on
+              CLIENT-side navigations to "/" — hand those to the server too.
+              Dev keeps FrontDoor (no vercel redirects locally). */}
           <Route path="/" element={
-            loading ? <div /> : user ? <Navigate to="/home" replace /> : <FrontDoor />
+            loading ? <div /> : user ? <Navigate to="/home" replace />
+              : import.meta.env.PROD ? <GoWelcome /> : <FrontDoor />
           } />
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />
