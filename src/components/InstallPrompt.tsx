@@ -87,7 +87,7 @@ export default function InstallPrompt() {
           <button className="btn btn-ink" onClick={onInstall}>
             {deferred ? 'Install' : 'Show me how'}
           </button>
-          <button className="install-prompt__dismiss" onClick={() => rest(30)} aria-label="Keep using the web">
+          <button className="install-prompt__dismiss" onClick={() => rest(7)} aria-label="Keep using the web">
             <Icon name="close" size={14} />
           </button>
         </div>
@@ -117,7 +117,7 @@ export default function InstallPrompt() {
             </p>
             <div className="install-sheet__acts">
               <button className="btn btn-primary" onClick={() => rest(365)}>Done — I added it</button>
-              <button className="btn" onClick={() => rest(30)}>I&rsquo;ll keep using the web</button>
+              <button className="btn" onClick={() => rest(7)}>I&rsquo;ll keep using the web</button>
             </div>
           </div>
         </div>
