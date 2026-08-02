@@ -16,7 +16,7 @@ const DOORS: [string, string][] = [
   ['The Economy', '/economy'],
   ['Donate', '/donate'],
   ['Get Involved', '/get-involved'],
-  ['Events', '/events'],
+  // Events returns to public nav once non-member events exist (founder 2026-08-02).
 ];
 
 export default function SiteHeader() {
