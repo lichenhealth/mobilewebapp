@@ -5,6 +5,7 @@ import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type Adm
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
+import { supabase } from '../lib/supabase';
 import './SideMenu.css';
 
 interface SideMenuProps {
@@ -84,6 +85,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
   const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
+  // Platform-level knock queue (founder 2026-08-02): a "Request an
+  // invitation" toast disappearing shouldn't feel like the knock vanished —
+  // join_requests is the permanent record (Invite.tsx "At the door"); this
+  // badge just makes it impossible to lose track of an unhandled one.
+  const [knockCount, setKnockCount] = useState(0);
 
   // Fetch memberships whenever we have a user — on DESKTOP the menu is a
   // persistent sidebar that never "opens", so this must not gate on `open`
@@ -101,6 +107,22 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     return () => { live = false; };
   }, [open, user]);
 
+  // Live knock count — realtime, not just on-open, so the badge can never
+  // sit stale while someone waits at the door.
+  useEffect(() => {
+    if (!platformAdmin) return;
+    let live = true;
+    const refresh = () => {
+      void supabase.from('join_requests').select('id', { count: 'exact', head: true })
+        .eq('status', 'new').then(({ count }) => { if (live) setKnockCount(count ?? 0); });
+    };
+    refresh();
+    const channel = supabase.channel('join_requests:desk')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, refresh)
+      .subscribe();
+    return () => { live = false; supabase.removeChannel(channel); };
+  }, [platformAdmin]);
+
   const itemsFor = (key: string): { label: string; href: string; count: number; admin: boolean }[] => {
     const kind = SPACE_SECTIONS.find((s) => s.key === key)?.kind;
     if (!kind) return [];
@@ -113,7 +135,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         admin: desk.ids.has(s.id),
       }));
   };
-  const deskTotal = Object.values(desk.counts).reduce((a, b) => a + b, 0);
+  const deskTotal = Object.values(desk.counts).reduce((a, b) => a + b, 0) + knockCount;
   const flipAdminView = () => {
     setAdminView((v) => {
       localStorage.setItem('menu-admin-view', v ? '' : '1');
@@ -187,7 +209,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             })}
           </div>
 
-          {desk.ids.size > 0 && (
+          {(desk.ids.size > 0 || (platformAdmin && knockCount > 0)) && (
             <button
               className={'side-menu__adminview' + (adminView ? ' is-on' : '')}
               onClick={flipAdminView}
@@ -207,6 +229,14 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <span className="side-menu__header-label">Lichen</span>
               </button>
               <ul className="side-menu__sub-list">
+                <li>
+                  <button className="side-menu__sub-item" onClick={() => go('/invite')}>
+                    Knocking at the door
+                    {knockCount > 0 && (
+                      <span className="side-menu__deskbadge">{knockCount > 9 ? '9+' : knockCount}</span>
+                    )}
+                  </button>
+                </li>
                 <li>
                   <button className="side-menu__sub-item" onClick={() => go('/admin/supporters')}>
                     Memberships &amp; gifts

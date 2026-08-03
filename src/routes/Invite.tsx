@@ -56,6 +56,14 @@ export default function Invite() {
     })();
     return () => { live = false; };
   }, [user, isAdmin]);
+  // Handling a knock moves it off the "waiting" tally and the side-menu
+  // badge (founder 2026-08-02) — the row stays visible here either way, so
+  // nothing is ever truly lost, just no longer flagged as needing you.
+  async function resolveKnock(id: string, status: 'invited' | 'dismissed') {
+    setKnocks((cur) => cur.map((k) => (k.id === id ? { ...k, status } : k)));
+    const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
+    if (error) console.error('resolveKnock', error);
+  }
   const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -333,9 +341,21 @@ export default function Invite() {
                     </span>
                     <span className={'invite__pill' + (k.status !== 'new' ? ' is-in' : '')}>{k.status}</span>
                     {k.status === 'new' && (
-                      <button className="btn invite__use" onClick={() => { setEmail(k.email); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                        Invite them
-                      </button>
+                      <span className="invite__knock-acts">
+                        <button
+                          className="btn invite__use"
+                          onClick={() => {
+                            setEmail(k.email);
+                            void resolveKnock(k.id, 'invited');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          Invite them
+                        </button>
+                        <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'dismissed')}>
+                          Not now
+                        </button>
+                      </span>
                     )}
                   </li>
                 ))}

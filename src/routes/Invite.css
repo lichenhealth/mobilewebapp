@@ -90,3 +90,9 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 .invite__pill.is-in { background: var(--green-tint); color: var(--green-deep); }
 .invite__use { padding: 4px 12px; font-size: 12px; }
 .invite__by { display: block; font-size: 11.5px; color: var(--ink-faint); }
+.invite__knock-acts { display: flex; align-items: center; gap: 8px; }
+.invite__dismiss {
+  font-size: 12px; color: var(--ink-muted); background: none; border: none;
+  cursor: pointer; padding: 4px 4px;
+}
+.invite__dismiss:hover { color: var(--ink); text-decoration: underline; }
