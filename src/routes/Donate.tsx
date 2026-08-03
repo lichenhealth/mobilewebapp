@@ -234,7 +234,7 @@ export default function Donate() {
           <span className="donate__flow-name">Give</span>
           <span className="donate__flow-desc">
             A direct personal gift — you choose exactly who benefits.
-            Generous, honest, and not tax-deductible.
+            Generous and honest, but not tax-deductible.
           </span>
           <span
             role="link" tabIndex={0} className="donate__flow-learn"
