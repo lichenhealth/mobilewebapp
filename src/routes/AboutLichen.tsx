@@ -517,10 +517,12 @@ export default function AboutLichen() {
             <p className="about__mock-eyebrow">The table’s journey</p>
             <p className="about__byhand">
               <em>In the current economy,</em> you’d give the table to the first person who has the
-              time to browse for the style and dimensions they need and is willing to pay what you
-              are asking for it — one need met. <em>In the Lichen Economy,</em> the web of need and
-              contribution is matched to minimize waste, balance resources and maximize quality of
-              life for all living beings.
+              time to browse for the style and dimensions that fit their space and is willing to
+              pay what you are asking for it — one need (inefficiently) met. <em>In the Lichen
+              Economy,</em> the web of need and contribution is matched to minimize waste, balance
+              resources and maximize quality of life for all living beings. Your AI assistant knows
+              your style and space requirements, so matches aren’t just based on need — they’re
+              based on the true, authentic expression of you, your family and your space.
             </p>
             <TableJourney />
             <p className="about__mock-cap">
