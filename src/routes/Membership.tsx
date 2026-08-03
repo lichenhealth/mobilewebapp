@@ -58,6 +58,17 @@ export default function Membership() {
     window.location.href = url;
   }
 
+  // The third door (founder 2026-08-03): re-up Concierge, join Community,
+  // or step away — a graceful sign-out, not a dead end. Nothing is deleted;
+  // the profile and any data stay exactly as they are, ready whenever they
+  // come back and pick a plan.
+  const [leaving, setLeaving] = useState(false);
+  async function exitStageLeft() {
+    setLeaving(true);
+    await supabase.auth.signOut();
+    navigate('/', { replace: true });
+  }
+
   async function manage() {
     setBusy('manage'); setError('');
     const { data, error: e } = await supabase.functions.invoke('stripe-portal', {});
@@ -139,6 +150,19 @@ export default function Membership() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {(!activeTier || giftEndingSoon) && (
+        <div className="mship__exit">
+          <p className="mship__exit-lead">Not ready to choose?</p>
+          <button className="mship__exit-btn" onClick={exitStageLeft} disabled={leaving}>
+            {leaving ? 'Stepping away…' : 'Exit, stage left'}
+          </button>
+          <p className="mship__exit-sub">
+            No pressure — you&rsquo;ll be signed out, nothing is deleted, and your
+            spot is here whenever you&rsquo;re ready to come back.
+          </p>
         </div>
       )}
 
