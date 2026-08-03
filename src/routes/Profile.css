@@ -65,6 +65,14 @@
   background: transparent; border: 0; color: var(--ink-faint); cursor: pointer;
 }
 .prof__space-open:hover { color: var(--peach-deep); }
+.prof__handle {
+  display: flex; align-items: center; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm); overflow: hidden;
+}
+.prof__handle:focus-within { border-color: var(--peach); }
+.prof__handle-prefix { padding: 10px 0 10px 12px; color: var(--ink-faint); font-size: var(--t-base); white-space: nowrap; }
+.prof__handle .prof__input { border: 0; background: transparent; padding-left: 2px; }
+.prof__handle .prof__input:focus { outline: none; }
 .prof__input, .prof__textarea {
   padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
   background: var(--bone-warm); font-size: var(--t-base); color: var(--ink); width: 100%; font-family: inherit;

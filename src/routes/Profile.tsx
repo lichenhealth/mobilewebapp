@@ -238,25 +238,40 @@ export default function Profile() {
   const [webMsg, setWebMsg] = useState('');
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const setPage = (patch: Partial<PageMeta>) => setPageMeta((m) => ({ ...m, ...patch }));
+  // Your vanity address (founder 2026-08-03) — lichen.health/<handle>
+  // resolves the same as a space's, via SpaceByHandle's fallback lookup.
+  const [handle, setHandleState] = useState('');
+  const [savedHandle, setSavedHandle] = useState('');
   useEffect(() => {
     if (!user) return;
-    void supabase.from('profiles').select('contact, public_page, page').eq('id', user.id).maybeSingle()
+    void supabase.from('profiles').select('contact, public_page, page, handle').eq('id', user.id).maybeSingle()
       .then(({ data }) => {
-        const r = data as { contact?: ContactInfo | null; public_page?: boolean; page?: PageMeta | null } | null;
-        if (r) { setContact(r.contact ?? {}); setPublicPage(!!r.public_page); setPageMeta(r.page ?? {}); }
+        const r = data as { contact?: ContactInfo | null; public_page?: boolean; page?: PageMeta | null; handle?: string | null } | null;
+        if (r) {
+          setContact(r.contact ?? {}); setPublicPage(!!r.public_page); setPageMeta(r.page ?? {});
+          setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
+        }
       });
   }, [user]);
+  const setHandle = (v: string) => setHandleState(v.toLowerCase().replace(/[^a-z0-9-]/g, ''));
   async function saveWebPage() {
     if (!user) return;
     setWebMsg('');
+    const h = handle.trim();
     const { error: e } = await supabase.from('profiles')
       .update({
         contact: Object.keys(contact).length ? contact : null,
         public_page: publicPage,
         page: Object.keys(pageMeta).length ? pageMeta : null,
+        handle: h || null,
       })
       .eq('id', user.id);
-    setWebMsg(e ? e.message : 'Saved.');
+    if (e) {
+      setWebMsg(e.code === '23505' ? 'That address is taken — try another.' : e.message);
+    } else {
+      setSavedHandle(h);
+      setWebMsg('Saved.');
+    }
   }
   async function updateAssistantReadable(next: boolean) {
     if (!user) return;
@@ -495,6 +510,19 @@ export default function Profile() {
             </span>
           </label>
 
+          <div className="prof__field">
+            <label className="prof__label">Your address</label>
+            <div className="prof__handle">
+              <span className="prof__handle-prefix">lichen.health/</span>
+              <input className="prof__input" value={handle} onChange={(e) => setHandle(e.target.value)}
+                placeholder="yourname" />
+            </div>
+            <p className="prof__hint">
+              Letters, numbers and dashes only. Leave it blank and your page lives at{' '}
+              <code>/members/{user?.id?.slice(0, 8)}…</code> instead.
+            </p>
+          </div>
+
           <p className="prof__privacy-sub">Your page</p>
           <div className="prof__field">
             <label className="prof__label">One line — what you do, for whom</label>
@@ -547,14 +575,16 @@ export default function Profile() {
 
           <div className="prof__save-row">
             <button className="btn btn-primary" onClick={() => void saveWebPage()}>Save</button>
-            <button className="btn" onClick={() => window.open(`/members/${user?.id}?preview=1`, '_blank')}>
+            <button className="btn" onClick={() => window.open(
+              savedHandle ? `/${savedHandle}?preview=1` : `/members/${user?.id}?preview=1`, '_blank')}>
               Preview
             </button>
             {publicPage && (
               <button
                 className="btn"
                 onClick={() => {
-                  void navigator.clipboard.writeText(`${window.location.origin}/members/${user?.id}`)
+                  const path = savedHandle ? `/${savedHandle}` : `/members/${user?.id}`;
+                  void navigator.clipboard.writeText(`${window.location.origin}${path}`)
                     .then(() => setWebMsg('Link copied.'));
                 }}
               >
