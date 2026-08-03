@@ -424,9 +424,10 @@ export default function AboutLichen() {
           <p>
             That same web is your safety when things change hands. Star ratings can be farmed;
             a path through <em>your</em> relationships can’t be faked. Browse the whole
-            marketplace, or narrow it to <em>people you trust</em> — or people <em>they</em>{' '}
-            trust — and every listing shows you your path to the person behind it:{' '}
-            <em>&ldquo;Trusted by Melanie — someone you trust.&rdquo;</em> The mutual friend you’d
+            marketplace, or narrow it to <em>people, places, groups, communities or
+            organizations you trust</em> — or people <em>they</em>{' '}
+            trust — and every listing shows you your path to the energy behind it:{' '}
+            <em>&ldquo;Trusted by Audacity Labs — someone you trust.&rdquo;</em> The mutual friend you’d
             want before meeting a stranger, built into the ground you walk on.
           </p>
         </section>
