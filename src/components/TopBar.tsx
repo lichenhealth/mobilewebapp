@@ -107,9 +107,16 @@ export default function TopBar({
   }
 
   const ident = useTopIdentity();
+  // Identity pages (own/member/space profile) skip the logo slot entirely —
+  // the page's own big avatar IS the identity, so a small duplicate circle
+  // up here only wasted a gap between it and the real content (founder
+  // 2026-08-03, extending the earlier /profile-only rule to every profile
+  // kind). The bar itself shrinks to match, so the page content actually
+  // moves up instead of leaving that space empty.
+  const compact = !!ident || section?.prefix === '/profile';
 
   return (
-    <header className="top-bar">
+    <header className={'top-bar' + (compact ? ' top-bar--compact' : '')}>
       <button
         className="top-bar__icon"
         onClick={onMenu}
@@ -120,11 +127,7 @@ export default function TopBar({
 
       <div className="top-bar__logo">
         {ident ? (
-          /* De-branding (founder 2026-07-30): on an entity's profile the top
-             bar wears THEIR mark — Lichen steps out of the spotlight. */
-          <div className="top-bar__ident" role="img" aria-label={ident.name} title={ident.name}>
-            <Avatar id={ident.id} name={ident.name} url={ident.avatarUrl ?? undefined} size={48} />
-          </div>
+          null
         ) : section ? (
           section.prefix === '/profile' ? (
             /* No section mark on Profile — the page's own photo IS the identity;

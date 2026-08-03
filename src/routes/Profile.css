@@ -1,5 +1,9 @@
-/* Tighter top: no section mark above on this page (TopBar renders none). */
-.prof { max-width: var(--app-max); margin: 0 auto; padding: var(--s-2) var(--s-5) var(--s-8); }
+/* Tighter top: no section mark above on this page (TopBar renders none) —
+   the shared .scroll-view padding-top assumes the full-height bar, so pull
+   up by exactly the compact bar's savings (founder 2026-08-03). Shared by
+   every identity page: Profile, MemberProfile, SpaceProfile, MemberAbout,
+   SpaceByHandle. */
+.prof { max-width: var(--app-max); margin: calc(var(--top-h-compact) - var(--top-h)) auto 0; padding: var(--s-2) var(--s-5) var(--s-8); }
 .prof__muted { color: var(--ink-muted); font-size: var(--t-sm); text-align: center; padding: var(--s-7) 0; }
 .prof__head { text-align: center; margin-bottom: var(--s-5); }
 .prof__name { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 600; color: var(--ink); line-height: var(--lh-tight); }

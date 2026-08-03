@@ -117,25 +117,18 @@ export default function Marketplace() {
   // always. MULTI-SELECT (founder 2026-08-03): degrees stack — "someone I
   // trust" and "trusted by someone I trust" can both be on at once, even
   // though the latter already implies the former; comfort over strict logic.
+  // NOT sticky (founder 2026-08-03): every visit to Marketplace starts at
+  // Anyone — the lens is a within-visit narrowing, not a standing filter.
   type TrustLens = 'second' | 'mine' | 'rec-mine' | 'rec-second';
-  const [trustLenses, setTrustLenses] = useState<Set<TrustLens>>(() => {
-    const saved = localStorage.getItem('mkt-trust');
-    if (!saved) return new Set();
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return new Set(parsed as TrustLens[]);
-    } catch { /* legacy single-value string below */ }
-    return saved === 'any' ? new Set() : new Set([saved as TrustLens]);
-  });
+  const [trustLenses, setTrustLenses] = useState<Set<TrustLens>>(new Set());
   const toggleLens = (l: TrustLens) => {
     setTrustLenses((prev) => {
       const next = new Set(prev);
       if (next.has(l)) next.delete(l); else next.add(l);
-      localStorage.setItem('mkt-trust', JSON.stringify([...next]));
       return next;
     });
   };
-  const clearLenses = () => { setTrustLenses(new Set()); localStorage.setItem('mkt-trust', JSON.stringify([])); };
+  const clearLenses = () => setTrustLenses(new Set());
   const [web, setWeb] = useState<TrustWeb | null>(null);
   // Category dropdowns (founder 2026-07-28, Figma 286-3905): the composer's
   // pickers as FILTERS — goods, services, places & spaces. A listing passes

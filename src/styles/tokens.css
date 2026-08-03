@@ -93,6 +93,10 @@
   --app-max: 430px;
   --nav-h:   84px;
   --top-h:   110px;
+  /* Compact top bar for identity pages (profile/member/space) — no big
+     circle in the logo slot, so the reserved height can shrink and let the
+     page's own avatar sit higher (founder 2026-08-03). */
+  --top-h-compact: 66px;
   --safe-top: env(safe-area-inset-top, 0);
   --safe-bot: env(safe-area-inset-bottom, 0);
 
