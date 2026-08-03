@@ -25,8 +25,9 @@ import { supabase } from '../lib/supabase';
  *  what they offer, and the two ways to connect (Trust into your mycelium,
  *  or start a conversation). Email, phone, and exact whereabouts stay
  *  private by design. */
-export default function MemberProfile() {
-  const { id = '' } = useParams();
+export default function MemberProfile({ memberId }: { memberId?: string } = {}) {
+  const { id: paramId = '' } = useParams();
+  const id = memberId || paramId;
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';

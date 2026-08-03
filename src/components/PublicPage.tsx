@@ -70,6 +70,10 @@ export interface PublicPageProps {
   page: PageMeta;
   /** Rendered under Presence — events, posts. Optional. */
   children?: React.ReactNode;
+  /** Rendered right under the hero, above every other section — for
+   *  navigational doors that shouldn't get lost below a long page
+   *  (founder 2026-08-03). Optional. */
+  beforeContent?: React.ReactNode;
   /** Owner previewing their own page. */
   preview?: boolean;
   /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
@@ -220,6 +224,12 @@ export default function PublicPage(props: PublicPageProps) {
           <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
         )}
       </header>
+
+      {/* A signed-in member's own navigational doors (search/add/chat/
+          events/members) — kept right under the hero, above the page's
+          own content, so they're never lost to scrolling (founder
+          2026-08-03). Guests never pass this. */}
+      {props.beforeContent}
 
       {/* Custom door content — lead, then paragraphs, then (optionally)
           the contact list. */}

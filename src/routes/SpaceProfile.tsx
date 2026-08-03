@@ -675,6 +675,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
+        beforeContent={me && !backstage && !tab ? feedSection : undefined}
       >
         {childGroups.length > 0 && (
           <section className="ppage__sec">
@@ -689,7 +690,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             {noticeBanners}
             {actionRow}
             {plusMenu}
-            {feedSection}
             {roomsSection}
             {mapsButton}
           </>
