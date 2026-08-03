@@ -218,6 +218,10 @@ export default function App() {
               inbound links and search results keep landing somewhere real. */}
           <Route path="/mission" element={<Navigate to="/about" replace />} />
           <Route path="/vision" element={<Navigate to="/about" replace />} />
+          {/* /ourstory ships as a REAL static page now (founder 2026-08-03 —
+              the marketing homepage's Our Story button needed a real
+              destination); filesystem-first beats this route in prod, kept
+              only as a dev-server fallback. */}
           <Route path="/ourstory" element={<Navigate to="/about" replace />} />
           <Route path="/social-networks" element={<Navigate to="/about" replace />} />
           <Route path="/care-model" element={<Navigate to="/about" replace />} />

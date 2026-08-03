@@ -114,7 +114,7 @@ export default function Marketplace() {
   // THE SAFETY LENS (founder 2026-07-28): narrow the whole market to sellers
   // your web vouches for. 'any' stays the default — the lens is a choice,
   // never a wall. Vocabulary is the trust ladder, viewer-relative always.
-  type TrustLens = 'any' | 'second' | 'mine';
+  type TrustLens = 'any' | 'second' | 'mine' | 'rec-mine' | 'rec-second';
   const [trustLens, setTrustLens] = useState<TrustLens>(
     () => (localStorage.getItem('mkt-trust') as TrustLens) || 'any');
   const pickLens = (l: TrustLens) => { setTrustLens(l); localStorage.setItem('mkt-trust', l); };
@@ -165,6 +165,42 @@ export default function Marketplace() {
       ? `Trusted by ${viaNames.get(hit.via)} — someone you trust`
       : 'Trusted by someone you trust';
   };
+  // Recommend lens: who recommended THIS post (not its author), narrowed to
+  // recommenders inside my trust web — mirrors sellerPaths but for the
+  // recommendations table instead of authorship.
+  const [postRecommenders, setPostRecommenders] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    if (!posts.length) { setPostRecommenders(new Map()); return; }
+    let live = true;
+    const ids = posts.map((p) => p.id);
+    void supabase.from('recommendations').select('recommender_id, target_id')
+      .eq('target_type', 'post').in('target_id', ids)
+      .then(({ data }) => {
+        if (!live) return;
+        const m = new Map<string, string[]>();
+        for (const r of (data ?? []) as { recommender_id: string; target_id: string }[]) {
+          const arr = m.get(r.target_id) ?? [];
+          arr.push(r.recommender_id);
+          m.set(r.target_id, arr);
+        }
+        setPostRecommenders(m);
+      });
+    return () => { live = false; };
+  }, [posts]);
+  const recPaths = useMemo(() => {
+    const m = new Map<string, { degree: 'mine' | 'second' }>();
+    if (!web) return m;
+    for (const [postId, ids] of postRecommenders) {
+      let best: { degree: 'mine' | 'second' } | null = null;
+      for (const rid of ids) {
+        const hit = trustPathTo(web, 'profile', rid);
+        if (hit?.degree === 'mine') { best = { degree: 'mine' }; break; }
+        if (hit && !best) best = { degree: 'second' };
+      }
+      if (best) m.set(postId, best);
+    }
+    return m;
+  }, [web, postRecommenders]);
 
   useEffect(() => {
     let live = true;
@@ -207,11 +243,16 @@ export default function Marketplace() {
         return wantedCats.some((c) => hay.includes(c.name.toLowerCase()));
       });
     }
-    if (trustLens !== 'any') {
+    if (trustLens === 'mine' || trustLens === 'second') {
       list = list.filter((p) => {
         if (p.author_id === me) return true;
         const hit = sellerPaths.get(p.id);
         return !!hit && (trustLens === 'second' || hit.degree === 'mine');
+      });
+    } else if (trustLens === 'rec-mine' || trustLens === 'rec-second') {
+      list = list.filter((p) => {
+        const hit = recPaths.get(p.id);
+        return !!hit && (trustLens === 'rec-second' || hit.degree === 'mine');
       });
     }
     if (query.trim()) {
@@ -223,7 +264,7 @@ export default function Marketplace() {
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, activeChips, query, trustLens, sellerPaths, me, catFilter, allCats]);
+  }, [posts, activeChips, query, trustLens, sellerPaths, recPaths, me, catFilter, allCats]);
 
   const toggleChip = (c: Chip) =>
     setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -271,6 +312,10 @@ export default function Marketplace() {
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
           <span className="mkt__action-label">List</span>
         </button>
+        <div className="mkt__action mkt__action--assistant">
+          <AssistantDoor section="market" label="Your assistant — offers, seeks, and what moved" />
+          <span className="mkt__action-label">Brain</span>
+        </div>
         <div className="mkt__action-spacer" />
         {/* The featured door: entrust your offering to the routing — ideally
             the algorithm does better than any of us could alone. */}
@@ -329,7 +374,13 @@ export default function Marketplace() {
         </div>
         {me && (
           <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
-            {([['any', 'Anyone'], ['second', 'Trusted by someone I trust'], ['mine', 'Someone I trust']] as const).map(([v, l]) => (
+            {([
+              ['any', 'Anyone'],
+              ['second', 'Trusted by someone I trust'],
+              ['mine', 'Someone I trust'],
+              ['rec-mine', 'Recommended by someone I trust'],
+              ['rec-second', 'Recommended by someone trusted by someone I trust'],
+            ] as const).map(([v, l]) => (
               <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
                 onClick={() => pickLens(v)}>{l}</button>
             ))}
@@ -340,7 +391,6 @@ export default function Marketplace() {
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
-        <AssistantDoor section="market" label="Your assistant — offers, seeks, and what moved" />
         <ViewToggle view={view} onChange={pickView} />
       </p>
 

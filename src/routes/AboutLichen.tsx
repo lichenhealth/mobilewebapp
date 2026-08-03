@@ -254,9 +254,9 @@ function FirefighterJourney() {
       {/* the medicine's own value, flowing onward to its steward — a wide
           arc clear of "the healers" label column, matching the diagram's
           other curved connectors (founder 2026-08-03). */}
-      <path d="M270,214 C330,224 336,246 320,262 C304,278 264,276 232,266"
+      <path d="M240,204 C210,200 186,206 178,214 C172,220 170,226 170,232"
         fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
-      <path d="M216,270 C182,270 130,270 90,270"
+      <path d="M160,244 C132,240 100,246 80,258"
         fill="none" stroke={KIND.plants} strokeWidth="1.4" strokeDasharray="3 5" strokeLinecap="round" opacity="0.8" />
       {/* the crew */}
       <circle cx="44" cy="48" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
@@ -288,11 +288,14 @@ function FirefighterJourney() {
       <text x="256" y="228" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">the healers</text>
       <text x="256" y="240" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">free to heal, not coordinate</text>
       <text x="256" y="252" fontSize="9" fontStyle="italic" fill="var(--peach-deep, var(--peach))" textAnchor="middle">covered by the commons</text>
-      {/* Huachuma — the medicine itself, a beyond-human member */}
-      <circle cx="230" cy="270" r="14" fill="var(--bone-warm)" stroke={KIND.plants} strokeWidth="1.2" />
-      <text x="230" y="275" fontSize="12" textAnchor="middle">🌵</text>
-      <text x="230" y="298" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">Huachuma</text>
-      <text x="230" y="310" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">the medicine, honored</text>
+      {/* Huachuma — the medicine itself, a beyond-human member. Sits higher
+          than the Foundation on purpose (founder 2026-08-03) — a level
+          bottom row read too flat/mechanical against the diagram's other
+          staggered heights. */}
+      <circle cx="170" cy="234" r="14" fill="var(--bone-warm)" stroke={KIND.plants} strokeWidth="1.2" />
+      <text x="170" y="239" fontSize="12" textAnchor="middle">🌵</text>
+      <text x="170" y="262" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">Huachuma</text>
+      <text x="170" y="274" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">the medicine, honored</text>
       {/* the Huachuma Foundation — where the medicine's value is stewarded onward */}
       <circle cx="72" cy="270" r="16" fill="var(--bone-warm)" stroke={KIND.plants} strokeWidth="1.2" />
       <text x="72" y="275" fontSize="14" textAnchor="middle">🌱</text>
@@ -581,7 +584,8 @@ export default function AboutLichen() {
             <CrystalJourney />
             <p className="about__mock-cap">
               Innovation in today’s economy runs on exclusivity and competition — guard the idea,
-              outrun the rest. Competition has its place, but radical collaboration is the more
+              outrun the rest. As a result, most innovators are stressed out, tired and on the verge
+              of getting sick. Competition has its place, but radical collaboration is the more
               efficient engine for innovation: shared knowledge compounds instead of duplicating
               effort. Crystal’s roadblock is another founder’s strength — and hers is theirs. As part
               of Lichen’s Founder community, she’s paired with others working toward the same
