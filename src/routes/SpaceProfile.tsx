@@ -445,12 +445,224 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const kindLabel = KIND_LABEL[space.kind];
   const pinned = space.lat != null && space.lng != null;
 
+  // Member-facing controls, hoisted so both the rich page template (the
+  // default signed-in view, below) and the backstage/tab views (further
+  // down) can render the SAME markup rather than duplicating it (founder
+  // 2026-08-03 — "show members the page template too").
+  const noticeBanners = (
+    <>
+      {error && <p className="prof__error">{error}</p>}
+      {myRequest === 'invited' && !backstage && (
+        <div className="sprof__invite">
+          <span>You&rsquo;re invited to join {space.name}.</span>
+          <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+            onClick={() => void act(() => acceptInvite(id))}>Accept</button>
+          <button className="btn sprof__invite-btn" disabled={memBusy}
+            onClick={() => void act(() => removeRequest(id, me))}>Decline</button>
+        </div>
+      )}
+    </>
+  );
+  const actionRow = me && !backstage && (
+    <div className="mprof__actions">
+      {myRequest !== 'invited' && (
+        <button
+          className={'btn mprof__btn mprof__btn--trust' + (isMember || myRequest === 'requested' ? ' is-on' : '')}
+          onClick={onMembershipTap}
+          disabled={memBusy}
+          title={isMember
+            ? (myRole === 'super_admin' ? 'You run this space' : 'Member — tap to leave')
+            : myRequest === 'requested' ? 'Waiting for an admin — tap to cancel'
+            : 'Ask the admins to let you in'}
+        >
+          <Icon name={isMember ? 'check' : 'plus'} size={14} />{' '}
+          {isMember ? 'Member ✓' : myRequest === 'requested' ? 'Requested ✓' : 'Request to join'}
+        </button>
+      )}
+      <button
+        className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
+        onClick={toggleWeb}
+        title={inWeb ? 'In your my-celium — its doings flow to you' : 'Weave it into your my-celium (no trust implied)'}
+      >
+        <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
+      </button>
+      {space.kind !== 'place' && (
+        /* Trust is for relationships: people, orgs, communities, groups. */
+        <button
+          className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+          onClick={toggleTrust}
+          title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
+        >
+          <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+        </button>
+      )}
+      {/* Recommend rides beside trust on EVERY kind (founder 2026-07-30):
+          "I might trust someone but not recommend them" — and the
+          reverse. Independent signals, PR #77 doctrine completed. */}
+      <button
+        className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
+        onClick={toggleRecommend}
+        title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
+      >
+        <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
+      </button>
+    </div>
+  );
+  const plusMenu = plusOpen && !backstage && (
+    <div className="sprof__plus">
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}`)}>
+        <Icon name="sparkle" size={14} /> Post to {space.name}
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=marketplace`)}>
+        <Icon name="store" size={14} /> Marketplace listing
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=events`)}>
+        <Icon name="rsvp" size={14} /> Event
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=courses`)}>
+        <Icon name="graduation-cap" size={14} /> Course or training
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=library`)}>
+        <Icon name="book" size={14} /> Library piece
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=work`)}>
+        <Icon name="briefcase" size={14} /> Work — help wanted or offered
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=food`)}>
+        <Icon name="fork-spoon" size={14} /> Food
+      </button>
+      <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=art`)}>
+        <Icon name="palette" size={14} /> Art
+      </button>
+      {(space.kind === 'community' || space.kind === 'organization') && me && (
+        isAdmin ? (
+          <button
+            className="sprof__plus-row"
+            onClick={() => {
+              // Creation is admin work — it happens backstage.
+              setPlusOpen(false); setNewGroupOpen(true); setSearchParams({ manage: '1' });
+              setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
+            }}
+          >
+            <Icon name="user-multiple" size={14} /> New group
+          </button>
+        ) : (
+          <button
+            className="sprof__plus-row"
+            onClick={() => {
+              setPlusOpen(false); setProposeOpen(true);
+              setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+            }}
+          >
+            <Icon name="user-multiple" size={14} /> Propose a group
+          </button>
+        )
+      )}
+    </div>
+  );
+  // The profile IS a feed — the space's wall (posted AS it or TO it), with
+  // the space-anatomy circles (Chat for members, Members) leading the icon
+  // row. Identical for all four kinds.
+  const feedSection = !backstage && !tab && (
+    <ContributionsFeed
+      spaceId={space.id}
+      me={me}
+      entityName={space.name}
+      leading={[
+        // Every section carries its own doors: + posts INTO this space,
+        // Search searches WITHIN it (Figma 286-11770). Search-then-+ mirrors
+        // Home's icon row (founder 2026-07-25 — one order everywhere).
+        { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
+        { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
+        ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
+      ]}
+      trailing={[
+        // The founder's Marketplace-icon analogy: a Groups door appears only
+        // when this space actually has groups nested under it.
+        ...(childGroups.length > 0
+          ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => openTab('groups') }]
+          : []),
+        // Members closes the row — the space's Directory, far right like
+        // Home's (founder 2026-07-25).
+        { icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') },
+        { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
+      ]}
+    />
+  );
+  const roomsSection = !backstage && resources.length > 0 && (
+    <section className="prof__section">
+      <h2 className="prof__h2">Rooms &amp; things</h2>
+      <div className="sprof__members">
+        {resources.map((r) => (
+          <div className="sprof__resource" key={r.id}>
+            <div className="sprof__grouprow">
+              <span className="sprof__res-main">
+                <Icon name={r.kind === 'room' ? 'location' : 'store'} size={16} />
+                <span className="sprof__res-name">{r.name}</span>
+                {r.description && <span className="sprof__res-desc">{r.description}</span>}
+              </span>
+              {r.bookable && me && (
+                <button className="btn sprof__invite-btn" onClick={() => void openBooking(r)}>
+                  {bookOpen === r.id ? 'Close' : r.approval === 'instant' ? 'Book' : 'Request'}
+                </button>
+              )}
+            </div>
+            {bookOpen === r.id && (
+              <div className="sprof__res-book">
+                {bookBusy.length > 0 && (
+                  <p className="prof__hint">
+                    Booked:{' '}
+                    {bookBusy.slice(0, 6).map((b, i) => (
+                      <button
+                        key={i}
+                        className="sprof__res-busy"
+                        title="Message whoever holds these dates — they may be open to another time"
+                        onClick={() => void messageHolder(r, b.start_date)}
+                      >
+                        {b.start_date === b.end_date ? b.start_date : `${b.start_date} – ${b.end_date}`}
+                      </button>
+                    ))}
+                  </p>
+                )}
+                <DateRangeCalendar value={bookRange} onChange={setBookRange} />
+                <input
+                  className="prof__input"
+                  value={bookNote}
+                  onChange={(e) => setBookNote(e.target.value)}
+                  placeholder="What for? (optional — helps the steward say yes)"
+                />
+                <div className="sprof__rolepills">
+                  <button className="btn btn-primary sprof__invite-btn" onClick={() => void sendBooking(r)}>
+                    {r.approval === 'instant' ? 'Book it' : 'Ask for these dates'}
+                  </button>
+                  {bookMsg && <span className="prof__msg">{bookMsg}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+  const mapsButton = pinned && !backstage && (
+    <section className="prof__section">
+      <button className="btn btn-primary sprof__map-btn" onClick={() => navigate('/maps')}>
+        <Icon name="maps" size={15} /> See it on Maps
+      </button>
+    </section>
+  );
+
   // The open web (and the owner previewing) sees the shared page template —
-  // one structure across every Lichen site (founder 2026-07-28).
+  // one structure across every Lichen site (founder 2026-07-28). Widened
+  // 2026-08-03 to be the DEFAULT signed-in landing view too — the rich page
+  // members see is the same one guests see, with their own controls above
+  // riding along as children. Backstage (?manage=1) and any ?tab= subview
+  // keep the familiar plain shell, unchanged, further down.
   const previewing = searchParams.get('preview') === '1';
   // forcePublic: on a custom domain (countrymanstables.com) EVERYONE gets
   // the website — even signed-in members; the app lives on Lichen's domain.
-  if (!me || previewing || forcePublic) {
+  const showTemplate = !me || previewing || forcePublic || (!backstage && !tab);
+  if (showTemplate) {
     return (
       <PublicPage
         id={space.id}
@@ -462,6 +674,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         contact={contact}
         page={pageMeta}
         preview={previewing}
+        signedIn={!!me}
       >
         {childGroups.length > 0 && (
           <section className="ppage__sec">
@@ -470,6 +683,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {childGroups.map((g) => <span className="ppage__chip" key={g.id}>{g.name}</span>)}
             </div>
           </section>
+        )}
+        {me && !backstage && !tab && (
+          <>
+            {noticeBanners}
+            {actionRow}
+            {plusMenu}
+            {feedSection}
+            {roomsSection}
+            {mapsButton}
+          </>
         )}
       </PublicPage>
     );
@@ -578,64 +801,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </p>
           </div>
         )}
-        {me && !backstage && (
-          <div className="mprof__actions">
-            {myRequest !== 'invited' && (
-              <button
-                className={'btn mprof__btn mprof__btn--trust' + (isMember || myRequest === 'requested' ? ' is-on' : '')}
-                onClick={onMembershipTap}
-                disabled={memBusy}
-                title={isMember
-                  ? (myRole === 'super_admin' ? 'You run this space' : 'Member — tap to leave')
-                  : myRequest === 'requested' ? 'Waiting for an admin — tap to cancel'
-                  : 'Ask the admins to let you in'}
-              >
-                <Icon name={isMember ? 'check' : 'plus'} size={14} />{' '}
-                {isMember ? 'Member ✓' : myRequest === 'requested' ? 'Requested ✓' : 'Request to join'}
-              </button>
-            )}
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
-              onClick={toggleWeb}
-              title={inWeb ? 'In your my-celium — its doings flow to you' : 'Weave it into your my-celium (no trust implied)'}
-            >
-              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
-            </button>
-            {space.kind !== 'place' && (
-              /* Trust is for relationships: people, orgs, communities, groups. */
-              <button
-                className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
-                onClick={toggleTrust}
-                title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
-              >
-                <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
-              </button>
-            )}
-            {/* Recommend rides beside trust on EVERY kind (founder 2026-07-30):
-                "I might trust someone but not recommend them" — and the
-                reverse. Independent signals, PR #77 doctrine completed. */}
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
-              onClick={toggleRecommend}
-              title={recommended ? 'Recommended to those who trust you' : 'Recommend to those who trust you'}
-            >
-              <Icon name="thumbs-up" size={14} /> {recommended ? 'Recommended ✓' : 'Recommend'}
-            </button>
-          </div>
-        )}
+        {actionRow}
       </div>
 
-      {error && <p className="prof__error">{error}</p>}
-
-      {myRequest === 'invited' && !backstage && (
-        <div className="sprof__invite">
-          <span>You&rsquo;re invited to join {space.name}.</span>
-          <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
-            onClick={() => void act(() => acceptInvite(id))}>Accept</button>
-          <button className="btn sprof__invite-btn" disabled={memBusy}
-            onClick={() => void act(() => removeRequest(id, me))}>Decline</button>
-        </div>
-      )}
+      {noticeBanners}
 
       {adminTools && editOpen && (
         <section className="prof__section">
@@ -726,87 +895,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         </section>
       )}
 
-      {/* + menu: what are you adding to this space? (Figma 286-14250) */}
-      {plusOpen && !backstage && (
-        <div className="sprof__plus">
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}`)}>
-            <Icon name="sparkle" size={14} /> Post to {space.name}
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=marketplace`)}>
-            <Icon name="store" size={14} /> Marketplace listing
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=events`)}>
-            <Icon name="rsvp" size={14} /> Event
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=courses`)}>
-            <Icon name="graduation-cap" size={14} /> Course or training
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=library`)}>
-            <Icon name="book" size={14} /> Library piece
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=work`)}>
-            <Icon name="briefcase" size={14} /> Work — help wanted or offered
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=food`)}>
-            <Icon name="fork-spoon" size={14} /> Food
-          </button>
-          <button className="sprof__plus-row" onClick={() => navigate(`/compose?space=${space.id}&area=art`)}>
-            <Icon name="palette" size={14} /> Art
-          </button>
-          {(space.kind === 'community' || space.kind === 'organization') && me && (
-            isAdmin ? (
-              <button
-                className="sprof__plus-row"
-                onClick={() => {
-                  // Creation is admin work — it happens backstage.
-                  setPlusOpen(false); setNewGroupOpen(true); setSearchParams({ manage: '1' });
-                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
-                }}
-              >
-                <Icon name="user-multiple" size={14} /> New group
-              </button>
-            ) : (
-              <button
-                className="sprof__plus-row"
-                onClick={() => {
-                  setPlusOpen(false); setProposeOpen(true);
-                  setTimeout(() => groupsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-                }}
-              >
-                <Icon name="user-multiple" size={14} /> Propose a group
-              </button>
-            )
-          )}
-        </div>
-      )}
+      {plusMenu}
 
-      {/* The profile IS a feed — the space's wall (posted AS it or TO it),
-          with the space-anatomy circles (Chat for members, Members) leading
-          the icon row. Identical for all four kinds. */}
-      {!backstage && !tab && <ContributionsFeed
-        spaceId={space.id}
-        me={me}
-        entityName={space.name}
-        leading={[
-          // Every section carries its own doors: + posts INTO this space,
-          // Search searches WITHIN it (Figma 286-11770). Search-then-+ mirrors
-          // Home's icon row (founder 2026-07-25 — one order everywhere).
-          { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
-          { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
-          ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
-        ]}
-        trailing={[
-          // The founder's Marketplace-icon analogy: a Groups door appears only
-          // when this space actually has groups nested under it.
-          ...(childGroups.length > 0
-            ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => openTab('groups') }]
-            : []),
-          // Members closes the row — the space's Directory, far right like
-          // Home's (founder 2026-07-25).
-          { icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') },
-          { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
-        ]}
-      />}
+      {feedSection}
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
       {/* Member shares awaiting the shelves (courses/library) — stewards
@@ -1243,69 +1334,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         </section>
       )}
 
-      {!backstage && (resources.length > 0) && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Rooms &amp; things</h2>
-          <div className="sprof__members">
-            {resources.map((r) => (
-              <div className="sprof__resource" key={r.id}>
-                <div className="sprof__grouprow">
-                  <span className="sprof__res-main">
-                    <Icon name={r.kind === 'room' ? 'location' : 'store'} size={16} />
-                    <span className="sprof__res-name">{r.name}</span>
-                    {r.description && <span className="sprof__res-desc">{r.description}</span>}
-                  </span>
-                  {r.bookable && me && (
-                    <button className="btn sprof__invite-btn" onClick={() => void openBooking(r)}>
-                      {bookOpen === r.id ? 'Close' : r.approval === 'instant' ? 'Book' : 'Request'}
-                    </button>
-                  )}
-                </div>
-                {bookOpen === r.id && (
-                  <div className="sprof__res-book">
-                    {bookBusy.length > 0 && (
-                      <p className="prof__hint">
-                        Booked:{' '}
-                        {bookBusy.slice(0, 6).map((b, i) => (
-                          <button
-                            key={i}
-                            className="sprof__res-busy"
-                            title="Message whoever holds these dates — they may be open to another time"
-                            onClick={() => void messageHolder(r, b.start_date)}
-                          >
-                            {b.start_date === b.end_date ? b.start_date : `${b.start_date} – ${b.end_date}`}
-                          </button>
-                        ))}
-                      </p>
-                    )}
-                    <DateRangeCalendar value={bookRange} onChange={setBookRange} />
-                    <input
-                      className="prof__input"
-                      value={bookNote}
-                      onChange={(e) => setBookNote(e.target.value)}
-                      placeholder="What for? (optional — helps the steward say yes)"
-                    />
-                    <div className="sprof__rolepills">
-                      <button className="btn btn-primary sprof__invite-btn" onClick={() => void sendBooking(r)}>
-                        {r.approval === 'instant' ? 'Book it' : 'Ask for these dates'}
-                      </button>
-                      {bookMsg && <span className="prof__msg">{bookMsg}</span>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {roomsSection}
 
-      {pinned && !backstage && (
-        <section className="prof__section">
-          <button className="btn btn-primary sprof__map-btn" onClick={() => navigate('/maps')}>
-            <Icon name="maps" size={15} /> See it on Maps
-          </button>
-        </section>
-      )}
+      {mapsButton}
     </div>
   );
 }

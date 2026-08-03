@@ -72,6 +72,10 @@ export interface PublicPageProps {
   children?: React.ReactNode;
   /** Owner previewing their own page. */
   preview?: boolean;
+  /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
+   *  they keep their normal app chrome and skip the guest-facing invite
+   *  doors/section; their real join/trust controls arrive via `children`. */
+  signedIn?: boolean;
 }
 
 export default function PublicPage(props: PublicPageProps) {
@@ -126,13 +130,14 @@ export default function PublicPage(props: PublicPageProps) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   // A visitor from the open web isn't an app user — no Lichen top bar, no
-  // bottom tabs (founder 2026-07-29). PublicPage only ever renders for
-  // signed-out visitors or an owner's preview, so marking the shell here is
-  // correct by construction; global.css hides the chrome.
+  // bottom tabs (founder 2026-07-29). Signed-in members keep their normal
+  // app chrome instead (founder 2026-08-03) — this page renders for them
+  // too now, alongside their real join/trust/feed controls in `children`.
   useEffect(() => {
+    if (props.signedIn) return;
     document.documentElement.classList.add('is-public-page');
     return () => document.documentElement.classList.remove('is-public-page');
-  }, []);
+  }, [props.signedIn]);
 
   // Uniform door anatomy (founder 2026-07-29): each door owns the cover
   // slot — About wears the page cover, every other door wears its own
@@ -148,15 +153,19 @@ export default function PublicPage(props: PublicPageProps) {
       : page.sections?.[tab as 'services' | 'facilities']?.image;
 
   return (
-    <div className={'ppage ppage--' + (page.coverStyle ?? 'tint')} style={{ ['--ppage-accent' as string]: accent }}>
+    <div
+      className={'ppage ppage--' + (page.coverStyle ?? 'tint') + (props.signedIn ? ' ppage--in-app' : '')}
+      style={{ ['--ppage-accent' as string]: accent }}
+    >
       {props.preview && (
         <p className="ppage__preview">Preview — this is what the open web sees.</p>
       )}
 
       {/* Platform doors, upper right — elegant and quiet (founder
           2026-07-29): Sign in for members everywhere; the invitation only
-          where the page owner wants it (join !== quiet). */}
-      {!props.preview && (
+          where the page owner wants it (join !== quiet). Skipped for a
+          signed-in viewer — they're already in. */}
+      {!props.preview && !props.signedIn && (
         <div className="ppage__corner">
           {page.join !== 'quiet' && (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
@@ -341,8 +350,10 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 6 · Join — every visit is a soft invitation. Some owners prefer to
-          extend it themselves; their pages carry one quiet line instead. */}
-      {page.join === 'quiet' ? (
+          extend it themselves; their pages carry one quiet line instead.
+          Skipped entirely for a signed-in viewer — their real join/trust
+          controls already rendered above, in `children`. */}
+      {props.signedIn ? null : page.join === 'quiet' ? (
         <p className="ppage__join-quiet">
           This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
           {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>

@@ -3,6 +3,11 @@
 /* Open space doctrine (founder 2026-07-29): generous air at the top, around
    the mark, in the margins, and at the foot — the page breathes. */
 .ppage { --ppage-accent: var(--peach); padding-bottom: 72px; position: relative; }
+/* In-app (signed-in) rendering keeps the normal top bar — .scroll-view's
+   padding-top isn't zeroed here the way it is for guests, so pull up by the
+   same amount .prof does to sit directly under the compact bar (founder
+   2026-08-03). */
+.ppage--in-app { margin-top: calc(var(--top-h-compact) - var(--top-h)); }
 .ppage__preview {
   margin: 0; padding: 8px var(--s-5); background: var(--blue-tint);
   color: var(--blue-deep); font-size: 12.5px; text-align: center;
