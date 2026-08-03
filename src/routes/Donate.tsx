@@ -184,6 +184,7 @@ export default function Donate() {
         <p className="donate__sub">
           Thank you for investing in a more balanced and healthy future.
         </p>
+        <p className="donate__caption">Welcome to the Community — every donor becomes part of Lichen&rsquo;s Donor Community inside the platform.</p>
         <div className="donate__head-links">
           <button
             type="button" className="donate__how-link"

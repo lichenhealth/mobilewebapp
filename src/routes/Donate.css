@@ -349,3 +349,10 @@
 .donate__fc-name { margin: 0; font-weight: 600; font-size: 14.5px; color: var(--ink); }
 .donate__fc-from { margin: 1px 0 6px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--peach-deep, var(--peach)); }
 .donate__fc-essence { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); font-style: italic; }
+
+/* "Welcome to the Community" — near the ask, not on the payment button
+   (founder 2026-08-02). */
+.donate__caption {
+  font-size: 13px; letter-spacing: 0.04em; color: var(--peach-deep, var(--peach));
+  font-weight: 500; margin-top: -6px;
+}
