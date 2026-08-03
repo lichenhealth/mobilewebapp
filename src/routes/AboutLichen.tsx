@@ -529,9 +529,9 @@ export default function AboutLichen() {
               One route, the whole economy. A family who can’t afford the table earns it by running
               community deliveries — via a truck borrowed from a truck driver during the days he’s
               not on a route, approved by his employer, a trusted organization on Lichen’s platform.
-              The family takes it home after a heartfelt day of delivering clean food for the
-              neighborhood: one neighbor pays for their produce; donations and membership revenue
-              cover the other’s. Lichen remembers every contributor — the tree’s
+              The family delivers it to their own home after a heartfelt day of delivering clean
+              food for the neighborhood: one neighbor pays for their produce; donations and
+              membership revenue cover the other’s. Lichen remembers every contributor — the tree’s
               fifty years, the artisan’s hours, the family’s miles — and the story returns to each
               of them. The route itself? Drawn by the assistant — the fewest miles, the smallest
               carbon footprint.
