@@ -251,8 +251,10 @@ function FirefighterJourney() {
       {/* the donor's gift, flowing into the retreat */}
       <path d="M280,153 C288,172 272,186 262,192"
         fill="none" stroke="#D9A441" strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
-      {/* the medicine's own value, flowing onward to its steward */}
-      <path d="M254,218 C246,236 240,250 236,256"
+      {/* the medicine's own value, flowing onward to its steward — a wide
+          arc clear of "the healers" label column, matching the diagram's
+          other curved connectors (founder 2026-08-03). */}
+      <path d="M270,214 C330,224 336,246 320,262 C304,278 264,276 232,266"
         fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
       <path d="M216,270 C182,270 130,270 90,270"
         fill="none" stroke={KIND.plants} strokeWidth="1.4" strokeDasharray="3 5" strokeLinecap="round" opacity="0.8" />
@@ -578,11 +580,16 @@ export default function AboutLichen() {
             <p className="about__mock-eyebrow">Under-resourced innovators · Crystal’s startup</p>
             <CrystalJourney />
             <p className="about__mock-cap">
-              Crystal’s roadblock is another founder’s strength — and hers is theirs. Her assistant
-              reads both, makes the introduction, and drafts the collaborative plan; the commons
-              seeds what the old economy starved. Radical collaboration instead of competition — an
-              edge the venture-funded can’t buy. Every person, place, and group — eventually the
-              network itself — can have an assistant that helps, never sells.
+              Innovation in today’s economy runs on exclusivity and competition — guard the idea,
+              outrun the rest. Competition has its place, but radical collaboration is the more
+              efficient engine for innovation: shared knowledge compounds instead of duplicating
+              effort. Crystal’s roadblock is another founder’s strength — and hers is theirs. As part
+              of Lichen’s Founder community, she’s paired with others working toward the same
+              mission, and the platform resources only what they still can’t contribute together.
+              Her assistant reads what each of them is missing, makes the introduction, and drafts
+              the collaborative plan — the commons seeds what the old economy starved. Every person,
+              place, and group — eventually the network itself — can have an assistant that helps,
+              never sells.
             </p>
           </div>
 
