@@ -112,12 +112,30 @@ export default function Marketplace() {
     () => (localStorage.getItem('mkt-view') === 'feed' ? 'feed' : 'browse'));
   const pickView = (v: 'browse' | 'feed') => { setView(v); localStorage.setItem('mkt-view', v); };
   // THE SAFETY LENS (founder 2026-07-28): narrow the whole market to sellers
-  // your web vouches for. 'any' stays the default — the lens is a choice,
-  // never a wall. Vocabulary is the trust ladder, viewer-relative always.
-  type TrustLens = 'any' | 'second' | 'mine' | 'rec-mine' | 'rec-second';
-  const [trustLens, setTrustLens] = useState<TrustLens>(
-    () => (localStorage.getItem('mkt-trust') as TrustLens) || 'any');
-  const pickLens = (l: TrustLens) => { setTrustLens(l); localStorage.setItem('mkt-trust', l); };
+  // your web vouches for. Empty set ("Anyone") stays the default — the lens
+  // is a choice, never a wall. Vocabulary is the trust ladder, viewer-relative
+  // always. MULTI-SELECT (founder 2026-08-03): degrees stack — "someone I
+  // trust" and "trusted by someone I trust" can both be on at once, even
+  // though the latter already implies the former; comfort over strict logic.
+  type TrustLens = 'second' | 'mine' | 'rec-mine' | 'rec-second';
+  const [trustLenses, setTrustLenses] = useState<Set<TrustLens>>(() => {
+    const saved = localStorage.getItem('mkt-trust');
+    if (!saved) return new Set();
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return new Set(parsed as TrustLens[]);
+    } catch { /* legacy single-value string below */ }
+    return saved === 'any' ? new Set() : new Set([saved as TrustLens]);
+  });
+  const toggleLens = (l: TrustLens) => {
+    setTrustLenses((prev) => {
+      const next = new Set(prev);
+      if (next.has(l)) next.delete(l); else next.add(l);
+      localStorage.setItem('mkt-trust', JSON.stringify([...next]));
+      return next;
+    });
+  };
+  const clearLenses = () => { setTrustLenses(new Set()); localStorage.setItem('mkt-trust', JSON.stringify([])); };
   const [web, setWeb] = useState<TrustWeb | null>(null);
   // Category dropdowns (founder 2026-07-28, Figma 286-3905): the composer's
   // pickers as FILTERS — goods, services, places & spaces. A listing passes
@@ -243,16 +261,13 @@ export default function Marketplace() {
         return wantedCats.some((c) => hay.includes(c.name.toLowerCase()));
       });
     }
-    if (trustLens === 'mine' || trustLens === 'second') {
+    if (trustLenses.size > 0) {
       list = list.filter((p) => {
-        if (p.author_id === me) return true;
-        const hit = sellerPaths.get(p.id);
-        return !!hit && (trustLens === 'second' || hit.degree === 'mine');
-      });
-    } else if (trustLens === 'rec-mine' || trustLens === 'rec-second') {
-      list = list.filter((p) => {
-        const hit = recPaths.get(p.id);
-        return !!hit && (trustLens === 'rec-second' || hit.degree === 'mine');
+        if (trustLenses.has('mine') && (p.author_id === me || sellerPaths.get(p.id)?.degree === 'mine')) return true;
+        if (trustLenses.has('second') && (p.author_id === me || sellerPaths.get(p.id))) return true;
+        if (trustLenses.has('rec-mine') && recPaths.get(p.id)?.degree === 'mine') return true;
+        if (trustLenses.has('rec-second') && recPaths.get(p.id)) return true;
+        return false;
       });
     }
     if (query.trim()) {
@@ -264,7 +279,7 @@ export default function Marketplace() {
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, activeChips, query, trustLens, sellerPaths, recPaths, me, catFilter, allCats]);
+  }, [posts, activeChips, query, trustLenses, sellerPaths, recPaths, me, catFilter, allCats]);
 
   const toggleChip = (c: Chip) =>
     setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -374,15 +389,16 @@ export default function Marketplace() {
         </div>
         {me && (
           <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
+            <button className={'mkt__trustlens-chip' + (trustLenses.size === 0 ? ' is-on' : '')}
+              onClick={clearLenses}>Anyone</button>
             {([
-              ['any', 'Anyone'],
               ['second', 'Trusted by someone I trust'],
               ['mine', 'Someone I trust'],
               ['rec-mine', 'Recommended by someone I trust'],
               ['rec-second', 'Recommended by someone trusted by someone I trust'],
             ] as const).map(([v, l]) => (
-              <button key={v} className={'mkt__trustlens-chip' + (trustLens === v ? ' is-on' : '')}
-                onClick={() => pickLens(v)}>{l}</button>
+              <button key={v} className={'mkt__trustlens-chip' + (trustLenses.has(v) ? ' is-on' : '')}
+                onClick={() => toggleLens(v)}>{l}</button>
             ))}
           </div>
         )}
@@ -402,7 +418,7 @@ export default function Marketplace() {
           <p className="mkt__empty-sub">
             {posts.length === 0
               ? 'Be the first — tap List and offer something to the network.'
-              : trustLens !== 'any'
+              : trustLenses.size > 0
               ? 'Nobody in your trust web is offering this yet — widen to Anyone, or weave more people in.'
               : 'Try clearing a filter or searching differently.'}
           </p>
