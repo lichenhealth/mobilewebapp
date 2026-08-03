@@ -212,8 +212,8 @@ export default function Donate() {
         >
           <span className="donate__flow-name">Donate</span>
           <span className="donate__flow-desc">
-            Tax-deductible. Voice a preference for where it flows; Lichen
-            assesses need and decides, as the IRS requires.
+            Tax-deductible. Lichen assesses and delivers your contribution
+            where it&rsquo;s needed most, as the IRS requires.
           </span>
           <span className="donate__flow-law">
             Once given, your dollars are permanently dedicated to the
