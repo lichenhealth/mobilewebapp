@@ -117,13 +117,27 @@ export default function TopBar({
 
   return (
     <header className={'top-bar' + (compact ? ' top-bar--compact' : '')}>
-      <button
-        className="top-bar__icon"
-        onClick={onMenu}
-        aria-label="Open menu"
-      >
-        <Icon name="menu" size={20} />
-      </button>
+      <div className="top-bar__left">
+        <button
+          className="top-bar__icon"
+          onClick={onMenu}
+          aria-label="Open menu"
+        >
+          <Icon name="menu" size={20} />
+        </button>
+        {/* Back-to-Home beside the hamburger on section screens (founder
+            2026-07-25): same circle, same size — one tap returns to Home. */}
+        {section && section.prefix !== '/profile' && (
+          <button
+            className="top-bar__icon"
+            onClick={() => navigate('/home')}
+            aria-label="Back to Home"
+            title="Back to Home"
+          >
+            <Icon name="arrow-left" size={18} />
+          </button>
+        )}
+      </div>
 
       <div className="top-bar__logo">
         {ident ? (
