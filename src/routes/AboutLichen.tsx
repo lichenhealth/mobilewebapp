@@ -27,7 +27,7 @@ const MAP_ROWS = [
   {
     label: 'a mother’s care',
     left: { size: 46, bg: KIND.people },
-    right: { size: 7, bg: KIND.people, note: 'not compensated' },
+    right: { size: 22, hollow: true, stroke: KIND.people, note: 'not compensated' },
   },
   {
     label: 'an old-growth forest',
@@ -235,11 +235,15 @@ function CrystalJourney() {
 /** The firefighters' retreat (from the deck): chronically undervalued,
  *  risk-carrying work answered with care — the assistant reads a station's
  *  shift rotations, finds the shared window, books a nearby Lichen place, and
- *  lifts all coordination off the healers. */
+ *  lifts all coordination off the healers. The retreat's own medicine —
+ *  Huachuma (San Pedro) — is honored too: its value doesn't vanish into the
+ *  transaction, it's routed onward to the Huachuma Foundation, which stewards
+ *  the preservation and re-planting of the cacti in Peru (founder 2026-08-03,
+ *  from the deck's beyond-human-member example). */
 function FirefighterJourney() {
   return (
-    <svg className="about__journey" viewBox="0 0 340 265" role="img"
-      aria-label="A map route: first responders — risk taken, vicarious trauma carried; the assistant weaves their shift rotations into a shared window; a community healing center offers a retreat close by; the healers arrive free to heal, coordination lifted; a donor's large gift funds the services and the commons carries the rest.">
+    <svg className="about__journey" viewBox="0 0 340 320" role="img"
+      aria-label="A map route: first responders — risk taken, vicarious trauma carried; the assistant weaves their shift rotations into a shared window; a community healing center offers a retreat close by; the healers arrive free to heal, coordination lifted, working with Huachuma medicine; a donor's large gift funds the services and the commons carries the rest; the medicine's own value flows onward to the Huachuma Foundation, which preserves and re-plants the cacti in Peru.">
       <path d="M-10,116 q45,-8 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.5" />
       <path d="M-10,178 q45,10 90,0 t90,0 t90,0 t90,0" fill="none" stroke="var(--bone-edge)" strokeWidth="0.9" opacity="0.4" />
       <path d="M44,48 C92,20 148,36 200,64 C226,88 152,112 110,140 C78,162 190,168 256,204"
@@ -247,6 +251,11 @@ function FirefighterJourney() {
       {/* the donor's gift, flowing into the retreat */}
       <path d="M280,153 C288,172 272,186 262,192"
         fill="none" stroke="#D9A441" strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
+      {/* the medicine's own value, flowing onward to its steward */}
+      <path d="M254,218 C246,236 240,250 236,256"
+        fill="none" stroke={KIND.plants} strokeWidth="1.6" strokeDasharray="3 5" strokeLinecap="round" opacity="0.9" />
+      <path d="M216,270 C182,270 130,270 90,270"
+        fill="none" stroke={KIND.plants} strokeWidth="1.4" strokeDasharray="3 5" strokeLinecap="round" opacity="0.8" />
       {/* the crew */}
       <circle cx="44" cy="48" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="44" y="53" fontSize="14" textAnchor="middle">🚒</text>
@@ -271,12 +280,22 @@ function FirefighterJourney() {
       <text x="282" y="141" fontSize="14" textAnchor="middle">💝</text>
       <text x="282" y="96" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">a donor</text>
       <text x="282" y="108" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">one big gift, many healed</text>
-      {/* the healers */}
+      {/* the healers, working with Huachuma medicine */}
       <circle cx="256" cy="204" r="16" fill="var(--bone-warm)" stroke="var(--bone-edge)" strokeWidth="1.2" />
       <text x="256" y="209" fontSize="14" textAnchor="middle">🌿</text>
-      <text x="250" y="232" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">the healers</text>
-      <text x="250" y="244" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">free to heal, not coordinate</text>
-      <text x="250" y="256" fontSize="9" fontStyle="italic" fill="var(--peach-deep, var(--peach))" textAnchor="middle">covered by the commons</text>
+      <text x="256" y="228" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">the healers</text>
+      <text x="256" y="240" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">free to heal, not coordinate</text>
+      <text x="256" y="252" fontSize="9" fontStyle="italic" fill="var(--peach-deep, var(--peach))" textAnchor="middle">covered by the commons</text>
+      {/* Huachuma — the medicine itself, a beyond-human member */}
+      <circle cx="230" cy="270" r="14" fill="var(--bone-warm)" stroke={KIND.plants} strokeWidth="1.2" />
+      <text x="230" y="275" fontSize="12" textAnchor="middle">🌵</text>
+      <text x="230" y="298" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">Huachuma</text>
+      <text x="230" y="310" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">the medicine, honored</text>
+      {/* the Huachuma Foundation — where the medicine's value is stewarded onward */}
+      <circle cx="72" cy="270" r="16" fill="var(--bone-warm)" stroke={KIND.plants} strokeWidth="1.2" />
+      <text x="72" y="275" fontSize="14" textAnchor="middle">🌱</text>
+      <text x="72" y="298" fontSize="10.5" fontWeight="600" fill="var(--ink)" textAnchor="middle">Huachuma Foundation</text>
+      <text x="72" y="310" fontSize="9" fontStyle="italic" fill="var(--ink-soft)" textAnchor="middle">preserves cacti in Peru</text>
     </svg>
   );
 }
@@ -289,13 +308,13 @@ const LEGEND: { label: string; color: string }[] = [
   { label: 'places', color: KIND.places },
 ];
 
-function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; stroke?: string; rust?: boolean; minus?: boolean } }) {
+function MapDot({ d }: { d: { size: number; bg?: string; dashed?: boolean; hollow?: boolean; stroke?: string; rust?: boolean; minus?: boolean } }) {
   return (
     <span
-      className={'about__maps-dot' + (d.dashed ? ' is-dashed' : '') + (d.rust ? ' is-rust' : '')}
+      className={'about__maps-dot' + (d.dashed ? ' is-dashed' : '') + (d.hollow ? ' is-hollow' : '') + (d.rust ? ' is-rust' : '')}
       style={{
         width: d.size, height: d.size,
-        background: d.dashed ? 'transparent' : d.bg,
+        background: (d.dashed || d.hollow) ? 'transparent' : d.bg,
         ...(d.stroke ? { borderColor: d.stroke } : {}),
       }}
     >
@@ -575,9 +594,12 @@ export default function AboutLichen() {
               the current economy under-values and fails to support. Lichen’s Economy closes the
               gap: the assistant reads a whole station’s shift rotations, finds the shared window,
               books a nearby community healing center, and lifts every ounce of retreat
-              coordination off the healers — who arrive simply to heal. A donor’s large gift funds
-              the services; the commons carries the rest. One big gift can heal whole crews — care
-              is the honest repayment for sacred sacrifices given.
+              coordination off the healers — who arrive simply to heal, working with Huachuma
+              (San Pedro) medicine. A donor’s large gift funds the services; the commons carries
+              the rest. One big gift can heal whole crews — care is the honest repayment for sacred
+              sacrifices given. And the medicine itself is honored as a contributing member, not
+              consumed and forgotten: its value flows onward to the Huachuma Foundation, which
+              stewards the preservation and re-planting of the cacti in Peru.
             </p>
           </div>
         </section>
