@@ -222,3 +222,45 @@ button.about__team-row:hover .about__team-name { color: var(--peach-deep, var(--
 .about__inline { color: var(--peach-deep, var(--peach)); text-decoration: underline; text-underline-offset: 2px; }
 .about__foot { margin-top: var(--s-6); display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--ink-faint); }
 .about__foot-link { font-size: 13px; color: var(--ink-soft); }
+
+/* ── Weave design language, adopted (founder 2026-08-04) ─────────────── */
+/* The systems-crumble intro from the weave pages. */
+.about__crumble {
+  font-family: var(--font-display); font-style: italic;
+  font-size: 19px; line-height: 1.4; color: var(--ink-soft);
+  margin: 0 0 var(--s-3);
+}
+/* The four-quadrant ecosystem box — peach = carbon/life (Community, Care),
+   blue = silicon/structure (Business, Platform). */
+.about__quad { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: var(--s-3); }
+.about__quad-cell {
+  position: relative; display: flex; flex-direction: column; gap: 8px;
+  padding: var(--s-4); background: var(--bone-warm);
+  border: 2px solid var(--peach); border-radius: var(--r-lg);
+}
+.about__quad-cell--si { border-color: var(--blue); }
+.about__quad-el { position: absolute; top: 8px; right: 12px; font-family: var(--font-display); font-size: 15px; }
+.about__quad-el--c { color: var(--peach-deep); }
+.about__quad-el--si { color: var(--blue); }
+.about__quad-cell h3 { font-family: var(--font-display); font-size: 18px; font-weight: 400; margin: 0; }
+.about__sec .about__quad-cell p, .about__quad-cell p { font-size: 13px; line-height: 1.55; color: var(--ink-muted); margin: 0; flex: 1; font-weight: 300; }
+.about__quad-link { font-size: 12.5px; color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 560px) { .about__quad { grid-template-columns: 1fr; } }
+/* Carbon + silicon element tiles. */
+.about__elements { display: flex; align-items: center; justify-content: center; gap: var(--s-4); margin: var(--s-5) 0 0; }
+.about__elem {
+  width: clamp(110px, 22vw, 160px); aspect-ratio: 1;
+  background: var(--bone-warm); border-radius: var(--r-lg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; text-align: center; padding: var(--s-2);
+}
+.about__elem--c { border: 2px solid var(--peach); }
+.about__elem--si { border: 2px solid var(--blue); }
+.about__elem-num { position: absolute; top: 8px; left: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); }
+.about__elem-sym { font-family: var(--font-display); font-size: clamp(36px, 7vw, 52px); line-height: 1; color: var(--ink); }
+.about__elem-name { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-top: 4px; }
+.about__elem-mass { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.about__elem-role { font-size: 10px; font-style: italic; color: var(--ink-muted); margin-top: 4px; }
+.about__bond { display: flex; flex-direction: column; gap: 6px; }
+.about__bond span { width: clamp(24px, 5vw, 44px); height: 2px; background: linear-gradient(90deg, var(--peach) 50%, var(--blue) 50%); }
+.about__sec p.about__elem-cap { text-align: center; font-size: 12.5px; font-style: italic; color: var(--ink-muted); margin-top: var(--s-3); }

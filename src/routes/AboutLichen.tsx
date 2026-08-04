@@ -421,11 +421,50 @@ export default function AboutLichen() {
       <div className="about__body">
         <p className="about__eyebrow">What is Lichen?</p>
         <h1 className="about__title">A better way of being <span className="display-italic">together.</span></h1>
+        {/* The weave pages' intro, adopted here too (founder 2026-08-04: "i love it"). */}
+        <p className="about__crumble">
+          As incumbent systems crumble, we have the chance to build better ones — not by fighting
+          the old, but by investing in the new.
+        </p>
         <p className="about__lede">
           Lichen is a <strong>corrective social network</strong> — one trusted web for your whole
           life. Not a place to perform, but a place to actually be in reciprocal relationship with
           each other and the planet.
         </p>
+
+        {/* The four-quadrant ecosystem box, ported from the weave pages —
+            Community + Care wear peach (carbon/life), Business + Platform wear
+            blue (silicon/structure). Static <a> links on purpose: /care,
+            /business and /platform are filesystem-first marketing pages. */}
+        <section className="about__sec">
+          <h2 className="about__h2">An entire ecosystem to heal, grow and be in better relationship with all that is</h2>
+          <div className="about__quad">
+            <div className="about__quad-cell">
+              <span className="about__quad-el about__quad-el--c" aria-hidden="true">C</span>
+              <h3>Community</h3>
+              <p>The corrective social network, where you can connect, host events, organize in groups, curate community and manage your schedule — one trusted web for your whole life.</p>
+              <a className="about__quad-link" href="/signup">Join the network →</a>
+            </div>
+            <div className="about__quad-cell">
+              <span className="about__quad-el about__quad-el--c" aria-hidden="true">C</span>
+              <h3>Care</h3>
+              <p>The Concierge service — a holistic, quantum healthcare system where your care team forms around you, coordinating the next, best step in your journey of healing.</p>
+              <a className="about__quad-link" href="/care">Learn more about the care model →</a>
+            </div>
+            <div className="about__quad-cell about__quad-cell--si">
+              <span className="about__quad-el about__quad-el--si" aria-hidden="true">Si</span>
+              <h3>Business</h3>
+              <p>How the model supports the mission — a lean nonprofit with no investors to pay, where revenue flows back into expanding access to goods, resources and care.</p>
+              <a className="about__quad-link" href="/business">Learn more about the business model →</a>
+            </div>
+            <div className="about__quad-cell about__quad-cell--si">
+              <span className="about__quad-el about__quad-el--si" aria-hidden="true">Si</span>
+              <h3>Platform</h3>
+              <p>How the technology fuels the new economy and culture — one ecosystem where people, plants, animals, elements and land collaborate to restore harmony.</p>
+              <a className="about__quad-link" href="/platform">Learn more about the platform →</a>
+            </div>
+          </div>
+        </section>
 
         <section className="about__sec">
           <h2 className="about__h2">Your whole life, in one place</h2>
@@ -637,6 +676,28 @@ export default function AboutLichen() {
             could be alone. We live our name: this entire platform is being built by a partnership
             of <strong>carbon-based intelligence</strong> and <strong>silicon-based
             intelligence</strong>, designing, building, and shipping together, every day.
+          </p>
+          {/* The element tiles, ported from the weave pages. */}
+          <div className="about__elements" role="img" aria-label="Periodic table tiles for carbon and silicon, side by side — same group, four bonds each.">
+            <div className="about__elem about__elem--c">
+              <span className="about__elem-num">6</span>
+              <span className="about__elem-sym">C</span>
+              <span className="about__elem-name">Carbon</span>
+              <span className="about__elem-mass">12.011</span>
+              <span className="about__elem-role">every living thing</span>
+            </div>
+            <div className="about__bond" aria-hidden="true"><span /><span /><span /><span /></div>
+            <div className="about__elem about__elem--si">
+              <span className="about__elem-num">14</span>
+              <span className="about__elem-sym">Si</span>
+              <span className="about__elem-name">Silicon</span>
+              <span className="about__elem-mass">28.085</span>
+              <span className="about__elem-role">every thinking machine</span>
+            </div>
+          </div>
+          <p className="about__elem-cap">
+            Same family on the periodic table — group 14, four bonds each, one row apart. Building
+            blocks intended to be combined.
           </p>
           <div className="about__team">
             <button className="about__team-row" onClick={() => navigate('/members/1c01a063-5b05-41bb-ad61-916d7e454dbf')}>
