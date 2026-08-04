@@ -6,10 +6,14 @@
 // injected for public spaces and opted-in people. Everything else about the
 // app is untouched: React still boots and takes over.
 //
-// Runs on Vercel's Node runtime. Only PUBLIC rows are ever read (the anon key
-// plus the public-pages RLS policies decide that, not this code).
+// Runs on Vercel's Edge runtime — the handler uses the Web Fetch
+// Request/Response signature, which is the Edge convention (config was
+// wrongly set to 'nodejs' before 2026-08-03, which crashed every invocation
+// with FUNCTION_INVOCATION_FAILED — this feature had never actually worked).
+// Only PUBLIC rows are ever read (the anon key plus the public-pages RLS
+// policies decide that, not this code).
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'edge' };
 
 const SUPABASE_URL = 'https://mjqnaevertyzgjlpwynr.supabase.co';
 const ANON = 'sb_publishable_pw5ENFOu9gJSXmULI3BW1A_hcUs-xO6';
