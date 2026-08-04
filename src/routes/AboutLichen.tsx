@@ -702,7 +702,7 @@ export default function AboutLichen() {
           <div className="about__team">
             <button className="about__team-row" onClick={() => navigate('/members/1c01a063-5b05-41bb-ad61-916d7e454dbf')}>
               <span className="about__team-name">Galyn Burke</span>
-              <span className="about__team-role">visionary</span>
+              <span className="about__team-role">architect</span>
             </button>
             {/* Melanie + Blair hidden for now (founder, 2026-07-25) — uncomment to bring them back.
             <button className="about__team-row" onClick={() => navigate('/members/a6bbbe5e-747d-417c-a996-24bcfcd24e9c')}>
