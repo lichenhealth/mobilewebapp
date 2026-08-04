@@ -21,34 +21,51 @@
 -- Sign in as any of them: password  lichen-demo-2026
 
 -- ── 1. People ────────────────────────────────────────────────────────────
+-- ⚠ GOTCHA (found 2026-08-04): auth.users.confirmation_token/recovery_token/
+-- email_change/email_change_token_new have NO column default (unlike
+-- phone_change/phone_change_token/etc, which default to ''), so a plain
+-- insert leaves them NULL. Current GoTrue can't scan NULL into those Go
+-- string fields — every login for an account created this way fails with
+-- 500 "Database error querying schema" (the real error, findable only via
+-- the Management API's auth_logs, is "sql: Scan error on column index 3,
+-- name confirmation_token: converting NULL to string is unsupported").
+-- Explicitly set them to '' below. If you're copying this pattern for a
+-- future demo-user script, keep this line.
 insert into auth.users
   (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+   confirmation_token, recovery_token, email_change, email_change_token_new)
 values
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000001',
    'authenticated', 'authenticated', 'kelly.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Kelly Bolton"}', now(), now()),
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Kelly Bolton"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000002',
    'authenticated', 'authenticated', 'cherlynn.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Cherlynn Resager"}', now(), now()),
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Cherlynn Resager"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000003',
    'authenticated', 'authenticated', 'jordan.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Jordan Reyes"}', now(), now()),
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Jordan Reyes"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000004',
    'authenticated', 'authenticated', 'payton.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Payton Skawinski"}', now(), now()),
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Payton Skawinski"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000005',
    'authenticated', 'authenticated', 'mountainbeef.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Mountain Beef Co."}', now(), now()),
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Mountain Beef Co."}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'de300101-0000-4000-a000-000000000006',
    'authenticated', 'authenticated', 'heroesjourney.example@demo.lichen.health',
    extensions.crypt('lichen-demo-2026', extensions.gen_salt('bf')), now(),
-   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Heroes Journey Center"}', now(), now())
+   '{"provider": "email", "providers": ["email"]}', '{"full_name": "Heroes Journey Center"}', now(), now(),
+   '', '', '', '')
 on conflict (id) do nothing;
 
 insert into auth.identities

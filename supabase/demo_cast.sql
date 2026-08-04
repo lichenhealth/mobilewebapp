@@ -10,6 +10,15 @@
 -- ALSO: sets Claude's avatar to the brain mark (deployed at
 -- https://lichen.healthcare/claude-avatar.svg — run ~2 min after the deploy).
 
+-- ⚠ GOTCHA (found 2026-08-04, doesn't affect this already-run batch — see
+-- marketing_demo.sql for the fix): auth.users.confirmation_token/
+-- recovery_token/email_change/email_change_token_new have no column
+-- default, so a plain insert like the one below leaves them NULL, and
+-- current GoTrue can't log in an account with NULL there (500 "Database
+-- error querying schema"). This batch's rows work today only because a
+-- later Supabase platform-side auth migration backfilled existing rows —
+-- that backfill won't apply to any NEW insert. If you ever re-run or copy
+-- this pattern, explicitly set those four columns to ''.
 -- ── 1. Three example members (auth.users → trigger creates profiles) ────────
 insert into auth.users
   (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
