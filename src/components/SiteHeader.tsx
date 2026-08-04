@@ -10,9 +10,9 @@ import '../routes/FrontDoor.css';
 const DOORS: [string, string][] = [
   ['Home', '/'],
   ['About', '/about'],
-  ['Care', '/project/care'],
-  ['Business', '/project/business'],
-  ['Platform', '/project/platform'],
+  ['Care', '/care'],
+  ['Business', '/business'],
+  ['Platform', '/platform'],
   ['The Economy', '/economy'],
   ['Get Involved', '/get-involved'],
   ['Donate', '/donate'],

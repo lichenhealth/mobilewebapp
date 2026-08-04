@@ -41,6 +41,11 @@
       "has": [{ "type": "host", "value": "www.lichen.healthcare" }],
       "destination": "https://lichen.health/:path*",
       "permanent": true
+    },
+    {
+      "source": "/project/:slug",
+      "destination": "/:slug",
+      "permanent": true
     }
   ],
   "rewrites": [
