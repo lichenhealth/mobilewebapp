@@ -17,7 +17,15 @@
       "mcp__Claude_Browser__form_input",
       "mcp__092cd7c5-9f26-45a6-96ed-c2be3bb86a9a__get_screenshot",
       "mcp__092cd7c5-9f26-45a6-96ed-c2be3bb86a9a__get_metadata",
-      "mcp__092cd7c5-9f26-45a6-96ed-c2be3bb86a9a__get_design_context"
+      "mcp__092cd7c5-9f26-45a6-96ed-c2be3bb86a9a__get_design_context",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__preview_stop",
+      "mcp__Claude_Preview__preview_snapshot",
+      "mcp__Claude_Preview__preview_click",
+      "mcp__9f0d5f47-2215-4b49-bf2e-03d58bc3eb47__read_file_content",
+      "Bash(git fetch)"
     ]
   }
 }
