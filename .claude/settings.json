@@ -25,7 +25,8 @@
       "mcp__Claude_Preview__preview_snapshot",
       "mcp__Claude_Preview__preview_click",
       "mcp__9f0d5f47-2215-4b49-bf2e-03d58bc3eb47__read_file_content",
-      "Bash(git fetch)"
+      "Bash(git fetch)",
+      "Bash(./worker/migrate.sh supabase/marketing_demo*)"
     ]
   }
 }
