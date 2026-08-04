@@ -59,10 +59,14 @@ export default function Invite() {
   // Handling a knock moves it off the "waiting" tally and the side-menu
   // badge (founder 2026-08-02) — the row stays visible here either way, so
   // nothing is ever truly lost, just no longer flagged as needing you.
-  async function resolveKnock(id: string, status: 'invited' | 'dismissed') {
+  async function resolveKnock(id: string, status: 'invited' | 'declined') {
+    const prior = knocks;
     setKnocks((cur) => cur.map((k) => (k.id === id ? { ...k, status } : k)));
     const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
-    if (error) console.error('resolveKnock', error);
+    if (error) {
+      setKnocks(prior);
+      setError(error.message);
+    }
   }
   const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
@@ -339,7 +343,7 @@ export default function Invite() {
                       <strong>{k.name}</strong> · {k.email}
                       {k.story && <em className="invite__story">{k.story}</em>}
                     </span>
-                    <span className={'invite__pill' + (k.status !== 'new' ? ' is-in' : '')}>{k.status}</span>
+                    <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : k.status === 'declined' ? ' is-declined' : '')}>{k.status}</span>
                     {k.status === 'new' && (
                       <span className="invite__knock-acts">
                         <button
@@ -352,7 +356,7 @@ export default function Invite() {
                         >
                           Invite them
                         </button>
-                        <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'dismissed')}>
+                        <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
                         </button>
                       </span>
