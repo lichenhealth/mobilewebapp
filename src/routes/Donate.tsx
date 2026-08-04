@@ -461,8 +461,9 @@ export default function Donate() {
         <h2 className="donate__fc-title">The Founders Circle</h2>
         <p className="donate__fc-sub">
           For those ready to anchor the forest — founding contributions that
-          build the land, the sanctuary, and the commons underneath everything
-          Lichen does. Tax-deductible; anonymity honored at every tier.
+          restore the land, build the sanctuary, and fuel the infrastructure
+          that supports the commons. Tax-deductible; invitation into
+          community, with anonymity honored as desired at every tier.
         </p>
         <div className="donate__fc-tiers">
           {[

@@ -1,0 +1,48 @@
+.afaq { width: 100%; }
+.afaq__eyebrow {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--peach-deep, var(--peach)); margin-bottom: 4px;
+}
+.afaq__title { font-family: var(--font-display); font-size: 22px; font-weight: 400; margin: 0 0 var(--s-4); }
+
+.afaq__search {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  padding: 9px 14px; background: var(--bone-warm); color: var(--ink-muted, var(--ink));
+  margin-bottom: var(--s-4);
+}
+.afaq__search input { border: 0; background: transparent; outline: none; font-size: 14px; color: var(--ink); flex: 1; }
+
+.afaq__list { display: flex; flex-direction: column; }
+.afaq__item { border-bottom: 1px solid var(--bone-edge); }
+.afaq__q {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: 12px 0; text-align: left; font-size: 14px; font-weight: 500; color: var(--ink);
+}
+.afaq__chev { transition: transform 160ms ease; flex-shrink: 0; color: var(--ink-muted, var(--ink)); }
+.afaq__chev--open { transform: rotate(90deg); }
+.afaq__a { font-size: 13px; line-height: 1.6; color: var(--ink-muted, var(--ink)); font-weight: 300; padding: 0 0 14px; margin: 0; }
+.afaq__empty { font-size: 13px; color: var(--ink-muted, var(--ink)); padding: var(--s-3) 0; }
+
+.afaq__chat { margin-top: var(--s-5); }
+.afaq__chatbtn {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--peach); border-radius: var(--r-full); padding: 12px 16px;
+  font-size: 14px; font-weight: 500; color: var(--peach-deep, var(--peach)); background: var(--bone-warm);
+}
+.afaq__chatbtn:hover { background: var(--peach-tint, var(--bone)); }
+
+.afaq__ask { display: flex; flex-direction: column; gap: 8px; }
+.afaq__ask input, .afaq__ask textarea {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md, 9px); padding: 10px 12px;
+  font-size: 13px; color: var(--ink); background: var(--bone-warm); font-family: inherit;
+}
+.afaq__ask textarea { resize: vertical; }
+.afaq__send { width: 100%; }
+.afaq__thanks { font-size: 13px; color: var(--ink); }
+.afaq__err { font-size: 12px; color: var(--rust, #b8623c); }
+.afaq__err a { color: inherit; text-decoration: underline; }
+
+@media (max-width: 960px) {
+  .afaq__title { font-size: 20px; }
+}

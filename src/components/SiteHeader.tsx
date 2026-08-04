@@ -14,8 +14,8 @@ const DOORS: [string, string][] = [
   ['Business', '/project/business'],
   ['Platform', '/project/platform'],
   ['The Economy', '/economy'],
-  ['Donate', '/donate'],
   ['Get Involved', '/get-involved'],
+  ['Donate', '/donate'],
   // Events returns to public nav once non-member events exist (founder 2026-08-02).
 ];
 

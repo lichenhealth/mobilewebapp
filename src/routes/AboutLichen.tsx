@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
 import SiteHeader from '../components/SiteHeader';
+import AboutFAQ from '../components/AboutFAQ';
 import { useAuth } from '../auth/AuthProvider';
 import './AboutLichen.css';
 
@@ -388,8 +389,11 @@ export default function AboutLichen() {
   // Chrome-free reading (founder 2026-07-30): the app sidebar was leaking in
   // on desktop — About is a public page; the platform steps back.
   useEffect(() => {
-    document.documentElement.classList.add('is-public-page');
-    return () => document.documentElement.classList.remove('is-public-page');
+    // is-about-page widens the app-shell for the FAQ side-rail on desktop —
+    // scoped separately from is-public-page, which several other public
+    // routes share and should stay at the phone-width column.
+    document.documentElement.classList.add('is-public-page', 'is-about-page');
+    return () => document.documentElement.classList.remove('is-public-page', 'is-about-page');
   }, []);
 
   useEffect(() => {
@@ -413,6 +417,7 @@ export default function AboutLichen() {
         </header>
       )}
 
+      <div className="about__layout">
       <div className="about__body">
         <p className="about__eyebrow">What is Lichen?</p>
         <h1 className="about__title">A better way of being <span className="display-italic">together.</span></h1>
@@ -719,6 +724,9 @@ export default function AboutLichen() {
           <span aria-hidden="true">·</span>
           <button className="about__foot-link" onClick={() => navigate('/terms')}>Terms</button>
         </footer>
+      </div>
+
+      <AboutFAQ />
       </div>
     </div>
   );

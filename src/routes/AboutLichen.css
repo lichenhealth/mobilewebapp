@@ -19,7 +19,23 @@
   border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink-soft);
 }
 
-.about__body { max-width: 640px; margin: 0 auto; padding: var(--s-5) var(--s-4) var(--s-7); }
+/* Widen the shared app-shell just for this page (desktop only) so the FAQ
+   rail has room — is-about-page is scoped narrower than is-public-page,
+   which several other public routes also set at the normal phone width. */
+@media (min-width: 961px) {
+  .is-about-page .app-shell { max-width: 1020px; }
+}
+
+.about__layout {
+  max-width: 1020px; margin: 0 auto; padding: var(--s-5) var(--s-4) var(--s-7);
+  display: flex; align-items: flex-start; gap: var(--s-8);
+}
+.about__body { max-width: 640px; flex: 1; min-width: 0; }
+.about__layout .afaq { width: 300px; flex-shrink: 0; position: sticky; top: calc(var(--s-5) + 8px); }
+@media (max-width: 960px) {
+  .about__layout { flex-direction: column; }
+  .about__layout .afaq { width: 100%; position: static; border-top: 1px solid var(--bone-edge); padding-top: var(--s-6); margin-top: var(--s-2); }
+}
 .about__eyebrow {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--peach-deep, var(--peach)); margin-bottom: var(--s-2);
