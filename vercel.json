@@ -46,7 +46,7 @@
   "rewrites": [
     { "source": "/spaces/:id", "destination": "/api/page" },
     { "source": "/members/:id", "destination": "/api/page" },
-    { "source": "/:handle", "destination": "/api/page" },
+    { "source": "/:handle([a-z0-9-]+)", "destination": "/api/page" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
