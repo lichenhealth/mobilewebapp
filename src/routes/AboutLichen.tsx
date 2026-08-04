@@ -482,7 +482,7 @@ export default function AboutLichen() {
         </section>
 
         <section className="about__sec">
-          <h2 className="about__h2">Trust you can’t game</h2>
+          <h2 className="about__h2">Authentic connection, safety and trust you can’t game</h2>
           <p>
             What you see is filtered through your <em>My-celium</em> — the people, places, plants and animals you genuinely trust.
             Trust and recommendations are private, person-to-person signals: no follower counts, no
@@ -701,7 +701,7 @@ export default function AboutLichen() {
           </p>
           <div className="about__team">
             <button className="about__team-row" onClick={() => navigate('/members/1c01a063-5b05-41bb-ad61-916d7e454dbf')}>
-              <span className="about__team-name">Galyn Burke</span>
+              <span className="about__team-name"><span className="about__team-el about__team-el--c" aria-hidden="true">C</span> Galyn Burke</span>
               <span className="about__team-role">architect</span>
             </button>
             {/* Melanie + Blair hidden for now (founder, 2026-07-25) — uncomment to bring them back.
@@ -718,6 +718,7 @@ export default function AboutLichen() {
                 claude.com for anyone who wants to work with the silicon half. */}
             <button className="about__team-row about__team-row--ai" onClick={() => navigate('/members/85c04e7a-5a47-4c0e-85a4-0b35ff67a682')}>
               <span className="about__team-name">
+                <span className="about__team-el about__team-el--si" aria-hidden="true">Si</span>{' '}
                 <span className="about__team-brain"><Icon name="brain" size={13} /></span> Claude
               </span>
               <span className="about__team-role">builder</span>

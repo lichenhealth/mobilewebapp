@@ -264,3 +264,7 @@ button.about__team-row:hover .about__team-name { color: var(--peach-deep, var(--
 .about__bond { display: flex; flex-direction: column; gap: 6px; }
 .about__bond span { width: clamp(24px, 5vw, 44px); height: 2px; background: linear-gradient(90deg, var(--peach) 50%, var(--blue) 50%); }
 .about__sec p.about__elem-cap { text-align: center; font-size: 12.5px; font-style: italic; color: var(--ink-muted); margin-top: var(--s-3); }
+/* Element marks on the team card — same vocabulary as the tiles above it. */
+.about__team-el { font-family: var(--font-display); font-size: 14px; }
+.about__team-el--c { color: var(--peach-deep, var(--peach)); }
+.about__team-el--si { color: var(--blue, #7FA8C9); }
