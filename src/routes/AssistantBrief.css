@@ -1,11 +1,26 @@
 .abrief { padding: var(--s-4) var(--s-5); max-width: 640px; margin: 0 auto; }
-.abrief__head { display: flex; gap: 14px; align-items: center; margin: var(--s-3) 0 var(--s-4); }
+.abrief__head { text-align: center; margin: var(--s-3) 0 var(--s-5); }
+.abrief__avatar-wrap { position: relative; display: inline-block; }
 .abrief__avatar {
-  width: 52px; height: 52px; border-radius: 50%; padding: 9px;
-  background: transparent; border: 1px solid var(--peach);
+  width: 76px; height: 76px; border-radius: 50%; padding: 13px;
+  background: transparent; border: 1px solid var(--blue);
+  color: var(--blue);
 }
-.abrief__title { margin: 0; font-family: var(--font-display, inherit); font-size: 24px; }
-.abrief__sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-muted); }
+/* The silicon badge, top-right — same element language as About's C/Si
+   tiles and the weavers card. */
+.abrief__el {
+  position: absolute; top: -2px; right: -4px;
+  min-width: 22px; height: 22px; padding: 0 5px; border-radius: var(--r-full);
+  background: var(--blue); color: #fff;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.abrief__title { margin: 8px 0 0; font-family: var(--font-display, inherit); font-size: 24px; }
+.abrief__scope {
+  margin: 2px 0 0; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue-deep, var(--blue));
+}
+.abrief__sub { margin: 6px auto 0; font-size: 13px; color: var(--ink-muted); max-width: 46ch; }
 .abrief__card {
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   border-radius: var(--r-lg, 16px); padding: 18px 20px; margin-bottom: var(--s-4);

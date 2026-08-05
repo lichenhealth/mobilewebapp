@@ -249,12 +249,18 @@ export default function AssistantBrief() {
   return (
     <div className="abrief">
       <button className="cmp__back calp__backchip" onClick={() => navigate(-1)}>← Back</button>
+      {/* Shaped like every other profile on Lichen (founder 2026-08-05):
+          picture, then the name under it. The mark wears an Si badge in the
+          silicon blue the About page already gives it — the assistant is a
+          partner with an identity, not a feature with an icon. */}
       <div className="abrief__head">
-        <img className="abrief__avatar" src="/claude-avatar.svg" alt="" />
-        <div>
-          <h1 className="abrief__title">{meta.title}</h1>
-          <p className="abrief__sub">Your assistant&rsquo;s briefing — organized highlights, filtered for what needs you.</p>
-        </div>
+        <span className="abrief__avatar-wrap">
+          <img className="abrief__avatar" src="/claude-avatar.svg" alt="" />
+          <span className="abrief__el" aria-hidden="true">Si</span>
+        </span>
+        <h1 className="abrief__title">AI Assistant</h1>
+        <p className="abrief__scope">{meta.title}</p>
+        <p className="abrief__sub">Your assistant&rsquo;s briefing — organized highlights, filtered for what needs you.</p>
       </div>
 
       <div className="abrief__card">
