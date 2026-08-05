@@ -20,6 +20,10 @@ export interface OfferingMeta {
   /** The course's circle — a real Lichen GROUP (chat, events, find-a-time
    *  ride along for free). Set when the owner creates it. */
   circleId?: string;
+  /** The teacher's own words on WHY this teaching is held closed — shown
+   *  when a student expands the protection line (founder 2026-08-05).
+   *  Empty falls back to the platform's standing promise. */
+  protectedNote?: string;
   /** Hero image for the course room and the shelf (founder 2026-07-28). */
   coverUrl?: string;
   /** Protected teaching (founder 2026-08-05, the lineage-teacher promise):

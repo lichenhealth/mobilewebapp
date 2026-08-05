@@ -175,7 +175,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
                 ? 'Your assistant — a briefing for this part of your Lichen life'
                 : 'You’ve switched the assistant off for this section. Tap to change that.'}
             >
-              <span className="cfeed__area-circle"><Icon name="brain" size={14} /></span>
+              <span className="cfeed__area-circle">
+                <Icon name="brain" size={14} />
+                {!aiDoorOn(assistantSection) && <span className="cfeed__area-slash" aria-hidden />}
+              </span>
               <span className="cfeed__area-label">AI</span>
             </button>
           )}

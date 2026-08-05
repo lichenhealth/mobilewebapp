@@ -50,3 +50,11 @@
 .cfeed__area--ai .cfeed__area-circle { border-color: var(--peach); color: var(--peach-deep); }
 .cfeed__area--ai.is-ai-off .cfeed__area-circle { border-color: var(--bone-edge); color: var(--ink-faint); }
 .cfeed__area--ai.is-ai-off .cfeed__area-label { color: var(--ink-faint); }
+/* A thin grey strike through the brain when a space has switched the
+   assistant off — the state is visible without reading a label (founder
+   2026-08-05); same glyph as AssistantDoor's slash. */
+.cfeed__area--ai .cfeed__area-circle { position: relative; }
+.cfeed__area-slash {
+  position: absolute; width: 20px; height: 1.5px; background: var(--ink-faint);
+  transform: rotate(-45deg); border-radius: 1px;
+}

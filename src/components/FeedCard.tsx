@@ -377,7 +377,13 @@ export default function FeedCard({
         trusted={trusted}
         recommended={recommended}
         saved={saved}
-        availability={availability}
+        availability={noDownload
+          // Protected content can't be shelved or passed along — the same
+          // switch that turns downloads off closes those doors too
+          // (founder 2026-08-05). Buttons gray rather than vanish, so the
+          // boundary is legible instead of mysterious.
+          ? { ...availability, save: false, share: false }
+          : availability}
         onTrust={onTrust}
         onRecommend={onRecommend}
         onSave={onSave}

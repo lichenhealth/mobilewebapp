@@ -49,6 +49,7 @@ export default function CollectionPage() {
   const [meta, setMeta] = useState<CollectionRow | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [ready, setReady] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
@@ -328,11 +329,21 @@ export default function CollectionPage() {
         {meta.description && <p className="colp__desc">{meta.description}</p>}
         {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} itemWord={itemWord(meta.kind)} />}
         {meta.kind === 'course' && meta.details.protectedTeaching && (
-          <p className="colp__protect">
-            <strong>Protected teaching.</strong> This course stays in the room: no downloads,
-            every recording watermarked with the viewer's name, and never read by any
-            assistant — a standing promise, made by the teacher, kept by the platform.
-          </p>
+          /* One line by default; the WHY opens underneath — in the teacher's
+             own words when they wrote some (founder 2026-08-05). */
+          <div className="colp__protect">
+            <button className="colp__protect-head" onClick={() => setWhyOpen((o) => !o)}
+              aria-expanded={whyOpen}>
+              <span><strong>Downloads, recordings &amp; AI</strong> — disabled</span>
+              <Icon name={whyOpen ? 'chevron-left' : 'chevron-right'} size={13} />
+            </button>
+            {whyOpen && (
+              <p className="colp__protect-why">
+                {meta.details.protectedNote?.trim()
+                  || "This course stays in the room: no downloads, every recording watermarked with the viewer's name, and never read by any assistant — a standing promise, made by the teacher, kept by the platform."}
+              </p>
+            )}
+          </div>
         )}
       </header>
 
@@ -522,6 +533,12 @@ export default function CollectionPage() {
                     Shown to students as a standing promise.
                   </span>
                 </label>
+              )}
+              {meta.kind === 'course' && form.protectedTeaching && (
+                <textarea className="prof__input colp__protect-note" rows={3}
+                  value={form.protectedNote ?? ''}
+                  placeholder="Why this teaching is held closed — in your words. Students see this when they open the line."
+                  onChange={(e) => setForm((f) => ({ ...f, protectedNote: e.target.value || undefined }))} />
               )}
               {meta.kind === 'course' && (
                 <>
