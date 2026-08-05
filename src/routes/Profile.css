@@ -301,3 +301,9 @@
    2026-08-05) — give it its own breathing room. */
 .prof__section .prof__hint + *, .prof__privacy-links + .prof__hint { margin-top: var(--s-4); }
 .prof__hint { margin-top: var(--s-3); }
+/* The guardian's approval queue — Ruby's "Waiting on Melanie", made real. */
+.prof__gq { margin-bottom: var(--s-4); }
+.prof__gq-lead {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--peach-deep); margin-bottom: var(--s-2);
+}

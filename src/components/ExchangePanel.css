@@ -1,0 +1,39 @@
+/* The exchange, on a listing (founder 2026-08-05). Peach because this is
+   life/engagement, not stewardship — the platform's standing colour doctrine. */
+.xch {
+  margin: var(--s-4) var(--s-5) 0;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: var(--s-4);
+}
+.xch--live { border-color: var(--peach); }
+.xch--quiet { background: transparent; border-style: dashed; }
+.xch__quiet { font-size: var(--t-sm); color: var(--ink-muted); font-style: italic; text-align: center; }
+.xch__cta { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.xch__form { display: flex; flex-direction: column; gap: var(--s-3); }
+.xch__label { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
+.xch__note {
+  width: 100%; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 9px 11px; font: inherit; font-size: var(--t-sm);
+  color: var(--ink); resize: vertical;
+}
+.xch__note:focus { outline: none; border-color: var(--peach); }
+.xch__row { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: var(--s-3); }
+.xch__state {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--t-md); font-weight: 600; color: var(--ink);
+}
+.xch__dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--peach); flex-shrink: 0;
+}
+.xch__amt {
+  margin-left: auto; font-style: normal; font-family: var(--font-display);
+  font-size: var(--t-md); color: var(--peach-deep);
+}
+.xch__their-note { font-size: var(--t-sm); color: var(--ink-soft); font-style: italic; margin-top: var(--s-2); }
+.xch__guard {
+  margin-top: var(--s-3); padding: 9px 11px;
+  background: var(--peach-tint); border-left: 3px solid var(--peach);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: var(--t-sm); line-height: 1.5; color: var(--ink-soft);
+}
+.xch__msg { margin-top: var(--s-3); font-size: var(--t-sm); color: var(--ink-muted); }

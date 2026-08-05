@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { listGuardianQueue, approveAsGuardian, cancelExchange, type Exchange } from '../lib/exchangeApi';
 import {
   listMyBeings, createBeing, ENTITY_KINDS,
   type Being, type EntityKind, type EntityAspect,
@@ -73,6 +74,8 @@ export default function Profile() {
   // Beings you steward — hidden until the stewardship migration lands.
   const [beings, setBeings] = useState<Being[]>([]);
   const [minors, setMinors] = useState<{ id: string; full_name: string | null; is_adult: boolean }[]>([]);
+  const [gQueue, setGQueue] = useState<Exchange[]>([]);
+  const loadGQueue = () => { void listGuardianQueue().then(setGQueue); };
   const [beingsOn, setBeingsOn] = useState(false);
   const [beingName, setBeingName] = useState('');
   const [beingKind, setBeingKind] = useState<EntityKind>('animal');
@@ -206,6 +209,7 @@ export default function Profile() {
         if (!live || e2) return;
         setMinors((data as { id: string; full_name: string | null; is_adult: boolean }[] | null) ?? []);
       });
+      void listGuardianQueue().then((q) => { if (live) setGQueue(q); });
     });
     return () => { live = false; };
   }, [user]);
@@ -1035,6 +1039,28 @@ export default function Profile() {
             They can offer what they make and keep what they earn. Buying, selling and
             meeting wait on your yes.
           </p>
+          {gQueue.length > 0 && (
+            <div className="prof__gq">
+              <p className="prof__gq-lead">Waiting on your yes</p>
+              {gQueue.map((x) => (
+                <div className="prof__care-row" key={x.id}>
+                  <div className="prof__care-id">
+                    <span className="prof__care-name">
+                      {x.mode === 'sale' || x.mode === 'sliding' ? 'A purchase' : 'An exchange'}
+                      {x.amount > 0 ? ` · ${x.amount} Current-cy` : ''}
+                    </span>
+                    <span className="prof__care-tag">{x.note ?? 'no note'}</span>
+                  </div>
+                  <div className="prof__care-actions">
+                    <button className="prof__care-btn prof__care-btn--ok"
+                      onClick={() => void approveAsGuardian(x.id).then(loadGQueue)}>Approve</button>
+                    <button className="prof__care-btn"
+                      onClick={() => void cancelExchange(x.id).then(loadGQueue)}>Not now</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="prof__care-list">
             {minors.map((m) => (
               <div className="prof__care-row" key={m.id}>

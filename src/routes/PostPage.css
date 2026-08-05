@@ -64,3 +64,21 @@
 .postp__join-lead { margin: 0 0 4px; font-size: 15px; }
 .postp__join-sub { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
 .postp__join-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* The physical facts of a listing — first rendered 2026-08-05, though Compose
+   has written them since July. A buyer needs these to choose. */
+.postp__facts {
+  margin: var(--s-4) var(--s-5) 0;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm);
+}
+.postp__fact {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
+  padding: 10px 14px;
+}
+.postp__fact + .postp__fact { border-top: 1px solid var(--bone-edge-soft); }
+.postp__fact-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); flex-shrink: 0;
+}
+.postp__fact-value { font-size: var(--t-sm); color: var(--ink); text-align: right; }

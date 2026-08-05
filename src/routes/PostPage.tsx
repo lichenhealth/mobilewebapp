@@ -19,6 +19,7 @@ import {
 } from '../lib/myceliumApi';
 import './PostPage.css';
 import { loadSpaceNames } from '../lib/postsApi';
+import ExchangePanel from '../components/ExchangePanel';
 
 /** Where each service area lives — the frozen bar's "relevant places" doors. */
 const AREA_HOME: Partial<Record<ServiceArea, string>> = {
@@ -126,6 +127,33 @@ export default function PostPage() {
   const saved = mySaves.has('post:' + p.id);
   const recommended = myRecs.has('post:' + p.id);
   const areas = postAreas(p).filter((a) => AREA_HOME[a]);
+  const isMarket = postAreas(p).includes('marketplace') && !p.linked_event_id;
+
+  // The five fields Compose has written since 2026-07-28 with no reader.
+  const d = (p.details ?? {}) as Record<string, unknown>;
+  const CONDITION: Record<string, string> = {
+    new: 'New', like_new: 'Like new', good: 'Good', fair: 'Fair',
+  };
+  const FULFILMENT: Record<string, string> = {
+    pickup: 'Pick up', deliver: 'Delivered', ship: 'Shipped', in_store: 'In store',
+  };
+  const listOf = (v: unknown, map: Record<string, string>) =>
+    Array.isArray(v) ? (v as string[]).map((x) => map[x] ?? x).join(' · ') : '';
+  const when = [d.availFrom, d.availTo].filter(Boolean) as string[];
+  const facts: { label: string; value: string }[] = [
+    { label: 'Condition', value: listOf(d.condition, CONDITION) },
+    {
+      label: when.length === 2 ? 'Available' : 'Available',
+      value: when.length === 2 ? `${when[0]} – ${when[1]}` : (when[0] ?? ''),
+    },
+    {
+      label: 'How it changes hands',
+      value: [listOf(d.fulfillment, FULFILMENT),
+        d.deliverRadiusMi ? `within ${d.deliverRadiusMi} mi` : '']
+        .filter(Boolean).join(' · '),
+    },
+    { label: 'Payment', value: (d.paymentPlan as string) ?? '' },
+  ].filter((f) => f.value);
 
   return (
     <>
@@ -203,6 +231,27 @@ export default function PostPage() {
         } : undefined}
         onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
       />
+
+      {/* THE EXCHANGE (founder 2026-08-05). A marketplace listing finally has
+          a door forward that isn't a pasted URL: ask for it, then a live strip
+          showing what it's waiting on. */}
+      {isMarket && me && (
+        <ExchangePanel post={p} me={me} />
+      )}
+
+      {/* The physical facts a buyer needs to choose — condition, when, and how
+          it changes hands. Compose has written these since 2026-07-28 and
+          nothing has ever rendered them until now. */}
+      {isMarket && (facts.length > 0) && (
+        <div className="postp__facts">
+          {facts.map((f) => (
+            <div className="postp__fact" key={f.label}>
+              <span className="postp__fact-label">{f.label}</span>
+              <span className="postp__fact-value">{f.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Visual style, stage 1: what the listing photo looks like, in the
           controlled vocabulary — helps a seeker feel whether it's their
