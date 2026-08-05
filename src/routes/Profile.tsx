@@ -17,6 +17,7 @@ import { Icon } from '../components/Icon';
 import HomeLocationSection from '../components/HomeLocationSection';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { uploadAvatar } from '../lib/avatarApi';
+import { tidyName, tidyNote, tidySpaceName } from '../lib/spaceName';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
@@ -95,6 +96,9 @@ export default function Profile() {
     organization: '', community: '', group: '', place: '',
   });
   const [addingKind, setAddingKind] = useState<SpaceKind | null>(null);
+  // Auto-corrected kind word, keyed by the field it happened in (a kind for
+  // the add rows, a space id for a rename).
+  const [nameNote, setNameNote] = useState<{ key: string; text: string } | null>(null);
   const [error, setError] = useState('');
 
   const [pendingCats, setPendingCats] = useState(0);
@@ -422,7 +426,7 @@ export default function Profile() {
   }
 
   async function addSpace(kind: SpaceKind) {
-    const name = (newNames[kind] || '').trim();
+    const name = tidySpaceName(newNames[kind] || '', kind);
     if (!user || !name) return;
     setAddingKind(kind); setError('');
     const { error: e } = await supabase.from('spaces').insert({ kind, name, created_by: user.id });
@@ -435,10 +439,12 @@ export default function Profile() {
   function editLocalName(id: string, name: string) {
     setSpaces((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)));
   }
-  async function renameSpace(id: string, name: string) {
-    if (!name.trim()) { loadAll(); return; }
+  async function renameSpace(id: string, kind: SpaceKind, raw: string) {
+    if (!raw.trim()) { loadAll(); return; }
     setError('');
-    const { error: e } = await supabase.from('spaces').update({ name: name.trim() }).eq('id', id);
+    const { name, removed } = tidyName(raw, kind);
+    if (removed) { editLocalName(id, name); setNameNote({ key: id, text: tidyNote(removed, kind) }); }
+    const { error: e } = await supabase.from('spaces').update({ name }).eq('id', id);
     if (e) setError(e.message);
   }
 
@@ -1015,8 +1021,8 @@ export default function Profile() {
                       className="prof__space-name"
                       value={s.name}
                       readOnly={!canEdit}
-                      onChange={(e) => editLocalName(s.id, e.target.value)}
-                      onBlur={(e) => { if (canEdit) renameSpace(s.id, e.target.value); }}
+                      onChange={(e) => { editLocalName(s.id, e.target.value); setNameNote(null); }}
+                      onBlur={(e) => { if (canEdit) void renameSpace(s.id, sec.kind, e.target.value); }}
                     />
                     <span className="prof__space-role">{ROLE_LABEL[s.role]}</span>
                     <button
@@ -1030,11 +1036,21 @@ export default function Profile() {
                 );
               })}
             </div>
+            {nameNote && mine.some((s) => s.id === nameNote.key) && (
+              <p className="name-tidy-note">{nameNote.text}</p>
+            )}
             <div className="prof__add-row">
               <input
                 className="prof__input"
                 value={newNames[sec.kind]}
-                onChange={(e) => setNewNames((m) => ({ ...m, [sec.kind]: e.target.value }))}
+                onChange={(e) => { setNewNames((m) => ({ ...m, [sec.kind]: e.target.value })); setNameNote(null); }}
+                onBlur={() => {
+                  const t = tidyName(newNames[sec.kind] || '', sec.kind);
+                  if (t.removed) {
+                    setNewNames((m) => ({ ...m, [sec.kind]: t.name }));
+                    setNameNote({ key: sec.kind, text: tidyNote(t.removed, sec.kind) });
+                  }
+                }}
                 placeholder={'Name your ' + sec.one}
               />
               <button
@@ -1045,6 +1061,7 @@ export default function Profile() {
                 {addingKind === sec.kind ? 'Adding...' : `Add ${article} ${sec.one}`}
               </button>
             </div>
+            {nameNote?.key === sec.kind && <p className="name-tidy-note">{nameNote.text}</p>}
           </section>
         );
       })}

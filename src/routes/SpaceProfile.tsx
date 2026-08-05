@@ -20,6 +20,7 @@ import {
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
+import { tidyName, tidyNote } from '../lib/spaceName';
 import { supabase } from '../lib/supabase';
 import { loadPostsByIds, loadAuthorFeed, postAreas, type FeedPost } from '../lib/postsApi';
 import {
@@ -125,6 +126,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
   // edit state (admins)
   const [name, setName] = useState('');
+  // Auto-corrected kind words ("… Group" under a heading that says Group)
+  const [nameNote, setNameNote] = useState('');
+  const [groupNote, setGroupNote] = useState('');
   const [description, setDescription] = useState('');
   const [locText, setLocText] = useState('');
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
@@ -419,7 +423,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           note = `Proposed — waiting for ${parentPick.name}'s admins`;
         }
       }
-      await updateSpaceProfile(space.id, patch);
+      await updateSpaceProfile(space.id, patch, space.kind);
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
       await load();
@@ -830,7 +834,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <h2 className="prof__h2">About this {kindLabel.toLowerCase()}</h2>
           <div className="prof__field">
             <label className="prof__label">Name</label>
-            <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className="prof__input"
+              value={name}
+              onChange={(e) => { setName(e.target.value); setNameNote(''); }}
+              onBlur={() => {
+                const t = tidyName(name, space.kind);
+                if (t.removed) { setName(t.name); setNameNote(tidyNote(t.removed, space.kind)); }
+              }}
+            />
+            {nameNote && <p className="name-tidy-note">{nameNote}</p>}
           </div>
           <div className="prof__field">
             <label className="prof__label">Description</label>
@@ -1321,14 +1334,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 <input
                   className="prof__input"
                   value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
+                  onChange={(e) => { setNewGroupName(e.target.value); setGroupNote(''); }}
+                  onBlur={() => {
+                    const t = tidyName(newGroupName, 'group');
+                    if (t.removed) { setNewGroupName(t.name); setGroupNote(tidyNote(t.removed, 'group')); }
+                  }}
                   placeholder={`Name the new group (it lives inside ${space.name})`}
                   autoFocus
                 />
                 <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newGroupName.trim()}
                   onClick={() => void createChildGroup()}>Create</button>
                 <button className="btn sprof__invite-btn" disabled={memBusy}
-                  onClick={() => { setNewGroupOpen(false); setNewGroupName(''); }}>Cancel</button>
+                  onClick={() => { setNewGroupOpen(false); setNewGroupName(''); setGroupNote(''); }}>Cancel</button>
+                {groupNote && <p className="name-tidy-note">{groupNote}</p>}
               </div>
             )
           ) : me ? (
@@ -1339,14 +1357,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 <input
                   className="prof__input"
                   value={proposeName}
-                  onChange={(e) => setProposeName(e.target.value)}
+                  onChange={(e) => { setProposeName(e.target.value); setGroupNote(''); }}
+                  onBlur={() => {
+                    const t = tidyName(proposeName, 'group');
+                    if (t.removed) { setProposeName(t.name); setGroupNote(tidyNote(t.removed, 'group')); }
+                  }}
                   placeholder={`Name your group — ${space.name}'s admins will review it`}
                   autoFocus
                 />
                 <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !proposeName.trim()}
                   onClick={() => void proposeNewGroup()}>Propose</button>
                 <button className="btn sprof__invite-btn" disabled={memBusy}
-                  onClick={() => { setProposeOpen(false); setProposeName(''); }}>Cancel</button>
+                  onClick={() => { setProposeOpen(false); setProposeName(''); setGroupNote(''); }}>Cancel</button>
+                {groupNote && <p className="name-tidy-note">{groupNote}</p>}
               </div>
             )
           ) : null}

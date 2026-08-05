@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { GeoPoint } from './geoApi';
 import { downscaleImage } from './avatarApi';
+import { tidySpaceName } from './spaceName';
 
 // ─── Spaces on the map (Maps v1.1) ────────────────────────────────────────────
 // Any space an admin gives a picked-suggestion address gets coordinates;
@@ -175,7 +176,9 @@ export async function loadSpaceChatId(spaceId: string): Promise<string | null> {
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/** Admin edits the space's public profile (name/description/avatar/location). */
+/** Admin edits the space's public profile (name/description/avatar/location).
+ *  Pass the space's kind so a renamed space gets the same kind-word trim as a
+ *  new one (see spaceName.ts). */
 export async function updateSpaceProfile(id: string, patch: {
   name?: string;
   description?: string | null;
@@ -184,8 +187,11 @@ export async function updateSpaceProfile(id: string, patch: {
   lat?: number | null;
   lng?: number | null;
   parent_space_id?: string | null;   // group admins nest/unnest under a community/org
-}): Promise<void> {
-  const { error } = await supabase.from('spaces').update(patch).eq('id', id);
+}, kind?: SpaceKind): Promise<void> {
+  const clean = kind && patch.name != null
+    ? { ...patch, name: tidySpaceName(patch.name, kind) }
+    : patch;
+  const { error } = await supabase.from('spaces').update(clean).eq('id', id);
   if (error) throw error;
 }
 
@@ -208,7 +214,7 @@ export async function createSpaceWithLocation(
 ): Promise<string> {
   const { data, error } = await supabase.from('spaces').insert({
     kind,
-    name: name.trim(),
+    name: tidySpaceName(name, kind),
     created_by: me,
     location: location.trim() || null,
     lat: geo?.lat ?? null,

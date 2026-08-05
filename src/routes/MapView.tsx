@@ -19,6 +19,7 @@ import {
   type MappableSpace, type SpaceKind,
 } from '../lib/spacesApi';
 import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
+import { tidyName, tidyNote } from '../lib/spaceName';
 import './MapView.css';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -434,6 +435,7 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
   const [locText, setLocText] = useState('');
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
   const [newName, setNewName] = useState('');
+  const [nameNote, setNameNote] = useState('');
   const [newKind, setNewKind] = useState<SpaceKind>('place');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -547,7 +549,17 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
         {view === 'create' && (
           <>
             <label className="mapv__sheet-label">Name</label>
-            <input className="cmp__input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name your place" />
+            <input
+              className="cmp__input"
+              value={newName}
+              onChange={(e) => { setNewName(e.target.value); setNameNote(''); }}
+              onBlur={() => {
+                const t = tidyName(newName, newKind);
+                if (t.removed) { setNewName(t.name); setNameNote(tidyNote(t.removed, newKind)); }
+              }}
+              placeholder="Name your place"
+            />
+            {nameNote && <p className="name-tidy-note">{nameNote}</p>}
             <label className="mapv__sheet-label">What is it?</label>
             <div className="mapv__sheet-kinds">
               {(['place', 'organization'] as SpaceKind[]).map((k) => (

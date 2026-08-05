@@ -391,3 +391,11 @@ input, textarea, select { font: inherit; color: inherit; }
 
 /* De-branded top bar: the entity's own mark centered (founder 2026-07-30). */
 .top-bar__ident { display: flex; align-items: center; justify-content: center; padding-top: 4px; }
+
+/* Space-name auto-correct (founder 2026-08-05): the quiet line that says what
+   we trimmed — "Melanie Bright Mentorship Group" under a heading that already
+   reads "Group". Used by every screen that names a space. */
+.name-tidy-note {
+  margin-top: 6px;
+  font-size: 11px; font-weight: 300; color: var(--peach-deep);
+}

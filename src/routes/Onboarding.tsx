@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { LichenMark } from '../components/LichenMark';
+import { tidyName, tidyNote, tidySpaceName } from '../lib/spaceName';
 import './Onboarding.css';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
@@ -29,6 +30,8 @@ export default function Onboarding() {
   const [phone, setPhone] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
+  // Auto-corrected kind word ("… Group" when the section already says Group)
+  const [nameNote, setNameNote] = useState<{ key: number; text: string } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceCats, setServiceCats] = useState<string[]>([]);
   const [goodCats, setGoodCats] = useState<string[]>([]);
@@ -124,7 +127,7 @@ export default function Onboarding() {
       }
 
       if (named.length) {
-        const rows = named.map((s) => ({ kind: s.kind, name: s.name.trim(), created_by: user.id }));
+        const rows = named.map((s) => ({ kind: s.kind, name: tidySpaceName(s.name, s.kind), created_by: user.id }));
         const { error: spaceErr } = await supabase.from('spaces').insert(rows);
         if (spaceErr) throw spaceErr;
       }
@@ -262,7 +265,14 @@ export default function Onboarding() {
                     className="onb__input"
                     type="text"
                     value={s.name}
-                    onChange={(e) => updateSpace(s.id, { name: e.target.value })}
+                    onChange={(e) => { updateSpace(s.id, { name: e.target.value }); setNameNote(null); }}
+                    onBlur={() => {
+                      const t = tidyName(s.name, s.kind);
+                      if (t.removed) {
+                        updateSpace(s.id, { name: t.name });
+                        setNameNote({ key: s.id, text: tidyNote(t.removed, s.kind) });
+                      }
+                    }}
                     placeholder={'Name your ' + sec.one}
                   />
                   <button
@@ -275,6 +285,9 @@ export default function Onboarding() {
                   </button>
                 </div>
               ))}
+              {nameNote && mine.some((s) => s.id === nameNote.key) && (
+                <p className="name-tidy-note">{nameNote.text}</p>
+              )}
 
               <button type="button" className="onb__add" onClick={() => addSpace(sec.kind)}>
                 + Add {mine.length ? 'another' : `${article} ${sec.one}`}
