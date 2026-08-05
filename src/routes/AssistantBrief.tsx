@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -46,6 +47,8 @@ const cache = new Map<string, string>();
 export default function AssistantBrief() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const [ask, setAsk] = useState('');
+  const [sending, setSending] = useState(false);
   const section = params.get('section') ?? 'home';
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -246,6 +249,24 @@ export default function AssistantBrief() {
     navigate(`/chat/${await ensureDirectChat(CLAUDE_PROFILE_ID)}`);
   }
 
+  /** The composer at the foot of the brief (founder 2026-08-05): reply to
+   *  what you just read without hunting for a door. The line is really sent
+   *  into the Claude DM — the same room, the same daily cap, the same
+   *  answering trigger — and we land you in the thread to read the reply. */
+  async function sendToClaude() {
+    const text = ask.trim();
+    if (!text || !me || sending) return;
+    setSending(true);
+    try {
+      const chatId = await ensureDirectChat(CLAUDE_PROFILE_ID);
+      await supabase.from('chat_messages').insert({ chat_id: chatId, sender_id: me, body: text });
+      setAsk('');
+      navigate(`/chat/${chatId}`);
+    } catch {
+      setSending(false);
+    }
+  }
+
   return (
     <div className="abrief">
       <button className="cmp__back calp__backchip" onClick={() => navigate(-1)}>← Back</button>
@@ -255,7 +276,9 @@ export default function AssistantBrief() {
           partner with an identity, not a feature with an icon. */}
       <div className="abrief__head">
         <span className="abrief__avatar-wrap">
-          <img className="abrief__avatar" src="/claude-avatar.svg" alt="" />
+          {/* The brain as a glyph, not the peach-filled avatar file — it has
+              to take the silicon blue, not fight it. */}
+          <span className="abrief__avatar"><Icon name="brain" size={38} /></span>
           <span className="abrief__el" aria-hidden="true">Si</span>
         </span>
         <h1 className="abrief__title">AI Assistant</h1>
@@ -296,11 +319,28 @@ export default function AssistantBrief() {
       </label>
 
       <div className="abrief__acts">
-        <button className="btn btn-primary" onClick={() => void talkToClaude()}>
-          Talk it through with Claude
-        </button>
+        <button className="btn" onClick={() => void talkToClaude()}>Open the conversation</button>
         <button className="btn" onClick={() => navigate('/search')}>Search instead</button>
       </div>
+
+      {/* Always-there composer — answer the brief in place (founder
+          2026-08-05). Enter sends; Shift+Enter makes a new line. */}
+      <form className="abrief__ask" onSubmit={(e) => { e.preventDefault(); void sendToClaude(); }}>
+        <textarea
+          className="abrief__ask-input"
+          rows={1}
+          value={ask}
+          placeholder="Ask about any of this…"
+          onChange={(e) => setAsk(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendToClaude(); }
+          }}
+        />
+        <button className="abrief__ask-send" type="submit" disabled={!ask.trim() || sending}
+          aria-label="Send to your assistant">
+          <Icon name="send" size={15} />
+        </button>
+      </form>
       <p className="abrief__foot">
         Carbon decides; silicon organizes. Nothing here is a score, and nothing leaves your view.
       </p>

@@ -2,9 +2,10 @@
 .abrief__head { text-align: center; margin: var(--s-3) 0 var(--s-5); }
 .abrief__avatar-wrap { position: relative; display: inline-block; }
 .abrief__avatar {
-  width: 76px; height: 76px; border-radius: 50%; padding: 13px;
+  width: 76px; height: 76px; border-radius: 50%;
   background: transparent; border: 1px solid var(--blue);
   color: var(--blue);
+  display: inline-flex; align-items: center; justify-content: center;
 }
 /* The silicon badge, top-right — same element language as About's C/Si
    tiles and the weavers card. */
@@ -36,3 +37,27 @@
 .abrief__consent { display: flex; align-items: flex-start; gap: 8px; margin-bottom: var(--s-3); font-size: 13px; color: var(--ink-soft); cursor: pointer; }
 .abrief__consent input { margin-top: 2px; }
 .abrief__consent em { font-style: normal; color: var(--ink-faint); }
+
+/* ── The composer at the foot of the brief (founder 2026-08-05) ────────
+   Always there, like a real conversation: answer what you just read
+   without going looking for a door. Sends into the same Claude DM. */
+.abrief__ask {
+  display: flex; align-items: flex-end; gap: 8px;
+  margin-top: var(--s-4);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 16px); padding: 8px 8px 8px 14px;
+}
+.abrief__ask:focus-within { border-color: var(--blue); }
+.abrief__ask-input {
+  flex: 1; min-width: 0; border: 0; background: transparent; resize: none;
+  font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink);
+  padding: 7px 0; max-height: 140px;
+}
+.abrief__ask-input:focus { outline: none; }
+.abrief__ask-input::placeholder { color: var(--ink-faint); }
+.abrief__ask-send {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
+  border: 0; background: var(--blue); color: #fff; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.abrief__ask-send:disabled { background: var(--bone-edge); color: var(--ink-faint); cursor: default; }
