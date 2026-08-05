@@ -32,6 +32,8 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   concierge: { title: 'Care', frame: 'You help them tend care — their own and the people they care for.' },
   communities: { title: 'Your communities', frame: 'You help them tend belonging: what their groups and communities need from them.' },
   groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them.' },
+  organizations: { title: 'Your organizations', frame: 'You help them tend belonging: what the organizations they steward or belong to need from them.' },
+  places: { title: 'Your places', frame: 'You help them tend the places they steward or gather in.' },
   events: { title: 'Events', frame: 'You help them gather: invitations, RSVPs, what is coming up.' },
   membership: { title: 'Membership', frame: 'You help them steward their stake in the commons.' },
   saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },

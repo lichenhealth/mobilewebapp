@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
@@ -96,7 +96,11 @@ export default function BookSession() {
     <div className="bkg">
       <button className="cmp__back" onClick={() => navigate(-1)}><Icon name="arrow-left" size={14} /> Back</button>
       <header className="bkg__head">
-        <p className="eyebrow">Book{providerName ? ` · ${providerName}` : ''}</p>
+        {/* The practitioner's name is a door to their profile (founder
+            2026-08-05) — you should be able to read who you're booking. */}
+        <p className="eyebrow">
+          Book{providerName && <> · <Link className="bkg__who" to={`/members/${t.provider_id}`}>{providerName}</Link></>}
+        </p>
         <h1 className="bkg__title display-italic">{t.title}</h1>
         <p className="bkg__sub">
           {t.duration_min} min{t.price ? ` · ${t.price}` : ''}{t.location ? ` · ${t.location}` : ''}

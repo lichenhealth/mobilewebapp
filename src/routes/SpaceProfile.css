@@ -31,6 +31,8 @@
 .sprof__kind {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--peach-deep); margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  justify-content: center;
 }
 .sprof__desc {
   font-size: 13px; font-weight: 300; color: var(--ink); line-height: 1.55;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import FilterRow from './FilterRow';
 import FeedCard from './FeedCard';
 import { Icon, IconName } from './Icon';
+import { aiDoorOn } from './AssistantDoor';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
@@ -41,15 +42,27 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], trailing = [], entityName }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, trailing = [], hideAreas = [], entityName }: {
   profileId?: string;
   spaceId?: string;
   me: string;
+  /** Circles BEFORE the hairline: search, add — the doors that are about you
+   *  acting, not about this entity (founder 2026-08-05). */
   leading?: { icon: IconName; label: string; onClick: () => void }[];
+  /** Circles right AFTER the hairline, ahead of the area lenses — the
+   *  entity's own rooms (Chat). */
+  afterGap?: { icon: IconName; label: string; onClick: () => void }[];
+  /** When set, an assistant door closes the leading group — quiet when this
+   *  section's consent is off, exactly like Home's brain. */
+  assistantSection?: string;
   /** Far-right action circles AFTER the area icons — Members sits at the end
    *  of every space row, mirroring Home's Directory-at-the-far-right
    *  (founder 2026-07-25). */
   trailing?: { icon: IconName; label: string; onClick: () => void }[];
+  /** Area lenses to leave out because a trailing door already opens that
+   *  section properly — a space's Events tab beats an events-only filter,
+   *  and two identical circles side by side read as a bug. */
+  hideAreas?: string[];
   /** The entity's display name — lets a single area lens read as a PLACE:
    *  tap Library on Melanie's profile and the feed declares "Melanie's
    *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
@@ -98,7 +111,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const areasPresent = useMemo(() => {
     const present = new Set<ServiceArea>();
     posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
-    return SERVICE_AREAS.filter((a) => present.has(a.value))
+    return SERVICE_AREAS.filter((a) => present.has(a.value) && !hideAreas.includes(a.value))
       .sort((a, b) => HOME_ORDER.indexOf(a.value) - HOME_ORDER.indexOf(b.value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts]);
@@ -138,7 +151,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
 
   if (!ready) return <p className="cfeed__empty">Loading…</p>;
   // Space anatomy (Chat/Members) stays visible even before the first post.
-  if (posts.length === 0 && leading.length === 0) {
+  if (posts.length === 0 && leading.length === 0 && afterGap.length === 0) {
     return <p className="cfeed__empty">No contributions yet.</p>;
   }
 
@@ -154,7 +167,27 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
               <span className="cfeed__area-label">{l.label}</span>
             </button>
           ))}
-          {leading.length > 0 && (areasPresent.length > 0 || trailing.length > 0) && <span className="cfeed__area-gap" />}
+          {assistantSection && (
+            <button
+              className={'cfeed__area cfeed__area--ai' + (aiDoorOn(assistantSection) ? '' : ' is-ai-off')}
+              onClick={() => navigate(`/assistant?section=${assistantSection}`)}
+              title={aiDoorOn(assistantSection)
+                ? 'Your assistant — a briefing for this part of your Lichen life'
+                : 'You’ve switched the assistant off for this section. Tap to change that.'}
+            >
+              <span className="cfeed__area-circle"><Icon name="brain" size={14} /></span>
+              <span className="cfeed__area-label">AI</span>
+            </button>
+          )}
+          {(leading.length > 0 || assistantSection)
+            && (afterGap.length > 0 || areasPresent.length > 0 || trailing.length > 0)
+            && <span className="cfeed__area-gap" />}
+          {afterGap.map((l) => (
+            <button key={l.label} className="cfeed__area" onClick={l.onClick}>
+              <span className="cfeed__area-circle"><Icon name={l.icon} size={14} /></span>
+              <span className="cfeed__area-label">{l.label}</span>
+            </button>
+          ))}
           {areasPresent.map((a) => (
             <button
               key={a.value}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
@@ -41,6 +41,16 @@ import PublicPage, { type PageMeta } from '../components/PublicPage';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
+};
+// The kind's mark rides beside its word under the name — never in the top bar
+// (founder 2026-08-05: the section mark belongs to where you ARE, not to what
+// kind of room you're standing in).
+const KIND_ICON: Record<SpaceKind, IconName> = {
+  organization: 'globe', community: 'user-multiple', group: 'groups', place: 'location',
+};
+// Which assistant frame a space page briefs from — its own kind.
+const ASSISTANT_SECTION: Record<SpaceKind, string> = {
+  organization: 'organizations', community: 'communities', group: 'groups', place: 'places',
 };
 const ROLE_LABEL: Record<string, string> = {
   super_admin: 'super admin', admin: 'admin', member: 'member',
@@ -574,8 +584,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         // Home's icon row (founder 2026-07-25 — one order everywhere).
         { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?space=${space.id}`) },
         { icon: 'plus' as const, label: 'Add', onClick: () => setPlusOpen((o) => !o) },
-        ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []),
       ]}
+      // The brain closes the acting-doors group, just before the hairline
+      // (founder 2026-08-05) — quiet when this section's consent is off.
+      assistantSection={ASSISTANT_SECTION[space.kind]}
+      // …and the space's own rooms open the group after it.
+      afterGap={chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []}
       trailing={[
         // The founder's Marketplace-icon analogy: a Groups door appears only
         // when this space actually has groups nested under it.
@@ -587,6 +601,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         { icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') },
         { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
       ]}
+      // The Events door below opens the real gatherings list — an
+      // events-only feed lens beside it was the same circle twice.
+      hideAreas={['events']}
     />
   );
   const roomsSection = !backstage && resources.length > 0 && (
@@ -668,6 +685,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         id={space.id}
         name={space.name}
         kindLabel={kindLabel}
+        kindIcon={KIND_ICON[space.kind]}
         avatarUrl={space.avatar_url}
         description={space.description}
         location={space.location}
@@ -754,6 +772,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         <h1 className="prof__name">{space.name}</h1>
         <p className="sprof__kind">
           {kindLabel}
+          <Icon name={KIND_ICON[space.kind]} size={15} />
           {space.parent && (
             <>
               {' · '}

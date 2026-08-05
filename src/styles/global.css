@@ -280,6 +280,11 @@ input, textarea, select { font: inherit; color: inherit; }
     padding-top: var(--s-6);
     padding-bottom: var(--s-6);
   }
+  /* …and because it no longer reserves --top-h above the fold, the profile
+     screens must NOT pull themselves up by the difference — that pull was
+     calibrated for the mobile shell, and here it slid the avatar under the
+     sticky top bar's opaque bone, shearing off its top (founder 2026-08-05). */
+  .prof, .ppage--in-app { margin-top: 0; }
   /* Bottom nav replaced by the sidebar */
   .bottom-nav { display: none; }
   /* Fuller feed: two columns of cards */

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
 import './PublicPage.css';
@@ -62,6 +62,9 @@ export interface PublicPageProps {
   id: string;
   name: string;
   kindLabel?: string;          // "Place", "Organization", or a person's headline
+  /** The kind's mark, shown beside its word — spaces only (founder
+   *  2026-08-05: the kind belongs under the name, not in the top bar). */
+  kindIcon?: IconName;
   avatarUrl?: string | null;
   description?: string | null; // the Lichen bio/description, used when story is empty
   location?: string | null;
@@ -158,7 +161,7 @@ export default function PublicPage(props: PublicPageProps) {
 
   return (
     <div
-      className={'ppage ppage--' + (page.coverStyle ?? 'tint') + (props.signedIn ? ' ppage--in-app' : '')}
+      className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')}
       style={{ ['--ppage-accent' as string]: accent }}
     >
       {props.preview && (
@@ -190,7 +193,12 @@ export default function PublicPage(props: PublicPageProps) {
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={128} />
           <h1 className="ppage__name">{name}</h1>
           {(page.tagline || kindLabel) && (
-            <p className="ppage__tagline">{page.tagline || kindLabel}</p>
+            <p className="ppage__tagline">
+              {page.tagline || kindLabel}
+              {!page.tagline && props.kindIcon && (
+                <Icon name={props.kindIcon} size={16} />
+              )}
+            </p>
           )}
           {location && <p className="ppage__where"><Icon name="location" size={13} /> {location}</p>}
           {act && actHref && navItems.length === 0 && (

@@ -80,3 +80,6 @@
   font-size: 12px; color: var(--ink-soft); cursor: pointer;
 }
 .cmp__back svg { color: var(--peach-deep, var(--peach)); }
+
+.bkg__who { color: var(--peach-deep, var(--peach)); text-decoration: none; font-weight: 600; }
+.bkg__who:hover { text-decoration: underline; }

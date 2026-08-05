@@ -584,9 +584,9 @@ export default function Profile() {
           <div className="prof__field">
             <label className="prof__label">Look</label>
             <div className="cmp__chips">
-              {([['tint', 'Tinted'], ['photo', 'Photo cover'], ['plain', 'Plain']] as const).map(([v, label]) => (
+              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
                 <button key={v}
-                  className={'cmp__chip' + ((pageMeta.coverStyle ?? 'tint') === v ? ' is-on' : '')}
+                  className={'cmp__chip' + ((pageMeta.coverStyle ?? 'plain') === v ? ' is-on' : '')}
                   onClick={() => setPage({ coverStyle: v })}>{label}</button>
               ))}
             </div>

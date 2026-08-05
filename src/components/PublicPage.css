@@ -52,9 +52,11 @@
    Generous air around images — content gets room to breathe (founder). */
 .ppage__hero-body--top { padding-bottom: var(--s-3); }
 .ppage__hero .ppage__cover { margin-top: var(--s-4); margin-bottom: var(--s-5); }
-.ppage--tint .ppage__hero-body { background: linear-gradient(180deg, color-mix(in srgb, var(--ppage-accent) 14%, transparent), transparent); }
+/* No wash behind the identity — just the profile picture (founder
+   2026-08-05). 'tint' survives as a stored value on older pages; it simply
+   renders plain now. */
 .ppage__name { margin: 6px 0 0; font-family: var(--font-display, inherit); font-size: 30px; line-height: 1.15; }
-.ppage__tagline { margin: 0; font-size: 15.5px; color: var(--ink-soft); max-width: 46ch; }
+.ppage__tagline { margin: 0; font-size: 15.5px; color: var(--ink-soft); max-width: 46ch; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }
 .ppage__where { display: inline-flex; align-items: center; gap: 5px; margin: 2px 0 0; font-size: 13px; color: var(--ink-muted); }
 .ppage__cta {
   margin-top: 12px; padding: 11px 22px; border-radius: var(--r-full);
