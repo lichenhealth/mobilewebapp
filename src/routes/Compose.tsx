@@ -619,6 +619,7 @@ export default function Compose() {
           isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
+          authorBeingId: actor.type === 'being' ? actor.id : null,
           eventCategory: isEvent ? evCategory : null,
           eventMode: isEvent ? (evMode as EventMode) : null,
           linkedEventId,

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { getIdentityTags } from '../lib/meansApi';
+import { loadSteward } from '../lib/stewardshipApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
 import {
@@ -33,6 +34,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const me = user?.id ?? '';
 
   const [member, setMember] = useState<MemberRow | null>(null);
+  const [steward, setSteward] = useState<{ name: string; to: string } | null>(null);
   const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
   const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
@@ -115,6 +117,16 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     setTopIdentity({ id: member.id, name: member.full_name || 'A Lichen member', avatarUrl: member.avatar_url, kind: 'person' });
     return () => setTopIdentity(null);
   }, [member]);
+
+  // Who tends this being (nothing to resolve for a person).
+  useEffect(() => {
+    if (!member || !member.kind || member.kind === 'person') { setSteward(null); return; }
+    let live = true;
+    void loadSteward(member).then((sv) => { if (live) setSteward(sv); });
+    return () => { live = false; };
+  }, [member]);
+
+  const isBeing = !!member && !!member.kind && member.kind !== 'person';
 
   if (loading) return <div className="prof"><p className="mprof__muted">Loading…</p></div>;
   if (!member) {
@@ -204,6 +216,19 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       <div className="prof__head">
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
+        {/* A being's kind and who tends it — the beyond-human members
+            (founder 2026-08-05). Nothing renders for a person. */}
+        {isBeing && (
+          <p className="mprof__being">
+            <span className="mprof__being-kind">{member.kind}</span>
+            {steward && (
+              <>
+                {' · Stewarded by '}
+                <Link className="mprof__being-steward" to={steward.to}>{steward.name}</Link>
+              </>
+            )}
+          </p>
+        )}
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
         {idTags.length > 0 && (
           <p className="mprof__idtags">
@@ -233,9 +258,19 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         )}
         {me && !isSelf && (
           <div className="mprof__actions">
-            <button className="btn btn-primary mprof__btn" onClick={message} disabled={busy}>
-              <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}
-            </button>
+            {/* You can't DM a horse — the door goes to whoever tends it. */}
+            {isBeing ? (
+              steward && (
+                <button className="btn btn-primary mprof__btn"
+                  onClick={() => navigate(steward.to)}>
+                  <Icon name="message" size={14} /> Reach {steward.name.split(' ')[0]}
+                </button>
+              )
+            ) : (
+              <button className="btn btn-primary mprof__btn" onClick={message} disabled={busy}>
+                <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}
+              </button>
+            )}
             <button
               className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
               onClick={toggleWeb}

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { listMyBeings } from '../lib/stewardshipApi';
 
 // "Acting as" — Facebook-style identity switching. You can act as yourself or
 // as any space (organization / community / group / place) you administer.
@@ -10,7 +11,13 @@ import { useAuth } from '../auth/AuthProvider';
 
 export type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 export interface ActingSpace { id: string; name: string; kind: SpaceKind }
-export type Actor = { type: 'self' } | ({ type: 'space' } & ActingSpace);
+/** A being you steward — a horse, a cactus, a river (founder 2026-08-05).
+ *  It has a profile but no login, so you speak and act for it. */
+export interface ActingBeing { id: string; name: string; kind: string }
+export type Actor =
+  | { type: 'self' }
+  | ({ type: 'space' } & ActingSpace)
+  | ({ type: 'being' } & ActingBeing);
 
 export interface SelfIdentity { name: string; avatarUrl: string | null }
 
@@ -18,12 +25,13 @@ interface ActingCtx {
   actor: Actor;
   setActor: (a: Actor) => void;
   options: ActingSpace[];          // spaces I can act as (admin/super_admin)
+  beings: ActingBeing[];           // beings I steward
   self: SelfIdentity;              // my own display identity (for the chip)
   refreshSelf: () => void;         // call after changing name/avatar
 }
 
 const Ctx = createContext<ActingCtx>({
-  actor: { type: 'self' }, setActor: () => {}, options: [],
+  actor: { type: 'self' }, setActor: () => {}, options: [], beings: [],
   self: { name: '', avatarUrl: null }, refreshSelf: () => {},
 });
 export const useActing = () => useContext(Ctx);
@@ -33,6 +41,7 @@ const storageKey = (uid: string) => `lichen.actingAs.${uid}`;
 export function ActingProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [options, setOptions] = useState<ActingSpace[]>([]);
+  const [beings, setBeings] = useState<ActingBeing[]>([]);
   const [actor, setActorState] = useState<Actor>({ type: 'self' });
   const [self, setSelf] = useState<SelfIdentity>({ name: '', avatarUrl: null });
   const [selfBump, setSelfBump] = useState(0);
@@ -52,7 +61,7 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   }, [user, selfBump]);
 
   useEffect(() => {
-    if (!user) { setOptions([]); setActorState({ type: 'self' }); return; }
+    if (!user) { setOptions([]); setBeings([]); setActorState({ type: 'self' }); return; }
     let live = true;
     (async () => {
       const { data } = await supabase
@@ -64,12 +73,22 @@ export function ActingProvider({ children }: { children: ReactNode }) {
       const opts = ((data as unknown as { spaces: ActingSpace | null }[] | null) ?? [])
         .map((r) => r.spaces).filter((s): s is ActingSpace => !!s);
       setOptions(opts);
-      // Restore a persisted choice — only if it's still a space we administer.
+      // Beings I steward join the switcher (empty pre-migration).
+      const mine = await listMyBeings(user.id);
+      if (!live) return;
+      const bs: ActingBeing[] = mine.map((b) => ({
+        id: b.id, name: b.full_name ?? 'A being', kind: b.kind,
+      }));
+      setBeings(bs);
+      // Restore a persisted choice — only if it's still ours to act as.
       try {
         const saved = localStorage.getItem(storageKey(user.id));
         if (saved) {
-          const hit = opts.find((o) => o.id === saved);
-          setActorState(hit ? { type: 'space', ...hit } : { type: 'self' });
+          const space = opts.find((o) => o.id === saved);
+          const being = bs.find((b) => b.id === saved);
+          setActorState(space ? { type: 'space', ...space }
+            : being ? { type: 'being', ...being }
+            : { type: 'self' });
         }
       } catch { /* storage unavailable — stay self */ }
     })();
@@ -80,12 +99,12 @@ export function ActingProvider({ children }: { children: ReactNode }) {
     setActorState(a);
     if (!user) return;
     try {
-      if (a.type === 'space') localStorage.setItem(storageKey(user.id), a.id);
+      if (a.type === 'space' || a.type === 'being') localStorage.setItem(storageKey(user.id), a.id);
       else localStorage.removeItem(storageKey(user.id));
     } catch { /* ignore */ }
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const value = useMemo(() => ({ actor, setActor, options, self, refreshSelf }), [actor, options, self]);
+  const value = useMemo(() => ({ actor, setActor, options, beings, self, refreshSelf }), [actor, options, beings, self]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

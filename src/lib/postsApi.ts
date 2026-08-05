@@ -61,6 +61,8 @@ export type NewPost = {
   serviceAreas: ServiceArea[];
   // v2: posted as a space you admin ("acting as"); null = personal.
   authorSpaceId?: string | null;
+  /** Posting AS a being you steward (Tango, a cactus). */
+  authorBeingId?: string | null;
   // Events: category + mode + the linked calendar event (RSVP container).
   eventCategory?: EventCategory | null;
   eventMode?: EventMode | null;
@@ -87,7 +89,10 @@ export async function createPost(input: NewPost) {
   // the DB bridge trigger backstops both directions.
   const visibility: Visibility = input.isPublic ? 'public' : input.toMycelium ? 'mycelium' : 'space';
   const { data, error } = await supabase.from('posts').insert({
-    author_id: user.id,
+    // Acting as a being you steward puts THEM in the author seat — the RLS
+    // policy delegates via is_entity_steward, mirroring how author_space_id
+    // has always delegated via is_space_admin (founder 2026-08-05).
+    author_id: input.authorBeingId ?? user.id,
     author_space_id: input.authorSpaceId ?? null,
     event_category: input.eventCategory ?? null,
     event_mode: input.eventMode ?? null,

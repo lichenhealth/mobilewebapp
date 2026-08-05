@@ -14,12 +14,18 @@ export interface MemberProfile {
   /** This member works without the assistant (founder 2026-08-05) — their
    *  AI door reads slashed. Absent pre-migration = on. */
   assistant_enabled?: boolean;
+  /** Beyond-human members (founder 2026-08-05): 'person' unless this is a
+   *  being tended by someone. Absent pre-migration = treat as a person. */
+  kind?: string;
+  aspect?: string | null;
+  steward_profile_id?: string | null;
+  steward_space_id?: string | null;
 }
 
 export async function loadMemberProfile(id: string): Promise<MemberProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled')
+    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled, kind, aspect, steward_profile_id, steward_space_id')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadMemberProfile:', error.message); return null; }

@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import {
+  listMyBeings, createBeing, ENTITY_KINDS,
+  type Being, type EntityKind, type EntityAspect,
+} from '../lib/stewardshipApi';
 import { getIdentityTags, saveIdentityTags } from '../lib/meansApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
@@ -66,6 +70,14 @@ export default function Profile() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
+  // Beings you steward — hidden until the stewardship migration lands.
+  const [beings, setBeings] = useState<Being[]>([]);
+  const [beingsOn, setBeingsOn] = useState(false);
+  const [beingName, setBeingName] = useState('');
+  const [beingKind, setBeingKind] = useState<EntityKind>('animal');
+  const [beingAspect, setBeingAspect] = useState<EntityAspect>('individual');
+  const [beingBusy, setBeingBusy] = useState(false);
+  const [beingMsg, setBeingMsg] = useState('');
   const [fullName, setFullName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -180,6 +192,18 @@ export default function Profile() {
     if (!loading && !user) { navigate('/login', { replace: true }); return; }
     if (user) { loadAll(); loadCare(); }
   }, [user, loading, navigate, loadAll, loadCare]);
+
+  // Beings you steward — the section stays hidden pre-migration.
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void supabase.from('profiles').select('kind').limit(1).then(({ error }) => {
+      if (!live || error) return;   // columns not there yet
+      setBeingsOn(true);
+      void listMyBeings(user.id).then((b) => { if (live) setBeings(b); });
+    });
+    return () => { live = false; };
+  }, [user]);
 
   // Admin badge: how many category suggestions are waiting for review.
   useEffect(() => {
@@ -998,6 +1022,73 @@ export default function Profile() {
         </div>
         {careMsg && <p className="prof__care-msg">{careMsg}</p>}
       </section>
+
+      {/* Beings you steward (founder 2026-08-05). A therapy horse, a sacred
+          plant, a river — real members with no login, who act through you.
+          The section hides itself until the stewardship migration lands. */}
+      {beingsOn && (
+        <section className="prof__section">
+          <h2 className="prof__h2" id="stewarding">Beings you steward</h2>
+          <p className="prof__care-lead">
+            Members who can&rsquo;t hold a password — an animal, a plant, a place, an
+            element. They earn, hold and spend in their own name; you act for them.
+          </p>
+          {beings.length === 0 && <p className="prof__empty">You don&rsquo;t steward anyone yet.</p>}
+          <div className="prof__care-list">
+            {beings.map((b) => (
+              <div className="prof__care-row" key={b.id}>
+                <div className="prof__care-id">
+                  <span className="prof__care-name">{b.full_name ?? 'A being'}</span>
+                  <span className="prof__care-tag">
+                    {b.kind}{b.steward_space_id ? ' · through a space you administer' : ''}
+                  </span>
+                </div>
+                <div className="prof__care-actions">
+                  <button className="prof__care-btn" onClick={() => navigate(`/members/${b.id}`)}>Open</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="prof__being-add">
+            <input className="prof__input" value={beingName}
+              onChange={(e) => { setBeingName(e.target.value); setBeingMsg(''); }}
+              placeholder="Their name — Tango, Grandmother Saguaro…" />
+            <div className="cmp__chips">
+              {ENTITY_KINDS.map((k) => (
+                <button key={k.value}
+                  className={'cmp__chip' + (beingKind === k.value ? ' is-on' : '')}
+                  onClick={() => setBeingKind(k.value)}>{k.label}</button>
+              ))}
+            </div>
+            <div className="cmp__chips">
+              {(['individual', 'collective'] as const).map((a) => (
+                <button key={a}
+                  className={'cmp__chip' + (beingAspect === a ? ' is-on' : '')}
+                  onClick={() => setBeingAspect(a)}>
+                  {a === 'individual' ? 'An individual' : 'A collective spirit'}
+                </button>
+              ))}
+            </div>
+            <p className="prof__hint">
+              Tango is an individual; Huachuma is a collective. The question isn&rsquo;t
+              plant or animal — it&rsquo;s one being or many acting as one.
+            </p>
+            <button className="btn btn-primary" disabled={beingBusy || !beingName.trim()}
+              onClick={() => {
+                setBeingBusy(true);
+                void createBeing(beingName.trim(), beingKind, beingAspect)
+                  .then(async (r) => {
+                    setBeingMsg(r.message);
+                    if (r.ok) { setBeingName(''); setBeings(await listMyBeings(meId)); }
+                  })
+                  .finally(() => setBeingBusy(false));
+              }}>
+              Weave them in
+            </button>
+            {beingMsg && <p className="prof__care-msg">{beingMsg}</p>}
+          </div>
+        </section>
+      )}
 
       {SPACE_SECTIONS.map((sec) => {
         const mine = spaces.filter((s) => s.kind === sec.kind);

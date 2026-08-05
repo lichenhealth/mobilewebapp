@@ -57,6 +57,8 @@ const SECTION_LOGOS: SectionLogo[] = [
 // (Concierge's settings gear removed 2026-07-17 — it only opened /profile,
 // which the avatar chip already does everywhere.)
 
+const SPACE_KINDS = ['organization', 'community', 'group', 'place'];
+
 export default function TopBar({
   onMenu,
 }: TopBarProps) {
@@ -65,7 +67,7 @@ export default function TopBar({
   const section = SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
 
   const { unreadForScope } = useNotifications();
-  const { actor, setActor, options, self } = useActing();
+  const { actor, setActor, options, beings, self } = useActing();
   const { user } = useAuth();
   const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
@@ -94,13 +96,17 @@ export default function TopBar({
     navigate('/login', { replace: true });
   }
 
-  /** Pick an identity: act as it AND land on its profile. */
-  function pickIdentity(target: 'self' | (typeof options)[number]) {
+  /** Pick an identity: act as it AND land on its profile. Beings you steward
+   *  live on /members/:id, same as any other member (founder 2026-08-05). */
+  function pickIdentity(target: 'self' | (typeof options)[number] | (typeof beings)[number]) {
     if (target === 'self') {
       setActor({ type: 'self' });
       navigate('/profile');
+    } else if ('kind' in target && !SPACE_KINDS.includes(target.kind)) {
+      setActor({ type: 'being', id: target.id, name: target.name, kind: target.kind });
+      navigate(`/members/${target.id}`);
     } else {
-      setActor({ type: 'space', ...target });
+      setActor({ type: 'space', ...(target as (typeof options)[number]) });
       navigate(`/spaces/${target.id}`);
     }
     setSwitchOpen(false);
@@ -174,13 +180,13 @@ export default function TopBar({
       <div className="top-bar__right">
         <div className="top-bar__switch-wrap">
         <button
-          className={'top-bar__acting' + (actor.type === 'space' ? ' is-entity' : '')}
+          className={'top-bar__acting' + (actor.type !== 'self' ? ' is-entity' : '')}
           onClick={() => (user ? setSwitchOpen((o) => !o)
             : navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`))}
-          title={!user ? 'Sign in' : actor.type === 'space' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
-          aria-label={!user ? 'Sign in' : actor.type === 'space' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
+          title={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
+          aria-label={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
-          {actor.type === 'space' ? (
+          {actor.type !== 'self' ? (
             <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
               {monogramFor(actor.name)}
             </span>
@@ -213,6 +219,20 @@ export default function TopBar({
                   </span>
                   <span className="top-bar__switch-name">{o.name}</span>
                   <span className="top-bar__switch-kind">{o.kind}</span>
+                </button>
+              ))}
+              {beings.map((b) => (
+                <button
+                  key={b.id}
+                  className={'top-bar__switch-row' + (actor.type === 'being' && actor.id === b.id ? ' is-on' : '')}
+                  onClick={() => pickIdentity(b)}
+                  role="menuitem"
+                >
+                  <span className="top-bar__switch-avatar" style={{ background: colorFor(b.id) }}>
+                    {monogramFor(b.name)}
+                  </span>
+                  <span className="top-bar__switch-name">{b.name}</span>
+                  <span className="top-bar__switch-kind">{b.kind}</span>
                 </button>
               ))}
               <button className="top-bar__switch-row top-bar__switch-signout" onClick={signOut} role="menuitem">

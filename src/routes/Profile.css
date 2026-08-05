@@ -293,3 +293,6 @@
   color: var(--peach-deep); text-decoration: underline; cursor: pointer;
 }
 .prof__story { min-height: 140px; }
+
+/* Weaving in a being you steward. */
+.prof__being-add { display: flex; flex-direction: column; gap: var(--s-3); margin-top: var(--s-4); }
