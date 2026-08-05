@@ -26,7 +26,30 @@
       "mcp__Claude_Preview__preview_click",
       "mcp__9f0d5f47-2215-4b49-bf2e-03d58bc3eb47__read_file_content",
       "Bash(git fetch)",
-      "Bash(./worker/migrate.sh supabase/marketing_demo*)"
+      "Bash(./worker/migrate.sh supabase/marketing_demo*)",
+      "Bash(npx tsc -b)",
+      "Bash(npx tsc -b *)",
+      "Bash(npx vite build)",
+      "Bash(npx vite build *)",
+      "Bash(npm run build)",
+      "Bash(npm run build *)",
+      "Bash(npm install)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git push -q)",
+      "Bash(git pull --rebase)",
+      "Bash(git stash list)",
+      "Bash(rsync -a *)",
+      "Bash(curl -s https://lichen.health/*)",
+      "Bash(curl -sI https://lichen.health/*)",
+      "Bash(until curl -s https://lichen.health/*)",
+      "Bash(node /private/tmp/claude-501/*)",
+      "Bash(sips *)",
+      "Bash(./worker/migrate.sh supabase/migrations/*)",
+      "Bash(supabase functions deploy *)",
+      "mcp__092cd7c5-9f26-45a6-96ed-c2be3bb86a9a__download_assets",
+      "mcp__Claude_Browser__read_widget_context"
     ]
   }
 }

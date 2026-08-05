@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+interface SpeechRecognitionLike {
+  lang: string; interimResults: boolean;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null; onerror: (() => void) | null;
+  start: () => void;
+}
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
@@ -11,7 +18,7 @@ import {
 import { listPendingResourceBookings } from '../lib/resourcesApi';
 import { listReminders, remindersOn } from '../lib/remindersApi';
 import { occursOn } from '../lib/recurrence';
-import { ensureDirectChat } from '../lib/chatApi';
+import { ensureDirectChat, uploadChatMedia } from '../lib/chatApi';
 import { type Scope } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
@@ -21,6 +28,35 @@ import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
 // back-from-vacation briefing for WHERE YOU ARE — organized highlights,
 // filtered for what needs you. The client gathers what it already holds
 // (RLS-scoped reads it made anyway); Claude organizes; the member decides.
+
+/** Turn the entity names the CLIENT gathered into real doors inside the
+ *  brief's prose. Deterministic: only labels we already hold become links, so
+ *  the assistant can never invent a destination (founder 2026-08-05). */
+function linkify(text: string, refs: { label: string; to: string }[]): React.ReactNode[] {
+  if (!refs.length) return [text];
+  let parts: React.ReactNode[] = [text];
+  for (const ref of refs) {
+    const next: React.ReactNode[] = [];
+    for (const part of parts) {
+      if (typeof part !== 'string') { next.push(part); continue; }
+      let rest = part;
+      let at = rest.toLowerCase().indexOf(ref.label.toLowerCase());
+      while (at >= 0) {
+        if (at > 0) next.push(rest.slice(0, at));
+        next.push(
+          <Link key={`${ref.to}-${next.length}`} className="abrief__ref" to={ref.to}>
+            {rest.slice(at, at + ref.label.length)}
+          </Link>,
+        );
+        rest = rest.slice(at + ref.label.length);
+        at = rest.toLowerCase().indexOf(ref.label.toLowerCase());
+      }
+      if (rest) next.push(rest);
+    }
+    parts = next;
+  }
+  return parts;
+}
 
 /** Claude the member — the 1:1 door when a briefing raises a question. */
 const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
@@ -47,8 +83,16 @@ const cache = new Map<string, string>();
 export default function AssistantBrief() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  // Entities the brief may name, with where they live. Built from what the
+  // CLIENT already gathered — never from the model — so a link can't be
+  // invented (founder 2026-08-05: "can all of the linkable content within
+  // the AI update show up with a blue link?").
+  const [refs, setRefs] = useState<{ label: string; to: string }[]>([]);
   const [ask, setAsk] = useState('');
   const [sending, setSending] = useState(false);
+  const [attach, setAttach] = useState<File | null>(null);
+  const [listening, setListening] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const section = params.get('section') ?? 'home';
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -79,6 +123,7 @@ export default function AssistantBrief() {
     let live = true;
     void (async () => {
       // Stewarding load joins the snapshot (duty-scoped, invites excluded).
+      const found: { label: string; to: string }[] = [];
       let desk: Record<string, number> | undefined;
       let deskNames: Record<string, string> | undefined;
       try {
@@ -89,6 +134,7 @@ export default function AssistantBrief() {
           deskNames = Object.fromEntries(spaces
             .filter((s) => d.counts[s.id])
             .map((s) => [s.id, s.name]));
+          found.push(...spaces.map((sp) => ({ label: sp.name, to: `/spaces/${sp.id}` })));
         }
       } catch { /* snapshot stays lighter */ }
 
@@ -100,7 +146,7 @@ export default function AssistantBrief() {
       try {
         if (section === 'market' || section === 'home') {
           const { data: mine } = await supabase.from('posts')
-            .select('title, body, details, created_at')
+            .select('id, title, body, details, created_at')
             .eq('author_id', me)
             .contains('service_areas', ['marketplace'])
             .order('created_at', { ascending: false }).limit(8);
@@ -114,6 +160,8 @@ export default function AssistantBrief() {
               since: p.created_at.slice(0, 10),
             }));
           if (listings.length) extras.my_open_listings_and_seeks = listings;
+          ((mine as { id?: string; title: string | null }[] | null) ?? [])
+            .forEach((p) => { if (p.id && p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
           const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
           const { count } = await supabase.from('posts')
             .select('id', { count: 'exact', head: true })
@@ -208,6 +256,9 @@ export default function AssistantBrief() {
               listPendingSectionShares(sid).catch(() => []),
               listPendingResourceBookings(sid).catch(() => []),
             ]);
+            reqs.forEach((r) => {
+              if (r.profile?.full_name) found.push({ label: r.profile.full_name, to: `/members/${r.profile_id}` });
+            });
             queues.push({
               space: deskNames[sid] ?? 'a space',
               at_the_door: reqs.filter((r) => r.initiated_by === r.profile_id)
@@ -238,6 +289,10 @@ export default function AssistantBrief() {
       if (d2.capped) { setState('capped'); return; }
       cache.set(section, d2.brief ?? '');
       setBrief(d2.brief ?? '');
+      // Longest first so "Pine Valley Grange" wins over "Pine Valley".
+      setRefs(found
+        .filter((r) => r.label && r.label.length > 3)
+        .sort((a, b) => b.label.length - a.label.length));
       setState('ready');
     })();
     return () => { live = false; };
@@ -255,16 +310,46 @@ export default function AssistantBrief() {
    *  answering trigger — and we land you in the thread to read the reply. */
   async function sendToClaude() {
     const text = ask.trim();
-    if (!text || !me || sending) return;
+    if ((!text && !attach) || !me || sending) return;
     setSending(true);
     try {
       const chatId = await ensureDirectChat(CLAUDE_PROFILE_ID);
-      await supabase.from('chat_messages').insert({ chat_id: chatId, sender_id: me, body: text });
-      setAsk('');
+      let attachments: { type: string; url: string }[] | null = null;
+      if (attach) {
+        const ext = (attach.name.split('.').pop() || 'bin').toLowerCase();
+        const path = await uploadChatMedia(chatId, attach, ext);
+        attachments = [{ type: attach.type.startsWith('image/') ? 'image' : 'file', url: path }];
+      }
+      await supabase.from('chat_messages').insert({
+        chat_id: chatId, sender_id: me, body: text || null,
+        attachments: attachments?.length ? attachments : null,
+      });
+      setAsk(''); setAttach(null);
       navigate(`/chat/${chatId}`);
     } catch {
       setSending(false);
     }
+  }
+
+  /** Dictation, where the browser offers it. Chrome and Safari both expose
+   *  webkitSpeechRecognition; anywhere it's missing the mic simply doesn't
+   *  render rather than pretending. */
+  const SR = (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike; SpeechRecognition?: new () => SpeechRecognitionLike })
+    .webkitSpeechRecognition
+    ?? (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition;
+  function dictate() {
+    if (!SR || listening) return;
+    const rec = new SR();
+    rec.lang = navigator.language || 'en-US';
+    rec.interimResults = false;
+    rec.onresult = (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
+      const said = e.results[e.results.length - 1][0].transcript;
+      setAsk((a) => (a ? `${a} ${said}` : said));
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    setListening(true);
+    rec.start();
   }
 
   return (
@@ -297,7 +382,7 @@ export default function AssistantBrief() {
           </p>
         )}
         {doorOn && state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
-        {doorOn && state === 'ready' && <p className="abrief__text">{brief}</p>}
+        {doorOn && state === 'ready' && <p className="abrief__text">{linkify(brief ?? '', refs)}</p>}
         {doorOn && state === 'capped' && (
           <p className="abrief__text">You&rsquo;ve leaned on me a lot today — which I love. The briefing rests until tomorrow; everything&rsquo;s still in your bell and queues.</p>
         )}
@@ -328,6 +413,18 @@ export default function AssistantBrief() {
       {/* Always-there composer — answer the brief in place (founder
           2026-08-05). Enter sends; Shift+Enter makes a new line. */}
       <form className="abrief__ask" onSubmit={(e) => { e.preventDefault(); void sendToClaude(); }}>
+        <button type="button" className="abrief__ask-btn" onClick={() => fileRef.current?.click()}
+          aria-label="Attach something">
+          <Icon name="plus" size={17} />
+        </button>
+        <input ref={fileRef} type="file" hidden
+          onChange={(e) => { setAttach(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+        {SR && (
+          <button type="button" className={'abrief__ask-btn' + (listening ? ' is-live' : '')}
+            onClick={dictate} aria-label="Speak instead">
+            <Icon name="mic" size={17} />
+          </button>
+        )}
         <textarea
           className="abrief__ask-input"
           rows={1}
@@ -338,11 +435,17 @@ export default function AssistantBrief() {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendToClaude(); }
           }}
         />
-        <button className="abrief__ask-send" type="submit" disabled={!ask.trim() || sending}
+        <button className="abrief__ask-send" type="submit" disabled={(!ask.trim() && !attach) || sending}
           aria-label="Send to your assistant">
           <Icon name="send" size={15} />
         </button>
       </form>
+      {attach && (
+        <p className="abrief__attach">
+          {attach.name}
+          <button onClick={() => setAttach(null)} aria-label="Remove attachment">×</button>
+        </p>
+      )}
       <p className="abrief__foot">
         Carbon decides; silicon organizes. Nothing here is a score, and nothing leaves your view.
       </p>

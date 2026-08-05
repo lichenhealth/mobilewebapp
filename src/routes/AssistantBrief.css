@@ -41,17 +41,40 @@
 /* ── The composer at the foot of the brief (founder 2026-08-05) ────────
    Always there, like a real conversation: answer what you just read
    without going looking for a door. Sends into the same Claude DM. */
+/* Entities named in the brief are doors — silicon blue, because we're inside
+   the assistant's room (founder 2026-08-05). */
+.abrief__ref {
+  color: var(--blue-deep, var(--blue)); font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--blue) 45%, transparent);
+}
+.abrief__ref:hover { border-bottom-color: var(--blue); }
+
 .abrief__ask {
-  display: flex; align-items: flex-end; gap: 8px;
+  display: flex; align-items: flex-end; gap: 4px;
   margin-top: var(--s-4);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  border-radius: var(--r-lg, 16px); padding: 8px 8px 8px 14px;
+  border-radius: var(--r-lg, 16px); padding: 7px 8px;
+}
+.abrief__ask-btn {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+  border: 0; background: transparent; color: var(--ink-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.abrief__ask-btn:hover { background: var(--blue-tint); color: var(--blue-deep); }
+.abrief__ask-btn.is-live { background: var(--blue); color: #fff; }
+.abrief__attach {
+  display: flex; align-items: center; gap: 8px;
+  margin: 6px 0 0; font-size: 12px; color: var(--ink-muted);
+}
+.abrief__attach button {
+  border: 0; background: transparent; color: var(--ink-faint);
+  font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px;
 }
 .abrief__ask:focus-within { border-color: var(--blue); }
 .abrief__ask-input {
   flex: 1; min-width: 0; border: 0; background: transparent; resize: none;
   font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink);
-  padding: 7px 0; max-height: 140px;
+  padding: 7px 4px; max-height: 140px;
 }
 .abrief__ask-input:focus { outline: none; }
 .abrief__ask-input::placeholder { color: var(--ink-faint); }
