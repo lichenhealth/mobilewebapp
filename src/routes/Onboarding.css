@@ -99,3 +99,9 @@
 
 /* Lichen logo mark in the onboarding header (replaces the seed) */
 .onb__logo { display: flex; justify-content: center; margin-bottom: var(--s-2); }
+
+/* Age at signup (founder 2026-08-05): one question everyone answers, plus a
+   birth date from minors so the account ages up on its own. */
+.onb__age { margin-top: var(--s-5); }
+.onb__age-q { font-size: var(--t-sm); font-weight: 600; color: var(--ink); margin-bottom: var(--s-2); }
+.onb__age-date { margin-top: var(--s-3); }

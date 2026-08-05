@@ -27,6 +27,10 @@ export default function Onboarding() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  // Age (founder 2026-08-05). One question for everyone; a minor gives a birth
+  // date so the platform ages them up on its own instead of freezing a number.
+  const [adult, setAdult] = useState<boolean | null>(null);
+  const [birthDate, setBirthDate] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -70,12 +74,20 @@ export default function Onboarding() {
 
   /** The required basics; both Enter Lichen and "later" gate on these. */
   function basicsError(): string {
+    if (adult === null) return 'Please tell us whether you’re 18 or older.';
+    if (adult === false && !birthDate) return 'Please add your birth date so we can look after you properly.';
     return firstName.trim() && lastName.trim() && phone.trim()
       ? ''
       : 'Please add your first name, last name, and phone number.';
   }
   function basicsPatch() {
-    return { first_name: firstName.trim(), last_name: lastName.trim(), phone: phone.trim() };
+    return {
+      first_name: firstName.trim(), last_name: lastName.trim(), phone: phone.trim(),
+      // A birth date always wins — the trigger recomputes is_adult from it.
+      birth_date: birthDate || null,
+      is_adult: adult ?? undefined,
+      age_declared_at: new Date().toISOString(),
+    };
   }
 
   function toggleCap(id: string) {
@@ -204,6 +216,40 @@ export default function Onboarding() {
           <p className="onb__lead" style={{ marginBottom: 0 }}>
             Your care team uses your phone to reach you — and to call you if you’re ever on call for someone.
           </p>
+
+          {/* Age. Everyone answers; only a minor gives a date, so we can age
+              them up automatically rather than asking again (founder). */}
+          <div className="onb__age">
+            <p className="onb__age-q">How old are you?</p>
+            <div className="onb__chips">
+              <button type="button"
+                className={'onb__chip' + (adult === true ? ' is-on' : '')}
+                onClick={() => { setAdult(true); setBirthDate(''); }}>
+                18 or older
+              </button>
+              <button type="button"
+                className={'onb__chip' + (adult === false ? ' is-on' : '')}
+                onClick={() => setAdult(false)}>
+                Under 18
+              </button>
+            </div>
+            {adult === false && (
+              <>
+                <input
+                  className="onb__input onb__age-date"
+                  type="date"
+                  value={birthDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                />
+                <p className="onb__lead" style={{ marginBottom: 0 }}>
+                  Your birth date stays private — nobody else on Lichen can see it. We use it
+                  so your account grows up with you, and so a parent or guardian can hold the
+                  parts of the economy that need holding.
+                </p>
+              </>
+            )}
+          </div>
         </section>
 
         <section className="onb__section">
