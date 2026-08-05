@@ -22,6 +22,11 @@ export interface OfferingMeta {
   circleId?: string;
   /** Hero image for the course room and the shelf (founder 2026-07-28). */
   coverUrl?: string;
+  /** Protected teaching (founder 2026-08-05, the lineage-teacher promise):
+   *  downloads off, recordings watermarked with each viewer's name, and the
+   *  course never read by any assistant. Shown to students as a standing
+   *  promise on the course page. */
+  protectedTeaching?: boolean;
 }
 
 export interface CollectionRow {

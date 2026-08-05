@@ -4,8 +4,15 @@ import { getVideoJob, videoPublicUrl, type VideoJob } from '../lib/videoApi';
 /** Lichen-hosted video: plays the adaptive HLS rendition once the worker has
  *  it ready (Safari natively; hls.js elsewhere, loaded lazily), falling back
  *  to the original file meanwhile. Older posts without a job id play their
- *  url directly — nothing changes for them. */
-export default function VideoPlayer({ url, jobId }: { url: string; jobId?: string }) {
+ *  url directly — nothing changes for them.
+ *
+ *  Protection (founder 2026-08-05, the protected-teaching arc): downloads are
+ *  off EVERYWHERE — Lichen is not a video-download platform, so nodownload +
+ *  no picture-in-picture + no context menu apply to every player. The
+ *  optional `watermark` prop overlays the viewer's name faintly across the
+ *  frame — screen recording can't be technically blocked on the open web, so
+ *  a traceable name is the honest deterrent for protected teachings. */
+export default function VideoPlayer({ url, jobId, watermark }: { url: string; jobId?: string; watermark?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [job, setJob] = useState<VideoJob | null>(null);
 
@@ -50,9 +57,22 @@ export default function VideoPlayer({ url, jobId }: { url: string; jobId?: strin
     return () => { live = false; hls?.destroy(); };
   }, [hlsUrl]);
 
-  if (ready) {
-    return <video ref={videoRef} controls playsInline poster={poster} />;
-  }
-  // Not (yet) transcoded: play the original directly — honest and immediate.
-  return <video controls playsInline src={url} poster={poster} />;
+  const guard = {
+    controlsList: 'nodownload noremoteplayback',
+    disablePictureInPicture: true,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  } as const;
+
+  const video = ready
+    ? <video ref={videoRef} controls playsInline poster={poster} {...guard} />
+    // Not (yet) transcoded: play the original directly — honest and immediate.
+    : <video controls playsInline src={url} poster={poster} {...guard} />;
+
+  if (!watermark) return video;
+  return (
+    <span className="vp-marked">
+      {video}
+      <span className="vp-watermark" aria-hidden="true">{watermark}</span>
+    </span>
+  );
 }

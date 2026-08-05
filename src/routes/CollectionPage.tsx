@@ -327,6 +327,13 @@ export default function CollectionPage() {
         </p>
         {meta.description && <p className="colp__desc">{meta.description}</p>}
         {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} itemWord={itemWord(meta.kind)} />}
+        {meta.kind === 'course' && meta.details.protectedTeaching && (
+          <p className="colp__protect">
+            <strong>Protected teaching.</strong> This course stays in the room: no downloads,
+            every recording watermarked with the viewer's name, and never read by any
+            assistant — a standing promise, made by the teacher, kept by the platform.
+          </p>
+        )}
       </header>
 
       {error && <p className="colp__error">{error}</p>}
@@ -505,6 +512,17 @@ export default function CollectionPage() {
                 onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
               <input className="prof__input" value={form.price ?? ''} placeholder="Price / access (e.g. Free, $120, Sliding $40–$120)"
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value || undefined }))} />
+              {meta.kind === 'course' && (
+                <label className="colp__protect-toggle">
+                  <input type="checkbox" checked={!!form.protectedTeaching}
+                    onChange={(e) => setForm((f) => ({ ...f, protectedTeaching: e.target.checked || undefined }))} />
+                  <span>
+                    <strong>Protected teaching</strong> — downloads off, recordings watermarked
+                    with each viewer's name, and this course is never read by any assistant.
+                    Shown to students as a standing promise.
+                  </span>
+                </label>
+              )}
               {meta.kind === 'course' && (
                 <>
                   <span className="colp__meta-label">Modules</span>
