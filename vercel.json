@@ -46,6 +46,11 @@
       "source": "/project/:slug",
       "destination": "/:slug",
       "permanent": true
+    },
+    {
+      "source": "/weave",
+      "destination": "/about",
+      "permanent": true
     }
   ],
   "rewrites": [

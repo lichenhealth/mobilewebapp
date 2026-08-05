@@ -31,7 +31,14 @@ import CalendarSettings from './routes/CalendarSettings';
 import Events from './routes/Events';
 import EventPage from './routes/EventPage';
 import GuestEvent from './routes/GuestEvent';
-import AboutLichen from './routes/AboutLichen';
+// AboutLichen retired as a live route (founder 2026-08-04): /about is now the
+// static merged marketing page (public/about, weave design). Any in-app
+// navigate('/about') lands on this redirector, which hard-loads so the
+// server's filesystem-first static file wins over the SPA.
+function StaticAboutRedirect() {
+  useEffect(() => { window.location.replace('/about'); }, []);
+  return null;
+}
 import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
@@ -322,7 +329,7 @@ export default function App() {
           <Route path="/events/mine" element={<Events />} />
           <Route path="/events/:postId" element={<EventPage />} />
           <Route path="/e/:token" element={<GuestEvent />} />
-          <Route path="/about" element={<AboutLichen />} />
+          <Route path="/about" element={<StaticAboutRedirect />} />
           <Route path="/courses"  element={
             <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
               title="Lichen" italic="Courses."
