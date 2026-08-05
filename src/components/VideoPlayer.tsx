@@ -6,13 +6,14 @@ import { getVideoJob, videoPublicUrl, type VideoJob } from '../lib/videoApi';
  *  to the original file meanwhile. Older posts without a job id play their
  *  url directly — nothing changes for them.
  *
- *  Protection (founder 2026-08-05, the protected-teaching arc): downloads are
- *  off EVERYWHERE — Lichen is not a video-download platform, so nodownload +
- *  no picture-in-picture + no context menu apply to every player. The
- *  optional `watermark` prop overlays the viewer's name faintly across the
- *  frame — screen recording can't be technically blocked on the open web, so
- *  a traceable name is the honest deterrent for protected teachings. */
-export default function VideoPlayer({ url, jobId, watermark }: { url: string; jobId?: string; watermark?: string }) {
+ *  Protection (founder 2026-08-05): the universal default is DOWNLOADABLE —
+ *  protection is a choice, not a wall. When a post carries
+ *  details.noDownload (or a course is a protected teaching), pass
+ *  noDownload to hide the download button, block picture-in-picture and the
+ *  context menu. The optional `watermark` prop overlays the viewer's name —
+ *  screen recording can't be technically blocked on the open web, so a
+ *  traceable name is the honest deterrent. */
+export default function VideoPlayer({ url, jobId, watermark, noDownload }: { url: string; jobId?: string; watermark?: string; noDownload?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [job, setJob] = useState<VideoJob | null>(null);
 
@@ -57,11 +58,11 @@ export default function VideoPlayer({ url, jobId, watermark }: { url: string; jo
     return () => { live = false; hls?.destroy(); };
   }, [hlsUrl]);
 
-  const guard = {
+  const guard = noDownload ? {
     controlsList: 'nodownload noremoteplayback',
     disablePictureInPicture: true,
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  } as const;
+  } as const : {};
 
   const video = ready
     ? <video ref={videoRef} controls playsInline poster={poster} {...guard} />

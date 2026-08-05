@@ -60,7 +60,9 @@ export async function askAssistant(
       rec_degree: criteria.rec.degree,
       radius_miles: criteria.radiusMiles,
       people: results.people.slice(0, 8).map(personBrief),
-      posts: results.posts.slice(0, 8).map(postBrief),
+      // Per-post consent (founder 2026-08-05): posts marked not-AI-readable
+      // stay in the member's own results but never reach the narrator.
+      posts: results.posts.filter((p) => !(p.details as { aiExcluded?: boolean } | null)?.aiExcluded).slice(0, 8).map(postBrief),
       spaces: results.spaces.slice(0, 8).map(spaceBrief),
     },
   });

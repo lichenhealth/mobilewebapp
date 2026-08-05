@@ -229,6 +229,32 @@ export default function Profile() {
   // Consent travels with your words (founder 2026-07-28): may other members'
   // assistants read what you wrote in shared conversations?
   const [assistantReadable, setAssistantReadable] = useState(true);
+  // Content defaults (founder 2026-08-05): pre-select Compose's per-post
+  // AI-readable / downloadable toggles. Null until loaded (pre-migration →
+  // stays null, group hidden).
+  const [contentDefaults, setContentDefaults] = useState<{ ai: boolean; dl: boolean } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void supabase.from('profiles')
+      .select('content_ai_default, content_download_default')
+      .eq('id', user.id).maybeSingle()
+      .then(({ data, error: e }) => {
+        if (!live || e || !data) return;
+        const r = data as { content_ai_default?: boolean; content_download_default?: boolean };
+        setContentDefaults({ ai: r.content_ai_default !== false, dl: r.content_download_default !== false });
+      });
+    return () => { live = false; };
+  }, [user]);
+  async function updateContentDefault(key: 'ai' | 'dl', next: boolean) {
+    if (!user || !contentDefaults) return;
+    const prior = contentDefaults;
+    setContentDefaults({ ...contentDefaults, [key]: next });
+    const { error: e } = await supabase.from('profiles')
+      .update(key === 'ai' ? { content_ai_default: next } : { content_download_default: next })
+      .eq('id', user.id);
+    if (e) { setError(e.message); setContentDefaults(prior); }
+  }
   // Your page on the open web (founder 2026-07-28): three views of one
   // profile — Admin, In Lichen, and this one.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -725,6 +751,28 @@ export default function Profile() {
           Your own assistant switches on and off per section — the brain icon on Home,
           Marketplace, Calendar, Chat and your shelf each carry their own choice.
         </p>
+
+        {contentDefaults && (
+          <>
+            <p className="prof__privacy-sub">Your content — defaults for new posts</p>
+            <label className="prof__consent">
+              <input type="checkbox" checked={contentDefaults.ai}
+                onChange={(e) => void updateContentDefault('ai', e.target.checked)} />
+              <span>
+                <strong>New posts are AI-readable</strong>
+                <em>Assistants may read and surface what you post. Each post can still flip this in Compose — this only sets the starting position.</em>
+              </span>
+            </label>
+            <label className="prof__consent">
+              <input type="checkbox" checked={contentDefaults.dl}
+                onChange={(e) => void updateContentDefault('dl', e.target.checked)} />
+              <span>
+                <strong>New posts&rsquo; media is downloadable</strong>
+                <em>People can save the photos and videos you share. Also flippable per post.</em>
+              </span>
+            </label>
+          </>
+        )}
 
         <p className="prof__privacy-sub">Who can see what</p>
         <div className="prof__privacy-doors">

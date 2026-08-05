@@ -50,6 +50,9 @@ export interface FeedCardProps {
   route?: { to: string; names: string[] };
   // Inline media (photos / videos / audio uploaded with a post)
   media?: { type: 'photo' | 'video' | 'audio'; url: string; jobId?: string }[];
+  /** details.noDownload — the author switched saving off for this post's
+   *  media (universal default is downloadable; founder 2026-08-05). */
+  noDownload?: boolean;
   // Message the author (omit / undefined hides the button — e.g. your own post)
   onMessage?: () => void;
   /** Tap handler for the image badge's bottom button (e.g. Book / RSVP). */
@@ -98,6 +101,7 @@ export default function FeedCard({
   onSave,
   eyebrow, trustLine, route,
   media,
+  noDownload,
   onMessage,
   onBadgeAction,
   onOpen,
@@ -355,10 +359,11 @@ export default function FeedCard({
         <div className="feed-card__media">
           {media.map((m, i) =>
             m.type === 'photo' ? (
-              <img key={i} src={m.url} alt="" />
+              <img key={i} src={m.url} alt=""
+                onContextMenu={noDownload ? (e) => e.preventDefault() : undefined} />
             ) : m.type === 'video' ? (
               // Lichen-hosted: adaptive HLS once the worker transcodes it
-              <VideoPlayer key={i} url={m.url} jobId={m.jobId} />
+              <VideoPlayer key={i} url={m.url} jobId={m.jobId} noDownload={noDownload} />
             ) : (
               <audio key={i} src={m.url} controls />
             )

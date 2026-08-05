@@ -100,6 +100,9 @@ export default function AssistantBrief() {
             .contains('service_areas', ['marketplace'])
             .order('created_at', { ascending: false }).limit(8);
           const listings = ((mine as { title: string | null; body: string; details: Record<string, unknown> | null; created_at: string }[] | null) ?? [])
+            // Per-post consent: not-AI-readable posts never reach the brief,
+            // even the author's own — one uniform rule (founder 2026-08-05).
+            .filter((p) => !p.details?.aiExcluded)
             .map((p) => ({
               title: p.title || p.body.slice(0, 48),
               modes: (p.details?.modes as string[] | undefined) ?? [p.details?.mode as string ?? 'unlabeled'],

@@ -85,6 +85,7 @@ export function postToCard(
   const media = Array.isArray(p.details?.media)
     ? (p.details.media as FeedCardProps['media'])
     : undefined;
+  const noDownload = p.details?.noDownload === true;
   // Listings wear their offer: "Rent · $20/day", "Gift", "Sliding scale $20–$60".
   // Sliding scale is a pricing style within For sale, not its own category:
   // fixed price → "For sale · $50", sliding → "For sale · sliding $20–$60".
@@ -151,6 +152,7 @@ export function postToCard(
     areaDoors,
     eyebrow: offerLine ?? ((p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined),
     media,
+    noDownload,
     previews,
   };
 }

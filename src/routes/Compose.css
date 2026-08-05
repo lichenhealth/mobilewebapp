@@ -256,3 +256,17 @@
   font-size: 14px; color: var(--ink); cursor: pointer;
 }
 .cmp__aud-row input { flex-shrink: 0; }
+
+/* ── Content controls (founder 2026-08-05): AI-readable + downloadable ── */
+.cmp__content-controls {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: var(--s-4) 0 var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+}
+.cmp__cc {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: var(--t-sm); line-height: 1.45; color: var(--ink-muted); cursor: pointer;
+}
+.cmp__cc input { margin-top: 2px; flex-shrink: 0; }
+.cmp__cc strong { color: var(--ink); font-weight: 500; }

@@ -168,6 +168,28 @@ export default function Compose() {
     return (a && AREA_HOME[a]) || '/home';
   }
   const editing = !!editPostId;
+
+  // Content controls (founder 2026-08-05): AI-readable + downloadable, BOTH
+  // on by default; a member's profile defaults pre-select them for new
+  // posts, and each post can flip either. Stored in details only when OFF.
+  const [aiReadable, setAiReadable] = useState(true);
+  const [downloadable, setDownloadable] = useState(true);
+  useEffect(() => {
+    if (!user || editPostId) return;   // edits prefill from the post itself
+    let live = true;
+    void supabase.from('profiles')
+      .select('content_ai_default, content_download_default')
+      .eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        if (!live || !data) return;    // pre-migration: keep the true defaults
+        const r = data as { content_ai_default?: boolean; content_download_default?: boolean };
+        if (r.content_ai_default === false) setAiReadable(false);
+        if (r.content_download_default === false) setDownloadable(false);
+      });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, editPostId]);
+
   const [editReady, setEditReady] = useState(!editing);
   const editLinkedEvent = useRef<string | null>(null);
 
@@ -201,6 +223,8 @@ export default function Compose() {
         if (ev.end_min != null) setEvEndMin(ev.end_min);
       }
       const d = p.details ?? {};
+      setAiReadable(!d.aiExcluded);
+      setDownloadable(!d.noDownload);
       const back: Record<string, OfferMode> = {
         gift: 'free', sale: 'paid', sliding: 'paid',
         trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow', iso: 'iso',
@@ -454,6 +478,8 @@ export default function Compose() {
       // only) — no silent re-add here.
       const effAreas = new Set(areas);
       const details: Record<string, unknown> = {};
+      if (!aiReadable) details.aiExcluded = true;
+      if (!downloadable) details.noDownload = true;
       // Events' calendar rows show ONE location line — the address when in
       // person, else the meeting link (SmartLocation renders links as Join).
       const effLocation = inPerson && location.trim() ? location.trim()
@@ -1183,6 +1209,19 @@ export default function Compose() {
           )}
         </div>
       )}
+
+      {/* Content controls — on by default (the uniform rule); profile
+          defaults pre-select them, this post can flip either. */}
+      <div className="cmp__content-controls">
+        <label className="cmp__cc">
+          <input type="checkbox" checked={aiReadable} onChange={(e) => setAiReadable(e.target.checked)} />
+          <span><strong>AI-readable</strong> — assistants may read and surface this post</span>
+        </label>
+        <label className="cmp__cc">
+          <input type="checkbox" checked={downloadable} onChange={(e) => setDownloadable(e.target.checked)} />
+          <span><strong>Downloadable</strong> — people can save this post&rsquo;s media</span>
+        </label>
+      </div>
 
       {/* Rejections must be visible WHERE you clicked — a silent disabled
           button reads as a freeze (this hid 'add a few words' from an
