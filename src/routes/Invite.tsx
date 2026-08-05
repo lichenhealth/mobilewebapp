@@ -79,6 +79,9 @@ export default function Invite() {
   const [giftMonths, setGiftMonths] = useState<number | null>(12);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  // Setting up a young person's account (founder 2026-08-05): the token carries
+  // guardianship, so you're holding it from the moment they sign in.
+  const [forMinor, setForMinor] = useState(false);
   const [error, setError] = useState('');
 
   // Email invites send from our server (Resend). Phone invites can't be
@@ -102,7 +105,8 @@ export default function Invite() {
     let link = 'https://lichen.health/signup';
     if (user) {
       const { data } = await supabase.from('invite_tokens')
-        .insert({ created_by: user.id }).select('token').maybeSingle();
+        .insert({ created_by: user.id, ...(forMinor ? { for_minor: true } : {}) })
+        .select('token').maybeSingle();
       const tok = (data as { token: string } | null)?.token;
       if (tok) link = `https://lichen.health/signup?invite=${tok}`;
     }
@@ -219,6 +223,22 @@ export default function Invite() {
           maxLength={500}
           onChange={(e) => setNote(e.target.value)}
         />
+
+        {/* Guardianship rides the invite (founder 2026-08-05). A young person
+            doesn't sign themselves up — a grown-up sets the account up, and
+            holds it from the first moment. */}
+        <label className="invite__minor">
+          <input type="checkbox" checked={forMinor}
+            onChange={(e) => { setForMinor(e.target.checked); setMsg(''); }} />
+          <span>
+            I&rsquo;m setting this up for a young person
+            <em>
+              You&rsquo;ll be their guardian on Lichen: they can offer what they make and hold
+              what they earn, and money doesn&rsquo;t move without you. Anyone under 13 can only
+              join this way.
+            </em>
+          </span>
+        </label>
 
         {isAdmin && channel === 'phone' && (
           <p className="invite__hint">To attach a gifted membership, invite by email — gifts are keyed to an email address.</p>

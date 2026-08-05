@@ -31,6 +31,9 @@ export default function Onboarding() {
   // date so the platform ages them up on its own instead of freezing a number.
   const [adult, setAdult] = useState<boolean | null>(null);
   const [birthDate, setBirthDate] = useState('');
+  // Whether a grown-up already holds this account (a guardian-minted invite
+  // creates the link at claim time). Under 13 can't proceed without one.
+  const [heldBy, setHeldBy] = useState<string | null>(null);
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -56,6 +59,17 @@ export default function Onboarding() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void supabase.rpc('my_guardians').then(({ data, error }) => {
+      if (!live || error) return;
+      const g = (data as { full_name: string | null }[] | null) ?? [];
+      if (g.length) setHeldBy(g.map((x) => x.full_name ?? 'a grown-up').join(' & '));
+    });
+    return () => { live = false; };
+  }, [user]);
+
   // Prefill first/last from the name collected at signup (splittable full_name).
   useEffect(() => {
     if (!user) return;
@@ -76,6 +90,15 @@ export default function Onboarding() {
   function basicsError(): string {
     if (adult === null) return 'Please tell us whether you’re 18 or older.';
     if (adult === false && !birthDate) return 'Please add your birth date so we can look after you properly.';
+    // COPPA floor (founder 2026-08-05): under 13 joins only through a
+    // guardian-minted invite, which is the consent record.
+    if (adult === false && birthDate && !heldBy) {
+      const thirteen = new Date();
+      thirteen.setFullYear(thirteen.getFullYear() - 13);
+      if (new Date(birthDate) > thirteen) {
+        return 'Ask a parent or guardian to set this up for you — they can invite you from their own Lichen account.';
+      }
+    }
     return firstName.trim() && lastName.trim() && phone.trim()
       ? ''
       : 'Please add your first name, last name, and phone number.';
@@ -247,6 +270,12 @@ export default function Onboarding() {
                   so your account grows up with you, and so a parent or guardian can hold the
                   parts of the economy that need holding.
                 </p>
+                {heldBy && (
+                  <p className="onb__held">
+                    <strong>{heldBy}</strong> is holding your account. You can offer what you
+                    make and keep what you earn — money moves with their yes.
+                  </p>
+                )}
               </>
             )}
           </div>

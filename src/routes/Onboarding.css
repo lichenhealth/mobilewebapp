@@ -105,3 +105,10 @@
 .onb__age { margin-top: var(--s-5); }
 .onb__age-q { font-size: var(--t-sm); font-weight: 600; color: var(--ink); margin-bottom: var(--s-2); }
 .onb__age-date { margin-top: var(--s-3); }
+.onb__held {
+  margin-top: var(--s-3); padding: var(--s-3) var(--s-4);
+  background: var(--peach-tint); border-left: 3px solid var(--peach);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: var(--t-sm); line-height: 1.5; color: var(--ink-soft);
+}
+.onb__held strong { color: var(--ink); }

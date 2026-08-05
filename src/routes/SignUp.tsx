@@ -17,15 +17,19 @@ export default function SignUp() {
   // null = still checking; false = no/invalid token (show the knock form)
   const [inviteOk, setInviteOk] = useState<boolean | null>(inviteToken ? null : false);
   const [inviterName, setInviterName] = useState('');
+  // A child invite carries guardianship: the grown-up who minted it will hold
+  // the account from the first moment (founder 2026-08-05).
+  const [forMinor, setForMinor] = useState(false);
   useEffect(() => {
     if (!inviteToken) return;
     let live = true;
     void supabase.rpc('check_invite', { p_token: inviteToken }).then(({ data, error }) => {
       if (!live) return;
-      const d = data as { valid?: boolean; inviter?: string } | null;
+      const d = data as { valid?: boolean; inviter?: string; for_minor?: boolean } | null;
       if (!error && d?.valid) {
         setInviteOk(true);
         setInviterName(d.inviter ?? 'a member');
+        setForMinor(!!d.for_minor);
         localStorage.setItem('lichen-invite-token', inviteToken);
       } else if (error) {
         // check_invite missing (pre-migration) → don't lock anyone out
@@ -159,9 +163,11 @@ export default function SignUp() {
           <div className="auth__logo"><LichenMark size={56} /></div>
           <h1 className="auth__title">Join Lichen</h1>
           <p className="auth__sub">
-            {inviterName
-              ? `Invited by ${inviterName} — put down roots beside them.`
-              : 'Put down roots. Create your account to begin.'}
+            {forMinor
+              ? `${inviterName} is setting this up for you, and will be holding your account.`
+              : inviterName
+                ? `Invited by ${inviterName} — put down roots beside them.`
+                : 'Put down roots. Create your account to begin.'}
           </p>
         </div>
         <form className="auth__form" onSubmit={handleSubmit}>

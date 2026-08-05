@@ -97,3 +97,13 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
   cursor: pointer; padding: 4px 4px;
 }
 .invite__dismiss:hover { color: var(--ink); text-decoration: underline; }
+
+/* Setting up a young person's account (founder 2026-08-05) — guardianship
+   rides the invite token, so the grown-up holds it from the first moment. */
+.invite__minor {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: var(--s-4); font-size: var(--t-sm); color: var(--ink-soft);
+  line-height: 1.5; cursor: pointer;
+}
+.invite__minor input { margin-top: 3px; flex-shrink: 0; }
+.invite__minor em { display: block; font-style: normal; font-size: var(--t-xs); color: var(--ink-muted); margin-top: 3px; }

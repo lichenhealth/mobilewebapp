@@ -72,6 +72,7 @@ export default function Profile() {
   const [email, setEmail] = useState('');
   // Beings you steward — hidden until the stewardship migration lands.
   const [beings, setBeings] = useState<Being[]>([]);
+  const [minors, setMinors] = useState<{ id: string; full_name: string | null; is_adult: boolean }[]>([]);
   const [beingsOn, setBeingsOn] = useState(false);
   const [beingName, setBeingName] = useState('');
   const [beingKind, setBeingKind] = useState<EntityKind>('animal');
@@ -201,6 +202,10 @@ export default function Profile() {
       if (!live || error) return;   // columns not there yet
       setBeingsOn(true);
       void listMyBeings(user.id).then((b) => { if (live) setBeings(b); });
+      void supabase.rpc('my_minors').then(({ data, error: e2 }) => {
+        if (!live || e2) return;
+        setMinors((data as { id: string; full_name: string | null; is_adult: boolean }[] | null) ?? []);
+      });
     });
     return () => { live = false; };
   }, [user]);
@@ -1022,6 +1027,29 @@ export default function Profile() {
         </div>
         {careMsg && <p className="prof__care-msg">{careMsg}</p>}
       </section>
+
+      {minors.length > 0 && (
+        <section className="prof__section">
+          <h2 className="prof__h2" id="holding">Young people you hold</h2>
+          <p className="prof__care-lead">
+            They can offer what they make and keep what they earn. Buying, selling and
+            meeting wait on your yes.
+          </p>
+          <div className="prof__care-list">
+            {minors.map((m) => (
+              <div className="prof__care-row" key={m.id}>
+                <div className="prof__care-id">
+                  <span className="prof__care-name">{m.full_name ?? 'A young member'}</span>
+                  {m.is_adult && <span className="prof__care-tag">now 18 — no longer held</span>}
+                </div>
+                <div className="prof__care-actions">
+                  <button className="prof__care-btn" onClick={() => navigate(`/members/${m.id}`)}>Open</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Beings you steward (founder 2026-08-05). A therapy horse, a sacred
           plant, a river — real members with no login, who act through you.
