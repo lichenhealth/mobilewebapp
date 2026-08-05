@@ -131,6 +131,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Public-page facts (founder 2026-07-28): a space's profile IS its website.
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(true);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -170,6 +171,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       const sx = s as unknown as { contact?: ContactInfo | null; public_page?: boolean };
       setContact(sx.contact ?? {});
       setPublicPage(sx.public_page !== false);
+      setAiEnabled((sx as { assistant_enabled?: boolean }).assistant_enabled !== false);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
     }
     setLoading(false);
@@ -406,7 +408,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       };
       // Public-page facts ride the same Save (harmless if the columns are new).
       await supabase.from('spaces')
-        .update({ contact: Object.keys(contact).length ? contact : null, public_page: publicPage })
+        .update({
+          contact: Object.keys(contact).length ? contact : null,
+          public_page: publicPage,
+          assistant_enabled: aiEnabled,
+        })
         .eq('id', id);
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
         if (!parentPick) {
@@ -588,6 +594,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // The brain closes the acting-doors group, just before the hairline
       // (founder 2026-08-05) — quiet when this section's consent is off.
       assistantSection={ASSISTANT_SECTION[space.kind]}
+      assistantOff={space.assistant_enabled === false}
       // …and the space's own rooms open the group after it.
       afterGap={chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []}
       trailing={[
@@ -903,6 +910,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               Serve this page to the open web
               <em>Anyone can see the identity, story, contact and hours above — no account needed.
                 Recommending, booking, messaging and events still require joining Lichen.</em>
+            </span>
+          </label>
+          {/* A community can decide it works without the assistant — the AI
+              door then reads slashed for everyone who visits (founder
+              2026-08-05: "AI is off at the admin level for the group"). */}
+          <label className="sprof__duty">
+            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
+            <span>
+              Work with the assistant here
+              <em>Off means this {kindLabel.toLowerCase()} carries a slashed AI mark, and nothing
+                here is gathered for anyone&rsquo;s briefing. Members always reach their own
+                assistant elsewhere.</em>
             </span>
           </label>
           <div className="prof__save-row">

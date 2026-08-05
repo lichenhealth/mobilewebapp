@@ -66,6 +66,9 @@ export interface SpaceProfileRow {
   lat: number | null;
   lng: number | null;
   created_by: string | null;
+  /** This space works without the assistant (founder 2026-08-05) — its AI
+   *  door reads slashed for everyone. Absent pre-migration = on. */
+  assistant_enabled?: boolean;
   parent: { id: string; name: string } | null;   // a group's home community/org
 }
 
@@ -74,7 +77,7 @@ export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | nu
   // CHILDREN direction (an array), not the parent. Fetch the parent by id.
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page, assistant_enabled')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }
@@ -184,6 +187,7 @@ export async function updateSpaceProfile(id: string, patch: {
   lat?: number | null;
   lng?: number | null;
   parent_space_id?: string | null;   // group admins nest/unnest under a community/org
+  assistant_enabled?: boolean;       // admins switch the assistant off for the space
 }): Promise<void> {
   const { error } = await supabase.from('spaces').update(patch).eq('id', id);
   if (error) throw error;

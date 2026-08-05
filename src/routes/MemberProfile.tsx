@@ -277,6 +277,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         entityName={name}
         leading={[{ icon: 'search', label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) }]}
         assistantSection="profile"
+        assistantOff={member.assistant_enabled === false}
       />
     </div>
   );

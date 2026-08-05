@@ -11,12 +11,15 @@ export interface MemberProfile {
   bio: string | null;
   avatar_url: string | null;
   location: string | null;
+  /** This member works without the assistant (founder 2026-08-05) — their
+   *  AI door reads slashed. Absent pre-migration = on. */
+  assistant_enabled?: boolean;
 }
 
 export async function loadMemberProfile(id: string): Promise<MemberProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, headline, bio, avatar_url, location')
+    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadMemberProfile:', error.message); return null; }

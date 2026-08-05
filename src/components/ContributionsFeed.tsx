@@ -42,7 +42,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, trailing = [], hideAreas = [], entityName }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -55,6 +55,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   /** When set, an assistant door closes the leading group — quiet when this
    *  section's consent is off, exactly like Home's brain. */
   assistantSection?: string;
+  /** This profile or space has opted out of the assistant (founder
+   *  2026-08-05). The door still opens — a member always reaches their own
+   *  assistant — it just reads as switched off for everyone who visits. */
+  assistantOff?: boolean;
   /** Far-right action circles AFTER the area icons — Members sits at the end
    *  of every space row, mirroring Home's Directory-at-the-far-right
    *  (founder 2026-07-25). */
@@ -108,6 +112,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   // 2026-07-25): Marketplace · Events · Work · Education · Food · Creative ·
   // Places · Library.
   const HOME_ORDER: ServiceArea[] = ['marketplace', 'events', 'work', 'courses', 'food', 'art', 'places', 'library', 'people'];
+  // Off when the owner has opted out, or when the viewer has switched this
+  // section off for themselves. Either way the door still opens.
+  const aiOn = !assistantOff && !!assistantSection && aiDoorOn(assistantSection);
+
   const areasPresent = useMemo(() => {
     const present = new Set<ServiceArea>();
     posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
@@ -169,15 +177,17 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           ))}
           {assistantSection && (
             <button
-              className={'cfeed__area cfeed__area--ai' + (aiDoorOn(assistantSection) ? '' : ' is-ai-off')}
+              className={'cfeed__area cfeed__area--ai' + (aiOn ? '' : ' is-ai-off')}
               onClick={() => navigate(`/assistant?section=${assistantSection}`)}
-              title={aiDoorOn(assistantSection)
+              title={aiOn
                 ? 'Your assistant — a briefing for this part of your Lichen life'
-                : 'You’ve switched the assistant off for this section. Tap to change that.'}
+                : assistantOff
+                  ? 'This one works without the assistant. Your own is still a tap away.'
+                  : 'You’ve switched the assistant off for this section. Tap to change that.'}
             >
               <span className="cfeed__area-circle">
                 <Icon name="brain" size={14} />
-                {!aiDoorOn(assistantSection) && <span className="cfeed__area-slash" aria-hidden />}
+                {!aiOn && <span className="cfeed__area-slash" aria-hidden />}
               </span>
               <span className="cfeed__area-label">AI</span>
             </button>
