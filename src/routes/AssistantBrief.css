@@ -61,3 +61,9 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .abrief__ask-send:disabled { background: var(--bone-edge); color: var(--ink-faint); cursor: default; }
+
+/* Inside the assistant's own world everything wears silicon blue — the
+   consent checkbox included (founder 2026-08-05). tokens.css sets a peach
+   accent platform-wide; this is the one room that overrides it. */
+.abrief input[type="checkbox"],
+.abrief input[type="radio"] { accent-color: var(--blue); }

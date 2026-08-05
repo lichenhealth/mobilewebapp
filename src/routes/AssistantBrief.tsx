@@ -282,8 +282,10 @@ export default function AssistantBrief() {
           <span className="abrief__el" aria-hidden="true">Si</span>
         </span>
         <h1 className="abrief__title">AI Assistant</h1>
-        <p className="abrief__scope">{meta.title}</p>
-        <p className="abrief__sub">Your assistant&rsquo;s briefing — organized highlights, filtered for what needs you.</p>
+        {/* Name, then role — the section it's briefing on moves into the
+            line below, so context survives (founder 2026-08-05). */}
+        <p className="abrief__scope">Your Lichen Partner</p>
+        <p className="abrief__sub">{meta.title} — organized highlights, filtered for what needs you.</p>
       </div>
 
       <div className="abrief__card">
