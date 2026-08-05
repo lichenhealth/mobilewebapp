@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { formatDateShort } from '../lib/conciergeApi';
 import {
-  LedgerEntry, myBalance, myStatement, sendCurrentcy, fmtCurrent,
+  LedgerEntry, myBalance, myStatement, sendCurrentcy, fmtCurrentNum,
 } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
@@ -67,7 +67,13 @@ export default function CurrentcyCard() {
       <h2 className="prof__h2">Current-cy</h2>
       <div className="curc">
         <div className="curc__balrow">
-          <span className="curc__bal">{fmtCurrent(balance)}</span>
+          <span className="curc__bal">
+            <svg className="curc__bolt" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M13.5 3 6 13.5h4.8L10.5 21 18 10.5h-4.8L13.5 3Z"
+                stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+            </svg>
+            {fmtCurrentNum(balance)} Current-cy
+          </span>
           <button className="btn curc__sendbtn" onClick={() => { setSendOpen((s) => !s); setError(''); }}>
             {sendOpen ? 'Close' : 'Send'}
           </button>
@@ -104,7 +110,7 @@ export default function CurrentcyCard() {
             </div>
             {error && <p className="curc__error">{error}</p>}
             <button className="btn btn-primary curc__go" disabled={busy} onClick={send}>
-              {busy ? 'Sending…' : 'Send Current'}
+              {busy ? 'Sending…' : 'Send Current-cy'}
             </button>
           </div>
         )}

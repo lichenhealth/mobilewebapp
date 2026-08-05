@@ -79,5 +79,9 @@ export async function mintCurrentcy(
   if (error) throw error;
 }
 
+/** The number alone — the ⚡ and the word are rendered beside it, so the
+ *  glyph can be a real icon rather than an emoji (founder 2026-08-05). */
+export const fmtCurrentNum = (n: number) =>
+  `${Number.isInteger(n) ? n : n.toFixed(2)}`;
 export const fmtCurrent = (n: number) =>
-  `${Number.isInteger(n) ? n : n.toFixed(2)} Current`;
+  `${fmtCurrentNum(n)} Current-cy`;

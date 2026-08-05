@@ -296,3 +296,8 @@
 
 /* Weaving in a being you steward. */
 .prof__being-add { display: flex; flex-direction: column; gap: var(--s-3); margin-top: var(--s-4); }
+
+/* The Settings 101 pointer sat flush against the card above it (founder
+   2026-08-05) — give it its own breathing room. */
+.prof__section .prof__hint + *, .prof__privacy-links + .prof__hint { margin-top: var(--s-4); }
+.prof__hint { margin-top: var(--s-3); }
