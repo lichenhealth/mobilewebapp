@@ -42,7 +42,7 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null) {
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string) {
   const signup = token ? `${APP_URL}/signup?invite=${token}` : `${APP_URL}/signup`;
   const subject = `${inviterName} invited you to Lichen`;
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
@@ -60,23 +60,32 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
     : '';
 
   // The "sweet note" — what Lichen is, and the invitation to help build it.
-  const mission =
+  const DEFAULT_MISSION =
     `We're building something different — a corrective social network. One trusted web for the whole of a life: `
     + `care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually `
     + `be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — `
     + `shape it, test it, ship it — the beginning of a better world.`;
+  // An admin may rewrite this paragraph before sending (founder 2026-08-06:
+  // "give you the boilerplate language as a template to edit"). Empty falls
+  // back to the standard words.
+  const missionText = (mission ?? '').trim() || DEFAULT_MISSION;
   // Everyone gets 3 months free on signup (growth phase) — framed as a
   // co-creation window, not a trial. A specific admin gift supersedes it.
   const trial = giftLine ? '' :
     `Your first 3 months are on us. Use them to make Lichen yours — tell us what you need, help us build it out, and be part of the beginning of a better world.`;
 
-  const parts = [intro, mission];
+  const parts = [intro, missionText];
   if (note) parts.push(`They added a note:\n"${note}"`);
   if (giftLine) parts.push(giftLine);
   else if (trial) parts.push(trial);
   const text = parts.join('\n\n') + `\n\nJoin here:\n${signup}\n\n— Lichen`;
 
-  const missionHtml = `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">We're building something different — a <em>corrective</em> social network. One trusted web for the whole of a life: care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — shape it, test it, ship it — the beginning of a better world.</p>`;
+  // A rewritten mission is escaped and paragraphed; the default keeps its
+  // hand-set emphasis.
+  const missionHtml = (mission ?? '').trim()
+    ? missionText.split(/\n{2,}/).filter(Boolean).map((para) =>
+        `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">${esc(para)}</p>`).join('')
+    : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">We're building something different — a <em>corrective</em> social network. One trusted web for the whole of a life: care, work and offerings, jobs, events, the places we gather, and a fairer economy — made to help us actually be in relationship, not perform for one another. It's early, and that's the invitation: come build it with us — shape it, test it, ship it — the beginning of a better world.</p>`;
   const noteHtml = note
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#fff;border-radius:12px;color:#4a463f">${esc(note)}</p>`
     : '';
@@ -110,7 +119,7 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string };
   try {
     body = await req.json();
   } catch {
@@ -144,7 +153,8 @@ Deno.serve(async (req) => {
     }
   } catch (e) { console.error('token mint:', e); }
 
-  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths, token);
+  const mission = (body.mission ?? '').trim().slice(0, 2000);
+  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths, token, mission);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+
+/** The invitation's standard paragraph — kept in step with send-invite's
+ *  DEFAULT_MISSION by hand. Shown as the starting text when an admin chooses
+ *  to customize, so they edit the real words rather than a blank box. */
+const DEFAULT_MISSION =
+  "We're building something different — a corrective social network. One trusted web for "
+  + 'the whole of a life: care, work and offerings, jobs, events, the places we gather, and '
+  + 'a fairer economy — made to help us actually be in relationship, not perform for one '
+  + "another. It's early, and that's the invitation: come build it with us — shape it, test "
+  + 'it, ship it — the beginning of a better world.';
 import { useAuth } from '../auth/AuthProvider';
 import './Invite.css';
 
@@ -143,9 +153,11 @@ export default function Invite() {
       .then(({ data }) => setFullName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user, loading, navigate]);
 
-  async function send(toArg?: string, noteArg?: string) {
+  async function send(toArg?: string, missionArg?: string) {
     const to = (toArg ?? email).trim();
-    const theNote = (noteArg ?? note).trim();
+    const theNote = note.trim();
+    // A rewritten opening replaces the standard paragraph; empty keeps it.
+    const theMission = (missionArg ?? '').trim();
     if (!to || !user) return;
     const gifting = isAdmin && gift;
     setBusy(true); setMsg(''); setError('');
@@ -181,7 +193,12 @@ export default function Invite() {
       if (mg) { setBusy(false); setError(mg.message); return; }
     }
     const { error: e } = await supabase.functions.invoke('send-invite', {
-      body: { email: to, inviterName: fullName, note: theNote, giftTier: gifting ? giftTier : undefined, giftMonths: gifting ? giftMonths : undefined },
+      body: {
+        email: to, inviterName: fullName, note: theNote,
+        mission: theMission || undefined,
+        giftTier: gifting ? giftTier : undefined,
+        giftMonths: gifting ? giftMonths : undefined,
+      },
     });
     setBusy(false);
     if (e) {
@@ -392,11 +409,15 @@ export default function Invite() {
                     <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : k.status === 'declined' ? ' is-declined' : '')}>{k.status}</span>
                     {k.status === 'new' && composeFor !== k.id && (
                       <span className="invite__knock-acts">
-                        <button
-                          className="btn invite__use"
-                          onClick={() => { setComposeFor(k.id); setComposeNote(''); }}
-                        >
-                          Invite them
+                        {/* The standard invitation is the default — a personal
+                            line is a choice, not a chore (founder 2026-08-06). */}
+                        <button className="btn btn-primary invite__use" disabled={busy}
+                          onClick={() => void send(k.email, '')}>
+                          {busy ? 'Sending…' : 'Send'}
+                        </button>
+                        <button className="btn invite__use"
+                          onClick={() => { setComposeFor(k.id); setComposeNote(DEFAULT_MISSION); }}>
+                          Customize &amp; send
                         </button>
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
@@ -407,11 +428,11 @@ export default function Invite() {
                       <span className="invite__compose">
                         <textarea
                           className="invite__input invite__textarea"
-                          rows={3}
+                          rows={8}
                           autoFocus
                           value={composeNote}
                           maxLength={500}
-                          placeholder={`A line just for ${k.name} — why now, and why them.`}
+                          placeholder={`What ${k.name} should read when they open it.`}
                           onChange={(e) => setComposeNote(e.target.value)}
                         />
                         <span className="invite__compose-acts">
@@ -453,26 +474,32 @@ export default function Invite() {
                       })()}
                       {k.status === 'invited' && !sentTo.has(k.email.toLowerCase())
                         && !sentNow.has(k.email.toLowerCase()) && composeFor !== k.id && (
-                        <button className="btn invite__use"
-                          onClick={() => { setComposeFor(k.id); setComposeNote(''); }}>
-                          No invitation sent — write one
-                        </button>
+                        <span className="invite__knock-acts">
+                          <button className="btn btn-primary invite__use" disabled={busy}
+                            onClick={() => void send(k.email, '')}>
+                            {busy ? 'Sending…' : 'Send'}
+                          </button>
+                          <button className="btn invite__use"
+                            onClick={() => { setComposeFor(k.id); setComposeNote(DEFAULT_MISSION); }}>
+                            Customize &amp; send
+                          </button>
+                        </span>
                       )}
                       {composeFor === k.id && (
                         <span className="invite__compose">
                           <textarea
                             className="invite__input invite__textarea"
-                            rows={3}
+                            rows={8}
                             autoFocus
                             value={composeNote}
                             maxLength={500}
-                            placeholder={`A line just for ${k.name} — why now, and why them.`}
+                            placeholder={`What ${k.name} should read when they open it.`}
                             onChange={(e) => setComposeNote(e.target.value)}
                           />
                           <span className="invite__compose-acts">
                             <button className="btn btn-primary" disabled={busy}
                               onClick={() => { void send(k.email, composeNote).then(() => setComposeFor(null)); }}>
-                              {busy ? 'Sending…' : 'Send invitation'}
+                              {busy ? 'Sending…' : 'Send this'}
                             </button>
                             <button className="btn" onClick={() => setComposeFor(null)}>Not yet</button>
                           </span>
