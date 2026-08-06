@@ -112,3 +112,9 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
    honest flag when the invitation never actually went out. */
 .invite__h2--quiet { color: var(--ink-muted); margin-top: var(--s-6); }
 .invite__row--knock.is-done { opacity: 0.82; }
+.invite__sent-now { font-size: var(--t-xs); font-weight: 600; color: var(--green-deep, #6E8F33); }
+/* A knock the queue calls "invited" that no invitation ever reached. */
+.invite__pill.is-stalled {
+  background: var(--peach-tint); border-color: var(--peach);
+  color: var(--peach-deep);
+}

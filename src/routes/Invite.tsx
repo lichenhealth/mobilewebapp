@@ -84,6 +84,9 @@ export default function Invite() {
   const [forMinor, setForMinor] = useState(false);
   // Which knock the prefilled form belongs to, so it resolves on send.
   const [pendingKnock, setPendingKnock] = useState<{ id: string; email: string } | null>(null);
+  // Addresses invited during THIS sitting — the token list is fetched on load,
+  // so without this a just-sent row would still offer to send again.
+  const [sentNow, setSentNow] = useState<Set<string>>(new Set());
   // Emails with a real invitation on record. A knock marked "invited" with no
   // token behind it never actually reached anyone.
   const sentTo = new Set(
@@ -136,8 +139,8 @@ export default function Invite() {
       .then(({ data }) => setFullName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user, loading, navigate]);
 
-  async function send() {
-    const to = email.trim();
+  async function send(toArg?: string) {
+    const to = (toArg ?? email).trim();
     if (!to || !user) return;
     const gifting = isAdmin && gift;
     setBusy(true); setMsg(''); setError('');
@@ -182,11 +185,12 @@ export default function Invite() {
         : 'Couldn’t send the invite just now. Please try again in a moment.');
       return;
     }
-    // NOW the knock is genuinely handled.
-    if (pendingKnock && pendingKnock.email === to.toLowerCase()) {
-      void resolveKnock(pendingKnock.id, 'invited');
-      setPendingKnock(null);
-    }
+    // NOW the knock is genuinely handled — matched on the address that was
+    // actually sent to, so a direct send from a row resolves that row.
+    const hit = knocks.find((k) => k.email.toLowerCase() === to.toLowerCase());
+    if (hit && hit.status !== 'invited') void resolveKnock(hit.id, 'invited');
+    if (pendingKnock?.email === to.toLowerCase()) setPendingKnock(null);
+    setSentNow((prev) => new Set(prev).add(to.toLowerCase()));
     setMsg(gifting
       ? `Invitation sent to ${to} — ${giftMonths ? (spanText(giftMonths) + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
       : `Invitation sent to ${to}.`);
@@ -316,7 +320,7 @@ export default function Invite() {
             <button type="button" className="btn invite__send" onClick={() => void copyInvite()}>Copy invite</button>
           </div>
         ) : (
-          <button className="btn btn-primary invite__send" onClick={send} disabled={busy || channel !== 'email'}>
+          <button className="btn btn-primary invite__send" onClick={() => void send()} disabled={busy || channel !== 'email'}>
             {busy ? 'Sending…' : 'Send invitation'}
           </button>
         )}
@@ -416,18 +420,29 @@ export default function Invite() {
                       <span className="invite__row-who">
                         <strong>{k.name}</strong> · {k.email}
                       </span>
-                      <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : ' is-declined')}>
-                        {k.status}
-                      </span>
-                      {k.status === 'invited' && !sentTo.has(k.email.toLowerCase()) && (
-                        <button className="btn invite__use"
-                          onClick={() => {
-                            setEmail(k.email);
-                            setPendingKnock({ id: k.id, email: k.email.toLowerCase() });
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}>
-                          No invitation sent — send one
+                      {/* The pill says what's TRUE, not what the queue was
+                          told (founder 2026-08-06: "it still shows a green
+                          invited even though they haven't been"). Green only
+                          when an invitation actually exists. */}
+                      {(() => {
+                        const reallySent = sentTo.has(k.email.toLowerCase())
+                          || sentNow.has(k.email.toLowerCase());
+                        if (k.status === 'declined') {
+                          return <span className="invite__pill is-declined">declined</span>;
+                        }
+                        return reallySent
+                          ? <span className="invite__pill is-in">invited</span>
+                          : <span className="invite__pill is-stalled">not sent</span>;
+                      })()}
+                      {k.status === 'invited' && !sentTo.has(k.email.toLowerCase())
+                        && !sentNow.has(k.email.toLowerCase()) && (
+                        <button className="btn invite__use" disabled={busy}
+                          onClick={() => void send(k.email)}>
+                          {busy ? 'Sending…' : 'No invitation sent — send one now'}
                         </button>
+                      )}
+                      {sentNow.has(k.email.toLowerCase()) && (
+                        <span className="invite__sent-now">Sent ✓</span>
                       )}
                     </li>
                   ))}
