@@ -95,8 +95,12 @@ export default function MapView() {
   }, []);
 
   const visibleEvents = useMemo(() => (layers.events ? eventPins : []), [eventPins, layers]);
+  // A pin on the map already means "somewhere you can go", so the Places
+  // layer shows every pinned space regardless of kind (founder 2026-08-06:
+  // "organizations can show up in a places search... if they have an HQ").
+  // Its own kind layer still shows it too — one pin, two ways to find it.
   const visibleSpaces = useMemo(
-    () => spacePins.filter((s) => layers[KIND_LAYER[s.kind]]),
+    () => spacePins.filter((s) => layers[KIND_LAYER[s.kind]] || layers.places),
     [spacePins, layers],
   );
   const visiblePeople = useMemo(() => (layers.people ? peoplePins : []), [peoplePins, layers]);

@@ -238,11 +238,19 @@ export interface SpaceDirectoryRow {
 
 /** Every space of a kind, with member counts and (for groups) the parent. */
 export async function listSpacesByKind(kind: SpaceKind): Promise<SpaceDirectoryRow[]> {
-  const { data, error } = await supabase
+  // PLACES IS A QUESTION, NOT A CATEGORY (founder 2026-08-06: "organizations
+  // can show up in a places search, just like a community can, if they have an
+  // HQ"). Somewhere you can go is somewhere you can go, whatever the row's
+  // kind says — so /places also lists any space that has an address. Nobody
+  // ticks a box; having an HQ is the qualification, the same grammar as an
+  // area circle appearing once you've posted there.
+  const q = supabase
     .from('spaces')
     .select('id, name, kind, description, avatar_url, location, parent_space_id, space_members(count)')
-    .eq('kind', kind)
     .order('name');
+  const { data, error } = await (kind === 'place'
+    ? q.or('kind.eq.place,and(location.not.is.null,kind.neq.place)')
+    : q.eq('kind', kind));
   if (error) { console.warn('listSpacesByKind:', error.message); return []; }
   type Raw = Omit<SpaceDirectoryRow, 'parent' | 'member_count'> & {
     parent_space_id: string | null;
