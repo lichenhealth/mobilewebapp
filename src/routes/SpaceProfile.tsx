@@ -693,6 +693,35 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // forcePublic: on a custom domain (countrymanstables.com) EVERYONE gets
   // the website — even signed-in members; the app lives on Lichen's domain.
   const showTemplate = !me || previewing || forcePublic || (!backstage && !tab);
+  // The way into backstage has to exist on the page an admin actually lands
+  // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
+  // not sure where to edit the page"). It lived only in the non-template
+  // shell, which a signed-in admin never reaches.
+  const adminBar = isAdmin ? (
+    <div className="view-toggle-row">
+      <span className="view-toggle" role="group" aria-label="View">
+        <button
+          className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
+          onClick={() => { setEditOpen(false); setSearchParams({}); }}
+        >
+          Member view
+        </button>
+        <button
+          className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
+          onClick={() => setSearchParams({ manage: '1' })}
+        >
+          Admin view
+          {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
+        </button>
+      </span>
+      {backstage && (
+        <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
+          {editOpen ? 'Done editing' : 'Edit profile'}
+        </button>
+      )}
+    </div>
+  ) : null;
+
   if (showTemplate) {
     return (
       <PublicPage
@@ -707,7 +736,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
-        beforeContent={me && !backstage && !tab ? feedSection : undefined}
+        beforeContent={me ? (
+          <>
+            {adminBar}
+            {!backstage && !tab ? feedSection : null}
+          </>
+        ) : undefined}
       >
         {childGroups.length > 0 && (
           <section className="ppage__sec">
@@ -732,30 +766,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
   return (
     <div className={'prof' + (backstage ? ' is-adminview' : '')}>
-      {isAdmin && (
-        <div className="view-toggle-row">
-          <span className="view-toggle" role="group" aria-label="View">
-            <button
-              className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
-              onClick={() => { setEditOpen(false); setSearchParams({}); }}
-            >
-              Member view
-            </button>
-            <button
-              className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
-              onClick={() => setSearchParams({ manage: '1' })}
-            >
-              Admin view
-              {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
-            </button>
-          </span>
-          {backstage && (
-            <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
-              {editOpen ? 'Done editing' : 'Edit profile'}
-            </button>
-          )}
-        </div>
-      )}
+      {adminBar}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
           {space.avatar_url ? (
