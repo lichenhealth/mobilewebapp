@@ -28,6 +28,8 @@ import './Profile.css';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
 import ContactFields, { type ContactInfo } from '../components/ContactFields';
+import PageTabsEditor from '../components/PageTabsEditor';
+import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
@@ -624,6 +626,12 @@ export default function Profile() {
               ))}
             </div>
           </div>
+
+          <p className="prof__privacy-sub">Your page&rsquo;s tabs</p>
+          <PageTabsEditor
+            tabs={pageMeta.tabs ?? []}
+            onChange={(tabs: PageTab[]) => setPage({ tabs })}
+          />
 
           <p className="prof__privacy-sub">Contact &amp; hours</p>
           <ContactFields

@@ -1,0 +1,43 @@
+/* Choosing your page's tabs from the template library (founder 2026-08-05). */
+.ptabs { display: flex; flex-direction: column; gap: var(--s-2); }
+.ptabs__lead, .ptabs__note, .ptabs__empty {
+  font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5;
+}
+.ptabs__empty { font-style: italic; padding: var(--s-3) 0; }
+.ptabs__row {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: 9px 11px;
+}
+.ptabs__row.is-open { border-color: var(--peach); }
+.ptabs__head { display: flex; align-items: center; gap: 9px; }
+.ptabs__icon { color: var(--ink-soft); display: inline-flex; flex-shrink: 0; }
+.ptabs__name {
+  flex: 1; min-width: 0; font-size: var(--t-sm); font-weight: 600; color: var(--ink);
+  display: flex; align-items: baseline; gap: 7px;
+}
+.ptabs__auto {
+  font-style: normal; font-family: var(--font-mono); font-size: 8px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+.ptabs__moves { display: flex; gap: 3px; flex-shrink: 0; }
+.ptabs__mv {
+  border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink-soft);
+  border-radius: var(--r-full); font-size: 11px; padding: 2px 8px; cursor: pointer;
+}
+.ptabs__mv:hover { border-color: var(--peach); color: var(--ink); }
+.ptabs__mv--rm:hover { border-color: var(--rust, #B4553F); color: var(--rust, #B4553F); }
+.ptabs__row .ptabs__note { margin-top: 5px; }
+.ptabs__edit { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); }
+.ptabs__body { resize: vertical; }
+.ptabs__add { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; }
+.ptabs__picker { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-2); }
+.ptabs__pick {
+  display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: 10px 12px; cursor: pointer;
+}
+.ptabs__pick:hover { border-color: var(--peach); }
+.ptabs__pick-body { display: flex; flex-direction: column; gap: 2px; }
+.ptabs__pick-body strong { font-size: var(--t-sm); color: var(--ink); }
+.ptabs__pick-body em { font-style: normal; font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.45; }
+.ptabs__cancel { align-self: flex-start; }

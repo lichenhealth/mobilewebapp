@@ -4,6 +4,7 @@ import { appUrl } from '../lib/customDomain';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
+import { tabById, tabHasContent, type PageTab } from '../lib/pageTabs';
 import './PublicPage.css';
 
 // One structure for every Lichen site (founder 2026-07-28): hero, story,
@@ -56,6 +57,9 @@ export interface PageMeta {
    *  that tell it. A template feature for every public page. */
   storyImages?: { after: number; src: string }[];
   showPosts?: boolean;
+  /** The tabs this page's owner chose from the template library
+   *  (founder 2026-08-05). When present, these drive the row. */
+  tabs?: PageTab[];
 }
 
 export interface PublicPageProps {
@@ -130,14 +134,35 @@ export default function PublicPage(props: PublicPageProps) {
   const showFeed = !!props.feed && (!!props.signedIn || page.showPosts === true);
   // Custom doors (Countryman Stables) keep their own set; Feed joins in front.
   const doors = page.doors?.length ? page.doors : null;
-  const sectionItems = doors
-    ? doors.map((d) => ({ id: d.id, label: d.label }))
-    : [
-      story ? { id: 'about', label: 'About' } : null,
-      offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
-      page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
-      hasContact ? { id: 'contact', label: 'Contact' } : null,
-    ].filter((n): n is { id: string; label: string } => !!n);
+
+  // TABS THE OWNER CHOSE, from the template library (founder 2026-08-05:
+  // "create a bunch of tab options... and people can select those
+  // templates"). Built-in ids draw on data Lichen already holds; the rest
+  // carry their own lead and body. A chosen tab still only appears once it
+  // has something to show — adding one is an invitation to write, not an
+  // empty room for a visitor to walk into.
+  const chosen: PageTab[] = page.tabs?.length ? page.tabs : [];
+  const builtInHasContent = (id: string) =>
+    id === 'about' ? !!story
+      : id === 'services' ? offerings.length > 0
+      : id === 'facilities' ? !!page.facilities
+      : id === 'contact' ? hasContact
+      : false;
+  const liveChosen = chosen.filter((t) => {
+    const tpl = tabById(t.id);
+    return tpl?.builtIn ? builtInHasContent(t.id) : tabHasContent(t, tpl);
+  });
+
+  const sectionItems = liveChosen.length
+    ? liveChosen.map((t) => ({ id: t.id, label: t.label ?? tabById(t.id)?.label ?? t.id }))
+    : doors
+      ? doors.map((d) => ({ id: d.id, label: d.label }))
+      : [
+        story ? { id: 'about', label: 'About' } : null,
+        offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
+        page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
+        hasContact ? { id: 'contact', label: 'Contact' } : null,
+      ].filter((n): n is { id: string; label: string } => !!n);
   const navItems = showFeed
     ? [{ id: 'feed', label: 'Feed' }, ...sectionItems]
     : sectionItems;
@@ -147,6 +172,7 @@ export default function PublicPage(props: PublicPageProps) {
   const showingFeed = showFeed && tab === 'feed';
   const show = (id: string) => !doors && !showingFeed && (!tabbed || tab === id);
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
+  const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -258,6 +284,17 @@ export default function PublicPage(props: PublicPageProps) {
       {/* The Feed tab — the entity's actual stream, the thing the in-app
           profile used to be entirely (founder 2026-08-05). */}
       {showingFeed && props.feed}
+
+      {/* A chosen template tab — its lead, then its paragraphs. */}
+      {activeChosen && (
+        <section className="ppage__sec">
+          <h2 className="ppage__sec-title">{activeChosen.label ?? tabById(activeChosen.id)?.label}</h2>
+          {activeChosen.lead && <p className="ppage__lead">{activeChosen.lead}</p>}
+          {(activeChosen.body ?? '').split(/\n{2,}/).filter(Boolean).map((para, i) => (
+            <p className="ppage__para" key={i}>{para}</p>
+          ))}
+        </section>
+      )}
 
       {/* Custom door content — lead, then paragraphs, then (optionally)
           the contact list. */}
