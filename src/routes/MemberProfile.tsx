@@ -310,7 +310,14 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         profileId={member.id}
         me={me}
         entityName={name}
-        leading={[{ icon: 'search', label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) }]}
+        leading={[
+          { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) },
+          // Your own profile can start a post, same as a space's page can
+          // (founder 2026-08-05). Search · Add · AI, the platform's one order.
+          ...(isSelf
+            ? [{ icon: 'plus' as const, label: 'Add', onClick: () => navigate('/compose') }]
+            : []),
+        ]}
         assistantSection="profile"
         assistantOff={member.assistant_enabled === false}
       />
