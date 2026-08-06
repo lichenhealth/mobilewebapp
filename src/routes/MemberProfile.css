@@ -97,3 +97,8 @@
 .mprof__being-kind { color: var(--peach-deep); }
 .mprof__being-steward { color: var(--ink-soft); text-decoration: none; border-bottom: 1px solid var(--bone-edge); }
 .mprof__being-steward:hover { border-bottom-color: var(--peach); }
+/* Whose signal this is, when you're acting as someone else. */
+.mprof__whose {
+  flex-basis: 100%; margin-top: var(--s-2);
+  font-size: var(--t-xs); color: var(--ink-muted); font-style: italic;
+}

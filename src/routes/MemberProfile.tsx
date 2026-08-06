@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { getIdentityTags } from '../lib/meansApi';
 import { loadSteward } from '../lib/stewardshipApi';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -35,6 +36,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
 
   const [member, setMember] = useState<MemberRow | null>(null);
   const [steward, setSteward] = useState<{ name: string; to: string } | null>(null);
+  const { actor } = useActing();
   const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
   const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
@@ -244,6 +246,17 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           >
             <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
           </button>
+          {/* Trust and my-celium are PERSONAL edges — mycelium.truster_id and
+              recommendations.recommender_id both reference a profile, so a
+              space cannot hold them. While you're acting as one, these still
+              read and write YOUR relationship, and saying so beats letting the
+              stable look like it vouched for someone (founder 2026-08-06). */}
+          {actor.type !== 'self' && (
+            <p className="mprof__whose">
+              These are yours, not {actor.name}&rsquo;s — trust and my-celium are
+              person-to-person.
+            </p>
+          )}
         </div>
       )}
     </>
