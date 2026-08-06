@@ -236,3 +236,10 @@
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--ink-faint);
 }
+
+/* Same compaction for a space's join / my-celium / trust / recommend row. */
+.sprof__actions { gap: var(--s-2); flex-wrap: wrap; justify-content: center; }
+.sprof__actions .sprof__invite-btn, .sprof__actions .btn {
+  padding: 6px 12px; font-size: var(--t-xs); gap: 5px;
+}
+.sprof__actions .btn svg { width: 13px; height: 13px; }

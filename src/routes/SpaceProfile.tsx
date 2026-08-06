@@ -739,6 +739,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         beforeContent={me ? (
           <>
             {adminBar}
+            {/* Join / my-celium / trust ride ABOVE the page, not below every
+                section of it (founder 2026-08-06: "it gets pushed to the
+                bottom... seems important enough to keep at the top"). */}
+            {!backstage && !tab && (
+              <>
+                {noticeBanners}
+                {actionRow}
+              </>
+            )}
             {!backstage && !tab ? feedSection : null}
           </>
         ) : undefined}
@@ -753,8 +762,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         )}
         {me && !backstage && !tab && (
           <>
-            {noticeBanners}
-            {actionRow}
             {plusMenu}
             {roomsSection}
             {mapsButton}

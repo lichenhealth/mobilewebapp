@@ -102,3 +102,12 @@
   flex-basis: 100%; margin-top: var(--s-2);
   font-size: var(--t-xs); color: var(--ink-muted); font-style: italic;
 }
+
+/* Relationship controls, compact (founder 2026-08-06: "a bit less clunky,
+   take up less space"). They sit high on the page, so they have to be quiet:
+   one line, smaller type, tighter padding. */
+.mprof__actions { gap: var(--s-2); flex-wrap: wrap; justify-content: center; }
+.mprof__actions .mprof__btn {
+  padding: 6px 12px; font-size: var(--t-xs); gap: 5px;
+}
+.mprof__actions .mprof__btn svg { width: 13px; height: 13px; }
