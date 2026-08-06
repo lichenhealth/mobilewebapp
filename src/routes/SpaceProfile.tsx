@@ -38,6 +38,7 @@ import './MemberProfile.css';   // shares the mprof action-button styles
 import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
 import PublicPage, { type PageMeta } from '../components/PublicPage';
+import PageTabsEditor from '../components/PageTabsEditor';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -132,6 +133,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(true);
   const [aiEnabled, setAiEnabled] = useState(true);
+  const [pageEdit, setPageEdit] = useState<PageMeta>({});
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -172,6 +174,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContact(sx.contact ?? {});
       setPublicPage(sx.public_page !== false);
       setAiEnabled((sx as { assistant_enabled?: boolean }).assistant_enabled !== false);
+      setPageEdit(((sx as { page?: PageMeta }).page ?? {}) as PageMeta);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
     }
     setLoading(false);
@@ -412,6 +415,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           contact: Object.keys(contact).length ? contact : null,
           public_page: publicPage,
           assistant_enabled: aiEnabled,
+          // Only ever WRITE a page, never null one out: this form didn't touch
+          // `page` before today, and a mis-seeded save would wipe a built page
+          // (Countryman Stables lives in this column).
+          ...(Object.keys(pageEdit).length ? { page: pageEdit } : {}),
         })
         .eq('id', id);
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
@@ -912,6 +919,17 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 Recommending, booking, messaging and events still require joining Lichen.</em>
             </span>
           </label>
+          {/* Spaces build their page's tabs from the same library people do
+              (founder 2026-08-06) — this form never wrote `page` until now. */}
+          <p className="prof__privacy-sub">This page&rsquo;s tabs</p>
+          <PageTabsEditor
+            tabs={pageEdit.tabs ?? []}
+            onChange={(tabs) => setPageEdit((pm) => ({ ...pm, tabs }))}
+            photos={pageEdit.photos ?? []}
+            onPhotos={(photos) => setPageEdit((pm) => ({ ...pm, photos }))}
+            uploaderId={me}
+          />
+
           {/* A community can decide it works without the assistant — the AI
               door then reads slashed for everyone who visits (founder
               2026-08-05: "AI is off at the admin level for the group"). */}

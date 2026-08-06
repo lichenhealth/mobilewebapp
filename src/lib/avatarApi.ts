@@ -32,3 +32,15 @@ export async function uploadAvatar(uid: string, file: File): Promise<string> {
   if (dbErr) throw dbErr;
   return url;
 }
+
+/** A photo for someone's page — the Gallery tab and story images (founder
+ *  2026-08-06). Same bucket and per-user folder as avatars, so the existing
+ *  storage policy covers it with nothing new to grant. */
+export async function uploadPageImage(uid: string, file: File): Promise<string> {
+  const blob = await downscaleImage(file, 1600);
+  const path = `${uid}/page-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage.from('avatars')
+    .upload(path, blob, { contentType: 'image/jpeg' });
+  if (error) throw error;
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+}

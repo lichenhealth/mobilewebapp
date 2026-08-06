@@ -41,3 +41,16 @@
 .ptabs__pick-body strong { font-size: var(--t-sm); color: var(--ink); }
 .ptabs__pick-body em { font-style: normal; font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.45; }
 .ptabs__cancel { align-self: flex-start; }
+.ptabs__shots { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.ptabs__shot { position: relative; display: inline-block; }
+.ptabs__shot img {
+  width: 74px; height: 74px; object-fit: cover; border-radius: var(--r-sm);
+  display: block; border: 1px solid var(--bone-edge);
+}
+.ptabs__shot button {
+  position: absolute; top: -6px; right: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid var(--bone-edge); background: var(--bone);
+  color: var(--ink-soft); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.ptabs__upload { align-self: flex-start; cursor: pointer; }

@@ -631,6 +631,9 @@ export default function Profile() {
           <PageTabsEditor
             tabs={pageMeta.tabs ?? []}
             onChange={(tabs: PageTab[]) => setPage({ tabs })}
+            photos={pageMeta.photos ?? []}
+            onPhotos={(photos: string[]) => setPage({ photos })}
+            uploaderId={user?.id}
           />
 
           <p className="prof__privacy-sub">Contact &amp; hours</p>

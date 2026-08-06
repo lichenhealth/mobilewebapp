@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { uploadPageImage } from '../lib/avatarApi';
 import {
   TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
 } from '../lib/pageTabs';
@@ -16,10 +17,16 @@ import './PageTabsEditor.css';
  *
  *  A tab stays off the live page until it has something to show, so adding one
  *  can never leave a visitor in an empty room. */
-export default function PageTabsEditor({ tabs, onChange }: {
+export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, uploaderId }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
+  /** page.photos — what the Gallery tab shows. */
+  photos?: string[];
+  onPhotos?: (next: string[]) => void;
+  /** Whose storage folder the uploads land in (the signed-in member). */
+  uploaderId?: string;
 }) {
+  const [upBusy, setUpBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const spare = availableTemplates(tabs);
@@ -73,7 +80,40 @@ export default function PageTabsEditor({ tabs, onChange }: {
               <p className="ptabs__note">{tpl.blurb}</p>
             )}
 
-            {open && !tpl?.builtIn && (
+            {/* The Gallery tab is pictures, not prose. */}
+            {open && t.id === 'gallery' && onPhotos && uploaderId && (
+              <div className="ptabs__edit">
+                <div className="ptabs__shots">
+                  {photos.map((src) => (
+                    <span className="ptabs__shot" key={src}>
+                      <img src={src} alt="" />
+                      <button onClick={() => onPhotos(photos.filter((x) => x !== src))}
+                        aria-label="Remove this photo">×</button>
+                    </span>
+                  ))}
+                </div>
+                <label className="btn ptabs__upload">
+                  {upBusy ? 'Adding…' : 'Add photos'}
+                  <input type="file" accept="image/*" multiple hidden disabled={upBusy}
+                    onChange={async (e) => {
+                      const files = [...(e.target.files ?? [])];
+                      e.target.value = '';
+                      if (!files.length) return;
+                      setUpBusy(true);
+                      try {
+                        const urls = await Promise.all(files.map((f) => uploadPageImage(uploaderId, f)));
+                        onPhotos([...photos, ...urls]);
+                      } catch (err) { console.error(err); }
+                      setUpBusy(false);
+                    }} />
+                </label>
+                <p className="ptabs__note">
+                  Tap any photo on the live page to see it uncropped.
+                </p>
+              </div>
+            )}
+
+            {open && !tpl?.builtIn && t.id !== 'gallery' && (
               <div className="ptabs__edit">
                 <input className="prof__input" value={t.label ?? tpl?.label ?? ''}
                   placeholder="Tab name"
