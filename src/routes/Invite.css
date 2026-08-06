@@ -107,3 +107,8 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 }
 .invite__minor input { margin-top: 3px; flex-shrink: 0; }
 .invite__minor em { display: block; font-style: normal; font-size: var(--t-xs); color: var(--ink-muted); margin-top: 3px; }
+
+/* Knocks already answered — quieter than the ones still waiting, with an
+   honest flag when the invitation never actually went out. */
+.invite__h2--quiet { color: var(--ink-muted); margin-top: var(--s-6); }
+.invite__row--knock.is-done { opacity: 0.82; }

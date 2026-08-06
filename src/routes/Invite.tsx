@@ -82,6 +82,15 @@ export default function Invite() {
   // Setting up a young person's account (founder 2026-08-05): the token carries
   // guardianship, so you're holding it from the moment they sign in.
   const [forMinor, setForMinor] = useState(false);
+  // Which knock the prefilled form belongs to, so it resolves on send.
+  const [pendingKnock, setPendingKnock] = useState<{ id: string; email: string } | null>(null);
+  // Emails with a real invitation on record. A knock marked "invited" with no
+  // token behind it never actually reached anyone.
+  const sentTo = new Set(
+    invites.map((r) => (r.invitee_email ?? '').toLowerCase()).filter(Boolean),
+  );
+  const waitingKnocks = knocks.filter((k) => k.status === 'new');
+  const handledKnocks = knocks.filter((k) => k.status !== 'new');
   const [error, setError] = useState('');
 
   // Email invites send from our server (Resend). Phone invites can't be
@@ -172,6 +181,11 @@ export default function Invite() {
         ? 'The membership is reserved for them, but the email didn’t send. Try again in a moment.'
         : 'Couldn’t send the invite just now. Please try again in a moment.');
       return;
+    }
+    // NOW the knock is genuinely handled.
+    if (pendingKnock && pendingKnock.email === to.toLowerCase()) {
+      void resolveKnock(pendingKnock.id, 'invited');
+      setPendingKnock(null);
     }
     setMsg(gifting
       ? `Invitation sent to ${to} — ${giftMonths ? (spanText(giftMonths) + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
@@ -349,15 +363,18 @@ export default function Invite() {
         )}
         {isAdmin && (
           <>
+            {/* "At the door" means people still waiting. Handled ones moved
+                below — a 0-waiting heading above four rows is what let three
+                unsent invitations hide in plain sight (founder 2026-08-06). */}
             <h2 className="invite__h2">
               At the door
-              {knocks.length > 0 && <span className="invite__tally">{knocks.filter((k) => k.status === 'new').length} waiting</span>}
+              {waitingKnocks.length > 0 && <span className="invite__tally">{waitingKnocks.length} waiting</span>}
             </h2>
-            {knocks.length === 0 ? (
+            {waitingKnocks.length === 0 ? (
               <p className="invite__muted">Nobody knocking right now.</p>
             ) : (
               <ul className="invite__list">
-                {knocks.map((k) => (
+                {waitingKnocks.map((k) => (
                   <li className="invite__row invite__row--knock" key={k.id}>
                     <span className="invite__row-who">
                       <strong>{k.name}</strong> · {k.email}
@@ -369,8 +386,12 @@ export default function Invite() {
                         <button
                           className="btn invite__use"
                           onClick={() => {
+                            // Prefill and REMEMBER — the knock only resolves
+                            // once the invitation actually sends (founder
+                            // 2026-08-06: three people were marked invited
+                            // and never heard anything).
                             setEmail(k.email);
-                            void resolveKnock(k.id, 'invited');
+                            setPendingKnock({ id: k.id, email: k.email.toLowerCase() });
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                         >
@@ -384,6 +405,34 @@ export default function Invite() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {handledKnocks.length > 0 && (
+              <>
+                <h2 className="invite__h2 invite__h2--quiet">Already answered</h2>
+                <ul className="invite__list">
+                  {handledKnocks.map((k) => (
+                    <li className="invite__row invite__row--knock is-done" key={k.id}>
+                      <span className="invite__row-who">
+                        <strong>{k.name}</strong> · {k.email}
+                      </span>
+                      <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : ' is-declined')}>
+                        {k.status}
+                      </span>
+                      {k.status === 'invited' && !sentTo.has(k.email.toLowerCase()) && (
+                        <button className="btn invite__use"
+                          onClick={() => {
+                            setEmail(k.email);
+                            setPendingKnock({ id: k.id, email: k.email.toLowerCase() });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}>
+                          No invitation sent — send one
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </>
         )}
