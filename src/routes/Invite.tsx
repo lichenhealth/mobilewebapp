@@ -87,6 +87,10 @@ export default function Invite() {
   // Addresses invited during THIS sitting — the token list is fetched on load,
   // so without this a just-sent row would still offer to send again.
   const [sentNow, setSentNow] = useState<Set<string>>(new Set());
+  // Personalising an invitation before it goes (founder 2026-08-06): the note
+  // is written on the row itself, so nothing is sent until you've read it.
+  const [composeFor, setComposeFor] = useState<string | null>(null);
+  const [composeNote, setComposeNote] = useState('');
   // Emails with a real invitation on record. A knock marked "invited" with no
   // token behind it never actually reached anyone.
   const sentTo = new Set(
@@ -139,8 +143,9 @@ export default function Invite() {
       .then(({ data }) => setFullName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user, loading, navigate]);
 
-  async function send(toArg?: string) {
+  async function send(toArg?: string, noteArg?: string) {
     const to = (toArg ?? email).trim();
+    const theNote = (noteArg ?? note).trim();
     if (!to || !user) return;
     const gifting = isAdmin && gift;
     setBusy(true); setMsg(''); setError('');
@@ -176,7 +181,7 @@ export default function Invite() {
       if (mg) { setBusy(false); setError(mg.message); return; }
     }
     const { error: e } = await supabase.functions.invoke('send-invite', {
-      body: { email: to, inviterName: fullName, note: note.trim(), giftTier: gifting ? giftTier : undefined, giftMonths: gifting ? giftMonths : undefined },
+      body: { email: to, inviterName: fullName, note: theNote, giftTier: gifting ? giftTier : undefined, giftMonths: gifting ? giftMonths : undefined },
     });
     setBusy(false);
     if (e) {
@@ -385,25 +390,37 @@ export default function Invite() {
                       {k.story && <em className="invite__story">{k.story}</em>}
                     </span>
                     <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : k.status === 'declined' ? ' is-declined' : '')}>{k.status}</span>
-                    {k.status === 'new' && (
+                    {k.status === 'new' && composeFor !== k.id && (
                       <span className="invite__knock-acts">
                         <button
                           className="btn invite__use"
-                          onClick={() => {
-                            // Prefill and REMEMBER — the knock only resolves
-                            // once the invitation actually sends (founder
-                            // 2026-08-06: three people were marked invited
-                            // and never heard anything).
-                            setEmail(k.email);
-                            setPendingKnock({ id: k.id, email: k.email.toLowerCase() });
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
+                          onClick={() => { setComposeFor(k.id); setComposeNote(''); }}
                         >
                           Invite them
                         </button>
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
                         </button>
+                      </span>
+                    )}
+                    {composeFor === k.id && (
+                      <span className="invite__compose">
+                        <textarea
+                          className="invite__input invite__textarea"
+                          rows={3}
+                          autoFocus
+                          value={composeNote}
+                          maxLength={500}
+                          placeholder={`A line just for ${k.name} — why now, and why them.`}
+                          onChange={(e) => setComposeNote(e.target.value)}
+                        />
+                        <span className="invite__compose-acts">
+                          <button className="btn btn-primary" disabled={busy}
+                            onClick={() => { void send(k.email, composeNote).then(() => setComposeFor(null)); }}>
+                            {busy ? 'Sending…' : 'Send invitation'}
+                          </button>
+                          <button className="btn" onClick={() => setComposeFor(null)}>Not yet</button>
+                        </span>
                       </span>
                     )}
                   </li>
@@ -435,11 +452,31 @@ export default function Invite() {
                           : <span className="invite__pill is-stalled">not sent</span>;
                       })()}
                       {k.status === 'invited' && !sentTo.has(k.email.toLowerCase())
-                        && !sentNow.has(k.email.toLowerCase()) && (
-                        <button className="btn invite__use" disabled={busy}
-                          onClick={() => void send(k.email)}>
-                          {busy ? 'Sending…' : 'No invitation sent — send one now'}
+                        && !sentNow.has(k.email.toLowerCase()) && composeFor !== k.id && (
+                        <button className="btn invite__use"
+                          onClick={() => { setComposeFor(k.id); setComposeNote(''); }}>
+                          No invitation sent — write one
                         </button>
+                      )}
+                      {composeFor === k.id && (
+                        <span className="invite__compose">
+                          <textarea
+                            className="invite__input invite__textarea"
+                            rows={3}
+                            autoFocus
+                            value={composeNote}
+                            maxLength={500}
+                            placeholder={`A line just for ${k.name} — why now, and why them.`}
+                            onChange={(e) => setComposeNote(e.target.value)}
+                          />
+                          <span className="invite__compose-acts">
+                            <button className="btn btn-primary" disabled={busy}
+                              onClick={() => { void send(k.email, composeNote).then(() => setComposeFor(null)); }}>
+                              {busy ? 'Sending…' : 'Send invitation'}
+                            </button>
+                            <button className="btn" onClick={() => setComposeFor(null)}>Not yet</button>
+                          </span>
+                        </span>
                       )}
                       {sentNow.has(k.email.toLowerCase()) && (
                         <span className="invite__sent-now">Sent ✓</span>

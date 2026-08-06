@@ -118,3 +118,8 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
   background: var(--peach-tint); border-color: var(--peach);
   color: var(--peach-deep);
 }
+
+/* Writing an invitation from the queue — the note sits on the row, so the
+   thing you're about to send is the thing you're looking at. */
+.invite__compose { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; margin-top: var(--s-2); }
+.invite__compose-acts { display: flex; gap: var(--s-2); flex-wrap: wrap; }
