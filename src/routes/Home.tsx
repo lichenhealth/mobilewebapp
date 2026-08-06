@@ -15,7 +15,6 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
-import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import './Home.css';
 import { aiDoorOn } from '../components/AssistantDoor';
@@ -36,14 +35,17 @@ function salutation(): string {
 }
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
   'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
-/** Whose network is awake — "your network" was ambiguous when the count is
- *  really the whole web you're part of, and misleading once you're acting as
- *  a community (founder 2026-08-06). Naming it removes both doubts. */
-function awakeLine(n: number | null, where: string): string {
+/** network_awake_count() counts YOUR web — the people in your my-celium plus
+ *  those you share a space with. Not the whole Lichen network, and NOT the
+ *  space you happen to be acting as: the number doesn't change when you switch
+ *  hats, so the words mustn't either (founder 2026-08-06, after I renamed the
+ *  label without touching the count and it claimed Morgahn was in Countryman
+ *  Stables). A real per-space count needs its own query — see the note below. */
+function awakeLine(n: number | null): string {
   if (n === null) return 'Welcome back.';
-  if (n === 0) return `${where} is resting.`;
-  if (n === 1) return `One in ${where} is awake.`;
-  return `${NUMBER_WORDS[n] ?? n} in ${where} are awake.`;
+  if (n === 0) return 'Your web is resting.';
+  if (n === 1) return 'One in your web is awake.';
+  return `${NUMBER_WORDS[n] ?? n} in your web are awake.`;
 }
 
 const CATEGORY_ICONS: IconRowItem[] = [
@@ -90,9 +92,6 @@ export default function Home() {
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [awake, setAwake] = useState<number | null>(null);
-  const { actor } = useActing();
-  // Acting as a community? Then it's THEIR people who are awake.
-  const awakeWhere = actor.type === 'space' ? actor.name : 'the Lichen network';
 
   useEffect(() => {
     (async () => {
@@ -123,11 +122,11 @@ export default function Home() {
           {user ? (
             // The doorway: awake+opted-in members lead your web's directory.
             <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
-              {awakeLine(awake, awakeWhere)}
+              {awakeLine(awake)}
               <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
           ) : (
-            <span className="display">{awakeLine(awake, awakeWhere)}</span>
+            <span className="display">{awakeLine(awake)}</span>
           )}
         </h1>
         {/* The creed — captions the presence doorway it explains. */}
