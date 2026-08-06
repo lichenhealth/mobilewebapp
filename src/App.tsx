@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Home from './routes/Home';
 import SpacesDirectory from './routes/SpacesDirectory';
 import Mycelium from './routes/Mycelium';
@@ -35,6 +35,12 @@ import GuestEvent from './routes/GuestEvent';
 // static merged marketing page (public/about, weave design). Any in-app
 // navigate('/about') lands on this redirector, which hard-loads so the
 // server's filesystem-first static file wins over the SPA.
+/** /members/:id/about → the profile's About tab. */
+function MemberAboutRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/members/${id}`} replace />;
+}
+
 function StaticAboutRedirect() {
   useEffect(() => { window.location.replace('/about'); }, []);
   return null;
@@ -42,7 +48,6 @@ function StaticAboutRedirect() {
 import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
-import MemberAbout from './routes/MemberAbout';
 import SignUp from './routes/SignUp';
 import Login from './routes/Login';
 import ResetPassword from './routes/ResetPassword';
@@ -256,7 +261,10 @@ export default function App() {
           <Route path="/profile"   element={<Profile />} />
           <Route path="/spaces/:id" element={<SpaceProfile />} />
           <Route path="/members/:id" element={<MemberProfile />} />
-          <Route path="/members/:id/about" element={<MemberAbout />} />
+          {/* The separate About page is retired (founder 2026-08-05) — its bio
+              and offerings are the profile's own About and Services tabs now.
+              The route survives so shared links don't 404. */}
+          <Route path="/members/:id/about" element={<MemberAboutRedirect />} />
           <Route path="/invite"    element={<Invite />} />
           <Route path="/help"      element={<Help />} />
           <Route path="/membership" element={<Membership />} />

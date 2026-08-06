@@ -180,25 +180,11 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     } catch (e) { console.error('message', e); setBusy(false); }
   }
 
-  // Signed-out visitors — and the owner hitting Preview — get the template.
-  if ((!me || previewing) && pub && (pub.on || previewing)) {
-    return (
-      <PublicPage
-        id={id}
-        name={name}
-        kindLabel={member.headline ?? undefined}
-        avatarUrl={member.avatar_url}
-        description={member.bio}
-        offerings={[...offerings.services, ...offerings.goods]}
-        contact={pub.contact}
-        page={pub.page}
-        preview={previewing}
-      />
-    );
-  }
-
-  return (
-    <div className="prof">
+  // ── The member-only pieces (founder 2026-08-05). These ride the template
+  //    when you're signed in and simply aren't passed when you're not, which
+  //    is the whole "omit the internal flags on the public web" idea. ──
+  const identityExtras = (
+    <>
       {isSelf && (
         <div className="view-toggle-row">
           <span className="view-toggle" role="group" aria-label="View">
@@ -213,11 +199,110 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           <span className="mprof__selfhint">How other members see you.</span>
         </div>
       )}
+      {idTags.length > 0 && (
+        <p className="mprof__idtags">
+          {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
+        </p>
+      )}
+      {bookables.length > 0 && (
+        <div className="mprof__book">
+          {bookables.map((bt) => (
+            <button className="mprof__book-row" key={bt.id} onClick={() => navigate(`/book/${bt.id}`)}>
+              <span className="mprof__book-body">
+                <span className="mprof__book-title">{bt.title}</span>
+                <span className="mprof__book-sub">
+                  {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''}{bt.location ? ` · ${bt.location}` : ''}
+                </span>
+              </span>
+              <Icon name="chevron-right" size={14} />
+            </button>
+          ))}
+        </div>
+      )}
+      {me && !isSelf && (
+        <div className="mprof__actions">
+          {isBeing ? (
+            steward && (
+              <button className="btn btn-primary mprof__btn" onClick={() => navigate(steward.to)}>
+                <Icon name="message" size={14} /> Reach {steward.name.split(' ')[0]}
+              </button>
+            )
+          ) : (
+            <button className="btn btn-primary mprof__btn" onClick={message} disabled={busy}>
+              <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}
+            </button>
+          )}
+          <button
+            className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
+            onClick={toggleWeb}
+          >
+            <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
+          </button>
+          <button
+            className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+            onClick={toggleTrust}
+          >
+            <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  const memberFeed = (
+    <ContributionsFeed
+      profileId={member.id}
+      me={me}
+      entityName={name}
+      showFilters={false}
+      leading={[
+        { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) },
+        ...(isSelf
+          ? [{ icon: 'plus' as const, label: 'Add', onClick: () => navigate('/compose') }]
+          : []),
+      ]}
+      assistantSection="profile"
+      assistantOff={member.assistant_enabled === false}
+    />
+  );
+
+  // ONE structure (founder 2026-08-05): the web page IS the profile. Signed in
+  // you get the same tabs plus the member-only pieces; signed out, the same
+  // page with those omitted. public_page no longer decides WHETHER the
+  // template renders — only what a signed-out visitor is allowed to see.
+  const canSeeIt = !!me || previewing || pub?.on;
+  if (pub && canSeeIt) {
+    return (
+      <PublicPage
+        id={id}
+        name={name}
+        kindLabel={member.headline ?? undefined}
+        avatarUrl={member.avatar_url}
+        description={member.bio}
+        location={homeSpot?.place
+          ? (homeSpot.level !== 'exact' ? areaLabel(homeSpot.place) : homeSpot.place)
+          : undefined}
+        // Services and goods stay SPLIT — flattening them lost what the old
+        // About page showed.
+        offerings={[...offerings.services, ...offerings.goods]}
+        contact={pub.contact}
+        page={pub.page}
+        preview={previewing}
+        signedIn={!!me}
+        feed={memberFeed}
+        beforeContent={me ? identityExtras : undefined}
+      />
+    );
+  }
+
+  // Fallback when the page blob hasn't loaded (or the row is unreadable):
+  // identity, the member-only pieces, the feed. No About door — that content
+  // is the About tab now.
+  return (
+    <div className="prof">
       <div className="prof__head">
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
-        {/* A being's kind and who tends it — the beyond-human members
-            (founder 2026-08-05). Nothing renders for a person. */}
         {isBeing && (
           <p className="mprof__being">
             <span className="mprof__being-kind">{member.kind}</span>
@@ -230,97 +315,10 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           </p>
         )}
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
-        {idTags.length > 0 && (
-          <p className="mprof__idtags">
-            {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
-          </p>
-        )}
-        {homeSpot?.place && (
-          <p className="mprof__loc">
-            <Icon name="location" size={12} />{' '}
-            {homeSpot.level !== 'exact' ? areaLabel(homeSpot.place) : homeSpot.place}
-          </p>
-        )}
-        {bookables.length > 0 && (
-          <div className="mprof__book">
-            {bookables.map((bt) => (
-              <button className="mprof__book-row" key={bt.id} onClick={() => navigate(`/book/${bt.id}`)}>
-                <span className="mprof__book-body">
-                  <span className="mprof__book-title">{bt.title}</span>
-                  <span className="mprof__book-sub">
-                    {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''}{bt.location ? ` · ${bt.location}` : ''}
-                  </span>
-                </span>
-                <Icon name="chevron-right" size={14} />
-              </button>
-            ))}
-          </div>
-        )}
-        {me && !isSelf && (
-          <div className="mprof__actions">
-            {/* You can't DM a horse — the door goes to whoever tends it. */}
-            {isBeing ? (
-              steward && (
-                <button className="btn btn-primary mprof__btn"
-                  onClick={() => navigate(steward.to)}>
-                  <Icon name="message" size={14} /> Reach {steward.name.split(' ')[0]}
-                </button>
-              )
-            ) : (
-              <button className="btn btn-primary mprof__btn" onClick={message} disabled={busy}>
-                <Icon name="message" size={14} /> {busy ? 'Opening…' : 'Message'}
-              </button>
-            )}
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (inWeb ? ' is-on' : '')}
-              onClick={toggleWeb}
-              title={inWeb ? 'In your my-celium — their doings flow to you' : 'Weave them into your my-celium (no trust implied)'}
-            >
-              <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
-            </button>
-            <button
-              className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
-              onClick={toggleTrust}
-              title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
-            >
-              <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
-            </button>
-          </div>
-        )}
+        {member.bio && <p className="mprof__bio">{member.bio}</p>}
       </div>
-
-      {/* Feed-first on mobile (founder 2026-07-19): a taste of the bio + one
-          door to the full About room — the tag wall lives there now. */}
-      {(member.bio || offerings.services.length > 0 || offerings.goods.length > 0) && (
-        <div className="mprof__about">
-          {member.bio && <p className="mprof__bio mprof__bio--clamp">{member.bio}</p>}
-          <button className="mprof__aboutdoor" onClick={() => navigate(`/members/${id}/about`)}>
-            About & offerings
-            {(offerings.services.length + offerings.goods.length) > 0 && (
-              <em>{offerings.services.length + offerings.goods.length} listed</em>
-            )}
-            <Icon name="chevron-right" size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* The profile IS a feed — their contributions, standard lenses.
-          Search scopes to just this person's stream. */}
-      <ContributionsFeed
-        profileId={member.id}
-        me={me}
-        entityName={name}
-        leading={[
-          { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) },
-          // Your own profile can start a post, same as a space's page can
-          // (founder 2026-08-05). Search · Add · AI, the platform's one order.
-          ...(isSelf
-            ? [{ icon: 'plus' as const, label: 'Add', onClick: () => navigate('/compose') }]
-            : []),
-        ]}
-        assistantSection="profile"
-        assistantOff={member.assistant_enabled === false}
-      />
+      {identityExtras}
+      {memberFeed}
     </div>
   );
 }

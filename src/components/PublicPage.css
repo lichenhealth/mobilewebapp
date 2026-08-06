@@ -8,6 +8,13 @@
    same amount .prof does to sit directly under the compact bar (founder
    2026-08-03). */
 .ppage--in-app { margin-top: calc(var(--top-h-compact) - var(--top-h)); }
+/* In-app the hero is a profile header, not a landing page — the website-scale
+   air above the avatar reads as a bug on a phone (founder 2026-08-05). */
+/* The hero reserves 104px for the floating Request-an-invitation / Sign-in
+   corner. A signed-in member never sees that corner, so in-app it was just
+   dead air above the avatar (founder 2026-08-05). */
+.ppage--in-app .ppage__hero { padding-top: var(--s-3); }
+.ppage--in-app .ppage__hero-body { padding-top: 0; }
 .ppage__preview {
   margin: 0; padding: 8px var(--s-5); background: var(--blue-tint);
   color: var(--blue-deep); font-size: 12.5px; text-align: center;

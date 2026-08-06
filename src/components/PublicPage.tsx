@@ -77,6 +77,9 @@ export interface PublicPageProps {
    *  navigational doors that shouldn't get lost below a long page
    *  (founder 2026-08-03). Optional. */
   beforeContent?: React.ReactNode;
+  /** The entity's stream. Rendered under a Feed tab that leads the row —
+   *  member-only unless page.showPosts opens it to the web. */
+  feed?: React.ReactNode;
   /** Owner previewing their own page. */
   preview?: boolean;
   /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
@@ -117,9 +120,17 @@ export default function PublicPage(props: PublicPageProps) {
   // only the active section renders below the hero. Only doors whose
   // section exists render; with no doors, everything shows inline.
   const hasContact = Object.keys(contact).length > 0 || !!page.practical;
-  // Custom doors override the built-in section set entirely.
+  // ONE tab row (founder 2026-08-05, merging the in-app profile with the web
+  // page): Feed first, then whichever templated sections actually have
+  // content. A person with nothing but posts sees no tabs at all — the right
+  // amount of chrome for them.
+  //
+  // Feed is member-only unless the page opts in via page.showPosts, which was
+  // declared in PageMeta from the start and never read until now.
+  const showFeed = !!props.feed && (!!props.signedIn || page.showPosts === true);
+  // Custom doors (Countryman Stables) keep their own set; Feed joins in front.
   const doors = page.doors?.length ? page.doors : null;
-  const navItems = doors
+  const sectionItems = doors
     ? doors.map((d) => ({ id: d.id, label: d.label }))
     : [
       story ? { id: 'about', label: 'About' } : null,
@@ -127,10 +138,14 @@ export default function PublicPage(props: PublicPageProps) {
       page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
       hasContact ? { id: 'contact', label: 'Contact' } : null,
     ].filter((n): n is { id: string; label: string } => !!n);
-  const firstContentDoor = doors?.find((d) => !d.href)?.id;
+  const navItems = showFeed
+    ? [{ id: 'feed', label: 'Feed' }, ...sectionItems]
+    : sectionItems;
+  const firstContentDoor = showFeed ? 'feed' : doors?.find((d) => !d.href)?.id;
   const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
   const tabbed = navItems.length > 0;
-  const show = (id: string) => !doors && (!tabbed || tab === id);
+  const showingFeed = showFeed && tab === 'feed';
+  const show = (id: string) => !doors && !showingFeed && (!tabbed || tab === id);
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
@@ -190,7 +205,8 @@ export default function PublicPage(props: PublicPageProps) {
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
         <div className="ppage__hero-body ppage__hero-body--top">
-          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={128} />
+          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
+            size={props.signedIn ? 96 : 128} />
           <h1 className="ppage__name">{name}</h1>
           {(page.tagline || kindLabel) && (
             <p className="ppage__tagline">
@@ -238,6 +254,10 @@ export default function PublicPage(props: PublicPageProps) {
           own content, so they're never lost to scrolling (founder
           2026-08-03). Guests never pass this. */}
       {props.beforeContent}
+
+      {/* The Feed tab — the entity's actual stream, the thing the in-app
+          profile used to be entirely (founder 2026-08-05). */}
+      {showingFeed && props.feed}
 
       {/* Custom door content — lead, then paragraphs, then (optionally)
           the contact list. */}

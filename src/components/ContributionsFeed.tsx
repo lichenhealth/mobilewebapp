@@ -42,7 +42,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, showFilters = true }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -67,6 +67,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  section properly — a space's Events tab beats an events-only filter,
    *  and two identical circles side by side read as a bug. */
   hideAreas?: string[];
+  /** All/Social/Actionable. Off on a profile, where the founder wants "just
+   *  Home Feed, which has everything" (2026-08-05); Home and the area feeds
+   *  keep theirs. */
+  showFilters?: boolean;
   /** The entity's display name — lets a single area lens read as a PLACE:
    *  tap Library on Melanie's profile and the feed declares "Melanie's
    *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
@@ -165,7 +169,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
 
   return (
     <div className="cfeed">
-      {posts.length > 0 && <FilterRow options={TABS} value={tab} onChange={setTab} />}
+      {showFilters && posts.length > 0 && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
       {(leading.length > 0 || trailing.length > 0 || areasPresent.length > 0) && (
         <div className="cfeed__areas h-scroll">
