@@ -84,30 +84,45 @@ export const setTrust = setVouch;
 
 /** Everything the current user recommends, as `${type}:${id}` keys (same
  *  polymorphic shape as trust — posts, profiles, and spaces alike). */
+/** Keys are 'type:id' for a whole target, and 'type:id#category' for a
+ *  recommendation tagged to one of a person's offerings. */
 export async function loadMyRecommendations(): Promise<Set<string>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Set();
   const { data } = await supabase
     .from('recommendations')
-    .select('target_type, target_id')
+    .select('target_type, target_id, offering_category')
     .eq('recommender_id', user.id);
-  return new Set((data ?? []).map((r) => myceliumKey(r.target_type as TargetType, r.target_id)));
+  const rows = (data ?? []) as { target_type: string; target_id: string; offering_category: string | null }[];
+  return new Set(rows.map((r) => recommendKey(
+    r.target_type as TargetType, r.target_id, r.offering_category ?? undefined)));
 }
 
-/** Recommend (amplify) or un-recommend an entity — a post, a person, a space. */
-export async function setRecommend(type: TargetType, id: string, on: boolean): Promise<void> {
+export const recommendKey = (type: TargetType, id: string, category?: string) =>
+  category ? `${myceliumKey(type, id)}#${category}` : myceliumKey(type, id);
+
+/** Recommend (amplify) or un-recommend — a post, a space, or ONE OF A
+ *  PERSON'S OFFERINGS (founder 2026-08-06: you don't recommend a person, you
+ *  recommend their work). `category` is a category id the person actually
+ *  lists; the DB trigger refuses anything else. */
+export async function setRecommend(
+  type: TargetType, id: string, on: boolean, category?: string,
+): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   if (on) {
     const { error } = await supabase
       .from('recommendations')
-      .insert({ recommender_id: user.id, target_type: type, target_id: id });
+      .insert({
+        recommender_id: user.id, target_type: type, target_id: id,
+        offering_category: category ?? null,
+      });
     if (error && error.code !== '23505') throw error;
   } else {
-    const { error } = await supabase
-      .from('recommendations')
-      .delete()
+    let q = supabase.from('recommendations').delete()
       .eq('recommender_id', user.id).eq('target_type', type).eq('target_id', id);
+    q = category ? q.eq('offering_category', category) : q.is('offering_category', null);
+    const { error } = await q;
     if (error) throw error;
   }
 }

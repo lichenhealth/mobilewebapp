@@ -32,16 +32,22 @@ export async function loadMemberProfile(id: string): Promise<MemberProfile | nul
   return (data as MemberProfile | null) ?? null;
 }
 
-export interface MemberOfferings { services: string[]; goods: string[] }
+export interface Offering { id: string; name: string; domain: 'good' | 'service' | 'place' }
+export interface MemberOfferings {
+  services: string[]; goods: string[];
+  /** With ids, so a recommendation can name the offering it's for
+   *  (founder 2026-08-06). */
+  rows: Offering[];
+}
 
 /** Category names a member offers, split by domain (the Provider face). */
 export async function loadMemberOfferings(id: string): Promise<MemberOfferings> {
   const { data, error } = await supabase
     .from('profile_categories')
-    .select('categories(name, domain)')
+    .select('categories(id, name, domain)')
     .eq('profile_id', id);
-  if (error) { console.warn('loadMemberOfferings:', error.message); return { services: [], goods: [] }; }
-  const rows = (data as unknown as { categories: { name: string; domain: 'good' | 'service' | 'place' } | null }[] | null) ?? [];
+  if (error) { console.warn('loadMemberOfferings:', error.message); return { services: [], goods: [], rows: [] }; }
+  const rows = (data as unknown as { categories: Offering | null }[] | null) ?? [];
   const services: string[] = [];
   const goods: string[] = [];
   for (const r of rows) {
@@ -49,5 +55,7 @@ export async function loadMemberOfferings(id: string): Promise<MemberOfferings> 
     (r.categories.domain === 'service' ? services : goods).push(r.categories.name);
   }
   services.sort(); goods.sort();
-  return { services, goods };
+  const offerings = rows.map((r) => r.categories).filter((c): c is Offering => !!c)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { services, goods, rows: offerings };
 }

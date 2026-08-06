@@ -52,10 +52,6 @@ export default function Directory() {
     if (on) setMyWebSet((s) => withKey(s, 'profile:' + id, true)); // trusting auto-weaves
     void setVouch('profile', id, on).catch(console.error);
   };
-  const toggleRec = (id: string, on: boolean) => {
-    setMyRecs((s) => withKey(s, 'profile:' + id, on));
-    void setRecommend('profile', id, on).catch(console.error);
-  };
 
   useEffect(() => {
     if (!me) return;
@@ -161,15 +157,10 @@ export default function Directory() {
               >
                 <Icon name="shield-user" size={16} />
               </button>
-              <button
-                className={'dir__sig' + (myRecs.has('profile:' + m.id) ? ' is-on' : '')}
-                onClick={(e) => { e.stopPropagation(); toggleRec(m.id, !myRecs.has('profile:' + m.id)); }}
-                aria-pressed={myRecs.has('profile:' + m.id)}
-                aria-label={myRecs.has('profile:' + m.id) ? `Stop recommending ${name}` : `Recommend ${name}`}
-                title={myRecs.has('profile:' + m.id) ? 'Recommended by you' : 'Recommend'}
-              >
-                <Icon name="thumbs-up" size={16} />
-              </button>
+              {/* No bare-profile thumb (founder 2026-08-06): recommending a
+                  whole person implicitly endorsed everything they'd ever
+                  listed. The thumb lives on their offerings instead — open
+                  their page and recommend the work you actually know. */}
               <WeaveMark
                 on={myWebSet.has('profile:' + m.id)}
                 onToggle={(on) => toggleWeave(m.id, on)}

@@ -8,7 +8,9 @@ import { useActing } from '../acting/ActingProvider';
 import { getIdentityTags } from '../lib/meansApi';
 import { loadSteward } from '../lib/stewardshipApi';
 import { ensureDirectChat } from '../lib/chatApi';
-import { loadMyWeb, setInWeb, setVouch } from '../lib/myceliumApi';
+import {
+  loadMyWeb, setInWeb, setVouch, setRecommend, loadMyRecommendations, recommendKey,
+} from '../lib/myceliumApi';
 import {
   loadMappableMembers, loadMyHome, loadMyLocationShares, areaLabel, type MappableMember,
 } from '../lib/locationApi';
@@ -37,7 +39,9 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const [member, setMember] = useState<MemberRow | null>(null);
   const [steward, setSteward] = useState<{ name: string; to: string } | null>(null);
   const { actor } = useActing();
-  const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [] });
+  // Which of their offerings I recommend (keyed 'profile:id#category').
+  const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  const [offerings, setOfferings] = useState<MemberOfferings>({ services: [], goods: [], rows: [] });
   const [inWeb, setInWebState] = useState(false);
   const [trusted, setTrusted] = useState(false);
   const [homeSpot, setHomeSpot] = useState<MappableMember | null>(null);
@@ -119,6 +123,13 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     setTopIdentity({ id: member.id, name: member.full_name || 'A Lichen member', avatarUrl: member.avatar_url, kind: 'person' });
     return () => setTopIdentity(null);
   }, [member]);
+
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadMyRecommendations().then((r) => { if (live) setMyRecs(r); });
+    return () => { live = false; };
+  }, [me]);
 
   // Who tends this being (nothing to resolve for a person).
   useEffect(() => {
@@ -298,6 +309,29 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         // Services and goods stay SPLIT — flattening them lost what the old
         // About page showed.
         offerings={[...offerings.services, ...offerings.goods]}
+        offeringRows={offerings.rows}
+        renderOfferingAction={me && !isSelf ? (o) => {
+          const key = recommendKey('profile', member.id, o.id);
+          const on = myRecs.has(key);
+          return (
+            <button
+              className={'ppage__offer-rec' + (on ? ' is-on' : '')}
+              aria-pressed={on}
+              title={on ? `You recommend ${o.name}` : `Recommend their ${o.name}`}
+              onClick={() => {
+                setMyRecs((prev) => {
+                  const next = new Set(prev);
+                  if (on) next.delete(key); else next.add(key);
+                  return next;
+                });
+                void setRecommend('profile', member.id, !on, o.id).catch(console.error);
+              }}
+            >
+              <Icon name="thumbs-up" size={13} />
+              {on ? 'Recommended' : 'Recommend'}
+            </button>
+          );
+        } : undefined}
         contact={pub.contact}
         page={pub.page}
         preview={previewing}

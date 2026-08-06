@@ -26,7 +26,7 @@ export interface PageMeta {
   /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
-  sections?: Partial<Record<'about' | 'services' | 'facilities', { lead?: string; image?: string }>>;
+  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -84,6 +84,12 @@ export interface PublicPageProps {
   /** The entity's stream. Rendered under a Feed tab that leads the row —
    *  member-only unless page.showPosts opens it to the web. */
   feed?: React.ReactNode;
+  /** Offerings WITH ids and domains, so Services and Goods can be separate
+   *  tabs and each row can carry its own recommend (founder 2026-08-06:
+   *  "you don't recommend a person, you recommend their work"). */
+  offeringRows?: { id: string; name: string; domain: string }[];
+  /** Renders the thumb for one offering; omitted for guests. */
+  renderOfferingAction?: (o: { id: string; name: string }) => React.ReactNode;
   /** Owner previewing their own page. */
   preview?: boolean;
   /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
@@ -142,9 +148,12 @@ export default function PublicPage(props: PublicPageProps) {
   // has something to show — adding one is an invitation to write, not an
   // empty room for a visitor to walk into.
   const chosen: PageTab[] = page.tabs?.length ? page.tabs : [];
+  const svcRows = (props.offeringRows ?? []).filter((o) => o.domain === 'service');
+  const goodRows = (props.offeringRows ?? []).filter((o) => o.domain === 'good');
   const builtInHasContent = (id: string) =>
     id === 'about' ? !!story
-      : id === 'services' ? offerings.length > 0
+      : id === 'goods' ? goodRows.length > 0
+      : id === 'services' ? (svcRows.length > 0 || offerings.length > 0)
       : id === 'facilities' ? !!page.facilities
       : id === 'contact' ? hasContact
       : false;
@@ -190,7 +199,7 @@ export default function PublicPage(props: PublicPageProps) {
   // Uniform door anatomy (founder 2026-07-29): each door owns the cover
   // slot — About wears the page cover, every other door wears its own
   // section image up top; the lead reads as the section's title below it.
-  const flavor = (id: 'about' | 'services' | 'facilities') => {
+  const flavor = (id: 'about' | 'services' | 'goods' | 'facilities') => {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
@@ -348,15 +357,46 @@ export default function PublicPage(props: PublicPageProps) {
         </div>
       )}
 
-      {/* 3 · Offerings — straight from Lichen, so it never goes stale */}
-      {offerings.length > 0 && show('services') && (
+      {/* 3 · Offerings — straight from Lichen, so they never go stale.
+             Services and Goods are separate tabs (founder 2026-08-06), and
+             each row carries its OWN recommend: you recommend the work, not
+             the person. */}
+      {svcRows.length > 0 && show('services') && (
+        <section className="ppage__sec">
+          <h2 className="ppage__h2">Services</h2>
+          {flavor('services')}
+          <ul className="ppage__offers">
+            {svcRows.map((o) => (
+              <li className="ppage__offer" key={o.id}>
+                <span className="ppage__offer-name">{o.name}</span>
+                {props.renderOfferingAction?.(o)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {goodRows.length > 0 && show('goods') && (
+        <section className="ppage__sec">
+          <h2 className="ppage__h2">Goods</h2>
+          {flavor('goods')}
+          <ul className="ppage__offers">
+            {goodRows.map((o) => (
+              <li className="ppage__offer" key={o.id}>
+                <span className="ppage__offer-name">{o.name}</span>
+                {props.renderOfferingAction?.(o)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* A page that gave us plain strings (a space's hand-written offerings)
+          keeps the old single list. */}
+      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
-          {/* A plain list, not chips — to a signed-out visitor these are
-              information, not buttons. The same services become actionable
-              inside Lichen once you're a member of the org (founder rule,
-              2026-07-29: external face informs, the platform transacts). */}
           <ul className="ppage__offers">
             {offerings.map((o) => {
               const [head, ...rest] = o.split(' · ');

@@ -32,7 +32,9 @@ export const TAB_TEMPLATES: TabTemplate[] = [
   { id: 'about', label: 'About', icon: 'info', builtIn: true,
     blurb: 'Your story — the one you’ve already written on your profile.' },
   { id: 'services', label: 'Services', icon: 'briefcase', builtIn: true,
-    blurb: 'What you offer, kept in step with your categories automatically.' },
+    blurb: 'What you do for people, kept in step with your categories automatically.' },
+  { id: 'goods', label: 'Goods', icon: 'store', builtIn: true,
+    blurb: 'What you make or sell — the same list, kept in step automatically.' },
   { id: 'contact', label: 'Contact', icon: 'phone', builtIn: true,
     blurb: 'Address, hours, phone, email — plus what to bring and where to park.' },
 

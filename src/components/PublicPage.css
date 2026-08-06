@@ -225,3 +225,17 @@
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--ppage-accent);
 }
 .ppage__person-note { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+
+/* Recommending ONE offering — you recommend the work, not the person
+   (founder 2026-08-06). Quiet until it's on. */
+.ppage__offer-rec {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
+  border: 1px solid var(--bone-edge); background: transparent;
+  border-radius: var(--r-full); padding: 3px 10px; cursor: pointer;
+  font-size: 12px; color: var(--ink-muted);
+}
+.ppage__offer-rec:hover { border-color: var(--peach); color: var(--ink); }
+.ppage__offer-rec.is-on {
+  border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep);
+}
+.ppage__offer { display: flex; align-items: center; gap: var(--s-3); }
