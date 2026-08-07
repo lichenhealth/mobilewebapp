@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
+import { MyceliumMark } from './MyceliumMark';
 import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type AdminDesk } from '../lib/spacesApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
@@ -26,8 +27,18 @@ interface NavSection {
   defaultExpanded: boolean;
 }
 
+/** THE TWO FEEDS, AT THE TOP (founder 2026-08-08: "rename home as Lichen,
+ *  then put My-celium directly under it, so you can quickly go from everyone
+ *  to just your web"). Same feed, two scopes — the whole platform, then the
+ *  people you've woven in. Everything else is a tool or a place; these two are
+ *  where you read. My-celium wears the mycelium mark rather than an Icon glyph,
+ *  so the nav entry and the section's own identity are the same drawing. */
+const LEAD: { to: string; label: string; icon: IconName }[] = [
+  { to: '/home',      label: 'Lichen',    icon: 'home' },
+  { to: '/mycelium',  label: 'My-celium', icon: 'sparkle' },   // icon overridden below
+];
+
 const PRIMARY: { to: string; label: string; icon: IconName }[] = [
-  { to: '/home',      label: 'Home',      icon: 'home' },
   { to: '/concierge', label: 'Concierge', icon: 'concierge' },
   { to: '/chat',      label: 'Chat',      icon: 'chat' },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
@@ -51,19 +62,17 @@ const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/sa
 const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/members/');
 
 /** The four space sections' sub-items are the member's REAL memberships,
- *  fetched when the menu opens. Mycelium has no sub-items — its kind lenses
- *  live as chips on the feed itself (PR #72; the old sub-links duplicated
- *  them and didn't switch the lens once the feed was already open). */
+ *  fetched when the menu opens. My-celium left this list (founder 2026-08-08)
+ *  — it's a FEED, so it belongs beside Lichen at the top, not among the
+ *  places you belong to. */
 const SPACE_SECTIONS: { key: string; title: string; href: string; kind: MappableSpace['kind'] }[] = [
   { key: 'communities', title: 'Communities', href: '/communities', kind: 'community' },
   { key: 'groups', title: 'Groups', href: '/groups', kind: 'group' },
   { key: 'organizations', title: 'Organizations', href: '/organizations', kind: 'organization' },
   { key: 'places', title: 'Places', href: '/places', kind: 'place' },
 ];
-const SECTIONS: NavSection[] = [
-  { key: 'mycelium', title: 'My-celium', href: '/mycelium', items: [], defaultExpanded: false },
-  ...SPACE_SECTIONS.map((s) => ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false })),
-];
+const SECTIONS: NavSection[] = SPACE_SECTIONS.map((s) =>
+  ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false }));
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
@@ -160,6 +169,36 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     onClose();
   };
 
+  // Lichen + My-celium; the web feed steps aside in admin view.
+  const lead = adminView ? LEAD.filter((p) => p.to !== '/mycelium') : LEAD;
+
+  /** One row of the nav — used by both the lead pair and the tools below. */
+  const navItem = (p: { to: string; label: string; icon: IconName }) => {
+    const count = p.to === '/home'
+      ? totalUnread
+      : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
+    return (
+      <Fragment key={p.to}>
+        {/* "you" above the line, platform doors below it */}
+        {p.to === '/invite' && <div className="side-menu__divider" aria-hidden />}
+        <NavLink
+          to={p.to}
+          onClick={onClose}
+          className={({ isActive }) =>
+            'side-menu__primary-item' + (isActive ? ' is-active' : '')
+            + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '')
+          }
+        >
+          {p.to === '/mycelium'
+            ? <MyceliumMark size={20} label="" />
+            : <Icon name={p.icon} size={20} />}
+          <span>{p.label}</span>
+          {count > 0 && <span className="nav-badge side-menu__badge">{count > 9 ? '9+' : count}</span>}
+        </NavLink>
+      </Fragment>
+    );
+  };
+
   const toggleAndGo = (section: NavSection) => {
     setExpanded((e) => ({ ...e, [section.key]: !e[section.key] }));
     go(section.href);
@@ -181,30 +220,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           {/* About button removed (founder 2026-08-04): /about is the static
               merged story on the marketing site now — "you figure it out
               before you enter the platform." */}
+          {/* THE TWO FEEDS lead the nav: everyone, then your web. In admin
+              view My-celium steps aside — that mode is about the spaces you
+              steward, not what you're reading. */}
           <div className="side-menu__primary">
-            {primary.map((p) => {
-              const count = p.to === '/home'
-                ? totalUnread
-                : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
-              return (
-                <Fragment key={p.to}>
-                {/* "you" above the line, platform doors below it */}
-                {p.to === '/invite' && <div className="side-menu__divider" aria-hidden />}
-                <NavLink
-                  to={p.to}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    'side-menu__primary-item' + (isActive ? ' is-active' : '')
-                    + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '')
-                  }
-                >
-                  <Icon name={p.icon} size={20} />
-                  <span>{p.label}</span>
-                  {count > 0 && <span className="nav-badge side-menu__badge">{count > 9 ? '9+' : count}</span>}
-                </NavLink>
-                </Fragment>
-              );
-            })}
+            {lead.map(navItem)}
           </div>
 
           {(desk.ids.size > 0 || (platformAdmin && knockCount > 0)) && (
@@ -254,7 +274,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
           {SECTIONS.map((s) => {
             const items = itemsFor(s.key);
-            if (adminView && (s.key === 'mycelium' || items.length === 0)) return null;
+            if (adminView && items.length === 0) return null;
             return (
               <div key={s.key} className="side-menu__section">
                 <button
@@ -295,6 +315,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               </div>
             );
           })}
+
+          {/* The tools and platform doors come AFTER the places you belong to
+              (founder 2026-08-08): what you read and where you belong lead;
+              Concierge, Chat, Calendar and the rest follow. */}
+          <div className="side-menu__primary side-menu__primary--tools">
+            {primary.map(navItem)}
+          </div>
 
           <div className="side-menu__section">
             <button

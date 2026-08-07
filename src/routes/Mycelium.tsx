@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
+import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
@@ -24,12 +25,12 @@ import { loadSpaceNames } from '../lib/postsApi';
 // which is where narrowing by kind actually belongs. Legacy /mycelium/<kind>
 // deep links land on the unfiltered feed rather than filtering invisibly.
 
-// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07), and with it the last
-// of the area filtering. The section switcher below is the narrowing now — it
-// says where you're standing instead of quietly subtracting from what you see.
-// ⚠ The area filter it replaces was also WRONG: it required every post to
-// carry a service area, so a plain social post from your web never appeared in
-// My-celium at all. The feed is the whole web again.
+// THE FEED'S BAND, same as Lichen's (founder 2026-08-08) — My-celium IS the
+// home feed narrowed to your web, so it reads the same and filters the same.
+// ⚠ The AREA filtering that used to live here stays gone: it required every
+// post to carry a service area, so a plain social post from your web never
+// appeared in My-celium at all.
+const FILTERS = ['All', 'Social', 'Actionable'];
 
 // Your web's own newspaper, then the rest of your web by section. Mirrors
 // Home's row exactly — one vocabulary, wherever you're standing.
@@ -53,6 +54,7 @@ const MYC_ICONS: IconRowItem[] = [
 type Item = {
   key: string;
   card: FeedCardProps;
+  actionable: boolean;
 };
 
 export default function Mycelium() {
@@ -65,6 +67,7 @@ export default function Mycelium() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
+  const [tab, setTab] = useState('All');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -103,6 +106,7 @@ export default function Mycelium() {
         || p.author_id === user?.id)
       .map((p) => ({
         key: p.id,
+        actionable: p.content_type === 'actionable',
         card: {
           ...postToCard(p, user?.id, spaceNames),
           ...weaveProps(p, myWeb, user?.id),
@@ -126,6 +130,12 @@ export default function Mycelium() {
         },
       }));
   }, [posts, myWeb, myMyc, myRecs, mySaves, overlays, user, promptSaved, openPicker]);
+
+  const visible = useMemo(
+    () => items.filter((it) =>
+      tab === 'All' || (tab === 'Actionable' ? it.actionable : !it.actionable)),
+    [items, tab]
+  );
 
   return (
     <div className="myc">
@@ -153,17 +163,29 @@ export default function Mycelium() {
         ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` }
         : it))} />
 
+      {/* The lit section owns the band beneath it. */}
+      <FilterRow options={FILTERS} value={tab} onChange={setTab} />
+
       <p className="myc__count">
-        <span className="myc__count-n">{items.length}</span>{' '}
-        {items.length === 1 ? 'post' : 'posts'}
+        <span className="myc__count-n">{visible.length}</span>{' '}
+        {visible.length === 1 ? 'post' : 'posts'}
       </p>
 
       <section className="myc__feed">
-        {items.map((it) => <FeedCard key={it.key} {...it.card} />)}
-        {items.length === 0 && (
+        {visible.map((it) => <FeedCard key={it.key} {...it.card} />)}
+        {visible.length === 0 && (
           <div className="myc__empty">
-            <span className="display-italic">Nothing here yet.</span>
-            <p>Weave more people and places into your web.</p>
+            {items.length > 0 ? (
+              <>
+                <span className="display-italic">Nothing matches.</span>
+                <p>Try All, or a different side of the feed.</p>
+              </>
+            ) : (
+              <>
+                <span className="display-italic">Nothing here yet.</span>
+                <p>Weave more people and places into your web.</p>
+              </>
+            )}
           </div>
         )}
       </section>

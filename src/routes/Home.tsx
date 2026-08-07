@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -19,11 +20,16 @@ import './Home.css';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07). Home's row never
-// filtered anything — it was uncontrolled, purely decorative — and the section
-// switcher below now says the same thing spatially and honestly: Feed lit,
-// then Marketplace, Work, Events. content_type stays in the database, where it
-// drives Compose's actionable face, the marketplace auto-add and the matcher.
+// THE FEED'S OWN BAND (founder 2026-08-08, restoring the trio deliberately:
+// "we may replace that later with more or different filters"). It sits under
+// the section switcher — the lit icon owns the row beneath it — and unlike
+// every version before this one it actually FILTERS: it was uncontrolled and
+// purely decorative from the day it shipped until 2026-08-07, which is why
+// nobody noticed it did nothing. Legacy creative/educational/qa read as
+// Social; only 'actionable' is its own side.
+const FILTERS = ['All', 'Social', 'Actionable'];
+const matchesTab = (tab: string, ct: string): boolean =>
+  tab === 'All' || (tab === 'Actionable' ? ct === 'actionable' : ct !== 'actionable');
 
 // The greeting tells the truth now (founder, 2026-07-16): a time-aware
 // salutation + the real count of network members active in the last 12 hours.
@@ -86,6 +92,7 @@ export default function Home() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [tab, setTab] = useState('All');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
   // Provenance names: the spaces these posts were routed into.
@@ -123,6 +130,9 @@ export default function Home() {
         ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
         : it))} />
 
+      {/* The lit section owns the band beneath it. */}
+      <FilterRow options={FILTERS} value={tab} onChange={setTab} />
+
       <section className="home__greeting">
         <p className="eyebrow">Inward &amp; interwoven</p>
         <h1 className="home__title">
@@ -142,7 +152,7 @@ export default function Home() {
       </section>
 
       <section className="home__feed">
-        {posts.map((p) => (
+        {posts.filter((p) => matchesTab(tab, p.content_type)).map((p) => (
           <FeedCard
             key={p.id}
             {...postToCard(p, user?.id, spaceNames)}

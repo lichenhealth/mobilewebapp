@@ -30,11 +30,19 @@
 }
 .icon-row__btn:active { transform: scale(0.92); }
 
-/* Visual separation between "compose" actions (Search, Post) and the
-   "destinations" group (Marketplace, Work, Library, etc.). */
+/* Visual separation between the TOOLS (Search, Post, the assistant) and the
+   SECTIONS (Feed, Marketplace, Work, Library…). It was an invisible 16px hole
+   for months; the founder kept reaching for the line that wasn't there
+   (2026-08-08: "I still find myself wanting a thin, vertical gray line to
+   delineate two, different sections"). Same hairline the marketplace row uses
+   between its doors and its lenses — one idiom for "these are two families". */
 .icon-row__divider {
-  width: 16px;
+  width: 1px;
+  height: 26px;
   flex-shrink: 0;
+  align-self: center;
+  margin: 0 7px;          /* keeps the 16px of air the gap used to provide */
+  background: var(--bone-edge);
 }
 
 /* The assistant door: peach while it's switched on for you, quiet when off

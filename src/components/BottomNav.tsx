@@ -11,7 +11,10 @@ interface NavItem {
 }
 
 const ITEMS: NavItem[] = [
-  { to: '/home',      label: 'HOME',      icon: 'home' },
+  // "Lichen" not "Home" (founder 2026-08-08): the front door is the whole
+  // platform's feed, and My-celium beside it is the same feed narrowed to your
+  // web. Naming it Lichen makes that pair legible.
+  { to: '/home',      label: 'LICHEN',    icon: 'home' },
   { to: '/concierge', label: 'CONCIERGE', icon: 'concierge' },
   { to: '/chat',      label: 'CHAT',      icon: 'chat' },
   { to: '/calendar',  label: 'CALENDAR',  icon: 'calendar' },
