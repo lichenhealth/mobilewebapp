@@ -5,6 +5,7 @@ import {
   myPresence, setAlwaysPresent, snuffPresence, candleLit, type MyPresence,
 } from '../lib/presenceApi';
 import ConsentBubble from './ConsentBubble';
+import { loadPrompts, promptSeenToday, markPrompt } from '../lib/promptsApi';
 
 /** "Do you want your light on?" (founder 2026-08-07: "whenever someone logs in
  *  or opens the desktop app, can we have them get a pop up asking them if they
@@ -37,18 +38,19 @@ export default function PresencePrompt({ anchor, onChange }: {
   const [busy, setBusy] = useState(false);
   const askedFor = useRef<string | null>(null);
 
-  const todayKey = () => `presence-asked-${new Date().toISOString().slice(0, 10)}`;
-
-  // Once a day, on the first open.
+  // Once a day, on the first open — counted against the member, so a new
+  // phone doesn't re-ask a question already answered.
   useEffect(() => {
     if (!user) return;
     let live = true;
-    void myPresence(user.id).then((p) => {
+    void (async () => {
+      const p = await myPresence(user.id);
       if (!live || !p) return;              // pre-migration: stay silent
       setPres(p);
-      if (localStorage.getItem(todayKey())) return;
+      await loadPrompts(user.id);
+      if (!live || promptSeenToday('presence')) return;
       setWhy('open');
-    });
+    })();
     return () => { live = false; };
   }, [user]);
 
@@ -68,7 +70,7 @@ export default function PresencePrompt({ anchor, onChange }: {
   const actorName = actor.type === 'self' ? null : actor.name;
 
   const close = () => {
-    localStorage.setItem(todayKey(), '1');
+    void markPrompt(user.id, 'presence');
     setWhy(null);
   };
 

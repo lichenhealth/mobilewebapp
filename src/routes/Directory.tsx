@@ -8,7 +8,8 @@ import { ensureDirectChat, colorFor, monogramFor } from '../lib/chatApi';
 import {
   loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
 } from '../lib/myceliumApi';
-import ConsentBubble, { consentSeen, markConsentSeen } from '../components/ConsentBubble';
+import ConsentBubble from '../components/ConsentBubble';
+import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import './Directory.css';
 
 interface MemberRow { id: string; full_name: string | null; headline: string | null; }
@@ -25,18 +26,24 @@ export default function Directory() {
   const [askFindable, setAskFindable] = useState(false);
   const [findable, setFindable] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!user || consentSeen('findable')) return;
+    if (!user) return;
     let live = true;
-    void supabase.from('profiles').select('findable').eq('id', user.id).maybeSingle()
-      .then(({ data }) => {
-        const v = (data as { findable?: boolean } | null)?.findable;
-        if (!live || typeof v !== 'boolean') return;   // pre-migration: silent
-        setFindable(v);
-        setAskFindable(true);
-      }, () => {});
+    void (async () => {
+      await loadPrompts(user.id);
+      if (!live || promptSeen('findable')) return;
+      const { data } = await supabase.from('profiles')
+        .select('findable').eq('id', user.id).maybeSingle();
+      const v = (data as { findable?: boolean } | null)?.findable;
+      if (!live || typeof v !== 'boolean') return;   // pre-migration: silent
+      setFindable(v);
+      setAskFindable(true);
+    })();
     return () => { live = false; };
   }, [user]);
-  const closeFindable = () => { markConsentSeen('findable'); setAskFindable(false); };
+  const closeFindable = () => {
+    if (user) void markPrompt(user.id, 'findable');
+    setAskFindable(false);
+  };
   const setMyFindable = async (next: boolean) => {
     if (!user) return;
     setFindable(next);

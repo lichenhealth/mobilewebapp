@@ -110,10 +110,5 @@ export default function ConsentBubble({
   );
 }
 
-/** Seen-once bookkeeping. Per device, which is the right grain for a teaching
- *  prompt — a new phone is a new place to be told. */
-export const consentSeen = (id: string): boolean =>
-  !!localStorage.getItem('consent-seen-' + id);
-export const markConsentSeen = (id: string): void => {
-  localStorage.setItem('consent-seen-' + id, '1');
-};
+/* Seen-once bookkeeping lives in promptsApi — against the MEMBER, not the
+   device (founder 2026-08-07). A new phone is not a change of mind. */

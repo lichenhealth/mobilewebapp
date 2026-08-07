@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { myPresence, setAlwaysPresent } from '../lib/presenceApi';
 import PresencePrompt from './PresencePrompt';
+import { clearPromptCache } from '../lib/promptsApi';
 import Avatar from './Avatar';
 import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
@@ -96,6 +97,7 @@ export default function TopBar({
 
   async function signOut() {
     setSwitchOpen(false);
+    clearPromptCache();   // the next member reads their own history, not yours
     await supabase.auth.signOut();
     navigate('/login', { replace: true });
   }
