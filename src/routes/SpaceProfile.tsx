@@ -7,6 +7,7 @@ import LocationField from '../components/LocationField';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import type { GeoPoint } from '../lib/geoApi';
 import {
@@ -62,6 +63,7 @@ const ROLE_LABEL: Record<string, string> = {
  *  the same treatment people do. Everyone sees who/what it is; its admins
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
 export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: string; forcePublic?: boolean } = {}) {
+  const { actor } = useActing();
   const { id: paramId = '' } = useParams();
   const id = spaceId || paramId;
   const navigate = useNavigate();
@@ -759,7 +761,20 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     </div>
   ) : null;
 
-  const adminBar = isAdmin ? (
+  // THE STEWARD'S SWITCH BELONGS TO THE STEWARD'S IDENTITY (founder 2026-08-07:
+  // "if acting as Galyn, I'd want to interact with the Org... cleanest to have
+  // the admin toggle only show when you're acting as that entity").
+  //
+  // It matches how authorship already works: acting-as decides who a post is
+  // BY, so it should decide whose controls you're holding. Acting as yourself
+  // on an org you steward means you're a visitor there, with the member's
+  // trust/recommend/join gestures — which is what you want when you're being a
+  // person, and what confused the acting-as question this morning.
+  //
+  // Backstage keeps the bar regardless, so a desk notification or an Admin-view
+  // menu link deep-linking to ?manage=1 can never strand you with no way back.
+  const actingAsThis = actor.type === 'space' && actor.id === space.id;
+  const adminBar = isAdmin && (actingAsThis || backstage) ? (
     <div className="view-toggle-row">
       <span className="view-toggle" role="group" aria-label="View">
         <button
