@@ -39,6 +39,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
 import PublicPage, { type PageMeta } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
+import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -134,6 +135,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [publicPage, setPublicPage] = useState(true);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
+  // Who among THIS layer's members is around (founder 2026-08-06).
+  const [awake, setAwake] = useState<number | null>(null);
+  const [awakeOpen, setAwakeOpen] = useState(false);
+  const [awakeWho, setAwakeWho] = useState<AwakeMember[]>([]);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -250,6 +255,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const myRow = members.find((m) => m.profile_id === me);
   const myRole = myRow?.role;
   const isMember = !!myRole;
+
+  useEffect(() => {
+    if (!id || !isMember) { setAwake(null); return; }
+    let live = true;
+    void spaceAwakeCount(id).then((n) => { if (live) setAwake(n); });
+    return () => { live = false; };
+  }, [id, isMember]);
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
   const backstage = isAdmin && searchParams.get('manage') === '1';
   // Members and Groups open as their own views rather than scrolling the feed
@@ -697,6 +709,41 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
   // not sure where to edit the page"). It lived only in the non-template
   // shell, which a signed-in admin never reaches.
+  const awakeLine = isMember && awake !== null ? (
+    <div className="sprof__awake">
+      <button className="sprof__awake-line" onClick={() => {
+        const next = !awakeOpen;
+        setAwakeOpen(next);
+        if (next && awakeWho.length === 0) void spaceAwakeList(space.id).then(setAwakeWho);
+      }}>
+        {awake === 0
+          ? `${space.name} is resting.`
+          : awake === 1
+            ? `One in ${space.name} is awake.`
+            : `${awake} in ${space.name} are awake.`}
+        {awake > 0 && <Icon name="chevron-right" size={13} />}
+      </button>
+      {awakeOpen && (
+        <div className="sprof__awake-list">
+          {awakeWho.length === 0 && (
+            <p className="sprof__awake-empty">
+              Nobody here is showing presence right now. Presence is a gift, not a status —
+              each member chooses whether to light it.
+            </p>
+          )}
+          {awakeWho.map((a) => (
+            <button className="sprof__awake-who" key={a.id}
+              onClick={() => navigate(`/members/${a.id}`)}>
+              <Avatar id={a.id} name={a.full_name ?? 'A member'} url={a.avatar_url ?? undefined} size={28} />
+              <span className="sprof__awake-name">{a.full_name ?? 'A member'}</span>
+              <span className="sprof__awake-tag">{a.lit ? '🕯️ present' : 'around'}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
   const adminBar = isAdmin ? (
     <div className="view-toggle-row">
       <span className="view-toggle" role="group" aria-label="View">
@@ -746,6 +793,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               <>
                 {noticeBanners}
                 {actionRow}
+                {awakeLine}
               </>
             )}
             {!backstage && !tab ? feedSection : null}

@@ -243,3 +243,32 @@
   padding: 6px 12px; font-size: var(--t-xs); gap: 5px;
 }
 .sprof__actions .btn svg { width: 13px; height: 13px; }
+
+/* Presence inside one layer (founder 2026-08-06). Same restraint as the
+   whole-web panel: names only, no timestamps, and nothing ambient — it opens
+   because you asked it to. */
+.sprof__awake { margin-top: var(--s-3); text-align: center; }
+.sprof__awake-line {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 0; cursor: pointer; padding: 4px 2px;
+  font-family: var(--font-display); font-style: italic;
+  font-size: var(--t-md); color: var(--ink-soft);
+}
+.sprof__awake-line:hover { color: var(--ink); }
+.sprof__awake-line svg { color: var(--peach-deep); }
+.sprof__awake-list {
+  margin: var(--s-3) auto 0; max-width: 380px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.sprof__awake-who {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  background: none; border: 0; cursor: pointer;
+  padding: 6px 8px; border-radius: var(--r-md);
+}
+.sprof__awake-who:hover { background: var(--bone-warm); }
+.sprof__awake-name { flex: 1; font-size: var(--t-sm); color: var(--ink); }
+.sprof__awake-tag { font-size: var(--t-xs); color: var(--ink-muted); }
+.sprof__awake-empty {
+  font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5;
+  font-style: italic; padding: var(--s-2) var(--s-3);
+}

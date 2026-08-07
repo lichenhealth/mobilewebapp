@@ -71,3 +71,19 @@ export async function snuffPresence(me: string): Promise<void> {
 
 export const candleLit = (p: MyPresence | null): boolean =>
   !!p?.litUntil && new Date(p.litUntil).getTime() > Date.now();
+
+/** Presence inside ONE layer — a community, a group, a place (founder
+ *  2026-08-06: "each sub layer of the network to have its own feed where only
+ *  those awake within that sub community are shown"). Members only; the same
+ *  opt-ins and the same names-only, no-timestamps rule as the whole-web view. */
+export async function spaceAwakeCount(spaceId: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc('space_awake_count', { p_space: spaceId });
+  if (error) return null;   // pre-migration: the line simply doesn't render
+  return (data as number) ?? 0;
+}
+
+export async function spaceAwakeList(spaceId: string): Promise<AwakeMember[]> {
+  const { data, error } = await supabase.rpc('space_awake_list', { p_space: spaceId });
+  if (error) return [];
+  return (data as AwakeMember[] | null) ?? [];
+}
