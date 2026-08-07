@@ -11,6 +11,7 @@ export interface AwakeMember {
   avatar_url: string | null;
   headline: string | null;
   lit?: boolean;   // candle hand-lit = "present, open to connect"; else "around"
+  me?: boolean;    // you, inside a space's own list — shown as "you", not a name
 }
 
 /** Network members awake now who opted in — [] until the migration runs. */

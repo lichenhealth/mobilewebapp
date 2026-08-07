@@ -735,7 +735,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <button className="sprof__awake-who" key={a.id}
               onClick={() => navigate(`/members/${a.id}`)}>
               <Avatar id={a.id} name={a.full_name ?? 'A member'} url={a.avatar_url ?? undefined} size={28} />
-              <span className="sprof__awake-name">{a.full_name ?? 'A member'}</span>
+              <span className="sprof__awake-name">
+                {a.me ? 'You' : (a.full_name ?? 'A member')}
+              </span>
               <span className="sprof__awake-tag">{a.lit ? '🕯️ present' : 'around'}</span>
             </button>
           ))}
