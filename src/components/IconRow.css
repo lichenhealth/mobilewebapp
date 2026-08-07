@@ -42,3 +42,17 @@
 .icon-row__btn--ai { border-color: var(--peach); color: var(--peach-deep); }
 .icon-row__btn--ai:hover { background: var(--peach-tint); }
 .icon-row__btn--ai.ai-off { border-color: var(--bone-edge); color: var(--ink-faint); }
+
+/* YOU ARE HERE (founder 2026-08-08): the section switcher's lit door — the
+   newsfeed on Home and My-celium. Peach and a size larger than its
+   neighbours, so the row tells you where you're standing before you read it.
+   Filled, where the assistant door is only ringed: a ring is a door you may
+   open, a fill is the room you're in. */
+.icon-row__btn--here {
+  width: 40px;
+  height: 40px;
+  border-color: var(--peach);
+  background: var(--peach-tint);
+  color: var(--peach-deep);
+}
+.icon-row__btn--here:hover { border-color: var(--peach); color: var(--peach-deep); }
