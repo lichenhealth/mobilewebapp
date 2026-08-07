@@ -6,6 +6,7 @@ import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type Adm
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
+import { useAdminView } from '../lib/adminView';
 import { supabase } from '../lib/supabase';
 import './SideMenu.css';
 
@@ -84,11 +85,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     // views live as tabs INSIDE Profile — Admin · In Lichen · Web page.
     ;
   const { countsBySection, countsBySpace, totalUnread } = useNotifications();
-  // Admin view (founder 2026-07-27): flip the space lists from engagement
+  // Admin view (founder 2026-07-27): the space lists flip from engagement
   // (peach unreads) to stewardship — only the spaces you manage, blue badges
   // counting what waits at each desk, taps landing backstage. Blue = tending
-  // the structure; peach = life inside it.
-  const [adminView, setAdminView] = useState(() => localStorage.getItem('menu-admin-view') === '1');
+  // the structure; peach = life inside it. The TOGGLE itself moved onto the
+  // page in 2026-08-08 (AdminViewToggle, where a space's own Member|Admin pair
+  // sits); the menu only reads the flag now.
+  const adminView = useAdminView();
   const [desk, setDesk] = useState<AdminDesk>({ ids: new Set(), counts: {} });
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
@@ -143,13 +146,6 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         count: adminView ? (desk.counts[s.id] ?? 0) : (countsBySpace[s.id] ?? 0),
         admin: desk.ids.has(s.id),
       }));
-  };
-  const deskTotal = Object.values(desk.counts).reduce((a, b) => a + b, 0) + knockCount;
-  const flipAdminView = () => {
-    setAdminView((v) => {
-      localStorage.setItem('menu-admin-view', v ? '' : '1');
-      return !v;
-    });
   };
 
   // Lock body scroll + close on Escape
@@ -226,20 +222,6 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           <div className="side-menu__primary">
             {lead.map(navItem)}
           </div>
-
-          {(desk.ids.size > 0 || (platformAdmin && knockCount > 0)) && (
-            <button
-              className={'side-menu__adminview' + (adminView ? ' is-on' : '')}
-              onClick={flipAdminView}
-              title={adminView
-                ? 'Back to the regular menu'
-                : 'See the spaces you manage and what needs your attention'}
-            >
-              <Icon name="settings" size={15} />
-              <span>Admin view</span>
-              {deskTotal > 0 && <span className="side-menu__deskbadge">{deskTotal > 9 ? '9+' : deskTotal}</span>}
-            </button>
-          )}
 
           {adminView && platformAdmin && (
             <div className="side-menu__section">
