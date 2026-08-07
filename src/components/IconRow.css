@@ -1,16 +1,19 @@
 .icon-row.h-scroll {
   /* double class beats .h-scroll's 12px gap; snug icons, roomy edges */
   padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
-  /* 34px icons + 3px gaps: eight icons + the chevron land exactly on a
-     375px screen (36/4 left a one-pixel miss and a 35px hole) */
   gap: 3px;
   display: flex;
   align-items: center;
 }
 
+/* ONE SIZE, THE WHOLE ROW (founder 2026-08-08: "these buttons are all still
+   not the same size — make them all as large as the feed button"). The row was
+   34px with a 40px lit door; now every door is 40px and PEACH alone says which
+   section you're standing in. Fewer fit a 375px screen than the old 34px
+   packing did — that's what the scroll hint is for. */
 .icon-row__btn {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -38,7 +41,7 @@
    between its doors and its lenses — one idiom for "these are two families". */
 .icon-row__divider {
   width: 1px;
-  height: 26px;
+  height: 30px;
   flex-shrink: 0;
   align-self: center;
   margin: 0 7px;          /* keeps the 16px of air the gap used to provide */
@@ -51,14 +54,12 @@
 .icon-row__btn--ai:hover { background: var(--peach-tint); }
 .icon-row__btn--ai.ai-off { border-color: var(--bone-edge); color: var(--ink-faint); }
 
-/* YOU ARE HERE (founder 2026-08-08): the section switcher's lit door — the
-   newsfeed on Home and My-celium. Peach and a size larger than its
-   neighbours, so the row tells you where you're standing before you read it.
-   Filled, where the assistant door is only ringed: a ring is a door you may
-   open, a fill is the room you're in. */
+/* YOU ARE HERE: the section switcher's lit door — the newsfeed on Home and
+   My-celium. PEACH AND FILLED is the whole signal now (founder 2026-08-08);
+   it was also a size larger for a few hours, until the row was levelled and
+   size stopped meaning anything. Filled, where the assistant door is only
+   ringed: a ring is a door you may open, a fill is the room you're in. */
 .icon-row__btn--here {
-  width: 40px;
-  height: 40px;
   border-color: var(--peach);
   background: var(--peach-tint);
   color: var(--peach-deep);

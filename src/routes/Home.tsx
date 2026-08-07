@@ -71,7 +71,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   // The row was already a set of doors; naming the one you're already through
   // turns it into a section switcher you can read at a glance.
   { icon: 'newsfeed',       label: 'Feed',        to: '/home',
-    variant: 'icon-row__btn--here', size: 22, divider: true },
+    variant: 'icon-row__btn--here', divider: true },
   { icon: 'store',          label: 'Marketplace', to: '/market' },
   { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
