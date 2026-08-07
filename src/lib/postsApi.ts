@@ -266,10 +266,24 @@ export async function spaceHasEvents(spaceId: string): Promise<boolean> {
   return ((data ?? []).length > 0);
 }
 
-export async function loadFeed(limit = 50): Promise<FeedPost[]> {
+/** @param opts.river  Drop QUIET posts — the ones whose author asked not to
+ *  generate a feed story (founder 2026-08-07: "you may not want to generate 45
+ *  stories when you share a certain product set to marketplace").
+ *
+ *  OPT-IN, and it has to be: loadFeed is the shared source for Events,
+ *  Marketplace, AreaFeed, Maps and smart search as well as the two feeds.
+ *  Filtering it centrally made a quiet event vanish from /events itself, which
+ *  is the opposite of the point — quiet means "not a story on Home", never
+ *  "hidden". Only Home and My-celium pass river: true.
+ *
+ *  Filtered SERVER-side: 45 imported essays dropped in the client would eat the
+ *  whole 50-row page and leave the feed looking empty. */
+export async function loadFeed(limit = 50, opts: { river?: boolean } = {}): Promise<FeedPost[]> {
   // Hidden posts drop here, centrally — every feed surface inherits it.
+  let q = supabase.from('posts').select(FEED_SELECT);
+  if (opts.river) q = q.or('details->>quiet.is.null,details->>quiet.neq.true');
   const [{ data, error }, hidden] = await Promise.all([
-    supabase.from('posts').select(FEED_SELECT).order('created_at', { ascending: false }).limit(limit),
+    q.order('created_at', { ascending: false }).limit(limit),
     loadMyHidden(),
   ]);
   if (error) { console.error('loadFeed', error); return []; }

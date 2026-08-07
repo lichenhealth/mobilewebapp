@@ -173,6 +173,12 @@ export default function Compose() {
   // on by default; a member's profile defaults pre-select them for new
   // posts, and each post can flip either. Stored in details only when OFF.
   const [aiReadable, setAiReadable] = useState(true);
+  // QUIET POSTS (founder 2026-08-07: "a post compose option that says, don't
+  // generate a feed story... you may not want to generate 45 stories when you
+  // share a certain product set to marketplace"). The post is real everywhere
+  // it belongs — its section, your profile, search, the matcher — it just
+  // doesn't enter the Home and My-celium river.
+  const [quiet, setQuiet] = useState(false);
   const [downloadable, setDownloadable] = useState(true);
   useEffect(() => {
     if (!user || editPostId) return;   // edits prefill from the post itself
@@ -225,6 +231,7 @@ export default function Compose() {
       const d = p.details ?? {};
       setAiReadable(!d.aiExcluded);
       setDownloadable(!d.noDownload);
+      setQuiet(d.quiet === true);   // editing must not silently un-quiet it
       const back: Record<string, OfferMode> = {
         gift: 'free', sale: 'paid', sliding: 'paid',
         trade: 'trade', lend: 'lend', rent: 'rent', borrow: 'borrow', iso: 'iso',
@@ -479,6 +486,7 @@ export default function Compose() {
       const effAreas = new Set(areas);
       const details: Record<string, unknown> = {};
       if (!aiReadable) details.aiExcluded = true;
+      if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
       // Events' calendar rows show ONE location line — the address when in
       // person, else the meeting link (SmartLocation renders links as Join).
@@ -1221,6 +1229,14 @@ export default function Compose() {
         <label className="cmp__cc">
           <input type="checkbox" checked={downloadable} onChange={(e) => setDownloadable(e.target.checked)} />
           <span><strong>Downloadable</strong> — people can save this post&rsquo;s media</span>
+        </label>
+        <label className="cmp__cc">
+          <input type="checkbox" checked={quiet} onChange={(e) => setQuiet(e.target.checked)} />
+          <span>
+            <strong>Skip the feed</strong> — it still lives in its section, on
+            your profile and in search; it just won&rsquo;t appear as a story on
+            Home. Good for a back catalogue or a batch of listings.
+          </span>
         </label>
       </div>
 

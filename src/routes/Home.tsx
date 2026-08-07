@@ -95,7 +95,7 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const feed = await loadFeed();
+      const feed = await loadFeed(50, { river: true });
       const [{ web, vouched: myc }, recs, saves, awakeRes] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), loadMySaved(),
         supabase.rpc('network_awake_count'),

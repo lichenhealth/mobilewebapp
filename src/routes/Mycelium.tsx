@@ -70,7 +70,7 @@ export default function Mycelium() {
 
   useEffect(() => {
     (async () => {
-      const feed = await loadFeed();
+      const feed = await loadFeed(50, { river: true });
       const [{ web, vouched }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
       const ov = await loadEndorsements(feed, vouched);
       setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
