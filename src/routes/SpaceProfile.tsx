@@ -798,9 +798,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
+        // The steward's switch sits above the masthead, so a page with a big
+        // cover image doesn't bury the way to manage it.
+        aboveHero={adminBar}
         beforeContent={me ? (
           <>
-            {adminBar}
             {/* Join / my-celium / trust ride ABOVE the page, not below every
                 section of it (founder 2026-08-06: "it gets pushed to the
                 bottom... seems important enough to keep at the top"). */}

@@ -77,6 +77,12 @@ export interface PublicPageProps {
   page: PageMeta;
   /** Rendered under Presence — events, posts. Optional. */
   children?: React.ReactNode;
+  /** Rendered ABOVE the masthead — the steward's own controls, which have to
+   *  be reachable without scrolling past a full-bleed cover image (founder
+   *  2026-08-07: "move admin/member view up to above the fold when you're
+   *  acting as a page, so you can manage it easily if there is a hero image").
+   *  Everything else a viewer sees belongs below, in beforeContent. */
+  aboveHero?: React.ReactNode;
   /** Rendered right under the hero, above every other section — for
    *  navigational doors that shouldn't get lost below a long page
    *  (founder 2026-08-03). Optional. */
@@ -234,6 +240,8 @@ export default function PublicPage(props: PublicPageProps) {
           </button>
         </div>
       )}
+
+      {props.aboveHero}
 
       {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
           (logo, name, tagline, address), then the nav doors, then the cover
