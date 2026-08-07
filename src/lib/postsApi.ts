@@ -252,6 +252,20 @@ export async function loadAuthorFeed(by: { profileId?: string; spaceId?: string 
   return (((data as unknown as FeedPost[]) ?? []).filter((p) => !hidden.has(p.id)));
 }
 
+/** Does this space have any real gatherings? (founder 2026-08-07: "add icons
+ *  to a community, group or org page when they start using the feature... if
+ *  someone never uses Work, that icon will never show up on their profile".)
+ *  One row is enough to answer it — the full list waits until the door opens. */
+export async function spaceHasEvents(spaceId: string): Promise<boolean> {
+  const { data, error } = await supabase.from('posts')
+    .select('id')
+    .or(`author_space_id.eq.${spaceId},audience_space_ids.cs.{${spaceId}}`)
+    .not('linked_event_id', 'is', null)
+    .limit(1);
+  if (error) return false;
+  return ((data ?? []).length > 0);
+}
+
 export async function loadFeed(limit = 50): Promise<FeedPost[]> {
   // Hidden posts drop here, centrally — every feed surface inherits it.
   const [{ data, error }, hidden] = await Promise.all([

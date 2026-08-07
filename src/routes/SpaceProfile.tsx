@@ -21,7 +21,7 @@ import {
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
-import { loadPostsByIds, loadAuthorFeed, postAreas, type FeedPost } from '../lib/postsApi';
+import { loadPostsByIds, loadAuthorFeed, postAreas, spaceHasEvents, type FeedPost } from '../lib/postsApi';
 import {
   listSpaceResources, createResource, deleteResource, resourceBusy,
   requestResourceBooking, listPendingResourceBookings, decideResourceBooking,
@@ -269,6 +269,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const tab = searchParams.get('tab');
   // The space's own gatherings — what's coming up, then what's past.
   const [spaceEvents, setSpaceEvents] = useState<FeedPost[]>([]);
+  // A door only appears once the space walks through it (founder 2026-08-07).
+  const [hasEvents, setHasEvents] = useState(false);
+  useEffect(() => {
+    if (!id) return;
+    let live = true;
+    void spaceHasEvents(id).then((yes) => { if (live) setHasEvents(yes); });
+    return () => { live = false; };
+  }, [id]);
   useEffect(() => {
     if (tab !== 'events' || !id) return;
     let live = true;
@@ -625,12 +633,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           : []),
         // Members closes the row — the space's Directory, far right like
         // Home's (founder 2026-07-25).
-        { icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') },
+        // Same rule as Groups above: no gatherings yet, no Events door. An
+        // icon that opens an empty room teaches the space is broken, not empty.
+        ...(hasEvents
+          ? [{ icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') }]
+          : []),
         { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
       ]}
       // The Events door below opens the real gatherings list — an
       // events-only feed lens beside it was the same circle twice.
-      hideAreas={['events']}
+      hideAreas={hasEvents ? ['events'] : []}
     />
   );
   const roomsSection = !backstage && resources.length > 0 && (
