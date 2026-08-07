@@ -71,7 +71,9 @@ export default function MyceliumDirectory() {
     const t = setTimeout(async () => {
       const needle = '%' + q.trim() + '%';
       const [profs, sps] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, headline, avatar_url').ilike('full_name', needle).limit(8),
+        // Weaving someone in starts by finding them — a browse surface.
+        supabase.from('profiles').select('id, full_name, headline, avatar_url')
+          .ilike('full_name', needle).eq('findable', true).limit(8),
         supabase.from('spaces').select('id, name, kind, avatar_url').ilike('name', needle).limit(8),
       ]);
       if (!live) return;
@@ -230,9 +232,9 @@ export default function MyceliumDirectory() {
             {/* PRESENT — the candle lives in the top bar now: light it there,
                 anywhere, and it stays lit until you snuff it (no fade). */}
             <span className="mycdir__presence-note">
-              🕯️ Light the candle in the top bar to show you&rsquo;re present &amp; open to connecting.
+              🕯️ Light the candle in the top bar to show you&rsquo;re around and open to connecting.
             </span>
-            <span className="mycdir__presence-creed">Presence is a gift, not a status.</span>
+            <span className="mycdir__presence-creed">Being present is a gift.</span>
           </div>
         )}
         {ready && entries.length > 0 && (

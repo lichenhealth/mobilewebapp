@@ -61,6 +61,10 @@ export default function Directory() {
         .from('profiles')
         .select('id, full_name, headline')
         .or('onboarded.eq.true,kind.neq.person')  // beings have no signup to complete   // half-created accounts aren't members yet
+        // Honours the findable switch. RLS is the floor — it hides quiet
+        // members from strangers — but anyone with a public post stays
+        // readable, so the browse surfaces respect the choice themselves.
+        .eq('findable', true)
         .neq('id', me)
         .order('full_name', { ascending: true })
         .limit(500);

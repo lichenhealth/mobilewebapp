@@ -165,6 +165,11 @@ export default function Profile() {
       setNotifPref(p.notification_pref ?? 'in_app');
       // '*' select elsewhere would be heavy; read this one on its own so the
       // page keeps working before the column exists.
+      void supabase.from('profiles').select('findable').eq('id', user.id).maybeSingle()
+        .then(({ data: f }) => {
+          const v = (f as { findable?: boolean } | null)?.findable;
+          if (typeof v === 'boolean') setFindable(v);   // pre-migration: stays on
+        }, () => {});
       void supabase.from('profiles').select('assistant_readable').eq('id', user.id).maybeSingle()
         .then(({ data: ar }) => {
           const v = (ar as { assistant_readable?: boolean } | null)?.assistant_readable;
@@ -264,6 +269,8 @@ export default function Profile() {
   // Consent travels with your words (founder 2026-07-28): may other members'
   // assistants read what you wrote in shared conversations?
   const [assistantReadable, setAssistantReadable] = useState(true);
+  // Findable by other members — on by default, like every other consent here.
+  const [findable, setFindable] = useState(true);
   // Content defaults (founder 2026-08-05): pre-select Compose's per-post
   // AI-readable / downloadable toggles. Null until loaded (pre-migration →
   // stays null, group hidden).
@@ -334,6 +341,14 @@ export default function Profile() {
       setWebMsg('Saved.');
     }
   }
+  async function updateFindable(next: boolean) {
+    if (!user) return;
+    setFindable(next);
+    const { error: e } = await supabase.from('profiles')
+      .update({ findable: next }).eq('id', user.id);
+    if (e) { setError(e.message); setFindable(!next); }
+  }
+
   async function updateAssistantReadable(next: boolean) {
     if (!user) return;
     setAssistantReadable(next);
@@ -772,6 +787,24 @@ export default function Profile() {
           Who can see what, and what the assistant may help with. Almost everything is
           on by default and yours to switch off.
         </p>
+
+        <p className="prof__privacy-sub">Being found</p>
+        <label className="prof__consent">
+          <input
+            type="checkbox"
+            checked={findable}
+            onChange={(e) => void updateFindable(e.target.checked)}
+          />
+          <span>
+            <strong>Findable by other members</strong>
+            <em>
+              On, you appear in the member directory, in search, and when someone
+              types a name. Off, you don&rsquo;t. People you already share a space,
+              a chat, a care team or your web with still see you, and your name
+              still shows on anything you post publicly.
+            </em>
+          </span>
+        </label>
 
         <p className="prof__privacy-sub">What the assistant may read</p>
         <label className="prof__consent">

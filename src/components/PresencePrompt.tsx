@@ -131,9 +131,8 @@ export default function PresencePrompt({ anchor, onChange }: {
 
         {why === 'switch' ? (
           <p className="prespr__body">
-            Your presence doesn’t change when you switch — it’s <strong>one light</strong>,
-            yours, and it shows in every community and place you belong to.
-            Right now it’s {lit ? 'on' : 'out'}.
+            Switching doesn’t change your light. You have one, and it shows
+            everywhere you belong. Right now it’s {lit ? 'on' : 'out'}.
           </p>
         ) : (
           <p className="prespr__body">
@@ -144,7 +143,8 @@ export default function PresencePrompt({ anchor, onChange }: {
 
         <p className="prespr__body prespr__body--quiet">
           Being present is the default. If you’d rather get things done without
-          being open to connecting, turn it out — tap the candle any time.
+          being open to connecting, tap the candle any time to blow it out or
+          light it back up.
         </p>
 
         <div className="prespr__acts">
@@ -154,13 +154,9 @@ export default function PresencePrompt({ anchor, onChange }: {
           </button>
           <button className="btn prespr__out" disabled={busy}
             onClick={() => (lit ? void choose(false) : close())}>
-            {lit ? 'Turn it out' : 'Leave it out'}
+            {lit ? 'Blow it out' : 'Leave it out'}
           </button>
         </div>
-
-        <p className="prespr__foot">
-          Presence is a gift, not a status.
-        </p>
       </div>
     </>
   );

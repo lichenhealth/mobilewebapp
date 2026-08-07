@@ -44,12 +44,12 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   return (
     <div className="ptabs">
       <p className="ptabs__lead">
-        Feed always leads. These follow it — and each one waits until it has
-        something to say before a visitor sees it.
+        Feed always leads. Each tab below stays hidden until you give it
+        something to show.
       </p>
 
       {tabs.length === 0 && (
-        <p className="ptabs__empty">No tabs yet — your page is just your feed.</p>
+        <p className="ptabs__empty">No tabs yet. Your page is just your feed.</p>
       )}
 
       {tabs.map((t, i) => {

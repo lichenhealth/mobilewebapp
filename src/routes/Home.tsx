@@ -130,7 +130,7 @@ export default function Home() {
           )}
         </h1>
         {/* The creed — captions the presence doorway it explains. */}
-        <p className="home__creed">Presence is a gift, not a status.</p>
+        <p className="home__creed">Being present is a gift.</p>
       </section>
 
       <section className="home__feed">

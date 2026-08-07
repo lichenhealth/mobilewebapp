@@ -487,7 +487,9 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   const [posts, mappable, profRes, spaceRes, pcRes, trustRes, recRes] = await Promise.all([
     loadFeed(200),
     loadMappableMembers().catch(() => [] as MappableMember[]),
-    supabase.from('profiles').select('id, full_name, headline, bio, avatar_url').or('onboarded.eq.true,kind.neq.person').limit(500),
+    // .eq('findable') — people search is a browse surface (see Directory).
+    supabase.from('profiles').select('id, full_name, headline, bio, avatar_url')
+      .or('onboarded.eq.true,kind.neq.person').eq('findable', true).limit(500),
     supabase.from('spaces').select('id, name, kind, location, lat, lng').limit(500),
     (catIds.length || wantProviders)
       ? supabase.from('profile_categories').select('profile_id, category_id').limit(3000)

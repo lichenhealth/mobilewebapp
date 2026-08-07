@@ -318,7 +318,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     let live = true;
     (async () => {
       const { data } = await supabase.from('profiles')
-        .select('id, full_name').ilike('full_name', `%${q}%`).limit(8);
+        .select('id, full_name').ilike('full_name', `%${q}%`)
+        .eq('findable', true).limit(8);   // inviting a stranger is discovery
       if (!live) return;
       const taken = new Set([
         ...members.map((m) => m.profile_id),
@@ -727,8 +728,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         <div className="sprof__awake-list">
           {awakeWho.length === 0 && (
             <p className="sprof__awake-empty">
-              Nobody here is showing presence right now. Presence is a gift, not a status —
-              each member chooses whether to light it.
+              Nobody here is showing presence right now. Everyone chooses
+              whether to light their candle.
             </p>
           )}
           {awakeWho.map((a) => (
