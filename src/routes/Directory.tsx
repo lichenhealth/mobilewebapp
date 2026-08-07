@@ -8,6 +8,7 @@ import { ensureDirectChat, colorFor, monogramFor } from '../lib/chatApi';
 import {
   loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
 } from '../lib/myceliumApi';
+import ConsentBubble, { consentSeen, markConsentSeen } from '../components/ConsentBubble';
 import './Directory.css';
 
 interface MemberRow { id: string; full_name: string | null; headline: string | null; }
@@ -16,6 +17,32 @@ interface MemberRow { id: string; full_name: string | null; headline: string | n
  *  find someone and start a direct message (also handy for testing with more users). */
 export default function Directory() {
   const { user } = useAuth();
+  // FINDABILITY MEETS YOU HERE (founder 2026-08-07: the bubble should arrive
+  // "if/when the person gets to the pertinent decision"). Browsing the member
+  // list is the moment you realise you're on one — so that's when we say so,
+  // once, pointing at the heading that just told you.
+  const [headEl, setHeadEl] = useState<HTMLHeadingElement | null>(null);
+  const [askFindable, setAskFindable] = useState(false);
+  const [findable, setFindable] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!user || consentSeen('findable')) return;
+    let live = true;
+    void supabase.from('profiles').select('findable').eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        const v = (data as { findable?: boolean } | null)?.findable;
+        if (!live || typeof v !== 'boolean') return;   // pre-migration: silent
+        setFindable(v);
+        setAskFindable(true);
+      }, () => {});
+    return () => { live = false; };
+  }, [user]);
+  const closeFindable = () => { markConsentSeen('findable'); setAskFindable(false); };
+  const setMyFindable = async (next: boolean) => {
+    if (!user) return;
+    setFindable(next);
+    await supabase.from('profiles').update({ findable: next }).eq('id', user.id);
+    closeFindable();
+  };
   const me = user?.id ?? '';
   const navigate = useNavigate();
 
@@ -97,8 +124,39 @@ export default function Directory() {
     <div className="dir">
       <header className="dir__head">
         <span className="eyebrow">Directory · {members.length} {members.length === 1 ? 'member' : 'members'}</span>
-        <h1 className="dir__title"><span className="display-italic">Members</span></h1>
+        <h1 className="dir__title" ref={setHeadEl}><span className="display-italic">Members</span></h1>
         <p className="dir__sub">Everyone on Lichen. Find someone and start a direct message.</p>
+        {askFindable && findable !== null && (
+          <ConsentBubble
+            anchor={headEl}
+            onClose={closeFindable}
+            editLabel="who can find you"
+            editTo="/profile#privacy"
+            title={findable ? 'You’re listed here too.' : 'You’re not listed here.'}
+            actions={
+              <>
+                <button className="btn btn-primary"
+                  onClick={() => (findable ? closeFindable() : void setMyFindable(true))}>
+                  {findable ? 'Stay listed' : 'List me'}
+                </button>
+                <button className="btn cbub__out"
+                  onClick={() => (findable ? void setMyFindable(false) : closeFindable())}>
+                  {findable ? 'Hide me' : 'Stay hidden'}
+                </button>
+              </>
+            }
+          >
+            <p>
+              Being listed is the default, so people can find you by name here
+              and in search.
+            </p>
+            <p className="cbub__quiet">
+              Hide and you drop out of both. People you already share a space,
+              a chat, a care team or your web with still see you, and your name
+              still shows on anything you post publicly.
+            </p>
+          </ConsentBubble>
+        )}
       </header>
 
       <div className="dir__search">

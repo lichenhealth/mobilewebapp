@@ -1,17 +1,18 @@
-/* The presence bubble — a bone card growing out of the candle itself, never a
-   black snackbar (founder doctrine, PR #66) and never a centred modal (founder
-   2026-08-07: point at the control so people know where to act later).
+/* The consent bubble — a bone card growing out of the control it governs,
+   never a black snackbar (founder doctrine, PR #66) and never a centred modal
+   (founder 2026-08-07: point at the control so people know where to act
+   later). Shared by every consent that comes to you.
 
    z-index sits above the top bar (50) and its menus (60/61), below the confirm
    dialog (90) — a confirm must always be able to cover this. */
-.prespr__catch {
+.cbub__catch {
   position: fixed;
   inset: 0;
   z-index: 69;
   background: transparent;
 }
 
-.prespr {
+.cbub {
   position: fixed;
   z-index: 70;
   background: var(--bone);
@@ -19,13 +20,13 @@
   border-radius: 14px;
   padding: var(--s-4);
   box-shadow: 0 14px 36px rgba(28, 26, 24, 0.16);
-  animation: prespr-in 150ms ease-out;
+  animation: cbub-in 150ms ease-out;
   transform-origin: top center;
 }
 
 /* The tail: a rotated square sharing the card's fill, with only its two
    outer sides bordered so it reads as one continuous edge. */
-.prespr__tail {
+.cbub__tail {
   position: absolute;
   top: -6px;
   width: 11px;
@@ -38,29 +39,30 @@
   border-radius: 2px 0 0 0;
 }
 
-.prespr__title {
+.cbub__title {
   font-family: var(--font-display);
   font-size: 16px;
   line-height: 1.3;
   margin: 0 0 var(--s-2);
 }
 
-.prespr__body {
+.cbub__body p {
   font-size: 12.5px;
   line-height: 1.5;
   margin: 0 0 var(--s-3);
   color: var(--ink);
 }
 
-.prespr__body--quiet { color: var(--ink-2); }
+.cbub__quiet { color: var(--ink-2); }
+.cbub__body p:last-child { margin-bottom: 0; }
 
-.prespr__acts {
+.cbub__acts {
   display: flex;
   gap: var(--s-2);
   margin-top: var(--s-4);
 }
 
-.prespr__acts .btn {
+.cbub__acts .btn {
   flex: 1;
   justify-content: center;
   padding-inline: var(--s-3);
@@ -69,31 +71,48 @@
 
 /* Turning your light out is a real, unpenalized choice — an equal option, not
    a destructive one. No rust, no warning colour. */
-.prespr__out {
+.cbub__out {
   background: transparent;
   border: 1px solid var(--bone-edge);
   color: var(--ink-2);
 }
 
-.prespr__foot {
+.cbub__foot {
   font-size: 11px;
   line-height: 1.5;
   color: var(--ink-3);
   margin: var(--s-3) 0 0;
 }
 
-@keyframes prespr-in {
+@keyframes cbub-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
 
-/* The candle lifts while the bubble points at it, so the eye lands on the
-   control and not only on the words about it. */
+/* Whatever we point at lifts, so the eye lands on the control and not only on
+   the words about it. */
 .top-bar__candle.is-pointed {
   border-color: var(--peach);
   box-shadow: 0 0 0 4px var(--peach-tint);
 }
 
+/* The Edit door — the same on every bubble, so learning one teaches the rest. */
+.cbub__edit {
+  display: block;
+  width: 100%;
+  margin-top: var(--s-3);
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--peach-deep, var(--peach));
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .prespr { animation: none; }
+  .cbub { animation: none; }
 }
