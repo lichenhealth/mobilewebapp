@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, IconName } from '../components/Icon';
+import { Icon } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
-import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import {
-  loadFeed, deletePost, postAreas, SERVICE_AREAS,
-  type FeedPost, type ServiceArea,
-} from '../lib/postsApi';
+import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import { ensureDirectChat } from '../lib/chatApi';
 import {
@@ -28,8 +24,12 @@ import { loadSpaceNames } from '../lib/postsApi';
 // which is where narrowing by kind actually belongs. Legacy /mycelium/<kind>
 // deep links land on the unfiltered feed rather than filtering invisibly.
 
-// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
-const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
+// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07), and with it the last
+// of the area filtering. The section switcher below is the narrowing now — it
+// says where you're standing instead of quietly subtracting from what you see.
+// ⚠ The area filter it replaces was also WRONG: it required every post to
+// carry a service area, so a plain social post from your web never appeared in
+// My-celium at all. The feed is the whole web again.
 
 // Your web's own newspaper, then the rest of your web by section. Mirrors
 // Home's row exactly — one vocabulary, wherever you're standing.
@@ -50,13 +50,9 @@ const MYC_ICONS: IconRowItem[] = [
   { icon: 'book',           label: 'Library',     to: '/library?web=1' },
   { icon: 'member-heart',   label: 'Members',     to: '/mycelium/directory' },
 ];
-const CT_LABEL: Record<string, string> = { actionable: 'Actionable' };
-
 type Item = {
   key: string;
   card: FeedCardProps;
-  contentLabel: string;       // matches a CONTENT_FILTERS entry
-  areas: ServiceArea[];       // a post can live in several areas
 };
 
 export default function Mycelium() {
@@ -69,11 +65,7 @@ export default function Mycelium() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
-  const [content, setContent] = useState('All');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
-  // Lenses default ALL-ON (founder, 2026-07-16, media-lens grammar): you see
-  // everything until you deselect to narrow.
-  const [areas, setAreas] = useState<ServiceArea[]>(() => SERVICE_AREAS.map((a) => a.value));
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   // Provenance names: the spaces these posts were routed into.
@@ -111,8 +103,6 @@ export default function Mycelium() {
         || p.author_id === user?.id)
       .map((p) => ({
         key: p.id,
-        contentLabel: CT_LABEL[p.content_type] ?? 'Social',
-        areas: postAreas(p),
         card: {
           ...postToCard(p, user?.id, spaceNames),
           ...weaveProps(p, myWeb, user?.id),
@@ -137,17 +127,6 @@ export default function Mycelium() {
       }));
   }, [posts, myWeb, myMyc, myRecs, mySaves, overlays, user, promptSaved, openPicker]);
 
-  const visible = useMemo(
-    () => items.filter((it) =>
-      (content === 'All' || it.contentLabel === content) &&
-      it.areas.some((a) => areas.includes(a))
-    ),
-    [items, content, areas]
-  );
-
-  const toggleArea = (a: ServiceArea) =>
-    setAreas((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
-
   return (
     <div className="myc">
       <header className="myc__head">
@@ -160,13 +139,9 @@ export default function Mycelium() {
         </p>
         <h1 className="myc__title">Your My-celium</h1>
         <p className="myc__sub">
-          What your web is sharing — narrow by area or content.
+          What your web is sharing.
         </p>
       </header>
-
-      {/* Content-type (single-select) */}
-      <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />
-
 
       {/* THE SECTION SWITCHER (founder 2026-08-07: "do the same for Mycelium,
           and have people always default to the newsfeed of any space. Then you
@@ -179,16 +154,16 @@ export default function Mycelium() {
         : it))} />
 
       <p className="myc__count">
-        <span className="myc__count-n">{visible.length}</span>{' '}
-        {visible.length === 1 ? 'post' : 'posts'}
+        <span className="myc__count-n">{items.length}</span>{' '}
+        {items.length === 1 ? 'post' : 'posts'}
       </p>
 
       <section className="myc__feed">
-        {visible.map((it) => <FeedCard key={it.key} {...it.card} />)}
-        {visible.length === 0 && (
+        {items.map((it) => <FeedCard key={it.key} {...it.card} />)}
+        {items.length === 0 && (
           <div className="myc__empty">
-            <span className="display-italic">Nothing matches.</span>
-            <p>Clear a filter, or weave more people and places into your web.</p>
+            <span className="display-italic">Nothing here yet.</span>
+            <p>Weave more people and places into your web.</p>
           </div>
         )}
       </section>

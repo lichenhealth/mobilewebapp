@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FilterRow from './FilterRow';
 import FeedCard from './FeedCard';
 import { Icon, IconName } from './Icon';
 import { aiDoorOn } from './AssistantDoor';
@@ -21,8 +20,9 @@ import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
-const TABS = ['All', 'Social', 'Actionable'];
+// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07): the area circles
+// below already say what this entity does, and a second row of abstract
+// content words on top of them was noise. content_type stays in the database.
 
 /** "when" eyebrow for event posts (same rendering as the Events feed). */
 function whenLabel(p: FeedPost): string | undefined {
@@ -42,7 +42,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, showFilters = true }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -67,10 +67,6 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  section properly — a space's Events tab beats an events-only filter,
    *  and two identical circles side by side read as a bug. */
   hideAreas?: string[];
-  /** All/Social/Actionable. Off on a profile, where the founder wants "just
-   *  Home Feed, which has everything" (2026-08-05); Home and the area feeds
-   *  keep theirs. */
-  showFilters?: boolean;
   /** The entity's display name — lets a single area lens read as a PLACE:
    *  tap Library on Melanie's profile and the feed declares "Melanie's
    *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
@@ -90,7 +86,6 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     return () => { live = false; };
   }, [posts]);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
@@ -150,11 +145,8 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   };
 
   const visible = useMemo(() => {
-    return posts
-      .filter((p) => (tab === 'All'
-        || (tab === 'Actionable' ? p.content_type === 'actionable' : p.content_type !== 'actionable')))
-      .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
-  }, [posts, tab, areas]);
+    return posts.filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
+  }, [posts, areas]);
 
   async function messageAuthor(otherId: string) {
     const chatId = await ensureDirectChat(otherId);
@@ -169,8 +161,6 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
 
   return (
     <div className="cfeed">
-      {showFilters && posts.length > 0 && <FilterRow options={TABS} value={tab} onChange={setTab} />}
-
       {(leading.length > 0 || trailing.length > 0 || areasPresent.length > 0) && (
         <div className="cfeed__areas h-scroll">
           {leading.map((l) => (

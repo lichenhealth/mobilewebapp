@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -20,9 +19,11 @@ import './Home.css';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// The choice point's vocabulary (founder 2026-07-28): every post is Social
-// or Actionable — legacy creative/educational/qa read as Social.
-const FILTERS = ['All', 'Social', 'Actionable'];
+// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07). Home's row never
+// filtered anything — it was uncontrolled, purely decorative — and the section
+// switcher below now says the same thing spatially and honestly: Feed lit,
+// then Marketplace, Work, Events. content_type stays in the database, where it
+// drives Compose's actionable face, the marketplace auto-add and the matcher.
 
 // The greeting tells the truth now (founder, 2026-07-16): a time-aware
 // salutation + the real count of network members active in the last 12 hours.
@@ -116,8 +117,6 @@ export default function Home() {
 
   return (
     <div className="home">
-      <FilterRow options={FILTERS} />
-
       <IconRow items={CATEGORY_ICONS.map((it) => (it.label === 'Assistant'
         ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
         : it))} />

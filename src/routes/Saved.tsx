@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
-import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { postAreas, deletePost, CONTENT_TYPES, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { postAreas, deletePost, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -21,8 +20,9 @@ import './Saved.css';
 import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// Social or Actionable (founder 2026-07-28) — legacy types read as Social.
-const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
+// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07). The shelf keeps the
+// lenses that describe what's actually on it — the area circles, present-only —
+// and drops the abstract pair. content_type stays in the database.
 
 /** Saved — your private shelf. Everything you bookmarked, newest first,
  *  under the platform's standard lenses. Nobody else can see it. */
@@ -58,7 +58,6 @@ export default function Saved() {
   // ('path' kind — Organize) that opens ready to arrange.
   const [newKind, setNewKind] = useState<'collection' | 'path'>('collection');
 
-  const [content, setContent] = useState('All');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
   useEffect(() => {
@@ -103,13 +102,11 @@ export default function Saved() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return posts
-      .filter((p) => (content === 'All'
-        || (content === 'Actionable' ? p.content_type === 'actionable' : p.content_type !== 'actionable')))
       .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))))
       .filter((p) => !q
         || `${p.title ?? ''} ${p.body} ${p.author?.full_name ?? ''} ${p.author_space?.name ?? ''}`
           .toLowerCase().includes(q));
-  }, [posts, content, areas, query]);
+  }, [posts, areas, query]);
 
   async function makeFolder() {
     const nm = newFolderName.trim();
@@ -230,8 +227,6 @@ export default function Saved() {
           autoFocus
         />
       )}
-
-      {posts.length > 0 && <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />}
 
       {areasPresent.length > 1 && (
         <div className="myc__areas h-scroll" role="toolbar" aria-label="Service areas">

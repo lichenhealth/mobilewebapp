@@ -278,7 +278,6 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       profileId={member.id}
       me={me}
       entityName={name}
-      showFilters={false}
       leading={[
         { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) },
         ...(isSelf
