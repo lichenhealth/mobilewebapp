@@ -166,6 +166,51 @@
   .mkt__actions .mkt__action-label { letter-spacing: 0.02em; }
 }
 .mkt__action-label { white-space: nowrap; }
+
+/* LENSES READ AS SIGNALS (founder 2026-08-08: "I love how the Member,
+   Recommend checks are rendered here — can we update lend, sell, gift to be
+   this? Then you can select and deselect them, but they don't take up so much
+   space"). Same vocabulary as a space page's signal row (.mprof__actions
+   --signals): a mark, a small label, a check when it's on. No circle, no pill
+   — half the height of the circle-and-caption chips it replaces. The doors
+   keep their circles: a circle is something you open, text with a check is
+   something that's on.
+   ⚠ It stays ONE scrolling line rather than wrapping. Wrapping showed every
+   lens at once, which suits the all-on-by-default grammar — but on a phone it
+   ran to three lines and cost MORE height than the row it replaced, which was
+   the whole point. The double class beats .h-scroll's own 12px gap. */
+/* The two bands sit close: doors, then lenses. Trimmed padding keeps the pair
+   about the height of the single circle-and-caption row they replace. */
+.mkt__actions--doors.h-scroll { padding-bottom: 2px; }
+.mkt__lensrow.h-scroll {
+  display: flex;
+  align-items: center;
+  /* Tight: a word takes more width than a circle did, so every pixel of gap
+     is one fewer lens visible before the chevron. */
+  gap: var(--s-2);
+  padding: 2px 0 var(--s-2);   /* side gutters live on the ScrollHintRow wrapper */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mkt__lensrow::-webkit-scrollbar { display: none; }
+.mkt__lens {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.mkt__lens svg { width: 16px; height: 16px; }
+.mkt__lens:hover { color: var(--ink); }
+.mkt__lens.is-on { color: var(--peach-deep); }
 .mkt__action:hover { transform: translateY(-1px); }
 .mkt__action:active { transform: scale(0.96); }
 

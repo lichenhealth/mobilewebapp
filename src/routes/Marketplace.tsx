@@ -313,13 +313,11 @@ export default function Marketplace() {
         )}
       </header>
 
-      {/* Action chips: search & list something, then the offer-mode filters.
-          The leading trio is ICON-ONLY (founder 2026-08-08) — the same
-          vocabulary Home's row and the area feeds already speak. Search, post
-          and the brain are the platform's three constant doors; they don't
-          need naming on every screen. The chips after the spacer keep their
-          labels: Gift, Trade and Rent are choices, not doors. */}
-      <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Marketplace tools and filters" gutter>
+      {/* THE DOORS — icon-only (founder 2026-08-08), the same vocabulary Home's
+          row and the area feeds already speak. Search, post and the brain are
+          the platform's three constant doors; they don't need naming on every
+          screen. The lenses live on their own line below. */}
+      <ScrollHintRow className="mkt__actions mkt__actions--doors h-scroll" role="toolbar" ariaLabel="Marketplace tools" gutter>
         <button
           className={'mkt__action mkt__action--door' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
@@ -335,27 +333,40 @@ export default function Marketplace() {
         <div className="mkt__action mkt__action--door mkt__action--assistant">
           <AssistantDoor section="market" size={30} label="Your assistant — offers, seeks, and what moved" />
         </div>
-        <div className="mkt__action-spacer" />
         {/* The featured door: entrust your offering to the routing — ideally
-            the algorithm does better than any of us could alone. */}
+            the algorithm does better than any of us could alone. It sits with
+            the DOORS now, not among the lenses: it composes something, it
+            doesn't narrow what you're looking at. */}
         <button
-          className="mkt__action mkt__action--lichen"
+          className="mkt__action mkt__action--door mkt__action--lichen"
           onClick={() => navigate(`/compose?area=marketplace&entrust=1${space ? `&space=${space}` : ''}`)}
+          aria-label="Offer something and let Lichen route it"
           title="Offer something and let Lichen route it where it's needed most"
         >
           <span className="mkt__action-circle"><LichenMark size={22} label="" /></span>
-          <span className="mkt__action-label">Lichen</span>
         </button>
-        {MODES.map((m) => (
-          <button
-            key={m.chip}
-            className={'mkt__action' + (activeChips.includes(m.chip) ? ' is-active' : '')}
-            onClick={() => toggleChip(m.chip)}
-          >
-            <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
-            <span className="mkt__action-label">{m.label}</span>
-          </button>
-        ))}
+      </ScrollHintRow>
+
+      {/* The lens band, on its own line: the doors were eating half a phone's
+          width, and a word is wider than a circle — sharing one row left a
+          single lens visible before the chevron. Own line, full width, ~5
+          visible. */}
+      <ScrollHintRow className="mkt__lensrow h-scroll" role="toolbar" ariaLabel="Modes of exchange" gutter>
+        {MODES.map((m) => {
+          const on = activeChips.includes(m.chip);
+          return (
+            <button
+              key={m.chip}
+              className={'mkt__lens' + (on ? ' is-on' : '')}
+              onClick={() => toggleChip(m.chip)}
+              aria-pressed={on}
+              title={on ? `Showing ${m.label.toLowerCase()} — tap to hide` : `Tap to show ${m.label.toLowerCase()}`}
+            >
+              <Icon name={m.icon} size={16} />
+              {m.label}{on ? ' ✓' : ''}
+            </button>
+          );
+        })}
       </ScrollHintRow>
 
       {showSearch && (
