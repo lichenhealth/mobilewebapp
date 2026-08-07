@@ -37,7 +37,7 @@ const MYC_ICONS: IconRowItem[] = [
   { icon: 'search',         label: 'Search',      to: '/search' },
   { icon: 'plus',           label: 'Post',        to: '/compose' },
   { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=mycelium',
-    variant: 'icon-row__btn--ai', size: 22 },
+    variant: 'icon-row__btn--ai' },
   { icon: 'newsfeed',       label: 'Feed',        to: '/mycelium',
     variant: 'icon-row__btn--here', size: 22, divider: true },
   { icon: 'store',          label: 'Marketplace', to: '/market?web=1' },

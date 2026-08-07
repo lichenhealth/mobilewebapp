@@ -313,22 +313,27 @@ export default function Marketplace() {
         )}
       </header>
 
-      {/* Action chips: search & list something, then the offer-mode filters */}
+      {/* Action chips: search & list something, then the offer-mode filters.
+          The leading trio is ICON-ONLY (founder 2026-08-08) — the same
+          vocabulary Home's row and the area feeds already speak. Search, post
+          and the brain are the platform's three constant doors; they don't
+          need naming on every screen. The chips after the spacer keep their
+          labels: Gift, Trade and Rent are choices, not doors. */}
       <ScrollHintRow className="mkt__actions h-scroll" role="toolbar" ariaLabel="Marketplace tools and filters" gutter>
         <button
-          className={'mkt__action' + (showSearch ? ' is-active' : '')}
+          className={'mkt__action mkt__action--door' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
+          aria-label="Search" title="Search"
         >
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
-          <span className="mkt__action-label">Search</span>
         </button>
-        <button className="mkt__action" onClick={() => navigate(`/compose?area=marketplace${space ? `&space=${space}` : ''}`)}>
+        <button className="mkt__action mkt__action--door"
+          onClick={() => navigate(`/compose?area=marketplace${space ? `&space=${space}` : ''}`)}
+          aria-label="List something" title="List something">
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
-          <span className="mkt__action-label">List</span>
         </button>
-        <div className="mkt__action mkt__action--assistant">
-          <AssistantDoor section="market" label="Your assistant — offers, seeks, and what moved" />
-          <span className="mkt__action-label">Brain</span>
+        <div className="mkt__action mkt__action--door mkt__action--assistant">
+          <AssistantDoor section="market" size={30} label="Your assistant — offers, seeks, and what moved" />
         </div>
         <div className="mkt__action-spacer" />
         {/* The featured door: entrust your offering to the routing — ideally

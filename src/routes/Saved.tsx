@@ -168,7 +168,7 @@ export default function Saved() {
               </div>
             )}
           </div>
-          <AssistantDoor section="saved" label="Your assistant — what you've been keeping" />
+          <AssistantDoor section="saved" size={30} label="Your assistant — what you've been keeping" />
           <span className="saved__bar-spacer" />
           <div className="saved__folders">
             <button className="saved__folders-btn"
