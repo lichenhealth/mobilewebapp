@@ -91,22 +91,30 @@ export async function loadMyRecommendations(): Promise<Set<string>> {
   if (!user) return new Set();
   const { data } = await supabase
     .from('recommendations')
-    .select('target_type, target_id, offering_category')
+    .select('target_type, target_id, offering_category, recommender_space_id')
     .eq('recommender_id', user.id);
-  const rows = (data ?? []) as { target_type: string; target_id: string; offering_category: string | null }[];
+  const rows = (data ?? []) as {
+    target_type: string; target_id: string;
+    offering_category: string | null; recommender_space_id: string | null;
+  }[];
   return new Set(rows.map((r) => recommendKey(
-    r.target_type as TargetType, r.target_id, r.offering_category ?? undefined)));
+    r.target_type as TargetType, r.target_id,
+    r.offering_category ?? undefined, r.recommender_space_id ?? undefined)));
 }
 
-export const recommendKey = (type: TargetType, id: string, category?: string) =>
-  category ? `${myceliumKey(type, id)}#${category}` : myceliumKey(type, id);
+export const recommendKey = (
+  type: TargetType, id: string, category?: string, asSpace?: string,
+) => {
+  const base = category ? `${myceliumKey(type, id)}#${category}` : myceliumKey(type, id);
+  return asSpace ? `${base}@${asSpace}` : base;
+};
 
 /** Recommend (amplify) or un-recommend — a post, a space, or ONE OF A
  *  PERSON'S OFFERINGS (founder 2026-08-06: you don't recommend a person, you
  *  recommend their work). `category` is a category id the person actually
  *  lists; the DB trigger refuses anything else. */
 export async function setRecommend(
-  type: TargetType, id: string, on: boolean, category?: string,
+  type: TargetType, id: string, on: boolean, category?: string, asSpace?: string,
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
@@ -114,7 +122,11 @@ export async function setRecommend(
     const { error } = await supabase
       .from('recommendations')
       .insert({
-        recommender_id: user.id, target_type: type, target_id: id,
+        recommender_id: user.id,
+        // Speaking for a space you administer (founder 2026-08-06). The DB
+        // re-checks adminship; trust deliberately has no equivalent.
+        recommender_space_id: asSpace ?? null,
+        target_type: type, target_id: id,
         offering_category: category ?? null,
       });
     if (error && error.code !== '23505') throw error;
@@ -122,6 +134,7 @@ export async function setRecommend(
     let q = supabase.from('recommendations').delete()
       .eq('recommender_id', user.id).eq('target_type', type).eq('target_id', id);
     q = category ? q.eq('offering_category', category) : q.is('offering_category', null);
+    q = asSpace ? q.eq('recommender_space_id', asSpace) : q.is('recommender_space_id', null);
     const { error } = await q;
     if (error) throw error;
   }

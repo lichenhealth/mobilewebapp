@@ -239,3 +239,6 @@
   border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep);
 }
 .ppage__offer { display: flex; align-items: center; gap: var(--s-3); }
+.ppage__offer-as {
+  font-style: normal; font-size: 10px; opacity: 0.8; margin-left: 4px;
+}

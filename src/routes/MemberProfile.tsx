@@ -311,24 +311,31 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         offerings={[...offerings.services, ...offerings.goods]}
         offeringRows={offerings.rows}
         renderOfferingAction={me && !isSelf ? (o) => {
-          const key = recommendKey('profile', member.id, o.id);
+          // Recommend carries the acting-as voice — an org endorsing a
+          // farrier is a real, different statement (founder 2026-08-06).
+          const asSpace = actor.type === 'space' ? actor.id : undefined;
+          const asName = actor.type === 'space' ? actor.name : '';
+          const key = recommendKey('profile', member.id, o.id, asSpace);
           const on = myRecs.has(key);
           return (
             <button
               className={'ppage__offer-rec' + (on ? ' is-on' : '')}
               aria-pressed={on}
-              title={on ? `You recommend ${o.name}` : `Recommend their ${o.name}`}
+              title={on
+                ? `${asName || 'You'} recommend ${o.name}`
+                : `Recommend their ${o.name}${asName ? ` as ${asName}` : ''}`}
               onClick={() => {
                 setMyRecs((prev) => {
                   const next = new Set(prev);
                   if (on) next.delete(key); else next.add(key);
                   return next;
                 });
-                void setRecommend('profile', member.id, !on, o.id).catch(console.error);
+                void setRecommend('profile', member.id, !on, o.id, asSpace).catch(console.error);
               }}
             >
               <Icon name="thumbs-up" size={13} />
               {on ? 'Recommended' : 'Recommend'}
+              {asName && <em className="ppage__offer-as">as {asName}</em>}
             </button>
           );
         } : undefined}

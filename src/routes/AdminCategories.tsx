@@ -16,6 +16,26 @@ export default function AdminCategories() {
   const { loading, user, isAdmin } = useAuth();
   const [items, setItems] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [mapping, setMapping] = useState<string | null>(null);
+  const [mapQ, setMapQ] = useState('');
+  const [allCats, setAllCats] = useState<{ id: string; name: string; domain: string }[]>([]);
+
+  useEffect(() => {
+    void supabase.from('categories').select('id, name, domain').order('name')
+      .then(({ data }) => setAllCats((data as { id: string; name: string; domain: string }[] | null) ?? []));
+  }, []);
+
+  /** Answer a suggestion by mapping it onto a category that already exists. */
+  async function mapTo(suggestionId: string, categoryId: string) {
+    setBusy(suggestionId); setError('');
+    const { error } = await supabase.rpc('alias_category_suggestion', {
+      p_suggestion: suggestionId, p_category: categoryId,
+    });
+    setBusy(null);
+    if (error) { setError(error.message); return; }
+    setMapping(null); setMapQ('');
+    setItems((list) => list.filter((x) => x.id !== suggestionId));
+  }
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,12 +93,23 @@ export default function AdminCategories() {
               </span>
             </div>
             <div className="adminc__actions">
+              {/* MAPPING IS THE DEFAULT ANSWER (founder 2026-08-06). Every new
+                  category makes the picker longer and search less precise;
+                  an alias lets them use their own word while the filter list
+                  stays short. Minting a new one is the deliberate exception. */}
               <button
                 className="adminc__btn adminc__btn--approve"
+                onClick={() => setMapping(mapping === s.id ? null : s.id)}
+                disabled={busy === s.id}
+              >
+                Same as…
+              </button>
+              <button
+                className="adminc__btn"
                 onClick={() => decide(s.id, true)}
                 disabled={busy === s.id}
               >
-                {busy === s.id ? '…' : 'Approve'}
+                {busy === s.id ? '…' : 'New category'}
               </button>
               <button
                 className="adminc__btn adminc__btn--reject"
@@ -88,6 +119,33 @@ export default function AdminCategories() {
                 Reject
               </button>
             </div>
+            {mapping === s.id && (
+              <div className="adminc__map">
+                <input
+                  className="adminc__map-q"
+                  autoFocus
+                  value={mapQ}
+                  placeholder="Which existing category is this?"
+                  onChange={(e) => setMapQ(e.target.value)}
+                />
+                <div className="adminc__map-hits">
+                  {allCats
+                    .filter((c) => c.domain === s.domain
+                      && c.name.toLowerCase().includes(mapQ.trim().toLowerCase()))
+                    .slice(0, 6)
+                    .map((c) => (
+                      <button className="adminc__map-hit" key={c.id}
+                        onClick={() => void mapTo(s.id, c.id)}>
+                        {c.name}
+                      </button>
+                    ))}
+                </div>
+                <p className="adminc__map-note">
+                  &ldquo;{s.name}&rdquo; becomes another word for it — searches for either
+                  find the same people, and the filter list doesn&rsquo;t grow.
+                </p>
+              </div>
+            )}
           </li>
         ))}
       </ul>

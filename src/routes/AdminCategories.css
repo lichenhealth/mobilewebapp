@@ -75,3 +75,20 @@
   padding-top: var(--s-3);
   border-top: 1px solid var(--bone-edge);
 }
+
+/* Answering a suggestion by mapping it (founder 2026-08-06) — the default,
+   because every new category makes search less precise. */
+.adminc__map { flex-basis: 100%; margin-top: var(--s-3); }
+.adminc__map-q {
+  width: 100%; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 8px 11px; font: inherit; font-size: var(--t-sm);
+}
+.adminc__map-q:focus { outline: none; border-color: var(--peach); }
+.adminc__map-hits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s-2); }
+.adminc__map-hit {
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  border-radius: var(--r-full); padding: 4px 11px; cursor: pointer;
+  font-size: var(--t-xs); color: var(--ink);
+}
+.adminc__map-hit:hover { border-color: var(--peach); color: var(--peach-deep); }
+.adminc__map-note { margin-top: var(--s-2); font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5; }

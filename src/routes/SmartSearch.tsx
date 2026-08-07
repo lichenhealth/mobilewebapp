@@ -192,13 +192,25 @@ export default function SmartSearch() {
 
   useEffect(() => {
     (async () => {
-      const [catRes, spRes, memRes] = await Promise.all([
+      const [catRes, aliasRes, spRes, memRes] = await Promise.all([
         supabase.from('categories').select('id, name, domain').order('name'),
+        // Aliases are other words for the SAME category (founder 2026-08-06),
+        // so search understands a member's own vocabulary without the filter
+        // list growing. Absent pre-migration — the query just returns nothing.
+        supabase.from('category_aliases').select('alias, category_id'),
         me ? supabase.from('space_members').select('spaces(id, name, kind)').eq('profile_id', me)
           : Promise.resolve({ data: [] }),
         supabase.from('profiles').select('id, full_name').order('full_name').limit(500),
       ]);
-      setCats((catRes.data as SearchCategory[] | null) ?? []);
+      const baseCats = (catRes.data as SearchCategory[] | null) ?? [];
+      const byId = new Map(baseCats.map((c) => [c.id, c]));
+      const aliasCats = (((aliasRes.data as { alias: string; category_id: string }[] | null) ?? [])
+        .map((a) => {
+          const c = byId.get(a.category_id);
+          return c ? { ...c, name: a.alias } : null;
+        }).filter((c): c is SearchCategory => !!c));
+      // The real names first, so an exact name still wins the longest match.
+      setCats([...baseCats, ...aliasCats]);
       setMySpaces((((spRes.data as { spaces: MySpace | null }[] | null) ?? [])
         .map((r) => r.spaces).filter((s): s is MySpace => !!s)));
       setMembers(((memRes.data as MemberLite[] | null) ?? []).filter((m) => m.id !== me));
