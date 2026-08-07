@@ -150,7 +150,14 @@ export function postToCard(
     // economy (founder 2026-07-24 — demo posts teach how the platform works).
     demo: p.details?.demo === true,
     areaDoors,
-    eyebrow: offerLine ?? ((p.to_mycelium || p.visibility === 'mycelium') ? 'Mycelium' : undefined),
+    // The My-celium eyebrow tells you WHY a post reached you — someone shared
+    // it with their web rather than publicly. On your OWN post it answers a
+    // question you never asked, and reads as if the post came FROM My-celium
+    // instead of going to it (founder 2026-08-07: "I guess I'm in my own
+    // Mycelium, but it feels wonky"). Offer lines still show — what you're
+    // asking for something is worth seeing on your own listing.
+    eyebrow: offerLine ?? (!isMine && (p.to_mycelium || p.visibility === 'mycelium')
+      ? 'Mycelium' : undefined),
     media,
     noDownload,
     previews,
