@@ -5,7 +5,7 @@ import {
   myPresence, setAlwaysPresent, snuffPresence, candleLit, type MyPresence,
 } from '../lib/presenceApi';
 import ConsentBubble from './ConsentBubble';
-import { loadPrompts, promptSeenToday, markPrompt } from '../lib/promptsApi';
+import { loadPrompts, promptSeen, promptSeenToday, markPrompt } from '../lib/promptsApi';
 
 /** "Do you want your light on?" (founder 2026-08-07: "whenever someone logs in
  *  or opens the desktop app, can we have them get a pop up asking them if they
@@ -54,14 +54,18 @@ export default function PresencePrompt({ anchor, onChange }: {
     return () => { live = false; };
   }, [user]);
 
-  // On switching who you're acting as — once per identity per sitting.
+  // On switching who you're acting as — ONCE, EVER. It teaches one thing ("your
+  // light doesn't change when you switch"), and once that's learned it must
+  // stop: since the space view-toggle now switches your identity for you
+  // (founder 2026-08-07), this would otherwise fire every single time anyone
+  // opened Admin view, which is precisely the prompt-you-stop-reading problem.
   useEffect(() => {
     if (!user || !pres) return;
     const key = actor.type === 'self' ? 'self' : `${actor.type}:${actor.id}`;
     if (askedFor.current === null) { askedFor.current = key; return; }  // first paint
     if (askedFor.current === key) return;
     askedFor.current = key;
-    if (why === null) setWhy('switch');
+    if (why === null && !promptSeen('presence-switch')) setWhy('switch');
   }, [actor, user, pres, why]);
 
   if (!user || !pres || !why) return null;
@@ -70,7 +74,7 @@ export default function PresencePrompt({ anchor, onChange }: {
   const actorName = actor.type === 'self' ? null : actor.name;
 
   const close = () => {
-    void markPrompt(user.id, 'presence');
+    void markPrompt(user.id, why === 'switch' ? 'presence-switch' : 'presence');
     setWhy(null);
   };
 

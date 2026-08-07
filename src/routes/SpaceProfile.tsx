@@ -63,7 +63,7 @@ const ROLE_LABEL: Record<string, string> = {
  *  the same treatment people do. Everyone sees who/what it is; its admins
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
 export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: string; forcePublic?: boolean } = {}) {
-  const { actor } = useActing();
+  const { actor, setActor } = useActing();
   const { id: paramId = '' } = useParams();
   const id = spaceId || paramId;
   const navigate = useNavigate();
@@ -761,31 +761,35 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     </div>
   ) : null;
 
-  // THE STEWARD'S SWITCH BELONGS TO THE STEWARD'S IDENTITY (founder 2026-08-07:
-  // "if acting as Galyn, I'd want to interact with the Org... cleanest to have
-  // the admin toggle only show when you're acting as that entity").
+  // THE TOGGLE *IS* THE IDENTITY SWITCH (founder 2026-08-07: "it will show you
+  // admin view for any space you're an admin of, even if logged in to another.
+  // But when you click admin view, it will switch you to that account").
   //
-  // It matches how authorship already works: acting-as decides who a post is
-  // BY, so it should decide whose controls you're holding. Acting as yourself
-  // on an org you steward means you're a visitor there, with the member's
-  // trust/recommend/join gestures — which is what you want when you're being a
-  // person, and what confused the acting-as question this morning.
+  // Better than hiding it, which was the first attempt: you keep the reminder
+  // that you steward this place, and taking the controls is what changes who
+  // you are — rather than a rule you have to remember before you arrive.
   //
-  // Backstage keeps the bar regardless, so a desk notification or an Admin-view
-  // menu link deep-linking to ?manage=1 can never strand you with no way back.
+  // It also keeps authorship honest. Acting-as already decides who a post is
+  // BY (Compose reads the actor, not the space you post into), so anything
+  // published while managing goes out in the space's voice, which is what you
+  // meant. The pair is symmetric: Member view hands you back to yourself, so
+  // nobody wanders off still speaking as the organisation.
   const actingAsThis = actor.type === 'space' && actor.id === space.id;
-  const adminBar = isAdmin && (actingAsThis || backstage) ? (
+  const beThisSpace = () =>
+    setActor({ type: 'space', id: space.id, name: space.name, kind: space.kind });
+  const beMyself = () => { if (actingAsThis) setActor({ type: 'self' }); };
+  const adminBar = isAdmin ? (
     <div className="view-toggle-row">
       <span className="view-toggle" role="group" aria-label="View">
         <button
           className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
-          onClick={() => { setEditOpen(false); setSearchParams({}); }}
+          onClick={() => { setEditOpen(false); beMyself(); setSearchParams({}); }}
         >
           Member view
         </button>
         <button
           className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
-          onClick={() => setSearchParams({ manage: '1' })}
+          onClick={() => { beThisSpace(); setSearchParams({ manage: '1' }); }}
         >
           Admin view
           {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
