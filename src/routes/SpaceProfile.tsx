@@ -29,6 +29,7 @@ import {
   resourceSpanContact, type ResourceRow, type ResourceBusySpan, type ResourceBookingRow,
 } from '../lib/resourcesApi';
 import { ensureDirectChat } from '../lib/chatApi';
+import { WeaveMark } from '../components/WeaveMark';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
 import { todayISO } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
@@ -141,6 +142,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [awake, setAwake] = useState<number | null>(null);
   const [awakeOpen, setAwakeOpen] = useState(false);
   const [awakeWho, setAwakeWho] = useState<AwakeMember[]>([]);
+  // Presence and my relationship with each member — the Members tab is the one
+  // place people are listed, so it carries the same gestures the directory has
+  // (founder 2026-08-07: "it should allow me to trust and add those members to
+  // my mycelium, as well as chat with them, just like the member icon does").
+  const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
+  const [myVouchedSet, setMyVouchedSet] = useState<Set<string>>(new Set());
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -169,6 +176,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setMyRequest(req);
     setChildGroups(kids);
     setInWebState(mine.web.has(`space:${id}`));
+    setMyWebSet(mine.web);
+    setMyVouchedSet(mine.vouched);
     setTrusted(mine.vouched.has(`space:${id}`));
     setRecommended(recs.has(`space:${id}`));
     if (s) {
@@ -271,6 +280,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     void spaceHasEvents(id).then((yes) => { if (live) setHasEvents(yes); });
     return () => { live = false; };
   }, [id]);
+  // Who's awake, ready for the Members tab to sort by.
+  useEffect(() => {
+    if (!id || !isMember) return;
+    let live = true;
+    void spaceAwakeList(id).then((rows) => { if (live) setAwakeWho(rows); });
+    return () => { live = false; };
+  }, [id, isMember, awake]);
   useEffect(() => {
     if (tab !== 'events' || !id) return;
     let live = true;
@@ -712,11 +728,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // shell, which a signed-in admin never reaches.
   const awakeLine = isMember && awake !== null ? (
     <div className="sprof__awake">
-      <button className="sprof__awake-line" onClick={() => {
-        const next = !awakeOpen;
-        setAwakeOpen(next);
-        if (next && awakeWho.length === 0) void spaceAwakeList(space.id).then(setAwakeWho);
-      }}>
+      <button className="sprof__awake-line" onClick={() => openTab('members')}>
         {awake === 0
           ? `${space.name} is resting.`
           : awake === 1
@@ -724,26 +736,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             : `${awake} in ${space.name} are awake.`}
         {awake > 0 && <Icon name="chevron-right" size={13} />}
       </button>
-      {awakeOpen && (
-        <div className="sprof__awake-list">
-          {awakeWho.length === 0 && (
-            <p className="sprof__awake-empty">
-              Nobody here is showing presence right now. Everyone chooses
-              whether to light their candle.
-            </p>
-          )}
-          {awakeWho.map((a) => (
-            <button className="sprof__awake-who" key={a.id}
-              onClick={() => navigate(`/members/${a.id}`)}>
-              <Avatar id={a.id} name={a.full_name ?? 'A member'} url={a.avatar_url ?? undefined} size={28} />
-              <span className="sprof__awake-name">
-                {a.me ? 'You' : (a.full_name ?? 'A member')}
-              </span>
-              <span className="sprof__awake-tag">{a.lit ? '🕯️ present' : 'around'}</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   ) : null;
 
@@ -1277,7 +1269,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         <h2 className="prof__h2">Members</h2>
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
-          {members.map((m) => {
+          {[...members].sort((a, b) => {
+            // Present, then around, then everyone else — the same order the
+            // my-celium directory uses, so presence reads the same anywhere.
+            const rank = (id: string) => {
+              const w = awakeWho.find((x) => x.id === id);
+              return w ? (w.lit ? 0 : 1) : 2;
+            };
+            return rank(a.profile_id) - rank(b.profile_id)
+              || (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? '');
+          }).map((m) => {
+            const awakeHere = awakeWho.find((x) => x.id === m.profile_id);
+            const isMe = m.profile_id === me;
             // A scoped admin's label says what they steward ("admin · Library")
             const roleLabel = m.role === 'admin' && m.duties
               ? 'admin · ' + m.duties.map((d) => SPACE_DUTIES.find((x) => x.key === d)?.label ?? d).join(', ')
@@ -1296,9 +1299,60 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                     url={m.profile?.avatar_url}
                     size={34}
                   />
-                  <span className="sprof__member-name">{m.profile?.full_name ?? 'Member'}</span>
+                  <span className="sprof__member-name">
+                    {m.profile?.full_name ?? 'Member'}
+                    {awakeHere && (
+                      <span className="sprof__member-presence">
+                        {awakeHere.lit ? '🕯️ present' : (
+                          <><span className="sprof__member-dot" aria-hidden /> around</>
+                        )}
+                      </span>
+                    )}
+                  </span>
                   <span className="sprof__member-role">{roleLabel}</span>
                 </button>
+                {me && !isMe && (
+                  <span className="sprof__member-acts">
+                    <button
+                      className={'mycdir__shield' + (myVouchedSet.has('profile:' + m.profile_id) ? ' is-on' : '')}
+                      onClick={() => {
+                        const on = !myVouchedSet.has('profile:' + m.profile_id);
+                        setMyVouchedSet((cur) => {
+                          const next = new Set(cur);
+                          if (on) { next.add('profile:' + m.profile_id); } else next.delete('profile:' + m.profile_id);
+                          return next;
+                        });
+                        if (on) setMyWebSet((cur) => new Set(cur).add('profile:' + m.profile_id));
+                        void setVouch('profile', m.profile_id, on).catch(console.error);
+                      }}
+                      aria-label={`Trust ${m.profile?.full_name ?? 'this member'}`}
+                      title={myVouchedSet.has('profile:' + m.profile_id) ? 'Someone you trust' : 'Trust (private)'}
+                    >
+                      <Icon name="shield-user" size={16} />
+                    </button>
+                    <WeaveMark
+                      on={myWebSet.has('profile:' + m.profile_id)}
+                      onToggle={(on: boolean) => {
+                        setMyWebSet((cur) => {
+                          const next = new Set(cur);
+                          if (on) next.add('profile:' + m.profile_id); else next.delete('profile:' + m.profile_id);
+                          return next;
+                        });
+                        void setInWeb('profile', m.profile_id, on).catch(console.error);
+                      }}
+                      entityName={m.profile?.full_name ?? 'this member'}
+                      size={20}
+                    />
+                    <button
+                      className="mycdir__shield"
+                      onClick={() => void ensureDirectChat(m.profile_id).then((c) => navigate(`/chat/${c}`))}
+                      aria-label={`Message ${m.profile?.full_name ?? 'this member'}`}
+                      title="Message"
+                    >
+                      <Icon name="chat" size={16} />
+                    </button>
+                  </span>
+                )}
                 {canManage && (
                   <button
                     className="sprof__rolebtn"

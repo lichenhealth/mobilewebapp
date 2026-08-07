@@ -272,3 +272,16 @@
   font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5;
   font-style: italic; padding: var(--s-2) var(--s-3);
 }
+
+/* Presence rides beside the name in the Members tab — the same two signals the
+   my-celium directory uses (founder 2026-08-07). */
+.sprof__member-presence {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: var(--s-2);
+  font-size: 11px; color: var(--ink-muted); letter-spacing: 0.02em;
+}
+.sprof__member-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--peach); display: inline-block;
+}
+.sprof__member-acts { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
