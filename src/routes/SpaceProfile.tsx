@@ -204,14 +204,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     catch (e) { console.error(e); setInWebState(!next); }
   }
 
-  async function toggleTrust() {
-    if (!me) return;
-    const next = !trusted;
-    setTrusted(next);
-    if (next && !inWeb) setInWebState(true);  // trusting auto-adds to the web
-    try { await setVouch('space', id, next); } catch (e) { console.error(e); setTrusted(!next); }
-  }
-
   async function toggleRecommend() {
     if (!me) return;
     const next = !recommended;
@@ -510,7 +502,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     </>
   );
   const actionRow = me && !backstage && (
-    <div className="mprof__actions">
+    <div className="mprof__actions mprof__actions--signals">
       {myRequest !== 'invited' && (
         <button
           className={'btn mprof__btn mprof__btn--trust' + (isMember || myRequest === 'requested' ? ' is-on' : '')}
@@ -532,19 +524,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       >
         <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
       </button>
-      {space.kind !== 'place' && (
-        /* Trust is for relationships: people, orgs, communities, groups. */
-        <button
-          className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
-          onClick={toggleTrust}
-          title={trusted ? 'You trust them — private, tap to undo' : 'Trust them — a private signal, never shown as a count'}
-        >
-          <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
-        </button>
-      )}
-      {/* Recommend rides beside trust on EVERY kind (founder 2026-07-30):
-          "I might trust someone but not recommend them" — and the
-          reverse. Independent signals, PR #77 doctrine completed. */}
+      {/* NO TRUST ON A SPACE (founder 2026-08-07: "you can trust a person, but
+          recommend an org, group or community... shouldn't trust not be an
+          option for them?"). Trust is the private signal between people;
+          an organisation is something you vouch FOR, in public, which is
+          exactly recommend. This supersedes the both-on-everything rule from
+          PR #77 — existing space vouches stay in the data, they just can't be
+          made or unmade here any more. */}
       <button
         className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
         onClick={toggleRecommend}
@@ -820,6 +806,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         // The steward's switch sits above the masthead, so a page with a big
         // cover image doesn't bury the way to manage it.
         aboveHero={adminBar}
+        // Your relationship with this place sits in the masthead — a tall
+        // cover photo used to bury it (founder 2026-08-07).
+        heroSignals={!backstage && !tab ? actionRow : null}
         beforeContent={me ? (
           <>
             {/* Join / my-celium / trust ride ABOVE the page, not below every
@@ -828,7 +817,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             {!backstage && !tab && (
               <>
                 {noticeBanners}
-                {actionRow}
                 {awakeLine}
               </>
             )}

@@ -345,24 +345,33 @@ export default function MyceliumDirectory() {
                   </span>
                   {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
                 </span>
-                <button
-                  className={'mycdir__shield' + (e.vouched ? ' is-on' : '')}
-                  onClick={() => toggleVouch(e, !e.vouched)}
-                  aria-pressed={e.vouched}
-                  aria-label={e.vouched ? `Stop trusting ${e.name}` : `Trust ${e.name}`}
-                  title={e.vouched ? 'Someone you trust' : 'Trust (private)'}
-                >
-                  <Icon name="shield-user" size={16} />
-                </button>
-                <button
-                  className={'mycdir__shield' + (e.recommended ? ' is-on' : '')}
-                  onClick={() => toggleRec(e, !e.recommended)}
-                  aria-pressed={e.recommended}
-                  aria-label={e.recommended ? `Stop recommending ${e.name}` : `Recommend ${e.name}`}
-                  title={e.recommended ? 'Recommended by you' : 'Recommend'}
-                >
-                  <Icon name="thumbs-up" size={16} />
-                </button>
+                {/* ONE GESTURE PER KIND (founder 2026-08-07: "you can trust a
+                    person, but recommend an org, group or community... always a
+                    thumbs up for organizations, communities, groups and places,
+                    and a shield for people"). Trust is a relationship between
+                    people and stays private; an organisation is something you
+                    vouch FOR publicly, which is what recommend means. */}
+                {e.type === 'profile' ? (
+                  <button
+                    className={'mycdir__shield' + (e.vouched ? ' is-on' : '')}
+                    onClick={() => toggleVouch(e, !e.vouched)}
+                    aria-pressed={e.vouched}
+                    aria-label={e.vouched ? `Stop trusting ${e.name}` : `Trust ${e.name}`}
+                    title={e.vouched ? 'Someone you trust' : 'Trust (private)'}
+                  >
+                    <Icon name="shield-user" size={16} />
+                  </button>
+                ) : (
+                  <button
+                    className={'mycdir__shield' + (e.recommended ? ' is-on' : '')}
+                    onClick={() => toggleRec(e, !e.recommended)}
+                    aria-pressed={e.recommended}
+                    aria-label={e.recommended ? `Stop recommending ${e.name}` : `Recommend ${e.name}`}
+                    title={e.recommended ? 'Recommended by you' : 'Recommend'}
+                  >
+                    <Icon name="thumbs-up" size={16} />
+                  </button>
+                )}
                 <WeaveMark
                   on
                   onToggle={(on) => toggleWeave(e, on)}

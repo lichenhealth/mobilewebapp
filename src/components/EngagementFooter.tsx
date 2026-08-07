@@ -149,15 +149,11 @@ export default function EngagementFooter({
 
         {/* RIGHT: your actions */}
         <div className="engage__actions">
-          <button
-            className={'engage__action' + (myTrust && can.trust ? ' is-active' : '')}
-            onClick={handleTrust}
-            disabled={!can.trust}
-            title={can.trust ? undefined : 'Not available for this content'}
-          >
-            <Icon name="shield-user" size={13} />
-            <span>Trust</span>
-          </button>
+          {/* TRUST MOVED UP TO THE NAME (founder 2026-08-07: "a recommend
+              button at the bottom with the share and save buttons, and a
+              little shield by the member name at the top of the post to trust
+              the person"). The footer is what you do with the CONTENT; trusting
+              is what you think of the PERSON, so it belongs beside them. */}
           <button
             className={'engage__action' + (myRec && can.recommend ? ' is-active' : '')}
             onClick={handleRec}

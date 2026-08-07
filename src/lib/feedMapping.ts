@@ -149,6 +149,7 @@ export function postToCard(
     // Example content wears a small badge so nobody mistakes it for the real
     // economy (founder 2026-07-24 — demo posts teach how the platform works).
     demo: p.details?.demo === true,
+    authorIsSpace: !!p.author_space,
     areaDoors,
     // The My-celium eyebrow tells you WHY a post reached you — someone shared
     // it with their web rather than publicly. On your OWN post it answers a

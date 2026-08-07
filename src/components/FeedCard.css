@@ -419,3 +419,14 @@
   font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.5); text-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
 }
+
+/* Trust lives in the identity row beside the weave mark (founder 2026-08-07):
+   the header is who they are, the footer is what you do with the post. */
+.feed-card__trust {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0;
+  background: none; border: 0; cursor: pointer;
+  color: var(--ink-muted);
+}
+.feed-card__trust:hover { color: var(--ink); }
+.feed-card__trust.is-on { color: var(--peach-deep); }

@@ -41,6 +41,28 @@
   background: var(--peach-tint, var(--bone));
 }
 
+/* SIGNALS READ AS SIGNALS, NOT BUTTONS (founder 2026-08-07: "instead of the
+   big, bulky bubbles, let's have the Icons with text, as they appear in the
+   directory"). Same vocabulary as a directory row — a mark, a small label, no
+   pill — so the gesture looks the same wherever you meet it. The membership
+   button keeps its pill: joining is an action, not a signal. */
+.mprof__actions--signals { gap: var(--s-4); margin-top: var(--s-2); }
+.mprof__actions--signals .btn.mprof__btn--trust {
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  gap: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+}
+.mprof__actions--signals .btn.mprof__btn--trust svg { width: 16px; height: 16px; }
+.mprof__actions--signals .btn.mprof__btn--trust:hover { color: var(--ink); }
+.mprof__actions--signals .btn.mprof__btn--trust.is-on {
+  background: none;
+  color: var(--peach-deep);
+}
+
 .mprof__bio { font-size: 13px; font-weight: 300; color: var(--ink); line-height: 1.6; white-space: pre-wrap; }
 /* Compact about block above the contributions feed */
 .mprof__about {

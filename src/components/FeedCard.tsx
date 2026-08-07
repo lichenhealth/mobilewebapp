@@ -34,6 +34,10 @@ export interface FeedCardProps {
   // Engagement
   mycelium?: MyceliumSignals;  // network signals (peach icons on left)
   trusted?: boolean;            // your own state
+  /** The displayed author is a space — no private trust gesture, since you
+   *  recommend an organisation rather than vouching for it (founder
+   *  2026-08-07). */
+  authorIsSpace?: boolean;
   recommended?: boolean;
   saved?: boolean;
   availability?: ActionAvailability;
@@ -93,6 +97,7 @@ export default function FeedCard({
   image,
   mycelium,
   trusted,
+  authorIsSpace,
   recommended,
   saved,
   availability,
@@ -227,6 +232,21 @@ export default function FeedCard({
           <div className="feed-card__head-actions">
             {onWeave && (
               <WeaveMark on={inWeb ?? false} onToggle={onWeave} entityName={title} size={20} />
+            )}
+            {/* Trust sits with the identity, not with the content (founder
+                2026-08-07: "a little shield by the member name at the top of
+                the post to trust the person"). onWeave's absence already means
+                "your own post", so it gates this too. */}
+            {onWeave && onTrust && !authorIsSpace && (
+              <button
+                className={'feed-card__trust' + (trusted ? ' is-on' : '')}
+                onClick={(e) => { e.stopPropagation(); onTrust(!trusted); }}
+                aria-pressed={!!trusted}
+                aria-label={trusted ? `Stop trusting ${handle}` : `Trust ${handle}`}
+                title={trusted ? 'Someone you trust' : 'Trust (private)'}
+              >
+                <Icon name="shield-user" size={14} />
+              </button>
             )}
             {areaDoors.length > 0 ? (
               <div className="feed-card__cat-icons">

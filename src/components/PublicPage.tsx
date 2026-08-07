@@ -83,6 +83,11 @@ export interface PublicPageProps {
    *  acting as a page, so you can manage it easily if there is a hero image").
    *  Everything else a viewer sees belongs below, in beforeContent. */
   aboveHero?: React.ReactNode;
+  /** Your relationship with this entity — weave, recommend, join. Rendered
+   *  INSIDE the hero, under the nav and above the cover image, so it can't be
+   *  pushed below a tall photo (founder 2026-08-07: "icons with text, as they
+   *  appear in the directory, somewhere near the top of the profile"). */
+  heroSignals?: React.ReactNode;
   /** Rendered right under the hero, above every other section — for
    *  navigational doors that shouldn't get lost below a long page
    *  (founder 2026-08-03). Optional. */
@@ -287,6 +292,7 @@ export default function PublicPage(props: PublicPageProps) {
             )}
           </nav>
         )}
+        {props.heroSignals}
         {coverSrc && (
           <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
         )}
