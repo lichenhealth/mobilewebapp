@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { myPresence, setAlwaysPresent } from '../lib/presenceApi';
+import PresencePrompt from './PresencePrompt';
 import Avatar from './Avatar';
 import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
@@ -77,6 +78,9 @@ export default function TopBar({
   // The candle — a persistent "I'm present, open to connecting" toggle you can
   // light/snuff from anywhere. No fade: it stays until you unclick it.
   const [candleOn, setCandleOn] = useState<boolean | null>(null);
+  // The bubble anchors to the real button, so it has to be an element in
+  // state — a plain ref wouldn't re-render the prompt when it mounts.
+  const [candleEl, setCandleEl] = useState<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!user) { setCandleOn(null); return; }
     let live = true;
@@ -244,6 +248,7 @@ export default function TopBar({
         </div>
         {candleOn !== null && (
           <button
+            ref={setCandleEl}
             className={'top-bar__icon top-bar__candle' + (candleOn ? ' is-lit' : '')}
             onClick={toggleCandle}
             aria-pressed={candleOn}
@@ -266,6 +271,9 @@ export default function TopBar({
           )}
         </button>
       </div>
+
+      {/* The bubble can change the light too — keep the button in step. */}
+      <PresencePrompt anchor={candleEl} onChange={setCandleOn} />
 
       {panelOpen && <NotificationPanel scope={scope} onClose={() => setPanelOpen(false)} />}
     </header>

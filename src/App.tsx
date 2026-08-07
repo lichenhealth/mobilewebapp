@@ -68,7 +68,6 @@ import { useAuth } from './auth/AuthProvider';
 import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
-import PresencePrompt from './components/PresencePrompt';
 import AssistantBrief from './routes/AssistantBrief';
 import SpaceByHandle from './routes/SpaceByHandle';
 import FrontDoor from './routes/FrontDoor';
@@ -183,9 +182,6 @@ export default function App() {
     <div className="app-shell">
       <ScrollToTop />
       <ReminderAlerts />
-      {/* Not on the auth or guest screens — someone still signing up hasn't
-          got a light to ask about yet. */}
-      {!isAuth && !isGuest && <PresencePrompt />}
       {!isChatThread && !isAuth && !isGuest && !isAbout && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest || isAbout ? { padding: 0, minHeight: 0 } : undefined}>
         {customHandle ? (

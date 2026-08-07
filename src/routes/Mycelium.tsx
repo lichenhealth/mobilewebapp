@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
@@ -20,17 +20,11 @@ import { useAuth } from '../auth/AuthProvider';
 import './Mycelium.css';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// Entity kinds — multi-select, like the marketplace mode filters.
-type Kind = 'person' | 'provider' | 'organization' | 'place';
-const KINDS: { type: Kind; label: string; icon: IconName }[] = [
-  { type: 'person',       label: 'People',    icon: 'profile' },
-  { type: 'provider',     label: 'Providers', icon: 'store' },
-  { type: 'organization', label: 'Orgs',      icon: 'user-multiple' },
-  { type: 'place',        label: 'Places',    icon: 'location' },
-];
-const URL_TO_KIND: Record<string, Kind | undefined> = {
-  people: 'person', providers: 'provider', organizations: 'organization', places: 'place',
-};
+// ENTITY-KIND CHIPS RETIRED (founder 2026-08-07: "they create clutter and
+// people can use the search filters if they want to"). Home never had them, so
+// the two feeds now read the same; the kinds live on in search's Who filter,
+// which is where narrowing by kind actually belongs. Legacy /mycelium/<kind>
+// deep links land on the unfiltered feed rather than filtering invisibly.
 
 // Social or Actionable (founder 2026-07-28) — legacy types read as Social.
 const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
@@ -39,13 +33,11 @@ const CT_LABEL: Record<string, string> = { actionable: 'Actionable' };
 type Item = {
   key: string;
   card: FeedCardProps;
-  kind: Kind;
   contentLabel: string;       // matches a CONTENT_FILTERS entry
   areas: ServiceArea[];       // a post can live in several areas
 };
 
 export default function Mycelium() {
-  const { type: urlSlug = '' } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -58,12 +50,7 @@ export default function Mycelium() {
   const [content, setContent] = useState('All');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   // Lenses default ALL-ON (founder, 2026-07-16, media-lens grammar): you see
-  // everything until you deselect to narrow. A /mycelium/<kind> URL starts
-  // narrowed to that kind.
-  const [kinds, setKinds] = useState<Kind[]>(() => {
-    const k = URL_TO_KIND[urlSlug];
-    return k ? [k] : KINDS.map((x) => x.type);
-  });
+  // everything until you deselect to narrow.
   const [areas, setAreas] = useState<ServiceArea[]>(() => SERVICE_AREAS.map((a) => a.value));
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -102,7 +89,6 @@ export default function Mycelium() {
         || p.author_id === user?.id)
       .map((p) => ({
         key: p.id,
-        kind: 'person', // real author kinds light up once entities generalize
         contentLabel: CT_LABEL[p.content_type] ?? 'Social',
         areas: postAreas(p),
         card: {
@@ -132,14 +118,11 @@ export default function Mycelium() {
   const visible = useMemo(
     () => items.filter((it) =>
       (content === 'All' || it.contentLabel === content) &&
-      kinds.includes(it.kind) &&
       it.areas.some((a) => areas.includes(a))
     ),
-    [items, content, kinds, areas]
+    [items, content, areas]
   );
 
-  const toggleKind = (k: Kind) =>
-    setKinds((cur) => cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]);
   const toggleArea = (a: ServiceArea) =>
     setAreas((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
 
@@ -155,30 +138,13 @@ export default function Mycelium() {
         </p>
         <h1 className="myc__title">Your My-celium</h1>
         <p className="myc__sub">
-          What your web is sharing — filter by kind, area, or content.
+          What your web is sharing — narrow by area or content.
         </p>
       </header>
 
       {/* Content-type (single-select) */}
       <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />
 
-      {/* Entity kind (multi-select) */}
-      <div className="myc__kinds h-scroll">
-        {KINDS.map((k) => {
-          const on = kinds.includes(k.type);
-          return (
-            <button
-              key={k.type}
-              className={'myc__kind' + (on ? ' is-on' : '')}
-              onClick={() => toggleKind(k.type)}
-              aria-pressed={on}
-            >
-              <span className="myc__kind-circle"><Icon name={k.icon} size={13} /></span>
-              <span className="myc__kind-label">{k.label}</span>
-            </button>
-          );
-        })}
-      </div>
 
       {/* Service-area lens (multi-select) */}
       <div className="myc__areas h-scroll" role="toolbar" aria-label="Service areas">
@@ -201,10 +167,10 @@ export default function Mycelium() {
         <button
           className="myc__area myc__area--door"
           onClick={() => navigate('/mycelium/directory')}
-          aria-label="Your web — directory"
-          title="Your web — directory"
+          aria-label="Members of your web"
+          title="Members of your web"
         >
-          <Icon name="health" size={18} />
+          <Icon name="member-heart" size={18} />
         </button>
       </div>
 

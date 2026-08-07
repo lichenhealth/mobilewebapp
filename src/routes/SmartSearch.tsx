@@ -571,7 +571,7 @@ export default function SmartSearch() {
             onToggle={() => toggleSect('who')}
           >
             <div className="ssrch__pills">
-              {(['people', 'providers', 'organizations'] as WhoKind[]).map((w) => (
+              {(['people', 'providers', 'organizations', 'places'] as WhoKind[]).map((w) => (
                 <button
                   key={w}
                   className={'ssrch__pill' + (criteria.who.includes(w) ? ' is-on' : '')}

@@ -1,46 +1,53 @@
-/* The presence prompt — a bone card, never a black snackbar (founder doctrine,
-   PR #66). It sits above menus (60/61) and below nothing but the confirm
-   dialog's scrim, which it must not collide with. */
-.prespr__scrim {
+/* The presence bubble — a bone card growing out of the candle itself, never a
+   black snackbar (founder doctrine, PR #66) and never a centred modal (founder
+   2026-08-07: point at the control so people know where to act later).
+
+   z-index sits above the top bar (50) and its menus (60/61), below the confirm
+   dialog (90) — a confirm must always be able to cover this. */
+.prespr__catch {
   position: fixed;
   inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s-5);
-  background: rgba(28, 26, 24, 0.32);
-  animation: prespr-in 160ms ease-out;
+  z-index: 69;
+  background: transparent;
 }
 
 .prespr {
-  width: 100%;
-  max-width: 380px;
+  position: fixed;
+  z-index: 70;
   background: var(--bone);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: var(--s-6) var(--s-5) var(--s-5);
-  box-shadow: 0 18px 44px rgba(28, 26, 24, 0.18);
-  text-align: center;
+  border-radius: 14px;
+  padding: var(--s-4);
+  box-shadow: 0 14px 36px rgba(28, 26, 24, 0.16);
+  animation: prespr-in 150ms ease-out;
+  transform-origin: top center;
 }
 
-.prespr__flame {
-  font-size: 26px;
-  line-height: 1;
-  display: block;
-  margin-bottom: var(--s-3);
+/* The tail: a rotated square sharing the card's fill, with only its two
+   outer sides bordered so it reads as one continuous edge. */
+.prespr__tail {
+  position: absolute;
+  top: -6px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  background: var(--bone);
+  border-left: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  transform: rotate(45deg);
+  border-radius: 2px 0 0 0;
 }
 
 .prespr__title {
   font-family: var(--font-display);
-  font-size: 20px;
-  line-height: 1.25;
-  margin: 0 0 var(--s-3);
+  font-size: 16px;
+  line-height: 1.3;
+  margin: 0 0 var(--s-2);
 }
 
 .prespr__body {
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.5;
   margin: 0 0 var(--s-3);
   color: var(--ink);
 }
@@ -49,29 +56,44 @@
 
 .prespr__acts {
   display: flex;
-  flex-direction: column;
   gap: var(--s-2);
-  margin-top: var(--s-5);
+  margin-top: var(--s-4);
 }
 
-.prespr__acts .btn { width: 100%; justify-content: center; }
+.prespr__acts .btn {
+  flex: 1;
+  justify-content: center;
+  padding-inline: var(--s-3);
+  white-space: nowrap;
+}
 
-/* Turning your light out is a real, unpenalized choice — it reads as an equal
-   option, not a destructive one. No rust, no warning colour. */
+/* Turning your light out is a real, unpenalized choice — an equal option, not
+   a destructive one. No rust, no warning colour. */
 .prespr__out {
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--bone-edge);
   color: var(--ink-2);
 }
 
 .prespr__foot {
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--ink-3);
-  margin: var(--s-4) 0 0;
+  margin: var(--s-3) 0 0;
 }
 
 @keyframes prespr-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to   { opacity: 1; transform: none; }
+}
+
+/* The candle lifts while the bubble points at it, so the eye lands on the
+   control and not only on the words about it. */
+.top-bar__candle.is-pointed {
+  border-color: var(--peach);
+  box-shadow: 0 0 0 4px var(--peach-tint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prespr { animation: none; }
 }

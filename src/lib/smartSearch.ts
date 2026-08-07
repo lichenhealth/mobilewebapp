@@ -36,7 +36,10 @@ const noEndorse = (): EndorseFilter => ({ degree: null, personId: null });
 /** Offer modes (mockup's How): gift=free, buy=paid/sale/sliding. */
 export type OfferKind = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'iso' | 'buy';
 
-export type WhoKind = 'people' | 'providers' | 'organizations';
+// 'places' joined here when Mycelium's kind chips retired (founder 2026-08-07:
+// "people can use the search filters if they want to") — narrowing by kind now
+// lives in exactly one place instead of two.
+export type WhoKind = 'people' | 'providers' | 'organizations' | 'places';
 
 export interface SearchCriteria {
   trust: EndorseFilter;
@@ -654,7 +657,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   let nearHits = postHits.filter((p) => nearIds.has(p.id))
     .sort((a, b) => termHits(b) - termHits(a));
   postHits = postHits.filter((p) => !nearIds.has(p.id));
-  if (c.who.length && !c.who.includes('organizations') && (c.who.includes('people') || wantProviders)
+  if (c.who.length && !c.who.includes('organizations') && !c.who.includes('places')
+      && (c.who.includes('people') || wantProviders)
     && !postAreaFilter.length && !c.contentTypes.length) {
     // pure Who=People searches read as a member directory — keep posts out
     postHits = [];
@@ -692,6 +696,14 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     trusted: s.kind !== 'place' && myVouched.has('space:' + s.id),
   })).filter((s) => {
     if (c.spaceScope.length && !c.spaceScope.includes(s.id)) return false;
+    // Picking one kind and not the other narrows to it — otherwise "Places"
+    // would open the spaces tier and then hand back communities and orgs.
+    const wantPlaces = c.who.includes('places');
+    const wantOrgs = c.who.includes('organizations');
+    if (wantPlaces !== wantOrgs) {
+      if (wantPlaces && s.kind !== 'place') return false;
+      if (wantOrgs && s.kind === 'place') return false;
+    }
     if (s.kind === 'place') {
       // A place can't be trusted; a trust-only filter excludes places.
       if (trustFilterOn && !recFilterOn) return false;
@@ -708,7 +720,8 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       && !hasText([s.name, s.location], c.terms.length ? c.terms : c.categories.map((x) => x.name.toLowerCase()))) return false;
     return true;
   });
-  const wantsSpaces = !c.authorScope && (c.who.includes('organizations') || c.spaceScope.length > 0
+  const wantsSpaces = !c.authorScope && (c.who.includes('organizations')
+    || c.who.includes('places') || c.spaceScope.length > 0
     || c.areas.includes('places') || c.terms.length > 0 || (!c.who.length && !!endorseOnly));
   if (!wantsSpaces) spaceHits = spaceHits.filter((h) => h.addressMatch);
   spaceHits.sort((a, b) =>

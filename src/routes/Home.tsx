@@ -63,7 +63,7 @@ const CATEGORY_ICONS: IconRowItem[] = [
   { icon: 'location',       label: 'Places',      to: '/places'        },
   { icon: 'plane',          label: 'Travel',      to: '/travel'        },
   { icon: 'book',           label: 'Library',     to: '/library'       },
-  { icon: 'health',         label: 'Directory',   to: '/directory'     },
+  { icon: 'member-heart',   label: 'Members',     to: '/directory'     },
 ];
 
 export default function Home() {
