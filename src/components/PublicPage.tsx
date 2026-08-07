@@ -246,7 +246,17 @@ export default function PublicPage(props: PublicPageProps) {
         </div>
       )}
 
-      {props.aboveHero}
+      {/* THE TOP BAND IS YOURS, THE MASTHEAD IS THEIRS (founder 2026-08-07:
+          "let's not have it between the nav and the hero image. Move it up the
+          page"). Your view toggle and your relationship with this entity sit
+          together above the page's own composition — logo, name, tagline,
+          address, nav, cover — which now runs uninterrupted. */}
+      {(props.aboveHero || props.heroSignals) && (
+        <div className="ppage__utility">
+          {props.aboveHero}
+          {props.heroSignals}
+        </div>
+      )}
 
       {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
           (logo, name, tagline, address), then the nav doors, then the cover
@@ -292,7 +302,6 @@ export default function PublicPage(props: PublicPageProps) {
             )}
           </nav>
         )}
-        {props.heroSignals}
         {coverSrc && (
           <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
         )}

@@ -45,6 +45,7 @@ export type IconName =
   | 'menu'
   | 'message'
   | 'mic'
+  | 'newsfeed'
   | 'more-horizontal'
   | 'palette'
   | 'paperclip'
@@ -319,6 +320,14 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M4 8.5h8M16 8.5h4M4 15.5h3M11 15.5h9" stroke="currentColor" strokeLinecap="round"/><circle cx="14" cy="8.5" r="2" stroke="currentColor"/><circle cx="9" cy="15.5" r="2" stroke="currentColor"/></>,
+  },
+  /* The section's own newspaper (founder 2026-08-07). Drawn here rather than
+     lifted from Figma, so it's a clean 24 box — a folded sheet, a headline
+     block and column rules, at the family's hairline weight. */
+  'newsfeed': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.4,
+    content: <><path d="M17.5 19.5H5.5C4.67 19.5 4 18.83 4 18V5.5C4 5.22 4.22 5 4.5 5H17C17.28 5 17.5 5.22 17.5 5.5V19.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M17.5 9H19.5C19.78 9 20 9.22 20 9.5V18C20 18.83 19.33 19.5 18.5 19.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.75 8H11V11.5H6.75V8Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M13 8H15.25M13 10.25H15.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.75 14H15.25M6.75 16.5H15.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'store': {
     viewBox: '147 217 17 17',

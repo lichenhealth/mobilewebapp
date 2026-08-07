@@ -17,6 +17,8 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
+import IconRow, { IconRowItem } from '../components/IconRow';
+import { aiDoorOn } from '../components/AssistantDoor';
 import './Mycelium.css';
 import { loadSpaceNames } from '../lib/postsApi';
 
@@ -28,6 +30,26 @@ import { loadSpaceNames } from '../lib/postsApi';
 
 // Social or Actionable (founder 2026-07-28) — legacy types read as Social.
 const CONTENT_FILTERS = ['All', 'Social', 'Actionable'];
+
+// Your web's own newspaper, then the rest of your web by section. Mirrors
+// Home's row exactly — one vocabulary, wherever you're standing.
+const MYC_ICONS: IconRowItem[] = [
+  { icon: 'search',         label: 'Search',      to: '/search' },
+  { icon: 'plus',           label: 'Post',        to: '/compose' },
+  { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=mycelium',
+    variant: 'icon-row__btn--ai', size: 22 },
+  { icon: 'newsfeed',       label: 'Feed',        to: '/mycelium',
+    variant: 'icon-row__btn--here', divider: true },
+  { icon: 'store',          label: 'Marketplace', to: '/market?web=1' },
+  { icon: 'rsvp',           label: 'Events',      to: '/events' },
+  { icon: 'briefcase',      label: 'Work',        to: '/work?web=1' },
+  { icon: 'graduation-cap', label: 'Education',   to: '/courses?web=1' },
+  { icon: 'fork-spoon',     label: 'Food',        to: '/food?web=1' },
+  { icon: 'palette',        label: 'Creative',    to: '/art?web=1' },
+  { icon: 'plane',          label: 'Travel',      to: '/travel?web=1' },
+  { icon: 'book',           label: 'Library',     to: '/library?web=1' },
+  { icon: 'member-heart',   label: 'Members',     to: '/mycelium/directory' },
+];
 const CT_LABEL: Record<string, string> = { actionable: 'Actionable' };
 
 type Item = {
@@ -146,33 +168,15 @@ export default function Mycelium() {
       <FilterRow options={CONTENT_FILTERS} value={content} onChange={setContent} />
 
 
-      {/* Service-area lens (multi-select) */}
-      <div className="myc__areas h-scroll" role="toolbar" aria-label="Service areas">
-        {SERVICE_AREAS.map((a) => {
-          const on = areas.includes(a.value);
-          return (
-            <button
-              key={a.value}
-              className={'myc__area' + (on ? ' is-on' : '')}
-              onClick={() => toggleArea(a.value)}
-              aria-pressed={on}
-              aria-label={a.label}
-              title={a.label}
-            >
-              <Icon name={a.icon} size={18} />
-            </button>
-          );
-        })}
-        {/* Door, not a lens: the whole web as a browsable directory */}
-        <button
-          className="myc__area myc__area--door"
-          onClick={() => navigate('/mycelium/directory')}
-          aria-label="Members of your web"
-          title="Members of your web"
-        >
-          <Icon name="member-heart" size={18} />
-        </button>
-      </div>
+      {/* THE SECTION SWITCHER (founder 2026-08-07: "do the same for Mycelium,
+          and have people always default to the newsfeed of any space. Then you
+          can toggle to marketplace or events within your mycelium"). The lens
+          chips are gone — narrowing by area is search's job now, and this row
+          says where you ARE instead of quietly filtering what you see. Every
+          door carries web=1, so you stay inside your web when you switch. */}
+      <IconRow items={MYC_ICONS.map((it) => (it.label === 'Assistant'
+        ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` }
+        : it))} />
 
       <p className="myc__count">
         <span className="myc__count-n">{visible.length}</span>{' '}

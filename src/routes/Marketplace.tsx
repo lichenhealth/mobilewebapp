@@ -15,6 +15,7 @@ import { loadTrustWeb, trustPathTo, namesFor, type TrustWeb } from '../lib/trust
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
+import { webAuthorFilter } from '../lib/myceliumApi';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
@@ -220,7 +221,12 @@ export default function Marketplace() {
       const raw = member ? await loadAuthorFeed({ profileId: member })
         : space ? await loadAuthorFeed({ spaceId: space })
         : await loadFeed(200);
-      const feed = raw.filter((p) => postAreas(p).includes('marketplace'));
+      let feed = raw.filter((p) => postAreas(p).includes('marketplace'));
+      // ?web=1 — you came here from My-celium; stay in it (founder 2026-08-07).
+      if (params.get('web') === '1') {
+        const inWeb = await webAuthorFilter();
+        feed = feed.filter(inWeb);
+      }
       if (member) {
         const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
         if (live) setScopeName((data as { full_name: string | null } | null)?.full_name ?? '');

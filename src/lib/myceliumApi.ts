@@ -203,3 +203,22 @@ export async function loadEndorsements(
   }
   return out;
 }
+
+
+/** Keep only posts whose author (person OR the space they acted as) is woven
+ *  into your web (founder 2026-08-07: "you can toggle to marketplace or events
+ *  WITHIN your mycelium to switch places"). Your own posts always pass — you
+ *  are the centre of your own web. Membership, not trust: the web is who you
+ *  follow, and narrowing by trust is what the safety lens is for. */
+export async function webAuthorFilter(): Promise<(p: {
+  author_id: string | null; author_space_id: string | null;
+}) => boolean> {
+  const { web } = await loadMyWeb();
+  const { data } = await supabase.auth.getUser();
+  const me = data.user?.id ?? null;
+  return (p) => {
+    if (me && p.author_id === me) return true;
+    if (p.author_space_id) return web.has('space:' + p.author_space_id);
+    return !!p.author_id && web.has('profile:' + p.author_id);
+  };
+}

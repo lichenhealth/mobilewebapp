@@ -54,7 +54,14 @@ const CATEGORY_ICONS: IconRowItem[] = [
   // Searching, posting, and thinking-with are one family (founder 2026-07-28).
   { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=home',
     variant: 'icon-row__btn--ai', size: 22 },
-  { icon: 'store',          label: 'Marketplace', to: '/market',   divider: true },
+  // THE SECTION YOU'RE STANDING IN, LIT (founder 2026-08-07: "add a newsfeed
+  // icon to the right... orange, signifying that's what you're on, the
+  // newspaper of that space. Then you can toggle over to marketplace, or work").
+  // The row was already a set of doors; naming the one you're already through
+  // turns it into a section switcher you can read at a glance.
+  { icon: 'newsfeed',       label: 'Feed',        to: '/home',
+    variant: 'icon-row__btn--here', divider: true },
+  { icon: 'store',          label: 'Marketplace', to: '/market' },
   { icon: 'rsvp',           label: 'Events',      to: '/events'        },
   { icon: 'briefcase',      label: 'Work',        to: '/work'          },
   { icon: 'graduation-cap', label: 'Education',   to: '/courses'       },

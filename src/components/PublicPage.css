@@ -242,3 +242,17 @@
 .ppage__offer-as {
   font-style: normal; font-size: 10px; opacity: 0.8; margin-left: 4px;
 }
+
+/* Your controls, above the page's own masthead (founder 2026-08-07). Steward's
+   view toggle on the left, your relationship with the entity on the right;
+   they stack on a narrow screen rather than crowding. */
+.ppage__utility {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-2) var(--s-5) 0;
+}
+.ppage__utility .mprof__actions { margin-top: 0; justify-content: flex-start; }
+.ppage__utility .view-toggle-row { margin: 0; }

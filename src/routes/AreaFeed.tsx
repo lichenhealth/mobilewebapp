@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { webAuthorFilter } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -110,6 +111,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         : space ? await loadAuthorFeed({ spaceId: space })
         : await loadFeed(200);
       let feed = raw.filter((p) => postAreas(p).includes(area));
+      // ?web=1 — arrived from My-celium, so stay inside it (founder 2026-08-07).
+      if (params.get('web') === '1') {
+        const inWeb = await webAuthorFilter();
+        feed = feed.filter(inWeb);
+      }
       // Curated sections are stewarded (founder 2026-07-26): a space's
       // Courses/Library show its own voice + APPROVED member shares only.
       // (Pre-migration the query errors and we keep the open wall.)
