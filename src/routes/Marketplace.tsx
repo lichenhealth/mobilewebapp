@@ -407,14 +407,17 @@ export default function Marketplace() {
             <button className={'mkt__trustlens-chip' + (trustLenses.size === 0 ? ' is-on' : '')}
               onClick={clearLenses}>Anyone</button>
             {([
-              ['second', 'Trusted by someone I trust'],
-              ['mine', 'Someone I trust'],
-              ['rec-mine', 'Recommended by someone I trust'],
-              ['rec-second', 'Recommended by someone trusted by someone I trust'],
-            ] as const).map(([v, l]) => (
-              <button key={v} className={'mkt__trustlens-chip' + (trustLenses.has(v) ? ' is-on' : '')}
-                onClick={() => toggleLens(v)}>{l}</button>
-            ))}
+              ['mine', 'Trusted (1st)', 'Someone you trust, directly'],
+              ['second', 'Trusted (2nd)', 'Trusted by someone you trust'],
+              ['rec-mine', 'Recommended (1st)', 'Recommended by someone you trust'],
+              ['rec-second', 'Recommended (2nd)', 'Recommended by someone trusted by someone you trust'],
+            ] as const).map(([v, l, title]) => {
+              const on = trustLenses.has(v);
+              return (
+                <button key={v} className={'mkt__trustlens-chip' + (on ? ' is-on' : '')}
+                  onClick={() => toggleLens(v)} title={title}>{l}{on ? ' ✓' : ''}</button>
+              );
+            })}
           </div>
         )}
       </div>
