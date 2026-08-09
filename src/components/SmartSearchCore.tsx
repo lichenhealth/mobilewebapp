@@ -298,23 +298,30 @@ export default function SmartSearchCore({
     () => (q.trim() ? parseQuery(q, cats, members) : { criteria: emptyCriteria(), spans: [] as ParsedSpan[] }),
     [q, cats, members],
   );
+  // What the SENTENCE/PANEL/seed contributed, before scope is folded in —
+  // this, not the final criteria, is what hasSignal below checks. Scope
+  // (e.g. area='marketplace') is always present once embedded, so if
+  // hasSignal looked at post-scope criteria, an always-on scopeIsSignal={false}
+  // would still leak "there's an area filter" as a signal and auto-run on
+  // open — caught live: opening Marketplace's search fired a real search +
+  // assistant call before a single keystroke.
+  const preScope = useMemo(() => foldInSeed(merge(parsed, extras, cats), seed),
+    [parsed, extras, cats, seed]);
   const criteria = useMemo(() => {
-    let c = merge(parsed, extras, cats);
+    const c = { ...preScope };
     if (scopeSpaceId && !c.spaceScope.includes(scopeSpaceId)) c.spaceScope = [...c.spaceScope, scopeSpaceId];
     if (scopeMemberId) c.authorScope = scopeMemberId;
     if (scopeArea && !c.areas.includes(scopeArea)) c.areas = [...c.areas, scopeArea];
     if (scopeWho && !c.who.includes(scopeWho)) c.who = [...c.who, scopeWho];
-    c = foldInSeed(c, seed);
     return c;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsed, extras, cats, scopeSpaceId, scopeMemberId, scopeArea, scopeWho, seed]);
+  }, [preScope, scopeSpaceId, scopeMemberId, scopeArea, scopeWho]);
 
   const hasSignal = (scopeIsSignal && hasScope) || q.trim().length >= 3
-    || !!criteria.trust.degree || !!criteria.trust.personId
-    || !!criteria.rec.degree || !!criteria.rec.personId
-    || criteria.areas.length > 0 || criteria.categories.length > 0
-    || criteria.who.length > 0 || criteria.spaceScope.length > 0
-    || criteria.offers.length > 0 || criteria.radiusMiles != null;
+    || !!preScope.trust.degree || !!preScope.trust.personId
+    || !!preScope.rec.degree || !!preScope.rec.personId
+    || preScope.areas.length > 0 || preScope.categories.length > 0
+    || preScope.who.length > 0 || preScope.spaceScope.length > 0
+    || preScope.offers.length > 0 || preScope.radiusMiles != null;
 
   useEffect(() => { onActiveChange?.(hasSignal); }, [hasSignal, onActiveChange]);
 

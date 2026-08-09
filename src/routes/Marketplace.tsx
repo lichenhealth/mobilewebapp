@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
@@ -24,6 +24,12 @@ import {
 import './Marketplace.css';
 import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
+import type { SearchCriteria, OfferKind } from '../lib/smartSearch';
+
+// Same shared chunk as /search (see SmartSearch.tsx) — Marketplace is the
+// pilot section embedding it inline instead of navigating away (founder
+// 2026-08-09: "all search should be smart search").
+const SmartSearchCore = lazy(() => import('../components/SmartSearchCore'));
 
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
@@ -106,7 +112,10 @@ export default function Marketplace() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [activeChips, setActiveChips] = useState<Chip[]>(ALL_CHIPS);   // lenses default all-on
   const [showSearch, setShowSearch] = useState(false);
-  const [query, setQuery] = useState('');
+  // Smart search takes over the results area while it has something to say
+  // (a typed sentence, an active filter) — the normal grid/feed underneath
+  // isn't "gone", just not what's showing; closing the search box returns to it.
+  const [searchActive, setSearchActive] = useState(false);
   // Browse (photo-first tile grid) is the default; the trust-lens card feed
   // stays one toggle away. The choice sticks per device.
   const [view, setView] = useState<'browse' | 'feed'>(
@@ -269,19 +278,30 @@ export default function Marketplace() {
         return false;
       });
     }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((p) =>
-        (p.title ?? '').toLowerCase().includes(q)
-        || p.body.toLowerCase().includes(q)
-        || (p.author?.full_name ?? '').toLowerCase().includes(q)
-        || (p.author_space?.name ?? '').toLowerCase().includes(q));
-    }
     return list;
-  }, [posts, activeChips, query, trustLenses, sellerPaths, recPaths, me, catFilter, allCats]);
+  }, [posts, activeChips, trustLenses, sellerPaths, recPaths, me, catFilter, allCats]);
 
   const toggleChip = (c: Chip) =>
     setActiveChips((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
+
+  // Fold the current filter row into smart search so opening it doesn't
+  // silently drop what you'd already narrowed to. All-chips-active is the
+  // default (no filter) — same "don't seed a non-filter" rule merge() uses
+  // for categoryIds:'all'.
+  const searchSeed = useMemo((): Partial<SearchCriteria> => {
+    const seed: Partial<SearchCriteria> = {};
+    if (activeChips.length > 0 && activeChips.length < ALL_CHIPS.length) {
+      seed.offers = [...new Set(activeChips.flatMap((c) =>
+        CHIP_MODES[c].map((m) => (m === 'sale' || m === 'sliding' ? 'buy' : m) as OfferKind)))];
+    }
+    if (catFilter.length) seed.categories = allCats.filter((c) => catFilter.includes(c.id));
+    // Broader degree wins when both are on — 'second' already includes 'mine'.
+    if (trustLenses.has('second')) seed.trust = { degree: 'second', personId: null };
+    else if (trustLenses.has('mine')) seed.trust = { degree: 'mine', personId: null };
+    if (trustLenses.has('rec-second')) seed.rec = { degree: 'second', personId: null };
+    else if (trustLenses.has('rec-mine')) seed.rec = { degree: 'mine', personId: null };
+    return seed;
+  }, [activeChips, catFilter, allCats, trustLenses]);
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -320,7 +340,7 @@ export default function Marketplace() {
       <ScrollHintRow className="mkt__actions mkt__actions--doors h-scroll" role="toolbar" ariaLabel="Marketplace tools" gutter>
         <button
           className={'mkt__action mkt__action--door' + (showSearch ? ' is-active' : '')}
-          onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
+          onClick={() => { setShowSearch((s) => !s); if (showSearch) setSearchActive(false); }}
           aria-label="Search" title="Search"
         >
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
@@ -370,27 +390,18 @@ export default function Marketplace() {
       </ScrollHintRow>
 
       {showSearch && (
-        <div className="mkt__search">
-          <Icon name="search" size={14} />
-          <input
-            autoFocus
-            className="mkt__search-input"
-            placeholder="Search listings — or use smart search for distance & trust"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+        <Suspense fallback={<p className="mkt__empty-sub">Loading search…</p>}>
+          <SmartSearchCore
+            embedded
+            scopeIsSignal={false}
+            scope={{ area: 'marketplace', memberId: member, spaceId: space }}
+            scopeLabel={scopeName || undefined}
+            seed={searchSeed}
+            assistantSection="market"
+            placeholder="Search listings — try distance, trust, or a category…"
+            onActiveChange={setSearchActive}
           />
-          <button
-            className="mkt__search-smartlink"
-            onClick={() => navigate(`/search?area=marketplace${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
-          >
-            <Icon name="sliders" size={12} /> Smart
-          </button>
-          {query && (
-            <button className="mkt__search-clear" onClick={() => setQuery('')} aria-label="Clear">
-              <Icon name="close" size={12} />
-            </button>
-          )}
-        </div>
+        </Suspense>
       )}
 
       <div className="mkt__filters">
@@ -422,6 +433,9 @@ export default function Marketplace() {
         )}
       </div>
 
+      {/* Smart search takes the results area over while it's active — the
+          grid/feed below isn't gone, just not what's showing right now. */}
+      {!searchActive && <>
       <p className="mkt__count">
         <span className="mkt__count-n">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'listing' : 'listings'}
@@ -498,6 +512,7 @@ export default function Marketplace() {
         <span className="eyebrow">End of market</span>
         <Icon name="sparkle" size={14} />
       </footer>
+      </>}
     </div>
   );
 }
