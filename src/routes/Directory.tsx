@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { WeaveMark } from '../components/WeaveMark';
+import MemberRow from '../components/MemberRow';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { ensureDirectChat, colorFor, monogramFor } from '../lib/chatApi';
+import { CLAUDE_PROFILE_ID, hasDirectChatWith, sortClaudeFirst } from '../lib/chatApi';
 import {
   loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
 } from '../lib/myceliumApi';
@@ -12,7 +12,7 @@ import ConsentBubble from '../components/ConsentBubble';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import './Directory.css';
 
-interface MemberRow { id: string; full_name: string | null; headline: string | null; }
+interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; }
 
 /** Members directory — every registered member, searchable. The quickest way to
  *  find someone and start a direct message (also handy for testing with more users). */
@@ -54,9 +54,9 @@ export default function Directory() {
   const navigate = useNavigate();
 
   const [query, setQuery] = useState('');
-  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [members, setMembers] = useState<DirRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [opening, setOpening] = useState<string | null>(null);
+  const [claudeInUse, setClaudeInUse] = useState<boolean | undefined>(undefined);
 
   // Relationship signals, all toggleable in place: weave (web membership),
   // shield (private trust), thumb (recommend). Trust and recommend are
@@ -93,7 +93,7 @@ export default function Directory() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, headline')
+        .select('id, full_name, headline, avatar_url')
         .or('onboarded.eq.true,kind.neq.person')  // beings have no signup to complete   // half-created accounts aren't members yet
         // Honours the findable switch. RLS is the floor — it hides quiet
         // members from strangers — but anyone with a public post stays
@@ -102,30 +102,26 @@ export default function Directory() {
         .neq('id', me)
         .order('full_name', { ascending: true })
         .limit(500);
-      if (active) { setMembers((data as MemberRow[] | null) ?? []); setLoading(false); }
+      if (active) { setMembers((data as DirRow[] | null) ?? []); setLoading(false); }
     })();
     return () => { active = false; };
   }, [me]);
 
+  // Claude's row is grayed out until the viewer has actually talked to
+  // them — a real chat, not just seeing the row.
+  useEffect(() => {
+    if (!me) return;
+    void hasDirectChatWith(me, CLAUDE_PROFILE_ID).then(setClaudeInUse);
+  }, [me]);
+
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) =>
+    const matches = !q ? members : members.filter((m) =>
       (m.full_name?.toLowerCase().includes(q) ?? false) ||
       (m.headline?.toLowerCase().includes(q) ?? false),
     );
+    return sortClaudeFirst(matches);
   }, [query, members]);
-
-  async function message(id: string) {
-    setOpening(id);
-    try {
-      navigate(`/chat/${await ensureDirectChat(id)}`);
-    } catch (e) {
-      console.error(e);
-      setOpening(null);
-      alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e)));
-    }
-  }
 
   return (
     <div className="dir">
@@ -199,53 +195,28 @@ export default function Directory() {
           </div>
         )}
 
+        {/* No bare-profile thumb (founder 2026-08-06): recommending a whole
+            person implicitly endorsed everything they'd ever listed. The
+            thumb lives on their offerings instead — open their page and
+            recommend the work you actually know. So every row here is
+            kind="person" (shield only, no thumb). */}
         {hits.map((m) => {
           const name = m.full_name ?? 'Member';
           return (
-            // Row opens the member's public profile; Message stays a shortcut.
-            <div
-              className="dir__row dir__row--link"
+            <MemberRow
               key={m.id}
-              onClick={() => navigate(`/members/${m.id}`)}
-              role="link"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/members/${m.id}`); }}
-            >
-              <span className="dir__avatar" style={{ background: colorFor(m.id) }}>{monogramFor(name)}</span>
-              <span className="dir__row-body">
-                <span className="dir__row-name">{name}</span>
-                {m.headline && <span className="dir__row-sub">{m.headline}</span>}
-              </span>
-              <span className="dir__row-actions">
-              <button
-                className={'dir__sig' + (myVouched.has('profile:' + m.id) ? ' is-on' : '')}
-                onClick={(e) => { e.stopPropagation(); toggleVouch(m.id, !myVouched.has('profile:' + m.id)); }}
-                aria-pressed={myVouched.has('profile:' + m.id)}
-                aria-label={myVouched.has('profile:' + m.id) ? `Stop trusting ${name}` : `Trust ${name}`}
-                title={myVouched.has('profile:' + m.id) ? 'Someone you trust' : 'Trust (private)'}
-              >
-                <Icon name="shield-user" size={16} />
-              </button>
-              {/* No bare-profile thumb (founder 2026-08-06): recommending a
-                  whole person implicitly endorsed everything they'd ever
-                  listed. The thumb lives on their offerings instead — open
-                  their page and recommend the work you actually know. */}
-              <WeaveMark
-                on={myWebSet.has('profile:' + m.id)}
-                onToggle={(on) => toggleWeave(m.id, on)}
-                entityName={name}
-                size={20}
-              />
-              <button
-                className="dir__msg"
-                onClick={(e) => { e.stopPropagation(); message(m.id); }}
-                disabled={opening === m.id}
-              >
-                <Icon name="message" size={15} />
-                <span className="dir__msg-label">{opening === m.id ? '…' : 'Message'}</span>
-              </button>
-              </span>
-            </div>
+              id={m.id}
+              name={name}
+              sub={m.headline ?? undefined}
+              avatarUrl={m.avatar_url}
+              kind="person"
+              trusted={myVouched.has('profile:' + m.id)}
+              onTrust={(on) => toggleVouch(m.id, on)}
+              weaveOn={myWebSet.has('profile:' + m.id)}
+              onWeave={(on) => toggleWeave(m.id, on)}
+              onOpen={() => navigate(`/members/${m.id}`)}
+              claudeInUse={claudeInUse}
+            />
           );
         })}
       </div>

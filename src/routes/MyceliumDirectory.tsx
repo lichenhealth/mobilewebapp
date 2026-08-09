@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { WeaveMark } from '../components/WeaveMark';
+import MemberRow from '../components/MemberRow';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
+import { CLAUDE_PROFILE_ID, hasDirectChatWith, sortClaudeFirst } from '../lib/chatApi';
 import {
   awakeList, myPresence, setPresenceVisible,
   type MyPresence,
@@ -64,6 +66,12 @@ export default function MyceliumDirectory() {
   const [myPres, setMyPres] = useState<MyPresence | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
+  // Claude's row is grayed out until the viewer has actually talked to them.
+  const [claudeInUse, setClaudeInUse] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    if (!user) return;
+    void hasDirectChatWith(user.id, CLAUDE_PROFILE_ID).then(setClaudeInUse);
+  }, [user]);
 
   useEffect(() => {
     if (!addOpen || q.trim().length < 2) { setHits([]); return; }
@@ -309,76 +317,40 @@ export default function MyceliumDirectory() {
         // Present (candle) first, then around (dot), then the rest.
         const presenceRank = (e: Entry) =>
           e.type !== 'profile' ? 0 : litSet.has(e.id) ? 2 : awakeSet.has(e.id) ? 1 : 0;
-        const rows = entries.filter((e) => e.kind === g.kind)
-          .sort((a, b) => presenceRank(b) - presenceRank(a) || a.name.localeCompare(b.name));
+        // Present (candle), then around (dot), then everyone else — Claude
+        // always leads regardless (sortClaudeFirst is a no-op elsewhere,
+        // Claude only ever appears in the People group).
+        const rows = sortClaudeFirst(entries.filter((e) => e.kind === g.kind)
+          .sort((a, b) => presenceRank(b) - presenceRank(a) || a.name.localeCompare(b.name)));
         if (rows.length === 0) return null;
         return (
           <section key={g.kind} className="mycdir__sec">
             <h2 className="mycdir__h2">{g.title}</h2>
             {rows.map((e) => (
-              <div
+              <MemberRow
                 key={e.key}
-                className="mycdir__row"
-                role="link"
-                tabIndex={0}
-                onClick={(ev) => {
-                  if ((ev.target as HTMLElement).closest('button')) return;
-                  open(e);
-                }}
-                onKeyDown={(ev) => { if (ev.key === 'Enter') open(e); }}
-              >
-                <Avatar id={e.id} name={e.name} url={e.avatarUrl} size={40} />
-                <span className="mycdir__row-body">
-                  <span className="mycdir__row-name">
-                    {e.name}
-                    {e.type === 'profile' && litSet.has(e.id) ? (
-                      <span className="mycdir__awake mycdir__awake--lit" title="Present — open to connecting">
-                        <span aria-hidden="true">🕯️</span>
-                        present
-                      </span>
-                    ) : e.type === 'profile' && awakeSet.has(e.id) ? (
-                      <span className="mycdir__awake" title="Around recently">
-                        <span className="mycdir__awake-dot" aria-hidden="true" />
-                        around
-                      </span>
-                    ) : null}
-                  </span>
-                  {e.sub && <span className="mycdir__row-sub">{e.sub}</span>}
-                </span>
-                {/* ONE GESTURE PER KIND (founder 2026-08-07: "you can trust a
-                    person, but recommend an org, group or community... always a
-                    thumbs up for organizations, communities, groups and places,
-                    and a shield for people"). Trust is a relationship between
-                    people and stays private; an organisation is something you
-                    vouch FOR publicly, which is what recommend means. */}
-                {e.type === 'profile' ? (
-                  <button
-                    className={'mycdir__shield' + (e.vouched ? ' is-on' : '')}
-                    onClick={() => toggleVouch(e, !e.vouched)}
-                    aria-pressed={e.vouched}
-                    aria-label={e.vouched ? `Stop trusting ${e.name}` : `Trust ${e.name}`}
-                    title={e.vouched ? 'Someone you trust' : 'Trust (private)'}
-                  >
-                    <Icon name="shield-user" size={16} />
-                  </button>
-                ) : (
-                  <button
-                    className={'mycdir__shield' + (e.recommended ? ' is-on' : '')}
-                    onClick={() => toggleRec(e, !e.recommended)}
-                    aria-pressed={e.recommended}
-                    aria-label={e.recommended ? `Stop recommending ${e.name}` : `Recommend ${e.name}`}
-                    title={e.recommended ? 'Recommended by you' : 'Recommend'}
-                  >
-                    <Icon name="thumbs-up" size={16} />
-                  </button>
-                )}
-                <WeaveMark
-                  on
-                  onToggle={(on) => toggleWeave(e, on)}
-                  entityName={e.name}
-                  size={20}
-                />
-              </div>
+                id={e.id}
+                name={e.name}
+                sub={e.sub}
+                avatarUrl={e.avatarUrl}
+                presence={e.type === 'profile' && litSet.has(e.id) ? 'lit'
+                  : e.type === 'profile' && awakeSet.has(e.id) ? 'around' : null}
+                // ONE GESTURE PER KIND (founder 2026-08-07: "you can trust a
+                // person, but recommend an org, group or community... a
+                // shield for people, a thumbs up for organizations,
+                // communities, groups and places"). Trust is a relationship
+                // between people and stays private; an organisation is
+                // something you vouch FOR publicly — recommend.
+                kind={e.type === 'profile' ? 'person' : 'space'}
+                trusted={e.vouched}
+                onTrust={(on) => toggleVouch(e, on)}
+                recommended={e.recommended}
+                onRecommend={(on) => toggleRec(e, on)}
+                weaveOn
+                onWeave={(on) => toggleWeave(e, on)}
+                onOpen={() => open(e)}
+                claudeInUse={claudeInUse}
+              />
             ))}
           </section>
         );

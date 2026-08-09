@@ -1,0 +1,109 @@
+/* The one member/space row every listing surface renders through — ported
+   from Home's Directory (the reference look) and generalized. */
+
+.member-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--s-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--s-3) var(--s-2);
+  border-bottom: 1px solid var(--bone-edge-soft);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.member-row:last-child { border-bottom: 0; }
+.member-row:hover { background: var(--bone-warm); }
+
+.member-row__id {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.member-row__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.member-row__name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--t-base); color: var(--ink); letter-spacing: -0.015em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.member-row__sub {
+  font-size: 12px; font-weight: 300; color: var(--ink-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.member-row__role {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* Present (candle) / around (dot) — matches My-celium's directory tags. */
+.member-row__presence {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  font-size: 10px; color: var(--peach-deep, var(--peach)); letter-spacing: 0.02em;
+}
+.member-row__presence-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--peach); box-shadow: 0 0 0 3px var(--peach-tint);
+}
+.member-row__presence--lit { font-weight: 500; }
+
+/* Claude, muted until the viewer has actually talked to them — dim the
+   identity, keep the actions (Message especially) fully inviting. */
+.member-row--muted .member-row__id { opacity: 0.55; }
+
+.member-row__acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Trust shield (people) / recommend thumb (spaces) — the private-vs-public
+   signal, one gesture per kind. */
+.member-row__sig {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  transition: color var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+}
+.member-row__sig:hover { color: var(--ink); }
+.member-row__sig.is-on {
+  color: var(--peach-deep, var(--peach));
+  background: var(--peach-tint);
+}
+
+.member-row__msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: var(--s-2);
+  padding: 7px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+  flex-shrink: 0;
+  transition: color var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
+}
+.member-row__msg:hover { color: var(--peach); border-color: var(--peach); }
+.member-row__msg:active { transform: scale(0.96); }
+.member-row__msg:disabled { opacity: 0.6; }
+
+/* Phones: icons keep their tap targets, the Message label steps aside */
+@media (max-width: 480px) {
+  .member-row__msg-label { display: none; }
+  .member-row__msg { padding: 7px 9px; }
+}

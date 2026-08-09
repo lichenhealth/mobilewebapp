@@ -11,7 +11,7 @@ import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb } from '../lib/myceliumApi';
 import { areaLabel } from '../lib/locationApi';
 import { WeaveMark } from './WeaveMark';
-import { ensureDirectChat } from '../lib/chatApi';
+import { CLAUDE_PROFILE_ID, ensureDirectChat } from '../lib/chatApi';
 import { aiDoorOn } from './AssistantDoor';
 import { askAssistant, type AssistantAnswer } from '../lib/assistantApi';
 import {
@@ -97,14 +97,16 @@ const EMPTY_EXTRAS: Extras = {
   recDegree: null, recPerson: null,
 };
 
-const DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
-  { value: 'mine', label: 'Someone I trust' },
-  { value: 'second', label: 'Trusted by someone I trust' },
+const TRUST_DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
+  { value: 'mine', label: 'Trusted (1st)' },
+  { value: 'second', label: 'Trusted (2nd)' },
   { value: 'any', label: 'Anyone' },
 ];
-
-/** Claude the member — the DM the "Ask about this" escalation lands in. */
-const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+const REC_DEGREE_LABELS: { value: EndorseDegree; label: string }[] = [
+  { value: 'mine', label: 'Recommended (1st)' },
+  { value: 'second', label: 'Recommended (2nd)' },
+  { value: 'any', label: 'Anyone' },
+];
 
 function merge(parsed: SearchCriteria, x: Extras, cats: SearchCategory[]): SearchCriteria {
   // 'all' and empty both mean "no topic narrowing" — only a real subset filters.
@@ -403,9 +405,9 @@ export default function SmartSearchCore({
     const c = criteria;
     const out: string[] = [];
     if (c.trust.personId) out.push(`trusted by ${members.find((m) => m.id === c.trust.personId)?.full_name ?? 'someone'}`);
-    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'people I trust' : c.trust.degree === 'second' ? 'trusted by someone I trust' : 'trusted by anyone');
+    else if (c.trust.degree) out.push(c.trust.degree === 'mine' ? 'trusted (1st)' : c.trust.degree === 'second' ? 'trusted (2nd)' : 'trusted by anyone');
     if (c.rec.personId) out.push(`recommended by ${members.find((m) => m.id === c.rec.personId)?.full_name ?? 'someone'}`);
-    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended by someone I trust' : c.rec.degree === 'second' ? 'recommended by someone trusted by someone I trust' : 'recommended by anyone');
+    else if (c.rec.degree) out.push(c.rec.degree === 'mine' ? 'recommended (1st)' : c.rec.degree === 'second' ? 'recommended (2nd)' : 'recommended by anyone');
     for (const o of c.offers) out.push(o === 'gift' ? 'free / gift' : o);
     if (c.priceMin != null || c.priceMax != null) {
       out.push(`$${c.priceMin ?? 0}–${c.priceMax != null ? '$' + c.priceMax : 'up'}`);
@@ -506,7 +508,7 @@ export default function SmartSearchCore({
   ) => (
     <>
       <div className="ssrch__pills">
-        {DEGREE_LABELS.map((d) => (
+        {(which === 'trust' ? TRUST_DEGREE_LABELS : REC_DEGREE_LABELS).map((d) => (
           <button
             key={d.value}
             className={'ssrch__pill' + (degree === d.value ? ' is-on' : '')}

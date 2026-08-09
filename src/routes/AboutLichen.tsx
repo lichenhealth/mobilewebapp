@@ -5,6 +5,7 @@ import { LichenMark } from '../components/LichenMark';
 import SiteHeader from '../components/SiteHeader';
 import AboutFAQ from '../components/AboutFAQ';
 import { useAuth } from '../auth/AuthProvider';
+import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import './AboutLichen.css';
 
 /** The two maps, drawn: what's actually given (every being, sized by real
@@ -716,7 +717,7 @@ export default function AboutLichen() {
             */}
             {/* Claude is a Lichen member — stewarded by Galyn, bio links to
                 claude.com for anyone who wants to work with the silicon half. */}
-            <button className="about__team-row about__team-row--ai" onClick={() => navigate('/members/85c04e7a-5a47-4c0e-85a4-0b35ff67a682')}>
+            <button className="about__team-row about__team-row--ai" onClick={() => navigate(`/members/${CLAUDE_PROFILE_ID}`)}>
               <span className="about__team-name">
                 <span className="about__team-el about__team-el--si" aria-hidden="true">Si</span>{' '}
                 <span className="about__team-brain"><Icon name="brain" size={13} /></span> Claude

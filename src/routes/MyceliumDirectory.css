@@ -151,37 +151,12 @@
   white-space: nowrap;
 }
 
-.mycdir__shield {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-faint);
-  transition: color var(--d-fast) var(--ease-out),
-              background var(--d-fast) var(--ease-out);
-}
-.mycdir__shield:hover { color: var(--ink); }
-.mycdir__shield.is-on {
-  color: var(--peach-deep, var(--peach));
-  background: var(--peach-tint);
-}
-
 /* Presence in the directory: awake folk float first, tagged softly */
 .mycdir__back { margin: var(--s-3) var(--s-5) 0; }
-.mycdir__awake {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-style: normal; font-size: 10px; color: var(--peach-deep, var(--peach));
-  margin-left: 8px; letter-spacing: 0.02em;
-}
 .mycdir__awake-dot {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   background: var(--peach); box-shadow: 0 0 0 3px var(--peach-tint);
 }
-/* Present (candle) reads a touch stronger than around (dot). */
-.mycdir__awake--lit { color: var(--peach-deep, var(--peach)); font-weight: 500; }
 .mycdir__presence {
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
   font-size: 13px; color: var(--ink);

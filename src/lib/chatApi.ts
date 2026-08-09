@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
 
+/** Claude the member — a real Lichen profile, not a bot account. Every
+ *  surface that special-cases Claude's row (avatar, sort order, the "Ask
+ *  about this" DM escalation) reads this one constant. */
+export const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+
 export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help';
 
 export type MediaType = 'photo' | 'video' | 'audio';
@@ -191,6 +196,29 @@ export async function ensureDirectChat(otherId: string): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_direct_chat', { p_other: otherId });
   if (error) throw error;
   return data as string;
+}
+
+/** Read-only companion to ensureDirectChat — checks whether a DM already
+ *  exists WITHOUT creating one. Mirrors ensure_direct_chat's own direct_key
+ *  scheme exactly (least-uuid : greatest-uuid, see
+ *  supabase/migrations/00000000000000_init.sql). Used to tell whether a
+ *  member has ever actually messaged someone (e.g. Claude) rather than just
+ *  seeing their row in a list. */
+export async function hasDirectChatWith(me: string, otherId: string): Promise<boolean> {
+  const key = [me, otherId].sort().join(':');
+  const { data } = await supabase.from('chats').select('id').eq('direct_key', key).maybeSingle();
+  return !!data;
+}
+
+/** Claude's row always leads a member list — a first-class member with a
+ *  standing invitation, not just alphabetical luck. Everything else keeps
+ *  whatever order the caller already sorted it into. `getId` defaults to
+ *  `.id`; pass it when the row shape keys on something else (e.g. space
+ *  membership rows key on `profile_id`). */
+export function sortClaudeFirst<T>(rows: T[], getId: (row: T) => string = (r) => (r as { id: string }).id): T[] {
+  const claude = rows.filter((r) => getId(r) === CLAUDE_PROFILE_ID);
+  if (!claude.length) return rows;
+  return [...claude, ...rows.filter((r) => getId(r) !== CLAUDE_PROFILE_ID)];
 }
 
 /** Find-or-create my Help room with the Lichen support account; returns its id. */

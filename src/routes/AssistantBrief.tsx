@@ -18,7 +18,7 @@ import {
 import { listPendingResourceBookings } from '../lib/resourcesApi';
 import { listReminders, remindersOn } from '../lib/remindersApi';
 import { occursOn } from '../lib/recurrence';
-import { ensureDirectChat, uploadChatMedia } from '../lib/chatApi';
+import { CLAUDE_PROFILE_ID, ensureDirectChat, uploadChatMedia } from '../lib/chatApi';
 import { type Scope } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
@@ -57,9 +57,6 @@ function linkify(text: string, refs: { label: string; to: string }[]): React.Rea
   }
   return parts;
 }
-
-/** Claude the member — the 1:1 door when a briefing raises a question. */
-const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
 
 const FRAMES: Record<string, { title: string; frame: string }> = {
   home: { title: 'Your Lichen life', frame: 'The whole-life view: surface the biggest things across care, exchanges, groups and calendar.' },

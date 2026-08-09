@@ -49,6 +49,7 @@ Fallback (only if the account doesn't exist yet, or the service-role key isn't a
 - A recurring class of bug: a shared row's own back-chip/back-button styling loses an import-order specificity tie against a page-specific override. Fix with a compound selector (e.g. `.cmp__back.postp__back`), never a bare rule.
 - `loadFeed()` is the shared source for Events/Marketplace/AreaFeed/Maps/search — any filter added there needs to be **opt-in** (a flag like `{ river: true }`), not applied by default, or it silently drops posts from every other surface that calls it. Same pattern: Compose's "Skip the feed" writes `details.quiet`, honored only where `river: true` is passed.
 - Consent bubbles (`ConsentBubble.tsx`) are the pattern for a setting that needs in-context explanation (presence, findability): anchored to the control it governs, an "Edit `<setting>`" door, only one visible at a time, seen-state tracked per **member** via `member_prompts` (not per device — a new phone isn't a changed mind, so don't re-prompt on it).
+- `MemberRow.tsx` is the one shared row for every member/space listing (Home Directory, My-celium's web, a space's Members tab) — avatar, shield-or-thumb (person→trust, space→recommend), weave mark, labeled Message door. `chatApi.ts` exports `CLAUDE_PROFILE_ID` (the single source — don't re-inline the UUID), `sortClaudeFirst()`, and `hasDirectChatWith()` (a read-only existence check on `chats.direct_key`, unlike `ensureDirectChat` which creates the row). Claude's avatar look (Si-blue circle, brain glyph) lives in `public/claude-avatar.svg`, referenced by `profiles.avatar_url` — recolor by editing that file, not in code.
 
 ## Data model (all RLS-enabled)
 
@@ -203,6 +204,7 @@ Deploy with `supabase functions deploy <name>` (works without Docker). Secrets a
 - Alpha-data cleanup: delete test posts + the duplicate "Lichen" org row (SQL is ready; founder to pick a date).
 - Recurring-donation renewals (Stripe's `invoice.paid`) aren't recorded yet — only the initial checkout donation is.
 - Inbox realtime refresh (new messages appearing without a manual reload) and the broader "how much can signed-out visitors browse" scope decision are both still open.
+- Chat-per-relationship with Claude may become feed-per-relationship instead (founder, 2026-08-09) — "share to Claude" becomes posting into that feed; section-scoped context likely reuses the existing `aiDoorOn(section)` consent machinery. Not yet designed in detail — see [[assistant-architecture]] in memory.
 
 ## Housekeeping
 - Downloads folder has accumulated many `lichen-*` zip duplicates from the old manual deploy flow — irrelevant to the repo, but the source-of-truth is always `main` on GitHub.
