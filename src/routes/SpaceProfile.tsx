@@ -820,9 +820,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 {awakeLine}
               </>
             )}
-            {!backstage && !tab ? feedSection : null}
           </>
         ) : undefined}
+        // A real "Feed" nav tab, selected by default — parity with
+        // MemberProfile.tsx (founder 2026-08-09: organizations read as
+        // missing the icon row because this rode in beforeContent instead,
+        // which skips PublicPage's own tab gating entirely).
+        feed={!backstage && !tab ? feedSection : undefined}
       >
         {childGroups.length > 0 && (
           <section className="ppage__sec">
