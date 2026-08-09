@@ -73,6 +73,7 @@ import SpaceByHandle from './routes/SpaceByHandle';
 import FrontDoor from './routes/FrontDoor';
 import { hostSpaceHandle } from './lib/customDomain';
 import ReminderAlerts from './components/ReminderAlerts';
+import { PullToRefresh } from './components/PullToRefresh';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
@@ -184,6 +185,10 @@ export default function App() {
       <ReminderAlerts />
       {!isChatThread && !isAuth && !isGuest && !isAbout && <TopBar onMenu={() => setMenuOpen(true)} />}
       <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest || isAbout ? { padding: 0, minHeight: 0 } : undefined}>
+        {/* Full-bleed pages manage their own fixed layout (chat's pinned
+            input, the map canvas) — a pull gesture growing the page above
+            them would fight that, so this only mounts on normal pages. */}
+        {!isChatThread && !isAuth && !isMaps && !isGuest && !isAbout && <PullToRefresh />}
         {customHandle ? (
           /* CUSTOM DOMAIN (founder 2026-07-29): this hostname belongs to a
              space — every path serves its website; the app lives on Lichen's

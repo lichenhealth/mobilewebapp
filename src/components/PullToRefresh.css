@@ -1,0 +1,14 @@
+.ptr {
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; height: 0;
+}
+.ptr.is-active { transition: height 0.15s var(--ease-out, ease-out); }
+.ptr__spinner {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--peach-deep, var(--peach));
+  background: var(--peach-tint);
+  border: 1px solid var(--peach-light);
+}
+.ptr__spinner.is-spinning { animation: ptr-spin 0.7s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
