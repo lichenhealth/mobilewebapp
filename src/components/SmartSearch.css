@@ -1,5 +1,8 @@
 /* Smart search (Figma 286-3407) — sentence box with inline peach highlights */
 .ssrch { padding: var(--s-4); max-width: 720px; margin: 0 auto; }
+/* Embedded in a section (Marketplace etc., founder 2026-08-09): fill the
+   host's own width instead of centering as a standalone page. */
+.ssrch--embed { padding: 0; max-width: none; margin: 0; }
 
 /* Door back to where search was opened from (maps for now) */
 .ssrch__back {
@@ -232,13 +235,30 @@
   display: grid; place-items: center;
   border: 1px solid var(--peach); color: var(--peach);
 }
-.ssrch__assist-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ssrch__assist-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .ssrch__assist-eyebrow {
   font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink-soft);
 }
 .ssrch__assist-text { font-size: 14px; line-height: 1.55; color: var(--ink); }
 .ssrch__assist-text--thinking { color: var(--ink-soft); }
+/* Dismiss — top-right of the card, doesn't crowd the sparkle mark. */
+.ssrch__assist-x {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--ink-faint); cursor: pointer;
+}
+.ssrch__assist-x:hover { background: var(--bone); color: var(--ink-soft); }
+/* Escalate into a real conversation with the assistant (founder 2026-08-09:
+   "click through to your AI assistant to go into more detail"). */
+.ssrch__assist-actions { margin-top: 4px; }
+.ssrch__assist-more {
+  border: 0; background: transparent; padding: 0; font: inherit;
+  font-size: 12.5px; font-weight: 600; color: var(--peach-deep, var(--peach));
+  cursor: pointer;
+}
+.ssrch__assist-more:hover { text-decoration: underline; }
+.ssrch__assist-more:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
 
 .ssrch__sec { margin-top: var(--s-5); }
 .ssrch__h2 {
