@@ -185,6 +185,7 @@ Deploy with `supabase functions deploy <name>` (works without Docker). Secrets a
 - **Per-entity AI Partner fabric**: today there's one Claude member account; the vision is entity-scoped assistants (an org's, a group's, eventually a non-human entity's own AI Partner, via its steward).
 
 ## Open threads / next up
+- Onboarding trust walkthrough (founder, 2026-08-09): orient new members on what trust/recommend degrees mean (the "Trusted (1st)/(2nd)," "Recommended (1st)/(2nd)" language on the marketplace filter row) as part of onboarding, rather than explaining it in place — deliberately deferred so it ships together with the rest of the planned onboarding-consent work (onboarding orients on the big consents, in-context bubbles decide the rest).
 - Marketing-site Stripe Payment Link subscribers aren't in our `subscriptions` table (predates the webhook) — check Stripe periodically and gift them manually, or they'll hit the paywall.
 - Broader RLS/privacy review of remaining tables before public launch.
 - Event invites to Groups/Places — composer copy promises it, search is still member-only. Also no storage for previews/thumbnails on calendar-only (non-post) event invites.
