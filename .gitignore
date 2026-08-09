@@ -21,6 +21,7 @@ package-lock.json
 # Local Claude Code preview config (machine-specific paths)
 .claude/launch.json
 worker/.env
+worker/test-session.json
 
 # Countryman Stables recovery working files (archive downloads, logo work)
 cms-recovery/

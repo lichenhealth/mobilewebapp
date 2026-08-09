@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import './CategoryPicker.css';
 
@@ -22,6 +22,9 @@ type Props = {
   onChange: (ids: string[]) => void;
   /** When provided, enables "suggest a new one" (routed to admin approval). */
   userId?: string;
+  /** Narrow toggle, floating panel — for sitting 3-across on mobile (e.g.
+   *  the marketplace filter row) instead of stacking full-width. */
+  compact?: boolean;
 };
 
 /* --- tiny fuzzy match so we can nudge toward an existing category --- */
@@ -52,8 +55,24 @@ function similarity(a: string, b: string): number {
   return 1 - lev(x, y) / maxLen;
 }
 
-export default function CategoryPicker({ domain, categories, selected, onChange, userId }: Props) {
+export default function CategoryPicker({ domain, categories, selected, onChange, userId, compact }: Props) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Compact mode floats its panel over the page rather than pushing layout
+  // around — behave like a normal dropdown and close on an outside tap.
+  useEffect(() => {
+    if (!compact || !open) return;
+    const onOutside = (e: Event) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    document.addEventListener('touchstart', onOutside);
+    return () => {
+      document.removeEventListener('mousedown', onOutside);
+      document.removeEventListener('touchstart', onOutside);
+    };
+  }, [compact, open]);
   const [query, setQuery] = useState('');
   const [suggestName, setSuggestName] = useState('');
   const [pending, setPending] = useState<Pending[]>([]);
@@ -141,9 +160,9 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
   }
 
   return (
-    <div className="cat">
+    <div className={'cat' + (compact ? ' cat--compact' : '')} ref={rootRef}>
       <button type="button" className="cat__toggle" onClick={() => setOpen((o) => !o)}>
-        <span>{chosen.length ? `${chosen.length} selected` : noun.charAt(0).toUpperCase() + noun.slice(1)}</span>
+        <span className="cat__toggle-label">{chosen.length ? `${chosen.length} selected` : noun.charAt(0).toUpperCase() + noun.slice(1)}</span>
         <span className="cat__chev">{open ? '\u25B2' : '\u25BC'}</span>
       </button>
 

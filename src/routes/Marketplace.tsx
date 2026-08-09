@@ -398,7 +398,7 @@ export default function Marketplace() {
           {(['good', 'service', 'place'] as const).map((d) => (
             allCats.some((c) => c.domain === d) && (
               <CategoryPicker key={d} domain={d} categories={allCats}
-                selected={catFilter} onChange={setCatFilter} />
+                selected={catFilter} onChange={setCatFilter} compact />
             )
           ))}
         </div>

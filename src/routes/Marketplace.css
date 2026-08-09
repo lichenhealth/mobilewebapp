@@ -513,7 +513,11 @@
   display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
   padding: var(--s-2) var(--s-5) 0;
 }
-.mkt__cats { display: flex; flex-direction: column; gap: 6px; flex: 1 1 260px; max-width: 340px; }
+/* 3 narrow columns, side by side even on a phone (founder 2026-08-09) —
+   each CategoryPicker is `compact`, so its open panel floats over the page
+   instead of needing room in this row. minmax(0,...) is what lets a grid
+   column actually shrink narrower than its label text for the ellipsis. */
+.mkt__cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; flex: 1 1 260px; max-width: 460px; }
 .mkt__trustlens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; color: var(--ink-muted); }
 .mkt__trustlens-chip {
   padding: 5px 12px; border-radius: var(--r-full);
