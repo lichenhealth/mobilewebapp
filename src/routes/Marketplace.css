@@ -525,7 +525,11 @@
 /* Word + checkmark, same plain language as the Gift/Trade/Rent lens row
    above (founder 2026-08-09) — the filled pill bubbles read as heavier UI
    chrome than a set of toggles needs. */
-.mkt__trustlens { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; margin-left: auto; }
+/* Always its own row below the category dropdowns (founder 2026-08-09) —
+   was sharing the row on wide screens where it happened to fit, inconsistent
+   with the stacked mobile layout. flex-basis:100% forces the wrap
+   regardless of available width. */
+.mkt__trustlens { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; flex-basis: 100%; }
 .mkt__trustlens-chip {
   flex: 0 0 auto; background: none; border: 0; padding: 4px 2px;
   font-family: inherit; font-size: 11.5px; letter-spacing: 0.02em;
