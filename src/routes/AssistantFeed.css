@@ -1,0 +1,56 @@
+.afeed {
+  display: flex; flex-direction: column;
+  padding: var(--s-4) var(--s-5);
+  max-width: 640px; margin: 0 auto;
+  min-height: 100%;
+}
+
+.afeed__head {
+  display: flex; align-items: center; gap: var(--s-3);
+  margin: var(--s-4) 0 var(--s-3);
+}
+.afeed__head-text { flex: 1; min-width: 0; }
+.afeed__title {
+  font-family: var(--font-display); font-size: var(--t-lg);
+  font-weight: 400; color: var(--ink); line-height: 1.2;
+}
+.afeed__sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); margin-top: 2px; }
+
+.afeed__search-btn {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  color: var(--ink-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.afeed__search-btn:hover, .afeed__search-btn.is-on { border-color: var(--blue); color: var(--blue-deep); }
+
+.afeed__search {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 8px 12px; margin-bottom: var(--s-3);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full); color: var(--ink-muted);
+}
+.afeed__search input {
+  flex: 1; border: 0; background: transparent; outline: 0;
+  font: inherit; font-size: 14px; color: var(--ink);
+}
+.afeed__search button { color: var(--ink-faint); display: inline-flex; }
+
+.afeed__list { display: flex; flex-direction: column; gap: var(--s-4); flex: 1; padding-bottom: var(--s-4); }
+.afeed__muted { color: var(--ink-muted); font-size: 13px; text-align: center; padding: var(--s-6) 0; }
+
+.afeed__entry { display: flex; gap: var(--s-3); align-items: flex-start; }
+.afeed__entry-body { flex: 1; min-width: 0; }
+.afeed__entry-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.afeed__entry-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+.afeed__entry--claude .afeed__entry-name { color: var(--blue-deep, var(--blue)); }
+.afeed__entry-time { font-size: 11px; color: var(--ink-faint); }
+.afeed__entry-text {
+  font-size: 14px; line-height: 1.55; color: var(--ink); white-space: pre-wrap;
+}
+.afeed__ref {
+  display: block; margin-bottom: 6px; padding: 8px 12px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  font-size: 12px; color: var(--ink-soft); text-align: left; cursor: pointer;
+}
+.afeed__ref:hover { border-color: var(--blue); }

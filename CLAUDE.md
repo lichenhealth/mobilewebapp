@@ -123,7 +123,8 @@ Fallback (only if the account doesn't exist yet, or the service-role key isn't a
 
 ### Notifications & assistant
 - `notify()` is the single entry point for every bell (section-scoped: home/profile/calendar/chat/currentcy/membership). `ADMIN_DESK_TYPES` are excluded from the bell UI and unread counts (still written to the DB, still push-delivered) — those surface through each space's own backstage queue instead.
-- The assistant is a real Lichen member account (`claude@lichen.health`) plus a per-entity "AI Partner" fabric — two distinct roles, never conflate them in copy. Edge functions: `claude-chat` (the member's chat replies, via a `pg_net` trigger on new messages), `assistant-search` (narrates search results), `assistant-brief` (per-section "here's what's waiting" snapshot at `/assistant?section=`). All three share one daily spend cap per member (`ASSISTANT_DAILY_CAP` env, default 30/day) tracked in `assistant_queries`. `AssistantDoor.tsx` is the per-section opt-in/opt-out control (`localStorage 'ai-door-<section>'`) — a section's data is gathered and sent to the assistant **only** when that section's door is on; nothing moves ambiently.
+- The assistant is a real Lichen member account (`claude@lichen.health`) plus a per-entity "AI Partner" fabric — two distinct roles, never conflate them in copy. Edge functions: `claude-chat` (legacy 1:1 chat replies, `pg_net` trigger on `chat_messages`), `assistant-feed` (the current door — a member's relationship with Claude as a feed, not a chat thread; `assistant_feed_posts` table, `pg_net` trigger on new member posts there, own daily cap `ASSISTANT_FEED_CAP` default 20/day, `assistant_queries` context `'feed'`), `assistant-search` (narrates search results, context `'search'`), `assistant-brief` (per-section snapshot at `/assistant?section=`, context `'brief'`). `search`/`brief` share `ASSISTANT_DAILY_CAP` (default 30/day); `chat`/`feed` each have their own separate cap — none of the four are pooled together. `AssistantDoor.tsx` is the per-section opt-in/opt-out control (`localStorage 'ai-door-<section>'`) — a section's data is gathered and sent to the assistant **only** when that section's door is on; nothing moves ambiently.
+- `assistant_feed_posts` (profile_id, author `'member'|'claude'`, body, source_post_id) is private by construction (RLS = `profile_id = auth.uid()`, no visibility branching) — the pattern to reuse for any future closed 1:1-with-Claude relationship, not `posts` (public/space/mycelium only, no private-pairwise mode). `assistantFeedApi.ts` is the client API; `AssistantComposer.tsx` is the shared text+dictation input (`AssistantBrief.tsx`'s inline reply and the feed's own compose box). "Share to Claude" (a post's `⋯` menu, wired via `FeedCard`'s `extraMenuItems`) sets `source_post_id` so the reply is informed by what was shared, not just the note.
 - `profiles.assistant_readable` is the *other* consent direction — whether other members' assistants may read what **you** wrote when briefing them (see Chat above).
 
 ## Admin
@@ -146,7 +147,7 @@ Fallback (only if the account doesn't exist yet, or the service-role key isn't a
 - `SpaceProfile.tsx` — public face (identity, feed, join/trust/mycelium, Rooms & things, a single "Manage this {kind}" pill with a desk-count badge for admins) vs. backstage (`?manage=1`: edit profile, notifications, shared-for-the-shelves queue, waiting-at-the-door, member roles/duties, invite/suggest, group release/nesting proposals). `?tab=members` / `?tab=events` / `?tab=groups` open dedicated sub-pages instead of scrolling the feed.
 - `MemberProfile.tsx` / `MemberAbout.tsx` — public view (`ContributionsFeed`, a clamped bio + "About & offerings" door), Trust + Recommend + Message + Book doors, presence signals.
 - `PublicPage.tsx` (the page template) — one shared structure for every Lichen public site (hero → story → offerings → practical info → presence → join), rendered when the viewer is signed out or `?preview=1`. `SpaceByHandle.tsx` resolves `/:handle` to a space's page.
-- `AssistantBrief.tsx` (`/assistant?section=`) — per-section snapshot + narration, with a "Talk it through with Claude" door into the assistant DM.
+- `AssistantBrief.tsx` (`/assistant?section=`) — per-section snapshot + narration, with a door into your Claude feed (`AssistantFeed.tsx`, `/assistant/feed`) — your whole relationship with Claude, replacing the old 1:1 chat thread.
 - `Saved.tsx` / `/organize` — the saved-items shelf, with collection folders, search, and a Post door.
 - `MyceliumDirectory.tsx` (`/mycelium/directory`) — your whole web grouped by kind, trust shield for people / recommend thumb for spaces, presence controls, weave-from-search.
 - `SmartSearch.tsx` (`/search`) — sentence interpreter + full criteria panel, scoped per-section via `?space=`/`?member=`/`?area=`.
@@ -168,7 +169,8 @@ Deploy with `supabase functions deploy <name>` (works without Docker). Secrets a
 - `send-gift-notice` — gift-carrying invite emails.
 - `stripe-checkout`, `stripe-webhook`, `stripe-portal` — membership billing.
 - `donate-checkout` — donation checkout (`verify_jwt=false`, donors may be signed out).
-- `claude-chat` — the Claude member account's chat replies.
+- `claude-chat` — legacy 1:1 chat replies (superseded by `assistant-feed`; old threads still work if reached directly, nothing new routes there).
+- `assistant-feed` — the current door: replies in a member's Claude feed.
 - `assistant-search`, `assistant-brief` — search narration and per-section briefings.
 - `style-tags` — vision-tags marketplace photos into a controlled vocabulary.
 - `listing-autofill` — AI-suggested listing details from title+body text.
@@ -204,7 +206,7 @@ Deploy with `supabase functions deploy <name>` (works without Docker). Secrets a
 - Alpha-data cleanup: delete test posts + the duplicate "Lichen" org row (SQL is ready; founder to pick a date).
 - Recurring-donation renewals (Stripe's `invoice.paid`) aren't recorded yet — only the initial checkout donation is.
 - Inbox realtime refresh (new messages appearing without a manual reload) and the broader "how much can signed-out visitors browse" scope decision are both still open.
-- Chat-per-relationship with Claude may become feed-per-relationship instead (founder, 2026-08-09) — "share to Claude" becomes posting into that feed; section-scoped context likely reuses the existing `aiDoorOn(section)` consent machinery. Not yet designed in detail — see [[assistant-architecture]] in memory.
+- Claude's relationship shipped as a feed (`AssistantFeed.tsx`, 2026-08-09) with "Share to Claude" — but only for the member's own relationship. Still open: the full per-entity AI Partner fabric (every group/org/community/place gets its own Claude feed, filtered to that space's own activity the way Marketplace-on-a-Community only shows that Community's Marketplace posts — founder confirmed this is the right shape, 2026-08-09) — needs `assistant_identities` actually wired into the frontend (currently deny-all/unused) and per-space AI consent (today's `aiDoorOn(section)` is per broad section, e.g. all organizations at once, not per specific group). See [[assistant-architecture]] in memory.
 
 ## Housekeeping
 - Downloads folder has accumulated many `lichen-*` zip duplicates from the old manual deploy flow — irrelevant to the repo, but the source-of-truth is always `main` on GitHub.

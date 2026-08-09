@@ -11,7 +11,7 @@ import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb } from '../lib/myceliumApi';
 import { areaLabel } from '../lib/locationApi';
 import { WeaveMark } from './WeaveMark';
-import { CLAUDE_PROFILE_ID, ensureDirectChat } from '../lib/chatApi';
+import { postToAssistantFeed } from '../lib/assistantFeedApi';
 import { aiDoorOn } from './AssistantDoor';
 import { askAssistant, type AssistantAnswer } from '../lib/assistantApi';
 import {
@@ -467,11 +467,8 @@ export default function SmartSearchCore({
     if (!me || escalating) return;
     setEscalating(true);
     try {
-      const chatId = await ensureDirectChat(CLAUDE_PROFILE_ID);
-      await supabase.from('chat_messages').insert({
-        chat_id: chatId, sender_id: me, body: buildEscalateMessage(q, chips),
-      });
-      navigate(`/chat/${chatId}`);
+      await postToAssistantFeed(buildEscalateMessage(q, chips));
+      navigate('/assistant/feed');
     } catch {
       setEscalating(false);
     }

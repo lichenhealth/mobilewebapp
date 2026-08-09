@@ -8,7 +8,8 @@ import ContributionsFeed from '../components/ContributionsFeed';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
-import { colorFor, monogramFor, CLAUDE_PROFILE_ID, hasDirectChatWith, sortClaudeFirst } from '../lib/chatApi';
+import { colorFor, monogramFor, sortClaudeFirst } from '../lib/chatApi';
+import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import MemberRow from '../components/MemberRow';
 import type { GeoPoint } from '../lib/geoApi';
 import {
@@ -153,7 +154,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [claudeInUse, setClaudeInUse] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     if (!me) return;
-    void hasDirectChatWith(me, CLAUDE_PROFILE_ID).then(setClaudeInUse);
+    void hasClaudeFeedActivity(me).then(setClaudeInUse);
   }, [me]);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);

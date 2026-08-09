@@ -7,7 +7,8 @@ import MemberRow from '../components/MemberRow';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
-import { CLAUDE_PROFILE_ID, hasDirectChatWith, sortClaudeFirst } from '../lib/chatApi';
+import { sortClaudeFirst } from '../lib/chatApi';
+import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
   awakeList, myPresence, setPresenceVisible,
   type MyPresence,
@@ -70,7 +71,7 @@ export default function MyceliumDirectory() {
   const [claudeInUse, setClaudeInUse] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     if (!user) return;
-    void hasDirectChatWith(user.id, CLAUDE_PROFILE_ID).then(setClaudeInUse);
+    void hasClaudeFeedActivity(user.id).then(setClaudeInUse);
   }, [user]);
 
   useEffect(() => {

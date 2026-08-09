@@ -7,6 +7,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import { ensureDirectChat } from '../lib/chatApi';
+import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
@@ -71,6 +72,7 @@ export default function Mycelium() {
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
   // Provenance names: the spaces these posts were routed into.
   useEffect(() => {
     const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
@@ -118,7 +120,10 @@ export default function Mycelium() {
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
           saved: mySaves.has('post:' + p.id),
           onSave: (on: boolean) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); },
-          extraMenuItems: user ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined,
+          extraMenuItems: user ? [
+            { label: 'Add to collection…', onClick: () => openPicker(p.id) },
+            { label: 'Share to Claude', onClick: () => setShareTarget(p) },
+          ] : undefined,
           viewerIsAuthor: p.author_id === user?.id,
           onManage: p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined,
           onEdit: !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined,
@@ -189,6 +194,8 @@ export default function Mycelium() {
           </div>
         )}
       </section>
+
+      <ShareToClaudeSheet post={shareTarget} onClose={() => setShareTarget(null)} />
     </div>
   );
 }

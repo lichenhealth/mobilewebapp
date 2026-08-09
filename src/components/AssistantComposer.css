@@ -1,0 +1,27 @@
+.assist-composer {
+  display: flex; align-items: flex-end; gap: 4px;
+  margin-top: var(--s-4);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 16px); padding: 7px 8px;
+}
+.assist-composer:focus-within { border-color: var(--blue); }
+.assist-composer__btn {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+  border: 0; background: transparent; color: var(--ink-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.assist-composer__btn:hover { background: var(--blue-tint); color: var(--blue-deep); }
+.assist-composer__btn.is-live { background: var(--blue); color: #fff; }
+.assist-composer__input {
+  flex: 1; min-width: 0; border: 0; background: transparent; resize: none;
+  font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink);
+  padding: 7px 4px; max-height: 140px;
+}
+.assist-composer__input:focus { outline: none; }
+.assist-composer__input::placeholder { color: var(--ink-faint); }
+.assist-composer__send {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
+  border: 0; background: var(--blue); color: #fff; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.assist-composer__send:disabled { background: var(--bone-edge); color: var(--ink-faint); cursor: default; }

@@ -54,41 +54,7 @@
 }
 .abrief__ref:hover { border-bottom-color: var(--blue); }
 
-.abrief__ask {
-  display: flex; align-items: flex-end; gap: 4px;
-  margin-top: var(--s-4);
-  background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  border-radius: var(--r-lg, 16px); padding: 7px 8px;
-}
-.abrief__ask-btn {
-  width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
-  border: 0; background: transparent; color: var(--ink-muted); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.abrief__ask-btn:hover { background: var(--blue-tint); color: var(--blue-deep); }
-.abrief__ask-btn.is-live { background: var(--blue); color: #fff; }
-.abrief__attach {
-  display: flex; align-items: center; gap: 8px;
-  margin: 6px 0 0; font-size: 12px; color: var(--ink-muted);
-}
-.abrief__attach button {
-  border: 0; background: transparent; color: var(--ink-faint);
-  font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px;
-}
-.abrief__ask:focus-within { border-color: var(--blue); }
-.abrief__ask-input {
-  flex: 1; min-width: 0; border: 0; background: transparent; resize: none;
-  font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink);
-  padding: 7px 4px; max-height: 140px;
-}
-.abrief__ask-input:focus { outline: none; }
-.abrief__ask-input::placeholder { color: var(--ink-faint); }
-.abrief__ask-send {
-  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
-  border: 0; background: var(--blue); color: #fff; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.abrief__ask-send:disabled { background: var(--bone-edge); color: var(--ink-faint); cursor: default; }
+/* Composer styling now lives in AssistantComposer.css (shared with the feed page). */
 
 /* Inside the assistant's own world everything wears silicon blue — the
    consent checkbox included (founder 2026-08-05). tokens.css sets a peach

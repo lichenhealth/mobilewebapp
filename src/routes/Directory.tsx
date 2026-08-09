@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import MemberRow from '../components/MemberRow';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { CLAUDE_PROFILE_ID, hasDirectChatWith, sortClaudeFirst } from '../lib/chatApi';
+import { sortClaudeFirst } from '../lib/chatApi';
+import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
   loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
 } from '../lib/myceliumApi';
@@ -111,7 +112,7 @@ export default function Directory() {
   // them — a real chat, not just seeing the row.
   useEffect(() => {
     if (!me) return;
-    void hasDirectChatWith(me, CLAUDE_PROFILE_ID).then(setClaudeInUse);
+    void hasClaudeFeedActivity(me).then(setClaudeInUse);
   }, [me]);
 
   const hits = useMemo(() => {

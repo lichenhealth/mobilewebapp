@@ -1,14 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-interface SpeechRecognitionLike {
-  lang: string; interimResults: boolean;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onend: (() => void) | null; onerror: (() => void) | null;
-  start: () => void;
-}
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
+import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -18,7 +12,7 @@ import {
 import { listPendingResourceBookings } from '../lib/resourcesApi';
 import { listReminders, remindersOn } from '../lib/remindersApi';
 import { occursOn } from '../lib/recurrence';
-import { CLAUDE_PROFILE_ID, ensureDirectChat, uploadChatMedia } from '../lib/chatApi';
+import { postToAssistantFeed } from '../lib/assistantFeedApi';
 import { type Scope } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
@@ -102,11 +96,6 @@ export default function AssistantBrief() {
   // invented (founder 2026-08-05: "can all of the linkable content within
   // the AI update show up with a blue link?").
   const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(params.get('section') ?? 'home')?.refs ?? []);
-  const [ask, setAsk] = useState('');
-  const [sending, setSending] = useState(false);
-  const [attach, setAttach] = useState<File | null>(null);
-  const [listening, setListening] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const section = params.get('section') ?? 'home';
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -328,57 +317,20 @@ export default function AssistantBrief() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, section, doorOn, fingerprint, refreshTick]);
 
-  async function talkToClaude() {
-    if (!me) return;
-    navigate(`/chat/${await ensureDirectChat(CLAUDE_PROFILE_ID)}`);
+  function talkToClaude() {
+    navigate('/assistant/feed');
   }
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
-   *  what you just read without hunting for a door. The line is really sent
-   *  into the Claude DM — the same room, the same daily cap, the same
-   *  answering trigger — and we land you in the thread to read the reply. */
-  async function sendToClaude() {
-    const text = ask.trim();
-    if ((!text && !attach) || !me || sending) return;
-    setSending(true);
-    try {
-      const chatId = await ensureDirectChat(CLAUDE_PROFILE_ID);
-      let attachments: { type: string; url: string }[] | null = null;
-      if (attach) {
-        const ext = (attach.name.split('.').pop() || 'bin').toLowerCase();
-        const path = await uploadChatMedia(chatId, attach, ext);
-        attachments = [{ type: attach.type.startsWith('image/') ? 'image' : 'file', url: path }];
-      }
-      await supabase.from('chat_messages').insert({
-        chat_id: chatId, sender_id: me, body: text || null,
-        attachments: attachments?.length ? attachments : null,
-      });
-      setAsk(''); setAttach(null);
-      navigate(`/chat/${chatId}`);
-    } catch {
-      setSending(false);
-    }
-  }
-
-  /** Dictation, where the browser offers it. Chrome and Safari both expose
-   *  webkitSpeechRecognition; anywhere it's missing the mic simply doesn't
-   *  render rather than pretending. */
-  const SR = (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike; SpeechRecognition?: new () => SpeechRecognitionLike })
-    .webkitSpeechRecognition
-    ?? (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition;
-  function dictate() {
-    if (!SR || listening) return;
-    const rec = new SR();
-    rec.lang = navigator.language || 'en-US';
-    rec.interimResults = false;
-    rec.onresult = (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      const said = e.results[e.results.length - 1][0].transcript;
-      setAsk((a) => (a ? `${a} ${said}` : said));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    setListening(true);
-    rec.start();
+   *  what you just read without hunting for a door. It really lands in the
+   *  member's Claude feed (founder, 2026-08-09 — chat felt redundant with a
+   *  relationship that's about gathering context over time) — the same
+   *  daily cap, the same answering trigger — and we land you there to read
+   *  the reply. */
+  async function sendToClaude(text: string) {
+    if (!me) return;
+    await postToAssistantFeed(text);
+    navigate('/assistant/feed');
   }
 
   return (
@@ -443,46 +395,14 @@ export default function AssistantBrief() {
       </label>
 
       <div className="abrief__acts">
-        <button className="btn" onClick={() => void talkToClaude()}>Open the conversation</button>
+        <button className="btn" onClick={() => talkToClaude()}>Open your feed</button>
         <button className="btn" onClick={() => navigate('/search')}>Search instead</button>
       </div>
 
       {/* Always-there composer — answer the brief in place (founder
-          2026-08-05). Enter sends; Shift+Enter makes a new line. */}
-      <form className="abrief__ask" onSubmit={(e) => { e.preventDefault(); void sendToClaude(); }}>
-        <button type="button" className="abrief__ask-btn" onClick={() => fileRef.current?.click()}
-          aria-label="Attach something">
-          <Icon name="plus" size={17} />
-        </button>
-        <input ref={fileRef} type="file" hidden
-          onChange={(e) => { setAttach(e.target.files?.[0] ?? null); e.target.value = ''; }} />
-        {SR && (
-          <button type="button" className={'abrief__ask-btn' + (listening ? ' is-live' : '')}
-            onClick={dictate} aria-label="Speak instead">
-            <Icon name="mic" size={17} />
-          </button>
-        )}
-        <textarea
-          className="abrief__ask-input"
-          rows={1}
-          value={ask}
-          placeholder="Ask about any of this…"
-          onChange={(e) => setAsk(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendToClaude(); }
-          }}
-        />
-        <button className="abrief__ask-send" type="submit" disabled={(!ask.trim() && !attach) || sending}
-          aria-label="Send to your assistant">
-          <Icon name="send" size={15} />
-        </button>
-      </form>
-      {attach && (
-        <p className="abrief__attach">
-          {attach.name}
-          <button onClick={() => setAttach(null)} aria-label="Remove attachment">×</button>
-        </p>
-      )}
+          2026-08-05), lands in the feed (founder 2026-08-09). */}
+      <AssistantComposer onSend={sendToClaude} />
+
       <p className="abrief__foot">
         Carbon decides; silicon organizes. Nothing here is a score, and nothing leaves your view.
       </p>

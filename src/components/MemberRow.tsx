@@ -52,6 +52,7 @@ export default function MemberRow({
 
   const message = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (id === CLAUDE_PROFILE_ID) { navigate('/assistant/feed'); return; }
     setOpening(true);
     try {
       navigate(`/chat/${await ensureDirectChat(id)}`);

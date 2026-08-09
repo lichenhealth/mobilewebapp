@@ -7,7 +7,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { getIdentityTags } from '../lib/meansApi';
 import { loadSteward } from '../lib/stewardshipApi';
-import { ensureDirectChat } from '../lib/chatApi';
+import { CLAUDE_PROFILE_ID, ensureDirectChat } from '../lib/chatApi';
 import {
   loadMyWeb, setInWeb, setVouch, setRecommend, loadMyRecommendations, recommendKey,
 } from '../lib/myceliumApi';
@@ -187,6 +187,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
 
   async function message() {
     if (!me || busy) return;
+    if (id === CLAUDE_PROFILE_ID) { navigate('/assistant/feed'); return; }
     setBusy(true);
     try {
       navigate(`/chat/${await ensureDirectChat(id)}`);

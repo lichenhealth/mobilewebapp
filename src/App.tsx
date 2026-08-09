@@ -69,6 +69,7 @@ import { supabase } from './lib/supabase';
 import { CollectPromptProvider } from './collections/CollectPrompt';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import AssistantBrief from './routes/AssistantBrief';
+import AssistantFeed from './routes/AssistantFeed';
 import SpaceByHandle from './routes/SpaceByHandle';
 import FrontDoor from './routes/FrontDoor';
 import { hostSpaceHandle } from './lib/customDomain';
@@ -227,6 +228,7 @@ export default function App() {
           <Route path="/posts/:postId" element={<PostPage />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/assistant" element={<AssistantBrief />} />
+          <Route path="/assistant/feed" element={<AssistantFeed />} />
           {/* Clean addresses: /countrymanstables → that space's page. Static
               routes outrank this by React Router's own ranking, so it only
               catches names nothing else claims. */}

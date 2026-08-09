@@ -13,6 +13,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { ensureDirectChat } from '../lib/chatApi';
+import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -95,6 +96,7 @@ export default function Home() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
   const [tab, setTab] = useState('All');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
@@ -173,7 +175,10 @@ export default function Home() {
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-            extraMenuItems={user ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
+            extraMenuItems={user ? [
+              { label: 'Add to collection…', onClick: () => openPicker(p.id) },
+              { label: 'Share to Claude', onClick: () => setShareTarget(p) },
+            ] : undefined}
             viewerIsAuthor={p.author_id === user?.id}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
@@ -190,6 +195,8 @@ export default function Home() {
         <span className="eyebrow">All caught up</span>
         <Icon name="sparkle" size={14} />
       </footer>
+
+      <ShareToClaudeSheet post={shareTarget} onClose={() => setShareTarget(null)} />
     </div>
   );
 }

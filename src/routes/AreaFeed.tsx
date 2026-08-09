@@ -8,6 +8,7 @@ import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
+import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { listPublicCollections, listSpaceCollections, createCollection, type CollectionRow, type CollectionKind } from '../lib/collectionsApi';
@@ -71,6 +72,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const me = user?.id ?? '';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
   // Provenance names: the spaces these posts were routed into.
   useEffect(() => {
     const ids = posts.flatMap((p) => p.audience_space_ids ?? []);
@@ -424,7 +426,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-            extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
+            extraMenuItems={me ? [
+              { label: 'Add to collection…', onClick: () => openPicker(p.id) },
+              { label: 'Share to Claude', onClick: () => setShareTarget(p) },
+            ] : undefined}
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
@@ -441,6 +446,8 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>
         <Icon name="sparkle" size={14} />
       </footer>
+
+      <ShareToClaudeSheet post={shareTarget} onClose={() => setShareTarget(null)} />
     </div>
   );
 }
