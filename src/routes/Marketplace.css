@@ -517,7 +517,11 @@
    each CategoryPicker is `compact`, so its open panel floats over the page
    instead of needing room in this row. minmax(0,...) is what lets a grid
    column actually shrink narrower than its label text for the ellipsis. */
-.mkt__cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; flex: 1 1 260px; max-width: 460px; }
+.mkt__cats {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  flex: 1 1 260px; max-width: 460px;
+  position: relative; /* compact CategoryPicker panels anchor here, not their own toggle */
+}
 .mkt__trustlens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; color: var(--ink-muted); }
 .mkt__trustlens-chip {
   padding: 5px 12px; border-radius: var(--r-full);

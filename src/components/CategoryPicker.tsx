@@ -73,6 +73,30 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
       document.removeEventListener('touchstart', onOutside);
     };
   }, [compact, open]);
+
+  // Compact pickers sit narrow, side by side — two floating panels open at
+  // once collide and run off the screen. Only one may be open at a time;
+  // opening one broadcasts to close any other (scoped to compact so
+  // Profile/Compose/Onboarding's stacked, full-width pickers are unaffected).
+  useEffect(() => {
+    if (!compact) return;
+    const onOtherOpen = (e: Event) => {
+      const openedDomain = (e as CustomEvent<{ domain: string }>).detail?.domain;
+      if (openedDomain !== domain) setOpen(false);
+    };
+    document.addEventListener('lichen:cat-open', onOtherOpen);
+    return () => document.removeEventListener('lichen:cat-open', onOtherOpen);
+  }, [compact, domain]);
+
+  function toggleOpen() {
+    setOpen((o) => {
+      const next = !o;
+      if (compact && next) {
+        document.dispatchEvent(new CustomEvent('lichen:cat-open', { detail: { domain } }));
+      }
+      return next;
+    });
+  }
   const [query, setQuery] = useState('');
   const [suggestName, setSuggestName] = useState('');
   const [pending, setPending] = useState<Pending[]>([]);
@@ -161,7 +185,7 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
 
   return (
     <div className={'cat' + (compact ? ' cat--compact' : '')} ref={rootRef}>
-      <button type="button" className="cat__toggle" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="cat__toggle" onClick={toggleOpen}>
         <span className="cat__toggle-label">{chosen.length ? `${chosen.length} selected` : noun.charAt(0).toUpperCase() + noun.slice(1)}</span>
         <span className="cat__chev">{open ? '\u25B2' : '\u25BC'}</span>
       </button>

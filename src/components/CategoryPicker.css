@@ -104,8 +104,14 @@
 /* ── Compact mode: narrow enough to sit 3-across on a phone (the
    marketplace filter row). The toggle stays a slim pill; the panel floats
    over the page instead of pushing the row's width around, so it can be
-   roomy while the collapsed row stays slim. */
-.cat--compact { position: relative; }
+   roomy while the collapsed row stays slim.
+   The panel anchors to the ROW CONTAINER, not its own toggle — anchoring
+   per-toggle made the 2nd/3rd column's panel bleed off the right edge of
+   the viewport (clipped invisible by .app-shell's overflow-x, not just
+   off-screen). The container (e.g. `.mkt__cats`) must be `position: relative`
+   and already viewport-width-safe; every compact panel then spans its full
+   width edge-to-edge, so it can never overflow regardless of which column
+   opened it. */
 .cat--compact .cat__toggle { padding: 8px 8px; gap: 4px; font-size: 13px; }
 .cat--compact .cat__toggle-label {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
@@ -113,8 +119,7 @@
 .cat--compact .cat__chev { flex-shrink: 0; }
 .cat--compact .cat__chips { display: none; } /* the toggle's own "N selected" already says it */
 .cat--compact .cat__panel {
-  position: absolute; z-index: 25; top: calc(100% + 6px); left: 0;
-  width: max(260px, 100%); max-width: min(320px, 88vw);
+  position: absolute; z-index: 25; top: calc(100% + 6px); left: 0; right: 0;
 }
 
 /* Two labeled worlds inside the list — everyday commerce, then healing. */
