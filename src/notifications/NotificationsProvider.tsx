@@ -35,7 +35,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!me) { setRows([]); return; }
     let active = true;
-    loadNotifications(me).then((r) => { if (active) setRows(r); });
+    const resync = () => { loadNotifications(me).then((r) => { if (active) setRows(r); }); };
+    resync();
     const channel = supabase
       .channel(`notifications:${me}`)
       .on('postgres_changes',
@@ -52,8 +53,21 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             setRows((cur) => cur.filter((r) => r.id !== old.id));
           }
         })
-      .subscribe();
-    return () => { active = false; supabase.removeChannel(channel); };
+      // Realtime never replays what the socket missed while suspended
+      // (backgrounded tab, iOS PWA backgrounding, sleep/wake, a network
+      // blip) — resync on every (re)connect so a dropped connection can't
+      // leave the bell stuck on stale state until something else nudges it.
+      .subscribe((status) => { if (status === 'SUBSCRIBED') resync(); });
+    // Belt-and-suspenders: some browsers suspend a backgrounded tab's socket
+    // without cleanly signaling a reconnect. Catch up whenever the tab is
+    // looked at again, regardless of what the channel reports.
+    const onVisible = () => { if (document.visibilityState === 'visible') resync(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      supabase.removeChannel(channel);
+    };
   }, [me]);
 
   const { countsBySection, countsBySpace, totalUnread } = useMemo(() => {

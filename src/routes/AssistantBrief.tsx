@@ -77,8 +77,25 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
 };
 
-// One brief per section per sitting — never re-billed on navigation.
-const cache = new Map<string, string>();
+// One brief per section, kept until the notifications feeding it actually
+// change — never re-billed on a plain revisit, but never allowed to go
+// stale either (founder report 2026-08-09: briefs were showing old news).
+interface CachedBrief {
+  text: string;
+  refs: { label: string; to: string }[];
+  fingerprint: string;
+  at: number;
+}
+const cache = new Map<string, CachedBrief>();
+
+function timeAgo(at: number): string {
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins === 1) return '1 minute ago';
+  if (mins < 60) return `${mins} minutes ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`;
+}
 
 export default function AssistantBrief() {
   const navigate = useNavigate();
@@ -87,7 +104,7 @@ export default function AssistantBrief() {
   // CLIENT already gathered — never from the model — so a link can't be
   // invented (founder 2026-08-05: "can all of the linkable content within
   // the AI update show up with a blue link?").
-  const [refs, setRefs] = useState<{ label: string; to: string }[]>([]);
+  const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(params.get('section') ?? 'home')?.refs ?? []);
   const [ask, setAsk] = useState('');
   const [sending, setSending] = useState(false);
   const [attach, setAttach] = useState<File | null>(null);
@@ -98,28 +115,40 @@ export default function AssistantBrief() {
   const me = user?.id ?? '';
   const { rows } = useNotifications();
   const [doorOn, setDoorOn] = useState(() => aiDoorOn(section));
-  const [brief, setBrief] = useState<string | null>(cache.get(section) ?? null);
+  const cached = cache.get(section);
+  const [brief, setBrief] = useState<string | null>(cached?.text ?? null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(cached?.at ?? null);
   const [state, setState] = useState<'thinking' | 'ready' | 'quietly-unavailable' | 'capped'>(
-    cache.has(section) ? 'ready' : 'thinking');
+    cached ? 'ready' : 'thinking');
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const meta = FRAMES[section] ?? FRAMES.home;
 
-  const snapshot = useMemo(() => {
+  const { snapshot, fingerprint } = useMemo(() => {
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as never };
-    const relevant = rows
-      .filter((r) => scope.kind === 'global'
-        || (r.space_id == null && r.section === section))
+    const scoped = rows.filter((r) => scope.kind === 'global'
+      || (r.space_id == null && r.section === section));
+    const relevant = scoped
       .slice(0, 25)
       .map((r) => ({
         type: r.type, title: r.title, body: (r.body ?? '').slice(0, 120),
         unread: !r.read_at, when: r.created_at.slice(0, 10),
       }));
-    return { notifications: relevant };
+    // What the cache is invalidated against: which notifications feed this
+    // section's brief. A new or removed one means the world has moved since
+    // the cached text was written — refetch instead of showing old news.
+    return { snapshot: { notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
   }, [rows, section]);
 
+  function refresh() {
+    cache.delete(section);
+    setState('thinking');
+    setRefreshTick((t) => t + 1);
+  }
+
   useEffect(() => {
-    if (!me || !doorOn || cache.has(section)) return;
+    if (!me || !doorOn || cache.get(section)?.fingerprint === fingerprint) return;
     let live = true;
     void (async () => {
       // Stewarding load joins the snapshot (duty-scoped, invites excluded).
@@ -287,17 +316,20 @@ export default function AssistantBrief() {
       const d2 = (data ?? {}) as { available?: boolean; capped?: boolean; brief?: string };
       if (error || d2.available === false) { setState('quietly-unavailable'); return; }
       if (d2.capped) { setState('capped'); return; }
-      cache.set(section, d2.brief ?? '');
-      setBrief(d2.brief ?? '');
       // Longest first so "Pine Valley Grange" wins over "Pine Valley".
-      setRefs(found
+      const sortedRefs = found
         .filter((r) => r.label && r.label.length > 3)
-        .sort((a, b) => b.label.length - a.label.length));
+        .sort((a, b) => b.label.length - a.label.length);
+      const at = Date.now();
+      cache.set(section, { text: d2.brief ?? '', refs: sortedRefs, fingerprint, at });
+      setBrief(d2.brief ?? '');
+      setRefs(sortedRefs);
+      setUpdatedAt(at);
       setState('ready');
     })();
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, section, doorOn]);
+  }, [me, section, doorOn, fingerprint, refreshTick]);
 
   async function talkToClaude() {
     if (!me) return;
@@ -382,7 +414,15 @@ export default function AssistantBrief() {
           </p>
         )}
         {doorOn && state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
-        {doorOn && state === 'ready' && <p className="abrief__text">{linkify(brief ?? '', refs)}</p>}
+        {doorOn && state === 'ready' && (
+          <>
+            <p className="abrief__text">{linkify(brief ?? '', refs)}</p>
+            <p className="abrief__updated">
+              {updatedAt != null && <>Updated {timeAgo(updatedAt)} · </>}
+              <button type="button" className="abrief__refresh" onClick={refresh}>Refresh</button>
+            </p>
+          </>
+        )}
         {doorOn && state === 'capped' && (
           <p className="abrief__text">You&rsquo;ve leaned on me a lot today — which I love. The briefing rests until tomorrow; everything&rsquo;s still in your bell and queues.</p>
         )}

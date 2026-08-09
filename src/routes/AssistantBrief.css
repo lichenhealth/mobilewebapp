@@ -29,6 +29,11 @@
 .abrief__thinking { margin: 0; font-style: italic; color: var(--ink-muted); animation: abrief-pulse 1.6s ease-in-out infinite; }
 @keyframes abrief-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 .abrief__text { margin: 0; font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-wrap; }
+.abrief__updated { margin: 10px 0 0; font-size: 11px; color: var(--ink-faint); }
+.abrief__refresh {
+  border: 0; background: transparent; padding: 0; font: inherit; font-size: 11px;
+  color: var(--blue-deep, var(--blue)); text-decoration: underline; cursor: pointer;
+}
 .abrief__acts { display: flex; gap: 10px; flex-wrap: wrap; }
 .abrief__foot { margin-top: var(--s-4); font-size: 12px; color: var(--ink-faint); font-style: italic; }
 
