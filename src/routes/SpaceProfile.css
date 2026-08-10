@@ -281,7 +281,7 @@
   .prof.is-space { max-width: 720px; }
   .sprof__members {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     align-items: start;
   }
 }
