@@ -71,6 +71,10 @@ export default function Profile() {
   const { user, loading, isAdmin } = useAuth();
   const { actor, setActor, options: actingOptions, refreshSelf } = useActing();
   const navigate = useNavigate();
+  // Collapsed by default (founder 2026-08-10): this used to render every
+  // acting-as option as a full row, permanently — a wall of cards for
+  // anyone who admins more than one or two spaces.
+  const [actingOpen, setActingOpen] = useState(false);
 
   const [email, setEmail] = useState('');
   // Beings you steward — hidden until the stewardship migration lands.
@@ -689,50 +693,75 @@ export default function Profile() {
       {error && <p className="prof__error">{error}</p>}
 
 
-      {/* ── Acting as: post & create as yourself or a space you admin ── */}
+      {/* ── Acting as: post & create as yourself or a space you admin ──
+          Collapsed dropdown (founder 2026-08-10) — a closed trigger showing
+          who you're acting as now; opens to the same options list. */}
       {actingOptions.length > 0 && (
         <section className="prof__section">
           <h2 className="prof__h2">Acting as</h2>
           <p className="prof__care-lead">Choose who you're acting as.</p>
-          <div className="prof__acting-list">
-            <button
-              className={'prof__acting-row' + (actor.type === 'self' ? ' is-on' : '')}
-              onClick={() => setActor({ type: 'self' })}
-            >
-              <Avatar id={user?.id ?? 'me'} name={fullName || 'Me'} url={avatarUrl} size={34} />
-              <span className="prof__acting-name">{fullName || 'Yourself'}</span>
-              <span className="prof__acting-kind">You</span>
-              {actor.type === 'self' && <span className="prof__acting-on">Acting</span>}
-            </button>
-            {actingOptions.map((o) => {
-              const on = actor.type === 'space' && actor.id === o.id;
-              return (
-                // Row switches acting identity; the chevron opens the space's
-                // own profile (two buttons — nesting them is invalid HTML).
-                <div className="prof__acting-pair" key={o.id}>
-                  <button
-                    className={'prof__acting-row' + (on ? ' is-on' : '')}
-                    onClick={() => setActor({ type: 'space', ...o })}
-                  >
-                    <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
-                      {monogramFor(o.name)}
-                    </span>
-                    <span className="prof__acting-name">{o.name}</span>
-                    <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
-                    {on && <span className="prof__acting-on">Acting</span>}
-                  </button>
-                  <button
-                    className="prof__acting-open"
-                    onClick={() => navigate(`/spaces/${o.id}`)}
-                    aria-label={`Open ${o.name}'s profile`}
-                    title="Open profile"
-                  >
-                    <Icon name="chevron-right" size={15} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          {(() => {
+            const activeOpt = actor.type === 'space' ? actingOptions.find((o) => o.id === actor.id) : undefined;
+            return (
+              <button
+                className={'prof__acting-trigger' + (actingOpen ? ' is-open' : '')}
+                onClick={() => setActingOpen((o) => !o)}
+                aria-expanded={actingOpen}
+              >
+                {actor.type === 'self' ? (
+                  <Avatar id={user?.id ?? 'me'} name={fullName || 'Me'} url={avatarUrl} size={30} />
+                ) : (
+                  <span className="prof__acting-avatar" style={{ background: colorFor(actor.id) }}>
+                    {monogramFor(activeOpt?.name ?? actor.name)}
+                  </span>
+                )}
+                <span className="prof__acting-name">{actor.type === 'self' ? (fullName || 'Yourself') : (activeOpt?.name ?? actor.name)}</span>
+                <span className="prof__acting-kind">{actor.type === 'self' ? 'You' : (activeOpt ? ACTING_KIND_LABEL[activeOpt.kind] : '')}</span>
+                <Icon name="chevron-right" size={15} className="prof__acting-chevron" />
+              </button>
+            );
+          })()}
+          {actingOpen && (
+            <div className="prof__acting-list">
+              <button
+                className={'prof__acting-row' + (actor.type === 'self' ? ' is-on' : '')}
+                onClick={() => { setActor({ type: 'self' }); setActingOpen(false); }}
+              >
+                <Avatar id={user?.id ?? 'me'} name={fullName || 'Me'} url={avatarUrl} size={34} />
+                <span className="prof__acting-name">{fullName || 'Yourself'}</span>
+                <span className="prof__acting-kind">You</span>
+                {actor.type === 'self' && <span className="prof__acting-on">Acting</span>}
+              </button>
+              {actingOptions.map((o) => {
+                const on = actor.type === 'space' && actor.id === o.id;
+                return (
+                  // Row switches acting identity; the chevron opens the space's
+                  // own profile (two buttons — nesting them is invalid HTML).
+                  <div className="prof__acting-pair" key={o.id}>
+                    <button
+                      className={'prof__acting-row' + (on ? ' is-on' : '')}
+                      onClick={() => { setActor({ type: 'space', ...o }); setActingOpen(false); }}
+                    >
+                      <span className="prof__acting-avatar" style={{ background: colorFor(o.id) }}>
+                        {monogramFor(o.name)}
+                      </span>
+                      <span className="prof__acting-name">{o.name}</span>
+                      <span className="prof__acting-kind">{ACTING_KIND_LABEL[o.kind]}</span>
+                      {on && <span className="prof__acting-on">Acting</span>}
+                    </button>
+                    <button
+                      className="prof__acting-open"
+                      onClick={() => navigate(`/spaces/${o.id}`)}
+                      aria-label={`Open ${o.name}'s profile`}
+                      title="Open profile"
+                    >
+                      <Icon name="chevron-right" size={15} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
