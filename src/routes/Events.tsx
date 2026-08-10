@@ -184,6 +184,12 @@ export default function Events() {
       {...weaveProps(p, myWebSet, me)}
       eyebrow={eyebrow ?? whenLabel(p) ?? postToCard(p, me).eyebrow}
       image={badgeFor(p)}
+      /* badgeFor() already draws details.media's photo as the date/RSVP
+         cover — postToCard's own `media` would render the SAME photo a
+         second time, full-width, below the body (founder 2026-08-10:
+         "the mocks for Events have redundant images"). An event's photo
+         lives in the badge only. */
+      media={undefined}
       onBadgeAction={() => onBadge(p)}
       onOpen={() => navigate(`/events/${p.id}`)}
       onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
