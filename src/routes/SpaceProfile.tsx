@@ -853,7 +853,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }
 
   return (
-    <div className={'prof' + (backstage ? ' is-adminview' : '')}>
+    <div className={'prof is-space' + (backstage ? ' is-adminview' : '')}>
       {adminBar}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">

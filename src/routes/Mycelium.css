@@ -145,6 +145,13 @@
   gap: var(--s-4);
   padding: var(--s-2) var(--s-5) var(--s-7);
 }
+@media (min-width: 1024px) {
+  .myc__feed {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    align-items: start;
+  }
+}
 
 .myc__empty {
   padding: var(--s-7) var(--s-5);

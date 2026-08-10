@@ -58,3 +58,15 @@
 }
 .dir__empty p { font-size: 13px; font-weight: 400; }
 .dir__empty-sub { color: var(--ink-faint); font-weight: 300; font-size: 12px; }
+
+/* Desktop: give the list room and let rows tile into a grid instead of one
+   long full-bleed column (same auto-fill idiom as ListingTile's tile grid). */
+@media (min-width: 1024px) {
+  .dir { max-width: 900px; margin: 0 auto; }
+  .dir__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
+    gap: 0 var(--s-3);
+  }
+}

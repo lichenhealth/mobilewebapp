@@ -1,4 +1,10 @@
 .cmp { max-width: var(--app-max); margin: 0 auto; padding: var(--s-5) var(--s-5) var(--s-8); }
+/* Desktop: widen so the internal auto-fit/auto-fill pickers below (audience
+   groups, video grid) actually have room to show more than one column —
+   they already use a responsive grid idiom, just starved by this cap. */
+@media (min-width: 1024px) {
+  .cmp { max-width: 720px; }
+}
 .cmp__muted { color: var(--ink-muted); font-size: var(--t-sm); text-align: center; padding: var(--s-7) 0; }
 
 /* Way back without posting (same language as SmartSearch's back chip) */

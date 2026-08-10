@@ -83,3 +83,16 @@
 }
 .cg__gate-sub { font-size: 13px; font-weight: 300; line-height: 1.5; max-width: 34ch; }
 .cg__empty .btn, .cg__gate .btn { margin-top: var(--s-3); }
+
+/* Desktop: this page has no width cap at all today, so rows stretch full-bleed
+   into thin, wide strips — cap it and let rows tile into a grid instead. */
+@media (min-width: 1024px) {
+  .cg { max-width: 900px; margin: 0 auto; }
+  .cg__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+  }
+  .cg__row { border-radius: var(--r-md); border: 1px solid var(--bone-edge-soft); }
+  .cg__row:last-child { border-bottom: 1px solid var(--bone-edge-soft); }
+}

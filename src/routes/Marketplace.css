@@ -502,6 +502,13 @@
 .afeed__courses-grid .afeed__course { width: auto; }
 @media (min-width: 1024px) {
   .afeed__courses-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  /* Feed-view mode (Marketplace's own feed + all 6 AreaFeed areas): FeedCard
+     stack tiles into a grid instead of one long single column. */
+  .mkt__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    align-items: start;
+  }
 }
 
 /* Course creator is a door to their profile (founder 2026-07-26) */
