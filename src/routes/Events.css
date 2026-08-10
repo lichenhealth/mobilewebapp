@@ -34,8 +34,9 @@
 
 .evt__actions.h-scroll {
   display: flex; align-items: flex-start; gap: var(--s-3);
-  padding: var(--s-3) 0 var(--s-2);   /* side gutters live on the wrapper */
+  padding: var(--s-3) 0 2px;   /* side gutters live on the wrapper */
 }
+.evt__actions--doors.h-scroll { padding-bottom: 2px; }
 .evt__action {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   background: none; border: 0; cursor: pointer; flex-shrink: 0;
@@ -50,8 +51,26 @@
 .evt__action.is-active .evt__action-circle {
   background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
 }
-.evt__action-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
-.evt__action-spacer { width: 1px; align-self: stretch; background: var(--bone-edge); margin: 2px var(--s-1); flex-shrink: 0; }
+
+/* Type filters read as signals, not doors — same vocabulary as Marketplace's
+   mode lenses (founder 2026-08-08): text + icon, no circle, a check when
+   it's on. A circle is something you open; text with a check is something
+   that's on. */
+.evt__lensrow.h-scroll {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 2px 0 var(--s-2);   /* side gutters live on the wrapper */
+}
+.evt__lens {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 0; padding: 4px 2px;
+  font-size: 11.5px; letter-spacing: 0.02em; color: var(--ink-muted);
+  cursor: pointer; white-space: nowrap;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.evt__lens svg { width: 16px; height: 16px; }
+.evt__lens:hover { color: var(--ink); }
+.evt__lens.is-on { color: var(--peach-deep); }
 
 .evt__feed { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-2) var(--s-5) var(--s-8); }
 .evt__empty { text-align: center; color: var(--ink-faint); font-size: 13px; padding: var(--s-7) 0; }

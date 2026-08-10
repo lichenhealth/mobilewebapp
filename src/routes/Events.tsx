@@ -258,34 +258,49 @@ export default function Events() {
         <>
           {scoped && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
-          {/* Search · Post · | · Free / Trade / Paid (Marketplace-style circles) */}
-          <ScrollHintRow className="evt__actions h-scroll" role="toolbar" ariaLabel="Tools and filters" gutter>
+          {/* THE DOORS — icon-only (matching Marketplace's 2026-08-08 pattern):
+              Search and Post are constant doors, not filters, so no caption. */}
+          <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools" gutter>
             <button
-              className="evt__action"
+              className="evt__action evt__action--door"
               onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
+              aria-label="Search" title="Search"
             >
               <span className="evt__action-circle"><Icon name="search" size={14} /></span>
-              <span className="evt__action-label">Search</span>
             </button>
-            <button className="evt__action" onClick={() => navigate(`/compose?area=events${space ? `&space=${space}` : ''}`)}>
+            <button
+              className="evt__action evt__action--door"
+              onClick={() => navigate(`/compose?area=events${space ? `&space=${space}` : ''}`)}
+              aria-label="Post an event" title="Post an event"
+            >
               <span className="evt__action-circle">
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                   <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </span>
-              <span className="evt__action-label">Post</span>
             </button>
-            <div className="evt__action-spacer" />
-            {EVENT_MODES.map((m) => (
-              <button
-                key={m.value}
-                className={'evt__action' + (modes.includes(m.value) ? ' is-active' : '')}
-                onClick={() => toggleMode(m.value)}
-              >
-                <span className="evt__action-circle"><Icon name={m.icon} size={14} /></span>
-                <span className="evt__action-label">{m.label}</span>
-              </button>
-            ))}
+          </ScrollHintRow>
+
+          {/* Free / Trade / Paid read as signals, same vocabulary as
+              Marketplace's mode lenses — text + icon, no circle, a check
+              when it's on; select and deselect without eating a row of
+              height for a caption under a circle. */}
+          <ScrollHintRow className="evt__lensrow h-scroll" role="toolbar" ariaLabel="Event type filters" gutter>
+            {EVENT_MODES.map((m) => {
+              const on = modes.includes(m.value);
+              return (
+                <button
+                  key={m.value}
+                  className={'evt__lens' + (on ? ' is-on' : '')}
+                  onClick={() => toggleMode(m.value)}
+                  aria-pressed={on}
+                  title={on ? `Showing ${m.label.toLowerCase()} events — tap to hide` : `Tap to show ${m.label.toLowerCase()} events`}
+                >
+                  <Icon name={m.icon} size={16} />
+                  {m.label}{on ? ' ✓' : ''}
+                </button>
+              );
+            })}
           </ScrollHintRow>
 
           <section className="evt__feed">
