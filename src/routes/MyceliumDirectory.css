@@ -186,15 +186,8 @@
 
 .mycdir__presence-note { font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
 
-/* Desktop: each kind-group's rows tile into a grid instead of one long
-   full-bleed column; the group heading spans the full width above them. */
+/* Desktop: give the list room to breathe — single column, not a grid
+   (founder 2026-08-10: rows side by side read as a bug, not a feature). */
 @media (min-width: 1024px) {
-  .mycdir { max-width: 900px; margin: 0 auto; }
-  .mycdir__sec {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    align-items: start;
-    gap: 0 var(--s-3);
-  }
-  .mycdir__h2 { grid-column: 1 / -1; }
+  .mycdir { max-width: 640px; margin: 0 auto; }
 }

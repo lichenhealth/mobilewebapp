@@ -276,13 +276,9 @@
 /* Desktop: this page's own content column is capped at the mobile shell's
    430px (.prof, shared with Profile.tsx's genuinely-narrow settings page) —
    widen it here so Members/Groups/Events and the backstage forms actually
-   use the ~972px desktop column, then let the row lists tile into a grid. */
+   use the ~972px desktop column. Rows stay single-column, not a grid
+   (founder 2026-08-10: rows side by side read as a bug, not a feature). */
 @media (min-width: 1024px) {
   .prof.is-space { max-width: 720px; }
-  .sprof__members {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    align-items: start;
-  }
 }
 
