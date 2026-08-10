@@ -64,7 +64,7 @@ const ROLE_LABEL: Record<SpaceRole, string> = {
 
 export default function Profile() {
   const { user, loading, isAdmin } = useAuth();
-  const { refreshSelf } = useActing();
+  const { actor, refreshSelf } = useActing();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -380,6 +380,17 @@ export default function Profile() {
     }, 100);
     return () => window.clearInterval(tick);
   }, [hash]);
+
+  // Your whole experience follows who you're acting as (founder 2026-08-10):
+  // Profile is always the settings page for whoever the TopBar says you are.
+  // Acting as a space lands you on ITS backstage instead of your own — the
+  // acting-as options are themselves built from spaces you admin, so
+  // backstage is always reachable. Skip it when a hash is present: deep
+  // links like /profile#privacy and /profile#care-for are always about the
+  // person, not whatever they're acting as.
+  useEffect(() => {
+    if (!hash && actor.type === 'space') navigate(`/spaces/${actor.id}?manage=1`, { replace: true });
+  }, [actor, hash, navigate]);
 
   async function saveProfile() {
     if (!user) return;
