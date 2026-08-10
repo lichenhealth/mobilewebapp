@@ -145,6 +145,17 @@
   line-height: 1.25;
 }
 
+/* Library pieces whose content lives outside Lichen (founder 2026-08-10) —
+   a quiet inline marker, not a corner bubble like the demo badge, since a
+   post can't be both. */
+.feed-card__resource-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 2px; padding: 1px 7px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-muted);
+}
+
 .feed-card__handle {
   font-size: 10px;
   font-weight: 400;

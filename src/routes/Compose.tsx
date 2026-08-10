@@ -20,7 +20,7 @@ import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
-import { parseBodyUrls } from '../lib/linkify';
+import { parseBodyUrls, hrefFor } from '../lib/linkify';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import TimeField from '../components/TimeField';
@@ -136,6 +136,14 @@ export default function Compose() {
   const [myCols, setMyCols] = useState<CollectionRow[]>([]);
   const [organizeInto, setOrganizeInto] = useState<string | null>(null);
   const [newColName, setNewColName] = useState('');
+  // External resources (founder 2026-08-10): "much of it will be hosted
+  // outside of lichen, until we become a popular platform" — a Library
+  // piece can point at something hosted elsewhere. Reuses the existing
+  // rich-preview pipeline (resolvePreviews/link-preview edge fn), just
+  // resolved from a dedicated field instead of requiring the URL be
+  // pasted into the body. details.isResource marks it for a distinct
+  // "external resource" badge in FeedCard/ListingTile.
+  const [resourceUrl, setResourceUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   // Video picker: upload from this device, or attach a big file the studio
   // Mac already ingested (worker/ingest.js — Zoom recordings skip the cap).
@@ -557,8 +565,13 @@ export default function Compose() {
       if (media.length) details.media = media;
       // Rich previews for any pasted links, resolved once at compose time
       // (YouTube parsed locally; other links via the link-preview function).
-      const previews = await resolvePreviews(parseBodyUrls(body));
+      // A Library "resource" URL rides the same pipeline — just added to
+      // the list explicitly rather than requiring it be pasted in the body.
+      const resourceHref = isLibrary && resourceUrl.trim() ? hrefFor(resourceUrl.trim()) : null;
+      const previewUrls = [...new Set([...parseBodyUrls(body), ...(resourceHref ? [resourceHref] : [])])];
+      const previews = await resolvePreviews(previewUrls);
       if (previews.length) details.previews = previews;
+      if (resourceHref) details.isResource = true;
       const firstPhoto = media.find((m) => m.type === 'photo')?.url ?? null;
 
       if (editing && editPostId) {
@@ -833,6 +846,20 @@ export default function Compose() {
           />
           <p className="cmp__hint-ev">
             This post becomes a piece of that {isCourse ? 'course — you\u2019ll arrange lessons on its page' : 'collection — you\u2019ll arrange the order on its page'}.
+          </p>
+        </>
+      )}
+
+      {isLibrary && (
+        <>
+          <label className="cmp__label" htmlFor="cmp-resource">Link to an external resource (optional)</label>
+          <input
+            id="cmp-resource" className="cmp__input" type="url" inputMode="url"
+            value={resourceUrl} onChange={(e) => setResourceUrl(e.target.value)}
+            placeholder="https://…"
+          />
+          <p className="cmp__hint-ev">
+            Hosted outside Lichen — we’ll show a preview card and link straight out.
           </p>
         </>
       )}

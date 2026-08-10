@@ -27,7 +27,12 @@ export default function ListingTile({ post, offer, endorsed, trustLine, modeIcon
 }) {
   const media = Array.isArray(post.details?.media)
     ? (post.details.media as { type: string; url: string }[]) : [];
-  const photo = media.find((m) => m.type === 'photo')?.url;
+  const previews = Array.isArray(post.details?.previews)
+    ? (post.details.previews as { image?: string }[]) : [];
+  // External resources (details.isResource) carry no uploaded media — fall
+  // back to the resolved link preview's image so the tile isn't a bare
+  // typographic cover (founder 2026-08-10).
+  const photo = media.find((m) => m.type === 'photo')?.url ?? previews.find((p) => p.image)?.image;
   let title = post.title || (post.body.length > 64 ? post.body.slice(0, 61) + '…' : post.body);
   // The offer line already says "In search of" — don't say it twice.
   if (offer?.toLowerCase().includes('in search of')) {

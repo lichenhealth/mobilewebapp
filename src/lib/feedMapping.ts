@@ -149,6 +149,8 @@ export function postToCard(
     // Example content wears a small badge so nobody mistakes it for the real
     // economy (founder 2026-07-24 — demo posts teach how the platform works).
     demo: p.details?.demo === true,
+    // A Library piece hosted outside Lichen (founder 2026-08-10).
+    isResource: p.details?.isResource === true,
     authorIsSpace: !!p.author_space,
     areaDoors,
     // The My-celium eyebrow tells you WHY a post reached you — someone shared

@@ -22,6 +22,10 @@ export interface FeedCardProps {
   /** Example content (details.demo) — wears a small badge so nobody mistakes
    *  it for the real economy; it's there to teach how the platform works. */
   demo?: boolean;
+  /** details.isResource — a Library piece whose primary content lives
+   *  outside Lichen (founder 2026-08-10). Wears a small "external" badge
+   *  beside the title; the actual preview card renders via `previews`. */
+  isResource?: boolean;
   body: string;
   // Image-badge column on the right
   image?: {
@@ -93,6 +97,7 @@ export default function FeedCard({
   categoryIcons = [],
   areaDoors = [],
   demo,
+  isResource,
   body,
   image,
   mycelium,
@@ -189,6 +194,11 @@ export default function FeedCard({
             <button className="feed-card__title feed-card__title--btn" onClick={onOpen}>{title}</button>
           ) : (
             <h3 className="feed-card__title">{title}</h3>
+          )}
+          {isResource && (
+            <span className="feed-card__resource-badge" title="Hosted outside Lichen">
+              <Icon name="globe" size={11} /> External resource
+            </span>
           )}
           <div className="feed-card__handle-row">
             {onAuthor ? (
