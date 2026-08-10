@@ -144,7 +144,6 @@ export default function Home() {
       <FilterRow options={FILTERS} value={tab} onChange={setTab} />
 
       <section className="home__greeting">
-        <p className="eyebrow">Inward &amp; interwoven</p>
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (

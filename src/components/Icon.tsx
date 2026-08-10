@@ -164,7 +164,7 @@ const ICONS: Record<IconName, IconEntry> = {
     content: <><path d="M99.9912 855.131L94.3561 849.732C91.2849 846.537 95.7648 840.35 99.9912 845.355C104.218 840.365 108.74 846.551 105.626 849.732L99.9912 855.131Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M96.3752 849.034H97.9677L99.0402 846.914L100.665 850.818L102.063 849.034H103.623" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'fork-spoon': {
-    viewBox: '315 219 16 16',
+    viewBox: '314 218 18 17',
     strokeWidth: 1.0,
     content: <><path d="M327.8 225.923C329.567 225.923 331 224.373 331 222.462C331 220.55 329.567 219 327.8 219C326.033 219 324.6 220.55 324.6 222.462C324.6 224.373 326.033 225.923 327.8 225.923Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M327.8 225.923V234" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M318.333 219V234" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M321.666 219V221.885C321.666 222.263 321.58 222.639 321.413 222.989C321.245 223.338 321 223.656 320.69 223.924C320.381 224.192 320.013 224.405 319.609 224.55C319.204 224.695 318.771 224.769 318.333 224.769C317.449 224.769 316.601 224.465 315.976 223.924C315.351 223.383 315 222.65 315 221.885V219" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
@@ -174,7 +174,7 @@ const ICONS: Record<IconName, IconEntry> = {
     content: <><path d="M328 862C335.18 862 341 856.18 341 849C341 841.82 335.18 836 328 836C320.82 836 315 841.82 315 849C315 856.18 320.82 862 328 862Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M316 854H319.5C320.428 854 321.319 853.631 321.975 852.975C322.631 852.318 323 851.428 323 850.5V847.5C323 846.572 323.369 845.681 324.025 845.025C324.682 844.369 325.572 844 326.5 844C327.428 844 328.319 843.631 328.975 842.975C329.631 842.318 330 841.428 330 840.5V836.14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M341 848.8C339.999 848.28 338.888 848.006 337.76 848H333.5C332.572 848 331.681 848.369 331.025 849.025C330.369 849.681 330 850.572 330 851.5C330 852.428 330.369 853.319 331.025 853.975C331.681 854.631 332.572 855 333.5 855C334.163 855 334.799 855.263 335.268 855.732C335.737 856.201 336 856.837 336 857.5V859.24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'graduation-cap': {
-    viewBox: '213 215 20 23',
+    viewBox: '213 216 21 21',
     strokeWidth: 1.44,
     content: <><path d="M223 217.247L232.286 221.873L223 226.5L213.714 221.873L223 217.247Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M217.927 223.984L217.937 229.018C217.937 229.018 219.47 231.351 223 231.351C226.529 231.351 228.071 229.018 228.071 229.018L228.07 223.984" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M215.422 232.416V222.739" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M215.423 236.346C216.366 236.346 217.131 235.466 217.131 234.381C217.131 233.296 216.366 232.417 215.423 232.417C214.479 232.417 213.714 233.296 213.714 234.381C213.714 235.466 214.479 236.346 215.423 236.346Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
@@ -348,7 +348,7 @@ const ICONS: Record<IconName, IconEntry> = {
   // distinct from 'message', which opens the entity's own chat.
   // Travel: an airliner in the set's hairline idiom (founder 2026-07-28).
   'plane': {
-    viewBox: '0 0 24 24',
+    viewBox: '1 2 22 20',
     strokeWidth: 1.4,
     content: <path d="M22 14.6l-8.6-2.4V5.4c0-1.2-.6-2.2-1.4-2.2s-1.4 1-1.4 2.2v6.8L2 14.6v1.9l8.6-1.8v3.8L8.2 20v1.2l3.8-.9 3.8.9V20l-2.4-1.5v-3.8l8.6 1.8z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
   },

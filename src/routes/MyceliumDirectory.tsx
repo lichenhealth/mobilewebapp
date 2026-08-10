@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { WeaveMark } from '../components/WeaveMark';
 import MemberRow from '../components/MemberRow';
+import IconRow, { IconRowItem } from '../components/IconRow';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
@@ -32,6 +33,18 @@ interface Entry {
   vouched: boolean;
   recommended: boolean;
 }
+
+// Doors row, left-aligned — same icon-circle convention as Home's own row
+// (founder 2026-08-10: the old top-right floating + read as off-brand).
+// Both doors open the same weave-search panel below; Search and Plus are
+// kept as separate icons purely to match the platform's Search+Post
+// doorway pair, not because they do different things here.
+// TODO(founder, 2026-08-10): Plus should only show for members with
+// capacity to invite — permission model still to be defined.
+const WEB_ICONS: IconRowItem[] = [
+  { icon: 'search', label: 'Search' },
+  { icon: 'plus',   label: 'Weave someone in' },
+];
 
 const GROUPS: { kind: string; title: string }[] = [
   { kind: 'person',       title: 'People' },
@@ -201,18 +214,8 @@ export default function MyceliumDirectory() {
           <Icon name="arrow-left" size={14} /> Home
         </button>
       )}
+      <IconRow items={WEB_ICONS} onSelect={() => { setAddOpen((o) => !o); setQ(''); }} />
       <header className="mycdir__head">
-        <button
-          className="mycdir__add"
-          onClick={() => { setAddOpen((o) => !o); setQ(''); }}
-          aria-expanded={addOpen}
-          aria-label="Weave someone in"
-          title="Weave someone in"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-            <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
         <p className="mycdir__crumb">
           <Icon name="sparkle" size={11} />
           <span>My-celium · Directory</span>
