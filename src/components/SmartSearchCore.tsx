@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import Avatar from './Avatar';
 import LocationField from './LocationField';
+import CollapsibleSection from './CollapsibleSection';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import type { GeoPoint } from '../lib/geoApi';
@@ -171,29 +172,6 @@ function buildEscalateMessage(q: string, chips: string[]): string {
   if (sentence) return sentence;
   if (chips.length) return `I'm looking for: ${chips.join(', ')}.`;
   return 'Can you help me search?';
-}
-
-/** A collapsible panel section, mockup-style: checkbox-look header that shows
- *  whether the section is contributing filters, chevron to open. */
-function Section({ label, active, open, onToggle, children }: {
-  label: string; active: boolean; open: boolean; onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={'ssrch__sect' + (open ? ' is-open' : '')}>
-      <button className="ssrch__sect-head" onClick={onToggle} aria-expanded={open}>
-        <span className="ssrch__sect-label">
-          {label}
-          {/* peach dot = this section is narrowing the search right now */}
-          {active && <span className="ssrch__sect-dot" aria-label="active" />}
-        </span>
-        <span className="ssrch__sect-chev" aria-hidden>
-          <Icon name="chevron-right" size={13} />
-        </span>
-      </button>
-      {open && <div className="ssrch__sect-body">{children}</div>}
-    </div>
-  );
 }
 
 // Per-criteria AI narration cache — module-level, not per-mount, so
@@ -623,8 +601,8 @@ export default function SmartSearchCore({
             Everything is included until you narrow it — open a section to pick less.
           </p>
 
-          <Section
-            label="Topics"
+          <CollapsibleSection
+            title="Topics"
             active={parsed.categories.length > 0
               || (extras.categoryIds !== 'all' && extras.categoryIds.length > 0 && extras.categoryIds.length < cats.length)}
             open={openSects.has('topics')}
@@ -670,10 +648,10 @@ export default function SmartSearchCore({
                 );
               })}
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="Who"
+          <CollapsibleSection
+            title="Who"
             active={criteria.who.length > 0}
             open={openSects.has('who')}
             onToggle={() => toggleSect('who')}
@@ -689,10 +667,10 @@ export default function SmartSearchCore({
                 </button>
               ))}
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="My circles"
+          <CollapsibleSection
+            title="My circles"
             active={criteria.spaceScope.length > 0}
             open={openSects.has('scope')}
             onToggle={() => toggleSect('scope')}
@@ -718,10 +696,10 @@ export default function SmartSearchCore({
                 </div>
               );
             })}
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="What"
+          <CollapsibleSection
+            title="What"
             active={criteria.contentTypes.length > 0 || criteria.areas.length > 0}
             open={openSects.has('what')}
             onToggle={() => toggleSect('what')}
@@ -750,10 +728,10 @@ export default function SmartSearchCore({
                 </button>
               ))}
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="How"
+          <CollapsibleSection
+            title="How"
             active={criteria.offers.length > 0 || criteria.priceMin != null || criteria.priceMax != null}
             open={openSects.has('how')}
             onToggle={() => toggleSect('how')}
@@ -785,10 +763,10 @@ export default function SmartSearchCore({
                 placeholder="Max $"
               />
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="Where"
+          <CollapsibleSection
+            title="Where"
             active={criteria.online || criteria.inPerson || criteria.radiusMiles != null}
             open={openSects.has('where')}
             onToggle={() => toggleSect('where')}
@@ -815,10 +793,10 @@ export default function SmartSearchCore({
               onChange={(t, g) => setExtras((x) => ({ ...x, anchorText: t, anchorGeo: g }))}
               placeholder="Measure distance from… (a town or address)"
             />
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="When"
+          <CollapsibleSection
+            title="When"
             active={!!criteria.dateFrom || !!criteria.dateTo || criteria.hideConflicts}
             open={openSects.has('when')}
             onToggle={() => toggleSect('when')}
@@ -847,25 +825,25 @@ export default function SmartSearchCore({
               />
               Hide events that clash with my calendar
             </label>
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="Trusted by"
+          <CollapsibleSection
+            title="Trusted by"
             active={!!criteria.trust.degree || !!criteria.trust.personId}
             open={openSects.has('trust')}
             onToggle={() => toggleSect('trust')}
           >
             {endorsePicker('trust', extras.trustDegree ?? parsed.trust.degree, extras.trustPerson, trustQ, setTrustQ)}
-          </Section>
+          </CollapsibleSection>
 
-          <Section
-            label="Recommended by"
+          <CollapsibleSection
+            title="Recommended by"
             active={!!criteria.rec.degree || !!criteria.rec.personId}
             open={openSects.has('rec')}
             onToggle={() => toggleSect('rec')}
           >
             {endorsePicker('rec', extras.recDegree ?? parsed.rec.degree, extras.recPerson, recQ, setRecQ)}
-          </Section>
+          </CollapsibleSection>
 
           <div className="ssrch__panel-actions">
             <button className="btn" onClick={() => { setExtras(EMPTY_EXTRAS); setTopicQ(''); setTrustQ(''); setRecQ(''); }}>Reset</button>

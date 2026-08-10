@@ -1,0 +1,25 @@
+.coll { border-top: 1px solid var(--bone-edge); }
+.coll__head {
+  display: flex; align-items: center; gap: var(--s-3); width: 100%;
+  padding: 13px 6px; background: transparent; border: 0;
+  cursor: pointer; text-align: left; font: inherit; color: inherit;
+}
+.coll__head:hover { background: var(--bone-warm); border-radius: var(--r-md); }
+.coll__chev {
+  width: 26px; height: 26px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft);
+}
+.coll__chev svg { transition: transform 140ms; }
+.coll.is-open .coll__chev svg { transform: rotate(90deg); }
+.coll.is-open .coll__chev { background: var(--peach-tint, var(--bone-warm)); border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
+.coll__label {
+  flex: 1; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.coll__dot {
+  width: 8px; height: 8px; border-radius: var(--r-full);
+  background: var(--peach); flex-shrink: 0;
+}
+.coll__body { padding: var(--s-1) 6px var(--s-4) 6px; }
