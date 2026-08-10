@@ -53,6 +53,7 @@ export type IconName =
   | 'pin'
   | 'plus'
   | 'profile'
+  | 'queue'
   | 'reply'
   | 'repeat'
   | 'rent'
@@ -272,6 +273,13 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M17 2l4 4-4 4M3 11V10a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" /></>,
+  },
+  // A curatable list: bars for the pieces, an up/down arrow for reordering
+  // them — the Curate door's glyph (founder 2026-08-10).
+  'queue': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M3 6h12M3 12h9M3 18h12" strokeLinecap="round"/><path d="M20 4v16M20 4l-2.5 3M20 4l2.5 3M20 20l-2.5-3M20 20l2.5-3" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'saved': {
     viewBox: '264 838 29 26',

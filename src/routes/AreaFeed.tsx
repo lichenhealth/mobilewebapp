@@ -236,31 +236,43 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
         </button>
-        {/* The third door: Organize, visible and labeled — creation deserves
+        {/* The third door: Curate, visible and labeled — creation deserves
             its own front door, not a hiding spot in the + (Library 2026-07-24;
-            Courses joined 2026-07-25, retiring the +'s two-way chooser). */}
+            Courses joined 2026-07-25, retiring the +'s two-way chooser).
+            A queue glyph, not the page's own crumb icon (founder 2026-08-10)
+            — this door files pieces into order, it doesn't represent the
+            section itself. Equal gap to Search and + — same flex gap, no
+            spacer before it (the spacer moves to sit before the lenses). */}
         {structuredKind && canCreate && (
           <button
             className={'mkt__action' + (createOpen ? ' is-active' : '')}
             onClick={() => setCreateOpen((o) => !o)}
           >
-            <span className="mkt__action-circle"><Icon name={icon} size={14} /></span>
-            <span className="mkt__action-label">Organize</span>
+            <span className="mkt__action-circle"><Icon name="queue" size={14} /></span>
+            <span className="mkt__action-label">Curate</span>
           </button>
         )}
         {mediaLenses && (
           <>
             <div className="mkt__action-spacer" />
-            {MEDIA_LENSES.map((m) => (
-              <button
-                key={m.medium}
-                className={'mkt__action' + (media.includes(m.medium) ? ' is-active' : '')}
-                onClick={() => toggleMedium(m.medium)}
-              >
-                <span className="mkt__action-circle"><Icon name={m.icon} size={14} /></span>
-                <span className="mkt__action-label">{m.label}</span>
-              </button>
-            ))}
+            {/* Read/Look/Listen/Watch read as signals, not doors — same
+                vocabulary as Marketplace's mode lenses and Events' type
+                filters (founder 2026-08-10): text + icon, no circle, a
+                check when it's on. */}
+            {MEDIA_LENSES.map((m) => {
+              const on = media.includes(m.medium);
+              return (
+                <button
+                  key={m.medium}
+                  className={'mkt__lens' + (on ? ' is-on' : '')}
+                  onClick={() => toggleMedium(m.medium)}
+                  aria-pressed={on}
+                >
+                  <Icon name={m.icon} size={16} />
+                  {m.label}{on ? ' ✓' : ''}
+                </button>
+              );
+            })}
           </>
         )}
       </ScrollHintRow>
