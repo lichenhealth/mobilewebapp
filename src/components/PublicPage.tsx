@@ -285,6 +285,20 @@ export default function PublicPage(props: PublicPageProps) {
           <nav className="ppage__nav">
             {navItems.map((n) => {
               const d = doors?.find((x) => x.id === n.id);
+              // Feed reads as a door, not a template tab (founder 2026-08-09):
+              // an icon, filled peach when it's the active tab — the same
+              // "you are here" signal Home and My-celium already lead their
+              // icon row with, not another text pill beside About/Services.
+              if (n.id === 'feed') {
+                return (
+                  <button
+                    className={'ppage__nav-icon' + (tab === n.id ? ' ppage__nav-icon--on' : '')}
+                    onClick={() => setTab(n.id)} key={n.id} type="button" aria-label={n.label} title={n.label}
+                  >
+                    <Icon name="newsfeed" size={18} />
+                  </button>
+                );
+              }
               return (
                 <button
                   className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}

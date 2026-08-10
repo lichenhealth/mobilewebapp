@@ -37,7 +37,6 @@ const spaceBrief = (s: SpaceHit) => ({
   where: s.location,
   miles_away: s.distanceMi != null ? Math.round(s.distanceMi) : null,
   recommended_by: s.recommenders.slice(0, 3),
-  in_my_web: s.trusted,
 });
 
 export async function askAssistant(

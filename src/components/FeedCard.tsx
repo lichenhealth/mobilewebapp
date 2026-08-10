@@ -222,7 +222,7 @@ export default function FeedCard({
               </span>
             )}
           </div>
-          {trustLine && (
+          {trustLine && !authorIsSpace && (
             <span className="feed-card__trustline">
               <Icon name="shield-user" size={11} /> {trustLine}
             </span>

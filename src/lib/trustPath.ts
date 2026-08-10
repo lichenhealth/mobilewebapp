@@ -24,12 +24,33 @@ export interface TrustPathHit {
 export async function loadTrustWeb(me: string): Promise<TrustWeb> {
   const [{ vouched }, edgesRes] = await Promise.all([
     loadMyWeb(),
+    // mycelium's RLS scopes SELECT to your own rows (founder architecture
+    // audit, 2026-08-09) — this now naturally returns only MY edges, which
+    // is exactly what myVouched needs. For anyone else's edges (the 2-hop
+    // "trusted by someone I trust" check), see loadTrustEdgesFor() below.
     supabase.from('mycelium').select('truster_id, target_type, target_id')
       .eq('vouched', true).limit(5000),
   ]);
   const edges: Edge[] = ((edgesRes.data as { truster_id: string; target_type: string; target_id: string }[] | null) ?? [])
     .map((e) => ({ actor: e.truster_id, target_type: e.target_type, target_id: e.target_id }));
   return { me, myVouched: vouched, edges };
+}
+
+/** Trust edges for a specific batch of targets — the only way to see
+ *  anyone ELSE's trust edges now that mycelium's RLS is locked to your own
+ *  rows. Computed server-side via a SECURITY DEFINER RPC, scoped to exactly
+ *  the targets you already have in view (a search result, a listing's
+ *  seller) — never a whole-graph read. Merge the result into a TrustWeb's
+ *  `edges` before calling trustPathTo() so 2-hop resolution still works. */
+export async function loadTrustEdgesFor(
+  targets: { type: 'profile' | 'space' | 'post'; id: string }[],
+): Promise<Edge[]> {
+  if (!targets.length) return [];
+  const { data } = await supabase.rpc('trust_edges_for_targets', {
+    p_targets: targets.map((t) => ({ type: t.type, id: t.id })),
+  });
+  return ((data as { target_type: string; target_id: string; truster_id: string }[] | null) ?? [])
+    .map((r) => ({ actor: r.truster_id, target_type: r.target_type, target_id: r.target_id }));
 }
 
 /** My path to an entity: direct trust, one hop through someone I trust, or none. */

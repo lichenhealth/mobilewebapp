@@ -86,6 +86,24 @@
 .ppage__nav-link:hover, .ppage__nav-link:focus-visible { color: var(--ink); }
 /* The active door — text-width peach underline, the platform selection idiom. */
 .ppage__nav-link--on { color: var(--ink); border-bottom-color: var(--ppage-accent); }
+
+/* Feed is a door, not a template tab (founder 2026-08-09) — an icon, same
+   "YOU ARE HERE" treatment IconRow.css already gives Home/My-celium's own
+   lit Feed door: peach and filled when active, quiet otherwise. Always the
+   platform's own peach, not the page's customizable --ppage-accent — this
+   is the one platform-wide convention, not a brandable element. */
+.ppage__nav-icon {
+  width: 34px; height: 34px; flex-shrink: 0; margin-bottom: -6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  background: var(--bone-warm); color: var(--ink-soft); cursor: pointer;
+  transition: border-color var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.ppage__nav-icon:hover { border-color: var(--peach); color: var(--peach-deep); }
+.ppage__nav-icon--on {
+  border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep);
+}
+.ppage__nav-icon--on:hover { border-color: var(--peach); color: var(--peach-deep); }
 .ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; white-space: nowrap; }
 /* Platform doors, upper right — the invitation pill with a quiet Sign-in
    bubble beneath it, right-aligned. Design-forward: no heavy fills up here,

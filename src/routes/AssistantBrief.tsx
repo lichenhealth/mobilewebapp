@@ -13,7 +13,7 @@ import { listPendingResourceBookings } from '../lib/resourcesApi';
 import { listReminders, remindersOn } from '../lib/remindersApi';
 import { occursOn } from '../lib/recurrence';
 import { postToAssistantFeed } from '../lib/assistantFeedApi';
-import { type Scope } from '../lib/sections';
+import { type Scope, type Section } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
@@ -112,7 +112,7 @@ export default function AssistantBrief() {
 
   const { snapshot, fingerprint } = useMemo(() => {
     const scope: Scope = section === 'home'
-      ? { kind: 'global' } : { kind: 'section', section: section as never };
+      ? { kind: 'global' } : { kind: 'section', section: section as Section };
     const scoped = rows.filter((r) => scope.kind === 'global'
       || (r.space_id == null && r.section === section));
     const relevant = scoped
@@ -261,7 +261,7 @@ export default function AssistantBrief() {
             }
           }
         }
-        if ((section === 'communities' || section === 'groups') && desk && deskNames) {
+        if ((section === 'communities' || section === 'groups' || section === 'organizations' || section === 'places') && desk && deskNames) {
           // The actual queue rows, for up to three busiest desks.
           const busiest = Object.entries(desk).sort((a, b) => b[1] - a[1]).slice(0, 3);
           const queues: unknown[] = [];

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WOfcaHIYhiUxAmoQD0AbvwbXAAkYxM4orkZaMZU28c8LerYg2HK2ZSo0mk1uof4
+\restrict TGjIKGuwkwOLzfcfNNAJWnaeMhnxuXlK0gve9dG4gcryCznR9beng13avXFOVb3
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3537,6 +3537,24 @@ end; $$;
 ALTER FUNCTION public.set_member_role(p_space uuid, p_profile uuid, p_role text, p_duties text[]) OWNER TO postgres;
 
 --
+-- Name: set_space_public_page_default(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_space_public_page_default() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if new.public_page is null then
+    new.public_page := (new.kind in ('organization', 'place'));
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.set_space_public_page_default() OWNER TO postgres;
+
+--
 -- Name: space_awake_count(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -3769,6 +3787,26 @@ end $_$;
 
 
 ALTER FUNCTION public.translate_donation(p_donation uuid, p_to_type text, p_to_id uuid) OWNER TO postgres;
+
+--
+-- Name: trust_edges_for_targets(jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.trust_edges_for_targets(p_targets jsonb) RETURNS TABLE(target_type text, target_id uuid, truster_id uuid)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  SELECT m.target_type, m.target_id, m.truster_id
+  FROM public.mycelium m
+  JOIN (
+    SELECT (t->>'type')::text AS target_type, (t->>'id')::uuid AS target_id
+    FROM jsonb_array_elements(p_targets) AS t
+  ) tg ON tg.target_type = m.target_type AND tg.target_id = m.target_id
+  WHERE m.vouched = true;
+$$;
+
+
+ALTER FUNCTION public.trust_edges_for_targets(p_targets jsonb) OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -4648,6 +4686,7 @@ CREATE TABLE public.mycelium (
     target_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     vouched boolean DEFAULT true NOT NULL,
+    CONSTRAINT mycelium_no_space_trust CHECK ((NOT ((vouched = true) AND (target_type = 'space'::text)))),
     CONSTRAINT mycelium_target_type_check CHECK ((target_type = ANY (ARRAY['profile'::text, 'space'::text, 'post'::text])))
 );
 
@@ -5038,7 +5077,7 @@ CREATE TABLE public.spaces (
     cohort_of uuid,
     term text,
     contact jsonb,
-    public_page boolean DEFAULT false NOT NULL,
+    public_page boolean NOT NULL,
     page jsonb,
     assistant_enabled boolean DEFAULT true NOT NULL
 );
@@ -6187,6 +6226,13 @@ CREATE TRIGGER assistant_on_feed_post AFTER INSERT ON public.assistant_feed_post
 --
 
 CREATE TRIGGER assistant_on_message AFTER INSERT ON public.chat_messages FOR EACH ROW EXECUTE FUNCTION public.assistant_on_message();
+
+
+--
+-- Name: spaces before_space_public_page_default; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER before_space_public_page_default BEFORE INSERT ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.set_space_public_page_default();
 
 
 --
@@ -7531,11 +7577,7 @@ CREATE POLICY "Admins read all suggestions" ON public.category_suggestions FOR S
 -- Name: spaces Admins update their space; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Admins update their space" ON public.spaces FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = spaces.id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = spaces.id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))));
+CREATE POLICY "Admins update their space" ON public.spaces FOR UPDATE USING (public.is_space_admin(id, auth.uid())) WITH CHECK (public.is_space_admin(id, auth.uid()));
 
 
 --
@@ -8143,7 +8185,7 @@ CREATE POLICY "events insert" ON public.events FOR INSERT TO authenticated WITH 
 
 CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR public.is_event_attendee(id, auth.uid()) OR (EXISTS ( SELECT 1
    FROM public.posts p
-  WHERE (p.linked_event_id = p.id)))));
+  WHERE (p.linked_event_id = events.id)))));
 
 
 --
@@ -8472,10 +8514,10 @@ CREATE POLICY "mycelium: drop own" ON public.mycelium FOR DELETE TO authenticate
 
 
 --
--- Name: mycelium mycelium: read; Type: POLICY; Schema: public; Owner: postgres
+-- Name: mycelium mycelium: read own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "mycelium: read" ON public.mycelium FOR SELECT TO authenticated USING (true);
+CREATE POLICY "mycelium: read own" ON public.mycelium FOR SELECT USING ((truster_id = auth.uid()));
 
 
 --
@@ -8827,9 +8869,7 @@ CREATE POLICY "saves: own only" ON public.saved_items TO authenticated USING ((p
 -- Name: space_membership_requests smr: read own or admin; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "smr: read own or admin" ON public.space_membership_requests FOR SELECT TO authenticated USING (((profile_id = auth.uid()) OR (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_membership_requests.space_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+CREATE POLICY "smr: read own or admin" ON public.space_membership_requests FOR SELECT USING (((profile_id = auth.uid()) OR public.is_space_admin(space_id, auth.uid())));
 
 
 --
@@ -8845,40 +8885,28 @@ CREATE POLICY "smr: request, invite, or suggest" ON public.space_membership_requ
 -- Name: space_membership_requests smr: withdraw or decline; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "smr: withdraw or decline" ON public.space_membership_requests FOR DELETE TO authenticated USING (((profile_id = auth.uid()) OR (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_membership_requests.space_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+CREATE POLICY "smr: withdraw or decline" ON public.space_membership_requests FOR DELETE USING (((profile_id = auth.uid()) OR public.is_space_admin(space_id, auth.uid())));
 
 
 --
 -- Name: space_nesting_requests snr: group admins propose; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "snr: group admins propose" ON public.space_nesting_requests FOR INSERT TO authenticated WITH CHECK (((initiated_by = auth.uid()) AND (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+CREATE POLICY "snr: group admins propose" ON public.space_nesting_requests FOR INSERT WITH CHECK (((initiated_by = auth.uid()) AND public.is_space_admin(group_id, auth.uid())));
 
 
 --
 -- Name: space_nesting_requests snr: read either side; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "snr: read either side" ON public.space_nesting_requests FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))) OR (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_nesting_requests.parent_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+CREATE POLICY "snr: read either side" ON public.space_nesting_requests FOR SELECT USING ((public.is_space_admin(group_id, auth.uid()) OR public.is_space_admin(parent_id, auth.uid())));
 
 
 --
 -- Name: space_nesting_requests snr: withdraw or decline; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "snr: withdraw or decline" ON public.space_nesting_requests FOR DELETE TO authenticated USING (((EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_nesting_requests.group_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role]))))) OR (EXISTS ( SELECT 1
-   FROM public.space_members m
-  WHERE ((m.space_id = space_nesting_requests.parent_id) AND (m.profile_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::public.space_member_role, 'super_admin'::public.space_member_role])))))));
+CREATE POLICY "snr: withdraw or decline" ON public.space_nesting_requests FOR DELETE USING ((public.is_space_admin(group_id, auth.uid()) OR public.is_space_admin(parent_id, auth.uid())));
 
 
 --
@@ -10073,6 +10101,15 @@ GRANT ALL ON FUNCTION public.set_member_role(p_space uuid, p_profile uuid, p_rol
 
 
 --
+-- Name: FUNCTION set_space_public_page_default(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.set_space_public_page_default() TO anon;
+GRANT ALL ON FUNCTION public.set_space_public_page_default() TO authenticated;
+GRANT ALL ON FUNCTION public.set_space_public_page_default() TO service_role;
+
+
+--
 -- Name: FUNCTION space_awake_count(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -10142,6 +10179,15 @@ GRANT ALL ON FUNCTION public.touch_updated_at() TO service_role;
 GRANT ALL ON FUNCTION public.translate_donation(p_donation uuid, p_to_type text, p_to_id uuid) TO anon;
 GRANT ALL ON FUNCTION public.translate_donation(p_donation uuid, p_to_type text, p_to_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.translate_donation(p_donation uuid, p_to_type text, p_to_id uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION trust_edges_for_targets(p_targets jsonb); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO anon;
+GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO service_role;
 
 
 --
@@ -11142,7 +11188,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WOfcaHIYhiUxAmoQD0AbvwbXAAkYxM4orkZaMZU28c8LerYg2HK2ZSo0mk1uof4
+\unrestrict TGjIKGuwkwOLzfcfNNAJWnaeMhnxuXlK0gve9dG4gcryCznR9beng13avXFOVb3
 
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)

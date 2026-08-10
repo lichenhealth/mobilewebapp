@@ -828,7 +828,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         // which skips PublicPage's own tab gating entirely).
         feed={!backstage && !tab ? feedSection : undefined}
       >
-        {childGroups.length > 0 && (
+        {/* PublicPage's `children` slot renders unconditionally regardless of
+            which tab is active (it doesn't gate on `tab` at all) — so this
+            content, which belongs to the space's own home view, needs its
+            own `!backstage && !tab` guard, same as `feed`/`beforeContent`
+            above, or it leaks onto every template tab (About, Services…). */}
+        {!backstage && !tab && childGroups.length > 0 && (
           <section className="ppage__sec">
             <h2 className="ppage__h2">Groups</h2>
             <div className="ppage__chips">

@@ -4,7 +4,7 @@
 
 export type Section =
   | 'concierge' | 'chat' | 'calendar' | 'events' | 'saved' | 'maps'
-  | 'profile' | 'mycelium' | 'communities' | 'groups' | 'market'
+  | 'profile' | 'mycelium' | 'communities' | 'groups' | 'organizations' | 'places' | 'market'
   | 'invite' | 'membership';
 
 export type Scope =
@@ -24,6 +24,8 @@ const PREFIX_SECTIONS: { prefix: string; section: Section }[] = [
   { prefix: '/mycelium', section: 'mycelium' },
   { prefix: '/communities', section: 'communities' },
   { prefix: '/groups', section: 'groups' },
+  { prefix: '/organizations', section: 'organizations' },
+  { prefix: '/places', section: 'places' },
   { prefix: '/market', section: 'market' },
   { prefix: '/invite', section: 'invite' },
   { prefix: '/membership', section: 'membership' },
@@ -33,7 +35,9 @@ const PREFIX_SECTIONS: { prefix: string; section: Section }[] = [
  *  community/group → that space; otherwise the matching top-level section. */
 export function scopeForPath(pathname: string): Scope {
   if (pathname === '/' || pathname.startsWith('/home')) return { kind: 'global' };
-  const space = pathname.match(/^\/(?:communities|groups)\/([^/]+)$/);
+  // /spaces/:id serves all four kinds (organization/community/group/place)
+  // through one shared page — matches by id alone, not by kind.
+  const space = pathname.match(/^\/spaces\/([^/]+)$/);
   if (space) return { kind: 'space', spaceId: space[1] };
   const hit = PREFIX_SECTIONS.find((p) => pathname.startsWith(p.prefix));
   return hit ? { kind: 'section', section: hit.section } : { kind: 'global' };

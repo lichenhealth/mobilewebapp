@@ -5,6 +5,7 @@ import { loadMappableMembers, type MappableMember } from './locationApi';
 import { freeBusy, type FreeBusyRow } from './calendarApi';
 import { occursOn } from './recurrence';
 import { todayISO } from './conciergeApi';
+import { loadTrustEdgesFor } from './trustPath';
 
 // ─── Smart search (Figma 286-3407 + criteria panel 286-2515) ─────────────────
 // One sentence in, structured criteria out. The parser is deliberately
@@ -306,7 +307,7 @@ export interface PersonHit {
 export interface SpaceHit {
   id: string; name: string; kind: string; location: string | null;
   lat: number | null; lng: number | null; distanceMi: number | null;
-  recommenders: string[]; trusted: boolean;
+  recommenders: string[];
   /** The query matched this space's ADDRESS, not its name — present it
    *  address-first: "320 Rustlers Rd, Bailey — LICHEN HQ" (founder 2026-07-27). */
   addressMatch: boolean;
@@ -507,6 +508,9 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
   const spaces = (spaceRes.data as { id: string; name: string; kind: string; location: string | null; lat: number | null; lng: number | null }[] | null) ?? [];
   const pcRows = (pcRes.data as { profile_id: string; category_id: string }[] | null) ?? [];
 
+  // mycelium's RLS scopes SELECT to your own rows (founder architecture
+  // audit, 2026-08-09) — this now only returns MY edges, which is exactly
+  // what myVouched needs.
   const trustEdges: Edge[] = ((trustRes.data as { truster_id: string; target_type: string; target_id: string }[] | null) ?? [])
     .map((r) => ({ actor: r.truster_id, target_type: r.target_type, target_id: r.target_id }));
   const recEdges: Edge[] = ((recRes.data as { recommender_id: string; target_type: string; target_id: string }[] | null) ?? [])
@@ -514,6 +518,17 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
 
   const myVouched = new Set(trustEdges.filter((e) => e.actor === me).map((e) => `${e.target_type}:${e.target_id}`));
   const nameOf = (id: string) => profiles.find((p) => p.id === id)?.full_name || 'A member';
+
+  // The 2-hop "trusted by someone I trust" check (trustPass/endorsersOf
+  // below) needs OTHER people's edges too, which the locked-down RLS no
+  // longer returns directly — fetch them via the SECURITY DEFINER RPC,
+  // scoped to exactly the profiles that could appear in these results
+  // (never a whole-graph read), and merge them in alongside my own.
+  const trustTargets = [
+    ...profiles.map((p) => ({ type: 'profile' as const, id: p.id })),
+    ...posts.filter((p) => !p.author_space_id).map((p) => ({ type: 'profile' as const, id: p.author_id })),
+  ];
+  trustEdges.push(...await loadTrustEdgesFor(trustTargets));
 
   // Space scope: members of the selected spaces (for the People section).
   let scopeMembers: Set<string> | null = null;
@@ -692,10 +707,9 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
     lat: s.lat, lng: s.lng,
     distanceMi: anchor && s.lat != null && s.lng != null
       ? milesBetween(anchor, { lat: s.lat, lng: s.lng }) : null,
-    // Places are recommended (things); org/community/group are trusted
-    // (relationships) — each kind carries only its own signal.
-    recommenders: s.kind === 'place' ? displayRecs('space', s.id) : [],
-    trusted: s.kind !== 'place' && myVouched.has('space:' + s.id),
+    // Trust stays person-only (founder 2026-08-07) — every space kind is
+    // recommended, never trusted.
+    recommenders: displayRecs('space', s.id),
   })).filter((s) => {
     if (c.spaceScope.length && !c.spaceScope.includes(s.id)) return false;
     // Picking one kind and not the other narrows to it — otherwise "Places"
@@ -706,15 +720,9 @@ export async function runSmartSearch(c: SearchCriteria, me: string): Promise<Sma
       if (wantPlaces && s.kind !== 'place') return false;
       if (wantOrgs && s.kind === 'place') return false;
     }
-    if (s.kind === 'place') {
-      // A place can't be trusted; a trust-only filter excludes places.
-      if (trustFilterOn && !recFilterOn) return false;
-      if (!recPass('space', s.id)) return false;
-    } else {
-      // Org/community/group can't be recommended; a rec-only filter excludes them.
-      if (recFilterOn && !trustFilterOn) return false;
-      if (!trustPass('space', s.id)) return false;
-    }
+    // No space kind can be trusted; a trust-only filter excludes every space.
+    if (trustFilterOn && !recFilterOn) return false;
+    if (!recPass('space', s.id)) return false;
     if (anchor && c.radiusMiles != null) {
       if (s.distanceMi == null || s.distanceMi > c.radiusMiles) return false;
     }

@@ -11,7 +11,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import ListingTile from '../components/ListingTile';
-import { loadTrustWeb, trustPathTo, namesFor, type TrustWeb } from '../lib/trustPath';
+import { loadTrustWeb, loadTrustEdgesFor, trustPathTo, namesFor, type TrustWeb } from '../lib/trustPath';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
@@ -156,17 +156,26 @@ export default function Marketplace() {
   useEffect(() => {
     if (!me) return;
     let live = true;
-    void loadTrustWeb(me).then((w) => { if (live) setWeb(w); });
+    void loadTrustWeb(me).then(async (w) => {
+      // mycelium's RLS only returns MY OWN edges now — the 2-hop "trusted
+      // by someone I trust" check needs the sellers' own edges too, fetched
+      // for exactly these posts' authors, not a whole-graph read.
+      const targets = posts.filter((p) => !p.author_space_id)
+        .map((p) => ({ type: 'profile' as const, id: p.author_id }));
+      const extra = await loadTrustEdgesFor(targets);
+      if (live) setWeb({ ...w, edges: [...w.edges, ...extra] });
+    });
     return () => { live = false; };
-  }, [me]);
+  }, [me, posts]);
   // Seller paths, viewer-relative: postId → my path to its author.
   const sellerPaths = useMemo(() => {
     if (!web) return new Map<string, { degree: 'mine' | 'second'; via: string | null }>();
     const m = new Map<string, { degree: 'mine' | 'second'; via: string | null }>();
     for (const p of posts) {
-      const hit = p.author_space_id
-        ? trustPathTo(web, 'space', p.author_space_id)
-        : trustPathTo(web, 'profile', p.author_id);
+      // Trust stays person-only (founder 2026-08-07) — a space-authored
+      // post has no trust path, only its author (a person) can.
+      if (p.author_space_id) continue;
+      const hit = trustPathTo(web, 'profile', p.author_id);
       if (hit) m.set(p.id, hit);
     }
     return m;

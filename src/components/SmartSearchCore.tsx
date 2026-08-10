@@ -1013,7 +1013,6 @@ export default function SmartSearchCore({
               <span className="ssrch__hit-body">
                 <span className="ssrch__hit-name">
                   {s.addressMatch && s.location ? <>{s.location} — <strong>{s.name.toUpperCase()}</strong></> : s.name}
-                  {s.trusted && <Icon name="shield-user" size={12} />}
                 </span>
                 <span className="ssrch__hit-sub">
                   {s.kind.charAt(0).toUpperCase() + s.kind.slice(1)}

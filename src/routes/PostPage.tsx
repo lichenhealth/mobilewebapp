@@ -5,7 +5,7 @@ import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
-import { loadTrustWeb, trustPathTo, namesFor } from '../lib/trustPath';
+import { loadTrustWeb, loadTrustEdgesFor, trustPathTo, namesFor } from '../lib/trustPath';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -58,13 +58,16 @@ export default function PostPage() {
   const [overlay, setOverlay] = useState<MyceliumSignals | undefined>(undefined);
 
   useEffect(() => {
-    if (!user?.id || !post) { setTrustLine(undefined); return; }
+    // Trust stays person-only (founder 2026-08-07) — a space-authored post
+    // has no trust path, only its author (a person) can.
+    if (!user?.id || !post || post.author_space_id) { setTrustLine(undefined); return; }
     let live = true;
     void (async () => {
       const web = await loadTrustWeb(user.id);
-      const hit = post.author_space_id
-        ? trustPathTo(web, 'space', post.author_space_id)
-        : trustPathTo(web, 'profile', post.author_id);
+      // mycelium's RLS only returns MY OWN edges now — fetch the author's
+      // own edges too, scoped to just this one post, for the 2-hop check.
+      const extra = await loadTrustEdgesFor([{ type: 'profile', id: post.author_id }]);
+      const hit = trustPathTo({ ...web, edges: [...web.edges, ...extra] }, 'profile', post.author_id);
       if (!hit || !live) return;
       if (hit.degree === 'mine') { setTrustLine(post.author_id === user.id ? undefined : 'Someone you trust'); return; }
       const names = hit.via ? await namesFor([hit.via]) : new Map();
