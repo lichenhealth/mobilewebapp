@@ -155,15 +155,15 @@ insert into public.events
 values
   ('de300003-0000-4000-a000-000000000001',
    'de300001-0000-4000-a000-000000000003', null, 'de300002-0000-4000-a000-000000000001',
-   'Potluck & seed swap', 'Bring a dish and the seeds you saved — the Grange table has room. An example event.',
+   'Potluck & seed swap', 'Bring a dish and the seeds you saved — the Grange table has room for both.',
    'Pine Valley Grange Hall', current_date + 5, current_date + 5, false, 1020, 1200),
   ('de300003-0000-4000-a000-000000000002',
    'de300001-0000-4000-a000-000000000002', null, 'de300002-0000-4000-a000-000000000002',
-   'Riverbank trail day', 'Loppers, gloves, and good company — we clear the flood debris before fall. An example event.',
+   'Riverbank trail day', 'Loppers, gloves, and good company — we clear the flood debris before fall.',
    'River trailhead', current_date + 9, current_date + 9, false, 540, 780),
   ('de300003-0000-4000-a000-000000000003',
    'de300001-0000-4000-a000-000000000001', 'de300001-0000-4000-a000-000000000001', null,
-   'Herb walk with Rosa', 'Two slow miles, twelve plants, all of them medicine. An example event.',
+   'Herb walk with Rosa', 'Two slow miles, twelve plants, all of them medicine.',
    'Meet at the Grange porch', current_date + 12, current_date + 12, false, 600, 720)
 on conflict (id) do nothing;
 
@@ -174,19 +174,22 @@ insert into public.posts
 values
 ('de300001-0000-4000-a000-000000000003', 'de300002-0000-4000-a000-000000000001',
  'Potluck & seed swap',
- 'Bring a dish and the seeds you saved — the Grange table has room for both. An example event to try RSVP on.',
+ 'Bring a dish and the seeds you saved — the Grange table has room for both.',
  'actionable', true, false, '{}', 'public', '{events}', 'events',
- 'social', 'free', 'de300003-0000-4000-a000-000000000001', '{"demo": true}'::jsonb),
+ 'social', 'free', 'de300003-0000-4000-a000-000000000001',
+ '{"demo": true, "media": [{"type": "photo", "url": "https://picsum.photos/seed/lichen-potluck/800/800"}]}'::jsonb),
 ('de300001-0000-4000-a000-000000000002', 'de300002-0000-4000-a000-000000000002',
  'Riverbank trail day',
- 'Loppers, gloves, and good company — we clear the flood debris before fall. An example event to try RSVP on.',
+ 'Loppers, gloves, and good company — we clear the flood debris before fall.',
  'actionable', true, false, '{}', 'public', '{events}', 'events',
- 'work_charity', 'free', 'de300003-0000-4000-a000-000000000002', '{"demo": true}'::jsonb),
+ 'work_charity', 'free', 'de300003-0000-4000-a000-000000000002',
+ '{"demo": true, "media": [{"type": "photo", "url": "https://picsum.photos/seed/lichen-trailday/800/800"}]}'::jsonb),
 ('de300001-0000-4000-a000-000000000001', null,
  'Herb walk with Rosa',
- 'Two slow miles, twelve plants, all of them medicine. An example event to try RSVP on.',
+ 'Two slow miles, twelve plants, all of them medicine.',
  'actionable', true, false, '{}', 'public', '{events}', 'events',
- 'learning', 'free', 'de300003-0000-4000-a000-000000000003', '{"demo": true}'::jsonb)
+ 'learning', 'free', 'de300003-0000-4000-a000-000000000003',
+ '{"demo": true, "media": [{"type": "photo", "url": "https://picsum.photos/seed/lichen-herbwalk/800/800"}]}'::jsonb)
 on conflict do nothing;
 
 -- ── 5. Claude's avatar: the brain mark ──────────────────────────────────────
