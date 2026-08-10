@@ -33,10 +33,9 @@
 .evt__past-chevron.is-open { transform: rotate(90deg); }
 
 .evt__actions.h-scroll {
-  display: flex; align-items: flex-start; gap: var(--s-3);
-  padding: var(--s-3) 0 2px;   /* side gutters live on the wrapper */
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) 0 var(--s-2);   /* side gutters live on the wrapper */
 }
-.evt__actions--doors.h-scroll { padding-bottom: 2px; }
 .evt__action {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   background: none; border: 0; cursor: pointer; flex-shrink: 0;
@@ -51,15 +50,16 @@
 .evt__action.is-active .evt__action-circle {
   background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
 }
+.evt__action-spacer {
+  flex: 0 0 auto; width: 1px; align-self: center; height: 30px;
+  margin: 0 var(--s-1); background: var(--bone-edge);
+}
 
 /* Type filters read as signals, not doors — same vocabulary as Marketplace's
    mode lenses (founder 2026-08-08): text + icon, no circle, a check when
    it's on. A circle is something you open; text with a check is something
-   that's on. */
-.evt__lensrow.h-scroll {
-  display: flex; align-items: center; gap: var(--s-2);
-  padding: 2px 0 var(--s-2);   /* side gutters live on the wrapper */
-}
+   that's on. Share the doors' row — Events only has 3, not Marketplace's
+   6-8, so it fits without needing its own line. */
 .evt__lens {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; gap: 6px;
@@ -79,8 +79,8 @@
   .evt__feed { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
 }
 
-/* ── One-row nav (founder 2026-07-26): category tabs spread the full page
-   (the Concierge idiom) with the personal doors on the right. ───────────── */
+/* ── One-row nav: category tabs left-aligned, close together, with the
+   personal doors on the right. ─────────────────────────────────────── */
 .evt__nav {
   display: flex; align-items: center; gap: var(--s-3);
   padding: var(--s-3) var(--s-4);
@@ -88,7 +88,7 @@
 }
 .evt__nav-tabs {
   flex: 1; min-width: 0;
-  display: flex; justify-content: space-around; gap: var(--s-2);
+  display: flex; justify-content: flex-start; gap: var(--s-4);
   overflow-x: auto; scrollbar-width: none;
 }
 .evt__nav-tabs::-webkit-scrollbar { display: none; }

@@ -258,9 +258,10 @@ export default function Events() {
         <>
           {scoped && <FilterRow options={TABS} value={tab} onChange={setTab} />}
 
-          {/* THE DOORS — icon-only (matching Marketplace's 2026-08-08 pattern):
-              Search and Post are constant doors, not filters, so no caption. */}
-          <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools" gutter>
+          {/* THE DOORS (icon-only, Marketplace's 2026-08-08 pattern) share one
+              row with the type lenses — Events only has 3 (not Marketplace's
+              6-8), so it comfortably fits without needing its own line. */}
+          <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools and type filters" gutter>
             <button
               className="evt__action evt__action--door"
               onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
@@ -279,13 +280,10 @@ export default function Events() {
                 </svg>
               </span>
             </button>
-          </ScrollHintRow>
-
-          {/* Free / Trade / Paid read as signals, same vocabulary as
-              Marketplace's mode lenses — text + icon, no circle, a check
-              when it's on; select and deselect without eating a row of
-              height for a caption under a circle. */}
-          <ScrollHintRow className="evt__lensrow h-scroll" role="toolbar" ariaLabel="Event type filters" gutter>
+            <div className="evt__action-spacer" />
+            {/* Free / Trade / Paid read as signals, same vocabulary as
+                Marketplace's mode lenses — text + icon, no circle, a check
+                when it's on. */}
             {EVENT_MODES.map((m) => {
               const on = modes.includes(m.value);
               return (
