@@ -156,24 +156,6 @@ export default function FrontDoor() {
         </div>
       </section>
 
-      {/* Essays + Resources */}
-      <section className="fdoor__band fdoor__band--cards">
-        <a className="fdoor__card" href="/collections/02aa2dee-f955-54e9-879e-2542a7552e5f">
-          <img src={`${B}/hero-essays.jpg`} alt="" loading="lazy" />
-          <div>
-            <h3>The Lichen essays</h3>
-            <p>Why Lichen exists — mission, story, the care model, and the economics of a better world.</p>
-          </div>
-        </a>
-        <a className="fdoor__card" href="/collections/ea4ae9d1-a848-548e-83c6-7022cf81ea54">
-          <img src={`${B}/hero-involved.jpg`} alt="" loading="lazy" />
-          <div>
-            <h3>The Lichen bookshelf</h3>
-            <p>The books, talks and guides behind the work — trauma and healing, spirit, community, the living world.</p>
-          </div>
-        </a>
-      </section>
-
       {/* Donate band */}
       <section className="fdoor__band fdoor__band--donate"
         style={{ backgroundImage: `linear-gradient(rgba(30,24,18,.45), rgba(30,24,18,.45)), url(${B}/hero-donate.jpg)` }}>
