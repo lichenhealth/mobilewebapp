@@ -383,3 +383,22 @@
 }
 .chat__head-row .ai-door svg { width: 22px; height: 22px; }
 .chat__head-row .chat__new { margin-left: 0; }
+
+/* ─── Desktop split-view: inbox beside the open conversation ────────
+   Below 1024px, rows navigate to /chat/:id (ChatThread) as a full-page
+   takeover — unchanged. At 1024px+, Chat.tsx keeps the selected chat
+   inline via ChatConversation (the same self-contained component
+   ChatThread and Concierge's care tab already reuse) instead. ────── */
+@media (min-width: 1024px) {
+  .chat { display: grid; grid-template-columns: 380px 1fr; align-items: start; }
+  .chat__list-pane { min-width: 0; }
+  .chat__thread-pane {
+    position: sticky;
+    top: calc(var(--top-h) + var(--s-6));
+    align-self: start;
+    height: calc(100vh - var(--top-h) - var(--s-6));
+    border-left: 1px solid var(--bone-edge);
+    background: var(--bone);
+  }
+  .conv-row.is-active { background: var(--peach-tint); }
+}

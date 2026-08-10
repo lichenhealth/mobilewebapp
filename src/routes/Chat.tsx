@@ -10,6 +10,7 @@ import {
 import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
 import AssistantDoor from '../components/AssistantDoor';
+import ChatConversation from '../components/ChatConversation';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
@@ -17,6 +18,13 @@ export default function Chat() {
   const [unread, setUnread] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
+  // Desktop split-view: open a conversation beside the list instead of
+  // navigating away to the mobile full-page thread. `?open=` keeps it
+  // linkable/refreshable; below 1024px this stays unset and rows just
+  // navigate to /chat/:id (ChatThread) as before.
+  const [selectedId, setSelectedId] = useState<string | undefined>(
+    () => new URLSearchParams(window.location.search).get('open') || undefined,
+  );
   // Searching message HISTORY, not just the latest line (founder 2026-07-28).
   // RLS scopes it to rooms you're in; debounced so typing stays cheap.
   const [msgHits, setMsgHits] = useState<MessageHit[]>([]);
@@ -32,6 +40,23 @@ export default function Chat() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+
+  function openChat(id: string) {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setSelectedId(id);
+      const url = new URL(window.location.href);
+      url.searchParams.set('open', id);
+      window.history.replaceState(null, '', url);
+    } else {
+      navigate(`/chat/${id}`);
+    }
+  }
+  function closeThread() {
+    setSelectedId(undefined);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('open');
+    window.history.replaceState(null, '', url);
+  }
 
   useEffect(() => {
     if (!me) return;
@@ -53,6 +78,7 @@ export default function Chat() {
 
   return (
     <div className="chat">
+      <div className="chat__list-pane">
       <header className="chat__head">
         <div className="chat__head-row">
           <div>
@@ -116,7 +142,7 @@ export default function Chat() {
                 <button
                   key={m.id}
                   className="chat__msghit"
-                  onClick={() => navigate(`/chat/${m.chat_id}`)}
+                  onClick={() => openChat(m.chat_id)}
                 >
                   <span className="chat__msghit-top">
                     <strong>{m.senderName ?? 'A member'}</strong>
@@ -137,7 +163,8 @@ export default function Chat() {
             me={me}
             highlight={query}
             unread={unread.get(c.id) ?? 0}
-            onClick={() => navigate(`/chat/${c.id}`)}
+            active={c.id === selectedId}
+            onClick={() => openChat(c.id)}
           />
         ))}
       </div>
@@ -150,7 +177,7 @@ export default function Chat() {
             try {
               const chatId = await ensureDirectChat(otherId);
               setPicking(false);
-              navigate(`/chat/${chatId}`);
+              openChat(chatId);
             } catch (e) {
               console.error(e);
               alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e)));
@@ -158,11 +185,21 @@ export default function Chat() {
           }}
         />
       )}
+      </div>
+
+      {/* Desktop split-view only (Chat.css hides/shows via the 1024px grid;
+          not rendered at all on mobile since selectedId only ever gets set
+          from openChat's desktop branch). */}
+      {selectedId && (
+        <div className="chat__thread-pane">
+          <ChatConversation chatId={selectedId} me={me} onBack={closeThread} />
+        </div>
+      )}
     </div>
   );
 }
 
-function ConversationRow({ chat, me, highlight, unread = 0, onClick }: { chat: ChatVM; me: string; highlight?: string; unread?: number; onClick: () => void }) {
+function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void }) {
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
   const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
@@ -172,7 +209,7 @@ function ConversationRow({ chat, me, highlight, unread = 0, onClick }: { chat: C
   const showSender = last && !isDM;
 
   return (
-    <button className={'conv-row' + (unread > 0 ? ' has-unread' : '')} onClick={onClick}>
+    <button className={'conv-row' + (unread > 0 ? ' has-unread' : '') + (active ? ' is-active' : '')} onClick={onClick}>
       <div className="conv-row__avatar-stack">
         <GroupAvatar chat={chat} me={me} />
       </div>
