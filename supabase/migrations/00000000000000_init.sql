@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1TRVPDRvbLCvUamddEMJr7Ueo0jf3BUvUlWvN20eyhmF9in8Pzoiv8aOvrMZnCu
+\restrict FJWog5kdn7rLhbutsEUmS4Cr4p0s6Gj8N2mwSi0iQjiI2UMUhsqRbqLo60ccMRf
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -148,6 +148,30 @@ $$;
 
 
 ALTER FUNCTION public.admin_list_supporters() OWNER TO postgres;
+
+--
+-- Name: admin_search_members(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.admin_search_members(p_q text) RETURNS TABLE(profile_id uuid, full_name text, email text, tier text, source text, status text, current_period_end timestamp with time zone)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select p.id, p.full_name, p.email,
+         s.tier, s.source, s.status, s.current_period_end
+  from public.profiles p
+  left join public.subscriptions s on s.profile_id = p.id
+  where (select is_admin from public.profiles where id = auth.uid())
+    and (
+      p.full_name ilike '%' || p_q || '%'
+      or p.email ilike '%' || p_q || '%'
+    )
+  order by p.full_name nulls last
+  limit 12;
+$$;
+
+
+ALTER FUNCTION public.admin_search_members(p_q text) OWNER TO postgres;
 
 --
 -- Name: alias_category_suggestion(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -9106,6 +9130,15 @@ GRANT ALL ON FUNCTION public.admin_list_supporters() TO service_role;
 
 
 --
+-- Name: FUNCTION admin_search_members(p_q text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.admin_search_members(p_q text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.admin_search_members(p_q text) TO authenticated;
+GRANT ALL ON FUNCTION public.admin_search_members(p_q text) TO service_role;
+
+
+--
 -- Name: FUNCTION alias_category_suggestion(p_suggestion uuid, p_category text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11220,7 +11253,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1TRVPDRvbLCvUamddEMJr7Ueo0jf3BUvUlWvN20eyhmF9in8Pzoiv8aOvrMZnCu
+\unrestrict FJWog5kdn7rLhbutsEUmS4Cr4p0s6Gj8N2mwSi0iQjiI2UMUhsqRbqLo60ccMRf
 
 
 

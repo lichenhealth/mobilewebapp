@@ -148,6 +148,21 @@ async function record(subFromEvent: any, isDeleted: boolean) {
   const profileId = subFromEvent.metadata?.profile_id;
   if (!profileId) return; // not one of ours
 
+  // An admin gift-override outranks Stripe events (founder 2026-08-11:
+  // "override a Stripe membership with a gifted one"). gift_subscription
+  // nulls the row's stripe ids; if this event's subscription isn't the one
+  // the row points at, the row was deliberately handed to a gift and this
+  // event (a renewal, or the deleted event from the cancel that made room
+  // for the override) must not claw it back.
+  const { data: existing } = await admin.from('subscriptions')
+    .select('source, status, stripe_subscription_id')
+    .eq('profile_id', profileId)
+    .maybeSingle();
+  if (
+    existing?.source === 'gift' && existing.status === 'active'
+    && existing.stripe_subscription_id !== subFromEvent.id
+  ) return;
+
   // For create/update, fetch the authoritative current state (avoids stale or
   // out-of-order event payloads). For delete, the sub is gone — use the event.
   let sub = subFromEvent;
