@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FJWog5kdn7rLhbutsEUmS4Cr4p0s6Gj8N2mwSi0iQjiI2UMUhsqRbqLo60ccMRf
+\restrict 8zhi8AKxOVeDlo8Cd0zaRmPlnQFN3kiTEJOGZr9KB4kH2L5ZJbIY4SbugEXMMMN
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -848,6 +848,47 @@ end; $$;
 ALTER FUNCTION public.claim_care_invitations() OWNER TO postgres;
 
 --
+-- Name: claim_gifts_for_email(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.claim_gifts_for_email(p_user uuid, p_email text) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare g record; v_count int := 0;
+begin
+  if p_user is null or coalesce(p_email, '') = '' then return 0; end if;
+  for g in
+    select * from public.membership_gifts
+    where lower(invitee_email) = lower(p_email) and status = 'pending'
+    order by (tier = 'concierge') desc, created_at desc
+  loop
+    insert into public.subscriptions (profile_id, tier, source, status, granted_by, granted_at, current_period_end, updated_at)
+    values (
+      p_user, g.tier, 'gift', 'active', g.inviter_id, now(),
+      case when g.months is null then null else now() + make_interval(months => g.months) end,
+      now()
+    )
+    on conflict (profile_id) do nothing;
+    update public.membership_gifts
+      set status = 'claimed', claimed_profile_id = p_user, claimed_at = now()
+      where id = g.id;
+    perform public.notify(
+      p_user, 'membership', null, 'membership_gifted',
+      'Your gift is active: ' || coalesce(public.gift_span_text(g.months) || ' of ', '') || 'Lichen (' || initcap(g.tier) || ')',
+      'Welcome in.',
+      '/membership', g.inviter_id
+    );
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end;
+$$;
+
+
+ALTER FUNCTION public.claim_gifts_for_email(p_user uuid, p_email text) OWNER TO postgres;
+
+--
 -- Name: claim_invite(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -855,12 +896,12 @@ CREATE FUNCTION public.claim_invite(p_token uuid) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_inviter uuid; v_name text; v_minor boolean;
+declare v_inviter uuid; v_name text; v_minor boolean; v_invitee text;
 begin
   update public.invite_tokens
   set claimed_by = auth.uid(), claimed_at = now()
   where token = p_token and claimed_by is null and created_by <> auth.uid()
-  returning created_by, for_minor into v_inviter, v_minor;
+  returning created_by, for_minor, invitee_email into v_inviter, v_minor, v_invitee;
   if v_inviter is null then return; end if;
 
   if coalesce(v_minor, false) then
@@ -872,6 +913,12 @@ begin
   insert into public.mycelium (truster_id, target_type, target_id)
   values (v_inviter, 'profile', auth.uid()), (auth.uid(), 'profile', v_inviter)
   on conflict do nothing;
+
+  -- The token proves this is the invited person even when they signed up
+  -- under a different address — deliver any gift riding the invitation
+  -- (the audit found one orphaned exactly this way).
+  perform public.claim_gifts_for_email(auth.uid(), v_invitee);
+
   select full_name into v_name from public.profiles where id = auth.uid();
   perform public.notify(
     v_inviter, 'home', null, 'invite_accepted',
@@ -890,41 +937,10 @@ ALTER FUNCTION public.claim_invite(p_token uuid) OWNER TO postgres;
 --
 
 CREATE FUNCTION public.claim_membership_gift() RETURNS integer
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  v_uid   uuid := auth.uid();
-  v_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
-  g       record;
-  v_count int := 0;
-begin
-  if v_uid is null or v_email = '' then return 0; end if;
-  for g in
-    select * from public.membership_gifts
-    where lower(invitee_email) = v_email and status = 'pending'
-    order by (tier = 'concierge') desc, created_at desc
-  loop
-    insert into public.subscriptions (profile_id, tier, source, status, granted_by, granted_at, current_period_end, updated_at)
-    values (
-      v_uid, g.tier, 'gift', 'active', g.inviter_id, now(),
-      case when g.months is null then null else now() + make_interval(months => g.months) end,
-      now()
-    )
-    on conflict (profile_id) do nothing;
-    update public.membership_gifts
-      set status = 'claimed', claimed_profile_id = v_uid, claimed_at = now()
-      where id = g.id;
-    perform public.notify(
-      v_uid, 'membership', null, 'membership_gifted',
-      'Your gift is active: ' || coalesce(public.gift_span_text(g.months) || ' of ', '') || 'Lichen (' || initcap(g.tier) || ')',
-      'Welcome in.',
-      '/membership', g.inviter_id
-    );
-    v_count := v_count + 1;
-  end loop;
-  return v_count;
-end;
+  select public.claim_gifts_for_email(auth.uid(), auth.jwt() ->> 'email');
 $$;
 
 
@@ -2027,6 +2043,30 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
 begin
   insert into public.profiles (id, email, full_name)
   values (new.id, new.email, coalesce(new.raw_user_meta_data ->> 'full_name', ''));
+
+  -- Claim any invite addressed to this email the moment the account exists —
+  -- the old client-side path only fired for people who arrived through the
+  -- exact emailed link AND finished onboarding AND weren't admins, which
+  -- left real joiners shown as "open" forever. The weave is the invite's
+  -- promise, so it happens here too; claim_invite() (token path, for people
+  -- who signed up under a different address) no-ops on rows claimed here.
+  update public.invite_tokens t
+  set claimed_by = new.id, claimed_at = now()
+  where t.claimed_by is null
+    and lower(t.invitee_email) = lower(new.email)
+    and t.created_by <> new.id;
+
+  insert into public.mycelium (truster_id, target_type, target_id)
+  select x.created_by, 'profile', new.id
+  from public.invite_tokens x
+  where x.claimed_by = new.id
+  on conflict do nothing;
+  insert into public.mycelium (truster_id, target_type, target_id)
+  select new.id, 'profile', x.created_by
+  from public.invite_tokens x
+  where x.claimed_by = new.id
+  on conflict do nothing;
+
   return new;
 end;
 $$;
@@ -2455,6 +2495,22 @@ $$;
 
 
 ALTER FUNCTION public.mark_chat_read(p_chat uuid) OWNER TO postgres;
+
+--
+-- Name: mark_invite_opened(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.mark_invite_opened(p_token uuid) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  update public.invite_tokens
+  set opened_at = coalesce(opened_at, now())
+  where token = p_token;
+$$;
+
+
+ALTER FUNCTION public.mark_invite_opened(p_token uuid) OWNER TO postgres;
 
 --
 -- Name: match_marketplace_post(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4593,11 +4649,19 @@ CREATE TABLE public.invite_tokens (
     claimed_by uuid,
     claimed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    for_minor boolean DEFAULT false NOT NULL
+    for_minor boolean DEFAULT false NOT NULL,
+    opened_at timestamp with time zone
 );
 
 
 ALTER TABLE public.invite_tokens OWNER TO postgres;
+
+--
+-- Name: COLUMN invite_tokens.opened_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.invite_tokens.opened_at IS 'First time the invite link landed on the signup page — the "Opened" status. Stronger signal than an email-open pixel.';
+
 
 --
 -- Name: join_requests; Type: TABLE; Schema: public; Owner: postgres
@@ -9338,6 +9402,14 @@ GRANT ALL ON FUNCTION public.claim_care_invitations() TO service_role;
 
 
 --
+-- Name: FUNCTION claim_gifts_for_email(p_user uuid, p_email text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.claim_gifts_for_email(p_user uuid, p_email text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.claim_gifts_for_email(p_user uuid, p_email text) TO service_role;
+
+
+--
 -- Name: FUNCTION claim_invite(p_token uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -9829,6 +9901,16 @@ GRANT ALL ON FUNCTION public.mappable_members() TO service_role;
 GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO anon;
 GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.mark_chat_read(p_chat uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION mark_invite_opened(p_token uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.mark_invite_opened(p_token uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.mark_invite_opened(p_token uuid) TO anon;
+GRANT ALL ON FUNCTION public.mark_invite_opened(p_token uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.mark_invite_opened(p_token uuid) TO service_role;
 
 
 --
@@ -11253,7 +11335,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FJWog5kdn7rLhbutsEUmS4Cr4p0s6Gj8N2mwSi0iQjiI2UMUhsqRbqLo60ccMRf
+\unrestrict 8zhi8AKxOVeDlo8Cd0zaRmPlnQFN3kiTEJOGZr9KB4kH2L5ZJbIY4SbugEXMMMN
 
 
 

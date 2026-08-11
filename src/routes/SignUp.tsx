@@ -23,6 +23,9 @@ export default function SignUp() {
   useEffect(() => {
     if (!inviteToken) return;
     let live = true;
+    // Landing here with the token IS the "Opened" status on /invite —
+    // stamped once, fire-and-forget (founder 2026-08-11).
+    void supabase.rpc('mark_invite_opened', { p_token: inviteToken }).then(() => {}, () => {});
     void supabase.rpc('check_invite', { p_token: inviteToken }).then(({ data, error }) => {
       if (!live) return;
       const d = data as { valid?: boolean; inviter?: string; for_minor?: boolean } | null;

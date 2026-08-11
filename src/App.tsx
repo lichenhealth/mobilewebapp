@@ -133,6 +133,26 @@ export default function App() {
   // straight in without ever seeing the paywall.
   const memberOk = useRef(false);
   const endingNoticed = useRef(false);
+
+  // Invite claim (founder 2026-07-28): the signup page parked the token;
+  // claiming weaves inviter and invitee into each other's web. This used to
+  // live inside the membership gate below, which never runs for admins, for
+  // anyone mid-onboarding, or on gate-exempt paths — real joiners stayed
+  // "open" on /invite forever (2026-08-11 audit). Now it runs the moment a
+  // session exists, and the token only leaves localStorage once the RPC
+  // SUCCEEDS, so one network blip doesn't lose the claim for good.
+  // (Email-matching invites are claimed server-side at signup regardless —
+  // this token path is for people who signed up under a different address.)
+  useEffect(() => {
+    if (!user) return;
+    const invTok = localStorage.getItem('lichen-invite-token');
+    if (!invTok) return;
+    void supabase.rpc('claim_invite', { p_token: invTok }).then(
+      () => localStorage.removeItem('lichen-invite-token'),
+      () => {},
+    );
+  }, [user]);
+
   useEffect(() => {
     if (memberOk.current || loading || !user || onboarded !== true || isAdmin) return;
     if (GATE_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return;
@@ -146,13 +166,6 @@ export default function App() {
       const giftAlive = !sub || sub.source !== 'gift'
         || !sub.current_period_end || new Date(sub.current_period_end) > new Date();
       let ok = !!sub && ['active', 'past_due'].includes(sub.status) && giftAlive;
-      // Invite claim (founder 2026-07-28): the signup page parked the token;
-      // claiming weaves inviter and invitee into each other's web. Once.
-      const invTok = localStorage.getItem('lichen-invite-token');
-      if (invTok) {
-        localStorage.removeItem('lichen-invite-token');
-        void supabase.rpc('claim_invite', { p_token: invTok }).then(() => {}, () => {});
-      }
       if (!ok) {
         const { data: claimed } = await supabase.rpc('claim_membership_gift');
         ok = ((claimed as number | null) ?? 0) > 0;

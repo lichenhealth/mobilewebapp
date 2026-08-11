@@ -170,6 +170,12 @@ Deno.serve(async (req) => {
 
   if (!res.ok) {
     const detail = await res.text();
+    // The token was minted BEFORE the send — leaving it behind makes a
+    // failed email indistinguishable from a delivered invitation on
+    // /invite (2026-08-11 audit, bug 3). Un-mint it.
+    if (token) {
+      await svc.from('invite_tokens').delete().eq('token', token).is('claimed_by', null);
+    }
     return json({ error: 'Email provider rejected the send.', detail }, 502);
   }
 
