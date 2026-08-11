@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import './CollapsibleSection.css';
 
 export interface CollapsibleSectionProps {
+  id?: string;
   title: string;
   /** Peach dot beside the title — "this section is contributing/set right now" (founder 2026-08-10: reuse SmartSearchCore's manual-search criteria pattern). */
   active?: boolean;
@@ -19,9 +20,9 @@ export interface CollapsibleSectionProps {
  *  lookalike. Controlled — the caller owns open/onToggle, same as the
  *  search panel's own `openSects` Set, so callers can choose independent
  *  or exclusive-accordion behavior. */
-export default function CollapsibleSection({ title, active, open, onToggle, children }: CollapsibleSectionProps) {
+export default function CollapsibleSection({ id, title, active, open, onToggle, children }: CollapsibleSectionProps) {
   return (
-    <div className={'coll' + (open ? ' is-open' : '')}>
+    <div id={id} className={'coll' + (open ? ' is-open' : '')}>
       <button className="coll__head" onClick={onToggle} aria-expanded={open}>
         <span className="coll__label">
           {title}

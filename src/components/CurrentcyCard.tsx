@@ -3,17 +3,28 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { formatDateShort } from '../lib/conciergeApi';
 import {
-  LedgerEntry, myBalance, myStatement, sendCurrentcy, fmtCurrentNum,
+  LedgerEntry, EntityType, balanceOf, statementOf, sendCurrentcy, fmtCurrentNum,
 } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
 interface MemberLite { id: string; full_name: string | null }
 
-/** The member's Current-cy wallet (Profile section): balance, statement,
- *  and a small send flow. Hidden entirely until the ledger migration runs. */
-export default function CurrentcyCard() {
+export interface CurrentcyCardProps {
+  /** Whose wallet — defaults to the signed-in member's own. */
+  partyType?: EntityType;
+  partyId?: string;
+}
+
+/** A Current-cy wallet — balance, statement, and a small send flow. Used for
+ *  a member's own (Profile) and, since the ledger already treats spaces as
+ *  first-class parties, any space's too (SpaceProfile backstage, founder
+ *  2026-08-10 profile-features spreadsheet). Hidden entirely until the
+ *  ledger migration runs / the party has no wallet activity. Caller
+ *  supplies the section chrome (title, collapse) — this renders content
+ *  only. */
+export default function CurrentcyCard({ partyType = 'profile', partyId }: CurrentcyCardProps) {
   const { user } = useAuth();
-  const me = user?.id ?? '';
+  const me = partyId ?? user?.id ?? '';
 
   const [balance, setBalance] = useState<number | null>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
@@ -27,11 +38,11 @@ export default function CurrentcyCard() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const [b, s] = await Promise.all([myBalance(me), myStatement(me, 12)]);
+    const [b, s] = await Promise.all([balanceOf(partyType, me), statementOf(partyType, me, 12)]);
     setBalance(b);
     setEntries(s);
   };
-  useEffect(() => { if (me) void load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [me]);
+  useEffect(() => { if (me) void load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [me, partyType]);
 
   useEffect(() => {
     const n = who.trim();
@@ -53,7 +64,7 @@ export default function CurrentcyCard() {
     if (!Number.isFinite(amt) || amt <= 0) { setError('Enter an amount.'); return; }
     setBusy(true); setError('');
     try {
-      await sendCurrentcy('profile', me, 'profile', pick.id, amt, memo.trim());
+      await sendCurrentcy(partyType, me, 'profile', pick.id, amt, memo.trim());
       setSendOpen(false); setWho(''); setPick(null); setAmount(''); setMemo('');
       await load();
     } catch (e) {
@@ -63,8 +74,6 @@ export default function CurrentcyCard() {
   };
 
   return (
-    <section className="prof__section">
-      <h2 className="prof__h2">Current-cy</h2>
       <div className="curc">
         <div className="curc__balrow">
           <span className="curc__bal">
@@ -118,7 +127,7 @@ export default function CurrentcyCard() {
         {entries.length > 0 && (
           <div className="curc__list">
             {entries.map((e) => {
-              const incoming = e.to_type === 'profile' && e.to_id === me;
+              const incoming = e.to_type === partyType && e.to_id === me;
               return (
                 <div className="curc__entry" key={e.id}>
                   <span className={'curc__amt' + (incoming ? ' is-in' : '')}>
@@ -141,6 +150,5 @@ export default function CurrentcyCard() {
           </p>
         )}
       </div>
-    </section>
   );
 }

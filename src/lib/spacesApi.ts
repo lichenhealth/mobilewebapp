@@ -69,6 +69,13 @@ export interface SpaceProfileRow {
   /** This space works without the assistant (founder 2026-08-05) — its AI
    *  door reads slashed for everyone. Absent pre-migration = on. */
   assistant_enabled?: boolean;
+  /** Privacy toggles mirroring profiles' own (founder 2026-08-10 profile-
+   *  features spreadsheet). Absent pre-migration = on, same convention as
+   *  assistant_enabled above. */
+  findable?: boolean;
+  assistant_readable?: boolean;
+  content_ai_default?: boolean;
+  content_download_default?: boolean;
   parent: { id: string; name: string } | null;   // a group's home community/org
 }
 
@@ -77,7 +84,7 @@ export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | nu
   // CHILDREN direction (an array), not the parent. Fetch the parent by id.
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page, assistant_enabled')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page, assistant_enabled, findable, assistant_readable, content_ai_default, content_download_default')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }

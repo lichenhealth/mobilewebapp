@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TGjIKGuwkwOLzfcfNNAJWnaeMhnxuXlK0gve9dG4gcryCznR9beng13avXFOVb3
+\restrict 1TRVPDRvbLCvUamddEMJr7Ueo0jf3BUvUlWvN20eyhmF9in8Pzoiv8aOvrMZnCu
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -5079,11 +5079,43 @@ CREATE TABLE public.spaces (
     contact jsonb,
     public_page boolean NOT NULL,
     page jsonb,
-    assistant_enabled boolean DEFAULT true NOT NULL
+    assistant_enabled boolean DEFAULT true NOT NULL,
+    findable boolean DEFAULT true NOT NULL,
+    assistant_readable boolean DEFAULT true NOT NULL,
+    content_ai_default boolean DEFAULT true NOT NULL,
+    content_download_default boolean DEFAULT true NOT NULL
 );
 
 
 ALTER TABLE public.spaces OWNER TO postgres;
+
+--
+-- Name: COLUMN spaces.findable; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.spaces.findable IS 'Appears in directory/search — mirrors profiles.findable.';
+
+
+--
+-- Name: COLUMN spaces.assistant_readable; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.spaces.assistant_readable IS 'Other members'' assistants may read this space''s content when briefing — mirrors profiles.assistant_readable. Distinct from assistant_enabled (whether THIS space''s own assistant is on).';
+
+
+--
+-- Name: COLUMN spaces.content_ai_default; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.spaces.content_ai_default IS 'Default AI-readable flag for this space''s new posts — mirrors profiles.content_ai_default.';
+
+
+--
+-- Name: COLUMN spaces.content_download_default; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.spaces.content_download_default IS 'Default downloadable-media flag for this space''s new posts — mirrors profiles.content_download_default.';
+
 
 --
 -- Name: subscriptions; Type: TABLE; Schema: public; Owner: postgres
@@ -11188,7 +11220,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TGjIKGuwkwOLzfcfNNAJWnaeMhnxuXlK0gve9dG4gcryCznR9beng13avXFOVb3
+\unrestrict 1TRVPDRvbLCvUamddEMJr7Ueo0jf3BUvUlWvN20eyhmF9in8Pzoiv8aOvrMZnCu
+
 
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)

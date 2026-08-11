@@ -104,18 +104,18 @@ export default function TopBar({
     navigate('/login', { replace: true });
   }
 
-  /** Pick an identity: act as it AND land on its profile. Beings you steward
-   *  live on /members/:id, same as any other member (founder 2026-08-05). */
+  /** Pick an identity: act as it, and stay exactly where you were (founder
+   *  2026-08-10) — you switched from this page for a reason; pages that
+   *  care who's acting (Profile's own redirect, Calendar's default
+   *  calendar) react to the actor change themselves, so the switcher
+   *  doesn't need to force navigation on top of that. */
   function pickIdentity(target: 'self' | (typeof options)[number] | (typeof beings)[number]) {
     if (target === 'self') {
       setActor({ type: 'self' });
-      navigate('/profile');
     } else if ('kind' in target && !SPACE_KINDS.includes(target.kind)) {
       setActor({ type: 'being', id: target.id, name: target.name, kind: target.kind });
-      navigate(`/members/${target.id}`);
     } else {
       setActor({ type: 'space', ...(target as (typeof options)[number]) });
-      navigate(`/spaces/${target.id}`);
     }
     setSwitchOpen(false);
   }

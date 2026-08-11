@@ -15,6 +15,7 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import { aiDoorOn } from '../components/AssistantDoor';
 import './Mycelium.css';
@@ -60,8 +61,17 @@ type Item = {
 
 export default function Mycelium() {
   const { user } = useAuth();
+  const { actor } = useActing();
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
+
+  // A space has no web of its own yet (mycelium.truster_id is profile-only)
+  // — acting as one land here means Galyn's personal web renders under a
+  // misleadingly "yours" header. Until that's built, send the space's own
+  // page instead of showing the wrong person's data (founder 2026-08-10).
+  useEffect(() => {
+    if (actor.type === 'space') navigate(`/spaces/${actor.id}`, { replace: true });
+  }, [actor, navigate]);
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }

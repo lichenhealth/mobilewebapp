@@ -21,18 +21,24 @@ export interface LedgerEntry {
   to_name?: string;
 }
 
-/** Your balance. Returns null (not 0) when the ledger isn't live yet. */
-export async function myBalance(me: string): Promise<number | null> {
-  const { data, error } = await supabase.rpc('ledger_balance', { p_type: 'profile', p_id: me });
+/** Balance for a profile or a space. Returns null (not 0) when the ledger
+ *  isn't live yet. */
+export async function balanceOf(type: EntityType, id: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc('ledger_balance', { p_type: type, p_id: id });
   if (error) { console.warn('ledger_balance:', error.message); return null; }
   return Number(data ?? 0);
 }
 
-/** Your statement, newest first, with names resolved. */
-export async function myStatement(me: string, limit = 20): Promise<LedgerEntry[]> {
+/** Your balance. Returns null (not 0) when the ledger isn't live yet. */
+export async function myBalance(me: string): Promise<number | null> {
+  return balanceOf('profile', me);
+}
+
+/** Statement for a profile or a space, newest first, with names resolved. */
+export async function statementOf(type: EntityType, id: string, limit = 20): Promise<LedgerEntry[]> {
   const { data, error } = await supabase.from('ledger_entries')
     .select('id, from_type, from_id, to_type, to_id, amount, context, memo, created_at')
-    .or(`and(from_type.eq.profile,from_id.eq.${me}),and(to_type.eq.profile,to_id.eq.${me})`)
+    .or(`and(from_type.eq.${type},from_id.eq.${id}),and(to_type.eq.${type},to_id.eq.${id})`)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) { console.warn('myStatement:', error.message); return []; }
@@ -55,6 +61,11 @@ export async function myStatement(me: string, limit = 20): Promise<LedgerEntry[]
     t === null || id === null ? 'Lichen'
       : t === 'profile' ? (pName.get(id) ?? 'A member') : (sName.get(id) ?? 'A group');
   return rows.map((r) => ({ ...r, from_name: nameOf(r.from_type, r.from_id), to_name: nameOf(r.to_type, r.to_id) }));
+}
+
+/** Your statement, newest first, with names resolved. */
+export async function myStatement(me: string, limit = 20): Promise<LedgerEntry[]> {
+  return statementOf('profile', me, limit);
 }
 
 export async function sendCurrentcy(

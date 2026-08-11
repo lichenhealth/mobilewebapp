@@ -28,6 +28,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
 import ContactFields, { type ContactInfo } from '../components/ContactFields';
 import PageTabsEditor from '../components/PageTabsEditor';
+import CollapsibleSection from '../components/CollapsibleSection';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -369,9 +370,25 @@ export default function Profile() {
   }, [offerQ, user?.id]);
 
   const { hash } = useLocation();
+  // Each section opens inline, click to edit, then collapses back down
+  // (founder 2026-08-10: reusing the manual-search criteria pattern) —
+  // independent, not exclusive-accordion, so more than one can stay open.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggleSection = (key: string) => setOpenSections((s) => {
+    const next = new Set(s);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  // Care team / people you care for / young people you hold / beings you
+  // steward all live inside one "Concierge" accordion item now (founder's
+  // profile-features spreadsheet, 2026-08-10) — their old standalone
+  // anchors still work, they just open the shared parent instead.
+  const SECTION_ALIAS: Record<string, string> = { 'care-for': 'concierge', holding: 'concierge', stewarding: 'concierge' };
   useEffect(() => {
     if (!hash) return;
     const id = hash.slice(1);
+    const openKey = SECTION_ALIAS[id] ?? id;
+    setOpenSections((s) => (s.has(openKey) ? s : new Set(s).add(openKey)));
     let tries = 0;
     const tick = window.setInterval(() => {
       const el = document.getElementById(id);
@@ -695,8 +712,7 @@ export default function Profile() {
       {error && <p className="prof__error">{error}</p>}
 
 
-      <section className="prof__section">
-        <h2 className="prof__h2">About you</h2>
+      <CollapsibleSection id="about" title="About you" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
         <div className="prof__field">
           <label className="prof__label">First name</label>
           <input className="prof__input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
@@ -734,14 +750,13 @@ export default function Profile() {
           </button>
           {profileMsg && <span className="prof__msg">{profileMsg}</span>}
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* Privacy: the one place that answers "who can see what, and what can
           AI assist with" (founder 2026-07-28). Settings whose subject lives
           elsewhere keep living there — this hub owns the homeless ones and
           points at the rest, so nothing is hidden and nothing is duplicated. */}
-      <section className="prof__section" id="privacy">
-        <h2 className="prof__h2">Privacy</h2>
+      <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
         <p className="prof__care-lead">
           Who can see what, and what the assistant may help with. Almost everything is
           on by default and yours to switch off.
@@ -834,12 +849,11 @@ export default function Profile() {
           </button>{' '}
           walks every switch in five minutes.
         </p>
-      </section>
+      </CollapsibleSection>
 
       {user && <HomeLocationSection me={user.id} />}
 
-      <section className="prof__section">
-        <h2 className="prof__h2">Notifications</h2>
+      <CollapsibleSection id="notifications" title="Notifications" open={openSections.has('notifications')} onToggle={() => toggleSection('notifications')}>
         <p className="prof__care-lead">How would you like to get notified?</p>
         <div className="prof__notif-opts">
           {([
@@ -882,10 +896,9 @@ export default function Profile() {
           </div>
           {pushMsg && <p className="prof__push-msg">{pushMsg}</p>}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      <section className="prof__section">
-        <h2 className="prof__h2">What you offer</h2>
+      <CollapsibleSection id="offer" title="What you offer" open={openSections.has('offer')} onToggle={() => toggleSection('offer')}>
         <div className="prof__caps">
           {CAPS.map((c) => (
             <button key={c.id} type="button"
@@ -935,12 +948,14 @@ export default function Profile() {
             />
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
-      <CurrentcyCard />
+      <CollapsibleSection id="currentcy" title="Current-cy" open={openSections.has('currentcy')} onToggle={() => toggleSection('currentcy')}>
+        <CurrentcyCard />
+      </CollapsibleSection>
 
-      <section className="prof__section">
-        <h2 className="prof__h2">Your care team</h2>
+      <CollapsibleSection id="concierge" title="Concierge" open={openSections.has('concierge')} onToggle={() => toggleSection('concierge')}>
+        <p className="prof__privacy-sub">Your care team</p>
         <p className="prof__care-lead">People who help care for you. They approve before joining.</p>
         <p className="prof__empty">
           {myTeam.length === 0
@@ -951,10 +966,8 @@ export default function Profile() {
           Manage my care team
           <span aria-hidden="true"> →</span>
         </button>
-      </section>
 
-      <section className="prof__section">
-        <h2 className="prof__h2" id="care-for">People you care for</h2>
+        <p className="prof__privacy-sub" id="care-for">People you care for</p>
         <p className="prof__care-lead">Members who’ve added you as a caregiver, or whom you’ve offered to help.</p>
         <button className="prof__care-dash" onClick={() => navigate('/caregiver')}>
           Open caregiver dashboard
@@ -1033,11 +1046,10 @@ export default function Profile() {
             disabled={careBusy || !patientEmail.trim()}>Offer</button>
         </div>
         {careMsg && <p className="prof__care-msg">{careMsg}</p>}
-      </section>
 
       {minors.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2" id="holding">Young people you hold</h2>
+        <>
+          <p className="prof__privacy-sub" id="holding">Young people you hold</p>
           <p className="prof__care-lead">
             They can offer what they make and keep what they earn. Buying, selling and
             meeting wait on your yes.
@@ -1077,15 +1089,15 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </section>
+        </>
       )}
 
       {/* Beings you steward (founder 2026-08-05). A therapy horse, a sacred
           plant, a river — real members with no login, who act through you.
           The section hides itself until the stewardship migration lands. */}
       {beingsOn && (
-        <section className="prof__section">
-          <h2 className="prof__h2" id="stewarding">Beings you steward</h2>
+        <>
+          <p className="prof__privacy-sub" id="stewarding">Beings you steward</p>
           <p className="prof__care-lead">
             Members who can&rsquo;t hold a password — an animal, a plant, a place, an
             element. They earn, hold and spend in their own name; you act for them.
@@ -1144,15 +1156,15 @@ export default function Profile() {
             </button>
             {beingMsg && <p className="prof__care-msg">{beingMsg}</p>}
           </div>
-        </section>
+        </>
       )}
+      </CollapsibleSection>
 
       {SPACE_SECTIONS.map((sec) => {
         const mine = spaces.filter((s) => s.kind === sec.kind);
         const article = /^[aeiou]/i.test(sec.one) ? 'an' : 'a';
         return (
-          <section className="prof__section" key={sec.kind}>
-            <h2 className="prof__h2">{sec.title}</h2>
+          <CollapsibleSection key={sec.kind} id={sec.kind} title={sec.title} open={openSections.has(sec.kind)} onToggle={() => toggleSection(sec.kind)}>
             {mine.length === 0 && <p className="prof__empty">None yet.</p>}
             <div className="prof__spaces">
               {mine.map((s) => {
@@ -1193,13 +1205,12 @@ export default function Profile() {
                 {addingKind === sec.kind ? 'Adding...' : `Add ${article} ${sec.one}`}
               </button>
             </div>
-          </section>
+          </CollapsibleSection>
         );
       })}
 
       {isAdmin && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Admin</h2>
+        <CollapsibleSection id="admin" title="Admin" open={openSections.has('admin')} onToggle={() => toggleSection('admin')}>
           <p className="prof__care-lead">Lichen-wide tools — only admins see this section.</p>
           <div className="prof__admin-rows">
             <button className="prof__admin-row" onClick={() => navigate('/admin/categories')}>
@@ -1214,7 +1225,7 @@ export default function Profile() {
               <span className="prof__admin-go" aria-hidden>→</span>
             </button>
           </div>
-        </section>
+        </CollapsibleSection>
       )}
 
       <div className="prof__signout">

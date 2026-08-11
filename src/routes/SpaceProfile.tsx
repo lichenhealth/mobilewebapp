@@ -42,6 +42,8 @@ import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
 import PublicPage, { type PageMeta } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
+import CollapsibleSection from '../components/CollapsibleSection';
+import CurrentcyCard from '../components/CurrentcyCard';
 import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
@@ -138,6 +140,22 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(true);
   const [aiEnabled, setAiEnabled] = useState(true);
+  const [handle, setHandle] = useState('');
+  // Privacy toggles mirroring Profile's own (founder 2026-08-10 profile-
+  // features spreadsheet).
+  const [findable, setFindable] = useState(true);
+  const [assistantReadable, setAssistantReadable] = useState(true);
+  const [contentAiDefault, setContentAiDefault] = useState(true);
+  const [contentDownloadDefault, setContentDownloadDefault] = useState(true);
+  // Each backstage section opens inline to edit, then collapses back down
+  // (founder 2026-08-10 profile-features spreadsheet — same interaction as
+  // Profile's own sections, lifted from the manual-search criteria panel).
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['about']));
+  const toggleSection = (key: string) => setOpenSections((s) => {
+    const next = new Set(s);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [awake, setAwake] = useState<number | null>(null);
@@ -164,7 +182,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
   // 2026-07-27: queues and edit tools on the public page are distracting).
-  const [editOpen, setEditOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -190,6 +207,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setRecommended(recs.has(`space:${id}`));
     if (s) {
       setName(s.name);
+      setHandle(s.handle ?? '');
       setParentPick(s.parent);
       setDescription(s.description ?? '');
       setLocText(s.location ?? '');
@@ -198,6 +216,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContact(sx.contact ?? {});
       setPublicPage(sx.public_page !== false);
       setAiEnabled((sx as { assistant_enabled?: boolean }).assistant_enabled !== false);
+      setFindable(s.findable !== false);
+      setAssistantReadable(s.assistant_readable !== false);
+      setContentAiDefault(s.content_ai_default !== false);
+      setContentDownloadDefault(s.content_download_default !== false);
       setPageEdit(((sx as { page?: PageMeta }).page ?? {}) as PageMeta);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
     }
@@ -451,9 +473,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // Public-page facts ride the same Save (harmless if the columns are new).
       await supabase.from('spaces')
         .update({
+          handle: handle.trim() || null,
           contact: Object.keys(contact).length ? contact : null,
           public_page: publicPage,
           assistant_enabled: aiEnabled,
+          findable,
+          assistant_readable: assistantReadable,
+          content_ai_default: contentAiDefault,
+          content_download_default: contentDownloadDefault,
           // Only ever WRITE a page, never null one out: this form didn't touch
           // `page` before today, and a mis-seeded save would wipe a built page
           // (Countryman Stables lives in this column).
@@ -769,7 +796,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       <span className="view-toggle" role="group" aria-label="View">
         <button
           className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
-          onClick={() => { setEditOpen(false); beMyself(); setSearchParams({}); }}
+          onClick={() => { beMyself(); setSearchParams({}); }}
         >
           Member view
         </button>
@@ -781,11 +808,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
         </button>
       </span>
-      {backstage && (
-        <button className="sprof__edit-btn" onClick={() => setEditOpen((o) => !o)}>
-          {editOpen ? 'Done editing' : 'Edit profile'}
-        </button>
-      )}
     </div>
   ) : null;
 
@@ -864,7 +886,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {monogramFor(space.name)}
             </span>
           )}
-          {adminTools && editOpen && (
+          {adminTools && openSections.has('about') && (
             <button
               className="sprof__avatar-edit"
               onClick={() => avatarInputRef.current?.click()}
@@ -938,9 +960,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {noticeBanners}
 
-      {adminTools && editOpen && (
-        <section className="prof__section">
-          <h2 className="prof__h2">About this {kindLabel.toLowerCase()}</h2>
+      {adminTools && (
+        <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -1018,6 +1039,48 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 Recommending, booking, messaging and events still require joining Lichen.</em>
             </span>
           </label>
+
+          <div className="prof__field">
+            <label className="prof__label">Address</label>
+            <div className="prof__handle">
+              <span className="prof__handle-prefix">lichen.health/</span>
+              <input className="prof__input" value={handle} onChange={(e) => setHandle(e.target.value)}
+                placeholder={kindLabel.toLowerCase().replace(/\s+/g, '-')} />
+            </div>
+            <p className="prof__hint">
+              Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
+              <code>/spaces/{id.slice(0, 8)}…</code> instead.
+            </p>
+          </div>
+          <p className="prof__privacy-sub">This page</p>
+          <div className="prof__field">
+            <label className="prof__label">One line — what this {kindLabel.toLowerCase()} does, for whom</label>
+            <input className="prof__input" value={pageEdit.tagline ?? ''}
+              onChange={(e) => setPageEdit((pm) => ({ ...pm, tagline: e.target.value }))}
+              placeholder="A grange for the whole valley" />
+          </div>
+          <div className="prof__field">
+            <label className="prof__label">The one thing you want visitors to do</label>
+            <div className="cmp__chips">
+              {([['none', 'Nothing yet'], ['call', 'Call'], ['book', 'Book'], ['email', 'Email'], ['visit', 'Visit']] as const)
+                .map(([kind, label]) => (
+                  <button key={kind}
+                    className={'cmp__chip' + ((pageEdit.action?.kind ?? 'none') === kind ? ' is-on' : '')}
+                    onClick={() => setPageEdit((pm) => ({ ...pm, action: { kind } }))}>{label}</button>
+                ))}
+            </div>
+          </div>
+          <div className="prof__field">
+            <label className="prof__label">Look</label>
+            <div className="cmp__chips">
+              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
+                <button key={v}
+                  className={'cmp__chip' + ((pageEdit.coverStyle ?? 'plain') === v ? ' is-on' : '')}
+                  onClick={() => setPageEdit((pm) => ({ ...pm, coverStyle: v }))}>{label}</button>
+              ))}
+            </div>
+          </div>
+
           {/* Spaces build their page's tabs from the same library people do
               (founder 2026-08-06) — this form never wrote `page` until now. */}
           <p className="prof__privacy-sub">This page&rsquo;s tabs</p>
@@ -1047,7 +1110,60 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </button>
             {msg && <span className="prof__msg">{msg}</span>}
           </div>
-        </section>
+        </CollapsibleSection>
+      )}
+
+      {adminTools && (
+        <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
+          <p className="prof__care-lead">Who can see what, and what the assistant may help with.</p>
+
+          <p className="prof__privacy-sub">Being found</p>
+          <label className="prof__consent">
+            <input type="checkbox" checked={findable} onChange={(e) => setFindable(e.target.checked)} />
+            <span>
+              <strong>Findable in the directory and search</strong>
+              <em>On, this {kindLabel.toLowerCase()} appears in search and space directories. Off, it doesn&rsquo;t — members who already belong can still find it.</em>
+            </span>
+          </label>
+
+          <p className="prof__privacy-sub">What the assistant may read</p>
+          <label className="prof__consent">
+            <input type="checkbox" checked={assistantReadable} onChange={(e) => setAssistantReadable(e.target.checked)} />
+            <span>
+              <strong>Let other members&rsquo; assistants read this {kindLabel.toLowerCase()}&rsquo;s content</strong>
+              <em>When someone asks their assistant to brief them on a conversation this {kindLabel.toLowerCase()} is part of, it can read that content. Off keeps it out of everyone else&rsquo;s briefings.</em>
+            </span>
+          </label>
+
+          <p className="prof__privacy-sub">This {kindLabel.toLowerCase()}&rsquo;s content — defaults for new posts</p>
+          <label className="prof__consent">
+            <input type="checkbox" checked={contentAiDefault} onChange={(e) => setContentAiDefault(e.target.checked)} />
+            <span>
+              <strong>New posts are AI-readable</strong>
+              <em>Assistants may read and surface what&rsquo;s posted here. Each post can still flip this in Compose — this only sets the starting position.</em>
+            </span>
+          </label>
+          <label className="prof__consent">
+            <input type="checkbox" checked={contentDownloadDefault} onChange={(e) => setContentDownloadDefault(e.target.checked)} />
+            <span>
+              <strong>New posts&rsquo; media is downloadable</strong>
+              <em>People can save the photos and videos posted here. Also flippable per post.</em>
+            </span>
+          </label>
+
+          <div className="prof__save-row">
+            <button className="btn btn-primary" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {msg && <span className="prof__msg">{msg}</span>}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {adminTools && (
+        <CollapsibleSection id="currentcy" title="Current-cy" open={openSections.has('currentcy')} onToggle={() => toggleSection('currentcy')}>
+          <CurrentcyCard partyType="space" partyId={id} />
+        </CollapsibleSection>
       )}
 
       {plusMenu}
@@ -1058,8 +1174,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       {/* Member shares awaiting the shelves (courses/library) — stewards
           approve, and can promote the sharer into a section admin. */}
       {backstage && deskRowsForSpace(id).length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Notifications</h2>
+        <CollapsibleSection id="notifications" title="Notifications" open={openSections.has('notifications')} onToggle={() => toggleSection('notifications')}>
           <div className="sprof__desknotes">
             {deskRowsForSpace(id).slice(0, 10).map((n) => (
               <p className={'sprof__desknote' + (n.read_at ? '' : ' is-new')} key={n.id}>
@@ -1068,12 +1183,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             ))}
           </div>
           <p className="prof__hint">These stay off your main bell — everything actionable is in the queues below.</p>
-        </section>
+        </CollapsibleSection>
       )}
 
       {backstage && sharesForMe.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Shared for the shelves</h2>
+        <CollapsibleSection id="shelves" title="Shared for the shelves" open={openSections.has('shelves')} onToggle={() => toggleSection('shelves')}>
           {sharesForMe.map((r) => {
             const post = sharePosts.find((p) => p.id === r.post_id);
             const isMember = members.some((m) => m.profile_id === r.requested_by);
@@ -1105,12 +1219,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </div>
             );
           })}
-        </section>
+        </CollapsibleSection>
       )}
 
       {backstage && resBookings.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Booking requests</h2>
+        <CollapsibleSection id="bookings" title="Booking requests" open={openSections.has('bookings')} onToggle={() => toggleSection('bookings')}>
           {resBookings.map((b) => (
             <div className="sprof__req sprof__sharereq" key={b.id}>
               <span className="sprof__req-name">
@@ -1126,12 +1239,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </span>
             </div>
           ))}
-        </section>
+        </CollapsibleSection>
       )}
 
       {backstage && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Rooms &amp; things</h2>
+        <CollapsibleSection id="rooms" title="Rooms & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
             <p className="sprof__muted">Nothing listed yet — a room, a tool, the dinner plates. Anything members can book.</p>
           )}
@@ -1183,12 +1295,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           ) : (
             <button className="btn sprof__invite-btn" onClick={() => setNewResOpen(true)}>+ Add a room or thing</button>
           )}
-        </section>
+        </CollapsibleSection>
       )}
 
       {memberTools && pendingReqs.length > 0 && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Waiting at the door</h2>
+        <CollapsibleSection id="waiting" title="Waiting at the door" open={openSections.has('waiting')} onToggle={() => toggleSection('waiting')}>
           {pendingReqs.map((r) => {
             const initiatorRole = members.find((m) => m.profile_id === r.initiated_by)?.role;
             const kind = r.initiated_by === r.profile_id ? 'request'
@@ -1230,7 +1341,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </div>
             );
           })}
-        </section>
+        </CollapsibleSection>
       )}
 
       {tab && !backstage && (

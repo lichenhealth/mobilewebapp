@@ -1,4 +1,4 @@
-.coll { border-top: 1px solid var(--bone-edge); }
+.coll { border-top: 1px solid var(--bone-edge); scroll-margin-top: calc(var(--top-h) + var(--s-4)); }
 .coll__head {
   display: flex; align-items: center; gap: var(--s-3); width: 100%;
   padding: 13px 6px; background: transparent; border: 0;

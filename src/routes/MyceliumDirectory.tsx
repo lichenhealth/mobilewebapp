@@ -6,6 +6,7 @@ import { WeaveMark } from '../components/WeaveMark';
 import MemberRow from '../components/MemberRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
 import { sortClaudeFirst } from '../lib/chatApi';
@@ -66,6 +67,17 @@ interface Hit {
 export default function MyceliumDirectory() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { actor } = useActing();
+
+  // A space has no web of its own yet (mycelium.truster_id is profile-only)
+  // — acting as one and landing here means Galyn's personal web renders
+  // under a misleadingly "yours" header. Until that's built, send the
+  // space's own page instead of showing the wrong person's data (founder
+  // 2026-08-10).
+  useEffect(() => {
+    if (actor.type === 'space') navigate(`/spaces/${actor.id}`, { replace: true });
+  }, [actor, navigate]);
+
   const [entries, setEntries] = useState<Entry[]>([]);
   const [ready, setReady] = useState(false);
 

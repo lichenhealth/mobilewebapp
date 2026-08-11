@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { LinkifiedText } from '../components/CarePostCard';
 import { locationInfo } from '../lib/linkify';
@@ -78,6 +79,7 @@ function monthCells(iso: string): string[] {
 export default function Calendar() {
   const { user } = useAuth();
   const me = user?.id ?? '';
+  const { actor } = useActing();
   const navigate = useNavigate();
   // Arrived via Events > My Calendar → offer the way back (maps' ?from= pattern)
   const [urlParams] = useSearchParams();
@@ -111,6 +113,11 @@ export default function Calendar() {
   // on, tap a space chip to layer its events in (tap again to drop it).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
+  // Follows whoever the TopBar says you're acting as (founder 2026-08-10) —
+  // acting as a space shows ITS calendar, not "Mine" (Galyn's) by default.
+  useEffect(() => {
+    setSelectedCals(actor.type === 'space' ? [actor.id] : ['me']);
+  }, [actor]);
   const [overlayOn, setOverlayOn] = useState(false);
   // Find-a-time spans EVERY selected space (founder 2026-07-22): the more
   // groups you add, the more availability narrows toward when ALL their
