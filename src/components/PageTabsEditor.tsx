@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import {
@@ -31,13 +31,40 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   const [openId, setOpenId] = useState<string | null>(null);
   const spare = availableTemplates(tabs);
 
-  const move = (i: number, by: number) => {
-    const next = [...tabs];
-    const j = i + by;
-    if (j < 0 || j >= next.length) return;
-    [next[i], next[j]] = [next[j], next[i]];
-    onChange(next);
+  // Grab-and-pull reordering (founder 2026-08-11, replacing the ↑/↓
+  // arrows). Pointer events, not HTML5 drag-and-drop — this is a PWA and
+  // native DnD never fires on touch. Pointer capture on the handle keeps
+  // the stream alive while React re-keys the rows; rows live-shuffle as
+  // the pointer crosses their midpoints, so the drop needs no ghost.
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const startDrag = (i: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    // Capture can throw (pointer already lifted, or a synthetic event) —
+    // the drag still works without it, capture just keeps the stream on
+    // the handle once the pointer leaves it mid-pull.
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+    setDragIdx(i);
   };
+  const onDrag = (e: React.PointerEvent) => {
+    if (dragIdx === null) return;
+    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('.ptabs__row') ?? [])];
+    let target = dragIdx;
+    rows.forEach((el, j) => {
+      const r = el.getBoundingClientRect();
+      if (j < dragIdx && e.clientY < r.top + r.height / 2) target = Math.min(target, j);
+      if (j > dragIdx && e.clientY > r.top + r.height / 2) target = Math.max(target, j);
+    });
+    if (target !== dragIdx) {
+      const next = [...tabs];
+      const [held] = next.splice(dragIdx, 1);
+      next.splice(target, 0, held);
+      onChange(next);
+      setDragIdx(target);
+    }
+  };
+  const endDrag = () => setDragIdx(null);
+
   const patch = (id: string, p: Partial<PageTab>) =>
     onChange(tabs.map((t) => (t.id === id ? { ...t, ...p } : t)));
 
@@ -52,27 +79,34 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
         <p className="ptabs__empty">No tabs yet. Your page is just your feed.</p>
       )}
 
+      <div className="ptabs__list" ref={listRef}>
       {tabs.map((t, i) => {
         const tpl = tabById(t.id);
         const open = openId === t.id;
         return (
-          <div className={'ptabs__row' + (open ? ' is-open' : '')} key={t.id}>
+          <div className={'ptabs__row' + (open ? ' is-open' : '') + (dragIdx === i ? ' is-held' : '')} key={t.id}>
             <div className="ptabs__head">
+              {/* The handle only exists when there's somewhere to pull the
+                  row (founder 2026-08-11: with one tab the old arrows
+                  "don't seem to do anything"). */}
+              {tabs.length > 1 && (
+                <button
+                  className="ptabs__grip"
+                  onPointerDown={startDrag(i)}
+                  onPointerMove={onDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  aria-label="Drag to reorder"
+                >
+                  <Icon name="grip" size={14} />
+                </button>
+              )}
               <span className="ptabs__icon"><Icon name={tpl?.icon ?? 'info'} size={15} /></span>
               <span className="ptabs__name">
                 {t.label ?? tpl?.label ?? t.id}
                 {tpl?.builtIn && <em className="ptabs__auto">fills itself</em>}
               </span>
               <span className="ptabs__moves">
-                {/* An arrow only exists when it can actually move the row
-                    (founder 2026-08-11: with one tab, "these don't seem to
-                    do anything" — they were no-op buttons at the ends). */}
-                {i > 0 && (
-                  <button className="ptabs__mv" onClick={() => move(i, -1)} aria-label="Move up">↑</button>
-                )}
-                {i < tabs.length - 1 && (
-                  <button className="ptabs__mv" onClick={() => move(i, 1)} aria-label="Move down">↓</button>
-                )}
                 {!tpl?.builtIn && (
                   <button className="ptabs__mv" onClick={() => setOpenId(open ? null : t.id)}
                     aria-label="Edit this tab">{open ? 'Done' : 'Write'}</button>
@@ -136,6 +170,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
           </div>
         );
       })}
+      </div>
 
       {!adding && spare.length > 0 && (
         <button className="btn ptabs__add" onClick={() => setAdding(true)}>

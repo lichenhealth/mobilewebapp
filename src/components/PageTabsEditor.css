@@ -4,11 +4,28 @@
   font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5;
 }
 .ptabs__empty { font-style: italic; padding: var(--s-3) 0; }
+.ptabs__list { display: flex; flex-direction: column; gap: var(--s-2); }
 .ptabs__row {
   border: 1px solid var(--bone-edge); border-radius: var(--r-md);
   background: var(--bone-warm); padding: 9px 11px;
 }
 .ptabs__row.is-open { border-color: var(--peach); }
+/* The row being pulled (founder 2026-08-11: grab-and-pull instead of
+   arrows) — lifted, so you can see which one is in your hand while the
+   others shuffle out of the way. */
+.ptabs__row.is-held {
+  border-color: var(--peach); box-shadow: var(--sh-soft), 0 6px 18px rgb(var(--shadow-color) / 0.14);
+  position: relative; z-index: 1;
+}
+.ptabs__grip {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; padding: 2px; margin-left: -4px; flex-shrink: 0;
+  color: var(--ink-faint); cursor: grab;
+  /* Without this the browser claims vertical pointer moves for scrolling
+     and the drag never fires on touch. */
+  touch-action: none;
+}
+.ptabs__grip:active { cursor: grabbing; color: var(--ink-soft); }
 .ptabs__head { display: flex; align-items: center; gap: 9px; }
 .ptabs__icon { color: var(--ink-soft); display: inline-flex; flex-shrink: 0; }
 .ptabs__name {

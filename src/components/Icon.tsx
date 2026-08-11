@@ -47,6 +47,7 @@ export type IconName =
   | 'mic'
   | 'newsfeed'
   | 'more-horizontal'
+  | 'grip'
   | 'palette'
   | 'paperclip'
   | 'phone'
@@ -280,6 +281,12 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M3 6h12M3 12h9M3 18h12" strokeLinecap="round"/><path d="M20 4v16M20 4l-2.5 3M20 4l2.5 3M20 20l-2.5-3M20 20l2.5-3" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // Drag handle: two columns of dots — grab a row and pull it where it goes.
+  'grip': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 2.4,
+    content: <><path d="M9 5.5h.01M9 12h.01M9 18.5h.01M15 5.5h.01M15 12h.01M15 18.5h.01" strokeLinecap="round"/></>,
   },
   'saved': {
     viewBox: '264 838 29 26',
