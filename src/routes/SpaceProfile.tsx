@@ -43,6 +43,7 @@ import ContactFields, { ContactList, type ContactInfo } from '../components/Cont
 import PublicPage, { type PageMeta } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import ContactActionsPicker from '../components/ContactActionsPicker';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
@@ -1060,15 +1061,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               placeholder="A grange for the whole valley" />
           </div>
           <div className="prof__field">
-            <label className="prof__label">The one thing you want visitors to do</label>
-            <div className="cmp__chips">
-              {([['none', 'Nothing yet'], ['call', 'Call'], ['book', 'Book'], ['email', 'Email'], ['visit', 'Visit']] as const)
-                .map(([kind, label]) => (
-                  <button key={kind}
-                    className={'cmp__chip' + ((pageEdit.action?.kind ?? 'none') === kind ? ' is-on' : '')}
-                    onClick={() => setPageEdit((pm) => ({ ...pm, action: { kind } }))}>{label}</button>
-                ))}
-            </div>
+            <label className="prof__label">How do you want people to get in touch</label>
+            <ContactActionsPicker
+              value={pageEdit.actions
+                ?? (pageEdit.action && pageEdit.action.kind !== 'none' ? [pageEdit.action.kind] : [])}
+              onChange={(actions) => setPageEdit((pm) => ({ ...pm, actions }))}
+            />
           </div>
           <div className="prof__field">
             <label className="prof__label">Look</label>

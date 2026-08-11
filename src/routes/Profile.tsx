@@ -29,6 +29,7 @@ import { offerCareFor } from '../lib/careTeamApi';
 import ContactFields, { type ContactInfo } from '../components/ContactFields';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import ContactActionsPicker from '../components/ContactActionsPicker';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -643,16 +644,12 @@ export default function Profile() {
             </p>
           </div>
           <div className="prof__field">
-            <label className="prof__label">The one thing you want visitors to do</label>
-            <div className="cmp__chips">
-              {([['none', 'Nothing yet'], ['call', 'Call'], ['book', 'Book'], ['email', 'Email'], ['visit', 'Visit']] as const)
-                .map(([kind, label]) => (
-                  <button key={kind}
-                    className={'cmp__chip' + ((pageMeta.action?.kind ?? 'none') === kind ? ' is-on' : '')}
-                    onClick={() => setPage({ action: { kind } })}>{label}</button>
-                ))}
-            </div>
-            <p className="prof__hint">One action, not five — it's what makes a page feel calm.</p>
+            <label className="prof__label">How do you want people to get in touch</label>
+            <ContactActionsPicker
+              value={pageMeta.actions
+                ?? (pageMeta.action && pageMeta.action.kind !== 'none' ? [pageMeta.action.kind] : [])}
+              onChange={(actions) => setPage({ actions })}
+            />
           </div>
           <div className="prof__field">
             <label className="prof__label">Look</label>

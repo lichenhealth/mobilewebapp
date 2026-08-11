@@ -12,13 +12,20 @@ import './PublicPage.css';
 // can read them all — and members never face a blank canvas, because most of
 // it fills itself from what they already keep on Lichen.
 
+export type ContactActionKind = 'call' | 'book' | 'email' | 'visit';
+
 export interface PageMeta {
   tagline?: string;
   story?: string;
   cover?: string;
   coverStyle?: 'photo' | 'tint' | 'plain';
   accent?: string;
+  /** Legacy single CTA — kept for old rows; new saves write `actions`. */
   action?: { kind: 'call' | 'book' | 'email' | 'visit' | 'none'; label?: string; href?: string };
+  /** "How do you want people to get in touch" (founder 2026-08-11) —
+   *  multi-select, one CTA pill each, hrefs derived from Contact & hours.
+   *  Replaces the old one-action doctrine. */
+  actions?: ContactActionKind[];
   practical?: { bring?: string; parking?: string; access?: string };
   /** The grounds themselves — arena, tack room, stalls. Its own section
    *  (and its own hero-nav door) when present. */
@@ -122,18 +129,30 @@ export default function PublicPage(props: PublicPageProps) {
   const accent = page.accent || 'var(--peach)';
   const story = (page.story || description || '').trim();
 
-  // The single primary action — one, deliberately, not five.
-  const act = page.action && page.action.kind !== 'none' ? page.action : undefined;
-  const actHref = act
-    ? act.href
-      || (act.kind === 'call' && contact.phone ? `tel:${contact.phone.replace(/[^\d+]/g, '')}` : undefined)
-      || (act.kind === 'email' && contact.email ? `mailto:${contact.email}` : undefined)
-      || (act.kind === 'book' && contact.booking ? contact.booking : undefined)
-      || undefined
-    : undefined;
-  const actLabel = act?.label
-    || (act?.kind === 'call' ? 'Call us' : act?.kind === 'book' ? 'Book a time'
-      : act?.kind === 'email' ? 'Get in touch' : act?.kind === 'visit' ? 'Visit us' : '');
+  // "How do you want people to get in touch" (founder 2026-08-11) —
+  // multi-select now; the old one-action doctrine is retired. New saves
+  // write `page.actions`; old rows still carry the singular `page.action`,
+  // read here as a one-item list so nothing re-saves before it renders.
+  // Each pick resolves against Contact & hours; unresolvable ones (empty
+  // contact field) simply don't render — the editor's hints say why.
+  const actionKinds: ContactActionKind[] = page.actions
+    ?? (page.action && page.action.kind !== 'none' ? [page.action.kind] : []);
+  const ACTION_LABEL: Record<ContactActionKind, string> = {
+    call: 'Call us', book: 'Book a time', email: 'Get in touch', visit: 'Visit us',
+  };
+  const actionHref = (kind: ContactActionKind): string | undefined =>
+    kind === 'call' ? (contact.phone ? `tel:${contact.phone.replace(/[^\d+]/g, '')}` : undefined)
+      : kind === 'email' ? (contact.email ? `mailto:${contact.email}` : undefined)
+      : kind === 'book' ? (contact.booking || undefined)
+      : (contact.address ? `https://maps.google.com/?q=${encodeURIComponent(contact.address)}` : undefined);
+  const ctas = actionKinds
+    .map((kind) => ({
+      kind,
+      // A legacy action's hand-set href/label still win for its own kind.
+      href: (page.action?.kind === kind && page.action.href) || actionHref(kind),
+      label: (page.action?.kind === kind && page.action.label) || ACTION_LABEL[kind],
+    }))
+    .filter((c): c is { kind: ContactActionKind; href: string; label: string } => !!c.href);
 
   // Hero nav (founder 2026-07-29): section doors as clickable text on the
   // left, the one primary action far right — the same learn-once-read-all
@@ -275,11 +294,11 @@ export default function PublicPage(props: PublicPageProps) {
             </p>
           )}
           {location && <p className="ppage__where"><Icon name="location" size={13} /> {location}</p>}
-          {act && actHref && navItems.length === 0 && (
-            <a className="ppage__cta" href={actHref} target={actHref.startsWith('http') ? '_blank' : undefined} rel="noopener">
-              {actLabel}
+          {ctas.length > 0 && navItems.length === 0 && ctas.map((c) => (
+            <a className="ppage__cta" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
+              {c.label}
             </a>
-          )}
+          ))}
         </div>
         {navItems.length > 0 && (
           <nav className="ppage__nav">
@@ -308,12 +327,12 @@ export default function PublicPage(props: PublicPageProps) {
                 </button>
               );
             })}
-            {act && actHref && (
-              <a className="ppage__cta ppage__cta--nav" href={actHref}
-                target={actHref.startsWith('http') ? '_blank' : undefined} rel="noopener">
-                {actLabel}
+            {ctas.map((c) => (
+              <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href}
+                target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
+                {c.label}
               </a>
-            )}
+            ))}
           </nav>
         )}
         {coverSrc && (

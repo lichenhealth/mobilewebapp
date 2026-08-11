@@ -36,9 +36,12 @@
 }
 .sprof__desc {
   font-size: 13px; font-weight: 300; color: var(--ink); line-height: 1.55;
-  max-width: 420px; margin-top: var(--s-2); white-space: pre-wrap;
+  /* margin-inline auto, not just a max-width: without it the 420px box hugs
+     the left edge of the (wider) desktop column while its text centers
+     inside it — reads as off-center under the name (founder 2026-08-11). */
+  max-width: 420px; margin-top: var(--s-2); margin-inline: auto; white-space: pre-wrap;
 }
-.sprof__loc { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); flex-wrap: wrap; }
+.sprof__loc { display: flex; align-items: center; justify-content: center; gap: var(--s-3); margin-top: var(--s-2); flex-wrap: wrap; }
 .sprof__loc-link {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; color: var(--ink-muted); text-decoration: none;

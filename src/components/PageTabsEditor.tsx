@@ -64,8 +64,15 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
                 {tpl?.builtIn && <em className="ptabs__auto">fills itself</em>}
               </span>
               <span className="ptabs__moves">
-                <button className="ptabs__mv" onClick={() => move(i, -1)} aria-label="Move up">↑</button>
-                <button className="ptabs__mv" onClick={() => move(i, 1)} aria-label="Move down">↓</button>
+                {/* An arrow only exists when it can actually move the row
+                    (founder 2026-08-11: with one tab, "these don't seem to
+                    do anything" — they were no-op buttons at the ends). */}
+                {i > 0 && (
+                  <button className="ptabs__mv" onClick={() => move(i, -1)} aria-label="Move up">↑</button>
+                )}
+                {i < tabs.length - 1 && (
+                  <button className="ptabs__mv" onClick={() => move(i, 1)} aria-label="Move down">↓</button>
+                )}
                 {!tpl?.builtIn && (
                   <button className="ptabs__mv" onClick={() => setOpenId(open ? null : t.id)}
                     aria-label="Edit this tab">{open ? 'Done' : 'Write'}</button>
