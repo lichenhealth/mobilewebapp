@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8zhi8AKxOVeDlo8Cd0zaRmPlnQFN3kiTEJOGZr9KB4kH2L5ZJbIY4SbugEXMMMN
+\restrict tw4LeFXaESQFlyHuRRxCeIncsSPjQiQGE4wnYVjYTbVACfiHPdA5Yprbv0mnWOc
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4866,6 +4866,30 @@ CREATE TABLE public.profile_categories (
 ALTER TABLE public.profile_categories OWNER TO postgres;
 
 --
+-- Name: profile_locations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.profile_locations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    profile_id uuid NOT NULL,
+    label text DEFAULT ''::text NOT NULL,
+    location text NOT NULL,
+    lat double precision,
+    lng double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.profile_locations OWNER TO postgres;
+
+--
+-- Name: TABLE profile_locations; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.profile_locations IS 'A member''s goods & services addresses — deliberately public-to-members, unlike the privacy-laddered home location.';
+
+
+--
 -- Name: profiles; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5706,6 +5730,14 @@ ALTER TABLE ONLY public.profile_categories
 
 
 --
+-- Name: profile_locations profile_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profile_locations
+    ADD CONSTRAINT profile_locations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: profiles profiles_handle_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6220,6 +6252,13 @@ CREATE INDEX posts_service_areas_gin ON public.posts USING gin (service_areas);
 --
 
 CREATE INDEX posts_space_idx ON public.posts USING btree (space_id);
+
+
+--
+-- Name: profile_locations_profile_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX profile_locations_profile_idx ON public.profile_locations USING btree (profile_id);
 
 
 --
@@ -7386,6 +7425,14 @@ ALTER TABLE ONLY public.profile_categories
 
 ALTER TABLE ONLY public.profile_categories
     ADD CONSTRAINT profile_categories_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: profile_locations profile_locations_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profile_locations
+    ADD CONSTRAINT profile_locations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -8561,6 +8608,13 @@ CREATE POLICY "location_shares owner all" ON public.location_shares TO authentic
 
 
 --
+-- Name: profile_locations locations readable by members; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "locations readable by members" ON public.profile_locations FOR SELECT TO authenticated USING (true);
+
+
+--
 -- Name: financial_positions means: care team reads; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -8710,6 +8764,13 @@ CREATE POLICY "own feed write" ON public.assistant_feed_posts FOR INSERT TO auth
 
 
 --
+-- Name: profile_locations own locations: all; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "own locations: all" ON public.profile_locations TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+
+
+--
 -- Name: posts; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -8778,6 +8839,12 @@ CREATE POLICY "profile_categories: public pages" ON public.profile_categories FO
    FROM public.profiles p
   WHERE ((p.id = profile_categories.profile_id) AND p.public_page AND p.onboarded))));
 
+
+--
+-- Name: profile_locations; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.profile_locations ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: profiles; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -10779,6 +10846,15 @@ GRANT ALL ON TABLE public.profile_categories TO service_role;
 
 
 --
+-- Name: TABLE profile_locations; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.profile_locations TO anon;
+GRANT ALL ON TABLE public.profile_locations TO authenticated;
+GRANT ALL ON TABLE public.profile_locations TO service_role;
+
+
+--
 -- Name: TABLE profiles; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11335,7 +11411,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8zhi8AKxOVeDlo8Cd0zaRmPlnQFN3kiTEJOGZr9KB4kH2L5ZJbIY4SbugEXMMMN
+\unrestrict tw4LeFXaESQFlyHuRRxCeIncsSPjQiQGE4wnYVjYTbVACfiHPdA5Yprbv0mnWOc
 
 
 

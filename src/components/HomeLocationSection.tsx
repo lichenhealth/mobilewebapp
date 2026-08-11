@@ -20,10 +20,15 @@ const LEVEL_LABELS: Record<LocationLevel, string> = {
 
 interface RulePick { type: 'profile' | 'space'; id: string; name: string; label: string }
 
-/** Home location + "Who can find you on the map" (founder privacy model).
- *  Default is HIDDEN — adding an address shows it to nobody until rules say
- *  otherwise. An exclude is a specific rule set to Hidden: rules for a person
- *  beat rules for a group; at a tie, the more private rule wins. */
+type ProfileLocation = { id: string; label: string; location: string; lat: number | null; lng: number | null };
+
+/** The Location section's content (founder 2026-08-11: "Have Home Location
+ *  just be Location and make it a drop down"): the caller supplies the
+ *  CollapsibleSection chrome. Two kinds of address live here —
+ *  · Home address: hidden by default, revealed per-audience through the
+ *    location_shares ladder ("Who can find you on the map").
+ *  · Goods & Services addresses: as many as you need — the studio, the farm
+ *    stand — deliberately member-visible, because their point is being found. */
 export default function HomeLocationSection({ me }: { me: string }) {
   const [location, setLocation] = useState('');
   const [geo, setGeo] = useState<GeoPoint | null>(null);
@@ -42,6 +47,38 @@ export default function HomeLocationSection({ me }: { me: string }) {
   const [rResults, setRResults] = useState<RulePick[]>([]);
   const [rLevel, setRLevel] = useState<LocationLevel>('area');
 
+  // Goods & Services addresses — more than one location (founder 2026-08-11).
+  const [bizLocs, setBizLocs] = useState<ProfileLocation[]>([]);
+  const [bizLabel, setBizLabel] = useState('');
+  const [bizText, setBizText] = useState('');
+  const [bizGeo, setBizGeo] = useState<GeoPoint | null>(null);
+  const [bizBusy, setBizBusy] = useState(false);
+
+  async function loadBizLocs() {
+    const { data } = await supabase.from('profile_locations')
+      .select('id, label, location, lat, lng')
+      .eq('profile_id', me).order('created_at');
+    setBizLocs((data as ProfileLocation[] | null) ?? []);
+  }
+
+  async function addBizLoc() {
+    if (!bizText.trim()) return;
+    setBizBusy(true); setError('');
+    const { error: e } = await supabase.from('profile_locations').insert({
+      profile_id: me, label: bizLabel.trim(), location: bizText.trim(),
+      lat: bizGeo?.lat ?? null, lng: bizGeo?.lng ?? null,
+    });
+    if (e) setError(e.message);
+    else { setBizLabel(''); setBizText(''); setBizGeo(null); await loadBizLocs(); }
+    setBizBusy(false);
+  }
+
+  async function removeBizLoc(id: string) {
+    setError('');
+    const { error: e } = await supabase.from('profile_locations').delete().eq('id', id);
+    if (e) setError(e.message); else await loadBizLocs();
+  }
+
   useEffect(() => {
     if (!me) return;
     let live = true;
@@ -56,8 +93,10 @@ export default function HomeLocationSection({ me }: { me: string }) {
       setCounty(home.county); setHomeState(home.state);
       setRules(myRules);
       setMembers((memRes.data as { id: string; full_name: string | null }[] | null) ?? []);
+      void loadBizLocs();
     })();
     return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
   useEffect(() => {
@@ -104,8 +143,8 @@ export default function HomeLocationSection({ me }: { me: string }) {
   }
 
   return (
-    <section className="prof__section">
-      <h2 className="prof__h2">Home location</h2>
+    <>
+      <p className="prof__privacy-sub">Home address</p>
       <div className="prof__field">
         <LocationField
           className="prof__input"
@@ -229,6 +268,47 @@ export default function HomeLocationSection({ me }: { me: string }) {
         </button>
         {msg && <span className="prof__msg">{msg}</span>}
       </div>
-    </section>
+
+      {/* Goods & Services addresses (founder 2026-08-11): as many as you
+          need. Unlike home these are member-visible by design — the studio
+          or farm stand exists to be found. Adds and removes apply
+          instantly, like the map rules above. */}
+      <p className="prof__privacy-sub">Goods &amp; Services addresses</p>
+      <p className="prof__care-lead">
+        Where you offer what you make and do — a studio, a stand, a workshop.
+        Add as many as you need; other members can see these.
+      </p>
+      {bizLocs.map((b) => (
+        <div className="homeloc__row" key={b.id}>
+          <span className="homeloc__aud">
+            {b.label ? <strong>{b.label} · </strong> : null}{b.location}
+          </span>
+          <button className="homeloc__remove" onClick={() => void removeBizLoc(b.id)} aria-label="Remove this address">
+            <Icon name="close" size={13} />
+          </button>
+        </div>
+      ))}
+      <div className="homeloc__add">
+        <input
+          className="prof__input"
+          value={bizLabel}
+          onChange={(e) => setBizLabel(e.target.value)}
+          placeholder="Label — Studio, Farm stand… (optional)"
+        />
+      </div>
+      <div className="homeloc__add">
+        <LocationField
+          className="prof__input homeloc__grow"
+          value={bizText}
+          geo={bizGeo}
+          onChange={(text, g) => { setBizText(text); setBizGeo(g); }}
+          placeholder="Address or town"
+        />
+        <button className="btn btn-primary homeloc__add-btn" disabled={bizBusy || !bizText.trim()} onClick={() => void addBizLoc()}>
+          {bizBusy ? '…' : 'Add'}
+        </button>
+      </div>
+      <p className="prof__hint">Pick a suggestion to pin it on Maps — free text saves, but won&rsquo;t pin.</p>
+    </>
   );
 }

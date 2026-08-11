@@ -848,7 +848,11 @@ export default function Profile() {
         </p>
       </CollapsibleSection>
 
-      {user && <HomeLocationSection me={user.id} />}
+      {user && (
+        <CollapsibleSection id="location" title="Location" open={openSections.has('location')} onToggle={() => toggleSection('location')}>
+          <HomeLocationSection me={user.id} />
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection id="notifications" title="Notifications" open={openSections.has('notifications')} onToggle={() => toggleSection('notifications')}>
         <p className="prof__care-lead">How would you like to get notified?</p>
