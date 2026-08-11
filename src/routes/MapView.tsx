@@ -18,7 +18,7 @@ import {
   loadMappableSpaces, listMyAdminSpaces, setSpaceLocation, createSpaceWithLocation,
   type MappableSpace, type SpaceKind,
 } from '../lib/spacesApi';
-import { loadMappableMembers, type MappableMember } from '../lib/locationApi';
+import { loadMappableMembers, loadBizLocationPins, type MappableMember, type BizLocationPin } from '../lib/locationApi';
 import './MapView.css';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -68,6 +68,7 @@ export default function MapView() {
     events: true, places: true, orgs: true, communities: true, groups: true, people: true,
   });
   const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
+  const [bizPins, setBizPins] = useState<BizLocationPin[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -80,7 +81,7 @@ export default function MapView() {
     let live = true;
     (async () => {
       const today = todayISO();
-      const [feed, spaces, people] = await Promise.all([loadFeed(), loadMappableSpaces(), loadMappableMembers()]);
+      const [feed, spaces, people, biz] = await Promise.all([loadFeed(), loadMappableSpaces(), loadMappableMembers(), loadBizLocationPins()]);
       const mappable = feed
         .filter((p) => postAreas(p).includes('events'))
         .filter((p) => {
@@ -89,7 +90,7 @@ export default function MapView() {
           return !!ev.recurrence || (ev.end_date ?? ev.start_date) >= today;
         })
         .map((p) => ({ post: p, lat: p.linked_event!.lat!, lng: p.linked_event!.lng! }));
-      if (live) { setEventPins(mappable); setSpacePins(spaces); setPeoplePins(people); setReady(true); }
+      if (live) { setEventPins(mappable); setSpacePins(spaces); setPeoplePins(people); setBizPins(biz); setReady(true); }
     })();
     return () => { live = false; };
   }, []);
@@ -104,6 +105,9 @@ export default function MapView() {
     [spacePins, layers],
   );
   const visiblePeople = useMemo(() => (layers.people ? peoplePins : []), [peoplePins, layers]);
+  // Goods & Services addresses ride the Places layer — a pin already means
+  // "somewhere you can go", and a member's farm stand is exactly that.
+  const visibleBiz = useMemo(() => (layers.places ? bizPins : []), [bizPins, layers]);
 
   // ── map init (once) ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -216,6 +220,26 @@ export default function MapView() {
       next.set(`usr:${m.id}`, marker);
     });
 
+    // A member's goods & services spots (founder 2026-08-11) — place-style
+    // pins whose door opens the member behind them.
+    visibleBiz.forEach((b) => {
+      const el = document.createElement('button');
+      el.className = 'mapv__pin mapv__pin--space';
+      el.setAttribute('aria-label', b.label || b.location);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([b.lng, b.lat])
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: b.label || 'Goods & services' },
+            { cls: 'mapv__popup-when', text: b.owner_name ? `Goods & services · ${b.owner_name}` : 'Goods & services' },
+            { cls: 'mapv__popup-loc', text: b.location },
+          ],
+          { label: 'View member', onClick: () => navigate(`/members/${b.profile_id}`) },
+        ))
+        .addTo(map);
+      next.set(`biz:${b.id}`, marker);
+    });
+
     markersRef.current = next;
 
     if (next.size > 0) {
@@ -223,11 +247,12 @@ export default function MapView() {
       visibleEvents.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
       visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
       visiblePeople.forEach((m) => { if (m.lat != null && m.lng != null) bounds.extend([m.lng, m.lat]); });
+      visibleBiz.forEach((b) => bounds.extend([b.lng, b.lat]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
-  }, [visibleEvents, visibleSpaces, visiblePeople, navigate]);
+  }, [visibleEvents, visibleSpaces, visiblePeople, visibleBiz, navigate]);
 
-  const totalPins = eventPins.length + spacePins.length + peoplePins.length;
+  const totalPins = eventPins.length + spacePins.length + peoplePins.length + bizPins.length;
 
   return (
     <div className="mapv">

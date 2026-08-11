@@ -108,6 +108,10 @@ export interface PublicPageProps {
   offeringRows?: { id: string; name: string; domain: string }[];
   /** Renders the thumb for one offering; omitted for guests. */
   renderOfferingAction?: (o: { id: string; name: string }) => React.ReactNode;
+  /** A member's Goods & Services addresses marked show-on-profile
+   *  (founder 2026-08-11) — rendered as extra Practical rows, each
+   *  opening in maps. */
+  bizLocations?: { label: string; location: string }[];
   /** Owner previewing their own page. */
   preview?: boolean;
   /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
@@ -159,7 +163,8 @@ export default function PublicPage(props: PublicPageProps) {
   // structure on every Lichen site. Doors are PAGES, not scroll anchors:
   // only the active section renders below the hero. Only doors whose
   // section exists render; with no doors, everything shows inline.
-  const hasContact = Object.keys(contact).length > 0 || !!page.practical;
+  const bizLocations = props.bizLocations ?? [];
+  const hasContact = Object.keys(contact).length > 0 || !!page.practical || bizLocations.length > 0;
   // ONE tab row (founder 2026-08-05, merging the in-app profile with the web
   // page): Feed first, then whichever templated sections actually have
   // content. A person with nothing but posts sees no tabs at all — the right
@@ -483,6 +488,17 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           <h2 className="ppage__h2">Practical</h2>
           <ContactList contact={contact} />
+          {bizLocations.length > 0 && (
+            <div className="contactl">
+              {bizLocations.map((b, i) => (
+                <p className="contactl__row" key={`${b.location}-${i}`}>
+                  <span className="contactl__label">{b.label || 'Find us'}</span>
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent(b.location)}`}
+                    target="_blank" rel="noopener">{b.location}</a>
+                </p>
+              ))}
+            </div>
+          )}
           {page.practical?.bring && <p className="ppage__note"><strong>What to bring</strong> {page.practical.bring}</p>}
           {page.practical?.parking && <p className="ppage__note"><strong>Parking</strong> {page.practical.parking}</p>}
           {page.practical?.access && <p className="ppage__note"><strong>Accessibility</strong> {page.practical.access}</p>}

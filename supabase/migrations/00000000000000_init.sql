@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tw4LeFXaESQFlyHuRRxCeIncsSPjQiQGE4wnYVjYTbVACfiHPdA5Yprbv0mnWOc
+\restrict 42tf3jLta28r9jQ0gqVriy4bKQhzokIp6c855z7cpCVZlSUImEuqzXNKcLCiiao
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4876,7 +4876,9 @@ CREATE TABLE public.profile_locations (
     location text NOT NULL,
     lat double precision,
     lng double precision,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    show_on_maps boolean DEFAULT true NOT NULL,
+    show_on_profile boolean DEFAULT true NOT NULL
 );
 
 
@@ -11411,7 +11413,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tw4LeFXaESQFlyHuRRxCeIncsSPjQiQGE4wnYVjYTbVACfiHPdA5Yprbv0mnWOc
+\unrestrict 42tf3jLta28r9jQ0gqVriy4bKQhzokIp6c855z7cpCVZlSUImEuqzXNKcLCiiao
 
 
 

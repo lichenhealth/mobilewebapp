@@ -12,7 +12,8 @@ import {
   loadMyWeb, setInWeb, setVouch, setRecommend, loadMyRecommendations, recommendKey,
 } from '../lib/myceliumApi';
 import {
-  loadMappableMembers, loadMyHome, loadMyLocationShares, areaLabel, type MappableMember,
+  loadMappableMembers, loadMyHome, loadMyLocationShares, loadProfileBizLocations,
+  areaLabel, type MappableMember,
 } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
@@ -114,6 +115,13 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   useEffect(() => {
     let live = true;
     void getIdentityTags(id).then((t) => { if (live) setIdTags(t); });
+    return () => { live = false; };
+  }, [id]);
+  // Goods & Services addresses the member shows on their page.
+  const [bizLocs, setBizLocs] = useState<{ label: string; location: string }[]>([]);
+  useEffect(() => {
+    let live = true;
+    void loadProfileBizLocations(id).then((rows) => { if (live) setBizLocs(rows); });
     return () => { live = false; };
   }, [id]);
 
@@ -340,6 +348,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           );
         } : undefined}
         contact={pub.contact}
+        bizLocations={bizLocs}
         page={pub.page}
         preview={previewing}
         signedIn={!!me}

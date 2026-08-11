@@ -56,3 +56,13 @@
 }
 .homeloc__match:hover { border-color: var(--peach); }
 .homeloc__save { margin-top: var(--s-4); }
+/* Per-address visibility switches sit under their address row, indented to
+   read as belonging to it. */
+.homeloc__biz { padding: 2px 0 6px; border-bottom: 1px solid var(--bone-edge); }
+.homeloc__biz:last-of-type { border-bottom: 0; }
+.homeloc__biz-toggles { display: flex; gap: var(--s-4); padding: 0 0 4px 2px; }
+.homeloc__biz-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.homeloc__biz-toggle input { accent-color: var(--peach); }

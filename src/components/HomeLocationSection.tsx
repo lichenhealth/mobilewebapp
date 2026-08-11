@@ -20,7 +20,10 @@ const LEVEL_LABELS: Record<LocationLevel, string> = {
 
 interface RulePick { type: 'profile' | 'space'; id: string; name: string; label: string }
 
-type ProfileLocation = { id: string; label: string; location: string; lat: number | null; lng: number | null };
+type ProfileLocation = {
+  id: string; label: string; location: string; lat: number | null; lng: number | null;
+  show_on_maps: boolean; show_on_profile: boolean;
+};
 
 /** The Location section's content (founder 2026-08-11: "Have Home Location
  *  just be Location and make it a drop down"): the caller supplies the
@@ -56,9 +59,16 @@ export default function HomeLocationSection({ me }: { me: string }) {
 
   async function loadBizLocs() {
     const { data } = await supabase.from('profile_locations')
-      .select('id, label, location, lat, lng')
+      .select('id, label, location, lat, lng, show_on_maps, show_on_profile')
       .eq('profile_id', me).order('created_at');
     setBizLocs((data as ProfileLocation[] | null) ?? []);
+  }
+
+  async function toggleBizLoc(id: string, field: 'show_on_maps' | 'show_on_profile', on: boolean) {
+    setError('');
+    setBizLocs((cur) => cur.map((b) => (b.id === id ? { ...b, [field]: on } : b)));
+    const { error: e } = await supabase.from('profile_locations').update({ [field]: on }).eq('id', id);
+    if (e) { setError(e.message); await loadBizLocs(); }
   }
 
   async function addBizLoc() {
@@ -279,13 +289,29 @@ export default function HomeLocationSection({ me }: { me: string }) {
         Add as many as you need; other members can see these.
       </p>
       {bizLocs.map((b) => (
-        <div className="homeloc__row" key={b.id}>
-          <span className="homeloc__aud">
-            {b.label ? <strong>{b.label} · </strong> : null}{b.location}
-          </span>
-          <button className="homeloc__remove" onClick={() => void removeBizLoc(b.id)} aria-label="Remove this address">
-            <Icon name="close" size={13} />
-          </button>
+        <div className="homeloc__biz" key={b.id}>
+          <div className="homeloc__row">
+            <span className="homeloc__aud">
+              {b.label ? <strong>{b.label} · </strong> : null}{b.location}
+            </span>
+            <button className="homeloc__remove" onClick={() => void removeBizLoc(b.id)} aria-label="Remove this address">
+              <Icon name="close" size={13} />
+            </button>
+          </div>
+          {/* Each address decides where it appears (founder 2026-08-11) —
+              changes apply instantly, like the map rules above. */}
+          <div className="homeloc__biz-toggles">
+            <label className="homeloc__biz-toggle">
+              <input type="checkbox" checked={b.show_on_maps}
+                onChange={(e) => void toggleBizLoc(b.id, 'show_on_maps', e.target.checked)} />
+              Show on Maps
+            </label>
+            <label className="homeloc__biz-toggle">
+              <input type="checkbox" checked={b.show_on_profile}
+                onChange={(e) => void toggleBizLoc(b.id, 'show_on_profile', e.target.checked)} />
+              Show on my profile
+            </label>
+          </div>
         </div>
       ))}
       <div className="homeloc__add">

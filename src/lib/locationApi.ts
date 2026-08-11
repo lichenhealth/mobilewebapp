@@ -134,3 +134,39 @@ export async function loadMappableMembers(): Promise<MappableMember[]> {
   if (error) { console.warn('mappable_members:', error.message); return []; }
   return (data as MappableMember[] | null) ?? [];
 }
+
+// ── Goods & Services addresses (founder 2026-08-11) ───────────────────────────
+// A member's business spots — member-visible by design, each with its own
+// "show on maps" / "show on profile" switch.
+
+export interface BizLocationPin {
+  id: string;
+  profile_id: string;
+  label: string;
+  location: string;
+  lat: number;
+  lng: number;
+  owner_name: string | null;
+}
+
+/** Every pinned goods & services address whose owner shows it on Maps. */
+export async function loadBizLocationPins(): Promise<BizLocationPin[]> {
+  const { data, error } = await supabase.from('profile_locations')
+    .select('id, profile_id, label, location, lat, lng, profile:profiles(full_name)')
+    .eq('show_on_maps', true)
+    .not('lat', 'is', null);
+  if (error) { console.warn('loadBizLocationPins:', error.message); return []; }
+  return (((data as unknown as (Omit<BizLocationPin, 'owner_name'> & { profile: { full_name: string | null } | null })[] | null) ?? [])
+    .map(({ profile, ...r }) => ({ ...r, owner_name: profile?.full_name ?? null })));
+}
+
+/** One member's addresses marked for their public profile page. */
+export async function loadProfileBizLocations(profileId: string): Promise<{ label: string; location: string }[]> {
+  const { data, error } = await supabase.from('profile_locations')
+    .select('label, location')
+    .eq('profile_id', profileId)
+    .eq('show_on_profile', true)
+    .order('created_at');
+  if (error) { console.warn('loadProfileBizLocations:', error.message); return []; }
+  return ((data as { label: string; location: string }[] | null) ?? []);
+}
