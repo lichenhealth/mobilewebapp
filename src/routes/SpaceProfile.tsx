@@ -1116,7 +1116,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {adminTools && (
         <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
-          <p className="prof__care-lead">Who can see what, and what the assistant may help with.</p>
+          {/* Founder's wording, 2026-08-11 (matches Profile's Privacy lead) —
+              "your" reads as the space's own assistant here. */}
+          <p className="prof__care-lead">
+            Who can see what. What you&rsquo;re comfortable sharing with your AI
+            assistant. Almost everything is on by default but yours to switch
+            off, if you&rsquo;d prefer!
+          </p>
 
           <p className="prof__privacy-sub">Being found</p>
           <label className="prof__consent">

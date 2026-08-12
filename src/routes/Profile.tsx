@@ -754,9 +754,11 @@ export default function Profile() {
           elsewhere keep living there — this hub owns the homeless ones and
           points at the rest, so nothing is hidden and nothing is duplicated. */}
       <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
+        {/* Founder's wording, 2026-08-11 — keep verbatim. */}
         <p className="prof__care-lead">
-          Who can see what, and what the assistant may help with. Almost everything is
-          on by default and yours to switch off.
+          Who can see what. What you&rsquo;re comfortable sharing with your AI
+          assistant. Almost everything is on by default but yours to switch
+          off, if you&rsquo;d prefer!
         </p>
 
         <p className="prof__privacy-sub">Being found</p>
