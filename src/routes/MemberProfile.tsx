@@ -100,7 +100,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const isSelf = !!me && id === me;
   const [idTags, setIdTags] = useState<string[]>([]);
   // The open web (and the owner previewing) sees the shared page template.
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const previewing = params.get('preview') === '1';
   const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
   useEffect(() => {
@@ -208,17 +208,35 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const identityExtras = (
     <>
       {isSelf && (
+        /* One three-way toggle everywhere (founder 2026-08-11): Admin
+           manages, Lichen View is the internal experience, Public View is
+           the website layer (?preview=1 renders the open-web template). */
         <div className="view-toggle-row">
           <span className="view-toggle" role="group" aria-label="View">
-            <button className="view-toggle__side is-on">Public view</button>
             <button
               className="view-toggle__side view-toggle__side--admin"
               onClick={() => navigate('/profile')}
             >
-              Admin view
+              Admin
+            </button>
+            <button
+              className={'view-toggle__side' + (!previewing ? ' is-on' : '')}
+              onClick={() => setParams({})}
+            >
+              Lichen View
+            </button>
+            <button
+              className={'view-toggle__side' + (previewing ? ' is-on' : '')}
+              onClick={() => setParams({ preview: '1' })}
+            >
+              Public View
             </button>
           </span>
-          <span className="mprof__selfhint">How other members see you.</span>
+          <span className="mprof__selfhint">
+            {previewing
+              ? 'Your public website — what the open web sees.'
+              : 'How other members see you.'}
+          </span>
         </div>
       )}
       {idTags.length > 0 && (

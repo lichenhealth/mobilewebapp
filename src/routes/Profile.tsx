@@ -294,8 +294,10 @@ export default function Profile() {
       .eq('id', user.id);
     if (e) { setError(e.message); setContentDefaults(prior); }
   }
-  // Your page on the open web (founder 2026-07-28): three views of one
-  // profile — Admin, In Lichen, and this one.
+  // Three views of one profile (founder 2026-08-11 streamline): Admin is
+  // the ONLY place you manage content — both kinds. Lichen View is the
+  // internal experience (feed, marketplace, events); Public View is the
+  // website layer of public tabs on top. The other two toggles just LOOK.
   const [searchParams, setSearchParams] = useSearchParams();
   const view = searchParams.get('view');
   const [contact, setContact] = useState<ContactInfo>({});
@@ -398,6 +400,14 @@ export default function Profile() {
     }, 100);
     return () => window.clearInterval(tick);
   }, [hash]);
+
+  // Legacy deep link: /profile?view=web used to be its own segmented view —
+  // it's the "Public page" section inside Admin now (founder 2026-08-11).
+  useEffect(() => {
+    if (view !== 'web') return;
+    setOpenSections((s) => (s.has('public-page') ? s : new Set(s).add('public-page')));
+    setSearchParams({}, { replace: true });
+  }, [view, setSearchParams]);
 
   // Your whole experience follows who you're acting as (founder 2026-08-10):
   // Profile is always the settings page for whoever the TopBar says you are.
@@ -566,32 +576,28 @@ export default function Profile() {
 
       <div className="view-toggle-row view-toggle-row--center">
         <span className="view-toggle" role="group" aria-label="View">
-          <button
-            className={'view-toggle__side view-toggle__side--admin' + (!view ? ' is-on' : '')}
-            onClick={() => setSearchParams({})}
-          >
+          <button className="view-toggle__side view-toggle__side--admin is-on">
             Admin
           </button>
           <button className="view-toggle__side" onClick={() => navigate(`/members/${user?.id}`)}>
-            In Lichen
+            Lichen View
           </button>
-          <button
-            className={'view-toggle__side' + (view === 'web' ? ' is-on' : '')}
-            onClick={() => setSearchParams({ view: 'web' })}
-          >
-            Web page
+          <button className="view-toggle__side" onClick={() => navigate(`/members/${user?.id}?preview=1`)}>
+            Public View
           </button>
         </span>
         <span className="prof__selfhint">
-          {view === 'web'
-            ? 'Your page on the open web \u2014 no Lichen account needed to read it.'
-            : 'Your profile\u2019s backend \u2014 only you see this page.'}
+          Manage everything here &mdash; only you see this page.
         </span>
       </div>
 
-      {view === 'web' && (
-        <section className="prof__section">
-          <h2 className="prof__h2">Your page on the open web</h2>
+      {error && <p className="prof__error">{error}</p>}
+
+      {/* Public View content (founder 2026-08-11): the website layer of
+          public tabs — managed HERE like everything else, viewed via the
+          Public View toggle. Leads the accordion, same as a space
+          backstage's Public Profile Builder. */}
+      <CollapsibleSection id="public-page" title="Public page" open={openSections.has('public-page')} onToggle={() => toggleSection('public-page')}>
           <p className="prof__care-lead">
             This is what someone finds when they search your name or follow a link — no Lichen
             account needed. Everything deeper (recommending you, booking, messaging, your
@@ -699,14 +705,7 @@ export default function Profile() {
             {webMsg && <span className="prof__msg">{webMsg}</span>}
           </div>
 
-          <p className="prof__hint">
-            Your headline, story and offerings come from the <strong>Admin</strong> tab — they
-            appear here too. A richer page builder is coming; tell Claude what you want it to say.
-          </p>
-        </section>
-      )}
-
-      {error && <p className="prof__error">{error}</p>}
+      </CollapsibleSection>
 
 
       <CollapsibleSection id="about" title="About you" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
