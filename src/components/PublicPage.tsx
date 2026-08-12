@@ -14,6 +14,9 @@ import './PublicPage.css';
 
 export type ContactActionKind = 'call' | 'book' | 'email' | 'visit';
 
+/** Handed to a render-function `feed` on every tab (see the prop's doc). */
+export type FeedRenderCtx = { showing: boolean; open: () => void };
+
 export interface PageMeta {
   tagline?: string;
   story?: string;
@@ -99,9 +102,14 @@ export interface PublicPageProps {
    *  navigational doors that shouldn't get lost below a long page
    *  (founder 2026-08-03). Optional. */
   beforeContent?: React.ReactNode;
-  /** The entity's stream. Rendered under a Feed tab that leads the row —
-   *  member-only unless page.showPosts opens it to the web. */
-  feed?: React.ReactNode;
+  /** The entity's stream — member-only unless page.showPosts opens it to
+   *  the web. Pass the render-function form to move the Feed door INTO the
+   *  stream's own icon row (founder 2026-08-11: "move the newsfeed icon to
+   *  where it appears on all profiles"): it's called on EVERY tab so the
+   *  row persists as the section switcher — `showing` says whether the feed
+   *  list itself is the active tab, `open` switches back to it. A plain
+   *  node keeps the legacy Feed-icon-in-the-nav behavior. */
+  feed?: React.ReactNode | ((ctx: FeedRenderCtx) => React.ReactNode);
   /** Offerings WITH ids and domains, so Services and Goods can be separate
    *  tabs and each row can carry its own recommend (founder 2026-08-06:
    *  "you don't recommend a person, you recommend their work"). */
@@ -173,6 +181,10 @@ export default function PublicPage(props: PublicPageProps) {
   // Feed is member-only unless the page opts in via page.showPosts, which was
   // declared in PageMeta from the start and never read until now.
   const showFeed = !!props.feed && (!!props.signedIn || page.showPosts === true);
+  // The render-function form carries its own Feed door inside the stream's
+  // icon row (founder 2026-08-11: the newsfeed circle belongs with the other
+  // circles, not beside the About/Services text tabs) — so the nav skips it.
+  const feedInRow = typeof props.feed === 'function';
   // Custom doors (Countryman Stables) keep their own set; Feed joins in front.
   const doors = page.doors?.length ? page.doors : null;
 
@@ -207,7 +219,7 @@ export default function PublicPage(props: PublicPageProps) {
         page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
         hasContact ? { id: 'contact', label: 'Contact' } : null,
       ].filter((n): n is { id: string; label: string } => !!n);
-  const navItems = showFeed
+  const navItems = showFeed && !feedInRow
     ? [{ id: 'feed', label: 'Feed' }, ...sectionItems]
     : sectionItems;
   const firstContentDoor = showFeed ? 'feed' : doors?.find((d) => !d.href)?.id;
@@ -352,8 +364,15 @@ export default function PublicPage(props: PublicPageProps) {
       {props.beforeContent}
 
       {/* The Feed tab — the entity's actual stream, the thing the in-app
-          profile used to be entirely (founder 2026-08-05). */}
-      {showingFeed && props.feed}
+          profile used to be entirely (founder 2026-08-05). The function form
+          renders on EVERY tab: its icon row (with the lit Feed door) is the
+          profile's section switcher and must survive a hop to About/Services,
+          or there'd be no way back to the feed. */}
+      {showFeed && (feedInRow
+        ? (props.feed as (ctx: FeedRenderCtx) => React.ReactNode)({
+            showing: showingFeed, open: () => setTab('feed'),
+          })
+        : (showingFeed && (props.feed as React.ReactNode)))}
 
       {/* A chosen template tab — its lead, then its paragraphs. */}
       {activeChosen && (

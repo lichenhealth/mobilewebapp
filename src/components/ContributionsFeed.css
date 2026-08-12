@@ -47,6 +47,13 @@
 /* The assistant door in the feed's icon row: peach while this section's
    consent is on, faint and slashed when the member has switched it off
    (founder 2026-08-05 — same grammar as Home's brain). */
+/* The Feed door, lit when you're standing on it — same "you are here"
+   look as IconRow's .icon-row__btn--here on Home/My-celium. */
+.cfeed__area--feed.is-here .cfeed__area-circle {
+  border-color: var(--peach);
+  background: var(--peach-tint);
+  color: var(--peach-deep);
+}
 .cfeed__area--ai .cfeed__area-circle { border-color: var(--peach); color: var(--peach-deep); }
 .cfeed__area--ai.is-ai-off .cfeed__area-circle { border-color: var(--bone-edge); color: var(--ink-faint); }
 .cfeed__area--ai.is-ai-off .cfeed__area-label { color: var(--ink-faint); }

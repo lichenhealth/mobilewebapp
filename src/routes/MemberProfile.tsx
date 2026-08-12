@@ -21,7 +21,7 @@ import { BookingType, listBookableTypes } from '../lib/bookingApi';
 import '../routes/Bookings.css';
 import './Profile.css';
 import './MemberProfile.css';
-import PublicPage, { type PageMeta } from '../components/PublicPage';
+import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import { type ContactInfo } from '../components/ContactFields';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -282,7 +282,10 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     </>
   );
 
-  const memberFeed = (
+  // Render-function form (founder 2026-08-11): the Feed door rides the icon
+  // row itself — lit when the feed is the active tab — and the row stays up
+  // on About/Services as the way back.
+  const memberFeed = (ctx: FeedRenderCtx) => (
     <ContributionsFeed
       profileId={member.id}
       me={me}
@@ -295,6 +298,8 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       ]}
       assistantSection="profile"
       assistantOff={member.assistant_enabled === false}
+      feedDoor={{ here: ctx.showing, onClick: ctx.open }}
+      listHidden={!ctx.showing}
     />
   );
 
@@ -381,7 +386,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         {member.bio && <p className="mprof__bio">{member.bio}</p>}
       </div>
       {identityExtras}
-      {memberFeed}
+      {memberFeed({ showing: true, open: () => {} })}
     </div>
   );
 }

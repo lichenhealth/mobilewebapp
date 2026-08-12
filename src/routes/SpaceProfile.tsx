@@ -40,7 +40,7 @@ import './SpaceProfile.css';
 import './MemberProfile.css';   // shares the mprof action-button styles
 import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
-import PublicPage, { type PageMeta } from '../components/PublicPage';
+import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
@@ -646,8 +646,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   );
   // The profile IS a feed — the space's wall (posted AS it or TO it), with
   // the space-anatomy circles (Chat for members, Members) leading the icon
-  // row. Identical for all four kinds.
-  const feedSection = !backstage && !tab && (
+  // row. Identical for all four kinds. Render-function form (founder
+  // 2026-08-11): the Feed door rides the icon row, lit when the feed is the
+  // active tab, and the row stays up on template tabs as the way back.
+  const feedSection = (ctx: FeedRenderCtx) => (
     <ContributionsFeed
       spaceId={space.id}
       me={me}
@@ -683,6 +685,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // The Events door below opens the real gatherings list — an
       // events-only feed lens beside it was the same circle twice.
       hideAreas={hasEvents ? ['events'] : []}
+      feedDoor={{ here: ctx.showing, onClick: ctx.open }}
+      listHidden={!ctx.showing}
     />
   );
   const roomsSection = !backstage && resources.length > 0 && (
@@ -845,10 +849,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
           </>
         ) : undefined}
-        // A real "Feed" nav tab, selected by default — parity with
-        // MemberProfile.tsx (founder 2026-08-09: organizations read as
-        // missing the icon row because this rode in beforeContent instead,
-        // which skips PublicPage's own tab gating entirely).
+        // The feed, selected by default — parity with MemberProfile.tsx.
+        // The function form puts the Feed door in the icon row itself
+        // (founder 2026-08-11), so the nav stays all-text template tabs.
         feed={!backstage && !tab ? feedSection : undefined}
       >
         {/* PublicPage's `children` slot renders unconditionally regardless of
@@ -1166,7 +1169,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {plusMenu}
 
-      {feedSection}
+      {!backstage && !tab && feedSection({ showing: true, open: () => {} })}
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
       {/* Member shares awaiting the shelves (courses/library) — stewards

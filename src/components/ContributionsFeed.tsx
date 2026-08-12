@@ -42,7 +42,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -71,6 +71,14 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  tap Library on Melanie's profile and the feed declares "Melanie's
    *  Library" (destination feeling, no navigation cost — founder 2026-07-19). */
   entityName?: string;
+  /** A Feed door in Home's exact slot — right after the hairline, before the
+   *  area lenses, lit peach when `here` (founder 2026-08-11: the newsfeed
+   *  circle lives in the icon row on every profile, like Home/My-celium's).
+   *  `onClick` brings the feed tab back when you've wandered to another. */
+  feedDoor?: { here: boolean; onClick: () => void };
+  /** Row-only mode: the icon row stays up as the profile's section switcher
+   *  while another tab (About, Services) owns the content below. */
+  listHidden?: boolean;
 }) {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -161,7 +169,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
 
   return (
     <div className="cfeed">
-      {(leading.length > 0 || trailing.length > 0 || areasPresent.length > 0) && (
+      {(leading.length > 0 || trailing.length > 0 || areasPresent.length > 0 || !!feedDoor) && (
         <div className="cfeed__areas h-scroll">
           {leading.map((l) => (
             <button key={l.label} className="cfeed__area" onClick={l.onClick}>
@@ -187,8 +195,18 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             </button>
           )}
           {(leading.length > 0 || assistantSection)
-            && (afterGap.length > 0 || areasPresent.length > 0 || trailing.length > 0)
+            && (!!feedDoor || afterGap.length > 0 || areasPresent.length > 0 || trailing.length > 0)
             && <span className="cfeed__area-gap" />}
+          {feedDoor && (
+            <button
+              className={'cfeed__area cfeed__area--feed' + (feedDoor.here ? ' is-here' : '')}
+              onClick={feedDoor.onClick}
+              title={feedDoor.here ? 'You’re on the feed' : 'Back to the feed'}
+            >
+              <span className="cfeed__area-circle"><Icon name="newsfeed" size={14} /></span>
+              <span className="cfeed__area-label">Feed</span>
+            </button>
+          )}
           {afterGap.map((l) => (
             <button key={l.label} className="cfeed__area" onClick={l.onClick}>
               <span className="cfeed__area-circle"><Icon name={l.icon} size={14} /></span>
@@ -214,7 +232,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
         </div>
       )}
 
-      {entityName && areas.length === 1 && (
+      {!listHidden && entityName && areas.length === 1 && (
         <h2 className="cfeed__shelf">
           {entityName}&rsquo;s <span className="display-italic">
             {areasPresent.find((a) => a.value === areas[0])?.label ?? areas[0]}
@@ -222,7 +240,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
         </h2>
       )}
 
-      <div className="cfeed__list">
+      {!listHidden && <div className="cfeed__list">
         {posts.length === 0 && <p className="cfeed__empty">No contributions yet.</p>}
         {posts.length > 0 && visible.length === 0 && <p className="cfeed__empty">Nothing here under these filters.</p>}
         {visible.map((p) => (
@@ -250,7 +268,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
