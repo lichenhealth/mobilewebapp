@@ -137,6 +137,20 @@
 
 .feed-card__head-text { min-width: 0; }
 
+/* Phones: an icon-heavy actions cluster (weave + shield + area + chat + ⋯)
+   used to squeeze the title to one word per line. Flex-wrap lets the
+   cluster drop to its own right-aligned line ONLY when it genuinely
+   doesn't fit beside a readable title — the common three-icon cards keep
+   their single row (founder 2026-08-11). Sits AFTER the min-width: 0 rule
+   above, which would otherwise win the tie and re-squeeze the title. */
+@media (max-width: 480px) {
+  .feed-card__head { display: flex; flex-wrap: wrap; }
+  .feed-card__avatar-btn,
+  .feed-card__head > .feed-card__avatar { flex-shrink: 0; }
+  .feed-card__head-text { flex: 1 1 0; min-width: 42%; }
+  .feed-card__head-actions { margin-left: auto; }
+}
+
 .feed-card__title {
   font-size: var(--t-base);
   font-weight: 300;
