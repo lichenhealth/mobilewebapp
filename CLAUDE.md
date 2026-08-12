@@ -215,7 +215,7 @@ Deploy with `supabase functions deploy <name>` (works without Docker). Secrets a
 - Donate-back on gifted course content (a scholarship flow) — founder is checking the tax shape.
 - A course "Provider Studio" (manage all your offerings in one place), per-standalone-post legibility chips, and cohort scheduling.
 - Compose doesn't default its audience from the current profile/space context yet — always a manual pick.
-- Alpha-data cleanup: delete test posts + the duplicate "Lichen" org row (SQL is ready; founder to pick a date).
+- Alpha-data cleanup: delete test posts (SQL is ready; founder to pick a date). The duplicate "Lichen" org and duplicate "The Audacity Lab" rows are already gone (verified/cleaned 2026-08-11).
 - Recurring-donation renewals (Stripe's `invoice.paid`) aren't recorded yet — only the initial checkout donation is.
 - Inbox realtime refresh (new messages appearing without a manual reload) and the broader "how much can signed-out visitors browse" scope decision are both still open.
 - Claude's relationship shipped as a feed (`AssistantFeed.tsx`, 2026-08-09) with "Share to Claude" — but only for the member's own relationship. Still open: the full per-entity AI Partner fabric (every group/org/community/place gets its own Claude feed, filtered to that space's own activity the way Marketplace-on-a-Community only shows that Community's Marketplace posts — founder confirmed this is the right shape, 2026-08-09) — needs `assistant_identities` actually wired into the frontend (currently deny-all/unused) and per-space AI consent (today's `aiDoorOn(section)` is per broad section, e.g. all organizations at once, not per specific group). See [[assistant-architecture]] in memory.
