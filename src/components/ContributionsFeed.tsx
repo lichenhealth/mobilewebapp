@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FeedCard from './FeedCard';
 import { Icon, IconName } from './Icon';
+import { ScopeEmpty } from './ScopeEscape';
 import { aiDoorOn } from './AssistantDoor';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
@@ -168,7 +169,12 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   if (!ready) return <p className="cfeed__empty">Loading…</p>;
   // Space anatomy (Chat/Members) stays visible even before the first post.
   if (posts.length === 0 && leading.length === 0 && afterGap.length === 0) {
-    return <p className="cfeed__empty">No contributions yet.</p>;
+    return (
+      <ScopeEmpty
+        icon="newsfeed" section="Feed" who={entityName || 'them'}
+        to="/home" label="Visit the Lichen feed"
+      />
+    );
   }
 
   return (
@@ -245,7 +251,12 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
       )}
 
       {!listHidden && <div className="cfeed__list">
-        {posts.length === 0 && <p className="cfeed__empty">No contributions yet.</p>}
+        {posts.length === 0 && (
+          <ScopeEmpty
+            icon="newsfeed" section="Feed" who={entityName || 'them'}
+            to="/home" label="Visit the Lichen feed"
+          />
+        )}
         {posts.length > 0 && visible.length === 0 && <p className="cfeed__empty">Nothing here under these filters.</p>}
         {visible.map((p) => (
           <FeedCard
