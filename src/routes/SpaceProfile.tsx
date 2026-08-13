@@ -796,21 +796,30 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const beThisSpace = () =>
     setActor({ type: 'space', id: space.id, name: space.name, kind: space.kind });
   const beMyself = () => { if (actingAsThis) setActor({ type: 'self' }); };
+  // The same three-way every profile wears now (founder 2026-08-11):
+  // Admin manages, Lichen View is the internal experience, Public View is
+  // the website layer (?preview=1 renders the open-web template).
   const adminBar = isAdmin ? (
     <div className="view-toggle-row">
       <span className="view-toggle" role="group" aria-label="View">
         <button
-          className={'view-toggle__side' + (!backstage ? ' is-on' : '')}
-          onClick={() => { beMyself(); setSearchParams({}); }}
-        >
-          Member view
-        </button>
-        <button
           className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
           onClick={() => { beThisSpace(); setSearchParams({ manage: '1' }); }}
         >
-          Admin view
+          Admin
           {deskCount > 0 && <span className="view-toggle__badge">{deskCount}</span>}
+        </button>
+        <button
+          className={'view-toggle__side' + (!backstage && !previewing ? ' is-on' : '')}
+          onClick={() => { beMyself(); setSearchParams({}); }}
+        >
+          Lichen View
+        </button>
+        <button
+          className={'view-toggle__side' + (!backstage && previewing ? ' is-on' : '')}
+          onClick={() => { beMyself(); setSearchParams({ preview: '1' }); }}
+        >
+          Public View
         </button>
       </span>
     </div>
