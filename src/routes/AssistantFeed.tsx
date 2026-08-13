@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
-import { loadAssistantFeed, postToAssistantFeed, type FeedPostRow } from '../lib/assistantFeedApi';
+import {
+  loadAssistantFeed, postToAssistantFeed, loadThreadCounts,
+  ASSISTANT_THREADS, threadLabel, type FeedPostRow,
+} from '../lib/assistantFeedApi';
+import SnapshotPanel from '../components/SnapshotPanel';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import './AssistantFeed.css';
 
@@ -30,6 +34,13 @@ export default function AssistantFeed() {
   const { user } = useAuth();
   const me = user?.id ?? '';
 
+  // Rooms that mirror the platform (founder 2026-08-11) — ?thread= is the
+  // room, ?back= the way home to whatever sent you here.
+  const [params, setParams] = useSearchParams();
+  const thread = params.get('thread') || 'general';
+  const back = params.get('back') || '';
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourcePosts, setSourcePosts] = useState<Map<string, FeedPost>>(new Map());
@@ -39,7 +50,8 @@ export default function AssistantFeed() {
 
   const load = async () => {
     if (!me) return;
-    const rows = await loadAssistantFeed(me);
+    void loadThreadCounts(me).then(setCounts);
+    const rows = await loadAssistantFeed(me, thread);
     setPosts(rows);
     setLoading(false);
     const sourceIds = [...new Set(rows.map((r) => r.source_post_id).filter((id): id is string => !!id))];
@@ -48,7 +60,7 @@ export default function AssistantFeed() {
       setSourcePosts(new Map(sp.map((p) => [p.id, p])));
     }
   };
-  useEffect(() => { void load(); }, [me]);
+  useEffect(() => { setLoading(true); void load(); }, [me, thread]);
 
   useEffect(() => {
     if (!me) return;
@@ -72,12 +84,14 @@ export default function AssistantFeed() {
         { event: 'INSERT', schema: 'public', table: 'assistant_feed_posts', filter: `profile_id=eq.${me}` },
         (payload) => {
           const row = payload.new as FeedPostRow;
+          void loadThreadCounts(me).then(setCounts);
+          if ((row.thread ?? 'general') !== thread) return;   // another room's business
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
         },
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [me]);
+  }, [me, thread]);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -87,18 +101,24 @@ export default function AssistantFeed() {
   async function send(text: string) {
     // The realtime subscription above picks up both this insert and
     // Claude's reply — no need to refetch.
-    await postToAssistantFeed(text);
+    await postToAssistantFeed(text, undefined, thread);
   }
 
   return (
     <div className="afeed">
-      <button className="cmp__back" onClick={() => navigate(-1)}>← Back</button>
+      <button className="cmp__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
+        ← {back ? 'Back to manual mode' : 'Back'}
+      </button>
 
       <header className="afeed__head">
         <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={44} />
         <div className="afeed__head-text">
           <h1 className="afeed__title">Claude</h1>
-          <p className="afeed__sub">Your feed together — everything you've shared and asked, in one place.</p>
+          <p className="afeed__sub">
+            {thread === 'general'
+              ? 'Everything you’ve shared and asked — and it can draw on every room.'
+              : `${threadLabel(thread)} — this room keeps that work together.`}
+          </p>
         </div>
         <button
           className={'afeed__search-btn' + (searchOpen ? ' is-on' : '')}
@@ -126,6 +146,30 @@ export default function AssistantFeed() {
           )}
         </div>
       )}
+
+      {/* The rooms. General leads; a room with history shows its weight,
+          and the rest stay available so work has somewhere to land. */}
+      <div className="afeed__rooms h-scroll">
+        {ASSISTANT_THREADS.map((t) => (
+          <button
+            key={t.id}
+            className={'afeed__room' + (t.id === thread ? ' is-on' : '')}
+            title={t.blurb}
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('thread', t.id);
+              setParams(next, { replace: true });
+            }}
+          >
+            {t.label}
+            {counts[t.id] ? <em>{counts[t.id]}</em> : null}
+          </button>
+        ))}
+      </div>
+
+      {/* Building your presence happens HERE, in the profile room, rather
+          than off in a screen of its own (founder 2026-08-11). */}
+      {thread === 'profile' && <SnapshotPanel back={back} onDone={() => void load()} />}
 
       <div className="afeed__list">
         {loading && <p className="afeed__muted">Loading…</p>}

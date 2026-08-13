@@ -54,3 +54,25 @@
   font-size: 12px; color: var(--ink-soft); text-align: left; cursor: pointer;
 }
 .afeed__ref:hover { border-color: var(--blue); }
+
+/* The rooms — the assistant mirrors the platform, so work stays where it
+   belongs (founder 2026-08-11). */
+.afeed__rooms { display: flex; gap: 6px; margin: var(--s-2) 0 var(--s-3); }
+.afeed__room {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 6px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.afeed__room.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
+.afeed__room em {
+  font-style: normal; font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint);
+}
+.afeed__room.is-on em { color: var(--peach-deep); }
+
+/* Snapshot, hosted inside the profile room rather than a page of its own. */
+.snap--panel {
+  max-width: none; padding: var(--s-3) 0 var(--s-4);
+  border-bottom: 1px solid var(--bone-edge); margin-bottom: var(--s-3);
+}
+.snap--panel .snap__title { font-size: var(--t-lg); margin-top: 0; }

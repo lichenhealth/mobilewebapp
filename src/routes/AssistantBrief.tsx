@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
+import { threadForSection } from '../lib/assistantFeedApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -318,7 +319,9 @@ export default function AssistantBrief() {
   }, [me, section, doorOn, fingerprint, refreshTick]);
 
   function talkToClaude() {
-    navigate('/assistant/feed');
+    // Land in the room this section belongs to (founder 2026-08-11), so the
+    // work logs where it lives instead of in one flat feed.
+    navigate(`/assistant/feed?thread=${threadForSection(section)}`);
   }
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
@@ -329,8 +332,8 @@ export default function AssistantBrief() {
    *  the reply. */
   async function sendToClaude(text: string) {
     if (!me) return;
-    await postToAssistantFeed(text);
-    navigate('/assistant/feed');
+    await postToAssistantFeed(text, undefined, threadForSection(section));
+    navigate(`/assistant/feed?thread=${threadForSection(section)}`);
   }
 
   return (

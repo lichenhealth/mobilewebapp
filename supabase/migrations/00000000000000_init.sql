@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gaitITua1dse9WYbOlPY5jK8WvgaeGjgDVPxc8qVYVwVWhRqqwOw385aXPBwJl4
+\restrict 6L5s6Qyk51etbIoEEzi1WjKpCXmbeJd0agz8vob9HJ9VnJdsORDTIQc2DoktfSu
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3904,6 +3904,7 @@ CREATE TABLE public.assistant_feed_posts (
     attachments jsonb,
     source_post_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    thread text DEFAULT 'general'::text NOT NULL,
     CONSTRAINT assistant_feed_posts_author_check CHECK ((author = ANY (ARRAY['member'::text, 'claude'::text])))
 );
 
@@ -5905,6 +5906,13 @@ ALTER TABLE ONLY public.video_jobs
 --
 
 CREATE INDEX assistant_feed_posts_profile_time ON public.assistant_feed_posts USING btree (profile_id, created_at);
+
+
+--
+-- Name: assistant_feed_posts_thread_time; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assistant_feed_posts_thread_time ON public.assistant_feed_posts USING btree (profile_id, thread, created_at);
 
 
 --
@@ -11414,7 +11422,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gaitITua1dse9WYbOlPY5jK8WvgaeGjgDVPxc8qVYVwVWhRqqwOw385aXPBwJl4
+\unrestrict 6L5s6Qyk51etbIoEEzi1WjKpCXmbeJd0agz8vob9HJ9VnJdsORDTIQc2DoktfSu
 
 
 

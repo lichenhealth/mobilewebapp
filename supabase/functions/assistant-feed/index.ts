@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
   const ident = Array.isArray(idents) ? idents[0] : null;
   if (!ident) return json({ ok: true, skipped: 'no-identity' });
 
-  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id`)).json();
+  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread`)).json();
   const trigger = Array.isArray(posts) ? posts[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-post' });
 
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
   const used = Number(capRes.headers.get('content-range')?.split('/')[1] ?? '0');
   if (used >= DAILY_CAP) {
     await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-      profile_id, author: 'claude',
+      profile_id, author: 'claude', thread: trigger.thread ?? 'general',
       body: 'I’ve reached today’s limit with you — a small guardrail while the mycelium is young. Let’s pick this up tomorrow. 🌱',
     }) });
     return json({ ok: true, skipped: 'cap' });
@@ -79,9 +79,31 @@ Deno.serve(async (req) => {
     if (sp) sharedPostContext = `\n\n[The member shared this post: "${sp.title ?? ''}" — ${sp.body ?? ''}]`;
   }
 
-  // The recent feed, oldest → newest.
-  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&select=id,author,body,source_post_id&order=created_at.desc&limit=20`)).json();
+  // ROOMS (founder 2026-08-11): the assistant keeps a room per section, so
+  // this reply reads THIS room's history — marketplace work doesn't wander
+  // into a care conversation. General is the exception: it's the room for
+  // whatever isn't one subject, so it gets a short glance at the others.
+  const thread = trigger.thread ?? 'general';
+  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}&select=id,author,body,source_post_id&order=created_at.desc&limit=20`)).json();
   const rows = (Array.isArray(feed) ? feed : []).reverse().filter((p: { body?: string }) => p.body?.trim());
+
+  let elsewhere = '';
+  if (thread === 'general') {
+    const others = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=neq.general&select=thread,body,created_at&order=created_at.desc&limit=12`)).json();
+    const lines = (Array.isArray(others) ? others : [])
+      .filter((p: { body?: string }) => p.body?.trim())
+      .map((p: { thread: string; body: string }) => `[${p.thread}] ${p.body.slice(0, 180)}`);
+    if (lines.length) {
+      elsewhere = `\n\nFor context, recent work from their other rooms (do not bring it up unless it's relevant to what they just asked):\n${lines.join('\n')}`;
+    }
+  }
+
+  // Staying in the right room is part of the job: if what they've asked
+  // plainly belongs somewhere else, say so and point, rather than doing the
+  // work in the wrong place (founder 2026-08-11).
+  const roomRule = thread === 'general'
+    ? '\n\nYou are in their GENERAL room — anything goes here, and you may draw on their other rooms when it helps.'
+    : `\n\nYou are in their ${thread.toUpperCase()} room, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which room it belongs in so it stays findable — one short sentence, never a lecture.`;
 
   const messages = rows.map((p: { id: string; author: string; body: string; source_post_id: string | null }) =>
     p.author === 'claude'
@@ -94,7 +116,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 400,
-      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}`, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${roomRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
       messages,
     }),
   });
@@ -104,7 +126,7 @@ Deno.serve(async (req) => {
   if (!reply) return json({ ok: true, skipped: 'empty-reply' });
 
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-    profile_id, author: 'claude', body: reply,
+    profile_id, author: 'claude', body: reply, thread,
   }) });
 
   // UVA seed: record the silicon contribution with its exact cost.

@@ -20,7 +20,7 @@ export default function BuildModeSplit({ back }: { back: string }) {
       <button
         className="bmode__side bmode__side--ai"
         type="button"
-        onClick={() => navigate(`/snapshot?back=${encodeURIComponent(back)}`)}
+        onClick={() => navigate(`/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`)}
       >
         <strong><Icon name="brain" size={14} /> Build with Claude</strong>
         <em>Tell it about you, or paste your website</em>
@@ -39,7 +39,7 @@ export function FillWithClaude({ back, label = 'Fill this out with Claude' }: {
     <button
       className="bmode__inline"
       type="button"
-      onClick={() => navigate(`/snapshot?back=${encodeURIComponent(back)}`)}
+      onClick={() => navigate(`/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`)}
     >
       <Icon name="brain" size={12} /> {label}
     </button>
