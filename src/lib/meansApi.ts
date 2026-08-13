@@ -22,6 +22,11 @@ export interface FinancialPosition {
   income_band: IncomeBand | null;
   household_size: number | null;
   circumstances: string | null;
+  /** Web of Wellbeing consent (founder 2026-08-11): true = active care
+   *  team may read this; false = private to everyone — and the help built
+   *  on it (money conversations, coaching, subsidies) can't reach them.
+   *  The switch lives in Profile → Privacy. */
+  care_team_visible: boolean;
   updated_at: string;
 }
 
@@ -29,7 +34,7 @@ export interface FinancialPosition {
 export async function getFinancialPosition(profileId: string): Promise<FinancialPosition | null> {
   const { data, error } = await supabase
     .from('financial_positions')
-    .select('profile_id, income_band, household_size, circumstances, updated_at')
+    .select('profile_id, income_band, household_size, circumstances, care_team_visible, updated_at')
     .eq('profile_id', profileId)
     .maybeSingle();
   if (error) return null;

@@ -294,6 +294,32 @@ export default function Profile() {
       .eq('id', user.id);
     if (e) { setError(e.message); setContentDefaults(prior); }
   }
+  // Web of Wellbeing sharing (founder 2026-08-11): the financial picture
+  // lives with the rest of your health info, care-team-only by default —
+  // or fully private, understanding what can no longer be built on it.
+  // The flag rides financial_positions (upserted here even before any
+  // means data exists, so the choice always has somewhere to live).
+  const [wowShared, setWowShared] = useState(true);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void supabase.from('financial_positions')
+      .select('care_team_visible').eq('profile_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        if (!live) return;
+        const r = data as { care_team_visible?: boolean } | null;
+        setWowShared(r ? r.care_team_visible !== false : true);
+      });
+    return () => { live = false; };
+  }, [user]);
+  async function updateWowShared(next: boolean) {
+    if (!user) return;
+    const prior = wowShared;
+    setWowShared(next);
+    const { error: e } = await supabase.from('financial_positions')
+      .upsert({ profile_id: user.id, care_team_visible: next }, { onConflict: 'profile_id' });
+    if (e) { setError(e.message); setWowShared(prior); }
+  }
   // Three views of one profile (founder 2026-08-11 streamline): Admin is
   // the ONLY place you manage content — both kinds. Lichen View is the
   // internal experience (feed, marketplace, events); Public View is the
@@ -825,13 +851,14 @@ export default function Profile() {
           </>
         )}
 
+        {/* "Your public profile" used to lead this list — retired 2026-08-11:
+            the Lichen View / Public View toggles up top ARE that door now. */}
         <p className="prof__privacy-sub">Who can see what</p>
         <div className="prof__privacy-doors">
           {([
-            ['Your public profile', 'How other members see you', `/members/${user?.id}`],
             ['Calendar sharing', 'Busy blocks, full details, or nothing — per audience', '/calendar/settings'],
             ['Presence', 'Around, present, or neither', '/mycelium/directory'],
-            ['Financial position', 'Care-team only, never a score', '/concierge'],
+            ['Web of Wellbeing', 'Your health & financial picture, in one place — never a score', '/concierge'],
           ] as [string, string, string][]).map(([label, sub, to]) => (
             <button key={label} className="prof__privacy-door" onClick={() => navigate(to)}>
               <span>
@@ -842,6 +869,28 @@ export default function Profile() {
             </button>
           ))}
         </div>
+
+        {/* Money is sensitive, like AI (founder 2026-08-11): nobody HAS to
+            share — what changes is only what can be built on it. */}
+        <label className="prof__consent">
+          <input
+            type="checkbox"
+            checked={wowShared}
+            onChange={(e) => void updateWowShared(e.target.checked)}
+          />
+          <span>
+            <strong>Share your Web of Wellbeing with your care team</strong>
+            <em>
+              On, your care team — and only them — can see your financial
+              picture, so they can actually help with it: money conversations,
+              financial coaching, job training, and Lichen&rsquo;s subsidies
+              pool. Off, it&rsquo;s private to everyone. Like AI, money is
+              sensitive — you never have to share it; switching off just means
+              the help that&rsquo;s built on it can&rsquo;t reach you. Never a
+              score, never visible to anyone else, either way.
+            </em>
+          </span>
+        </label>
         <p className="prof__hint">
           New here?{' '}
           <button className="prof__inline-link" onClick={() => navigate('/collections/de300007-0000-4000-a000-000000000001')}>

@@ -419,14 +419,19 @@ function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
       <button className="means__row" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <Icon name="dollar" size={15} />
         <span className="means__title">Financial position</span>
-        <span className="means__state">{shared ? 'shared with your care team' : own ? 'not shared yet' : 'not shared'}</span>
+        <span className="means__state">
+          {row && row.care_team_visible === false
+            ? 'private — only you'
+            : shared ? 'shared with your care team' : own ? 'not shared yet' : 'not shared'}
+        </span>
         <Icon name="chevron-right" size={13} />
       </button>
       {open && own && (
         <div className="means__body">
           <p className="means__hint">
             Only you and your active care team can see this — never a score, never public.
-            An honest picture is what lets the network subsidize care fairly.
+            An honest picture is what lets the network subsidize care fairly. Whether your
+            care team sees it at all is yours to switch in Profile → Privacy.
           </p>
           <label className="means__label">Household income</label>
           <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>

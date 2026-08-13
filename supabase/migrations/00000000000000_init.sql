@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 42tf3jLta28r9jQ0gqVriy4bKQhzokIp6c855z7cpCVZlSUImEuqzXNKcLCiiao
+\restrict gaitITua1dse9WYbOlPY5jK8WvgaeGjgDVPxc8qVYVwVWhRqqwOw385aXPBwJl4
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4539,6 +4539,7 @@ CREATE TABLE public.financial_positions (
     household_size integer,
     circumstances text,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    care_team_visible boolean DEFAULT true NOT NULL,
     CONSTRAINT financial_positions_household_size_check CHECK (((household_size >= 1) AND (household_size <= 20))),
     CONSTRAINT financial_positions_income_band_check CHECK ((income_band = ANY (ARRAY['under_25k'::text, '25k_50k'::text, '50k_100k'::text, '100k_200k'::text, 'over_200k'::text])))
 );
@@ -8620,9 +8621,9 @@ CREATE POLICY "locations readable by members" ON public.profile_locations FOR SE
 -- Name: financial_positions means: care team reads; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "means: care team reads" ON public.financial_positions FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+CREATE POLICY "means: care team reads" ON public.financial_positions FOR SELECT TO authenticated USING ((care_team_visible AND (EXISTS ( SELECT 1
    FROM public.care_team_members c
-  WHERE ((c.patient_id = financial_positions.profile_id) AND (c.caregiver_id = auth.uid()) AND (c.status = 'active'::text)))));
+  WHERE ((c.patient_id = financial_positions.profile_id) AND (c.caregiver_id = auth.uid()) AND (c.status = 'active'::text))))));
 
 
 --
@@ -11413,7 +11414,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 42tf3jLta28r9jQ0gqVriy4bKQhzokIp6c855z7cpCVZlSUImEuqzXNKcLCiiao
+\unrestrict gaitITua1dse9WYbOlPY5jK8WvgaeGjgDVPxc8qVYVwVWhRqqwOw385aXPBwJl4
 
 
 
