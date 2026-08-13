@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6L5s6Qyk51etbIoEEzi1WjKpCXmbeJd0agz8vob9HJ9VnJdsORDTIQc2DoktfSu
+\restrict mE5TSmfqRUVI21Y3GHHD4WkxYoUJNVv4aNDIcXUPIoou9erMVa2nZc8eQZL6z8h
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -512,6 +512,52 @@ $$;
 ALTER FUNCTION public.booking_type_visible(p_type uuid, p_viewer uuid) OWNER TO postgres;
 
 --
+-- Name: burn_currentcy(text, uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text DEFAULT ''::text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_id uuid; v_amt numeric; v_bal numeric;
+begin
+  if not exists (select 1 from profiles p where p.id = auth.uid() and p.is_admin) then
+    raise exception 'Only admins can burn Current.';
+  end if;
+  v_amt := round(coalesce(p_amount, 0), 2);
+  if v_amt <= 0 then raise exception 'Amount must be positive.'; end if;
+  if p_from_type = 'profile' then
+    if not exists (select 1 from profiles where id = p_from_id) then raise exception 'No such member.'; end if;
+  elsif p_from_type = 'space' then
+    if not exists (select 1 from spaces where id = p_from_id) then raise exception 'No such group.'; end if;
+  else
+    raise exception 'Unknown holder kind.';
+  end if;
+
+  -- Same lock keyspace as send_currentcy and complete_exchange: every spend
+  -- from one party serializes, whichever door the money leaves by.
+  perform pg_advisory_xact_lock(hashtextextended(p_from_type || ':' || p_from_id::text, 42));
+
+  select coalesce(sum(case when to_type = p_from_type and to_id = p_from_id then amount else 0 end), 0)
+       - coalesce(sum(case when from_type = p_from_type and from_id = p_from_id then amount else 0 end), 0)
+    into v_bal
+    from ledger_entries
+   where (to_type = p_from_type and to_id = p_from_id)
+      or (from_type = p_from_type and from_id = p_from_id);
+  if v_bal < v_amt then
+    raise exception 'Not enough Current — this account holds %.', trim(to_char(v_bal, 'FM999999990.##'));
+  end if;
+
+  insert into ledger_entries (from_type, from_id, to_type, to_id, amount, context, memo, created_by)
+  values (p_from_type, p_from_id, null, null, v_amt, 'burn', coalesce(p_memo, ''), auth.uid())
+  returning id into v_id;
+  return v_id;
+end $$;
+
+
+ALTER FUNCTION public.burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text) OWNER TO postgres;
+
+--
 -- Name: calendar_level(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -657,7 +703,9 @@ begin
   if v_x.status = 'completed' then raise exception 'That one already happened.'; end if;
   if not (v_x.buyer_id = auth.uid() or v_x.seller_id = auth.uid()
           or (v_x.seller_space_id is not null
-              and public.is_space_admin(v_x.seller_space_id, auth.uid()))) then
+              and public.is_space_admin(v_x.seller_space_id, auth.uid()))
+          or (v_x.buyer_space_id is not null
+              and public.is_space_admin(v_x.buyer_space_id, auth.uid()))) then
     raise exception 'Not yours to cancel.';
   end if;
   update public.exchanges set status = 'canceled' where id = p_exchange;
@@ -968,7 +1016,8 @@ CREATE FUNCTION public.complete_exchange(p_exchange uuid) RETURNS void
 declare
   v_x public.exchanges%rowtype;
   v_is_buyer boolean; v_is_seller boolean;
-  v_bal numeric; v_entry uuid; v_who text;
+  v_bal numeric; v_entry uuid; v_who text; v_space text; v_admin record;
+  v_from_type text; v_from_id uuid; v_to_type text; v_to_id uuid;
 begin
   select * into v_x from public.exchanges where id = p_exchange;
   if v_x.id is null then raise exception 'No such exchange.'; end if;
@@ -979,7 +1028,9 @@ begin
     raise exception 'A grown-up needs to say yes first.';
   end if;
 
-  v_is_buyer := v_x.buyer_id = auth.uid();
+  v_is_buyer := v_x.buyer_id = auth.uid()
+    or (v_x.buyer_space_id is not null
+        and public.is_space_admin(v_x.buyer_space_id, auth.uid()));
   v_is_seller := v_x.seller_id = auth.uid()
     or (v_x.seller_space_id is not null
         and public.is_space_admin(v_x.seller_space_id, auth.uid()));
@@ -997,18 +1048,30 @@ begin
   if v_x.buyer_done_at is null or v_x.seller_done_at is null then return; end if;
 
   if v_x.amount > 0 then
-    select coalesce(sum(case when to_type = 'profile' and to_id = v_x.buyer_id then amount else 0 end), 0)
-         - coalesce(sum(case when from_type = 'profile' and from_id = v_x.buyer_id then amount else 0 end), 0)
+    -- The PARTIES, not the people: a space buyer pays from its treasury, a
+    -- space seller is paid INTO its treasury (this used to credit the human
+    -- who posted the space's listing — the treasury never saw its own sales).
+    v_from_type := case when v_x.buyer_space_id is not null then 'space' else 'profile' end;
+    v_from_id   := coalesce(v_x.buyer_space_id, v_x.buyer_id);
+    v_to_type   := case when v_x.seller_space_id is not null then 'space' else 'profile' end;
+    v_to_id     := coalesce(v_x.seller_space_id, v_x.seller_id);
+
+    -- Same lock keyspace as send_currentcy, so concurrent spends from the
+    -- same party serialize against each other no matter which door they use.
+    perform pg_advisory_xact_lock(hashtextextended(v_from_type || ':' || v_from_id::text, 42));
+
+    select coalesce(sum(case when to_type = v_from_type and to_id = v_from_id then amount else 0 end), 0)
+         - coalesce(sum(case when from_type = v_from_type and from_id = v_from_id then amount else 0 end), 0)
       into v_bal from public.ledger_entries
-     where (to_type = 'profile' and to_id = v_x.buyer_id)
-        or (from_type = 'profile' and from_id = v_x.buyer_id);
+     where (to_type = v_from_type and to_id = v_from_id)
+        or (from_type = v_from_type and from_id = v_from_id);
     if v_bal < v_x.amount then
       raise exception 'Not enough Current-cy — this account holds %.', v_bal;
     end if;
     insert into public.ledger_entries
       (from_type, from_id, to_type, to_id, amount, context, memo,
        ref_type, ref_id, created_by)
-    values ('profile', v_x.buyer_id, 'profile', v_x.seller_id, v_x.amount,
+    values (v_from_type, v_from_id, v_to_type, v_to_id, v_x.amount,
             'exchange', 'Marketplace exchange', 'exchange', v_x.id, auth.uid())
     returning id into v_entry;
   end if;
@@ -1024,6 +1087,23 @@ begin
     'That exchange is complete',
     v_who || ' marked it done. It''s in your statement.',
     '/posts/' || v_x.post_id, auth.uid());
+
+  -- Money landed in a treasury: its stewards hear, same as send_currentcy.
+  if v_entry is not null and v_x.seller_space_id is not null then
+    select name into v_space from public.spaces where id = v_x.seller_space_id;
+    for v_admin in
+      select m.profile_id from public.space_members m
+       where m.space_id = v_x.seller_space_id
+         and m.role in ('admin', 'super_admin')
+         and m.profile_id <> auth.uid()
+    loop
+      perform public.notify(v_admin.profile_id, 'home', v_x.seller_space_id, 'currentcy',
+        coalesce(v_space, 'Your group') || ' received '
+          || trim(to_char(v_x.amount, 'FM999999990.##')) || ' Current',
+        'A marketplace exchange completed.',
+        '/spaces/' || v_x.seller_space_id::text || '?manage=1', auth.uid());
+    end loop;
+  end if;
 end $$;
 
 
@@ -1234,8 +1314,11 @@ begin
   if not exists (select 1 from profiles p where p.id = auth.uid() and p.is_admin) then
     raise exception 'Admins only.';
   end if;
-  select coalesce(sum(amount), 0) into v_circulation
-    from ledger_entries where from_type is null;
+  select coalesce(sum(case when from_type is null then amount else 0 end), 0)
+       - coalesce(sum(case when to_type is null then amount else 0 end), 0)
+    into v_circulation
+    from ledger_entries
+   where from_type is null or to_type is null;
   select coalesce(sum(central_cents), 0) into v_operating
     from donations where central_cents is not null;
   return json_build_object(
@@ -2703,44 +2786,40 @@ CREATE FUNCTION public.my_phone() RETURNS text
 ALTER FUNCTION public.my_phone() OWNER TO postgres;
 
 --
--- Name: network_awake_count(); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: network_available_list(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.network_awake_count() RETURNS integer
+CREATE FUNCTION public.network_available_list() RETURNS TABLE(id uuid, full_name text, avatar_url text, headline text, local_date date, local_min smallint)
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select count(distinct p.id)::int
-  from public.profiles p
-  where p.id <> auth.uid()
-    and p.last_seen_at > now() - interval '12 hours'
-    and (
-      p.id in (select m.target_id from public.mycelium m
-               where m.truster_id = auth.uid() and m.target_type = 'profile')
-      or p.id in (select m2.profile_id
-                  from public.space_members m1
-                  join public.space_members m2 on m2.space_id = m1.space_id
-                  where m1.profile_id = auth.uid())
-    );
-$$;
-
-
-ALTER FUNCTION public.network_awake_count() OWNER TO postgres;
-
---
--- Name: network_awake_list(); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION public.network_awake_list() RETURNS TABLE(id uuid, full_name text, avatar_url text, headline text, lit boolean)
-    LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'public'
-    AS $$
+  with local_now as (
+    select p.id,
+           (now() at time zone coalesce(nullif(p.timezone, ''), 'UTC')) as lt
+    from public.profiles p
+  )
+  -- local_date / local_min come back so the client can subtract what's booked
+  -- in the MEMBER's own frame rather than the viewer's — 2pm busy means 2pm
+  -- where they are. It leaks nothing their being in-hours doesn't already imply.
   select distinct p.id, p.full_name, p.avatar_url, p.headline,
-         (p.presence_always_present or p.presence_lit_until > now()) as lit
+         ln.lt::date as local_date,
+         (extract(hour from ln.lt) * 60 + extract(minute from ln.lt))::smallint as local_min
   from public.profiles p
+  join local_now ln on ln.id = p.id
+  join public.availability_windows w on w.profile_id = p.id
   where p.id <> auth.uid()
-    and (p.presence_visible or p.presence_always_present or p.presence_lit_until > now())
-    and p.last_seen_at > now() - interval '12 hours'
+    and w.kind = 'social'
+    and extract(dow from ln.lt)::smallint = w.weekday
+    and (extract(hour from ln.lt) * 60 + extract(minute from ln.lt))
+          between w.start_min and w.end_min
+    and (w.valid_from is null or ln.lt::date >= w.valid_from)
+    and (w.valid_to   is null or ln.lt::date <= w.valid_to)
+    -- Their calendar has to be visible to you at all.
+    and public.calendar_level(p.id, auth.uid()) <> 'hidden'
+    -- Present outranks available; never count someone twice.
+    and not ((p.presence_always_present or p.presence_lit_until > now())
+             and p.last_seen_at > now() - interval '5 minutes')
+    -- The same web as presence: your mycelium, plus people you share a space with.
     and (
       p.id in (select m.target_id from public.mycelium m
                where m.truster_id = auth.uid() and m.target_type = 'profile')
@@ -2753,7 +2832,60 @@ CREATE FUNCTION public.network_awake_list() RETURNS TABLE(id uuid, full_name tex
 $$;
 
 
-ALTER FUNCTION public.network_awake_list() OWNER TO postgres;
+ALTER FUNCTION public.network_available_list() OWNER TO postgres;
+
+--
+-- Name: network_present_count(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.network_present_count() RETURNS integer
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select count(distinct p.id)::int
+  from public.profiles p
+  where p.id <> auth.uid()
+    and (p.presence_always_present or p.presence_lit_until > now())
+    and p.last_seen_at > now() - interval '5 minutes'
+    and (
+      p.id in (select m.target_id from public.mycelium m
+               where m.truster_id = auth.uid() and m.target_type = 'profile')
+      or p.id in (select m2.profile_id
+                  from public.space_members m1
+                  join public.space_members m2 on m2.space_id = m1.space_id
+                  where m1.profile_id = auth.uid())
+    );
+$$;
+
+
+ALTER FUNCTION public.network_present_count() OWNER TO postgres;
+
+--
+-- Name: network_present_list(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.network_present_list() RETURNS TABLE(id uuid, full_name text, avatar_url text, headline text, lit boolean)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select distinct p.id, p.full_name, p.avatar_url, p.headline, true as lit
+  from public.profiles p
+  where p.id <> auth.uid()
+    and (p.presence_always_present or p.presence_lit_until > now())
+    and p.last_seen_at > now() - interval '5 minutes'
+    and (
+      p.id in (select m.target_id from public.mycelium m
+               where m.truster_id = auth.uid() and m.target_type = 'profile')
+      or p.id in (select m2.profile_id
+                  from public.space_members m1
+                  join public.space_members m2 on m2.space_id = m1.space_id
+                  where m1.profile_id = auth.uid())
+    )
+  order by p.full_name;
+$$;
+
+
+ALTER FUNCTION public.network_present_list() OWNER TO postgres;
 
 --
 -- Name: notice_gift_ending(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -3180,13 +3312,13 @@ $$;
 ALTER FUNCTION public.reject_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
 
 --
--- Name: request_exchange(uuid, text, text, text); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: request_exchange(uuid, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.request_exchange(p_post uuid, p_mode text DEFAULT NULL::text, p_fulfillment text DEFAULT NULL::text, p_note text DEFAULT NULL::text) RETURNS uuid
+CREATE FUNCTION public.request_exchange(p_post uuid, p_mode text DEFAULT NULL::text, p_fulfillment text DEFAULT NULL::text, p_note text DEFAULT NULL::text, p_as_space uuid DEFAULT NULL::uuid) RETURNS uuid
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
-    AS $$
+    AS $_$
 declare
   v_post public.posts%rowtype;
   v_mode text; v_amount numeric(12,2); v_id uuid;
@@ -3197,36 +3329,59 @@ begin
   if not (v_post.service_areas @> array['marketplace']) then
     raise exception 'That isn''t a marketplace listing.';
   end if;
-  if v_post.author_id = auth.uid() then
+
+  if p_as_space is not null then
+    if not public.is_space_admin(p_as_space, auth.uid()) then
+      raise exception 'Only that group''s admins can buy on its behalf.';
+    end if;
+    if v_post.author_space_id = p_as_space then
+      raise exception 'That''s this group''s own listing.';
+    end if;
+  elsif v_post.author_id = auth.uid() then
     raise exception 'That''s your own listing.';
   end if;
+
   if public.post_claimed(p_post) then
     raise exception 'Someone already claimed this one.';
   end if;
+  -- One live ask per PARTY: yours as yourself, and one per space you steward.
   if exists (select 1 from public.exchanges x
-              where x.post_id = p_post and x.buyer_id = auth.uid()
-                and x.status = 'pending') then
+              where x.post_id = p_post and x.status = 'pending'
+                and ((p_as_space is null and x.buyer_id = auth.uid() and x.buyer_space_id is null)
+                  or (p_as_space is not null and x.buyer_space_id = p_as_space))) then
     raise exception 'You''ve already asked for this — it''s waiting on them.';
   end if;
 
-  -- Freeze the terms as they stand right now.
+  -- Freeze the terms as they stand right now. The FIRST number in the price
+  -- text, not every digit mashed together — the old strip-non-numerics turned
+  -- "sliding $10–$25" into 1025 Current. A range freezes at its low end; the
+  -- seller can always decline and name a figure in chat.
   v_mode := coalesce(nullif(p_mode, ''), v_post.details->>'mode', 'gift');
   v_amount := coalesce(
-    nullif(regexp_replace(coalesce(v_post.details->>'price', ''), '[^0-9.]', '', 'g'), '')::numeric,
+    nullif(substring(coalesce(v_post.details->>'price', '') from '[0-9]+\.?[0-9]*'), '')::numeric,
     0);
   -- Only priced modes carry money; a gift is a gift.
   if v_mode not in ('sale', 'sliding', 'rent') then v_amount := 0; end if;
 
-  -- Either party under 18 → a grown-up says yes before anything changes hands.
-  v_minor := public.is_minor(auth.uid()) or public.is_minor(v_post.author_id);
+  -- A treasury purchase is admin-gated, not guardian-gated — but a minor
+  -- SELLER still gets a grown-up's yes before anything changes hands.
+  v_minor := (p_as_space is null and public.is_minor(auth.uid()))
+             or public.is_minor(v_post.author_id);
 
-  insert into public.exchanges (post_id, seller_id, seller_space_id, buyer_id,
+  insert into public.exchanges (post_id, seller_id, seller_space_id,
+                                buyer_id, buyer_space_id,
                                 mode, amount, fulfillment, note, needs_guardian)
-  values (p_post, v_post.author_id, v_post.author_space_id, auth.uid(),
+  values (p_post, v_post.author_id, v_post.author_space_id,
+          auth.uid(), p_as_space,
           v_mode, v_amount, nullif(p_fulfillment, ''), nullif(p_note, ''), v_minor)
   returning id into v_id;
 
-  select coalesce(full_name, 'Someone') into v_who from public.profiles where id = auth.uid();
+  if p_as_space is not null then
+    select name into v_who from public.spaces where id = p_as_space;
+    v_who := coalesce(v_who, 'A group');
+  else
+    select coalesce(full_name, 'Someone') into v_who from public.profiles where id = auth.uid();
+  end if;
   perform public.notify(
     v_post.author_id, 'market', null, 'exchange_request',
     v_who || ' would like your ' || coalesce(v_post.title, 'listing'),
@@ -3242,10 +3397,10 @@ begin
   where v_minor and g.minor_id in (auth.uid(), v_post.author_id);
 
   return v_id;
-end $$;
+end $_$;
 
 
-ALTER FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text) OWNER TO postgres;
+ALTER FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid) OWNER TO postgres;
 
 --
 -- Name: request_resource_booking(uuid, date, date, integer, integer, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -3511,7 +3666,7 @@ CREATE FUNCTION public.send_currentcy(p_from_type text, p_from_id uuid, p_to_typ
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_id uuid; v_bal numeric; v_sender text; v_amt numeric;
+declare v_id uuid; v_bal numeric; v_sender text; v_amt numeric; v_space text; v_admin record;
 begin
   v_amt := round(coalesce(p_amount, 0), 2);
   if v_amt <= 0 then raise exception 'Amount must be positive.'; end if;
@@ -3556,11 +3711,33 @@ begin
   values (p_from_type, p_from_id, p_to_type, p_to_id, v_amt, 'exchange', coalesce(p_memo, ''), auth.uid())
   returning id into v_id;
 
-  if p_to_type = 'profile' then
+  -- The sender's name reads as whoever the money actually came FROM: the
+  -- space when a treasury paid, the human otherwise.
+  if p_from_type = 'space' then
+    select name into v_sender from spaces where id = p_from_id;
+  else
     select coalesce(full_name, 'A member') into v_sender from profiles where id = auth.uid();
+  end if;
+
+  if p_to_type = 'profile' then
     perform public.notify(p_to_id, 'home', null, 'currentcy',
       v_sender || ' sent you ' || trim(to_char(v_amt, 'FM999999990.##')) || ' Current',
       nullif(coalesce(p_memo, ''), ''), '/profile', auth.uid());
+  else
+    -- A space's money is stewarded, not owned — every admin hears, and the
+    -- bell opens the backstage where the space's Current-cy card lives.
+    select name into v_space from spaces where id = p_to_id;
+    for v_admin in
+      select m.profile_id from space_members m
+       where m.space_id = p_to_id and m.role in ('admin', 'super_admin')
+         and m.profile_id <> auth.uid()
+    loop
+      perform public.notify(v_admin.profile_id, 'home', p_to_id, 'currentcy',
+        v_sender || ' sent ' || coalesce(v_space, 'your group') || ' '
+          || trim(to_char(v_amt, 'FM999999990.##')) || ' Current',
+        nullif(coalesce(p_memo, ''), ''),
+        '/spaces/' || p_to_id::text || '?manage=1', auth.uid());
+    end loop;
   end if;
   return v_id;
 end $$;
@@ -3635,10 +3812,10 @@ $$;
 ALTER FUNCTION public.set_space_public_page_default() OWNER TO postgres;
 
 --
--- Name: space_awake_count(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: space_present_count(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.space_awake_count(p_space uuid) RETURNS integer
+CREATE FUNCTION public.space_present_count(p_space uuid) RETURNS integer
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
@@ -3651,32 +3828,30 @@ CREATE FUNCTION public.space_awake_count(p_space uuid) RETURNS integer
       select count(distinct p.id)::int
       from public.profiles p
       join public.space_members m on m.profile_id = p.id and m.space_id = p_space
-      where (p.presence_visible or p.presence_always_present
-             or p.presence_lit_until > now())
-        and p.last_seen_at > now() - interval '12 hours'
+      where (p.presence_always_present or p.presence_lit_until > now())
+        and p.last_seen_at > now() - interval '5 minutes'
     )
   end;
 $$;
 
 
-ALTER FUNCTION public.space_awake_count(p_space uuid) OWNER TO postgres;
+ALTER FUNCTION public.space_present_count(p_space uuid) OWNER TO postgres;
 
 --
--- Name: space_awake_list(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: space_present_list(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.space_awake_list(p_space uuid) RETURNS TABLE(id uuid, full_name text, avatar_url text, headline text, lit boolean, me boolean)
+CREATE FUNCTION public.space_present_list(p_space uuid) RETURNS TABLE(id uuid, full_name text, avatar_url text, headline text, lit boolean, me boolean)
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
   select distinct p.id, p.full_name, p.avatar_url, p.headline,
-         (p.presence_always_present or p.presence_lit_until > now()) as lit,
+         true as lit,
          (p.id = auth.uid()) as me
   from public.profiles p
   join public.space_members m on m.profile_id = p.id and m.space_id = p_space
-  where (p.presence_visible or p.presence_always_present
-         or p.presence_lit_until > now())
-    and p.last_seen_at > now() - interval '12 hours'
+  where (p.presence_always_present or p.presence_lit_until > now())
+    and p.last_seen_at > now() - interval '5 minutes'
     and exists (
       select 1 from public.space_members me2
       where me2.space_id = p_space and me2.profile_id = auth.uid()
@@ -3685,7 +3860,7 @@ CREATE FUNCTION public.space_awake_list(p_space uuid) RETURNS TABLE(id uuid, ful
 $$;
 
 
-ALTER FUNCTION public.space_awake_list(p_space uuid) OWNER TO postgres;
+ALTER FUNCTION public.space_present_list(p_space uuid) OWNER TO postgres;
 
 --
 -- Name: sync_attendee_to_event_chat(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -3958,7 +4133,7 @@ CREATE TABLE public.availability_windows (
     valid_to date,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT availability_windows_end_min_check CHECK (((end_min >= 1) AND (end_min <= 1440))),
-    CONSTRAINT availability_windows_kind_check CHECK ((kind = ANY (ARRAY['available'::text, 'on_call'::text]))),
+    CONSTRAINT availability_windows_kind_check CHECK ((kind = ANY (ARRAY['available'::text, 'social'::text, 'on_call'::text]))),
     CONSTRAINT availability_windows_span CHECK ((end_min > start_min)),
     CONSTRAINT availability_windows_start_min_check CHECK (((start_min >= 0) AND (start_min <= 1439))),
     CONSTRAINT availability_windows_validity CHECK (((valid_from IS NULL) OR (valid_to IS NULL) OR (valid_to >= valid_from))),
@@ -3967,6 +4142,13 @@ CREATE TABLE public.availability_windows (
 
 
 ALTER TABLE public.availability_windows OWNER TO postgres;
+
+--
+-- Name: COLUMN availability_windows.kind; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.availability_windows.kind IS 'available = work hours, bookable. social = hours you welcome a chat in; this is what Home''s "N are available" counts. on_call = the care rota (Concierge), deliberately not subtracted by bookings.';
+
 
 --
 -- Name: booking_types; Type: TABLE; Schema: public; Owner: postgres
@@ -4485,13 +4667,22 @@ CREATE TABLE public.exchanges (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     decided_at timestamp with time zone,
     completed_at timestamp with time zone,
+    buyer_space_id uuid,
     CONSTRAINT exchanges_amount_check CHECK ((amount >= (0)::numeric)),
-    CONSTRAINT exchanges_not_self CHECK ((buyer_id <> seller_id)),
+    CONSTRAINT exchanges_no_space_self_deal CHECK (((buyer_space_id IS NULL) OR (seller_space_id IS NULL) OR (buyer_space_id <> seller_space_id))),
+    CONSTRAINT exchanges_not_self CHECK (((buyer_id <> seller_id) OR (buyer_space_id IS NOT NULL))),
     CONSTRAINT exchanges_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text, 'completed'::text, 'canceled'::text])))
 );
 
 
 ALTER TABLE public.exchanges OWNER TO postgres;
+
+--
+-- Name: COLUMN exchanges.buyer_space_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.exchanges.buyer_space_id IS 'Set when a SPACE is the buyer, acting through the admin in buyer_id. Completion debits the space''s treasury, not the human.';
+
 
 --
 -- Name: external_busy; Type: TABLE; Schema: public; Owner: postgres
@@ -4690,8 +4881,8 @@ CREATE TABLE public.ledger_entries (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     from_type text,
     from_id uuid,
-    to_type text NOT NULL,
-    to_id uuid NOT NULL,
+    to_type text,
+    to_id uuid,
     amount numeric(12,2) NOT NULL,
     context text DEFAULT 'exchange'::text NOT NULL,
     memo text DEFAULT ''::text NOT NULL,
@@ -4701,13 +4892,22 @@ CREATE TABLE public.ledger_entries (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ledger_entries_amount_check CHECK ((amount > (0)::numeric)),
     CONSTRAINT ledger_entries_check CHECK (((from_type IS NULL) = (from_id IS NULL))),
-    CONSTRAINT ledger_entries_context_check CHECK ((context = ANY (ARRAY['mint'::text, 'grant'::text, 'gift'::text, 'exchange'::text, 'contribution'::text, 'adjustment'::text]))),
+    CONSTRAINT ledger_entries_context_check CHECK ((context = ANY (ARRAY['mint'::text, 'grant'::text, 'gift'::text, 'exchange'::text, 'contribution'::text, 'adjustment'::text, 'burn'::text]))),
     CONSTRAINT ledger_entries_from_type_check CHECK ((from_type = ANY (ARRAY['profile'::text, 'space'::text]))),
+    CONSTRAINT ledger_entries_some_party_check CHECK ((NOT ((from_type IS NULL) AND (to_type IS NULL)))),
+    CONSTRAINT ledger_entries_to_pair_check CHECK (((to_type IS NULL) = (to_id IS NULL))),
     CONSTRAINT ledger_entries_to_type_check CHECK ((to_type = ANY (ARRAY['profile'::text, 'space'::text])))
 );
 
 
 ALTER TABLE public.ledger_entries OWNER TO postgres;
+
+--
+-- Name: COLUMN ledger_entries.context; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ledger_entries.context IS 'mint/grant/gift = Current entering circulation (from is null). burn = Current leaving it (to is null) — the redemption channel. exchange/contribution move it inside; adjustment corrects, since the ledger is append-only.';
+
 
 --
 -- Name: location_shares; Type: TABLE; Schema: public; Owner: postgres
@@ -4738,11 +4938,19 @@ ALTER TABLE public.location_shares OWNER TO postgres;
 CREATE TABLE public.member_prompts (
     profile_id uuid NOT NULL,
     topic text NOT NULL,
-    seen_at timestamp with time zone DEFAULT now() NOT NULL
+    seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    times_seen integer DEFAULT 1 NOT NULL
 );
 
 
 ALTER TABLE public.member_prompts OWNER TO postgres;
+
+--
+-- Name: COLUMN member_prompts.times_seen; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.member_prompts.times_seen IS 'How many times this member has met this prompt. Lets a teaching prompt run for the first few visits and then fall silent, instead of asking forever.';
+
 
 --
 -- Name: membership_gifts; Type: TABLE; Schema: public; Owner: postgres
@@ -4776,12 +4984,22 @@ CREATE TABLE public.mycelium (
     target_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     vouched boolean DEFAULT true NOT NULL,
+    truster_space_id uuid,
+    CONSTRAINT mycelium_no_self_weave CHECK ((NOT ((target_type = 'space'::text) AND (target_id = truster_space_id)))),
     CONSTRAINT mycelium_no_space_trust CHECK ((NOT ((vouched = true) AND (target_type = 'space'::text)))),
+    CONSTRAINT mycelium_space_cannot_vouch CHECK ((NOT ((vouched = true) AND (truster_space_id IS NOT NULL)))),
     CONSTRAINT mycelium_target_type_check CHECK ((target_type = ANY (ARRAY['profile'::text, 'space'::text, 'post'::text])))
 );
 
 
 ALTER TABLE public.mycelium OWNER TO postgres;
+
+--
+-- Name: COLUMN mycelium.truster_space_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mycelium.truster_space_id IS 'Set when this edge is a SPACE''s, woven by an admin acting as it. truster_id still records which human did it. Null = an ordinary personal edge. A space edge can never be vouched — trust stays person-to-person.';
+
 
 --
 -- Name: notifications; Type: TABLE; Schema: public; Owner: postgres
@@ -4924,7 +5142,7 @@ CREATE TABLE public.profiles (
     home_state text,
     presence_visible boolean DEFAULT true NOT NULL,
     presence_lit_until timestamp with time zone,
-    presence_always_present boolean DEFAULT false NOT NULL,
+    presence_always_present boolean DEFAULT true NOT NULL,
     timezone text,
     identity_tags text[],
     assistant_readable boolean DEFAULT true NOT NULL,
@@ -4942,6 +5160,7 @@ CREATE TABLE public.profiles (
     is_adult boolean,
     age_declared_at timestamp with time zone,
     findable boolean DEFAULT true NOT NULL,
+    assistant_can_edit boolean DEFAULT false NOT NULL,
     CONSTRAINT profiles_aspect_check CHECK (((aspect IS NULL) OR (aspect = ANY (ARRAY['individual'::text, 'collective'::text])))),
     CONSTRAINT profiles_birth_date_sane CHECK (((birth_date IS NULL) OR ((birth_date > '1900-01-01'::date) AND (birth_date <= CURRENT_DATE)))),
     CONSTRAINT profiles_kind_check CHECK ((kind = ANY (ARRAY['person'::text, 'plant'::text, 'animal'::text, 'place'::text, 'element'::text, 'collective'::text]))),
@@ -4955,6 +5174,13 @@ END)
 
 
 ALTER TABLE public.profiles OWNER TO postgres;
+
+--
+-- Name: COLUMN profiles.assistant_can_edit; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.profiles.assistant_can_edit IS 'Member consent for the assistant to write their own public-page fields (page/contact/profile_categories) via assistant-feed tool use. Default false; never extends to private data, other members, or spaces.';
+
 
 --
 -- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: postgres
@@ -5694,14 +5920,6 @@ ALTER TABLE ONLY public.membership_gifts
 
 
 --
--- Name: mycelium mycelium_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.mycelium
-    ADD CONSTRAINT mycelium_pkey PRIMARY KEY (truster_id, target_type, target_id);
-
-
---
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6105,6 +6323,13 @@ CREATE INDEX exchanges_buyer_idx ON public.exchanges USING btree (buyer_id, stat
 
 
 --
+-- Name: exchanges_buyer_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX exchanges_buyer_space_idx ON public.exchanges USING btree (buyer_space_id, status) WHERE (buyer_space_id IS NOT NULL);
+
+
+--
 -- Name: exchanges_post_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6179,6 +6404,20 @@ CREATE UNIQUE INDEX location_shares_audience_uniq ON public.location_shares USIN
 --
 
 CREATE UNIQUE INDEX membership_gifts_one_pending ON public.membership_gifts USING btree (lower(invitee_email)) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: mycelium_personal_edge_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX mycelium_personal_edge_idx ON public.mycelium USING btree (truster_id, target_type, target_id) WHERE (truster_space_id IS NULL);
+
+
+--
+-- Name: mycelium_space_edge_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX mycelium_space_edge_idx ON public.mycelium USING btree (truster_space_id, target_type, target_id) WHERE (truster_space_id IS NOT NULL);
 
 
 --
@@ -7143,6 +7382,14 @@ ALTER TABLE ONLY public.exchanges
 
 
 --
+-- Name: exchanges exchanges_buyer_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.exchanges
+    ADD CONSTRAINT exchanges_buyer_space_id_fkey FOREIGN KEY (buyer_space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
+
+
+--
 -- Name: exchanges exchanges_ledger_entry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7356,6 +7603,14 @@ ALTER TABLE ONLY public.membership_gifts
 
 ALTER TABLE ONLY public.mycelium
     ADD CONSTRAINT mycelium_truster_id_fkey FOREIGN KEY (truster_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: mycelium mycelium_truster_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mycelium
+    ADD CONSTRAINT mycelium_truster_space_id_fkey FOREIGN KEY (truster_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
 
 
 --
@@ -8383,7 +8638,7 @@ ALTER TABLE public.exchanges ENABLE ROW LEVEL SECURITY;
 -- Name: exchanges exchanges: parties read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "exchanges: parties read" ON public.exchanges FOR SELECT TO authenticated USING (((buyer_id = auth.uid()) OR (seller_id = auth.uid()) OR ((seller_space_id IS NOT NULL) AND public.is_space_admin(seller_space_id, auth.uid())) OR public.is_guardian_of(buyer_id, auth.uid()) OR public.is_guardian_of(seller_id, auth.uid())));
+CREATE POLICY "exchanges: parties read" ON public.exchanges FOR SELECT TO authenticated USING (((buyer_id = auth.uid()) OR (seller_id = auth.uid()) OR ((seller_space_id IS NOT NULL) AND public.is_space_admin(seller_space_id, auth.uid())) OR ((buyer_space_id IS NOT NULL) AND public.is_space_admin(buyer_space_id, auth.uid())) OR public.is_guardian_of(buyer_id, auth.uid()) OR public.is_guardian_of(seller_id, auth.uid())));
 
 
 --
@@ -8688,28 +8943,28 @@ ALTER TABLE public.mycelium ENABLE ROW LEVEL SECURITY;
 -- Name: mycelium mycelium: add own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "mycelium: add own" ON public.mycelium FOR INSERT TO authenticated WITH CHECK ((truster_id = auth.uid()));
+CREATE POLICY "mycelium: add own" ON public.mycelium FOR INSERT TO authenticated WITH CHECK (((truster_id = auth.uid()) AND ((truster_space_id IS NULL) OR public.is_space_admin(truster_space_id, auth.uid()))));
 
 
 --
 -- Name: mycelium mycelium: drop own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "mycelium: drop own" ON public.mycelium FOR DELETE TO authenticated USING ((truster_id = auth.uid()));
+CREATE POLICY "mycelium: drop own" ON public.mycelium FOR DELETE TO authenticated USING (((truster_id = auth.uid()) OR ((truster_space_id IS NOT NULL) AND public.is_space_admin(truster_space_id, auth.uid()))));
 
 
 --
 -- Name: mycelium mycelium: read own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "mycelium: read own" ON public.mycelium FOR SELECT USING ((truster_id = auth.uid()));
+CREATE POLICY "mycelium: read own" ON public.mycelium FOR SELECT USING (((truster_id = auth.uid()) OR ((truster_space_id IS NOT NULL) AND public.is_space_member(truster_space_id, auth.uid()))));
 
 
 --
 -- Name: mycelium mycelium: update own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "mycelium: update own" ON public.mycelium FOR UPDATE TO authenticated USING ((truster_id = auth.uid())) WITH CHECK ((truster_id = auth.uid()));
+CREATE POLICY "mycelium: update own" ON public.mycelium FOR UPDATE TO authenticated USING (((truster_id = auth.uid()) OR ((truster_space_id IS NOT NULL) AND public.is_space_admin(truster_space_id, auth.uid())))) WITH CHECK (((truster_id = auth.uid()) OR ((truster_space_id IS NOT NULL) AND public.is_space_admin(truster_space_id, auth.uid()))));
 
 
 --
@@ -9368,6 +9623,15 @@ GRANT ALL ON FUNCTION public.booking_board(p_type uuid, p_from date, p_to date) 
 GRANT ALL ON FUNCTION public.booking_type_visible(p_type uuid, p_viewer uuid) TO anon;
 GRANT ALL ON FUNCTION public.booking_type_visible(p_type uuid, p_viewer uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.booking_type_visible(p_type uuid, p_viewer uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text) TO authenticated;
+GRANT ALL ON FUNCTION public.burn_currentcy(p_from_type text, p_from_id uuid, p_amount numeric, p_memo text) TO service_role;
 
 
 --
@@ -10055,21 +10319,30 @@ GRANT ALL ON FUNCTION public.my_phone() TO service_role;
 
 
 --
--- Name: FUNCTION network_awake_count(); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION network_available_list(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.network_awake_count() TO anon;
-GRANT ALL ON FUNCTION public.network_awake_count() TO authenticated;
-GRANT ALL ON FUNCTION public.network_awake_count() TO service_role;
+REVOKE ALL ON FUNCTION public.network_available_list() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.network_available_list() TO authenticated;
+GRANT ALL ON FUNCTION public.network_available_list() TO service_role;
 
 
 --
--- Name: FUNCTION network_awake_list(); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION network_present_count(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.network_awake_list() TO anon;
-GRANT ALL ON FUNCTION public.network_awake_list() TO authenticated;
-GRANT ALL ON FUNCTION public.network_awake_list() TO service_role;
+GRANT ALL ON FUNCTION public.network_present_count() TO anon;
+GRANT ALL ON FUNCTION public.network_present_count() TO authenticated;
+GRANT ALL ON FUNCTION public.network_present_count() TO service_role;
+
+
+--
+-- Name: FUNCTION network_present_list(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.network_present_list() TO anon;
+GRANT ALL ON FUNCTION public.network_present_list() TO authenticated;
+GRANT ALL ON FUNCTION public.network_present_list() TO service_role;
 
 
 --
@@ -10226,12 +10499,12 @@ GRANT ALL ON FUNCTION public.reject_category_suggestion(p_suggestion_id uuid) TO
 
 
 --
--- Name: FUNCTION request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text) TO authenticated;
-GRANT ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text) TO service_role;
+REVOKE ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid) TO service_role;
 
 
 --
@@ -10335,21 +10608,21 @@ GRANT ALL ON FUNCTION public.set_space_public_page_default() TO service_role;
 
 
 --
--- Name: FUNCTION space_awake_count(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION space_present_count(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON FUNCTION public.space_awake_count(p_space uuid) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.space_awake_count(p_space uuid) TO authenticated;
-GRANT ALL ON FUNCTION public.space_awake_count(p_space uuid) TO service_role;
+GRANT ALL ON FUNCTION public.space_present_count(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.space_present_count(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.space_present_count(p_space uuid) TO service_role;
 
 
 --
--- Name: FUNCTION space_awake_list(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION space_present_list(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON FUNCTION public.space_awake_list(p_space uuid) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.space_awake_list(p_space uuid) TO authenticated;
-GRANT ALL ON FUNCTION public.space_awake_list(p_space uuid) TO service_role;
+GRANT ALL ON FUNCTION public.space_present_list(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.space_present_list(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.space_present_list(p_space uuid) TO service_role;
 
 
 --
@@ -11121,6 +11394,13 @@ GRANT SELECT(findable) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.assistant_can_edit; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(assistant_can_edit) ON TABLE public.profiles TO authenticated;
+
+
+--
 -- Name: TABLE push_subscriptions; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11422,7 +11702,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6L5s6Qyk51etbIoEEzi1WjKpCXmbeJd0agz8vob9HJ9VnJdsORDTIQc2DoktfSu
+\unrestrict mE5TSmfqRUVI21Y3GHHD4WkxYoUJNVv4aNDIcXUPIoou9erMVa2nZc8eQZL6z8h
 
 
 

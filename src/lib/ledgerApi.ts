@@ -10,8 +10,10 @@ export interface LedgerEntry {
   id: string;
   from_type: EntityType | null;
   from_id: string | null;
-  to_type: EntityType;
-  to_id: string;
+  /** Null = a BURN — Current leaving circulation (the redemption channel,
+   *  2026-08-13). nameOf renders the null side as 'Lichen'. */
+  to_type: EntityType | null;
+  to_id: string | null;
   amount: number;
   context: string;
   memo: string;
@@ -48,8 +50,8 @@ export async function statementOf(type: EntityType, id: string, limit = 20): Pro
   for (const r of rows) {
     if (r.from_type === 'profile' && r.from_id) profIds.add(r.from_id);
     if (r.from_type === 'space' && r.from_id) spaceIds.add(r.from_id);
-    if (r.to_type === 'profile') profIds.add(r.to_id);
-    if (r.to_type === 'space') spaceIds.add(r.to_id);
+    if (r.to_type === 'profile' && r.to_id) profIds.add(r.to_id);
+    if (r.to_type === 'space' && r.to_id) spaceIds.add(r.to_id);
   }
   const [profs, sps] = await Promise.all([
     profIds.size ? supabase.from('profiles').select('id, full_name').in('id', [...profIds]) : Promise.resolve({ data: [] }),
