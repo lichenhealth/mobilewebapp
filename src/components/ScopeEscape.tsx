@@ -39,3 +39,30 @@ export function ScopeEmpty({ icon, section, who, to, label }: {
     </div>
   );
 }
+
+/** A thin shelf deserves the same pointer as a bare one (founder 2026-08-13:
+ *  "it should also have a notification in the results section, if there are
+ *  none, OR JUST A FEW, to go to Lichen's marketplace to get more results").
+ *  Sits UNDER the results rather than replacing them — what's here is still
+ *  the point; this only says where the rest lives. */
+export const FEW_RESULTS = 5;
+
+export function ScopeMore({ count, section, who, to, label }: {
+  count: number;
+  section: string;
+  who: string;
+  to: string;
+  label: string;
+}) {
+  const navigate = useNavigate();
+  if (count === 0 || count >= FEW_RESULTS) return null;   // 0 is ScopeEmpty's job
+  return (
+    <div className="scope-more">
+      <p className="scope-more__line">
+        That&rsquo;s all {count === 1 ? 'the one thing' : `${count} things`} {who} has
+        in {section} so far.
+      </p>
+      <button className="scope-more__link" onClick={() => navigate(to)}>{label}</button>
+    </div>
+  );
+}

@@ -21,3 +21,18 @@
   font-size: 14px; color: var(--peach-deep); text-decoration: underline;
 }
 .scope-empty__link:hover { color: var(--ink); }
+
+/* "That's all there is here" — a thin shelf gets the same pointer as a bare
+   one (founder 2026-08-13). Sits UNDER the results, quieter than ScopeEmpty:
+   what's here is still the point, this only says where the rest lives. */
+.scope-more {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-align: center; padding: var(--s-5) var(--s-4) var(--s-6);
+  color: var(--ink-muted);
+}
+.scope-more__line { margin: 0; font-size: 13px; line-height: 1.5; max-width: 34ch; }
+.scope-more__link {
+  background: none; border: 0; padding: 2px 0; cursor: pointer; font-family: inherit;
+  font-size: 14px; color: var(--peach-deep); text-decoration: underline;
+}
+.scope-more__link:hover { color: var(--ink); }

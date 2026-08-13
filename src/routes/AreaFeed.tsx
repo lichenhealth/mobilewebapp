@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { webAuthorFilter } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
-import { ScopeEscape, ScopeEmpty } from '../components/ScopeEscape';
+import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { possessive } from '../lib/names';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -474,6 +474,17 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           />
         ))}
       </section>}
+
+      {/* Same pointer when the shelf is thin, not only when it's bare. */}
+      {ready && scoped && (
+        <ScopeMore
+          count={filtered.length}
+          section={crumb}
+          who={memberName || 'they'}
+          to={`/${area}`}
+          label={`Browse the Lichen ${crumb}`}
+        />
+      )}
 
       <footer className="mkt__end">
         <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>

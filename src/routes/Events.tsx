@@ -4,6 +4,7 @@ import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { Icon } from '../components/Icon';
+import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
@@ -218,6 +219,7 @@ export default function Events() {
           <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
             <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
           </button>
+          <ScopeEscape to="/events" label="Go to Lichen Events" />
           <h1 className="mkt__title">
             {scopeName}&rsquo;s <span className="display-italic">Events</span>
           </h1>
@@ -308,10 +310,24 @@ export default function Events() {
           </ScrollHintRow>
 
           <section className="evt__feed">
-            {visible.length === 0 && (
+            {visible.length === 0 && (scoped ? (
+              <ScopeEmpty
+                icon="rsvp" section="Events" who={scopeName || 'them'}
+                to="/events" label="Visit Lichen Events"
+              />
+            ) : (
               <p className="evt__empty">No events here yet — post the first one.</p>
-            )}
+            ))}
             {visible.map((p) => card(p))}
+            {scoped && (
+              <ScopeMore
+                count={visible.length}
+                section="Events"
+                who={scopeName || 'they'}
+                to="/events"
+                label="Browse Lichen Events"
+              />
+            )}
           </section>
         </>
       )}

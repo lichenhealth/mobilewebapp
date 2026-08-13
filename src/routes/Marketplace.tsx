@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
-import { ScopeEscape, ScopeEmpty } from '../components/ScopeEscape';
+import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
+import { useActing } from '../acting/ActingProvider';
 import { possessive } from '../lib/names';
 import { LichenMark } from '../components/LichenMark';
 import FeedCard from '../components/FeedCard';
@@ -21,7 +22,7 @@ import { webAuthorFilter } from '../lib/myceliumApi';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend, recommendKey,
 } from '../lib/myceliumApi';
 import './Marketplace.css';
 import AssistantDoor from '../components/AssistantDoor';
@@ -94,6 +95,14 @@ export default function Marketplace() {
   const [scopeName, setScopeName] = useState('');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const { promptSaved, openPicker } = useCollect();
+  // YOU'RE ALWAYS A PARTICIPANT, EVEN AS AN ORG (founder 2026-08-13: "I want
+  // to be able to participate in the lichen marketplace as countryman
+  // stables"). Recommending is a public voice, so it can be the space's —
+  // setRecommend has taken asSpace since 2026-08-06 and this simply never
+  // passed it. TRUST STAYS PERSONAL: a space has no shield to give, by
+  // doctrine, so the shield keeps speaking for the human behind the hat.
+  const { actor } = useActing();
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
   const { user } = useAuth();
   const me = user?.id ?? '';
 
@@ -494,7 +503,7 @@ export default function Marketplace() {
                 endorsed={!!ov && ((ov.trusted?.length ?? 0) + (ov.recommended?.length ?? 0) > 0)}
                 trustLine={sellerLine(p.id)}
                 modeIcons={[...new Set(postModes(p).map((m) => MODE_ICON[m]))]}
-                recommended={myRecs.has('post:' + p.id)}
+                recommended={myRecs.has(recommendKey('post', p.id, undefined, asSpace))}
                 onOpen={() => navigate(postOpenPath(p))}
                 onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               />
@@ -511,11 +520,11 @@ export default function Marketplace() {
             {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
             trusted={myMyc.has('profile:' + p.author_id)}
-            recommended={myRecs.has('post:' + p.id)}
+            recommended={myRecs.has(recommendKey('post', p.id, undefined, asSpace))}
             mycelium={overlays[p.id]}
             availability={{ trust: !!me && p.author_id !== me }}
             onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
-            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+            onRecommend={(on) => { void setRecommend('post', p.id, on, undefined, asSpace).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
             extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
@@ -530,6 +539,18 @@ export default function Marketplace() {
           />
         ))}
       </section>}
+
+      {/* A thin shelf gets the same pointer as a bare one — under the
+          results, never instead of them (founder 2026-08-13). */}
+      {ready && scoped && (
+        <ScopeMore
+          count={filtered.length}
+          section="Marketplace"
+          who={scopeName || 'they'}
+          to="/market"
+          label="Browse the Lichen Marketplace"
+        />
+      )}
 
       <footer className="mkt__end">
         <span className="eyebrow">End of market</span>
