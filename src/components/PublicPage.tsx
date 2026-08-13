@@ -251,6 +251,16 @@ export default function PublicPage(props: PublicPageProps) {
   // Home shows the lot — it IS the front page; a named tab narrows to its
   // own section.
   const show = (id: string) => !doors && !showingFeed && (tab === 'home' || !tabbed || tab === id);
+  // ROOT AND BRANCHES (founder 2026-08-11): Home teases and routes. A section
+  // that has a tab of its own gives a taste on Home with a way through; a
+  // section with nowhere to route shows in full, so nothing is ever truncated
+  // into a dead end.
+  const teasing = (id: string) => tab === 'home' && navItems.some((n) => n.id === id);
+  const More = ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <button className="ppage__more" type="button" onClick={() => setTab(to)}>
+      {children} <span aria-hidden>&rarr;</span>
+    </button>
+  );
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
   const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
 
@@ -442,7 +452,7 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           {flavor('about')}
           <div className="ppage__story">
-            {story.split(/\n{2,}/).map((para, i) => (
+            {(teasing('about') ? story.split(/\n{2,}/).slice(0, 2) : story.split(/\n{2,}/)).map((para, i) => (
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
@@ -451,6 +461,9 @@ export default function PublicPage(props: PublicPageProps) {
                 ))}
               </div>
             ))}
+            {teasing('about') && story.split(/\n{2,}/).length > 2 && (
+              <More to="about">Read the whole story</More>
+            )}
           </div>
         </section>
       )}
@@ -474,13 +487,16 @@ export default function PublicPage(props: PublicPageProps) {
           <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
           <ul className="ppage__offers">
-            {svcRows.map((o) => (
+            {(teasing('services') ? svcRows.slice(0, 5) : svcRows).map((o) => (
               <li className="ppage__offer" key={o.id}>
                 <span className="ppage__offer-name">{o.name}</span>
                 {props.renderOfferingAction?.(o)}
               </li>
             ))}
           </ul>
+          {teasing('services') && svcRows.length > 5 && (
+            <More to="services">See everything they offer</More>
+          )}
         </section>
       )}
 
@@ -489,7 +505,7 @@ export default function PublicPage(props: PublicPageProps) {
           <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
           <ul className="ppage__offers">
-            {goodRows.map((o) => (
+            {(teasing('goods') ? goodRows.slice(0, 5) : goodRows).map((o) => (
               <li className="ppage__offer" key={o.id}>
                 <span className="ppage__offer-name">{o.name}</span>
                 {props.renderOfferingAction?.(o)}
@@ -506,7 +522,7 @@ export default function PublicPage(props: PublicPageProps) {
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
           <ul className="ppage__offers">
-            {offerings.map((o) => {
+            {(teasing('services') ? offerings.slice(0, 5) : offerings).map((o) => {
               const [head, ...rest] = o.split(' · ');
               return (
                 <li className="ppage__offer" key={o}>
@@ -516,6 +532,9 @@ export default function PublicPage(props: PublicPageProps) {
               );
             })}
           </ul>
+          {teasing('services') && offerings.length > 5 && (
+            <More to="services">See everything they offer</More>
+          )}
         </section>
       )}
 
@@ -525,7 +544,12 @@ export default function PublicPage(props: PublicPageProps) {
           <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
           <div className="ppage__story">
-            {page.facilities.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+            {(teasing('facilities')
+              ? page.facilities.split(/\n{2,}/).slice(0, 1)
+              : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
+            {teasing('facilities') && page.facilities.split(/\n{2,}/).length > 1 && (
+              <More to="facilities">See the grounds</More>
+            )}
           </div>
         </section>
       )}

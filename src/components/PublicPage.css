@@ -276,3 +276,12 @@
 }
 .ppage__utility .mprof__actions { margin-top: 0; justify-content: flex-start; }
 .ppage__utility .view-toggle-row { margin: 0; }
+
+/* Home teases and routes (founder 2026-08-11): the root shows a taste,
+   the branch holds the whole thing. */
+.ppage__more {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: var(--s-2);
+  background: none; border: 0; padding: 4px 0; cursor: pointer;
+  font-family: inherit; font-size: 14px; color: var(--ppage-accent, var(--peach-deep));
+}
+.ppage__more:hover { text-decoration: underline; }
