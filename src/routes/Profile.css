@@ -115,7 +115,7 @@
 
 .prof__signout { margin-top: var(--s-7); text-align: center; }
 
-/* category pickers within "What you offer" */
+/* category pickers within "Goods & services you offer" */
 .prof__picker { margin-top: var(--s-3); }
 .prof__picker-lead { font-size: var(--t-sm); color: var(--ink-soft); margin-bottom: var(--s-2); }
 

@@ -1063,7 +1063,7 @@ export default function Profile() {
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection id="offer" title="What you offer" open={openSections.has('offer')} onToggle={() => toggleSection('offer')}>
+      <CollapsibleSection id="offer" title="Goods &amp; services you offer" open={openSections.has('offer')} onToggle={() => toggleSection('offer')}>
         <div className="prof__caps">
           {CAPS.map((c) => (
             <button key={c.id} type="button"
@@ -1076,7 +1076,7 @@ export default function Profile() {
 
         {showServices && (
           <div className="prof__picker">
-            <p className="prof__picker-lead">Services you offer</p>
+            <p className="prof__picker-lead">Services</p>
             <CategoryPicker
               domain="service"
               categories={categories}
@@ -1088,7 +1088,7 @@ export default function Profile() {
         )}
         {showGoods && (
           <div className="prof__picker">
-            <p className="prof__picker-lead">Goods you offer</p>
+            <p className="prof__picker-lead">Goods</p>
             <CategoryPicker
               domain="good"
               categories={categories}
@@ -1103,7 +1103,7 @@ export default function Profile() {
             only once place categories exist. */}
         {categories.some((c) => c.domain === 'place') && (
           <div className="prof__picker">
-            <p className="prof__picker-lead">Places &amp; spaces you steward</p>
+            <p className="prof__picker-lead">Places you steward</p>
             <CategoryPicker
               domain="place"
               categories={categories}
