@@ -137,3 +137,19 @@ export async function applySnapshot(me: string, picked: SnapshotApply): Promise<
     if (lErr) throw lErr;
   }
 }
+
+/** Read the WHOLE story and write the homepage welcome (founder
+ *  2026-08-11) — a fresh greeting, not the story's first inches. */
+export async function requestHomeSummary(story: string, entityName?: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('profile-snapshot', {
+    body: { mode: 'summary', text: story, entityName },
+  });
+  if (error) {
+    let msg = '';
+    try { msg = ((await (error as { context?: Response }).context?.json()) as { error?: string })?.error ?? ''; } catch { /* noop */ }
+    throw new Error(msg || 'Could not write that just now.');
+  }
+  const p = data as { summary?: string; error?: string };
+  if (p?.error) throw new Error(p.error);
+  return p?.summary ?? '';
+}

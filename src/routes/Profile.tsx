@@ -34,6 +34,7 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
+import HomeSummaryButton from '../components/HomeSummaryButton';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -750,7 +751,11 @@ export default function Profile() {
               onChange={(e) => setPage({ homeSummary: e.target.value })}
               placeholder="A short welcome for the front page — your whole story still lives on About."
             />
-            <FillWithClaude back="/profile#public-page" label="Have Claude write this from my story" />
+            <HomeSummaryButton
+              story={pageMeta.story ?? bio ?? ''}
+              entityName={fullName}
+              onWritten={(t) => setPage({ homeSummary: t })}
+            />
             <p className="prof__hint">
               Leave it empty and Home opens with the first two paragraphs of your story.
             </p>

@@ -89,6 +89,45 @@ Deno.serve(async (req) => {
   const isSpace = body.kind === 'space';
   if (!text.trim() && urls.length === 0) return json({ error: 'Tell me something to work from first.' }, 400);
 
+  // HOME SUMMARY (founder 2026-08-11): read the WHOLE story and write a
+  // fresh welcome for the front page — not the first inches of it. Its own
+  // small mode on this function, sharing the auth, key and model.
+  if ((body as { mode?: string }).mode === 'summary') {
+    const story = text.trim();
+    if (!story) return json({ error: 'Write your story first and I’ll summarize it.' }, 400);
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content:
+              'This is the full story from a Lichen page' + (entityName ? ` for "${entityName}"` : '') + ':\n\n' +
+              story +
+              '\n\nWrite the WELCOME for their homepage: one or two short paragraphs that greet a visitor ' +
+              'and make them want to read more. Draw on the WHOLE story — the things worth knowing first ' +
+              'may be anywhere in it, not just the opening. Keep their voice. Invent nothing. Do not ' +
+              'summarize mechanically ("This barn offers…") — write it the way they would greet someone ' +
+              'at the gate. Reply with the welcome text and nothing else.',
+          }],
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.error?.message ?? `Anthropic ${r.status}`);
+      const blocks = (Array.isArray(d?.content) ? d.content : []) as { type?: string; text?: string }[];
+      const out = blocks.filter((b) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text).join('\n').trim();
+      if (!out) throw new Error('empty');
+      return json({ summary: out.slice(0, 1200) });
+    } catch (err) {
+      console.error('profile-snapshot summary:', err);
+      return json({ error: 'That didn’t come back cleanly. Try again in a moment.' }, 502);
+    }
+  }
+
   const read = await Promise.all(urls.map(readUrl));
   const unreadable = read.filter((r) => !r.ok).map((r) => r.url);
   const pages = read.filter((r) => r.ok);

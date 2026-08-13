@@ -46,6 +46,7 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
+import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
@@ -1029,9 +1030,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onChange={(e) => setPageEdit((pm) => ({ ...pm, homeSummary: e.target.value }))}
               placeholder="A short welcome for the front page — the whole story still lives on About."
             />
-            <FillWithClaude
-              back={`/spaces/${id}?manage=1#about`}
-              label="Have Claude write this from the full story"
+            <HomeSummaryButton
+              story={pageEdit.story ?? description ?? ''}
+              entityName={name}
+              onWritten={(t) => setPageEdit((pm) => ({ ...pm, homeSummary: t }))}
             />
             <p className="prof__hint">
               Leave it empty and Home opens with the first two paragraphs of your story.
