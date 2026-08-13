@@ -37,22 +37,25 @@ const SmartSearchCore = lazy(() => import('../components/SmartSearchCore'));
 // Offer modes as stored by Compose: details.mode (marketplace listings) with
 // event_mode as the fallback for event cross-posts.
 type Mode = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'sale' | 'sliding' | 'iso';
-// Lend and Borrow are separate chips (founder, 2026-07-17): Lend = offers
-// to lend out, Borrow = asks to borrow. ISO = in-search-of asks.
+// Lend and Borrow share ONE chip now (founder 2026-08-13: "they're 2 sides
+// of the same coin" — reversing the 2026-07-17 call that split them). The DB
+// modes stay separate — offering to lend and asking to borrow are different
+// acts when AUTHORING, so Compose keeps both — but someone browsing lending
+// wants to see the whole coin, and the freed slot lets every lens fit on a
+// phone without scrolling.
 // "For Sale" covers fixed-price AND sliding-scale — sliding is a pricing
 // style, not a category (founder, 2026-07-16); the card's eyebrow shows
 // either the fixed price or the sliding range.
-type Chip = 'gift' | 'trade' | 'rent' | 'lend' | 'borrow' | 'iso' | 'sale';
+type Chip = 'gift' | 'trade' | 'rent' | 'lend' | 'iso' | 'sale';
 const CHIP_MODES: Record<Chip, Mode[]> = {
   gift: ['gift'], trade: ['trade'], rent: ['rent'],
-  lend: ['lend'], borrow: ['borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
+  lend: ['lend', 'borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
 };
 const MODES: { chip: Chip; label: string; icon: IconName }[] = [
   { chip: 'gift',       label: 'Gift',        icon: 'heart-line' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
-  { chip: 'lend',       label: 'Lend',        icon: 'lend' },
-  { chip: 'borrow',     label: 'Borrow',      icon: 'repeat' },
+  { chip: 'lend',       label: 'Lending',     icon: 'lend' },
   { chip: 'sale',       label: 'For Sale',    icon: 'dollar' },
   { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
@@ -394,7 +397,7 @@ export default function Marketplace() {
           width, and a word is wider than a circle — sharing one row left a
           single lens visible before the chevron. Own line, full width, ~5
           visible. */}
-      <ScrollHintRow className="mkt__lensrow h-scroll" role="toolbar" ariaLabel="Modes of exchange" gutter>
+      <ScrollHintRow className="mkt__lensrow h-scroll" role="toolbar" ariaLabel="Modes of exchange" gutter fade>
         {MODES.map((m) => {
           const on = activeChips.includes(m.chip);
           return (

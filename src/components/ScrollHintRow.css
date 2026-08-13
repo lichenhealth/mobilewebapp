@@ -19,3 +19,14 @@
 .scrollrow__hint--r { right: var(--srow-gutter); justify-content: flex-end; }
 .scrollrow__hint--l { left: var(--srow-gutter); justify-content: flex-start; }
 .scrollrow__hint--l svg { transform: scaleX(-1); }
+
+/* Fade mode (text-chip rows): a cut chip tapers out under the chevron
+   instead of hiding and leaving its empty layout box behind. The gradient
+   runs to the page canvas, so the taper reads as the row dissolving. */
+.scrollrow__hint--fade { width: 44px; }
+.scrollrow__hint--fade.scrollrow__hint--r {
+  background: linear-gradient(to right, transparent, var(--bone) 60%);
+}
+.scrollrow__hint--fade.scrollrow__hint--l {
+  background: linear-gradient(to left, transparent, var(--bone) 60%);
+}

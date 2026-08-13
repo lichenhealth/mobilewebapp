@@ -186,8 +186,9 @@
   display: flex;
   align-items: center;
   /* Tight: a word takes more width than a circle did, so every pixel of gap
-     is one fewer lens visible before the chevron. */
-  gap: var(--s-2);
+     is one fewer lens visible before the chevron (founder 2026-08-13: fill
+     the space — five lenses should sit before the scroll on a phone). */
+  gap: 6px;
   padding: 2px 0 var(--s-2);   /* side gutters live on the ScrollHintRow wrapper */
   overflow-x: auto;
   scrollbar-width: none;
@@ -197,10 +198,10 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: none;
   border: 0;
-  padding: 4px 2px;
+  padding: 4px 1px;
   font-size: 11.5px;
   letter-spacing: 0.02em;
   color: var(--ink-muted);

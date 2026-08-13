@@ -16,12 +16,21 @@ const near = (a: HintBox | null, b: HintBox | null) =>
  *  the tab text aligns to — marks each direction that has more. Icons
  *  pack the full row width up to the chevron. `gutter` puts the side
  *  margins on the WRAPPER so they hold at every scroll position (strip
- *  the row's own horizontal padding when using it). */
-export function ScrollHintRow({ className, role, ariaLabel, gutter, children }: {
+ *  the row's own horizontal padding when using it).
+ *
+ *  `fade` (founder 2026-08-13, "fill the space — maximum visibility"): the
+ *  hide-until-whole rule was written for 48px icon circles, where the hidden
+ *  item's leftover layout box reads as breathing room. On a TEXT-chip row the
+ *  same rule leaves an 85–120px hole — the "empty space before the chevron"
+ *  the founder circled was a hidden chip's box. Fade mode never hides:
+ *  a cut chip tapers out under a gradient instead, so every pixel of the row
+ *  is a real, visible option. */
+export function ScrollHintRow({ className, role, ariaLabel, gutter, fade, children }: {
   className?: string;
   role?: string;
   ariaLabel?: string;
   gutter?: boolean;
+  fade?: boolean;
   children: ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -40,22 +49,23 @@ export function ScrollHintRow({ className, role, ariaLabel, gutter, children }: 
       const kr = kid.getBoundingClientRect();
       const straddlesR = kr.left < rect.right - 1 && kr.right > rect.right + 1;
       const straddlesL = kr.right > rect.left + 1 && kr.left < rect.left - 1;
-      kid.style.visibility = straddlesR || straddlesL ? 'hidden' : '';
+      kid.style.visibility = !fade && (straddlesR || straddlesL) ? 'hidden' : '';
     }
     const overflowR = el.scrollWidth - el.scrollLeft - el.clientWidth > 8;
     const overflowL = el.scrollLeft > 8;
 
     // The pinned chevron needs ~18px of clear floor — if the nearest whole
-    // icon crowds the edge, it steps aside too.
+    // icon crowds the edge, it steps aside too. (Fade mode: the gradient IS
+    // the clear floor, so nothing needs to step aside.)
     const visible = () => kids.filter((k) => eligible(k) && k.style.visibility !== 'hidden'
       && k.getBoundingClientRect().left >= rect.left - 1
       && k.getBoundingClientRect().right <= rect.right + 1);
-    if (overflowR) {
+    if (overflowR && !fade) {
       const vis = visible();
       const last = vis[vis.length - 1];
       if (last && rect.right - last.getBoundingClientRect().right < 18) last.style.visibility = 'hidden';
     }
-    if (overflowL) {
+    if (overflowL && !fade) {
       const vis = visible();
       const first = vis[0];
       if (first && first.getBoundingClientRect().left - rect.left < 18) first.style.visibility = 'hidden';
@@ -94,7 +104,7 @@ export function ScrollHintRow({ className, role, ariaLabel, gutter, children }: 
 
   const ghost = (h: HintBox, side: 'l' | 'r') => (
     <span
-      className={'scrollrow__hint scrollrow__hint--' + side}
+      className={'scrollrow__hint scrollrow__hint--' + side + (fade ? ' scrollrow__hint--fade' : '')}
       style={{ top: h.top, height: h.size }}
       aria-hidden="true"
     >
