@@ -16,6 +16,9 @@ export interface Exchange {
   seller_id: string;
   seller_space_id: string | null;
   buyer_id: string;
+  /** Set when a SPACE is the buyer — buyer_id records which admin acted,
+   *  the truster_id pattern. Completion debits the space's treasury. */
+  buyer_space_id: string | null;
   mode: string;
   amount: number;
   fulfillment: string | null;
@@ -28,7 +31,7 @@ export interface Exchange {
   created_at: string;
 }
 
-const COLS = 'id, post_id, seller_id, seller_space_id, buyer_id, mode, amount, fulfillment, note, status, needs_guardian, guardian_ok_at, buyer_done_at, seller_done_at, created_at';
+const COLS = 'id, post_id, seller_id, seller_space_id, buyer_id, buyer_space_id, mode, amount, fulfillment, note, status, needs_guardian, guardian_ok_at, buyer_done_at, seller_done_at, created_at';
 
 /** The verb for a listing's primary action — a gift isn't bought. */
 export function takeItLabel(mode?: string | null): string {
@@ -44,10 +47,14 @@ export function takeItLabel(mode?: string | null): string {
 
 export async function requestExchange(
   postId: string, mode?: string | null, fulfillment?: string | null, note?: string | null,
+  asSpace?: string,
 ): Promise<{ ok: boolean; id?: string; message: string }> {
   const { data, error } = await supabase.rpc('request_exchange', {
     p_post: postId, p_mode: mode ?? null,
     p_fulfillment: fulfillment ?? null, p_note: note ?? null,
+    // Buying on behalf of a space you steward (founder 2026-08-13). The DB
+    // re-checks adminship, and the treasury — not you — pays at completion.
+    p_as_space: asSpace ?? null,
   });
   if (error) return { ok: false, message: error.message };
   return { ok: true, id: data as string, message: 'Asked — they’ll get a bell.' };
@@ -84,11 +91,16 @@ export async function isClaimed(postId: string): Promise<boolean> {
 }
 
 /** My exchange on this listing, if I have one (either side). */
-export async function myExchangeForPost(postId: string, me: string): Promise<Exchange | null> {
+export async function myExchangeForPost(
+  postId: string, me: string, asSpace?: string,
+): Promise<Exchange | null> {
   if (!me) return null;
-  const { data, error } = await supabase.from('exchanges').select(COLS)
-    .eq('post_id', postId)
-    .or(`buyer_id.eq.${me},seller_id.eq.${me}`)
+  const q = supabase.from('exchanges').select(COLS).eq('post_id', postId);
+  // Wearing a space's hat, "my exchange" is the SPACE's — any of its admins
+  // sees and continues it, not just whoever asked. As yourself, your own.
+  const { data, error } = await (asSpace
+    ? q.eq('buyer_space_id', asSpace)
+    : q.or(`buyer_id.eq.${me},seller_id.eq.${me}`))
     .not('status', 'in', '("declined","canceled")')
     .order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (error) return null;

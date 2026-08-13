@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { useActing } from '../acting/ActingProvider';
 import type { FeedPost } from '../lib/postsApi';
 import {
   requestExchange, decideExchange, completeExchange, cancelExchange,
@@ -31,17 +32,30 @@ export default function ExchangePanel({ post, me }: { post: FeedPost; me: string
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
-  const mine = post.author_id === me;
+  // Wearing a space's hat, the SPACE is the party (founder 2026-08-13: "I'm
+  // always a participant, even if i'm an org") — it asks, its treasury pays,
+  // and any of its admins can carry the exchange forward. `options` is the
+  // list of spaces this member admins, which is exactly the adminship test
+  // the server will re-run.
+  const { actor, options } = useActing();
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
+  const adminOf = (spaceId: string | null) =>
+    !!spaceId && options.some((o) => o.id === spaceId);
+
+  // "Mine" = the side that's selling, so no CTA. As yourself, anything you
+  // authored; as a space, that space's own listings (buying your admin's
+  // personal listing AS the space is legitimate — the barn buys the saddle).
+  const mine = asSpace ? post.author_space_id === asSpace : post.author_id === me;
   const d = (post.details ?? {}) as { mode?: string; fulfillment?: string[] };
   const offered = (d.fulfillment ?? []).length
     ? FULFILMENT.filter((f) => (d.fulfillment ?? []).includes(f.id))
     : FULFILMENT;
 
   const load = async () => {
-    setX(await myExchangeForPost(post.id, me));
+    setX(await myExchangeForPost(post.id, me, asSpace));
     setClaimed(await isClaimed(post.id));
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [post.id, me]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [post.id, me, asSpace]);
 
   const run = async (fn: () => Promise<{ ok: boolean; message: string }>) => {
     setBusy(true);
@@ -71,6 +85,12 @@ export default function ExchangePanel({ post, me }: { post: FeedPost; me: string
           </button>
         ) : (
           <div className="xch__form">
+            {actor.type === 'space' && (
+              <p className="xch__asspace">
+                Asking as <strong>{actor.name}</strong> — its Current, not yours,
+                pays when you both call it done.
+              </p>
+            )}
             <p className="xch__label">How would it change hands?</p>
             <div className="cmp__chips">
               {offered.map((f) => (
@@ -84,7 +104,7 @@ export default function ExchangePanel({ post, me }: { post: FeedPost; me: string
               onChange={(e) => setNote(e.target.value)} />
             <div className="xch__row">
               <button className="btn btn-primary" disabled={busy}
-                onClick={() => void run(() => requestExchange(post.id, d.mode, fulfil, note))}>
+                onClick={() => void run(() => requestExchange(post.id, d.mode, fulfil, note, asSpace))}>
                 {busy ? 'Asking…' : 'Send it'}
               </button>
               <button className="btn" onClick={() => { setOpen(false); setMsg(''); }}>Not yet</button>
@@ -97,7 +117,8 @@ export default function ExchangePanel({ post, me }: { post: FeedPost; me: string
   }
 
   // An exchange exists — show what it's waiting on, and the verb that's next.
-  const iAmSeller = x.seller_id === me;
+  // Space parties act through ANY of their admins, not only whoever clicked.
+  const iAmSeller = x.seller_id === me || adminOf(x.seller_space_id);
   const iConfirmed = iAmSeller ? !!x.seller_done_at : !!x.buyer_done_at;
   const live = x.status === 'pending' || x.status === 'accepted';
 
