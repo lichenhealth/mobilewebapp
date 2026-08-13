@@ -400,8 +400,16 @@ export default function AssistantBrief() {
       </div>
 
       {/* Always-there composer — answer the brief in place (founder
-          2026-08-05), lands in the feed (founder 2026-08-09). */}
-      <AssistantComposer onSend={sendToClaude} />
+          2026-08-05), lands in the feed (founder 2026-08-09). A door can
+          arrive with its errand via ?ask= (founder 2026-08-11: "Draft it
+          with Claude" shouldn't forget why you came) — press enter to send
+          it, or add more first (a website to read, a length, a tone).
+          Keyed so a new ?ask always lands even if the composer is mounted. */}
+      <AssistantComposer
+        key={params.get('ask') ?? 'blank'}
+        onSend={sendToClaude}
+        initialText={params.get('ask') ?? undefined}
+      />
 
       <p className="abrief__foot">
         Carbon decides; silicon organizes. Nothing here is a score, and nothing leaves your view.

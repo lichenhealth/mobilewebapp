@@ -15,13 +15,17 @@ interface SpeechRecognitionLike {
  *  stays in place if `onSend` throws, so a failed send never loses what
  *  was typed. */
 export default function AssistantComposer({
-  onSend, placeholder = 'Ask about any of this…', className = '',
+  onSend, placeholder = 'Ask about any of this…', className = '', initialText,
 }: {
   onSend: (text: string) => void | Promise<void>;
   placeholder?: string;
   className?: string;
+  /** A door can arrive carrying its intent (founder 2026-08-11: "Draft it
+   *  with Claude" shouldn't forget why you came) — the prompt sits here
+   *  ready to send, or to edit first (add a website to read, a length…). */
+  initialText?: string;
 }) {
-  const [ask, setAsk] = useState('');
+  const [ask, setAsk] = useState(initialText ?? '');
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
 

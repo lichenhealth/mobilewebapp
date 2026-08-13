@@ -670,10 +670,15 @@ export default function Profile() {
               placeholder="Write it the way you'd tell a neighbor. A few short paragraphs is plenty." />
             <p className="prof__hint">
               Rather talk it through?{' '}
-              <button className="prof__inline-link" onClick={() => navigate('/assistant?section=profile')}>
+              <button
+                className="prof__inline-link"
+                onClick={() => navigate('/assistant?section=profile&ask=' + encodeURIComponent(
+                  'Help me draft the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer. Before you send this, feel free to add anything else: a website to read, a length ("140 characters"), a tone.',
+                ))}
+              >
                 Draft it with Claude
               </button>{' '}
-              — say it out loud, and edit what comes back.
+              — the ask arrives ready to send, or add to it first.
             </p>
           </div>
           <div className="prof__field">
