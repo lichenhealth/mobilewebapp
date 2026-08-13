@@ -1,0 +1,59 @@
+/* Snapshot — build your public & Lichen presence from what you already have. */
+.snap { max-width: 640px; margin: 0 auto; padding-bottom: var(--s-8); }
+.snap__title {
+  font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 400;
+  margin: var(--s-4) 0 var(--s-2);
+}
+.snap__lead { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin-bottom: var(--s-5); }
+.snap__field { margin-bottom: var(--s-5); }
+.snap__text { width: 100%; font-family: inherit; line-height: 1.5; resize: vertical; }
+.snap__url { width: 100%; margin-bottom: 6px; }
+.snap__addurl {
+  background: none; border: 0; padding: 2px 0; cursor: pointer;
+  color: var(--peach-deep); font-size: 13px; font-family: inherit;
+}
+.snap__mic { margin-top: var(--s-2); display: inline-flex; align-items: center; gap: 6px; }
+.snap__mic.is-live { border-color: var(--peach); color: var(--peach-deep); }
+.snap__go { margin-top: var(--s-2); }
+.snap__foot { margin-top: 6px; }
+.snap__review {
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); padding: var(--s-3); font-size: 14px;
+  color: var(--ink); margin-bottom: var(--s-4);
+}
+.snap__gap { margin-top: var(--s-4); }
+.snap__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s-2); }
+.snap__chip {
+  padding: 6px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.snap__chip.is-on {
+  border-color: var(--peach); background: var(--peach-tint); color: var(--ink);
+}
+.snap__missing { margin-top: var(--s-4); }
+.snap__acts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-5); }
+
+/* The second door — honest that it's next, not now. */
+.snap__sync {
+  margin-top: var(--s-8); padding-top: var(--s-5);
+  border-top: 1px solid var(--bone-edge);
+}
+.snap__sync-title {
+  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 400;
+  margin: 0 0 var(--s-2);
+}
+.snap__sync-lead { color: var(--ink-soft); font-size: 14px; line-height: 1.5; margin-bottom: 6px; }
+
+@media (min-width: 1024px) {
+  .snap { padding-inline: 0; }
+}
+
+/* The way home — the founder's words, so someone trying AI for the first
+   time can always see the door out. */
+.snap__back {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 0; padding: 4px 0; margin-bottom: var(--s-2);
+  color: var(--ink-soft); font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.snap__back:hover { color: var(--peach-deep); }

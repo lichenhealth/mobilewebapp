@@ -45,6 +45,7 @@ import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
+import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
@@ -1012,6 +1013,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {adminTools && (
         <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
+          <BuildModeSplit back={`/spaces/${id}?manage=1#about`} />
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -1024,6 +1026,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onChange={(e) => setDescription(e.target.value)}
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
+            <FillWithClaude back={`/spaces/${id}?manage=1#about`} label="Fill out with Claude" />
           </div>
           {space.kind === 'group' && (
             <div className="prof__field">

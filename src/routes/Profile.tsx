@@ -33,6 +33,7 @@ import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
+import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -703,6 +704,12 @@ export default function Profile() {
             events) invites them to join.
           </p>
 
+          {/* The fork (founder 2026-08-11): fill it in yourself, or hand it
+              to Claude. Manual stands as the default — the form is right
+              below — so the AI option teaches itself without blocking. */}
+          <BuildModeSplit back="/profile#public-page" />
+
+
           <label className="prof__consent">
             <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
             <span>
@@ -740,6 +747,7 @@ export default function Profile() {
             <textarea className="prof__textarea prof__story" value={pageMeta.story ?? ''}
               onChange={(e) => setPage({ story: e.target.value })}
               placeholder="Write it the way you'd tell a neighbor. A few short paragraphs is plenty." />
+            <FillWithClaude back="/profile#public-page" label="Fill out my story with Claude" />
             <p className="prof__hint">
               Rather talk it through?{' '}
               <button

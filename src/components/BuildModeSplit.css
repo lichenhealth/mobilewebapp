@@ -1,0 +1,32 @@
+/* Manual | with-Claude fork, at the top of a builder. */
+.bmode {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2);
+  margin: var(--s-2) 0 var(--s-4);
+}
+.bmode__side {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  padding: 10px 12px; border-radius: var(--r-md); cursor: pointer;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-family: inherit; text-align: left;
+}
+.bmode__side strong {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: var(--ink);
+}
+.bmode__side em {
+  font-style: normal; font-size: 11px; color: var(--ink-faint); line-height: 1.35;
+}
+.bmode__side.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.bmode__side--ai:hover { border-color: var(--peach); }
+
+/* The per-field nudge. */
+.bmode__inline {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 0; padding: 2px 0; margin-top: 2px;
+  color: var(--peach-deep); font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.bmode__inline:hover { text-decoration: underline; }
+
+@media (max-width: 480px) {
+  .bmode { grid-template-columns: 1fr; }
+}
