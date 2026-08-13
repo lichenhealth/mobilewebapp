@@ -19,27 +19,23 @@ export function ScopeEscape({ to, label }: { to: string; label: string }) {
   );
 }
 
-export function ScopeEmpty({ icon, who, what, to, label, note }: {
+export function ScopeEmpty({ icon, section, who, to, label }: {
   icon: Parameters<typeof Icon>[0]['name'];
-  /** Whose view this is — "Countryman Stables", "Your web". */
+  /** The section's own name — "Library", "Marketplace". */
+  section: string;
+  /** Whose view this is — "Countryman Stables", "your web". */
   who: string;
-  /** What isn't here yet, in their words — "goods, services or places". */
-  what: string;
   to: string;
   label: string;
-  /** An extra line when the viewer could do something about it. */
-  note?: string;
 }) {
   const navigate = useNavigate();
   return (
     <div className="scope-empty">
       <Icon name={icon} size={20} />
-      <p><span className="display-italic">No {what} here yet.</span></p>
-      <p className="scope-empty__sub">
-        {who} hasn&rsquo;t put anything on this shelf — it isn&rsquo;t missing, it&rsquo;s just early.
+      <p className="scope-empty__line">
+        No {section} content from {who} yet!
       </p>
-      {note && <p className="scope-empty__sub">{note}</p>}
-      <button className="btn scope-empty__go" onClick={() => navigate(to)}>{label}</button>
+      <button className="scope-empty__link" onClick={() => navigate(to)}>{label}</button>
     </div>
   );
 }

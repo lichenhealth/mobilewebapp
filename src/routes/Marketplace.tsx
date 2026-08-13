@@ -460,10 +460,10 @@ export default function Marketplace() {
       {ready && filtered.length === 0 && scoped && posts.length === 0 && (
         <ScopeEmpty
           icon="store"
-          who={scopeName || 'They'}
-          what="goods, services or places"
+          section="Marketplace"
+          who={scopeName || 'them'}
           to="/market"
-          label="Go to Lichen Marketplace"
+          label="Visit the Lichen Marketplace"
         />
       )}
       {ready && filtered.length === 0 && !(scoped && posts.length === 0) && (

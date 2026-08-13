@@ -404,10 +404,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       {ready && filtered.length === 0 && scoped && posts.length === 0 && (
         <ScopeEmpty
           icon={icon}
-          who={memberName || 'They'}
-          what={EMPTY_NOUN[area] ?? crumb.toLowerCase()}
+          section={crumb}
+          who={memberName || 'them'}
           to={`/${area}`}
-          label={`Go to Lichen ${crumb}`}
+          label={`Visit the Lichen ${crumb}`}
         />
       )}
       {ready && filtered.length === 0 && !(scoped && posts.length === 0) && (

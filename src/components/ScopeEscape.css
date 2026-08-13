@@ -12,5 +12,12 @@
   text-align: center; padding: var(--s-6) var(--s-4); color: var(--ink-soft);
 }
 .scope-empty p { margin: 0; }
-.scope-empty__sub { font-size: 13px; color: var(--ink-faint); max-width: 38ch; line-height: 1.45; }
-.scope-empty__go { margin-top: var(--s-2); }
+.scope-empty__line {
+  font-family: var(--font-display); font-style: italic;
+  font-size: var(--t-lg); color: var(--ink-soft); max-width: 30ch; line-height: 1.35;
+}
+.scope-empty__link {
+  background: none; border: 0; padding: 4px 0; cursor: pointer; font-family: inherit;
+  font-size: 14px; color: var(--peach-deep); text-decoration: underline;
+}
+.scope-empty__link:hover { color: var(--ink); }
