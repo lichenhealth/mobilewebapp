@@ -79,9 +79,9 @@ Deno.serve(async (req) => {
     if (sp) sharedPostContext = `\n\n[The member shared this post: "${sp.title ?? ''}" — ${sp.body ?? ''}]`;
   }
 
-  // ROOMS (founder 2026-08-11): the assistant keeps a room per section, so
-  // this reply reads THIS room's history — marketplace work doesn't wander
-  // into a care conversation. General is the exception: it's the room for
+  // THREADS (founder 2026-08-11): the assistant keeps a thread per section, so
+  // this reply reads THIS thread's history — marketplace work doesn't wander
+  // into a care conversation. General is the exception: it's the thread for
   // whatever isn't one subject, so it gets a short glance at the others.
   const thread = trigger.thread ?? 'general';
   const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}&select=id,author,body,source_post_id&order=created_at.desc&limit=20`)).json();
@@ -94,16 +94,16 @@ Deno.serve(async (req) => {
       .filter((p: { body?: string }) => p.body?.trim())
       .map((p: { thread: string; body: string }) => `[${p.thread}] ${p.body.slice(0, 180)}`);
     if (lines.length) {
-      elsewhere = `\n\nFor context, recent work from their other rooms (do not bring it up unless it's relevant to what they just asked):\n${lines.join('\n')}`;
+      elsewhere = `\n\nFor context, recent work from their other threads (do not bring it up unless it's relevant to what they just asked):\n${lines.join('\n')}`;
     }
   }
 
-  // Staying in the right room is part of the job: if what they've asked
+  // Staying in the right thread is part of the job: if what they've asked
   // plainly belongs somewhere else, say so and point, rather than doing the
   // work in the wrong place (founder 2026-08-11).
-  const roomRule = thread === 'general'
-    ? '\n\nYou are in their GENERAL room — anything goes here, and you may draw on their other rooms when it helps.'
-    : `\n\nYou are in their ${thread.toUpperCase()} room, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which room it belongs in so it stays findable — one short sentence, never a lecture.`;
+  const threadRule = thread === 'general'
+    ? '\n\nYou are in their GENERAL thread — anything goes here, and you may draw on their other threads when it helps.'
+    : `\n\nYou are in their ${thread.toUpperCase()} thread, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which thread it belongs in so it stays findable — one short sentence, never a lecture.`;
 
   const messages = rows.map((p: { id: string; author: string; body: string; source_post_id: string | null }) =>
     p.author === 'claude'
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 400,
-      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${roomRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${threadRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
       messages,
     }),
   });

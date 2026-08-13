@@ -9,14 +9,17 @@ export interface FeedPostRow {
   created_at: string;
 }
 
-// THREADS (founder 2026-08-11): the assistant keeps rooms that mirror the
-// platform, so work stays where it belongs — press AI inside Marketplace and
-// what you say is logged in the marketplace room. General is the room that
-// isn't about one section, and the one that can draw on all of them.
+// THREADS (founder 2026-08-11) — "since we're weaving a tapestry": the
+// assistant keeps a thread per part of the platform, so work stays where it
+// belongs. Press AI inside Marketplace and what you say is logged in the
+// Marketplace thread. Each thread weaves into its section's tapestry, and
+// those into the whole ecosystem — which is what General reads across.
+// (A space-scoped thread — Countryman Stables' Marketplace — is the same
+// idea one level in; the column is free text so it needs no migration.)
 export interface AssistantThread { id: string; label: string; blurb: string }
 
 export const ASSISTANT_THREADS: AssistantThread[] = [
-  { id: 'general', label: 'General', blurb: 'Anything at all — and it can draw on the rest.' },
+  { id: 'general', label: 'General', blurb: 'Anything at all — the whole weave, drawing on every other thread.' },
   { id: 'profile', label: 'Profile management', blurb: 'Your presence: page, story, what you offer.' },
   { id: 'market', label: 'Marketplace', blurb: 'What you’re offering and looking for.' },
   { id: 'events', label: 'Events', blurb: 'Gatherings you host or attend.' },
@@ -27,8 +30,8 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
 export const threadLabel = (id: string) =>
   ASSISTANT_THREADS.find((t) => t.id === id)?.label ?? 'General';
 
-/** A section key (sections.ts) → the room its work belongs in. Anything
- *  without a room of its own lands in general rather than inventing one. */
+/** A section key (sections.ts) → the thread its work belongs in. Anything
+ *  without a thread of its own lands in general rather than inventing one. */
 export function threadForSection(section?: string | null): string {
   if (!section) return 'general';
   const known = ASSISTANT_THREADS.some((t) => t.id === section);
@@ -36,7 +39,7 @@ export function threadForSection(section?: string | null): string {
 }
 
 /** The member's own feed relationship with Claude, oldest → newest.
- *  `thread` narrows to one room; omit it for the whole relationship. */
+ *  `thread` narrows to one thread; omit it for the whole relationship. */
 export async function loadAssistantFeed(profileId: string, thread?: string): Promise<FeedPostRow[]> {
   let q = supabase
     .from('assistant_feed_posts')
@@ -48,7 +51,7 @@ export async function loadAssistantFeed(profileId: string, thread?: string): Pro
   return (data as FeedPostRow[] | null) ?? [];
 }
 
-/** Which rooms this member has actually used — so the rail can lead with
+/** Which threads this member has actually used — so the rail can lead with
  *  the live ones rather than showing six empty doors. */
 export async function loadThreadCounts(profileId: string): Promise<Record<string, number>> {
   const { data } = await supabase
@@ -60,8 +63,8 @@ export async function loadThreadCounts(profileId: string): Promise<Record<string
   return counts;
 }
 
-/** Post into a room of your own feed — the assistant_on_feed_post trigger
- *  answers in the same room. */
+/** Post into a thread of your own feed — the assistant_on_feed_post trigger
+ *  answers in the same thread. */
 export async function postToAssistantFeed(
   body: string, sourcePostId?: string, thread = 'general',
 ): Promise<void> {

@@ -35,7 +35,7 @@ export default function AssistantFeed() {
   const me = user?.id ?? '';
 
   // Rooms that mirror the platform (founder 2026-08-11) — ?thread= is the
-  // room, ?back= the way home to whatever sent you here.
+  // thread, ?back= the way home to whatever sent you here.
   const [params, setParams] = useSearchParams();
   const thread = params.get('thread') || 'general';
   const back = params.get('back') || '';
@@ -85,7 +85,7 @@ export default function AssistantFeed() {
         (payload) => {
           const row = payload.new as FeedPostRow;
           void loadThreadCounts(me).then(setCounts);
-          if ((row.thread ?? 'general') !== thread) return;   // another room's business
+          if ((row.thread ?? 'general') !== thread) return;   // another thread's business
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
         },
       )
@@ -116,8 +116,8 @@ export default function AssistantFeed() {
           <h1 className="afeed__title">Claude</h1>
           <p className="afeed__sub">
             {thread === 'general'
-              ? 'Everything you’ve shared and asked — and it can draw on every room.'
-              : `${threadLabel(thread)} — this room keeps that work together.`}
+              ? 'Everything you’ve shared and asked — the whole weave, drawing on every thread.'
+              : `The ${threadLabel(thread)} thread — this is where that work stays woven together.`}
           </p>
         </div>
         <button
@@ -147,13 +147,13 @@ export default function AssistantFeed() {
         </div>
       )}
 
-      {/* The rooms. General leads; a room with history shows its weight,
+      {/* The threads. General leads; a thread with history shows its weight,
           and the rest stay available so work has somewhere to land. */}
-      <div className="afeed__rooms h-scroll">
+      <div className="afeed__threads h-scroll">
         {ASSISTANT_THREADS.map((t) => (
           <button
             key={t.id}
-            className={'afeed__room' + (t.id === thread ? ' is-on' : '')}
+            className={'afeed__thread' + (t.id === thread ? ' is-on' : '')}
             title={t.blurb}
             onClick={() => {
               const next = new URLSearchParams(params);
@@ -167,7 +167,7 @@ export default function AssistantFeed() {
         ))}
       </div>
 
-      {/* Building your presence happens HERE, in the profile room, rather
+      {/* Building your presence happens HERE, in the profile thread, rather
           than off in a screen of its own (founder 2026-08-11). */}
       {thread === 'profile' && <SnapshotPanel back={back} onDone={() => void load()} />}
 
