@@ -14,14 +14,19 @@ export interface MyWeb {
   vouched: Set<string>;  // the subset I privately trust
 }
 
-/** My whole web, split into membership and trust. Keys are `${type}:${id}`. */
-export async function loadMyWeb(): Promise<MyWeb> {
+/** My whole web, split into membership and trust. Keys are `${type}:${id}`.
+ *  `asSpace` reads a SPACE's own web instead of mine — everything an admin
+ *  wove while acting as it. A space's web never carries trust, so `vouched`
+ *  comes back empty there by construction. */
+export async function loadMyWeb(asSpace?: string): Promise<MyWeb> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { web: new Set(), vouched: new Set() };
-  const { data } = await supabase
+  const q = supabase
     .from('mycelium')
-    .select('target_type, target_id, vouched')
-    .eq('truster_id', user.id);
+    .select('target_type, target_id, vouched');
+  const { data } = await (asSpace
+    ? q.eq('truster_space_id', asSpace)
+    : q.eq('truster_id', user.id).is('truster_space_id', null));
   const web = new Set<string>();
   const vouched = new Set<string>();
   for (const r of (data as { target_type: TargetType; target_id: string; vouched: boolean }[] | null) ?? []) {
@@ -39,20 +44,32 @@ export async function loadMyMycelium(): Promise<Set<string>> {
 
 /** Weave into / remove from my mycelium (membership only — no vouch).
  *  Removing deletes the edge entirely: leaving the web withdraws trust too. */
-export async function setInWeb(type: TargetType, id: string, on: boolean): Promise<void> {
+export async function setInWeb(
+  type: TargetType, id: string, on: boolean, asSpace?: string,
+): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   if (on) {
     // Plain insert, duplicates ignored — must NEVER downgrade an existing vouch.
     const { error } = await supabase
       .from('mycelium')
-      .insert({ truster_id: user.id, target_type: type, target_id: id, vouched: false });
+      .insert({
+        truster_id: user.id,
+        // Weaving on behalf of a space you administer, the same way
+        // setRecommend speaks for one. The DB re-checks adminship; a space
+        // edge can never be vouched, since trust stays person-to-person.
+        truster_space_id: asSpace ?? null,
+        target_type: type, target_id: id, vouched: false,
+      });
     if (error && error.code !== '23505') throw error;
   } else {
-    const { error } = await supabase
-      .from('mycelium')
-      .delete()
-      .eq('truster_id', user.id).eq('target_type', type).eq('target_id', id);
+    const q = supabase.from('mycelium').delete()
+      .eq('target_type', type).eq('target_id', id);
+    // A space's edge belongs to the SPACE, so any of its admins can undo it —
+    // not only whoever happened to weave it.
+    const { error } = await (asSpace
+      ? q.eq('truster_space_id', asSpace)
+      : q.eq('truster_id', user.id).is('truster_space_id', null));
     if (error) throw error;
   }
 }
@@ -62,19 +79,33 @@ export async function setInWeb(type: TargetType, id: string, on: boolean): Promi
 export async function setVouch(type: TargetType, id: string, on: boolean): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
+  // Update-then-insert rather than upsert: the personal edge is now a PARTIAL
+  // unique index (…where truster_space_id is null), and ON CONFLICT can't
+  // infer a partial index without repeating its WHERE clause, which PostgREST
+  // has no way to send. Same effect, and a lost race still lands on 23505.
   if (on) {
-    const { error } = await supabase
+    const { data: hit, error: uErr } = await supabase
       .from('mycelium')
-      .upsert(
-        { truster_id: user.id, target_type: type, target_id: id, vouched: true },
-        { onConflict: 'truster_id,target_type,target_id' },
-      );
-    if (error) throw error;
+      .update({ vouched: true })
+      .eq('truster_id', user.id).eq('target_type', type).eq('target_id', id)
+      .is('truster_space_id', null)
+      .select('target_id');
+    if (uErr) throw uErr;
+    if (!hit?.length) {
+      const { error } = await supabase
+        .from('mycelium')
+        .insert({
+          truster_id: user.id, truster_space_id: null,
+          target_type: type, target_id: id, vouched: true,
+        });
+      if (error && error.code !== '23505') throw error;
+    }
   } else {
     const { error } = await supabase
       .from('mycelium')
       .update({ vouched: false })
-      .eq('truster_id', user.id).eq('target_type', type).eq('target_id', id);
+      .eq('truster_id', user.id).eq('target_type', type).eq('target_id', id)
+      .is('truster_space_id', null);
     if (error) throw error;
   }
 }

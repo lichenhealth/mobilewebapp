@@ -10,6 +10,7 @@ import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } from '../lib/myceliumApi';
 import { sortClaudeFirst } from '../lib/chatApi';
+import { possessive } from '../lib/names';
 import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
   awakeList, myPresence,
@@ -69,14 +70,11 @@ export default function MyceliumDirectory() {
   const { user } = useAuth();
   const { actor } = useActing();
 
-  // A space has no web of its own yet (mycelium.truster_id is profile-only)
-  // — acting as one and landing here means Galyn's personal web renders
-  // under a misleadingly "yours" header. Until that's built, send the
-  // space's own page instead of showing the wrong person's data (founder
-  // 2026-08-10).
-  useEffect(() => {
-    if (actor.type === 'space') navigate(`/spaces/${actor.id}`, { replace: true });
-  }, [actor, navigate]);
+  // A space now HAS a web of its own (mycelium.truster_space_id, 2026-08-13),
+  // so acting as one reads that web instead of bouncing to its profile page.
+  // Its stewards tend it; it holds no trust, because trust is between people.
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
+  const spaceName = actor.type === 'space' ? actor.name : null;
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [ready, setReady] = useState(false);
@@ -132,7 +130,7 @@ export default function MyceliumDirectory() {
 
   // Weaving from the panel mirrors straight into the directory below.
   const weaveFromSearch = (h: Hit, on: boolean) => {
-    void setInWeb(h.type, h.id, on).catch(console.error);
+    void setInWeb(h.type, h.id, on, asSpace).catch(console.error);
     const key = `${h.type}:${h.id}`;
     setEntries((cur) => {
       if (!on) return cur.filter((x) => x.key !== key);
@@ -147,7 +145,7 @@ export default function MyceliumDirectory() {
     let live = true;
     (async () => {
       const [{ web, vouched }, recs, folk, mine] = await Promise.all([
-        loadMyWeb(), loadMyRecommendations(), awakeList(), myPresence(user.id),
+        loadMyWeb(asSpace), loadMyRecommendations(), awakeList(), myPresence(user.id),
       ]);
       if (live) {
         setLitSet(new Set(folk.map((f) => f.id)));
@@ -193,7 +191,7 @@ export default function MyceliumDirectory() {
       setReady(true);
     })();
     return () => { live = false; };
-  }, [user]);
+  }, [user, asSpace]);
 
   const toggleVouch = (e: Entry, on: boolean) => {
     setEntries((cur) => cur.map((x) => (x.key === e.key ? { ...x, vouched: on } : x)));
@@ -212,7 +210,7 @@ export default function MyceliumDirectory() {
   // live in their own table and survive.
   const toggleWeave = (e: Entry, on: boolean) => {
     if (!on) setEntries((cur) => cur.map((x) => (x.key === e.key ? { ...x, vouched: false } : x)));
-    void setInWeb(e.type, e.id, on).catch(console.error);
+    void setInWeb(e.type, e.id, on, asSpace).catch(console.error);
   };
 
   const open = (e: Entry) =>
@@ -231,12 +229,21 @@ export default function MyceliumDirectory() {
           <Icon name="sparkle" size={11} />
           <span>My-celium · Directory</span>
         </p>
-        <h1 className="mycdir__title">Your web</h1>
+        <h1 className="mycdir__title">
+          {spaceName ? `${possessive(spaceName)} web` : 'Your web'}
+        </h1>
         <p className="mycdir__sub">
-          Everyone and everything you&rsquo;ve woven in. Shield = private
-          trust, thumb = recommend, mark = remove.
+          {spaceName
+            ? <>Everyone and everything {spaceName} has woven in. Thumb =
+                recommend, mark = remove. Trust stays between people, so a
+                space holds none.</>
+            : <>Everyone and everything you&rsquo;ve woven in. Shield = private
+                trust, thumb = recommend, mark = remove.</>}
         </p>
-        {myPres !== null && (
+        {/* Your candle is YOURS — showing it under a space's header would
+            imply the space has one, which it doesn't (the same reason
+            PresencePrompt refuses to ask on an identity switch). */}
+        {myPres !== null && !spaceName && (
           <div className="mycdir__presence">
             {/* THE CANDLE IS THE WHOLE SIGNAL (founder 2026-08-13). The old
                 "show I'm around when I'm online" opt-out went with it —
@@ -345,7 +352,9 @@ export default function MyceliumDirectory() {
                 // something you vouch FOR publicly — recommend.
                 kind={e.type === 'profile' ? 'person' : 'space'}
                 trusted={e.vouched}
-                onTrust={(on) => toggleVouch(e, on)}
+                // A space holds no trust — the shield is person-to-person and
+                // private, so acting as one it simply isn't offered.
+                onTrust={asSpace ? undefined : (on) => toggleVouch(e, on)}
                 recommended={e.recommended}
                 onRecommend={(on) => toggleRec(e, on)}
                 weaveOn

@@ -65,13 +65,10 @@ export default function Mycelium() {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
 
-  // A space has no web of its own yet (mycelium.truster_id is profile-only)
-  // — acting as one land here means Galyn's personal web renders under a
-  // misleadingly "yours" header. Until that's built, send the space's own
-  // page instead of showing the wrong person's data (founder 2026-08-10).
-  useEffect(() => {
-    if (actor.type === 'space') navigate(`/spaces/${actor.id}`, { replace: true });
-  }, [actor, navigate]);
+  // A space now HAS a web of its own (mycelium.truster_space_id, 2026-08-13),
+  // so acting as one no longer bounces to its profile page — this reads that
+  // space's web instead of the wrong person's.
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
 
   async function messageAuthor(authorId: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}`); }
@@ -100,11 +97,13 @@ export default function Mycelium() {
   useEffect(() => {
     (async () => {
       const feed = await loadFeed(50, { river: true });
-      const [{ web, vouched }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
+      const [{ web, vouched }, recs, saves] = await Promise.all([
+        loadMyWeb(asSpace), loadMyRecommendations(), loadMySaved(),
+      ]);
       const ov = await loadEndorsements(feed, vouched);
       setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
-  }, []);
+  }, [asSpace]);
 
   // The feed: real posts from entities in your mycelium.
   const items = useMemo<Item[]>(() => {

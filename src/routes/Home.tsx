@@ -162,14 +162,12 @@ export default function Home() {
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
-            // The doorway: awake+opted-in members lead a member listing —
-            // your web's directory as yourself, and acting as a space, that
-            // space's own Members tab (the same door its presence line uses),
-            // so the sentence and the room it opens agree about whose
-            // members these are (founder 2026-08-13).
-            <button className="display home__awake" onClick={() => navigate(
-              actor.type === 'space' ? `/spaces/${actor.id}?tab=members` : '/mycelium/directory?from=home',
-            )}>
+            // The doorway: present members lead a WEB — yours as yourself,
+            // and the space's own while you're acting as one (founder
+            // 2026-08-13: "have the network tagline go... to Countryman
+            // Stable's mycelium"). One destination again now that a space
+            // has a web of its own and My-celium no longer bounces.
+            <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
               {awakeLine(awake, actor.type === 'space' ? actor.name : null)}
               <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
