@@ -128,17 +128,6 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   // section off for themselves. Either way the door still opens.
   const aiOn = !assistantOff && !!assistantSection && aiDoorOn(assistantSection);
 
-  const areasPresent = useMemo(() => {
-    const present = new Set<ServiceArea>();
-    posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
-    return SERVICE_AREAS.filter((a) => present.has(a.value) && !hideAreas.includes(a.value))
-      .sort((a, b) => HOME_ORDER.indexOf(a.value) - HOME_ORDER.indexOf(b.value));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts]);
-
-  const toggleArea = (a: ServiceArea) =>
-    setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
-
   // An entity's area icon opens the REAL section, scoped to it ("Melanie's
   // Courses", "Pine Valley Grange's Marketplace" — founder 2026-07-24/25:
   // every area with a section of its own opens that section, never a search
@@ -147,6 +136,29 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     courses: '/courses', library: '/library', work: '/work', art: '/art',
     food: '/food', marketplace: '/market', events: '/events',
   };
+
+  const areasPresent = useMemo(() => {
+    const present = new Set<ServiceArea>();
+    posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
+    // On an ENTITY page the doors with real sections show even at zero
+    // (founder 2026-08-13: tapping into Countryman Stables' Marketplace
+    // should land on ITS marketplace with the note pointing at Lichen's for
+    // more — which can't happen if an empty section has no door). ScopeEmpty
+    // and ScopeMore are what make an empty scoped section a real place
+    // rather than a dead end, so presence-gating is only kept for the
+    // sectionless areas (places, people), whose fallback is a scoped search
+    // that IS a dead end when there's nothing to find.
+    const alwaysOn = (a: ServiceArea) =>
+      (profileId || spaceId) && SECTION_ROUTES[a] !== undefined;
+    return SERVICE_AREAS.filter((a) =>
+      (present.has(a.value) || alwaysOn(a.value)) && !hideAreas.includes(a.value))
+      .sort((a, b) => HOME_ORDER.indexOf(a.value) - HOME_ORDER.indexOf(b.value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, profileId, spaceId]);
+
+  const toggleArea = (a: ServiceArea) =>
+    setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
+
   const scopeQS = profileId ? `member=${profileId}` : `space=${spaceId}`;
   const areaDest = (a: ServiceArea) => {
     const route = SECTION_ROUTES[a];
