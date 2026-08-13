@@ -143,6 +143,12 @@ export default function Snapshot() {
         <>
           <div className="snap__field">
             <label className="prof__label">Tell me about yourself</label>
+            <p className="prof__hint">
+              Ramble — I&rsquo;ll shape it. The more you tell me, the less I have to
+              ask. Useful things: what you make or do, who it&rsquo;s for, how long
+              you&rsquo;ve been at it, where you are, how people reach you, what you
+              charge.
+            </p>
             <textarea
               className="prof__input snap__text"
               rows={8}
@@ -159,9 +165,13 @@ export default function Snapshot() {
 
           <div className="snap__field">
             <label className="prof__label">Already have a website, shop or page?</label>
-            <p className="prof__hint">
-              Paste the address and I&rsquo;ll read it — your own site, an Etsy shop, anything public.
-            </p>
+            <div className="snap__can">
+              <p><strong>What I can read</strong> — your own website, a blog, an Etsy
+                or Square shop: anything a visitor could open without signing in.</p>
+              <p><strong>What I can&rsquo;t</strong> — Instagram, Facebook, and anything
+                behind a login. Those lock readers out. Copy the words you like from
+                there into the box above and I&rsquo;ll fold them in.</p>
+            </div>
             {urls.map((u, i) => (
               <input
                 key={i}
@@ -188,7 +198,9 @@ export default function Snapshot() {
             {busy ? 'Reading…' : 'Build my profile'}
           </button>
           <p className="prof__hint snap__foot">
-            I&rsquo;ll show you everything before anything is saved.
+            {busy
+              ? 'Reading what you gave me and writing it up — about twenty seconds. Nothing is saved yet.'
+              : 'I’ll show you everything before anything is saved, and you can change any of it.'}
           </p>
         </>
       )}
@@ -202,8 +214,10 @@ export default function Snapshot() {
 
           {prop.unreadable.length > 0 && (
             <p className="prof__hint">
-              I couldn&rsquo;t open {prop.unreadable.join(', ')} — some sites don&rsquo;t let
-              readers in. Anything from there, paste in by hand.
+              I couldn&rsquo;t open {prop.unreadable.join(', ')}. That&rsquo;s usually a site
+              that locks readers out rather than anything you did — Instagram and
+              Facebook always do. Copy what matters from there into the box and run
+              it again, and I&rsquo;ll work it in.
             </p>
           )}
 

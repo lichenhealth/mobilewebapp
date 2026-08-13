@@ -57,3 +57,12 @@
   color: var(--ink-soft); font-size: 13px; font-family: inherit; cursor: pointer;
 }
 .snap__back:hover { color: var(--peach-deep); }
+
+/* What I can and can't read — said before you paste, not after it fails. */
+.snap__can {
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: var(--s-2);
+}
+.snap__can p { margin: 0 0 6px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.snap__can p:last-child { margin-bottom: 0; }
+.snap__can strong { color: var(--ink); font-weight: 500; }
