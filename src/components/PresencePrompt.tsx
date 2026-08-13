@@ -115,7 +115,7 @@ export default function PresencePrompt({ anchor, onChange }: {
       <p>
         {why === 'switch'
           ? `Switching doesn’t change your light. You have one, and it shows everywhere you belong. Right now it’s ${lit ? 'on' : 'out'}.`
-          : 'The candle says you’re around and open to connecting. No timestamps or last seen following you through the app.'}
+          : 'The candle is the only thing that says you’re present and open to connecting — nothing shows that you’re merely online. No timestamps or last seen following you through the app.'}
       </p>
       <p className="cbub__quiet">
         Being present is a gift. If you’d rather read, post and get things done

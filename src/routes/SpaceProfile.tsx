@@ -1540,7 +1540,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 id={m.profile_id}
                 name={m.profile?.full_name ?? 'Member'}
                 avatarUrl={m.profile?.avatar_url}
-                presence={awakeHere ? (awakeHere.lit ? 'lit' : 'around') : null}
+                presence={awakeHere ? 'lit' : null}
                 kind="person"
                 roleLabel={roleLabel}
                 trusted={myVouchedSet.has('profile:' + m.profile_id)}

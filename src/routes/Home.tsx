@@ -47,17 +47,19 @@ function salutation(): string {
 }
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
   'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
-/** network_awake_count() counts YOUR web — the people in your my-celium plus
- *  those you share a space with. Not the whole Lichen network. Acting as a
- *  space, the count and the words switch to that space's own members instead
- *  (space_awake_count) — the per-space query the 2026-08-06 note asked for
- *  before the label could honestly change. */
+/** PRESENT, NOT MERELY ONLINE (founder 2026-08-13): a lit candle says "I'm
+ *  open to live engagement", and that's the only thing this counts now —
+ *  being online was never something anyone chose. network_awake_count() is
+ *  YOUR network: your my-celium plus those you share a space with, never the
+ *  whole of Lichen. Acting as a space, the count and the words switch to that
+ *  space's own members (space_awake_count) — the per-space query the
+ *  2026-08-06 note asked for before the label could honestly change. */
 function awakeLine(n: number | null, whose: string | null): string {
   if (n === null) return 'Welcome back.';
-  const where = whose ?? 'your web';
-  if (n === 0) return whose ? `${whose} is resting.` : 'Your web is resting.';
-  if (n === 1) return `One in ${where} is awake.`;
-  return `${NUMBER_WORDS[n] ?? n} in ${where} are awake.`;
+  const where = whose ?? 'your network';
+  if (n === 0) return whose ? `${whose} is resting.` : 'Your network is resting.';
+  if (n === 1) return `One in ${where} is present.`;
+  return `${NUMBER_WORDS[n] ?? n} in ${where} are present.`;
 }
 
 const CATEGORY_ICONS: IconRowItem[] = [

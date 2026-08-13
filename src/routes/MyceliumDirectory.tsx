@@ -12,7 +12,7 @@ import { loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend } fr
 import { sortClaudeFirst } from '../lib/chatApi';
 import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
-  awakeList, myPresence, setPresenceVisible,
+  awakeList, myPresence,
   type MyPresence,
 } from '../lib/presenceApi';
 import './MyceliumDirectory.css';
@@ -83,11 +83,11 @@ export default function MyceliumDirectory() {
 
   // The + panel: search the whole platform, weave from the results.
   const [addOpen, setAddOpen] = useState(false);
-  // Presence: awake + opted-in members float to the top of People; own toggle
-  // lives here now (the greeting on Home leads straight to this room).
+  // Presence: members with a lit candle float to the top of People. Merely
+  // being online stopped being a signal (founder 2026-08-13) — the candle is
+  // the whole of it now.
   const [urlParams] = useSearchParams();
   const fromHome = urlParams.get('from') === 'home';
-  const [awakeSet, setAwakeSet] = useState<Set<string>>(new Set());   // "around" (dot)
   const [litSet, setLitSet] = useState<Set<string>>(new Set());       // "present" (candle)
   const [myPres, setMyPres] = useState<MyPresence | null>(null);
   const [q, setQ] = useState('');
@@ -150,8 +150,7 @@ export default function MyceliumDirectory() {
         loadMyWeb(), loadMyRecommendations(), awakeList(), myPresence(user.id),
       ]);
       if (live) {
-        setAwakeSet(new Set(folk.map((f) => f.id)));
-        setLitSet(new Set(folk.filter((f) => f.lit).map((f) => f.id)));
+        setLitSet(new Set(folk.map((f) => f.id)));
         setMyPres(mine);
       }
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
@@ -239,24 +238,13 @@ export default function MyceliumDirectory() {
         </p>
         {myPres !== null && (
           <div className="mycdir__presence">
-            {/* AROUND — the peach dot. Default on; opt out here. */}
-            <label className="mycdir__presence-row">
-              <input
-                type="checkbox" checked={myPres.visible}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  setMyPres((cur) => cur && ({ ...cur, visible: on }));
-                  if (user) void setPresenceVisible(user.id, on).catch(console.error);
-                }}
-              />
-              <span className="mycdir__awake-dot" aria-hidden="true" />
-              Show that I&rsquo;m around when I&rsquo;m online
-            </label>
-
-            {/* PRESENT — the candle lives in the top bar now: light it there,
-                anywhere, and it stays lit until you snuff it (no fade). */}
+            {/* THE CANDLE IS THE WHOLE SIGNAL (founder 2026-08-13). The old
+                "show I'm around when I'm online" opt-out went with it —
+                being online was never something anyone chose, so there's
+                nothing left to opt out of. Light it in the top bar,
+                anywhere, and it stays lit until you snuff it. */}
             <span className="mycdir__presence-note">
-              🕯️ Light the candle in the top bar to show you&rsquo;re around and open to connecting.
+              🕯️ Light the candle in the top bar to show you&rsquo;re present and open to connecting.
             </span>
             <span className="mycdir__presence-creed">Being present is a gift.</span>
           </div>
@@ -330,12 +318,11 @@ export default function MyceliumDirectory() {
       )}
 
       {GROUPS.map((g) => {
-        // Present (candle) first, then around (dot), then the rest.
+        // Present (candle) first, then everyone else — Claude always leads
+        // regardless (sortClaudeFirst is a no-op elsewhere, Claude only ever
+        // appears in the People group).
         const presenceRank = (e: Entry) =>
-          e.type !== 'profile' ? 0 : litSet.has(e.id) ? 2 : awakeSet.has(e.id) ? 1 : 0;
-        // Present (candle), then around (dot), then everyone else — Claude
-        // always leads regardless (sortClaudeFirst is a no-op elsewhere,
-        // Claude only ever appears in the People group).
+          e.type === 'profile' && litSet.has(e.id) ? 1 : 0;
         const rows = sortClaudeFirst(entries.filter((e) => e.kind === g.kind)
           .sort((a, b) => presenceRank(b) - presenceRank(a) || a.name.localeCompare(b.name)));
         if (rows.length === 0) return null;
@@ -349,8 +336,7 @@ export default function MyceliumDirectory() {
                 name={e.name}
                 sub={e.sub}
                 avatarUrl={e.avatarUrl}
-                presence={e.type === 'profile' && litSet.has(e.id) ? 'lit'
-                  : e.type === 'profile' && awakeSet.has(e.id) ? 'around' : null}
+                presence={e.type === 'profile' && litSet.has(e.id) ? 'lit' : null}
                 // ONE GESTURE PER KIND (founder 2026-08-07: "you can trust a
                 // person, but recommend an org, group or community... a
                 // shield for people, a thumbs up for organizations,

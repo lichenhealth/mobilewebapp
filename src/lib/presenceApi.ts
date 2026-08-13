@@ -1,16 +1,18 @@
 import { supabase } from './supabase';
 
 // ─── Presence, given not taken (founder 2026-07-19) ──────────────────────────
-// The Home greeting's awake count opens a panel showing ONLY network members
-// who CHOSE visibility (profiles.presence_visible, default off). Coarse by
-// design: names, no timestamps, no ambient dots anywhere else.
+// PRESENT MEANS A LIT CANDLE, AND NOTHING ELSE (founder 2026-08-13): the
+// candle says "I'm open to live engagement", as against being online just to
+// get things done. Being online was never a choice anyone made, so it is no
+// longer a signal — these lists return only people whose candle is lit.
+// Coarse by design: names, no timestamps, no ambient dots anywhere.
 
 export interface AwakeMember {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
   headline: string | null;
-  lit?: boolean;   // candle hand-lit = "present, open to connect"; else "around"
+  lit?: boolean;   // always true now — everyone returned here is present
   me?: boolean;    // you, inside a space's own list — shown as "you", not a name
 }
 
@@ -22,7 +24,9 @@ export async function awakeList(): Promise<AwakeMember[]> {
 }
 
 export interface MyPresence {
-  visible: boolean;               // AROUND (dot): show I'm online — default on
+  /** Retired 2026-08-13 — the column is still read so myPresence() can tell a
+   *  pre-migration database apart, but nothing shows who is merely online. */
+  visible: boolean;
   alwaysPresent: boolean;         // PRESENT (candle) whenever online
   litUntil: string | null;        // PRESENT (candle) lit by hand until this moment
 }
@@ -39,13 +43,6 @@ export async function myPresence(me: string): Promise<MyPresence | null> {
     alwaysPresent: d.presence_always_present ?? false,
     litUntil: d.presence_lit_until ?? null,
   };
-}
-
-/** AROUND (the dot) on/off — independent of the candle. */
-export async function setPresenceVisible(me: string, on: boolean): Promise<void> {
-  const { error } = await supabase.from('profiles')
-    .update({ presence_visible: on }).eq('id', me);
-  if (error) throw error;
 }
 
 /** PRESENT-always (candle whenever online) on/off. */

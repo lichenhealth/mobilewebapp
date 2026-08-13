@@ -12,8 +12,9 @@ export interface MemberRowProps {
   name: string;
   sub?: string;
   avatarUrl?: string | null;
-  /** Only meaningful for people — the my-celium directory's present/around tags. */
-  presence?: 'lit' | 'around' | null;
+  /** Only meaningful for people — the candle. Being merely online is not a
+   *  signal any more (founder 2026-08-13): present means lit, or nothing. */
+  presence?: 'lit' | null;
   /** People get the private trust shield; spaces get the public recommend thumb
    *  (founder 2026-07-17/2026-08-07: trust is a relationship between people and
    *  stays private, an organization is something you vouch for publicly). */
@@ -82,11 +83,6 @@ export default function MemberRow({
             {presence === 'lit' && (
               <span className="member-row__presence member-row__presence--lit">
                 <span aria-hidden="true">🕯️</span> present
-              </span>
-            )}
-            {presence === 'around' && (
-              <span className="member-row__presence">
-                <span className="member-row__presence-dot" aria-hidden="true" /> around
               </span>
             )}
           </span>
