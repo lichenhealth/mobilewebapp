@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { webAuthorFilter } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
+import { ScopeEscape, ScopeEmpty } from '../components/ScopeEscape';
+import { possessive } from '../lib/names';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -35,6 +37,13 @@ const MEDIA_LENSES: { medium: PostMedium; label: string; icon: IconName }[] = [
   { medium: 'listen', label: 'Listen', icon: 'mic' },
   { medium: 'watch',  label: 'Watch',  icon: 'video' },
 ];
+
+/** What's missing, in words that read right after "No … here yet."
+ *  ("No library here yet" doesn't; "No pieces here yet" does.) */
+const EMPTY_NOUN: Record<string, string> = {
+  library: 'pieces', courses: 'courses', work: 'work',
+  art: 'art', food: 'food', travel: 'trips',
+};
 
 export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, browse, browseStyle = 'tiles' }: {
   area: ServiceArea;
@@ -206,12 +215,15 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           </button>
         )}
         <p className="mkt__crumb">
+          {/* Filtered is still the whole section, narrowed — the door back
+              to all of it sits left of the mark (founder 2026-08-11). */}
+          {scoped && <ScopeEscape to={`/${area}`} label={`Go to Lichen ${crumb}`} />}
           <Icon name={icon} size={11} />
           <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
           {scoped
-            ? <>{memberName}&rsquo;s <span className="display-italic">{crumb}</span></>
+            ? <>{possessive(memberName)} <span className="display-italic">{crumb}</span></>
             : <>{title} <span className="display-italic">{italic}</span></>}
         </h1>
         {!scoped && <p className="mkt__sub">{sub}</p>}
@@ -389,7 +401,16 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       </p>
 
       {!ready && <p className="mkt__empty-sub">Loading…</p>}
-      {ready && filtered.length === 0 && (
+      {ready && filtered.length === 0 && scoped && posts.length === 0 && (
+        <ScopeEmpty
+          icon={icon}
+          who={memberName || 'They'}
+          what={EMPTY_NOUN[area] ?? crumb.toLowerCase()}
+          to={`/${area}`}
+          label={`Go to Lichen ${crumb}`}
+        />
+      )}
+      {ready && filtered.length === 0 && !(scoped && posts.length === 0) && (
         <div className="mkt__empty">
           <Icon name={icon} size={20} />
           <p><span className="display-italic">Nothing here yet.</span></p>

@@ -197,8 +197,16 @@ export default function Mycelium() {
               </>
             ) : (
               <>
-                <span className="display-italic">Nothing here yet.</span>
-                <p>Weave more people and places into your web.</p>
+                {/* Your web IS a filter on Lichen (founder 2026-08-11) — an
+                    empty one should say so and point at the whole. */}
+                <span className="display-italic">No goods, services or places here yet.</span>
+                <p>
+                  Your web is quiet so far — weave more people and places in, or
+                  see what the whole network is offering.
+                </p>
+                <button className="btn myc__empty-go" onClick={() => navigate('/market')}>
+                  Go to Lichen Marketplace
+                </button>
               </>
             )}
           </div>

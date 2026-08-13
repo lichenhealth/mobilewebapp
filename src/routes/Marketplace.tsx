@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
+import { ScopeEscape, ScopeEmpty } from '../components/ScopeEscape';
+import { possessive } from '../lib/names';
 import { LichenMark } from '../components/LichenMark';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -326,12 +328,15 @@ export default function Marketplace() {
           </button>
         )}
         <p className="mkt__crumb">
+          {/* A filtered Marketplace is still the Marketplace — the way to
+              the whole of it sits left of the mark (founder 2026-08-11). */}
+          {scoped && <ScopeEscape to="/market" label="Go to Lichen Marketplace" />}
           <Icon name="store" size={11} />
           <span>Marketplace</span>
         </p>
         <h1 className="mkt__title">
           {scoped
-            ? <>{scopeName}&rsquo;s <span className="display-italic">Marketplace</span></>
+            ? <>{possessive(scopeName)} <span className="display-italic">Marketplace</span></>
             : <>What members are <span className="display-italic">offering &amp; seeking.</span></>}
         </h1>
         {!scoped && (
@@ -452,7 +457,16 @@ export default function Marketplace() {
       </p>
 
       {!ready && <p className="mkt__empty-sub">Loading…</p>}
-      {ready && filtered.length === 0 && (
+      {ready && filtered.length === 0 && scoped && posts.length === 0 && (
+        <ScopeEmpty
+          icon="store"
+          who={scopeName || 'They'}
+          what="goods, services or places"
+          to="/market"
+          label="Go to Lichen Marketplace"
+        />
+      )}
+      {ready && filtered.length === 0 && !(scoped && posts.length === 0) && (
         <div className="mkt__empty">
           <Icon name="store" size={20} />
           <p><span className="display-italic">Nothing here yet.</span></p>

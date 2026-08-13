@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
@@ -69,6 +69,35 @@ export default function TopBar({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const section = SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
+
+  // WHOSE SECTION IS THIS (founder 2026-08-11): a scoped section — Countryman
+  // Stables' Marketplace, Melanie's Library — wears its owner's mark over the
+  // section's own, so you can see whose shelf you're standing at rather than
+  // having to read the title. Design solve, preferred over renaming the page.
+  const [topParams] = useSearchParams();
+  const scopeSpace = topParams.get('space');
+  const scopeMember = topParams.get('member');
+  const [scopeMark, setScopeMark] = useState<{ id: string; name: string; url: string | null } | null>(null);
+  useEffect(() => {
+    const id = scopeSpace || scopeMember;
+    if (!id || !section) { setScopeMark(null); return; }
+    let live = true;
+    void (async () => {
+      const { data } = scopeSpace
+        ? await supabase.from('spaces').select('id, name, avatar_url').eq('id', scopeSpace).maybeSingle()
+        : await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', scopeMember!).maybeSingle();
+      if (!live) return;
+      const r = data as { id: string; name?: string; full_name?: string; avatar_url: string | null } | null;
+      setScopeMark(r ? { id: r.id, name: r.name ?? r.full_name ?? '', url: r.avatar_url } : null);
+    })();
+    return () => { live = false; };
+  }, [scopeSpace, scopeMember, section]);
+
+  const scopeBadge = scopeMark ? (
+    <span className="top-bar__scope-badge" title={scopeMark.name}>
+      <Avatar id={scopeMark.id} name={scopeMark.name} url={scopeMark.url ?? undefined} size={26} />
+    </span>
+  ) : null;
 
   const { unreadForScope } = useNotifications();
   const { actor, setActor, options, beings, self } = useActing();
@@ -169,15 +198,17 @@ export default function TopBar({
               title={section.label}
             >
               <MyceliumMark size={68} />
+              {scopeBadge}
             </div>
           ) : (
             <div
               className="top-bar__section-mark"
               role="img"
-              aria-label={section.label}
-              title={section.label}
+              aria-label={scopeMark ? `${scopeMark.name} — ${section.label}` : section.label}
+              title={scopeMark ? `${scopeMark.name} — ${section.label}` : section.label}
             >
               <Icon name={section.icon!} size={34} />
+              {scopeBadge}
             </div>
           )
         ) : (

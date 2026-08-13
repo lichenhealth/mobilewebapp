@@ -213,3 +213,6 @@
   font-size: 12px; cursor: pointer; white-space: nowrap;
 }
 .saved__picker-new button:disabled { opacity: 0.5; }
+
+/* An empty web points at the whole network rather than dead-ending. */
+.myc__empty-go { margin-top: var(--s-3); }
