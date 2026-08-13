@@ -1,7 +1,6 @@
 # Assistant actions — letting Claude edit a member's own page
 
-**Status:** BUILT 2026-08-13 (steps 1–3 of the build order below; step 4, the
-side-by-side page view, is still open). Live behind `profiles.assistant_can_edit`,
+**Status:** BUILT 2026-08-13 — all four steps of the build order below. Live behind `profiles.assistant_can_edit`,
 default off, switched on in Profile → Privacy → "What the assistant may change",
 and armed only in the Profile thread. One correction from testing: an empty
 value CLEARS a field rather than erroring — without that, "put it back" could
@@ -73,8 +72,14 @@ way that wants a confirm step, not a chat message.
 2. The context card at the top of the Profile management thread.
 3. Point "Fill out with Claude" / "Have Claude write this from the full
    story" at the thread with an editable prefill instead of acting directly.
-4. Live review: the side-by-side page view (see the open thread in
-   CLAUDE.md — the embed collapsed to 2×2 and needs a devtools pass).
+4. Live review: the side-by-side page view. DONE — the 2×2 collapse didn't
+   reproduce once the frame carried an explicit `display: block` and
+   `.afeed__page` `align-self: stretch` (it's a flex item of a flex column,
+   which is how it failed to stretch the first time). The frame loads the
+   real page with `?embed=1`, which stands the app chrome down so it doesn't
+   render a second app inside itself; it's sticky from 1024px up, and
+   Claude's reply in this thread reloads it, so an edit is something you
+   watch rather than something you're told about.
 
 ## Watch out
 

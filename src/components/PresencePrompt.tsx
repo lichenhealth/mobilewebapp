@@ -5,7 +5,13 @@ import {
   myPresence, setAlwaysPresent, snuffPresence, candleLit, type MyPresence,
 } from '../lib/presenceApi';
 import ConsentBubble from './ConsentBubble';
-import { loadPrompts, promptSeen, promptSeenToday, markPrompt } from '../lib/promptsApi';
+import { loadPrompts, promptSeen, promptSeenToday, promptTimesSeen, markPrompt } from '../lib/promptsApi';
+
+/** How many visits the candle gets to teach itself before it goes quiet.
+ *  Presence is ON by default now (founder 2026-08-13), so this prompt is the
+ *  only thing that makes default-on honest rather than sneaky — it has to land
+ *  a few times, and then it has to stop. */
+const PRESENCE_LESSONS = 3;
 
 /** "Do you want your light on?" (founder 2026-08-07: "whenever someone logs in
  *  or opens the desktop app, can we have them get a pop up asking them if they
@@ -38,8 +44,11 @@ export default function PresencePrompt({ anchor, onChange }: {
   const [busy, setBusy] = useState(false);
   const askedFor = useRef<string | null>(null);
 
-  // Once a day, on the first open — counted against the member, so a new
-  // phone doesn't re-ask a question already answered.
+  // Once a day, on the first open, for the FIRST FEW VISITS only — counted
+  // against the member, so a new phone doesn't re-ask a question already
+  // answered. It used to ask once a day forever, which is exactly the
+  // prompt-you-learn-to-dismiss-without-reading problem this file warns
+  // about; now it teaches the gesture and then leaves you alone.
   useEffect(() => {
     if (!user) return;
     let live = true;
@@ -48,7 +57,9 @@ export default function PresencePrompt({ anchor, onChange }: {
       if (!live || !p) return;              // pre-migration: stay silent
       setPres(p);
       await loadPrompts(user.id);
-      if (!live || promptSeenToday('presence')) return;
+      if (!live) return;
+      if (promptSeenToday('presence')) return;
+      if (promptTimesSeen('presence') >= PRESENCE_LESSONS) return;
       setWhy('open');
     })();
     return () => { live = false; };

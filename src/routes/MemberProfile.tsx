@@ -102,6 +102,10 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   // The open web (and the owner previewing) sees the shared page template.
   const [params, setParams] = useSearchParams();
   const previewing = params.get('preview') === '1';
+  // Inside the assistant's side-by-side frame this is meant to read as the
+  // PAGE, not as an app you can steer — a view toggle in there would just
+  // navigate the frame out from under the conversation.
+  const embedded = params.get('embed') === '1';
   const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
   useEffect(() => {
     let live = true;
@@ -207,7 +211,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   //    is the whole "omit the internal flags on the public web" idea. ──
   const identityExtras = (
     <>
-      {isSelf && (
+      {isSelf && !embedded && (
         /* One three-way toggle everywhere (founder 2026-08-11): Admin
            manages, Lichen View is the internal experience, Public View is
            the website layer (?preview=1 renders the open-web template). */

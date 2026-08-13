@@ -99,10 +99,15 @@ function ScrollToTop() {
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
   const isGuest = pathname.startsWith('/e/');   // external guest landing — no app chrome
+  // Rendered INSIDE a frame — the page beside the assistant conversation
+  // (docs/ASSISTANT_ACTIONS.md step 4). Without this the frame shows a whole
+  // second app: two top bars, two bottom navs, two identity switchers. The
+  // point is to see the PAGE, so the chrome around it stands down.
+  const isEmbed = new URLSearchParams(search).get('embed') === '1';
   const customHandle = hostSpaceHandle();        // this hostname IS a space's website
   const isAbout = pathname === '/about';         // About page has its own header
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
@@ -198,8 +203,8 @@ export default function App() {
     <div className="app-shell">
       <ScrollToTop />
       <ReminderAlerts />
-      {!isChatThread && !isAuth && !isGuest && !isAbout && <TopBar onMenu={() => setMenuOpen(true)} />}
-      <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest || isAbout ? { padding: 0, minHeight: 0 } : undefined}>
+      {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <TopBar onMenu={() => setMenuOpen(true)} />}
+      <main className="scroll-view" style={isChatThread || isAuth || isMaps || isGuest || isAbout || isEmbed ? { padding: 0, minHeight: 0 } : undefined}>
         {/* Full-bleed pages manage their own fixed layout (chat's pinned
             input, the map canvas) — a pull gesture growing the page above
             them would fight that, so this only mounts on normal pages. */}
@@ -379,7 +384,7 @@ export default function App() {
         </Routes>
         )}
       </main>
-      {!isChatThread && !isAuth && !isGuest && !isAbout && <BottomNav />}
+      {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {!isChatThread && !isAuth && <InstallPrompt />}
     </div>

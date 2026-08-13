@@ -103,6 +103,10 @@ export default function AssistantFeed() {
           void loadThreadCounts(me).then(setCounts);
           if ((row.thread ?? 'general') !== thread) return;   // another thread's business
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
+          // Claude has just spoken in the profile thread, which is where it
+          // can change the page — reload the frame beside the conversation so
+          // you SEE the change rather than being told about it.
+          if (thread === 'profile' && row.author === 'claude') setPageNonce((n) => n + 1);
         },
       )
       .subscribe();
@@ -202,21 +206,41 @@ export default function AssistantFeed() {
             </button>
           </div>
           {showPage ? (
+            // The page beside the conversation, the way this session works:
+            // ask, and watch it change. The frame is the REAL page, keyed on
+            // pageNonce so it reloads the moment Claude reports an edit.
+            // Only from the desktop breakpoint up — a whole page squeezed
+            // into a phone-width frame teaches nobody anything, so small
+            // screens get the honest door instead.
             <div className="afeed__page">
-              {/* Two views, the way this session works: the page open beside
-                  the conversation. A new tab rather than an embed — an
-                  in-page frame collapsed unreliably, and a real tab is what
-                  someone editing actually wants anyway. */}
-              <p className="afeed__page-note">
-                Open your page in its own tab and keep it beside this one — tell Claude
-                what to change here, refresh there to see it.
+              <iframe
+                className="afeed__page-frame"
+                key={pageNonce}
+                src={`/members/${me}?preview=1&embed=1`}
+                title="Your public page"
+              />
+              <div className="afeed__page-foot">
+                <button
+                  className="afeed__page-refresh"
+                  onClick={() => setPageNonce((n) => n + 1)}
+                >
+                  Refresh
+                </button>
+                <button
+                  className="afeed__page-refresh"
+                  onClick={() => window.open(`/members/${me}?preview=1`, '_blank')}
+                >
+                  Open in a new tab
+                </button>
+              </div>
+              <p className="afeed__page-note afeed__page-note--wide">
+                This is your page as visitors see it. Tell Claude what to change
+                and it updates here.
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={() => window.open(`/members/${me}?preview=1`, '_blank')}
-              >
-                Open my page in a new tab
-              </button>
+              <p className="afeed__page-note afeed__page-note--narrow">
+                A whole page doesn&rsquo;t fit beside a conversation on a phone —
+                open it in its own tab and flip between the two.
+              </p>
             </div>
           ) : (
             <>
@@ -266,7 +290,12 @@ export default function AssistantFeed() {
         </>
       )}
 
-      <div className="afeed__list" hidden={thread === 'profile' && showPage}>
+      {/* The conversation stays put while the page shows above it — that's
+          the point: ask here, watch it change there. (This carried a `hidden`
+          attribute that never did anything, since .afeed__list's own
+          `display: flex` beats the UA stylesheet's [hidden]. Seeing both is
+          what's wanted, so the intent is now stated rather than mis-stated.) */}
+      <div className="afeed__list">
         {loading && <p className="afeed__muted">Loading…</p>}
         {!loading && visible.length === 0 && posts.length === 0 && (
           <p className="afeed__muted">Nothing here yet — say hello below, or share a post into this feed from anywhere on Lichen.</p>
