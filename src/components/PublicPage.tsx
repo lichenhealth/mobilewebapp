@@ -230,14 +230,27 @@ export default function PublicPage(props: PublicPageProps) {
         page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
         hasContact ? { id: 'contact', label: 'Contact' } : null,
       ].filter((n): n is { id: string; label: string } => !!n);
+  // EVERY public page has a Home to land on (founder 2026-08-11: "you
+  // always have to have a homepage to land on"). Home is the front page —
+  // the story, the offerings, the practical details, in the template's
+  // own order — so a visitor never meets a blank tab; About/Services and
+  // the rest are optional doors INTO those sections. Members skip it:
+  // their landing is the feed in the icon row.
+  // (A page driven by fully custom doors brings its own front door — Home
+  // would render nothing there.)
+  const homeItem = asGuest && !doors ? [{ id: 'home', label: 'Home' }] : [];
   const navItems = showFeed && !feedInRow
-    ? [{ id: 'feed', label: 'Feed' }, ...sectionItems]
-    : sectionItems;
-  const firstContentDoor = showFeed && !asGuest ? 'feed' : doors?.find((d) => !d.href)?.id;
+    ? [{ id: 'feed', label: 'Feed' }, ...homeItem, ...sectionItems]
+    : [...homeItem, ...sectionItems];
+  const firstContentDoor = asGuest
+    ? 'home'
+    : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id);
   const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
   const tabbed = navItems.length > 0;
   const showingFeed = showFeed && tab === 'feed';
-  const show = (id: string) => !doors && !showingFeed && (!tabbed || tab === id);
+  // Home shows the lot — it IS the front page; a named tab narrows to its
+  // own section.
+  const show = (id: string) => !doors && !showingFeed && (tab === 'home' || !tabbed || tab === id);
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
   const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
 

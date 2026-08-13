@@ -68,6 +68,30 @@ const ROLE_LABEL: Record<string, string> = {
 /** A space's own profile — organizations, communities, groups, and places get
  *  the same treatment people do. Everyone sees who/what it is; its admins
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
+/** Members wears the accordion backstage and stands open on its own tab —
+ *  one body, two frames (founder 2026-08-11). */
+function MembersShell({ backstage, open, onToggle, sectionRef, children }: {
+  backstage: boolean;
+  open: boolean;
+  onToggle: () => void;
+  sectionRef: React.RefObject<HTMLElement | null>;
+  children: React.ReactNode;
+}) {
+  if (backstage) {
+    return (
+      <CollapsibleSection id="members" title="Members" open={open} onToggle={onToggle}>
+        {children}
+      </CollapsibleSection>
+    );
+  }
+  return (
+    <section className="prof__section" ref={sectionRef as React.RefObject<HTMLElement>}>
+      <h2 className="prof__h2">Members</h2>
+      {children}
+    </section>
+  );
+}
+
 export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: string; forcePublic?: boolean } = {}) {
   const { actor, setActor } = useActing();
   const { id: paramId = '' } = useParams();
@@ -114,7 +138,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Curated-section shares awaiting stewards (courses/library)
   const [shares, setShares] = useState<SectionShareRow[]>([]);
   const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
-  // Rooms & things: the space's bookable resources + the steward queue.
+  // Bookable rooms & things: the space's bookable resources + the steward
+  // queue. Distinct from Goods (marketplace items that change hands) and
+  // from Places (a venue's category) — these are LENT and come back.
   const [resources, setResources] = useState<ResourceRow[]>([]);
   const [resBookings, setResBookings] = useState<ResourceBookingRow[]>([]);
   const [bookOpen, setBookOpen] = useState<string | null>(null);       // resource id
@@ -152,7 +178,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Each backstage section opens inline to edit, then collapses back down
   // (founder 2026-08-10 profile-features spreadsheet — same interaction as
   // Profile's own sections, lifted from the manual-search criteria panel).
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['about']));
+  // Backstage opens quiet (founder 2026-08-11: an expanded Public Profile
+  // Builder is "info overload") — every section closed, you open what you
+  // came for. Deep links like ?manage=1#privacy still open their target.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggleSection = (key: string) => setOpenSections((s) => {
     const next = new Set(s);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -696,7 +725,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   );
   const roomsSection = !backstage && resources.length > 0 && (
     <section className="prof__section">
-      <h2 className="prof__h2">Rooms &amp; things</h2>
+      <h2 className="prof__h2">Bookable rooms &amp; things</h2>
       <div className="sprof__members">
         {resources.map((r) => (
           <div className="sprof__resource" key={r.id}>
@@ -849,7 +878,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         aboveHero={adminBar}
         // Your relationship with this place sits in the masthead — a tall
         // cover photo used to bury it (founder 2026-08-07).
-        heroSignals={!backstage && !tab ? actionRow : null}
+        // Member ✓ / My-celium ✓ / Recommended ✓ are Lichen relationships,
+        // not website furniture — Public View is what the open web sees, so
+        // they step out of it (founder 2026-08-11).
+        heroSignals={!backstage && !tab && !previewing ? actionRow : null}
         beforeContent={me ? (
           <>
             {/* Join / my-celium / trust ride ABOVE the page, not below every
@@ -1298,7 +1330,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {backstage && (
-        <CollapsibleSection id="rooms" title="Rooms & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
+        <CollapsibleSection id="rooms" title="Bookable rooms & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
             <p className="sprof__muted">Nothing listed yet — a room, a tool, the dinner plates. Anything members can book.</p>
           )}
@@ -1447,9 +1479,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         </section>
       )}
 
+      {/* Backstage folds Members into the accordion like every other
+          section (founder 2026-08-11); the dedicated ?tab=members page
+          keeps it open — you navigated there to see exactly this. */}
       {(tab === 'members' || backstage) && (
-      <section className="prof__section" ref={membersRef}>
-        <h2 className="prof__h2">Members</h2>
+      <MembersShell
+        backstage={backstage}
+        open={openSections.has('members')}
+        onToggle={() => toggleSection('members')}
+        sectionRef={membersRef}
+      >
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
           {sortClaudeFirst([...members].sort((a, b) => {
@@ -1593,7 +1632,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
           </div>
         )}
-      </section>
+      </MembersShell>
       )}
 
       {/* Nested groups — the community's smaller circles. */}
