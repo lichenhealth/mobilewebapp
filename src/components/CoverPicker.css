@@ -1,0 +1,30 @@
+/* Cover-photo picker under the Look chips (Photo cover only). */
+.coverp { margin-top: var(--s-2); }
+.coverp__current {
+  position: relative; display: inline-block; margin-bottom: var(--s-2);
+}
+.coverp__current img {
+  display: block; width: 100%; max-width: 360px; aspect-ratio: 21 / 9;
+  object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--bone-edge);
+}
+.coverp__remove {
+  position: absolute; top: 6px; right: 6px;
+  width: 24px; height: 24px; border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.9); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft); display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.coverp__upload { display: inline-flex; }
+.coverp__lead { margin: var(--s-2) 0 6px; }
+.coverp__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px; max-width: 480px;
+}
+.coverp__thumb {
+  padding: 0; border: 2px solid transparent; border-radius: var(--r-md);
+  overflow: hidden; cursor: pointer; background: none; aspect-ratio: 1;
+}
+.coverp__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coverp__thumb.is-on { border-color: var(--peach); }
+.coverp__thumb:hover { border-color: var(--bone-edge); }
+.coverp__thumb.is-on:hover { border-color: var(--peach); }

@@ -44,6 +44,7 @@ import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/Pub
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
+import CoverPicker from '../components/CoverPicker';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
 
@@ -1091,6 +1092,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   onClick={() => setPageEdit((pm) => ({ ...pm, coverStyle: v }))}>{label}</button>
               ))}
             </div>
+            {pageEdit.coverStyle === 'photo' && me && (
+              <CoverPicker
+                value={pageEdit.cover}
+                onChange={(cover) => setPageEdit((pm) => ({ ...pm, cover }))}
+                uploaderId={me}
+                spaceId={space.id}
+                extraPhotos={pageEdit.photos ?? []}
+              />
+            )}
           </div>
 
           {/* Spaces build their page's tabs from the same library people do

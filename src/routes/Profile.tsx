@@ -30,6 +30,7 @@ import ContactFields, { type ContactInfo } from '../components/ContactFields';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
+import CoverPicker from '../components/CoverPicker';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -694,6 +695,15 @@ export default function Profile() {
                   onClick={() => setPage({ coverStyle: v })}>{label}</button>
               ))}
             </div>
+            {pageMeta.coverStyle === 'photo' && user && (
+              <CoverPicker
+                value={pageMeta.cover}
+                onChange={(cover) => setPage({ cover })}
+                uploaderId={user.id}
+                authorId={user.id}
+                extraPhotos={pageMeta.photos ?? []}
+              />
+            )}
           </div>
 
           <p className="prof__privacy-sub">Your page&rsquo;s tabs</p>
