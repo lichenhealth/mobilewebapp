@@ -138,7 +138,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Curated-section shares awaiting stewards (courses/library)
   const [shares, setShares] = useState<SectionShareRow[]>([]);
   const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
-  // Bookable rooms & things: the space's bookable resources + the steward
+  // Bookable areas & things: the space's bookable resources + the steward
   // queue. Distinct from Goods (marketplace items that change hands) and
   // from Places (a venue's category) — these are LENT and come back.
   const [resources, setResources] = useState<ResourceRow[]>([]);
@@ -725,7 +725,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   );
   const roomsSection = !backstage && resources.length > 0 && (
     <section className="prof__section">
-      <h2 className="prof__h2">Bookable rooms &amp; things</h2>
+      <h2 className="prof__h2">Bookable areas &amp; things</h2>
       <div className="sprof__members">
         {resources.map((r) => (
           <div className="sprof__resource" key={r.id}>
@@ -1330,9 +1330,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {backstage && (
-        <CollapsibleSection id="rooms" title="Bookable rooms & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
+        <CollapsibleSection id="rooms" title="Bookable areas & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
-            <p className="sprof__muted">Nothing listed yet — a room, a tool, the dinner plates. Anything members can book.</p>
+            <p className="sprof__muted">Nothing listed yet — a stall, an arena, a tool, the dinner plates. Anything members can book.</p>
           )}
           <div className="sprof__members">
             {resources.map((r) => (
@@ -1354,11 +1354,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           {newResOpen ? (
             <div className="sprof__res-new">
               <div className="sprof__rolepills">
-                <button className={'sprof__rolepill' + (newResKind === 'room' ? ' is-on' : '')} onClick={() => setNewResKind('room')}>Room</button>
+                <button className={'sprof__rolepill' + (newResKind === 'room' ? ' is-on' : '')} onClick={() => setNewResKind('room')}>Area</button>
                 <button className={'sprof__rolepill' + (newResKind === 'thing' ? ' is-on' : '')} onClick={() => setNewResKind('thing')}>Thing</button>
               </div>
               <input className="prof__input" value={newResName} onChange={(e) => setNewResName(e.target.value)}
-                placeholder={newResKind === 'room' ? 'e.g. The pavilion' : 'e.g. Formal dinner plates (service for 24)'} autoFocus />
+                placeholder={newResKind === 'room' ? 'e.g. The pavilion, stall 4, the north arena' : 'e.g. Formal dinner plates (service for 24)'} autoFocus />
               <input className="prof__input" value={newResDesc} onChange={(e) => setNewResDesc(e.target.value)}
                 placeholder="A few words — capacity, condition, care instructions (optional)" />
               <label className="sprof__duty">
@@ -1380,7 +1380,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </div>
             </div>
           ) : (
-            <button className="btn sprof__invite-btn" onClick={() => setNewResOpen(true)}>+ Add a room or thing</button>
+            <button className="btn sprof__invite-btn" onClick={() => setNewResOpen(true)}>+ Add an area or thing</button>
           )}
         </CollapsibleSection>
       )}
