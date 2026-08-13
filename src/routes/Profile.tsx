@@ -655,6 +655,8 @@ export default function Profile() {
               value={pageMeta.actions
                 ?? (pageMeta.action && pageMeta.action.kind !== 'none' ? [pageMeta.action.kind] : [])}
               onChange={(actions) => setPage({ actions })}
+              contact={contact}
+              onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
           <div className="prof__field">

@@ -1078,6 +1078,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               value={pageEdit.actions
                 ?? (pageEdit.action && pageEdit.action.kind !== 'none' ? [pageEdit.action.kind] : [])}
               onChange={(actions) => setPageEdit((pm) => ({ ...pm, actions }))}
+              contact={contact}
+              onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
           <div className="prof__field">
