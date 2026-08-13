@@ -230,7 +230,11 @@ export async function rsvp(eventId: string, me: string, status: Exclude<RsvpStat
 }
 
 // ─── Availability windows (declared hours; kind 'on_call' feeds Concierge) ───
-export type AvailabilityKind = 'available' | 'on_call';
+/** 'available' = work hours you'd take a booking in. 'social' = hours you'd
+ *  welcome a chat in — what Home's "N are available" counts (founder
+ *  2026-08-13: the two are different hours, and conflating them makes both a
+ *  lie). 'on_call' = the care rota, deliberately not subtracted by bookings. */
+export type AvailabilityKind = 'available' | 'social' | 'on_call';
 export interface AvailabilityWindow {
   id: string;
   profile_id: string;

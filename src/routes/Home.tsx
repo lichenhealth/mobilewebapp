@@ -23,7 +23,7 @@ import './Home.css';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 import { useActing } from '../acting/ActingProvider';
-import { spaceAwakeCount } from '../lib/presenceApi';
+import { spacePresentCount, availableList } from '../lib/presenceApi';
 
 // THE FEED'S OWN BAND (founder 2026-08-08, restoring the trio deliberately:
 // "we may replace that later with more or different filters"). It sits under
@@ -47,19 +47,30 @@ function salutation(): string {
 }
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
   'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
-/** PRESENT, NOT MERELY ONLINE (founder 2026-08-13): a lit candle says "I'm
- *  open to live engagement", and that's the only thing this counts now —
- *  being online was never something anyone chose. network_awake_count() is
- *  YOUR network: your my-celium plus those you share a space with, never the
- *  whole of Lichen. Acting as a space, the count and the words switch to that
- *  space's own members (space_awake_count) — the per-space query the
- *  2026-08-06 note asked for before the label could honestly change. */
-function awakeLine(n: number | null, whose: string | null): string {
-  if (n === null) return 'Welcome back.';
+/** TWO TIERS (founder 2026-08-13). PRESENT is here-this-minute: candle lit
+ *  and Lichen in front of you. AVAILABLE is your published SOCIAL hours minus
+ *  what's booked — it asks nothing of you at the time, which is the point
+ *  ("I just want people to be offline as much as possible, but be able to
+ *  signal when they're available"). Work hours are a booking concern and
+ *  deliberately never reach this line: Home is for connection, not commerce.
+ *
+ *  The word "awake" is retired — it read as either enlightened or asleep,
+ *  and neither is what being off Lichen means.
+ *
+ *  Acting as a space, the count is that space's own members (present only —
+ *  a space doesn't publish hours, its members do).
+ */
+function presenceLine(present: number | null, available: number, whose: string | null): string {
+  if (present === null) return 'Welcome back.';
   const where = whose ?? 'your network';
-  if (n === 0) return whose ? `${whose} is resting.` : 'Your network is resting.';
-  if (n === 1) return `One in ${where} is present.`;
-  return `${NUMBER_WORDS[n] ?? n} in ${where} are present.`;
+  const n = (x: number) => NUMBER_WORDS[x] ?? String(x);
+  const isAre = (x: number) => (x === 1 ? 'is' : 'are');
+  if (present && available) {
+    return `${n(present)} ${isAre(present)} present and ${n(available).toLowerCase()} ${isAre(available)} available.`;
+  }
+  if (present) return `${n(present)} in ${where} ${isAre(present)} present.`;
+  if (available) return `${n(available)} in ${where} ${isAre(available)} available.`;
+  return whose ? `${whose} is resting.` : 'Your network is resting.';
 }
 
 const CATEGORY_ICONS: IconRowItem[] = [
@@ -118,7 +129,8 @@ export default function Home() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
-  const [awake, setAwake] = useState<number | null>(null);
+  const [present, setPresent] = useState<number | null>(null);
+  const [available, setAvailable] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -138,9 +150,12 @@ export default function Home() {
   useEffect(() => {
     let live = true;
     void (actor.type === 'space'
-      ? spaceAwakeCount(actor.id)
-      : supabase.rpc('network_awake_count').then((r) => (r.data as number | null) ?? null)
-    ).then((n) => { if (live) setAwake(n ?? null); });
+      ? spacePresentCount(actor.id)
+      : supabase.rpc('network_present_count').then((r) => (r.data as number | null) ?? null)
+    ).then((n: number | null) => { if (live) setPresent(n ?? null); });
+    // Availability is personal — a space doesn't publish social hours.
+    if (actor.type === 'space') setAvailable(0);
+    else void availableList().then((rows) => { if (live) setAvailable(rows.length); });
     return () => { live = false; };
   }, [actor]);
 
@@ -168,11 +183,11 @@ export default function Home() {
             // Stable's mycelium"). One destination again now that a space
             // has a web of its own and My-celium no longer bounces.
             <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
-              {awakeLine(awake, actor.type === 'space' ? actor.name : null)}
+              {presenceLine(present, available, actor.type === 'space' ? actor.name : null)}
               <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
           ) : (
-            <span className="display">{awakeLine(awake, actor.type === 'space' ? actor.name : null)}</span>
+            <span className="display">{presenceLine(present, available, actor.type === 'space' ? actor.name : null)}</span>
           )}
         </h1>
         {/* The creed — captions the presence doorway it explains. */}

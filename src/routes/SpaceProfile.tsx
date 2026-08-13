@@ -48,7 +48,7 @@ import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
-import { spaceAwakeCount, spaceAwakeList, type AwakeMember } from '../lib/presenceApi';
+import { spacePresentCount, spacePresentList, type AwakeMember } from '../lib/presenceApi';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -325,7 +325,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   useEffect(() => {
     if (!id || !isMember) { setAwake(null); return; }
     let live = true;
-    void spaceAwakeCount(id).then((n) => { if (live) setAwake(n); });
+    void spacePresentCount(id).then((n) => { if (live) setAwake(n); });
     return () => { live = false; };
   }, [id, isMember]);
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
@@ -347,7 +347,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   useEffect(() => {
     if (!id || !isMember) return;
     let live = true;
-    void spaceAwakeList(id).then((rows) => { if (live) setAwakeWho(rows); });
+    void spacePresentList(id).then((rows) => { if (live) setAwakeWho(rows); });
     return () => { live = false; };
   }, [id, isMember, awake]);
   useEffect(() => {

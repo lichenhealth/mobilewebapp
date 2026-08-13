@@ -148,15 +148,23 @@ export default function CalendarSettings() {
         <div className="cedit__field">
           <span className="cedit__label">My hours</span>
           <p className="cedit__hint">
-            Times you're generally available. Groups use this (plus your events) to find meeting
-            times; on-call windows power your care team's urgent coverage.
+            Three kinds, because they're genuinely different hours.
+            <strong> Work</strong> is when you'd take a booking — groups also use it
+            (plus your events) to find meeting times.
+            <strong> Social</strong> is when you'd welcome a chat; it's what shows your
+            web that you&rsquo;re available, without you having to be in the app.
+            <strong> On call</strong> powers your care team&rsquo;s urgent coverage.
+            Anything booked takes you out of work and social hours automatically —
+            people can still message you, they just know not to expect you.
           </p>
           {windows.map((w) => (
             <div className="cset__row" key={w.id}>
               <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
               <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
-              <span className={'cset__kind' + (w.kind === 'on_call' ? ' is-oncall' : '')}>
-                {w.kind === 'on_call' ? 'On call' : 'Available'}
+              <span className={'cset__kind'
+                + (w.kind === 'on_call' ? ' is-oncall' : '')
+                + (w.kind === 'social' ? ' is-social' : '')}>
+                {w.kind === 'on_call' ? 'On call' : w.kind === 'social' ? 'Social' : 'Work'}
               </span>
               <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
             </div>
@@ -169,7 +177,8 @@ export default function CalendarSettings() {
             <span className="rec__lbl">to</span>
             <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
             <select className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
-              <option value="available">Available</option>
+              <option value="available">Work</option>
+              <option value="social">Social</option>
               <option value="on_call">On call</option>
             </select>
             <button

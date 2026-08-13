@@ -12,9 +12,11 @@ export interface MemberRowProps {
   name: string;
   sub?: string;
   avatarUrl?: string | null;
-  /** Only meaningful for people — the candle. Being merely online is not a
-   *  signal any more (founder 2026-08-13): present means lit, or nothing. */
-  presence?: 'lit' | null;
+  /** Only meaningful for people. Two tiers (founder 2026-08-13): 'lit' =
+   *  present, here this minute. 'available' = inside their published social
+   *  hours with nothing booked over it — not here, but open to being reached.
+   *  Neither gates messaging; they set expectations. */
+  presence?: 'lit' | 'available' | null;
   /** People get the private trust shield; spaces get the public recommend thumb
    *  (founder 2026-07-17/2026-08-07: trust is a relationship between people and
    *  stays private, an organization is something you vouch for publicly). */
@@ -83,6 +85,11 @@ export default function MemberRow({
             {presence === 'lit' && (
               <span className="member-row__presence member-row__presence--lit">
                 <span aria-hidden="true">🕯️</span> present
+              </span>
+            )}
+            {presence === 'available' && (
+              <span className="member-row__presence member-row__presence--free">
+                available
               </span>
             )}
           </span>

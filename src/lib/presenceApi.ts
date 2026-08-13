@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import { freeBusy } from './calendarApi';
+import { occursOn } from './recurrence';
 
 // ─── Presence, given not taken (founder 2026-07-19) ──────────────────────────
 // PRESENT MEANS A LIT CANDLE, AND NOTHING ELSE (founder 2026-08-13): the
@@ -16,11 +18,42 @@ export interface AwakeMember {
   me?: boolean;    // you, inside a space's own list — shown as "you", not a name
 }
 
-/** Network members awake now who opted in — [] until the migration runs. */
-export async function awakeList(): Promise<AwakeMember[]> {
-  const { data, error } = await supabase.rpc('network_awake_list');
-  if (error) { console.warn('network_awake_list:', error.message); return []; }
+/** Members of your web who are PRESENT — candle lit and here this minute. */
+export async function presentList(): Promise<AwakeMember[]> {
+  const { data, error } = await supabase.rpc('network_present_list');
+  if (error) { console.warn('network_present_list:', error.message); return []; }
   return (data as AwakeMember[] | null) ?? [];
+}
+
+/** Members of your web who are AVAILABLE — inside their published hours,
+ *  minus whatever is booked (founder 2026-08-13: "I just want people to be
+ *  offline as much as possible, but be able to signal when they're
+ *  available"). Disjoint from present: the SQL already drops anyone who is
+ *  here right now, so a person is only ever counted once.
+ *
+ *  The booked-subtraction happens HERE, not in SQL, because recurrence lives
+ *  in exactly one place (recurrence.ts, shared with the calendar, reminders
+ *  and fire-reminders) and a second expander in SQL would fork the engine.
+ *  The candidate set is only people currently in-hours, so this stays cheap.
+ *  ⚠ If a web ever runs to thousands, revisit — a SQL expander or a cached
+ *  rollup, not a bigger loop. */
+export async function availableList(): Promise<AwakeMember[]> {
+  const { data, error } = await supabase.rpc('network_available_list');
+  if (error) { console.warn('network_available_list:', error.message); return []; }
+  const rows = (data as (AwakeMember & { local_date: string; local_min: number })[] | null) ?? [];
+  if (!rows.length) return [];
+
+  // Their own clock, not the viewer's: 2pm busy means 2pm where they are.
+  const dates = [...new Set(rows.map((r) => r.local_date))].sort();
+  const busy = await freeBusy(rows.map((r) => r.id), dates[0], dates[dates.length - 1]);
+
+  return rows.filter((r) => !busy.some((e) => {
+    if (e.profile_id !== r.id) return false;
+    if (!occursOn(e, r.local_date)) return false;
+    if (e.all_day) return true;
+    if (e.start_min == null || e.end_min == null) return true;   // untimed: treat as busy
+    return r.local_min >= e.start_min && r.local_min < e.end_min;
+  }));
 }
 
 export interface MyPresence {
@@ -74,14 +107,14 @@ export const candleLit = (p: MyPresence | null): boolean =>
  *  2026-08-06: "each sub layer of the network to have its own feed where only
  *  those awake within that sub community are shown"). Members only; the same
  *  opt-ins and the same names-only, no-timestamps rule as the whole-web view. */
-export async function spaceAwakeCount(spaceId: string): Promise<number | null> {
-  const { data, error } = await supabase.rpc('space_awake_count', { p_space: spaceId });
+export async function spacePresentCount(spaceId: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc('space_present_count', { p_space: spaceId });
   if (error) return null;   // pre-migration: the line simply doesn't render
   return (data as number) ?? 0;
 }
 
-export async function spaceAwakeList(spaceId: string): Promise<AwakeMember[]> {
-  const { data, error } = await supabase.rpc('space_awake_list', { p_space: spaceId });
+export async function spacePresentList(spaceId: string): Promise<AwakeMember[]> {
+  const { data, error } = await supabase.rpc('space_present_list', { p_space: spaceId });
   if (error) return [];
   return (data as AwakeMember[] | null) ?? [];
 }

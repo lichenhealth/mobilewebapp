@@ -48,6 +48,8 @@
   font-size: 10px; color: var(--peach-deep, var(--peach)); letter-spacing: 0.02em;
 }
 .member-row__presence--lit { font-weight: 500; }
+/* Available is the quieter of the two: not here, but reachable. */
+.member-row__presence--free { color: var(--ink-muted); font-weight: 400; }
 
 /* Claude, muted until the viewer has actually talked to them — dim the
    identity, keep the actions (Message especially) fully inviting. */

@@ -13,7 +13,7 @@ import { sortClaudeFirst } from '../lib/chatApi';
 import { possessive } from '../lib/names';
 import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
-  awakeList, myPresence,
+  presentList, availableList, myPresence,
   type MyPresence,
 } from '../lib/presenceApi';
 import './MyceliumDirectory.css';
@@ -86,7 +86,8 @@ export default function MyceliumDirectory() {
   // the whole of it now.
   const [urlParams] = useSearchParams();
   const fromHome = urlParams.get('from') === 'home';
-  const [litSet, setLitSet] = useState<Set<string>>(new Set());       // "present" (candle)
+  const [litSet, setLitSet] = useState<Set<string>>(new Set());       // "present" (candle, here now)
+  const [freeSet, setFreeSet] = useState<Set<string>>(new Set());     // "available" (social hours, not booked)
   const [myPres, setMyPres] = useState<MyPresence | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
@@ -144,11 +145,13 @@ export default function MyceliumDirectory() {
     if (!user) { setReady(true); return; }
     let live = true;
     (async () => {
-      const [{ web, vouched }, recs, folk, mine] = await Promise.all([
-        loadMyWeb(asSpace), loadMyRecommendations(), awakeList(), myPresence(user.id),
+      const [{ web, vouched }, recs, here, free, mine] = await Promise.all([
+        loadMyWeb(asSpace), loadMyRecommendations(),
+        presentList(), availableList(), myPresence(user.id),
       ]);
       if (live) {
-        setLitSet(new Set(folk.map((f) => f.id)));
+        setLitSet(new Set(here.map((f) => f.id)));
+        setFreeSet(new Set(free.map((f) => f.id)));
         setMyPres(mine);
       }
       const profileIds = [...web].filter((k) => k.startsWith('profile:')).map((k) => k.slice(8));
@@ -328,8 +331,9 @@ export default function MyceliumDirectory() {
         // Present (candle) first, then everyone else — Claude always leads
         // regardless (sortClaudeFirst is a no-op elsewhere, Claude only ever
         // appears in the People group).
+        // Present first, then available, then everyone else.
         const presenceRank = (e: Entry) =>
-          e.type === 'profile' && litSet.has(e.id) ? 1 : 0;
+          e.type !== 'profile' ? 0 : litSet.has(e.id) ? 2 : freeSet.has(e.id) ? 1 : 0;
         const rows = sortClaudeFirst(entries.filter((e) => e.kind === g.kind)
           .sort((a, b) => presenceRank(b) - presenceRank(a) || a.name.localeCompare(b.name)));
         if (rows.length === 0) return null;
@@ -343,7 +347,9 @@ export default function MyceliumDirectory() {
                 name={e.name}
                 sub={e.sub}
                 avatarUrl={e.avatarUrl}
-                presence={e.type === 'profile' && litSet.has(e.id) ? 'lit' : null}
+                presence={e.type !== 'profile' ? null
+                  : litSet.has(e.id) ? 'lit'
+                  : freeSet.has(e.id) ? 'available' : null}
                 // ONE GESTURE PER KIND (founder 2026-08-07: "you can trust a
                 // person, but recommend an org, group or community... a
                 // shield for people, a thumbs up for organizations,
