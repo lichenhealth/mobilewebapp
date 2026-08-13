@@ -51,13 +51,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [userId]);
 
-  // Presence heartbeat: stamp last_seen_at on arrival and every 10 minutes
-  // while the app is open. Soft signal only — it feeds the Home greeting's
-  // aggregate "N in your network are awake" count (individual timestamps
-  // aren't readable by anyone; no column SELECT grant).
+  // PRESENCE HEARTBEAT — "here NOW", not "here today" (founder 2026-08-13:
+  // present should mean the candle is lit and you're actually online now).
+  //
+  // It beats every 2 minutes and ONLY while the tab is visible, which is what
+  // makes the signal true rather than merely faster: a backgrounded tab or a
+  // phone in a pocket stops beating, so it stops claiming you're open to being
+  // interrupted. It also beats the instant you come back, so returning to the
+  // tab restores presence at once instead of up to two minutes later.
+  //
+  // The DB window (network_awake_* / space_awake_*) is 5 minutes — 2.5x this
+  // beat, so one missed beat or a slow network doesn't blink anyone out. THE
+  // TWO ARE A PAIR: shortening the window below ~2x this interval makes
+  // presence strobe for someone sitting right there.
+  //
+  // Cost: ~30 writes/hour per member who is actually looking, and none while
+  // backgrounded (it used to beat regardless). Noise at alpha scale; worth
+  // revisiting at a few thousand members.
+  //
+  // Soft signal only — it feeds an aggregate count. Individual timestamps
+  // aren't readable by anyone; there's no column SELECT grant.
   useEffect(() => {
     if (!userId) return;
     const beat = () => {
+      if (document.visibilityState !== 'visible') return;
       // Also stamp the browser's timezone so server-side scheduled reminders
       // (pg_cron → fire-reminders) can fire at the member's true local time.
       let tz: string | undefined;
@@ -68,8 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then(() => {}, () => {});
     };
     beat();
-    const t = window.setInterval(beat, 10 * 60 * 1000);
-    return () => window.clearInterval(t);
+    const t = window.setInterval(beat, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', beat);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener('visibilitychange', beat);
+    };
   }, [userId]);
 
   const markOnboarded = useCallback(() => setOnboarded(true), []);
