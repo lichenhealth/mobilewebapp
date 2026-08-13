@@ -25,7 +25,12 @@ import '../routes/Snapshot.css';
  *  Snapshot is deliberately not Sync — no credentials, nothing ongoing.
  *  Plugging Lichen into a live backend (hub or spoke, real inventory) is
  *  its own build; the door below says so honestly rather than pretending. */
-export default function SnapshotPanel({ back, onDone }: { back?: string; onDone?: () => void }) {
+export default function SnapshotPanel({ back, onDone, openInitially = false }: {
+  back?: string; onDone?: () => void; openInitially?: boolean;
+}) {
+  // A conversation, not a form (founder 2026-08-11): the builder waits
+  // behind one line until it's actually wanted.
+  const [open, setOpen] = useState(openInitially);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -130,6 +135,15 @@ export default function SnapshotPanel({ back, onDone }: { back?: string; onDone?
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (!open && !prop) {
+    return (
+      <button className="snap__invite" onClick={() => setOpen(true)}>
+        <strong>Build your page from what you&rsquo;ve already got</strong>
+        <em>Tell me about yourself, or paste your website — I&rsquo;ll draft the whole thing.</em>
+      </button>
     );
   }
 

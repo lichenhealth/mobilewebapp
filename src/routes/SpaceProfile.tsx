@@ -1018,6 +1018,26 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
+          {/* What Home shows (founder 2026-08-11): a real summary, not the
+              story's first inches. Empty falls back to the opening two
+              paragraphs so Home is never blank. */}
+          <div className="prof__field">
+            <label className="prof__label">Home summary — what greets a visitor</label>
+            <textarea
+              className="prof__textarea"
+              value={pageEdit.homeSummary ?? ''}
+              onChange={(e) => setPageEdit((pm) => ({ ...pm, homeSummary: e.target.value }))}
+              placeholder="A short welcome for the front page — the whole story still lives on About."
+            />
+            <FillWithClaude
+              back={`/spaces/${id}?manage=1#about`}
+              label="Have Claude write this from the full story"
+            />
+            <p className="prof__hint">
+              Leave it empty and Home opens with the first two paragraphs of your story.
+            </p>
+          </div>
+
           <div className="prof__field">
             <label className="prof__label">Description</label>
             <textarea

@@ -22,6 +22,11 @@ export type FeedRenderCtx = { showing: boolean; open: () => void; guest: boolean
 export interface PageMeta {
   tagline?: string;
   story?: string;
+  /** What Home shows instead of the story's opening (founder 2026-08-11:
+   *  "a smart summary… versus just the first part of the story"). Written
+   *  by the owner or drafted by Claude; falls back to the first two
+   *  paragraphs when empty, so Home is never blank. */
+  homeSummary?: string;
   cover?: string;
   /** Vertical crop position for the cover, 0 (top) – 100 (bottom), default
    *  centered — "so I can move it up to see my dog's face" (founder
@@ -452,7 +457,11 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           {flavor('about')}
           <div className="ppage__story">
-            {(teasing('about') ? story.split(/\n{2,}/).slice(0, 2) : story.split(/\n{2,}/)).map((para, i) => (
+            {(teasing('about')
+              ? (page.homeSummary?.trim()
+                ? page.homeSummary.split(/\n{2,}/)
+                : story.split(/\n{2,}/).slice(0, 2))
+              : story.split(/\n{2,}/)).map((para, i) => (
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
@@ -461,7 +470,7 @@ export default function PublicPage(props: PublicPageProps) {
                 ))}
               </div>
             ))}
-            {teasing('about') && story.split(/\n{2,}/).length > 2 && (
+            {teasing('about') && (page.homeSummary?.trim() || story.split(/\n{2,}/).length > 2) && (
               <More to="about">Read the whole story</More>
             )}
           </div>
@@ -557,7 +566,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 4 · Practical */}
       {hasContact && show('contact') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">Practical</h2>
+          <h2 className="ppage__h2">Contact &amp; hours</h2>
           <ContactList contact={contact} />
           {bizLocations.length > 0 && (
             <div className="contactl">

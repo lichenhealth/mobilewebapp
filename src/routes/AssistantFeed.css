@@ -76,3 +76,25 @@
   border-bottom: 1px solid var(--bone-edge); margin-bottom: var(--s-3);
 }
 .snap--panel .snap__title { font-size: var(--t-lg); margin-top: 0; }
+
+/* Your page beside Claude — talk about what to change while looking at it. */
+.afeed__split { display: flex; gap: 6px; margin-bottom: var(--s-3); }
+.afeed__split-side {
+  flex: 1; padding: 7px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; color: var(--ink-soft); font-family: inherit; cursor: pointer;
+}
+.afeed__split-side.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
+.afeed__page { margin-bottom: var(--s-3); }
+.afeed__page iframe {
+  width: 100%; height: 60vh; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone);
+}
+.afeed__page-note {
+  font-size: 12px; color: var(--ink-faint); margin: 6px 0 0;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.afeed__page-refresh {
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: 12px; color: var(--peach-deep); text-decoration: underline;
+}

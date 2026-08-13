@@ -40,6 +40,12 @@ export default function AssistantFeed() {
   const thread = params.get('thread') || 'general';
   const back = params.get('back') || '';
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // Your page beside Claude (founder 2026-08-11: "toggle between their
+  // public profile and claude to speak to claude about what to change").
+  // The page is the real thing in an iframe, so it always shows the truth —
+  // and reloads the moment a change lands.
+  const [showPage, setShowPage] = useState(false);
+  const [pageNonce, setPageNonce] = useState(0);
 
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,9 +175,46 @@ export default function AssistantFeed() {
 
       {/* Building your presence happens HERE, in the profile thread, rather
           than off in a screen of its own (founder 2026-08-11). */}
-      {thread === 'profile' && <SnapshotPanel back={back} onDone={() => void load()} />}
+      {thread === 'profile' && (
+        <>
+          <div className="afeed__split">
+            <button
+              className={'afeed__split-side' + (!showPage ? ' is-on' : '')}
+              onClick={() => setShowPage(false)}
+            >
+              Talk to Claude
+            </button>
+            <button
+              className={'afeed__split-side' + (showPage ? ' is-on' : '')}
+              onClick={() => { setShowPage(true); setPageNonce((n) => n + 1); }}
+            >
+              Your page
+            </button>
+          </div>
+          {showPage ? (
+            <div className="afeed__page">
+              {/* Two views, the way this session works: the page open beside
+                  the conversation. A new tab rather than an embed — an
+                  in-page frame collapsed unreliably, and a real tab is what
+                  someone editing actually wants anyway. */}
+              <p className="afeed__page-note">
+                Open your page in its own tab and keep it beside this one — tell Claude
+                what to change here, refresh there to see it.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => window.open(`/members/${me}?preview=1`, '_blank')}
+              >
+                Open my page in a new tab
+              </button>
+            </div>
+          ) : (
+            <SnapshotPanel back={back} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
+          )}
+        </>
+      )}
 
-      <div className="afeed__list">
+      <div className="afeed__list" hidden={thread === 'profile' && showPage}>
         {loading && <p className="afeed__muted">Loading…</p>}
         {!loading && visible.length === 0 && posts.length === 0 && (
           <p className="afeed__muted">Nothing here yet — say hello below, or share a post into this feed from anywhere on Lichen.</p>

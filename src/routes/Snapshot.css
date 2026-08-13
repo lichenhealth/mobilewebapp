@@ -66,3 +66,14 @@
 .snap__can p { margin: 0 0 6px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
 .snap__can p:last-child { margin-bottom: 0; }
 .snap__can strong { color: var(--ink); font-weight: 500; }
+
+/* The builder's invitation — one line until it's wanted. */
+.snap__invite {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+  padding: 10px 12px; margin-bottom: var(--s-3);
+  border: 1px solid var(--peach); border-radius: var(--r-md);
+  background: var(--peach-tint);
+}
+.snap__invite strong { font-size: 13px; font-weight: 500; color: var(--ink); }
+.snap__invite em { font-style: normal; font-size: 11px; color: var(--ink-soft); }

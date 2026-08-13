@@ -743,6 +743,20 @@ export default function Profile() {
               placeholder="Equine-assisted healing in the Colorado foothills" />
           </div>
           <div className="prof__field">
+            <label className="prof__label">Home summary — what greets a visitor</label>
+            <textarea
+              className="prof__textarea"
+              value={pageMeta.homeSummary ?? ''}
+              onChange={(e) => setPage({ homeSummary: e.target.value })}
+              placeholder="A short welcome for the front page — your whole story still lives on About."
+            />
+            <FillWithClaude back="/profile#public-page" label="Have Claude write this from my story" />
+            <p className="prof__hint">
+              Leave it empty and Home opens with the first two paragraphs of your story.
+            </p>
+          </div>
+
+          <div className="prof__field">
             <label className="prof__label">Your story</label>
             <textarea className="prof__textarea prof__story" value={pageMeta.story ?? ''}
               onChange={(e) => setPage({ story: e.target.value })}
