@@ -7,8 +7,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
-  loadAssistantFeed, postToAssistantFeed, loadThreadCounts,
-  ASSISTANT_THREADS, threadLabel, type FeedPostRow,
+  loadAssistantFeed, postToAssistantFeed, loadThreadCounts, loadProfileContext,
+  ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext,
 } from '../lib/assistantFeedApi';
 import SnapshotPanel from '../components/SnapshotPanel';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
@@ -46,6 +46,16 @@ export default function AssistantFeed() {
   // and reloads the moment a change lands.
   const [showPage, setShowPage] = useState(false);
   const [pageNonce, setPageNonce] = useState(0);
+
+  // The receipt of what Claude is working from, at the top of the profile
+  // thread — its own inputs, so there's no mystery about what it knows.
+  const [ctx, setCtx] = useState<ProfileContext | null>(null);
+  useEffect(() => {
+    if (!me || thread !== 'profile') { setCtx(null); return; }
+    let live = true;
+    void loadProfileContext(me).then((c) => { if (live) setCtx(c); });
+    return () => { live = false; };
+  }, [me, thread, pageNonce]);
 
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,7 +219,49 @@ export default function AssistantFeed() {
               </button>
             </div>
           ) : (
-            <SnapshotPanel back={back} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
+            <>
+              {ctx && (
+                <div className="afeed__ctx">
+                  <p className="afeed__ctx-lead">
+                    What I&rsquo;m working from{ctx.canEdit ? '' : ' — I can suggest, but not change anything yet'}:
+                  </p>
+                  <ul className="afeed__ctx-list">
+                    <li>
+                      <span>Tagline</span>
+                      {ctx.tagline ? <em>&ldquo;{ctx.tagline}&rdquo;</em> : <em className="afeed__ctx-none">none yet</em>}
+                    </li>
+                    <li>
+                      <span>Story</span>
+                      {ctx.storyWords
+                        ? <em>{ctx.storyWords} words{ctx.homeSummary ? ', with its own Home welcome' : ', Home opens with its first two paragraphs'}</em>
+                        : <em className="afeed__ctx-none">nothing written</em>}
+                    </li>
+                    <li>
+                      <span>What you offer</span>
+                      {ctx.categories.length
+                        ? <em>{ctx.categories.join(', ')}</em>
+                        : <em className="afeed__ctx-none">nothing picked</em>}
+                    </li>
+                    <li>
+                      <span>Contact</span>
+                      {ctx.contactFilled.length
+                        ? <em>{ctx.contactFilled.join(', ')}{ctx.contactEmpty.length ? ` · empty: ${ctx.contactEmpty.join(', ')}` : ''}</em>
+                        : <em className="afeed__ctx-none">all empty</em>}
+                    </li>
+                  </ul>
+                  {!ctx.canEdit && (
+                    <p className="afeed__ctx-off">
+                      Ask and I&rsquo;ll write you a draft to paste in.{' '}
+                      <button className="afeed__ctx-link" onClick={() => navigate('/profile#privacy')}>
+                        Let me change it directly
+                      </button>{' '}
+                      and I&rsquo;ll make the change myself, and tell you exactly what I did.
+                    </p>
+                  )}
+                </div>
+              )}
+              <SnapshotPanel back={back} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
+            </>
           )}
         </>
       )}
@@ -249,7 +301,17 @@ export default function AssistantFeed() {
         })}
       </div>
 
-      <AssistantComposer onSend={send} placeholder="Say something…" />
+      {/* A door can arrive with its errand via ?ask= (the same prefill
+          AssistantBrief carries): it lands unsent, so "write my home summary"
+          can become "…and keep it under 100 words, mention the pasture"
+          before it goes. Keyed so a new ?ask always lands even if the
+          composer is already mounted. */}
+      <AssistantComposer
+        key={params.get('ask') ?? 'blank'}
+        onSend={send}
+        initialText={params.get('ask') ?? undefined}
+        placeholder="Say something…"
+      />
     </div>
   );
 }

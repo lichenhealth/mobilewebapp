@@ -98,3 +98,34 @@
   background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
   font-size: 12px; color: var(--peach-deep); text-decoration: underline;
 }
+
+/* THE RECEIPT (founder 2026-08-11): what Claude is working from, at the top
+   of the profile thread. A statement of its own inputs, not a description of
+   the member — so there's no mystery about what it knows before you ask. */
+.afeed__ctx {
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-3);
+}
+.afeed__ctx-lead {
+  margin: 0 0 8px; font-size: 11px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.afeed__ctx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.afeed__ctx-list li {
+  display: grid; grid-template-columns: 108px 1fr; gap: 10px;
+  font-size: 13px; line-height: 1.45; align-items: baseline;
+}
+.afeed__ctx-list span { color: var(--ink-faint); font-size: 12px; }
+.afeed__ctx-list em { font-style: normal; color: var(--ink); }
+.afeed__ctx-none { color: var(--ink-faint) !important; }
+.afeed__ctx-off {
+  margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft);
+}
+.afeed__ctx-link {
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: 12px; color: var(--peach-deep); text-decoration: underline;
+}
+@media (max-width: 420px) {
+  .afeed__ctx-list li { grid-template-columns: 1fr; gap: 1px; }
+}

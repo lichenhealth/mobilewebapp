@@ -207,6 +207,11 @@ export default function Profile() {
           const v = (ar as { assistant_readable?: boolean } | null)?.assistant_readable;
           if (typeof v === 'boolean') setAssistantReadable(v);
         });
+      void supabase.from('profiles').select('assistant_can_edit').eq('id', user.id).maybeSingle()
+        .then(({ data: ae }) => {
+          const v = (ae as { assistant_can_edit?: boolean } | null)?.assistant_can_edit;
+          if (typeof v === 'boolean') setAssistantCanEdit(v);   // pre-migration: stays off
+        }, () => {});
     }
     setPhone(myPhone);
     const cRows = (cRes.data as { capability: string }[] | null) ?? [];
@@ -301,6 +306,9 @@ export default function Profile() {
   // Consent travels with your words (founder 2026-07-28): may other members'
   // assistants read what you wrote in shared conversations?
   const [assistantReadable, setAssistantReadable] = useState(true);
+  // A hand that WRITES is opted into, never inherited — default off, unlike
+  // every other switch in this section (docs/ASSISTANT_ACTIONS.md).
+  const [assistantCanEdit, setAssistantCanEdit] = useState(false);
   // Findable by other members — on by default, like every other consent here.
   const [findable, setFindable] = useState(true);
   // Content defaults (founder 2026-08-05): pre-select Compose's per-post
@@ -455,6 +463,14 @@ export default function Profile() {
     const { error: e } = await supabase.from('profiles')
       .update({ assistant_readable: next }).eq('id', user.id);
     if (e) { setError(e.message); setAssistantReadable(!next); }
+  }
+
+  async function updateAssistantCanEdit(next: boolean) {
+    if (!user) return;
+    setAssistantCanEdit(next);
+    const { error: e } = await supabase.from('profiles')
+      .update({ assistant_can_edit: next }).eq('id', user.id);
+    if (e) { setError(e.message); setAssistantCanEdit(!next); }
   }
 
   const [offerQ, setOfferQ] = useState('');
@@ -766,12 +782,20 @@ export default function Profile() {
             <textarea className="prof__textarea prof__story" value={pageMeta.story ?? ''}
               onChange={(e) => setPage({ story: e.target.value })}
               placeholder="Write it the way you'd tell a neighbor. A few short paragraphs is plenty." />
-            <FillWithClaude back="/profile#public-page" label="Fill out my story with Claude" />
+            {/* Both doors land in the PROFILE thread now, not the brief —
+                that's the room where Claude can actually change the page
+                (docs/ASSISTANT_ACTIONS.md), and the errand rides along
+                unsent so it can be edited before it goes. */}
+            <FillWithClaude
+              back="/profile#public-page"
+              label="Fill out my story with Claude"
+              ask={'Help me write the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer.'}
+            />
             <p className="prof__hint">
               Rather talk it through?{' '}
               <button
                 className="prof__inline-link"
-                onClick={() => navigate('/assistant?section=profile&ask=' + encodeURIComponent(
+                onClick={() => navigate('/assistant/feed?thread=profile&back=' + encodeURIComponent('/profile#public-page') + '&ask=' + encodeURIComponent(
                   'Help me draft the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer. Before you send this, feel free to add anything else: a website to read, a length ("140 characters"), a tone.',
                 ))}
               >
@@ -967,6 +991,27 @@ export default function Profile() {
           Your own assistant switches on and off per section — the brain icon on Home,
           Marketplace, Calendar, Chat and your shelf each carry their own choice.
         </p>
+
+        <p className="prof__privacy-sub">What the assistant may change</p>
+        <label className="prof__consent">
+          <input
+            type="checkbox"
+            checked={assistantCanEdit}
+            onChange={(e) => void updateAssistantCanEdit(e.target.checked)}
+          />
+          <span>
+            <strong>Let Claude edit my page directly</strong>
+            <em>
+              On, you can say &ldquo;make my tagline warmer&rdquo; in your Profile thread
+              and Claude changes it, then tells you what it changed and what it said
+              before — so &ldquo;put it back&rdquo; always works. Off, it writes you a
+              draft and you apply it yourself. This reaches your public page only:
+              your tagline, home welcome, story, public contact details, and what you
+              offer. Never your location, your care, your means, another member, or a
+              space you steward.
+            </em>
+          </span>
+        </label>
 
         {contentDefaults && (
           <>

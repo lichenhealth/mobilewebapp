@@ -77,6 +77,52 @@ export async function postToAssistantFeed(
   if (error) throw error;
 }
 
+/** What Claude is working from, when it works on your page — a receipt of its
+ *  OWN inputs, not a description of you (founder 2026-08-11: "show the user
+ *  the context Claude already has on the subject"). Read straight from the
+ *  same rows the assistant's tools write to, so the card can't drift from
+ *  what's actually there. */
+export interface ProfileContext {
+  tagline: string | null;
+  storyWords: number;
+  homeSummary: boolean;
+  categories: string[];
+  contactFilled: string[];
+  contactEmpty: string[];
+  canEdit: boolean;
+}
+
+const CONTACT_FIELDS = ['website', 'email', 'phone', 'booking', 'hours', 'address', 'instagram', 'facebook'];
+
+export async function loadProfileContext(me: string): Promise<ProfileContext | null> {
+  const { data } = await supabase.from('profiles')
+    .select('page, contact, assistant_can_edit').eq('id', me).maybeSingle();
+  if (!data) return null;
+  const row = data as {
+    page: { tagline?: string; story?: string; homeSummary?: string } | null;
+    contact: Record<string, string> | null;
+    assistant_can_edit?: boolean;
+  };
+  const page = row.page ?? {};
+  const contact = row.contact ?? {};
+
+  const { data: catRows } = await supabase.from('profile_categories')
+    .select('categories(name)').eq('profile_id', me);
+  const categories = ((catRows as { categories: { name: string } | null }[] | null) ?? [])
+    .map((r) => r.categories?.name).filter((n): n is string => !!n);
+
+  const story = (page.story ?? '').trim();
+  return {
+    tagline: page.tagline?.trim() || null,
+    storyWords: story ? story.split(/\s+/).length : 0,
+    homeSummary: !!page.homeSummary?.trim(),
+    categories,
+    contactFilled: CONTACT_FIELDS.filter((f) => contact[f]?.trim()),
+    contactEmpty: CONTACT_FIELDS.filter((f) => !contact[f]?.trim()),
+    canEdit: !!row.assistant_can_edit,
+  };
+}
+
 /** Whether the member has actually used their Claude feed — a real post,
  *  not just having seen the row. */
 export async function hasClaudeFeedActivity(me: string): Promise<boolean> {

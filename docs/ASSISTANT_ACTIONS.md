@@ -1,6 +1,12 @@
 # Assistant actions — letting Claude edit a member's own page
 
-**Status:** specified, not built. Founder 2026-08-11: "it should load a chat
+**Status:** BUILT 2026-08-13 (steps 1–3 of the build order below; step 4, the
+side-by-side page view, is still open). Live behind `profiles.assistant_can_edit`,
+default off, switched on in Profile → Privacy → "What the assistant may change",
+and armed only in the Profile thread. One correction from testing: an empty
+value CLEARS a field rather than erroring — without that, "put it back" could
+never undo a write onto something that started empty, which is most first
+edits. Founder 2026-08-11: "it should load a chat
 with Claude that shows the user the context Claude already has on the
 subject, with the opportunity to add more before pressing send… then Claude
 lets you know when they're done so you can review it live and continue to

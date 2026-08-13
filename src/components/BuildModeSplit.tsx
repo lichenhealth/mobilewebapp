@@ -31,15 +31,21 @@ export default function BuildModeSplit({ back }: { back: string }) {
 
 /** The nudge that lives under a single field — same door, arriving with
  *  that field's job in mind. */
-export function FillWithClaude({ back, label = 'Fill this out with Claude' }: {
+export function FillWithClaude({ back, label = 'Fill this out with Claude', ask }: {
   back: string; label?: string;
+  /** The errand this door is for, prefilled into the composer unsent — so the
+   *  ask arrives ready to send, or to add to first. */
+  ask?: string;
 }) {
   const navigate = useNavigate();
   return (
     <button
       className="bmode__inline"
       type="button"
-      onClick={() => navigate(`/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`)}
+      onClick={() => navigate(
+        `/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`
+        + (ask ? `&ask=${encodeURIComponent(ask)}` : ''),
+      )}
     >
       <Icon name="brain" size={12} /> {label}
     </button>
