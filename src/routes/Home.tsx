@@ -22,6 +22,8 @@ import { supabase } from '../lib/supabase';
 import './Home.css';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
+import { useActing } from '../acting/ActingProvider';
+import { spaceAwakeCount } from '../lib/presenceApi';
 
 // THE FEED'S OWN BAND (founder 2026-08-08, restoring the trio deliberately:
 // "we may replace that later with more or different filters"). It sits under
@@ -46,16 +48,16 @@ function salutation(): string {
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
   'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
 /** network_awake_count() counts YOUR web — the people in your my-celium plus
- *  those you share a space with. Not the whole Lichen network, and NOT the
- *  space you happen to be acting as: the number doesn't change when you switch
- *  hats, so the words mustn't either (founder 2026-08-06, after I renamed the
- *  label without touching the count and it claimed Morgahn was in Countryman
- *  Stables). A real per-space count needs its own query — see the note below. */
-function awakeLine(n: number | null): string {
+ *  those you share a space with. Not the whole Lichen network. Acting as a
+ *  space, the count and the words switch to that space's own members instead
+ *  (space_awake_count) — the per-space query the 2026-08-06 note asked for
+ *  before the label could honestly change. */
+function awakeLine(n: number | null, whose: string | null): string {
   if (n === null) return 'Welcome back.';
-  if (n === 0) return 'Your web is resting.';
-  if (n === 1) return 'One in your web is awake.';
-  return `${NUMBER_WORDS[n] ?? n} in your web are awake.`;
+  const where = whose ?? 'your web';
+  if (n === 0) return whose ? `${whose} is resting.` : 'Your web is resting.';
+  if (n === 1) return `One in ${where} is awake.`;
+  return `${NUMBER_WORDS[n] ?? n} in ${where} are awake.`;
 }
 
 const CATEGORY_ICONS: IconRowItem[] = [
@@ -90,6 +92,7 @@ export default function Home() {
   const navigate = useNavigate();
   const adminView = useAdminView();
   const { promptSaved, openPicker } = useCollect();
+  const { actor } = useActing();
 
   async function messageAuthor(authorId: string, aboutPostId?: string) {
     try { navigate(`/chat/${await ensureDirectChat(authorId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
@@ -118,16 +121,26 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       const feed = await loadFeed(50, { river: true });
-      const [{ web, vouched: myc }, recs, saves, awakeRes] = await Promise.all([
+      const [{ web, vouched: myc }, recs, saves] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), loadMySaved(),
-        supabase.rpc('network_awake_count'),
       ]);
-      setAwake((awakeRes.data as number | null) ?? null);
       const ov = await loadEndorsements(feed, myc);
       // Set posts last so cards mount once, with engagement state already in hand.
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
   }, []);
+
+  // Presence follows whoever you're acting as — its own effect so switching
+  // hats re-counts without refetching the whole feed (which stays personal,
+  // deliberately — see the note above).
+  useEffect(() => {
+    let live = true;
+    void (actor.type === 'space'
+      ? spaceAwakeCount(actor.id)
+      : supabase.rpc('network_awake_count').then((r) => (r.data as number | null) ?? null)
+    ).then((n) => { if (live) setAwake(n ?? null); });
+    return () => { live = false; };
+  }, [actor]);
 
   return (
     <div className={'home' + (adminView ? ' is-adminview' : '')}>
@@ -147,13 +160,19 @@ export default function Home() {
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
-            // The doorway: awake+opted-in members lead your web's directory.
-            <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
-              {awakeLine(awake)}
+            // The doorway: awake+opted-in members lead a member listing —
+            // your web's directory as yourself, and acting as a space, that
+            // space's own Members tab (the same door its presence line uses),
+            // so the sentence and the room it opens agree about whose
+            // members these are (founder 2026-08-13).
+            <button className="display home__awake" onClick={() => navigate(
+              actor.type === 'space' ? `/spaces/${actor.id}?tab=members` : '/mycelium/directory?from=home',
+            )}>
+              {awakeLine(awake, actor.type === 'space' ? actor.name : null)}
               <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
           ) : (
-            <span className="display">{awakeLine(awake)}</span>
+            <span className="display">{awakeLine(awake, actor.type === 'space' ? actor.name : null)}</span>
           )}
         </h1>
         {/* The creed — captions the presence doorway it explains. */}
