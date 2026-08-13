@@ -13,10 +13,15 @@ import './CoverPicker.css';
 
 const GALLERY_CAP = 24;
 
-export default function CoverPicker({ value, onChange, uploaderId, authorId, spaceId, extraPhotos = [] }: {
+export default function CoverPicker({ value, onChange, uploaderId, authorId, spaceId, extraPhotos = [], pos, onPos }: {
   /** page.cover — the chosen photo's URL. */
   value?: string;
   onChange: (cover?: string) => void;
+  /** page.coverPos — vertical crop position, 0 (top) – 100 (bottom).
+   *  The slider that lets the dog's face into the frame (founder
+   *  2026-08-11). */
+  pos?: number;
+  onPos?: (pos: number) => void;
   /** Whose storage folder uploads land in (the signed-in member). */
   uploaderId: string;
   /** Harvest post photos by member… */
@@ -63,12 +68,25 @@ export default function CoverPicker({ value, onChange, uploaderId, authorId, spa
   return (
     <div className="coverp">
       {value && (
-        <div className="coverp__current">
-          <img src={value} alt="Your cover photo" />
-          <button className="coverp__remove" onClick={() => onChange(undefined)} aria-label="Remove cover photo">
-            <Icon name="close" size={12} />
-          </button>
-        </div>
+        <>
+          <div className="coverp__current">
+            <img src={value} alt="Your cover photo"
+              style={{ objectPosition: `50% ${pos ?? 50}%` }} />
+            <button className="coverp__remove" onClick={() => onChange(undefined)} aria-label="Remove cover photo">
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+          {onPos && (
+            <div className="coverp__pos">
+              <input
+                type="range" min={0} max={100} value={pos ?? 50}
+                onChange={(e) => onPos(Number(e.target.value))}
+                aria-label="Adjust which part of the photo shows"
+              />
+              <p className="prof__hint">Slide to move the photo up or down until the right part shows.</p>
+            </div>
+          )}
+        </>
       )}
       <label className="btn coverp__upload">
         {busy ? 'Uploading…' : value ? 'Upload a different photo' : 'Upload a photo'}

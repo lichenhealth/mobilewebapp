@@ -15,6 +15,9 @@
   cursor: pointer;
 }
 .coverp__upload { display: inline-flex; }
+.coverp__pos { max-width: 360px; margin-bottom: var(--s-2); }
+.coverp__pos input { width: 100%; accent-color: var(--peach); }
+.coverp__pos .prof__hint { margin-top: 2px; }
 .coverp__lead { margin: var(--s-2) 0 6px; }
 .coverp__grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));

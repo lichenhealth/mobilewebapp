@@ -21,6 +21,10 @@ export interface PageMeta {
   tagline?: string;
   story?: string;
   cover?: string;
+  /** Vertical crop position for the cover, 0 (top) – 100 (bottom), default
+   *  centered — "so I can move it up to see my dog's face" (founder
+   *  2026-08-11). */
+  coverPos?: number;
   coverStyle?: 'photo' | 'tint' | 'plain';
   accent?: string;
   /** Legacy single CTA — kept for old rows; new saves write `actions`. */
@@ -353,7 +357,11 @@ export default function PublicPage(props: PublicPageProps) {
           </nav>
         )}
         {coverSrc && (
-          <img className="ppage__cover" src={coverSrc} alt="" onClick={() => setLightbox(coverSrc)} key={coverSrc} />
+          <img
+            className="ppage__cover" src={coverSrc} alt=""
+            style={{ objectPosition: `50% ${page.coverPos ?? 50}%` }}
+            onClick={() => setLightbox(coverSrc)} key={coverSrc}
+          />
         )}
       </header>
 

@@ -704,6 +704,8 @@ export default function Profile() {
               <CoverPicker
                 value={pageMeta.cover}
                 onChange={(cover) => setPage({ cover })}
+                pos={pageMeta.coverPos}
+                onPos={(coverPos) => setPage({ coverPos })}
                 uploaderId={user.id}
                 authorId={user.id}
                 extraPhotos={pageMeta.photos ?? []}
