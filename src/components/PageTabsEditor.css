@@ -71,3 +71,8 @@
   color: var(--ink-soft); font-size: 12px; line-height: 1; cursor: pointer;
 }
 .ptabs__upload { align-self: flex-start; cursor: pointer; }
+
+/* A built-in tab's own section photo — wider than a gallery thumb, since
+   it's the one image that tab wears. */
+.ptabs__shot--wide { display: block; max-width: 320px; margin-bottom: var(--s-2); }
+.ptabs__shot--wide img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }

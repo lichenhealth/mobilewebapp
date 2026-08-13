@@ -14,8 +14,10 @@ import './PublicPage.css';
 
 export type ContactActionKind = 'call' | 'book' | 'email' | 'visit';
 
-/** Handed to a render-function `feed` on every tab (see the prop's doc). */
-export type FeedRenderCtx = { showing: boolean; open: () => void };
+/** Handed to a render-function `feed` on every tab (see the prop's doc).
+ *  `guest` = render as the open web sees it (a real signed-out visitor, or
+ *  the owner previewing) — no member doors, no member actions. */
+export type FeedRenderCtx = { showing: boolean; open: () => void; guest: boolean };
 
 export interface PageMeta {
   tagline?: string;
@@ -184,7 +186,12 @@ export default function PublicPage(props: PublicPageProps) {
   //
   // Feed is member-only unless the page opts in via page.showPosts, which was
   // declared in PageMeta from the start and never read until now.
-  const showFeed = !!props.feed && (!!props.signedIn || page.showPosts === true);
+  // "Public is what people outside of Lichen see" (founder 2026-08-11):
+  // preview renders exactly what a signed-out visitor gets — the feed only
+  // when the owner opted in via page.showPosts, and never as the landing
+  // tab: tab content (About) greets the open web first.
+  const asGuest = !props.signedIn || !!props.preview;
+  const showFeed = !!props.feed && (!asGuest || page.showPosts === true);
   // The render-function form carries its own Feed door inside the stream's
   // icon row (founder 2026-08-11: the newsfeed circle belongs with the other
   // circles, not beside the About/Services text tabs) — so the nav skips it.
@@ -226,7 +233,7 @@ export default function PublicPage(props: PublicPageProps) {
   const navItems = showFeed && !feedInRow
     ? [{ id: 'feed', label: 'Feed' }, ...sectionItems]
     : sectionItems;
-  const firstContentDoor = showFeed ? 'feed' : doors?.find((d) => !d.href)?.id;
+  const firstContentDoor = showFeed && !asGuest ? 'feed' : doors?.find((d) => !d.href)?.id;
   const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
   const tabbed = navItems.length > 0;
   const showingFeed = showFeed && tab === 'feed';
@@ -378,7 +385,7 @@ export default function PublicPage(props: PublicPageProps) {
           or there'd be no way back to the feed. */}
       {showFeed && (feedInRow
         ? (props.feed as (ctx: FeedRenderCtx) => React.ReactNode)({
-            showing: showingFeed, open: () => setTab('feed'),
+            showing: showingFeed, open: () => setTab('feed'), guest: asGuest,
           })
         : (showingFeed && (props.feed as React.ReactNode)))}
 

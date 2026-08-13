@@ -655,7 +655,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       spaceId={space.id}
       me={me}
       entityName={space.name}
-      leading={[
+      // The open web gets the stream, not the workshop (founder
+      // 2026-08-11) — member tools drop away for a guest (or the steward
+      // previewing as one).
+      leading={ctx.guest ? [] : [
         // Every section carries its own doors: + posts INTO this space,
         // Search searches WITHIN it (Figma 286-11770). Search-then-+ mirrors
         // Home's icon row (founder 2026-07-25 — one order everywhere).
@@ -664,11 +667,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       ]}
       // The brain closes the acting-doors group, just before the hairline
       // (founder 2026-08-05) — quiet when this section's consent is off.
-      assistantSection={ASSISTANT_SECTION[space.kind]}
+      assistantSection={ctx.guest ? undefined : ASSISTANT_SECTION[space.kind]}
       assistantOff={space.assistant_enabled === false}
       // …and the space's own rooms open the group after it.
-      afterGap={chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []}
-      trailing={[
+      afterGap={chatId && !ctx.guest ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }] : []}
+      trailing={ctx.guest ? [] : [
         // The founder's Marketplace-icon analogy: a Groups door appears only
         // when this space actually has groups nested under it.
         ...(childGroups.length > 0
@@ -688,6 +691,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       hideAreas={hasEvents ? ['events'] : []}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       listHidden={!ctx.showing}
+      interactive={!ctx.guest}
     />
   );
   const roomsSection = !backstage && resources.length > 0 && (
@@ -1105,6 +1109,25 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
           </div>
 
+          {/* The feed is a Lichen thing; the open web only sees it if this
+              space says so (founder 2026-08-11). */}
+          <label className="prof__consent">
+            <input
+              type="checkbox"
+              checked={pageEdit.showPosts === true}
+              onChange={(e) => setPageEdit((pm) => ({ ...pm, showPosts: e.target.checked }))}
+            />
+            <span>
+              <strong>Show this feed on the public page</strong>
+              <em>
+                Off, the stream stays inside Lichen and visitors see the tabs.
+                On, they can read public posts too — as a page to read, not to
+                act on: joining, recommending and messaging need an account.
+                Either way, visitors land on About first.
+              </em>
+            </span>
+          </label>
+
           {/* Spaces build their page's tabs from the same library people do
               (founder 2026-08-06) — this form never wrote `page` until now. */}
           <p className="prof__privacy-sub">This page&rsquo;s tabs</p>
@@ -1114,6 +1137,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             photos={pageEdit.photos ?? []}
             onPhotos={(photos) => setPageEdit((pm) => ({ ...pm, photos }))}
             uploaderId={me}
+            sections={pageEdit.sections}
+            onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
           />
 
           {/* A community can decide it works without the assistant — the AI
@@ -1198,7 +1223,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {plusMenu}
 
-      {!backstage && !tab && feedSection({ showing: true, open: () => {} })}
+      {!backstage && !tab && feedSection({ showing: true, open: () => {}, guest: !me })}
 
       {/* Admins see who's knocking (requests) and who hasn't answered (invites). */}
       {/* Member shares awaiting the shelves (courses/library) — stewards

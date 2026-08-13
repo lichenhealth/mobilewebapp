@@ -17,7 +17,11 @@ import './PageTabsEditor.css';
  *
  *  A tab stays off the live page until it has something to show, so adding one
  *  can never leave a visitor in an empty room. */
-export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, uploaderId }: {
+/** Built-in tabs whose lead line + photo the owner sets (page.sections). */
+const SECTIONED = ['about', 'services', 'goods', 'facilities'];
+type SectionMeta = Record<string, { lead?: string; image?: string } | undefined>;
+
+export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
   /** page.photos — what the Gallery tab shows. */
@@ -25,7 +29,16 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   onPhotos?: (next: string[]) => void;
   /** Whose storage folder the uploads land in (the signed-in member). */
   uploaderId?: string;
+  /** page.sections — each built-in tab's own lead line and photo
+   *  (founder 2026-08-11: reaching the Services photo). */
+  sections?: SectionMeta;
+  onSections?: (next: SectionMeta) => void;
 }) {
+  const patchSection = (id: string, patch: { lead?: string; image?: string }) => {
+    if (!onSections) return;
+    const cur = sections ?? {};
+    onSections({ ...cur, [id]: { ...cur[id], ...patch } });
+  };
   const [upBusy, setUpBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -107,9 +120,15 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
                 {tpl?.builtIn && <em className="ptabs__auto">fills itself</em>}
               </span>
               <span className="ptabs__moves">
-                {!tpl?.builtIn && (
+                {/* Built-in tabs fill their own BODY, but their lead line
+                    and photo are the owner's (founder 2026-08-11: "I need
+                    to adjust the photo on Services… how do I access that
+                    tab?"). Gallery keeps its own Write door below. */}
+                {(!tpl?.builtIn || (onSections && SECTIONED.includes(t.id))) && (
                   <button className="ptabs__mv" onClick={() => setOpenId(open ? null : t.id)}
-                    aria-label="Edit this tab">{open ? 'Done' : 'Write'}</button>
+                    aria-label="Edit this tab">
+                    {open ? 'Done' : tpl?.builtIn ? 'Style' : 'Write'}
+                  </button>
                 )}
                 <button className="ptabs__mv ptabs__mv--rm"
                   onClick={() => onChange(tabs.filter((x) => x.id !== t.id))}
@@ -119,6 +138,44 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
 
             {tpl?.builtIn && (
               <p className="ptabs__note">{tpl.blurb}</p>
+            )}
+
+            {/* A built-in tab's own lead + photo — its body still fills
+                itself from your profile. */}
+            {open && tpl?.builtIn && onSections && SECTIONED.includes(t.id) && (
+              <div className="ptabs__edit">
+                <input
+                  className="prof__input"
+                  value={sections?.[t.id]?.lead ?? ''}
+                  placeholder="A first line — the point of this page"
+                  onChange={(e) => patchSection(t.id, { lead: e.target.value || undefined })}
+                />
+                {sections?.[t.id]?.image && (
+                  <span className="ptabs__shot ptabs__shot--wide">
+                    <img src={sections[t.id]!.image} alt="" />
+                    <button onClick={() => patchSection(t.id, { image: undefined })}
+                      aria-label="Remove this photo">×</button>
+                  </span>
+                )}
+                {uploaderId && (
+                  <label className="btn ptabs__upload">
+                    {upBusy ? 'Adding…' : sections?.[t.id]?.image ? 'Replace photo' : 'Add a photo'}
+                    <input type="file" accept="image/*" hidden disabled={upBusy}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        setUpBusy(true);
+                        try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
+                        catch (err) { console.error(err); }
+                        setUpBusy(false);
+                      }} />
+                  </label>
+                )}
+                <p className="ptabs__note">
+                  This tab writes itself from your profile — the line and photo above are yours to set.
+                </p>
+              </div>
             )}
 
             {/* The Gallery tab is pictures, not prose. */}

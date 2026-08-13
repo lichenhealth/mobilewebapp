@@ -25,10 +25,19 @@ const FIELDS: { key: keyof ContactInfo; label: string; placeholder: string }[] =
   { key: 'facebook', label: 'Facebook', placeholder: 'facebook.com/…' },
 ];
 
-export default function ContactFields({ value, onChange, lead }: {
+/** One tappable "pull from Lichen" offer under an empty field. */
+export type ContactSuggestion = { label: string; value: string };
+
+export default function ContactFields({ value, onChange, lead, suggestions }: {
   value: ContactInfo;
   onChange: (next: ContactInfo) => void;
   lead?: string;
+  /** What Lichen already knows, per field (founder 2026-08-11) — offered
+   *  as one-tap chips under EMPTY fields, never auto-filled: this page is
+   *  public, and much of this data lives in more private scopes (phone is
+   *  care-team-only, addresses are member-visible). Publishing it stays a
+   *  deliberate act. */
+  suggestions?: Partial<Record<keyof ContactInfo, ContactSuggestion[]>>;
 }) {
   return (
     <div className="contactf">
@@ -43,6 +52,19 @@ export default function ContactFields({ value, onChange, lead }: {
               onChange={(e) => onChange({ ...value, [f.key]: e.target.value })}
               placeholder={f.placeholder}
             />
+            {!(value[f.key] ?? '').trim() && (suggestions?.[f.key]?.length ?? 0) > 0 && (
+              <span className="contactf__suggs">
+                {suggestions![f.key]!.slice(0, 3).map((s) => (
+                  <button
+                    key={s.value} type="button" className="contactf__sugg"
+                    onClick={() => onChange({ ...value, [f.key]: s.value })}
+                    title={s.value}
+                  >
+                    <em>From Lichen</em> {s.label}
+                  </button>
+                ))}
+              </span>
+            )}
           </label>
         ))}
       </div>

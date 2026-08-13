@@ -42,7 +42,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -79,6 +79,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   /** Row-only mode: the icon row stays up as the profile's section switcher
    *  while another tab (About, Services) owns the content below. */
   listHidden?: boolean;
+  /** False when rendering for the open web (a guest, or the owner
+   *  previewing as one — founder 2026-08-11): cards read-only, no member
+   *  actions. The doors themselves are the CALLER's to strip. */
+  interactive?: boolean;
 }) {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -251,21 +255,27 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             eyebrow={whenLabel(p) ?? postToCard(p, me, spaceNames).eyebrow}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-            trusted={myMyc.has('profile:' + p.author_id)}
-            recommended={myRecs.has('post:' + p.id)}
-            mycelium={overlays[p.id]}
-            availability={{ trust: !!me && p.author_id !== me }}
-            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
-            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
-            saved={mySaves.has('post:' + p.id)}
-            onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-            extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
-            viewerIsAuthor={p.author_id === me}
-            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
-            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+            trusted={interactive && myMyc.has('profile:' + p.author_id)}
+            recommended={interactive && myRecs.has('post:' + p.id)}
+            mycelium={interactive ? overlays[p.id] : undefined}
+            // On the open web every Lichen action grays out rather than
+            // vanishing (founder 2026-08-11: "grayed out unless someone
+            // logs in") — the page reads as a real Lichen page you could
+            // join, not a stripped one.
+            availability={interactive
+              ? { trust: !!me && p.author_id !== me }
+              : { trust: false, recommend: false, share: false, save: false, chat: false }}
+            onTrust={interactive ? (on) => { void setTrust('profile', p.author_id, on).catch(console.error); } : undefined}
+            onRecommend={interactive ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
+            saved={interactive && mySaves.has('post:' + p.id)}
+            onSave={interactive ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
+            extraMenuItems={interactive && me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
+            viewerIsAuthor={interactive && p.author_id === me}
+            onManage={interactive && p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+            onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+            onDelete={interactive && !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onHide={interactive && me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onMessage={interactive && me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
           />
         ))}
       </div>}

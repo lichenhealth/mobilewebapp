@@ -16,3 +16,18 @@
 }
 .contactl__row a { color: var(--peach-deep); text-decoration: none; }
 .contactl__row a:hover { text-decoration: underline; }
+
+/* "Pull from Lichen" offers under an empty field — one tap fills it in;
+   never auto-filled, because this page is public (founder 2026-08-11). */
+.contactf__suggs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.contactf__sugg {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm)); border: 1px solid var(--peach);
+  font-size: 12px; color: var(--ink); cursor: pointer; text-align: left;
+}
+.contactf__sugg em {
+  font-style: normal; font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--peach-deep);
+}
+.contactf__sugg:hover { background: var(--peach-tint); }

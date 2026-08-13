@@ -308,16 +308,20 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       profileId={member.id}
       me={me}
       entityName={name}
-      leading={[
+      // The open web gets the stream, not the workshop (founder
+      // 2026-08-11): Search/Add/AI are member tools, so a guest — or the
+      // owner previewing as one — sees only the Feed door and the areas.
+      leading={ctx.guest ? [] : [
         { icon: 'search' as const, label: 'Search', onClick: () => navigate(`/search?member=${member.id}`) },
         ...(isSelf
           ? [{ icon: 'plus' as const, label: 'Add', onClick: () => navigate('/compose') }]
           : []),
       ]}
-      assistantSection="profile"
+      assistantSection={ctx.guest ? undefined : 'profile'}
       assistantOff={member.assistant_enabled === false}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       listHidden={!ctx.showing}
+      interactive={!ctx.guest}
     />
   );
 
@@ -404,7 +408,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         {member.bio && <p className="mprof__bio">{member.bio}</p>}
       </div>
       {identityExtras}
-      {memberFeed({ showing: true, open: () => {} })}
+      {memberFeed({ showing: true, open: () => {}, guest: !me })}
     </div>
   );
 }

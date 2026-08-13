@@ -26,7 +26,9 @@ import { currentPushState, enablePush, disablePush, type PushState } from '../li
 import './Profile.css';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
-import ContactFields, { type ContactInfo } from '../components/ContactFields';
+import ContactFields, { type ContactInfo, type ContactSuggestion } from '../components/ContactFields';
+import { listMyBookingTypes } from '../lib/bookingApi';
+import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
@@ -64,6 +66,36 @@ const SPACE_SECTIONS: { kind: SpaceKind; title: string; one: string }[] = [
 const ROLE_LABEL: Record<SpaceRole, string> = {
   super_admin: 'super admin', admin: 'admin', member: 'member',
 };
+
+// "Tue–Sat, 9am–5pm · Sun, 10am–2pm" from availability windows —
+// consecutive weekdays sharing a range collapse into one span.
+const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function fmtMin(m: number): string {
+  const h = Math.floor(m / 60), mm = m % 60;
+  const h12 = ((h + 11) % 12) + 1;
+  const ap = h < 12 ? 'am' : 'pm';
+  return mm ? `${h12}:${String(mm).padStart(2, '0')}${ap}` : `${h12}${ap}`;
+}
+function formatWeeklyHours(ws: { weekday: number; start_min: number; end_min: number }[]): string {
+  if (!ws.length) return '';
+  const byDay = new Map<number, string>();
+  ws.forEach((w) => {
+    const r = `${fmtMin(w.start_min)}–${fmtMin(w.end_min)}`;
+    byDay.set(w.weekday, byDay.has(w.weekday) ? `${byDay.get(w.weekday)!} & ${r}` : r);
+  });
+  const days = [1, 2, 3, 4, 5, 6, 0]; // Monday-first reading order
+  const parts: string[] = [];
+  let i = 0;
+  while (i < days.length) {
+    const r = byDay.get(days[i]);
+    if (!r) { i++; continue; }
+    let j = i;
+    while (j + 1 < days.length && byDay.get(days[j + 1]) === r) j++;
+    parts.push(`${DAY_ABBR[days[i]]}${j > i ? `–${DAY_ABBR[days[j]]}` : ''}, ${r}`);
+    i = j + 1;
+  }
+  return parts.join(' · ');
+}
 
 export default function Profile() {
   const { user, loading, isAdmin } = useAuth();
@@ -295,6 +327,46 @@ export default function Profile() {
       .eq('id', user.id);
     if (e) { setError(e.message); setContentDefaults(prior); }
   }
+  // "From Lichen" contact suggestions (founder 2026-08-11): what the app
+  // already knows, offered under empty Contact & hours fields as one-tap
+  // chips — never auto-filled, because that section is PUBLIC and these
+  // values live in more private scopes until the tap says otherwise.
+  const [contactSuggs, setContactSuggs] = useState<Partial<Record<keyof ContactInfo, ContactSuggestion[]>>>({});
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    (async () => {
+      const [btRes, awRes, blRes] = await Promise.all([
+        listMyBookingTypes(user.id),
+        supabase.from('availability_windows').select('weekday, start_min, end_min, kind').eq('profile_id', user.id).eq('kind', 'available'),
+        supabase.from('profile_locations').select('label, location').eq('profile_id', user.id).order('created_at'),
+      ]);
+      if (!live) return;
+      const suggs: Partial<Record<keyof ContactInfo, ContactSuggestion[]>> = {};
+      if (user.email) suggs.email = [{ label: user.email, value: user.email }];
+      if (phone.trim()) suggs.phone = [{ label: phone.trim(), value: phone.trim() }];
+      const bookables = btRes.filter((b) => b.active && b.audience === 'everyone');
+      if (bookables.length) {
+        suggs.booking = bookables.slice(0, 2).map((b) => ({
+          label: `Your Lichen booking page — ${b.title}`,
+          value: `${APP_ORIGIN}/book/${b.id}`,
+        }));
+      }
+      const windows = (awRes.data as { weekday: number; start_min: number; end_min: number }[] | null) ?? [];
+      const hoursText = formatWeeklyHours(windows);
+      if (hoursText) suggs.hours = [{ label: hoursText, value: hoursText }];
+      const locs = (blRes.data as { label: string; location: string }[] | null) ?? [];
+      if (locs.length) {
+        suggs.address = locs.slice(0, 3).map((l) => ({
+          label: l.label ? `${l.label} — ${l.location}` : l.location,
+          value: l.location,
+        }));
+      }
+      setContactSuggs(suggs);
+    })();
+    return () => { live = false; };
+  }, [user, phone]);
+
   // Web of Wellbeing sharing (founder 2026-08-11): the financial picture
   // lives with the rest of your health info, care-team-only by default —
   // or fully private, understanding what can no longer be built on it.
@@ -713,6 +785,26 @@ export default function Profile() {
             )}
           </div>
 
+          {/* The feed is a Lichen thing; the open web only sees it if you
+              say so (founder 2026-08-11) — and even then About greets a
+              visitor first. */}
+          <label className="prof__consent">
+            <input
+              type="checkbox"
+              checked={pageMeta.showPosts === true}
+              onChange={(e) => setPage({ showPosts: e.target.checked })}
+            />
+            <span>
+              <strong>Show my feed on my public page</strong>
+              <em>
+                Off, your posts stay inside Lichen and visitors see your tabs.
+                On, they can read your public posts too — as a page to read,
+                not to act on: recommending, saving and messaging need an
+                account. Either way, visitors land on About first.
+              </em>
+            </span>
+          </label>
+
           <p className="prof__privacy-sub">Your page&rsquo;s tabs</p>
           <PageTabsEditor
             tabs={pageMeta.tabs ?? []}
@@ -720,6 +812,8 @@ export default function Profile() {
             photos={pageMeta.photos ?? []}
             onPhotos={(photos: string[]) => setPage({ photos })}
             uploaderId={user?.id}
+            sections={pageMeta.sections}
+            onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
           />
 
           <p className="prof__privacy-sub">Contact &amp; hours</p>
@@ -727,6 +821,7 @@ export default function Profile() {
             value={contact}
             onChange={setContact}
             lead="How someone reaches you without joining Lichen. Leave a field empty to keep it off the page."
+            suggestions={contactSuggs}
           />
 
           <div className="prof__save-row">
