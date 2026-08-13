@@ -98,6 +98,44 @@ Deno.serve(async (req) => {
     }
   }
 
+  // WHERE THEY STAND (founder 2026-08-11): the thread is always the
+  // MEMBER's, but what the assistant can usefully help with changes with
+  // their role in each place. Galyn is a member of Melanie's Mentorship
+  // Group and both member AND steward of WAG — so the assistant helps her
+  // participate in the first and also run the second. This reads only her
+  // OWN memberships; nobody else's standing is fetched.
+  let standing = '';
+  {
+    const mem = await (await sb(
+      `space_members?profile_id=eq.${profile_id}&select=role,duties,spaces(name,kind)&limit=60`,
+    )).json();
+    const rows = (Array.isArray(mem) ? mem : []) as {
+      role: string; duties: string[] | null; spaces: { name: string; kind: string } | null;
+    }[];
+    const steward = rows.filter((r) => r.role === 'admin' || r.role === 'super_admin');
+    const member = rows.filter((r) => r.role === 'member');
+    const name = (r: typeof rows[number]) => {
+      const s = r.spaces;
+      if (!s) return null;
+      // A duty-scoped admin stewards ONE part — say which, so the assistant
+      // doesn't offer them doors they don't actually hold.
+      const duties = Array.isArray(r.duties) && r.duties.length ? ` — ${r.duties.join(', ')} only` : '';
+      return `${s.name} (${s.kind})${duties}`;
+    };
+    const stewardNames = steward.map(name).filter(Boolean);
+    const memberNames = member.map(name).filter(Boolean);
+    if (stewardNames.length || memberNames.length) {
+      standing = '\n\nWhere this member stands today:'
+        + (stewardNames.length
+          ? `\n- They STEWARD (admin): ${stewardNames.join('; ')}. Here you can help both ways — running the place (approving who is waiting at the door, member roles, what is shared to the shelves, the public page, gatherings) AND taking part in it.`
+          : '')
+        + (memberNames.length
+          ? `\n- They are a MEMBER of: ${memberNames.join('; ')}. Here you help them take part — finding what is happening, joining in, offering and asking. Do not offer to run these or suggest steward actions they cannot take; if they need something only a steward can do, say who to ask.`
+          : '')
+        + '\nNever assume a role they do not hold, and never describe another member\'s standing.';
+    }
+  }
+
   // Staying in the right thread is part of the job: if what they've asked
   // plainly belongs somewhere else, say so and point, rather than doing the
   // work in the wrong place (founder 2026-08-11).
@@ -116,7 +154,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 400,
-      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${threadRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
       messages,
     }),
   });
