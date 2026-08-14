@@ -65,7 +65,7 @@ export default function Membership() {
   const [leaving, setLeaving] = useState(false);
   async function exitStageLeft() {
     setLeaving(true);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     navigate('/', { replace: true });
   }
 

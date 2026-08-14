@@ -129,7 +129,7 @@ export default function TopBar({
   async function signOut() {
     setSwitchOpen(false);
     clearPromptCache();   // the next member reads their own history, not yours
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     navigate('/login', { replace: true });
   }
 
@@ -225,7 +225,12 @@ export default function TopBar({
           title={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
           aria-label={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
-          {actor.type !== 'self' ? (
+          {!user ? (
+            /* Signed out is a STATE, not a broken avatar (founder 2026-08-13:
+               "side nav disappeared" was a lost session presenting as a "?"
+               circle). Say the one thing that fixes everything. */
+            <span className="top-bar__signin">Sign in</span>
+          ) : actor.type !== 'self' ? (
             <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
               {monogramFor(actor.name)}
             </span>

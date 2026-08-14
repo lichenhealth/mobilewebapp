@@ -644,7 +644,7 @@ export default function Profile() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     navigate('/login', { replace: true });
   }
 

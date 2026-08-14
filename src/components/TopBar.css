@@ -224,3 +224,11 @@
   padding: 2px; display: inline-flex; line-height: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
+
+/* Signed out, the chip says so instead of showing a "?" avatar — a lost
+   session should read as a state with one obvious door, not as breakage. */
+.top-bar__signin {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 14px;
+  border-radius: var(--r-full); background: var(--peach); color: #fff;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
