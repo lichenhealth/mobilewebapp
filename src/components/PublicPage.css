@@ -107,6 +107,11 @@
 }
 .ppage__nav-icon--on:hover { border-color: var(--peach); color: var(--peach-deep); }
 .ppage__cta--nav { margin-top: 0; margin-left: auto; padding: 9px 18px; font-size: 14px; white-space: nowrap; }
+/* Only the FIRST pill pushes right — with auto margins on every CTA the
+   leftover space distributes BETWEEN them, stranding one mid-row (founder
+   2026-08-14: keep the actions together so they share a line sooner). The
+   ~ catches later pills whether they're <a> CTAs or <button> extraCtas. */
+.ppage__cta--nav ~ .ppage__cta--nav { margin-left: 0; }
 /* Platform doors, upper right — the invitation pill with a quiet Sign-in
    bubble beneath it, right-aligned. Design-forward: no heavy fills up here,
    and plenty of air so nothing feels scrunched (founder 2026-07-29). */
