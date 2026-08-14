@@ -180,8 +180,9 @@ export default function Home() {
             // The doorway: present members lead a WEB — yours as yourself,
             // and the space's own while you're acting as one (founder
             // 2026-08-13: "have the network tagline go... to Countryman
-            // Stable's mycelium"). One destination again now that a space
-            // has a web of its own and My-celium no longer bounces.
+            // Stable's mycelium"; briefly re-pointed at the Members tab the
+            // same day, then confirmed back here — "we point to mycelium
+            // for that"). One destination; an empty web says what it is.
             <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
               {presenceLine(present, available, actor.type === 'space' ? actor.name : null)}
               <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>

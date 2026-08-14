@@ -4,7 +4,7 @@ import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { Icon } from '../components/Icon';
-import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
+import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
@@ -219,7 +219,6 @@ export default function Events() {
           <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
             <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
           </button>
-          <ScopeEscape to="/events" label="Go to Lichen Events" />
           <h1 className="mkt__title">
             {scopeName}&rsquo;s <span className="display-italic">Events</span>
           </h1>

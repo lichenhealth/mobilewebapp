@@ -7,18 +7,11 @@ import './ScopeEscape.css';
  *  narrowed. So it has to read as ITSELF even at zero, and always offer the
  *  way out to the unfiltered thing.
  *
- *  `ScopeEscape` is the door, sitting to the LEFT of the section's own mark.
  *  `ScopeEmpty` is what an empty filter should say: whose shelf is bare, and
- *  where the full one is. */
-export function ScopeEscape({ to, label }: { to: string; label: string }) {
-  const navigate = useNavigate();
-  return (
-    <button className="scope-esc" onClick={() => navigate(to)}>
-      <Icon name="arrow-left" size={12} /> {label}
-    </button>
-  );
-}
-
+ *  where the full one is; `ScopeMore` is the same pointer under a thin shelf.
+ *  (The separate header escape chip retired 2026-08-13 — founder: with the
+ *  link living where the content should be, the extra button was redundant
+ *  and made the UI busy.) */
 export function ScopeEmpty({ icon, section, who, to, label }: {
   icon: Parameters<typeof Icon>[0]['name'];
   /** The section's own name — "Library", "Marketplace". */

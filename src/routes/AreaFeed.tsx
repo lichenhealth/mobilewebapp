@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { webAuthorFilter } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
-import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
+import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { possessive } from '../lib/names';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -217,7 +217,6 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <p className="mkt__crumb">
           {/* Filtered is still the whole section, narrowed — the door back
               to all of it sits left of the mark (founder 2026-08-11). */}
-          {scoped && <ScopeEscape to={`/${area}`} label={`Go to Lichen ${crumb}`} />}
           <Icon name={icon} size={11} />
           <span>{crumb}</span>
         </p>

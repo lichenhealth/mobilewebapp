@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
-import { ScopeEscape, ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
+import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useActing } from '../acting/ActingProvider';
 import { possessive } from '../lib/names';
 import { LichenMark } from '../components/LichenMark';
@@ -342,7 +342,6 @@ export default function Marketplace() {
         <p className="mkt__crumb">
           {/* A filtered Marketplace is still the Marketplace — the way to
               the whole of it sits left of the mark (founder 2026-08-11). */}
-          {scoped && <ScopeEscape to="/market" label="Go to Lichen Marketplace" />}
           <Icon name="store" size={11} />
           <span>Marketplace</span>
         </p>

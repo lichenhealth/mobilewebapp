@@ -1,11 +1,4 @@
 /* The way out of a filter, and what a filtered-but-empty shelf says. */
-.scope-esc {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  padding: 4px 10px; border-radius: var(--r-full);
-  border: 1px solid var(--bone-edge); background: var(--bone-warm);
-  font-size: 11px; color: var(--ink-soft); font-family: inherit; cursor: pointer;
-}
-.scope-esc:hover { border-color: var(--peach); color: var(--peach-deep); }
 
 .scope-empty {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
