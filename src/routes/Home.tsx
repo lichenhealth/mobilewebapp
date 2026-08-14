@@ -70,7 +70,9 @@ function presenceLine(present: number | null, available: number, whose: string |
   }
   if (present) return `${n(present)} in ${where} ${isAre(present)} present.`;
   if (available) return `${n(available)} in ${where} ${isAre(available)} available.`;
-  // Nobody here is a GOOD sign (founder 2026-08-13: "they are out in the
+  // The state itself is named ELSEWHERE (founder 2026-08-14) — the third of
+  // present / available / elsewhere. The greeting renders it as "out living":
+  // nobody here is a GOOD sign (founder 2026-08-13: "they are out in the
   // world living their lives... we want Lichen to be a utility for healthy,
   // real engagement in the world, not a social network that's addictive").
   // "Resting" implied being here was the natural state and everyone had

@@ -129,6 +129,17 @@ export default function Calendar() {
     setSelectedCals((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
     setOverlayOn(false);
   };
+  // Search-first picker (founder 2026-08-14): the row no longer lists every
+  // membership as a bubble — type into "Add a calendar" instead. Empty query
+  // = the full membership list, so focus alone still shows everything.
+  const [calQ, setCalQ] = useState('');
+  const [calAddOpen, setCalAddOpen] = useState(false);
+  const calChoices = useMemo(() => {
+    const q = calQ.trim().toLowerCase();
+    return calendars
+      .filter((c) => !selectedCals.includes(c.id))
+      .filter((c) => !q || c.name.toLowerCase().includes(q));
+  }, [calendars, selectedCals, calQ]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
@@ -519,8 +530,11 @@ export default function Calendar() {
           </button>
         </div>
 
-        {/* Calendar chips — ADDITIVE: Mine defaults on, tap spaces to layer
-            their events in (+ find-a-time toggle when exactly one space is on) */}
+        {/* Calendar chips — ADDITIVE, and SEARCH-FIRST (founder 2026-08-14:
+            "with so many calendars... lets just have search right off the bat,
+            'Add a calendar' being the prompt"). Only Mine + calendars that are
+            ON render as chips; everything else is found by typing. Tap a chip
+            to drop it. */}
         <div className="calp__chips">
           <button
             className={'calp__calchip' + (selectedCals.includes('me') ? ' is-on' : '')}
@@ -529,17 +543,27 @@ export default function Calendar() {
           >
             Mine
           </button>
-          {calendars.map((c) => (
+          {calendars.filter((c) => selectedCals.includes(c.id)).map((c) => (
             <button
               key={c.id}
-              className={'calp__calchip' + (selectedCals.includes(c.id) ? ' is-on' : '')}
+              className="calp__calchip is-on"
               onClick={() => toggleCal(c.id)}
-              aria-pressed={selectedCals.includes(c.id)}
+              title={`Remove ${c.name}`}
             >
               <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
               {c.name}
+              <span className="calp__chipx" aria-hidden="true">×</span>
             </button>
           ))}
+          <input
+            className="calp__addcal"
+            placeholder="Add a calendar…"
+            value={calQ}
+            onChange={(e) => setCalQ(e.target.value)}
+            onFocus={() => setCalAddOpen(true)}
+            onBlur={() => setCalAddOpen(false)}
+            aria-label="Add a calendar"
+          />
           {spaceSel.length > 0 && view !== "month" && view !== "schedule" && (
             <button
               className={'calp__calchip calp__calchip--overlay' + (overlayOn ? ' is-on' : '')}
@@ -550,6 +574,46 @@ export default function Calendar() {
             </button>
           )}
         </div>
+        {/* The add-a-calendar results live BELOW the chip row (it scrolls
+            horizontally — a dropdown inside it would clip). An empty query
+            lists every calendar you're a member of, so nothing that used to
+            be a bubble became unfindable. Actions run on POINTERDOWN with
+            preventDefault: it fires before the input's blur can close the
+            panel, and keeps focus in the input so you can add several.
+            (A plain onClick never fires here — blur unmounts the panel
+            between pointerdown and click.) */}
+        {calAddOpen && (
+          <div className="calp__search">
+            {calChoices.map((c) => (
+              <button
+                className="calp__result" key={c.id}
+                onPointerDown={(e) => { e.preventDefault(); toggleCal(c.id); setCalQ(''); }}
+              >
+                <span className="calp__result-title">
+                  <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
+                  {c.name}
+                </span>
+                <span className="calp__result-when">add</span>
+              </button>
+            ))}
+            {calChoices.length === 0 && !calQ.trim() && (
+              <p className="calp__result-none">
+                {calendars.length === 0
+                  ? 'When you join a group, its calendar will show up here.'
+                  : 'Every calendar from your groups is already on.'}
+              </p>
+            )}
+            {calQ.trim() && (
+              <button
+                className="calp__result"
+                onPointerDown={(e) => { e.preventDefault(); setQuery(calQ.trim()); setSearchOpen(true); setCalQ(''); setCalAddOpen(false); }}
+              >
+                <span className="calp__result-title">Search all of Lichen for “{calQ.trim()}”</span>
+                <span className="calp__result-when">members &amp; groups</span>
+              </button>
+            )}
+          </div>
+        )}
         {searchOpen && (
           <div className="calp__search">
             <input
