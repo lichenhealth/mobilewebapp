@@ -35,7 +35,7 @@ export function SmartLocation({ loc, className }: { loc: string; className: stri
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
-import { listReminders, listDone, setDone, remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
+import { listReminders, listDone, setDone, remindersOn, leaveReminder, type Reminder as ReminderRow } from '../lib/remindersApi';
 import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
@@ -845,6 +845,10 @@ export default function Calendar() {
           reminders={reminders}
           remDone={remDone}
           onToggleRem={toggleRem}
+          onLeave={(r) => {
+            setReminders((cur) => cur.filter((x) => x.id !== r.id));
+            void leaveReminder(r.id, me).catch(console.error);
+          }}
           days={Array.from({ length: 30 }, (_, i) => addDays(today, i))}
           today={today}
         />

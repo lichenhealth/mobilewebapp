@@ -14,6 +14,9 @@ export interface Reminder {
   at_min: number | null;    // null = day reminder (morning nudge)
   lead_min: number;
   recurrence: Recurrence | null;
+  /** The owner's name — set on rows ASSIGNED to you (profile_id ≠ you), so
+   *  the list can say whose task it is. */
+  owner?: { full_name: string | null } | null;
 }
 
 // A shared-nudge recipient — a person or a whole space (org/group/community).
@@ -50,11 +53,29 @@ export async function loadReminderRecipients(reminderId: string): Promise<Recipi
   }));
 }
 
+/** Your reminders AND the ones assigned to you (founder 2026-08-14 — the
+ *  assignment machinery existed for a year of Thursdays but the client only
+ *  ever loaded your own rows; RLS was already right). No owner filter: RLS
+ *  returns what you own plus what names you (directly or via a space). */
 export async function listReminders(me: string): Promise<Reminder[]> {
   const { data, error } = await supabase.from('reminders')
-    .select(COLS).eq('profile_id', me).order('created_at');
-  if (error) { console.warn('listReminders:', error.message); return []; }
-  return (data as Reminder[] | null) ?? [];
+    .select(COLS + ', owner:profiles!reminders_profile_id_fkey(full_name)')
+    .order('created_at');
+  if (error) {
+    // Pre-migration fallback: owned rows only, no owner join.
+    const own = await supabase.from('reminders').select(COLS).eq('profile_id', me).order('created_at');
+    return (own.data as Reminder[] | null) ?? [];
+  }
+  return (data as unknown as Reminder[] | null) ?? [];
+}
+
+/** Step out of a task someone assigned to you — deletes YOUR recipient row
+ *  (the "reminder_recipients leave" policy); the owner's task is untouched. */
+export async function leaveReminder(reminderId: string, me: string): Promise<void> {
+  const { error } = await supabase.from('reminder_recipients')
+    .delete().eq('reminder_id', reminderId)
+    .eq('recipient_type', 'profile').eq('recipient_id', me);
+  if (error) throw error;
 }
 
 export async function createReminder(

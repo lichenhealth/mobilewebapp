@@ -598,14 +598,21 @@ export default function EventComposer() {
                     </select>
                   </div>
                 ) : (
-                  <p className="evav__note">A quiet nudge on your calendar that day — it never blocks your availability.</p>
+                  <p className="evav__note">
+                    No exact time — a <strong>finish-by</strong> task for that
+                    day. You (and anyone you assign) get a morning nudge; it
+                    never blocks availability.
+                  </p>
                 )}
               </div>
               {/* Nudge others rides in the right column beside the tall calendar —
                   fills the gap, keeps the form above the fold (founder design rule). */}
               <div className="cedit__field cedit__nudge">
-                <span className="cedit__label">Nudge others (optional)</span>
-                <p className="cedit__hint-ev">A shared nudge reminds the people you name too — no RSVP, and it never marks anyone busy.</p>
+                <span className="cedit__label">Assign / nudge others (optional)</span>
+                <p className="cedit__hint-ev">
+                  It lands on their list too — each person ticks their own
+                  copy, can step out any time, and nobody is ever marked busy.
+                </p>
                 {recipients.length > 0 && (
                   <div className="cedit__chips">
                     {recipients.map((r) => (

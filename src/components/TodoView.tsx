@@ -5,6 +5,8 @@ import { localDate } from '../lib/conciergeApi';
 import { minToLabel } from '../lib/calendarApi';
 import { remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
 import { listTodos, createTodo, setTodoDone, deleteTodo, type Todo } from '../lib/todosApi';
+import { visibleTasksOf, type VisibleTasks } from '../lib/tasksApi';
+import { supabase } from '../lib/supabase';
 import './TodoView.css';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -13,12 +15,15 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  calendar grid does. Free-form to-dos up top; reminders auto-populate below,
  *  grouped by day. Tick a reminder to mark that day done; tap it to edit. */
 export default function TodoView({
-  me, reminders, remDone, onToggleRem, days, today,
+  me, reminders, remDone, onToggleRem, onLeave, days, today,
 }: {
   me: string;
   reminders: ReminderRow[];
   remDone: Set<string>;
   onToggleRem: (r: ReminderRow, iso: string) => void;
+  /** Step out of a task someone assigned to you — removes it from your list,
+   *  leaves the owner's untouched. */
+  onLeave?: (r: ReminderRow) => void;
   days: string[];
   today: string;
 }) {
@@ -48,6 +53,30 @@ export default function TodoView({
   const remove = (t: Todo) => {
     setTodos((cur) => cur.filter((x) => x.id !== t.id));
     void deleteTodo(t.id).catch(console.error);
+  };
+
+  // Someone else's list, if their rules admit you.
+  const [peerQ, setPeerQ] = useState('');
+  const [peerHits, setPeerHits] = useState<{ id: string; name: string }[]>([]);
+  const [peer, setPeer] = useState<VisibleTasks | null>(null);
+  const [peerTried, setPeerTried] = useState<string | null>(null);
+  useEffect(() => {
+    const q = peerQ.trim();
+    if (q.length < 2 || peer) { setPeerHits([]); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name').ilike('full_name', `%${q}%`).neq('id', me).limit(5);
+      if (live) setPeerHits(((data as { id: string; full_name: string | null }[] | null) ?? [])
+        .map((r) => ({ id: r.id, name: r.full_name ?? 'Member' })));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [peerQ, peer, me]);
+  const openPeer = async (h: { id: string; name: string }) => {
+    setPeerHits([]); setPeerQ('');
+    const v = await visibleTasksOf(h.id);
+    if (v) { setPeer(v); setPeerTried(null); }
+    else { setPeer(null); setPeerTried(h.name); }
   };
 
   const openTodos = todos.filter((t) => !t.done);
@@ -102,7 +131,17 @@ export default function TodoView({
                     <button className="todo__title todo__title--btn" onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}>
                       {r.title}
                       {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
+                      {r.profile_id !== me && (
+                        <span className="todo__from">from {r.owner?.full_name ?? 'a member'}</span>
+                      )}
                     </button>
+                    {r.profile_id !== me && onLeave && (
+                      <button
+                        className="todo__x" aria-label="Step out of this task"
+                        title="Step out — their task stays on their list"
+                        onClick={() => onLeave(r)}
+                      ><Icon name="close" size={12} /></button>
+                    )}
                   </div>
                 );
               })}
@@ -110,6 +149,67 @@ export default function TodoView({
           ))}
         </>
       )}
+
+      {/* SEE SOMEONE'S LIST (founder 2026-08-14): only what their task-
+          visibility rules admit — default is hidden, and a private list says
+          so honestly instead of rendering blank. Session-only. */}
+      <div className="todo__peer">
+        {!peer && !peerTried && (
+          <div className="todo__add">
+            <input
+              className="todo__input" value={peerQ}
+              onChange={(e) => setPeerQ(e.target.value)}
+              placeholder="See someone's list…"
+            />
+          </div>
+        )}
+        {peerHits.map((h) => (
+          <button key={h.id} className="calp__match" onClick={() => void openPeer(h)}>
+            {h.name}
+          </button>
+        ))}
+        {peerTried && !peer && (
+          <p className="todo__empty">
+            {peerTried} keeps their tasks private.{' '}
+            <button className="todo__peer-clear" onClick={() => { setPeerTried(null); setPeerQ(''); }}>OK</button>
+          </p>
+        )}
+        {peer && (
+          <>
+            <p className="todo__head">
+              {peer.owner_name}&rsquo;s list
+              <button className="todo__peer-clear" onClick={() => { setPeer(null); setPeerTried(null); setPeerQ(''); }} aria-label="Close">×</button>
+            </p>
+            {peer.todos.map((t) => (
+              <div className="todo__row todo__row--peer" key={t.id}>
+                <span className="todo__box todo__box--ro" aria-hidden />
+                <span className="todo__title">{t.title}</span>
+              </div>
+            ))}
+            {days.map((iso) => {
+              const rems = remindersOn(peer.reminders as unknown as ReminderRow[], iso);
+              if (!rems.length) return null;
+              return (
+                <div className="todo__day" key={'peer' + iso}>
+                  <p className="todo__daylbl">{dayLabel(iso)}</p>
+                  {rems.map((r) => (
+                    <div className="todo__row todo__row--peer" key={r.id + iso}>
+                      <span className="todo__box todo__box--ro" aria-hidden />
+                      <span className="todo__title">
+                        {r.title}
+                        {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            {peer.todos.length === 0 && !days.some((iso) => remindersOn(peer.reminders as unknown as ReminderRow[], iso).length > 0) && (
+              <p className="todo__empty">Their list is clear.</p>
+            )}
+          </>
+        )}
+      </div>
 
       {doneTodos.length > 0 && (
         <>

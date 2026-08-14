@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zfc8TH1nVC8m58rQwXIRdyGZH6EKIZBmcdygV4D3Vc8w1kQNFg2QaIohIT5jQ7E
+\restrict 88acGkSGICV6ySrd50V1q7YI5aC6P2cSbzZhAeiNTQhrCGOtaaYg3w0evrvilVt
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4178,6 +4178,51 @@ end; $$;
 ALTER FUNCTION public.sync_member_to_chat() OWNER TO postgres;
 
 --
+-- Name: task_level(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.task_level(p_owner uuid, p_viewer uuid) RETURNS text
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v text;
+begin
+  if p_viewer is null then return 'hidden'; end if;
+  if p_owner = p_viewer then return 'see'; end if;
+
+  -- 1. An explicit person rule wins outright.
+  select s.level into v from public.task_shares s
+   where s.owner_id = p_owner and s.audience_type = 'profile'
+     and s.audience_profile_id = p_viewer;
+  if v is not null then return v; end if;
+
+  -- 2. Space rules over spaces BOTH belong to — most restrictive wins.
+  select s.level into v from public.task_shares s
+   where s.owner_id = p_owner and s.audience_type = 'space'
+     and public.is_space_member(s.audience_space_id, p_owner)
+     and public.is_space_member(s.audience_space_id, p_viewer)
+   order by case s.level when 'hidden' then 0 else 1 end asc
+   limit 1;
+  if v is not null then return v; end if;
+
+  -- 3. The web: a mycelium rule speaks to anyone the owner holds in theirs.
+  select s.level into v from public.task_shares s
+   where s.owner_id = p_owner and s.audience_type = 'mycelium'
+     and exists (select 1 from public.mycelium m
+                 where m.truster_id = p_owner
+                   and m.target_type = 'profile' and m.target_id = p_viewer);
+  if v is not null then return v; end if;
+
+  -- 4. Everyone, else the privacy-first default.
+  select s.level into v from public.task_shares s
+   where s.owner_id = p_owner and s.audience_type = 'everyone';
+  return coalesce(v, 'hidden');
+end $$;
+
+
+ALTER FUNCTION public.task_level(p_owner uuid, p_viewer uuid) OWNER TO postgres;
+
+--
 -- Name: tick_reminders(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4291,6 +4336,34 @@ $$;
 
 
 ALTER FUNCTION public.trust_edges_for_targets(p_targets jsonb) OWNER TO postgres;
+
+--
+-- Name: visible_tasks_of(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.visible_tasks_of(p_owner uuid) RETURNS jsonb
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select case when public.task_level(p_owner, auth.uid()) = 'hidden'
+    then null
+    else jsonb_build_object(
+      'owner_name', (select coalesce(full_name, 'A member') from public.profiles where id = p_owner),
+      'todos', coalesce((
+        select jsonb_agg(jsonb_build_object('id', t.id, 'title', t.title) order by t.created_at desc)
+        from public.todos t where t.profile_id = p_owner and not t.done), '[]'::jsonb),
+      'reminders', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', r.id, 'title', r.title, 'start_date', r.start_date,
+          'end_date', r.end_date, 'at_min', r.at_min, 'recurrence', r.recurrence))
+        from public.reminders r
+        where r.profile_id = p_owner
+          and (r.end_date >= current_date - 1 or r.recurrence is not null)), '[]'::jsonb))
+  end;
+$$;
+
+
+ALTER FUNCTION public.visible_tasks_of(p_owner uuid) OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -5767,6 +5840,26 @@ CREATE TABLE public.subscriptions (
 ALTER TABLE public.subscriptions OWNER TO postgres;
 
 --
+-- Name: task_shares; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.task_shares (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id uuid NOT NULL,
+    audience_type text NOT NULL,
+    audience_space_id uuid,
+    audience_profile_id uuid,
+    level text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT task_shares_audience_shape CHECK ((((audience_type = ANY (ARRAY['everyone'::text, 'mycelium'::text])) AND (audience_space_id IS NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'space'::text) AND (audience_space_id IS NOT NULL) AND (audience_profile_id IS NULL)) OR ((audience_type = 'profile'::text) AND (audience_profile_id IS NOT NULL) AND (audience_space_id IS NULL)))),
+    CONSTRAINT task_shares_audience_type_check CHECK ((audience_type = ANY (ARRAY['everyone'::text, 'mycelium'::text, 'space'::text, 'profile'::text]))),
+    CONSTRAINT task_shares_level_check CHECK ((level = ANY (ARRAY['hidden'::text, 'see'::text])))
+);
+
+
+ALTER TABLE public.task_shares OWNER TO postgres;
+
+--
 -- Name: todos; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -6403,6 +6496,14 @@ ALTER TABLE ONLY public.subscriptions
 
 
 --
+-- Name: task_shares task_shares_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.task_shares
+    ADD CONSTRAINT task_shares_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: todos todos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6899,6 +7000,13 @@ CREATE INDEX spaces_parent_idx ON public.spaces USING btree (parent_space_id);
 --
 
 CREATE INDEX sss_space_status_idx ON public.space_section_shares USING btree (space_id, area, status);
+
+
+--
+-- Name: task_shares_one_rule_per_audience; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX task_shares_one_rule_per_audience ON public.task_shares USING btree (owner_id, audience_type, COALESCE(audience_space_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(audience_profile_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 
 --
@@ -8304,6 +8412,30 @@ ALTER TABLE ONLY public.subscriptions
 
 
 --
+-- Name: task_shares task_shares_audience_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.task_shares
+    ADD CONSTRAINT task_shares_audience_profile_id_fkey FOREIGN KEY (audience_profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_shares task_shares_audience_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.task_shares
+    ADD CONSTRAINT task_shares_audience_space_id_fkey FOREIGN KEY (audience_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: task_shares task_shares_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.task_shares
+    ADD CONSTRAINT task_shares_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: todos todos_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -9582,6 +9714,13 @@ ALTER TABLE public.reminder_fired ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reminder_recipients ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: reminder_recipients reminder_recipients leave; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reminder_recipients leave" ON public.reminder_recipients FOR DELETE USING (((recipient_type = 'profile'::text) AND (recipient_id = auth.uid())));
+
+
+--
 -- Name: reminder_recipients reminder_recipients_owner; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -9769,6 +9908,19 @@ CREATE POLICY "sub read own" ON public.subscriptions FOR SELECT TO authenticated
 --
 
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: task_shares; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.task_shares ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: task_shares task_shares owner; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "task_shares owner" ON public.task_shares USING ((owner_id = auth.uid())) WITH CHECK ((owner_id = auth.uid()));
+
 
 --
 -- Name: todos; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -11049,6 +11201,15 @@ GRANT ALL ON FUNCTION public.sync_member_to_chat() TO service_role;
 
 
 --
+-- Name: FUNCTION task_level(p_owner uuid, p_viewer uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.task_level(p_owner uuid, p_viewer uuid) TO anon;
+GRANT ALL ON FUNCTION public.task_level(p_owner uuid, p_viewer uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.task_level(p_owner uuid, p_viewer uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION tick_reminders(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11082,6 +11243,15 @@ GRANT ALL ON FUNCTION public.translate_donation(p_donation uuid, p_to_type text,
 GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO anon;
 GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION visible_tasks_of(p_owner uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) TO service_role;
 
 
 --
@@ -12041,6 +12211,15 @@ GRANT ALL ON TABLE public.subscriptions TO service_role;
 
 
 --
+-- Name: TABLE task_shares; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.task_shares TO anon;
+GRANT ALL ON TABLE public.task_shares TO authenticated;
+GRANT ALL ON TABLE public.task_shares TO service_role;
+
+
+--
 -- Name: TABLE todos; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12122,7 +12301,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zfc8TH1nVC8m58rQwXIRdyGZH6EKIZBmcdygV4D3Vc8w1kQNFg2QaIohIT5jQ7E
+\unrestrict 88acGkSGICV6ySrd50V1q7YI5aC6P2cSbzZhAeiNTQhrCGOtaaYg3w0evrvilVt
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --

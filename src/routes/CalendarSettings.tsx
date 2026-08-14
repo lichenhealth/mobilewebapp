@@ -16,6 +16,7 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import CalImportGuide from '../components/CalImportGuide';
 import ShareRulesEditor from '../components/ShareRulesEditor';
+import TaskShareRules from '../components/TaskShareRules';
 import { loadMyPhone } from '../lib/conciergeApi';
 import {
   BookingType, listMyBookingTypes, saveBookingType, deleteBookingType,
@@ -532,6 +533,19 @@ export default function CalendarSettings() {
             onUpsert={(aud, lvl) => upsertShare(me, aud, lvl, null)}
             onDeleteRule={(id) => deleteShare(id)}
           />
+        </div>
+
+        {/* ── Tasks — who sees them (founder 2026-08-14) ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">My tasks &mdash; who sees them</span>
+          <p className="cedit__hint">
+            Your to-dos and reminders are <strong>hidden by default</strong> —
+            a task list is undone work, and it stays yours until you open it.
+            The most specific rule wins, and a rule set to Hidden excludes
+            that person or group even when a broader rule says yes. People
+            you admit see your list read-only, from the To&nbsp;Do view.
+          </p>
+          <TaskShareRules me={me} />
         </div>
 
       </div>
