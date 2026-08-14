@@ -39,7 +39,7 @@ import { listReminders, listDone, setDone, remindersOn, type Reminder as Reminde
 import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
-  loadMyExternalBusy, syncExternalCalendars,
+  loadMyExternalBusy, syncExternalCalendars, listExternalCalendars,
   listCalendarPins, addCalendarPin, removeCalendarPin,
 } from '../lib/calendarApi';
 import TodoView from '../components/TodoView';
@@ -111,18 +111,33 @@ export default function Calendar() {
 
   // Which calendars are showing — additive, like every lens row: Mine starts
   // on, tap a space chip to layer its events in (tap again to drop it).
+  // Imported calendars (Google, ICS) are their OWN chips, ids 'ext:<id>'
+  // (founder 2026-08-14: the chip row must tell the truth about every source
+  // on the grid — Google used to ride Mine invisibly).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
+  const [extCals, setExtCals] = useState<{ id: string; name: string }[]>([]);
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
+  useEffect(() => {
+    if (!me) return;
+    (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name }))))();
+  }, [me]);
   // Follows whoever the TopBar says you're acting as (founder 2026-08-10) —
   // acting as a space shows ITS calendar, not "Mine" (Galyn's) by default.
+  // As yourself, your imported calendars light up alongside Mine (they're
+  // your time too); as a space, the space's calendar stands alone.
+  const extKey = extCals.map((c) => c.id).join(',');
   useEffect(() => {
-    setSelectedCals(actor.type === 'space' ? [actor.id] : ['me']);
-  }, [actor]);
+    setSelectedCals(actor.type === 'space'
+      ? [actor.id]
+      : ['me', ...extCals.map((c) => 'ext:' + c.id)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor, extKey]);
   const [overlayOn, setOverlayOn] = useState(false);
   // Find-a-time spans EVERY selected space (founder 2026-07-22): the more
   // groups you add, the more availability narrows toward when ALL their
   // members are free. Mine may be on alongside.
-  const spaceSel = selectedCals.filter((x) => x !== 'me');
+  const spaceSel = selectedCals.filter((x) => x !== 'me' && !x.startsWith('ext:'));
+  const extSel = selectedCals.filter((x) => x.startsWith('ext:')).map((x) => x.slice(4));
   const spaceKey = spaceSel.join(',');
   const primarySpace = spaceSel[0] ?? null;   // organizer when creating from a slot
   const toggleCal = (id: string) => {
@@ -136,10 +151,15 @@ export default function Calendar() {
   const [calAddOpen, setCalAddOpen] = useState(false);
   const calChoices = useMemo(() => {
     const q = calQ.trim().toLowerCase();
-    return calendars
-      .filter((c) => !selectedCals.includes(c.id))
+    const all = [
+      ...calendars.map((c) => ({ key: c.id, name: c.name, tint: colorFor(c.id) })),
+      // Imported calendars join the same list — tint matches their blocks.
+      ...extCals.map((c) => ({ key: 'ext:' + c.id, name: c.name, tint: colorFor('extcal:' + c.id) })),
+    ];
+    return all
+      .filter((c) => !selectedCals.includes(c.key))
       .filter((c) => !q || c.name.toLowerCase().includes(q));
-  }, [calendars, selectedCals, calQ]);
+  }, [calendars, extCals, selectedCals, calQ]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
@@ -195,9 +215,10 @@ export default function Calendar() {
     ]);
     const byId = new Map<string, EventRow>();
     for (const arr of sources) for (const ev of arr) byId.set(ev.id, ev);
-    // Imported busy blocks ride along on YOUR calendar — muted, read-only.
-    if (selectedCals.includes('me')) {
-      for (const b of await loadMyExternalBusy(me, from, to)) {
+    // Imported busy blocks follow their OWN chips now — each connected
+    // calendar renders only while its chip is lit.
+    if (extSel.length > 0) {
+      for (const b of (await loadMyExternalBusy(me, from, to)).filter((r) => extSel.includes(r.calendar_id))) {
         byId.set('ext:' + b.id, {
           id: 'ext:' + b.id, creator_id: '', owner_profile_id: me, owner_space_id: null,
           title: b.title || 'Busy', description: '', location: '', lat: null, lng: null,
@@ -219,13 +240,20 @@ export default function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, from, to, selectedCals.join(',')]);
   useEffect(() => { load(); }, [load]);
+  // The sync callback must reload through a REF to the latest load — this
+  // effect runs once per member, so a captured `load` still carries the
+  // mount-time source selection. That stale closure is exactly how Google
+  // events painted the grid while acting-as had switched the chips to a
+  // space's calendar (founder's screenshot, 2026-08-14).
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
 
   // Refresh imported calendars quietly on arrival (the edge function skips
   // anything synced in the last 30 minutes), then fold new blocks in.
   useEffect(() => {
     if (!me) return;
     let live = true;
-    syncExternalCalendars().then(() => { if (live) load(); }).catch(() => { /* no external calendars / offline */ });
+    syncExternalCalendars().then(() => { if (live) loadRef.current(); }).catch(() => { /* no external calendars / offline */ });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
@@ -569,6 +597,18 @@ export default function Calendar() {
               <span className="calp__chipx" aria-hidden="true">×</span>
             </button>
           ))}
+          {extCals.filter((c) => selectedCals.includes('ext:' + c.id)).map((c) => (
+            <button
+              key={'ext:' + c.id}
+              className="calp__calchip is-on"
+              onClick={() => toggleCal('ext:' + c.id)}
+              title={`Remove ${c.name}`}
+            >
+              <span className="calp__chipdot" style={{ background: colorFor('extcal:' + c.id) }} />
+              {c.name}
+              <span className="calp__chipx" aria-hidden="true">×</span>
+            </button>
+          ))}
           <input
             className="calp__addcal"
             placeholder="Add a calendar…"
@@ -600,19 +640,19 @@ export default function Calendar() {
           <div className="calp__search">
             {calChoices.map((c) => (
               <button
-                className="calp__result" key={c.id}
-                onPointerDown={(e) => { e.preventDefault(); toggleCal(c.id); setCalQ(''); }}
+                className="calp__result" key={c.key}
+                onPointerDown={(e) => { e.preventDefault(); toggleCal(c.key); setCalQ(''); }}
               >
                 <span className="calp__result-title">
-                  <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
+                  <span className="calp__chipdot" style={{ background: c.tint }} />
                   {c.name}
                 </span>
-                <span className="calp__result-when">add</span>
+                <span className="calp__result-when">{c.key.startsWith('ext:') ? 'imported · add' : 'add'}</span>
               </button>
             ))}
             {calChoices.length === 0 && !calQ.trim() && (
               <p className="calp__result-none">
-                {calendars.length === 0
+                {calendars.length === 0 && extCals.length === 0
                   ? 'When you join a group, its calendar will show up here.'
                   : 'Every calendar from your groups is already on.'}
               </p>
