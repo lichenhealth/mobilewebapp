@@ -247,6 +247,9 @@ export default function App() {
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/calendar/settings" element={<CalendarSettings />} />
           <Route path="/posts/:postId" element={<PostPage />} />
+          {/* Drive (founder 2026-08-14) — /saved stays as an alias for old
+              links and muscle memory. */}
+          <Route path="/drive"     element={<Saved />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/assistant" element={<AssistantBrief />} />
           <Route path="/assistant/feed" element={<AssistantFeed />} />

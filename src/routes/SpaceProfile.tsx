@@ -192,9 +192,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
-  // How many posts the wall holds — null until the feed reports in. Drives
-  // the land-on-Home-until-there's-a-feed default (founder 2026-08-14).
-  const [feedCount, setFeedCount] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
   // Presence and my relationship with each member — the Members tab is the one
   // place people are listed, so it carries the same gestures the directory has
@@ -687,7 +684,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     <ContributionsFeed
       spaceId={space.id}
       me={me}
-      onLoaded={setFeedCount}
       entityName={space.name}
       // The open web gets the stream, not the workshop (founder
       // 2026-08-11) — member tools drop away for a guest (or the steward
@@ -724,6 +720,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // events-only feed lens beside it was the same circle twice.
       hideAreas={hasEvents ? ['events'] : []}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
+      navSlot={ctx.navSlot}
+      emptyEscape={ctx.openHome ? { label: 'Visit the homepage to engage', onGo: ctx.openHome } : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
     />
@@ -871,7 +869,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
-        feedHasPosts={feedCount === null ? undefined : feedCount > 0}
         // Actions in ONE place (founder 2026-08-14): the maps door sits
         // beside the page's own CTAs instead of floating at the page's foot.
         extraCtas={pinned && !backstage && !tab ? [{

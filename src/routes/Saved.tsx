@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
+import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
-import { postAreas, deletePost, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { postAreas, deletePost, loadAuthorFeed, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
-import { loadSavedPosts, setSaved } from '../lib/savedApi';
+import { loadSavedPostsTimed, setSaved } from '../lib/savedApi';
 import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -20,12 +21,17 @@ import './Saved.css';
 import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 
-// ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07). The shelf keeps the
-// lenses that describe what's actually on it — the area circles, present-only —
-// and drops the abstract pair. content_type stays in the database.
+// DRIVE (founder 2026-08-14): "saving something is different than having it
+// in a drive." The section holds BOTH what you saved and what you created —
+// one chronological feed, publishable out from here. The save GESTURE stays
+// "save" (you save TO Drive); only the place renamed. Word toggles below the
+// icon row: All / Saved / Created — the room's own vocabulary, replacing the
+// retired Social/Actionable pair.
 
-/** Saved — your private shelf. Everything you bookmarked, newest first,
- *  under the platform's standard lenses. Nobody else can see it. */
+const DRIVE_LENSES = ['All', 'Saved', 'Created'];
+
+/** Drive — your private repository. What you kept and what you made, newest
+ *  first, under the platform's standard lenses. Nobody else can see it. */
 export default function Saved() {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -59,15 +65,34 @@ export default function Saved() {
   const [newKind, setNewKind] = useState<'collection' | 'path'>('collection');
 
   const [areas, setAreas] = useState<ServiceArea[]>([]);
+  const [lens, setLens] = useState('All');
+  // When each save happened — Drive's chronology sorts saves by the save.
+  const [savedAt, setSavedAt] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     let live = true;
     (async () => {
-      const shelf = await loadSavedPosts();
+      const [shelf, created] = await Promise.all([
+        loadSavedPostsTimed(),
+        me ? loadAuthorFeed({ profileId: me }) : Promise.resolve([] as FeedPost[]),
+      ]);
+      // One entry per post: your own creations lead with their creation date,
+      // saves with their save date; a post that's both counts as created
+      // (it's yours) but still answers the Saved lens.
+      const times = new Map(shelf.map((x) => [x.post.id, x.savedAt]));
+      const byId = new Map<string, FeedPost>();
+      for (const p of created) byId.set(p.id, p);
+      for (const x of shelf) if (!byId.has(x.post.id)) byId.set(x.post.id, x.post);
+      const merged = [...byId.values()].sort((a, b) => {
+        const ta = a.author_id === me ? a.created_at : (times.get(a.id) ?? a.created_at);
+        const tb = b.author_id === me ? b.created_at : (times.get(b.id) ?? b.created_at);
+        return tb.localeCompare(ta);
+      });
       const [{ web, vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
-      const ov = await loadEndorsements(shelf, myc);
+      const ov = await loadEndorsements(merged, myc);
       if (!live) return;
-      setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(shelf); setReady(true);
+      setSavedAt(times);
+      setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(merged); setReady(true);
     })();
     return () => { live = false; };
   }, [me]);
@@ -102,11 +127,13 @@ export default function Saved() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return posts
+      .filter((p) => lens === 'All'
+        || (lens === 'Saved' ? savedAt.has(p.id) : p.author_id === me))
       .filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))))
       .filter((p) => !q
         || `${p.title ?? ''} ${p.body} ${p.author?.full_name ?? ''} ${p.author_space?.name ?? ''}`
           .toLowerCase().includes(q));
-  }, [posts, areas, query]);
+  }, [posts, areas, query, lens, savedAt, me]);
 
   async function makeFolder() {
     const nm = newFolderName.trim();
@@ -129,11 +156,12 @@ export default function Saved() {
       <header className="myc__head">
         <p className="myc__crumb">
           <Icon name="bookmark" size={11} />
-          <span>Saved</span>
+          <span>Drive</span>
         </p>
-        <h1 className="myc__title">Your shelf</h1>
+        <h1 className="myc__title">Your Drive</h1>
         <p className="myc__sub">
-          Things you wanted to come back to — kept quietly in one place, visible only to you.
+          What you&rsquo;ve saved and what you&rsquo;ve created — held quietly in
+          one place, visible only to you, ready to publish out from when you are.
         </p>
       </header>
 
@@ -172,9 +200,12 @@ export default function Saved() {
           {/* Area lenses ride the same row as the doors (founder 2026-08-14:
               "design consistency with other rooms") — hairline between the
               acting doors and the shelf's own filters, like everywhere else. */}
+          <span className="saved__bar-divider" aria-hidden="true" />
+          <button className="mkt__action is-active saved__feeddoor" aria-label="Drive feed" title="Your Drive feed">
+            <span className="mkt__action-circle"><Icon name="newsfeed" size={14} /></span>
+          </button>
           {areasPresent.length > 1 && (
             <>
-              <span className="saved__bar-divider" aria-hidden="true" />
               {areasPresent.map((a) => {
                 const on = areas.includes(a.value);
                 return (
@@ -228,6 +259,8 @@ export default function Saved() {
         </div>
       )}
 
+      {me && <FilterRow options={DRIVE_LENSES} value={lens} onChange={setLens} />}
+
       {newFolderOpen && (
         <span className="saved__newfolder">
           <input
@@ -254,7 +287,7 @@ export default function Saved() {
       {posts.length > 0 && (
         <p className="myc__count">
           <span className="myc__count-n">{visible.length}</span>{' '}
-          {visible.length === 1 ? 'saved item' : 'saved items'}
+          {visible.length === 1 ? 'item in your Drive' : 'items in your Drive'}
         </p>
       )}
 
@@ -262,14 +295,14 @@ export default function Saved() {
         {!ready && <p className="myc__sub">Loading…</p>}
         {ready && posts.length === 0 && (
           <div className="myc__empty">
-            <span className="display-italic">Nothing saved yet.</span>
-            <p>Tap the bookmark on any post — a listing, an event, a course — and it lands here.</p>
+            <span className="display-italic">Your Drive is empty.</span>
+            <p>Tap the bookmark on any post to save it here — and everything you create lands here on its own.</p>
           </div>
         )}
         {ready && posts.length > 0 && visible.length === 0 && (
           <div className="myc__empty">
             <span className="display-italic">Nothing matches.</span>
-            <p>Clear a filter to see the rest of your shelf.</p>
+            <p>Clear a filter to see the rest of your Drive.</p>
           </div>
         )}
         {visible.map((p) => (

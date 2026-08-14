@@ -124,3 +124,6 @@
 
 /* Back chip on the management pages hugs the left, like the calendar's. */
 .mkt__head .mkt__memberback { align-self: flex-start; }
+
+/* Below the icon row now (founder 2026-08-14: icons above, toggles below). */
+.evt__nav--below { margin-top: var(--s-2); }

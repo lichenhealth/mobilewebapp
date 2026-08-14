@@ -47,8 +47,6 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const [trusted, setTrusted] = useState(false);
   const [homeSpot, setHomeSpot] = useState<MappableMember | null>(null);
   const [bookables, setBookables] = useState<BookingType[]>([]);
-  // Land on Home until the feed actually holds posts (founder 2026-08-14).
-  const [feedCount, setFeedCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -313,7 +311,6 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     <ContributionsFeed
       profileId={member.id}
       me={me}
-      onLoaded={setFeedCount}
       entityName={name}
       // The open web gets the stream, not the workshop (founder
       // 2026-08-11): Search/Add/AI are member tools, so a guest — or the
@@ -327,6 +324,8 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       assistantSection={ctx.guest ? undefined : 'profile'}
       assistantOff={member.assistant_enabled === false}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
+      navSlot={ctx.navSlot}
+      emptyEscape={ctx.openHome ? { label: 'Visit the homepage to engage', onGo: ctx.openHome } : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
     />
@@ -386,7 +385,6 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         page={pub.page}
         preview={previewing}
         signedIn={!!me}
-        feedHasPosts={feedCount === null ? undefined : feedCount > 0}
         feed={memberFeed}
         beforeContent={me ? identityExtras : undefined}
       />

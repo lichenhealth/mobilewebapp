@@ -44,7 +44,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/chat',      label: 'Chat',      icon: 'chat' },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
   { to: '/events',    label: 'Events',    icon: 'rsvp' },
-  { to: '/saved',     label: 'Saved',     icon: 'saved' },
+  { to: '/drive',     label: 'Drive',     icon: 'saved' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
@@ -59,7 +59,7 @@ const SUPPORT_EMAIL = 'connect@lichen.health';
  *  Calendar) and Public profile (reachable from the Profile page) — founder
  *  2026-07-24. The platform doors (Invite/Help/Membership) stay: they have no
  *  other mobile home. Desktop sidebar shows everything. */
-const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/saved', '/maps', '/profile', '/events']);
+const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/drive', '/maps', '/profile', '/events']);
 const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/members/');
 
 /** The four space sections' sub-items are the member's REAL memberships,

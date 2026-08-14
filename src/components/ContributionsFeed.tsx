@@ -43,7 +43,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, emptyEscape }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -84,10 +84,16 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  previewing as one — founder 2026-08-11): cards read-only, no member
    *  actions. The doors themselves are the CALLER's to strip. */
   interactive?: boolean;
-  /** Fires once the stream loads, with how many posts it holds — lets the
-   *  page around it decide whether Feed is worth landing on (founder
-   *  2026-08-14: an empty stream defaults to Home instead). */
+  /** Fires once the stream loads, with how many posts it holds. */
   onLoaded?: (count: number) => void;
+  /** Rendered between the icon row and the list — the page template's word
+   *  tabs land here so every screen reads icons-above, toggles-below
+   *  (founder 2026-08-14: "I would prefer consistency"). */
+  navSlot?: React.ReactNode;
+  /** Where an EMPTY feed sends the viewer. An entity page kicks them UP to
+   *  its own Home tab ("No feed content yet — visit the homepage"), never
+   *  away to the global feed (founder 2026-08-14). */
+  emptyEscape?: { label: string; onGo: () => void };
 }) {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -184,7 +190,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     return (
       <ScopeEmpty
         icon="newsfeed" section="Feed" who={entityName || 'them'}
-        to="/home" label="Visit the Lichen feed"
+        to="/home" label={emptyEscape?.label ?? 'Visit the Lichen feed'} onGo={emptyEscape?.onGo}
       />
     );
   }
@@ -253,6 +259,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           ))}
         </div>
       )}
+      {navSlot}
 
       {!listHidden && entityName && areas.length === 1 && (
         <h2 className="cfeed__shelf">
@@ -266,7 +273,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
         {posts.length === 0 && (
           <ScopeEmpty
             icon="newsfeed" section="Feed" who={entityName || 'them'}
-            to="/home" label="Visit the Lichen feed"
+            to="/home" label={emptyEscape?.label ?? 'Visit the Lichen feed'} onGo={emptyEscape?.onGo}
           />
         )}
         {posts.length > 0 && visible.length === 0 && <p className="cfeed__empty">Nothing here under these filters.</p>}

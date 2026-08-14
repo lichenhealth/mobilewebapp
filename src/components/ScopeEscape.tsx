@@ -12,7 +12,7 @@ import './ScopeEscape.css';
  *  (The separate header escape chip retired 2026-08-13 — founder: with the
  *  link living where the content should be, the extra button was redundant
  *  and made the UI busy.) */
-export function ScopeEmpty({ icon, section, who, to, label }: {
+export function ScopeEmpty({ icon, section, who, to, label, onGo }: {
   icon: Parameters<typeof Icon>[0]['name'];
   /** The section's own name — "Library", "Marketplace". */
   section: string;
@@ -20,6 +20,10 @@ export function ScopeEmpty({ icon, section, who, to, label }: {
   who: string;
   to: string;
   label: string;
+  /** In-place escape (e.g. switch to the page's Home tab) instead of a
+   *  navigation — an entity's empty feed kicks you UP, not away
+   *  (founder 2026-08-14). */
+  onGo?: () => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -28,7 +32,7 @@ export function ScopeEmpty({ icon, section, who, to, label }: {
       <p className="scope-empty__line">
         No {section} content from {who} yet!
       </p>
-      <button className="scope-empty__link" onClick={() => navigate(to)}>{label}</button>
+      <button className="scope-empty__link" onClick={() => (onGo ? onGo() : navigate(to))}>{label}</button>
     </div>
   );
 }

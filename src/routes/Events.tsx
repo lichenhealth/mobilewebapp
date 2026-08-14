@@ -235,40 +235,15 @@ export default function Events() {
             My <span className="display-italic">Events</span>
           </h1>
         </header>
-      ) : (
-        /* One full-width row (the Concierge idiom): category tabs spread the
-           page, with the two personal doors — My Events / My Calendar — on
-           the right (founder 2026-07-26; the old 3-tab header is gone). */
-        <div className="evt__nav">
-          <div className="evt__nav-tabs">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                className={'evt__navtab' + (tab === t ? ' is-active' : '')}
-                onClick={() => setTab(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <span className="evt__nav-doors">
-            <button className="evt__navdoor" onClick={() => navigate('/events/mine')} title="My Events">
-              <Icon name="rsvp" size={13} /><span>My Events</span>
-            </button>
-            <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} title="My Calendar">
-              <Icon name="calendar" size={13} /><span>My Calendar</span>
-            </button>
-          </span>
-        </div>
-      )}
+      ) : null}
 
       {view === 'browse' && (
         <>
-          {scoped && <FilterRow options={TABS} value={tab} onChange={setTab} />}
-
           {/* THE DOORS (icon-only, Marketplace's 2026-08-08 pattern) share one
               row with the type lenses — Events only has 3 (not Marketplace's
-              6-8), so it comfortably fits without needing its own line. */}
+              6-8), so it comfortably fits without needing its own line.
+              ICONS ABOVE, TOGGLES BELOW (founder 2026-08-14): the category
+              word-tabs moved beneath this row, matching Home/My-celium. */}
           <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools and type filters" gutter>
             <button
               className="evt__action evt__action--door"
@@ -312,6 +287,30 @@ export default function Events() {
               );
             })}
           </ScrollHintRow>
+
+          {scoped ? <FilterRow options={TABS} value={tab} onChange={setTab} /> : (
+            <div className="evt__nav evt__nav--below">
+              <div className="evt__nav-tabs">
+                {TABS.map((t) => (
+                  <button
+                    key={t}
+                    className={'evt__navtab' + (tab === t ? ' is-active' : '')}
+                    onClick={() => setTab(t)}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <span className="evt__nav-doors">
+                <button className="evt__navdoor" onClick={() => navigate('/events/mine')} title="My Events">
+                  <Icon name="rsvp" size={13} /><span>My Events</span>
+                </button>
+                <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} title="My Calendar">
+                  <Icon name="calendar" size={13} /><span>My Calendar</span>
+                </button>
+              </span>
+            </div>
+          )}
 
           <section className="evt__feed">
             {visible.length === 0 && (scoped ? (

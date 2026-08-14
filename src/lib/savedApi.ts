@@ -40,6 +40,27 @@ export async function setSaved(type: SavedTargetType, id: string, on: boolean): 
 
 /** My saved posts, newest-saved first. Posts RLS no longer lets me see
  *  simply drop out (a deleted listing, a space I left). */
+/** Saved posts WITH when you saved them — Drive's chronology sorts saves by
+ *  the save, not the post's birthday (founder 2026-08-14). */
+export async function loadSavedPostsTimed(): Promise<{ post: FeedPost; savedAt: string }[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from('saved_items')
+    .select('target_id, created_at')
+    .eq('profile_id', user.id).eq('target_type', 'post')
+    .order('created_at', { ascending: false });
+  const hidden = await loadMyHidden();
+  const rows = ((data as { target_id: string; created_at: string }[] | null) ?? [])
+    .filter((r) => !hidden.has(r.target_id));
+  if (rows.length === 0) return [];
+  const posts = await loadPostsByIds(rows.map((r) => r.target_id));
+  const byId = new Map(posts.map((p) => [p.id, p]));
+  return rows
+    .map((r) => ({ post: byId.get(r.target_id), savedAt: r.created_at }))
+    .filter((x): x is { post: FeedPost; savedAt: string } => !!x.post);
+}
+
 export async function loadSavedPosts(): Promise<FeedPost[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];

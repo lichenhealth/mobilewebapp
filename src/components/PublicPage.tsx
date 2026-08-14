@@ -17,7 +17,15 @@ export type ContactActionKind = 'call' | 'book' | 'email' | 'visit';
 /** Handed to a render-function `feed` on every tab (see the prop's doc).
  *  `guest` = render as the open web sees it (a real signed-out visitor, or
  *  the owner previewing) — no member doors, no member actions. */
-export type FeedRenderCtx = { showing: boolean; open: () => void; guest: boolean };
+export type FeedRenderCtx = {
+  showing: boolean; open: () => void; guest: boolean;
+  /** The template's word-tab row, handed INTO the stream so it can sit
+   *  below the icon row — icons above, toggles below on every screen
+   *  (founder 2026-08-14). Absent for guests (nav stays in the hero). */
+  navSlot?: React.ReactNode;
+  /** Switches to the page's Home tab — where an empty feed sends people. */
+  openHome?: () => void;
+};
 
 export interface PageMeta {
   tagline?: string;
@@ -137,11 +145,6 @@ export interface PublicPageProps {
    *  they keep their normal app chrome and skip the guest-facing invite
    *  doors/section; their real join/trust controls arrive via `children`. */
   signedIn?: boolean;
-  /** Whether the feed actually holds posts. Until it does, signed-in
-   *  members land on Home instead of an empty stream (founder 2026-08-14:
-   *  "until a profile has a feed, why don't we default to Home"). Omit to
-   *  keep the old land-on-feed behavior. */
-  feedHasPosts?: boolean;
   /** Page-owner-independent actions (e.g. a space's "See it on Maps") that
    *  belong BESIDE the page's own CTAs — one place for every action. */
   extraCtas?: { label: React.ReactNode; onClick: () => void }[];
@@ -257,12 +260,13 @@ export default function PublicPage(props: PublicPageProps) {
   const navItems = showFeed && !feedInRow
     ? [{ id: 'feed', label: 'Feed' }, ...homeItem, ...sectionItems]
     : [...homeItem, ...sectionItems];
-  // Landing: guests always meet Home; members land on the feed ONCE IT HAS
-  // SOMETHING IN IT, and on Home until then (founder 2026-08-14) — an empty
-  // stream is a worse hello than the story and the offerings.
+  // Landing: guests always meet Home; members always land on Feed (founder
+  // 2026-08-14, choosing one rule over the earlier feed-when-nonempty: "I
+  // prefer consistency") — an EMPTY feed says so and kicks you up to the
+  // Home tab instead of quietly landing you elsewhere.
   const firstContentDoor = asGuest
     ? 'home'
-    : (showFeed && props.feedHasPosts !== false ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : undefined));
+    : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : undefined));
   const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
   // Re-land when the VIEW ITSELF changes (Lichen View ⇄ Public View swaps
   // ?preview= in place): the old tab may not exist on the other side, which
@@ -279,13 +283,6 @@ export default function PublicPage(props: PublicPageProps) {
     setTab(firstContentDoor ?? navItems[0]?.id ?? 'about');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relandKey]);
-  // The feed count arrives after the feed loads — if the automatic landing
-  // was Feed and it turns out empty, slide over to Home (never moving a tab
-  // the viewer picked themselves).
-  useEffect(() => {
-    if (props.feedHasPosts === false && tab === 'feed' && !touched.current && homeItem.length) setTab('home');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.feedHasPosts]);
   const tabbed = navItems.length > 0;
   const showingFeed = showFeed && tab === 'feed';
   // Home shows the lot — it IS the front page; a named tab narrows to its
@@ -301,6 +298,50 @@ export default function PublicPage(props: PublicPageProps) {
       {children} <span aria-hidden>&rarr;</span>
     </button>
   );
+  // ICONS ABOVE, TOGGLES BELOW (founder 2026-08-14: "I would prefer
+  // consistency"): for a signed-in member whose feed rides the icon row, the
+  // word-tab nav moves OUT of the hero and into the stream's navSlot — right
+  // under the icon row, like Home's filters. Guests and previews keep the
+  // hero nav: the public website's masthead is its own design.
+  const navInHero = !(feedInRow && !asGuest);
+  const navNode = navItems.length > 0 ? (
+    <nav className={'ppage__nav' + (navInHero ? '' : ' ppage__nav--below')}>
+      {navItems.map((n) => {
+        const d = doors?.find((x) => x.id === n.id);
+        // Legacy plain-node feed keeps its nav-icon door (founder 2026-08-09);
+        // render-function feeds never put 'feed' in navItems at all.
+        if (n.id === 'feed') {
+          return (
+            <button
+              className={'ppage__nav-icon' + (tab === n.id ? ' ppage__nav-icon--on' : '')}
+              onClick={() => chooseTab(n.id)} key={n.id} type="button" aria-label={n.label} title={n.label}
+            >
+              <Icon name="newsfeed" size={18} />
+            </button>
+          );
+        }
+        return (
+          <button
+            className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
+            onClick={() => (d?.href ? go(d.href) : chooseTab(n.id))} key={n.id} type="button"
+          >
+            {n.label}
+          </button>
+        );
+      })}
+      {ctas.map((c) => (
+        <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href}
+          target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
+          {c.label}
+        </a>
+      ))}
+      {/* Actions live in ONE place (founder 2026-08-14) — page-owner
+          CTAs and app doors like "See it on Maps" sit side by side. */}
+      {props.extraCtas?.map((c, i) => (
+        <button className="ppage__cta ppage__cta--nav" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
+      ))}
+    </nav>
+  ) : null;
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
   const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
 
@@ -394,46 +435,7 @@ export default function PublicPage(props: PublicPageProps) {
             <button className="ppage__cta" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
           ))}
         </div>
-        {navItems.length > 0 && (
-          <nav className="ppage__nav">
-            {navItems.map((n) => {
-              const d = doors?.find((x) => x.id === n.id);
-              // Feed reads as a door, not a template tab (founder 2026-08-09):
-              // an icon, filled peach when it's the active tab — the same
-              // "you are here" signal Home and My-celium already lead their
-              // icon row with, not another text pill beside About/Services.
-              if (n.id === 'feed') {
-                return (
-                  <button
-                    className={'ppage__nav-icon' + (tab === n.id ? ' ppage__nav-icon--on' : '')}
-                    onClick={() => chooseTab(n.id)} key={n.id} type="button" aria-label={n.label} title={n.label}
-                  >
-                    <Icon name="newsfeed" size={18} />
-                  </button>
-                );
-              }
-              return (
-                <button
-                  className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
-                  onClick={() => (d?.href ? go(d.href) : chooseTab(n.id))} key={n.id} type="button"
-                >
-                  {n.label}
-                </button>
-              );
-            })}
-            {ctas.map((c) => (
-              <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href}
-                target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
-                {c.label}
-              </a>
-            ))}
-            {/* Actions live in ONE place (founder 2026-08-14) — page-owner
-                CTAs and app doors like "See it on Maps" sit side by side. */}
-            {props.extraCtas?.map((c, i) => (
-              <button className="ppage__cta ppage__cta--nav" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
-            ))}
-          </nav>
-        )}
+        {navInHero && navNode}
         {coverSrc && (
           <img
             className="ppage__cover" src={coverSrc} alt=""
@@ -457,6 +459,8 @@ export default function PublicPage(props: PublicPageProps) {
       {showFeed && (feedInRow
         ? (props.feed as (ctx: FeedRenderCtx) => React.ReactNode)({
             showing: showingFeed, open: () => chooseTab('feed'), guest: asGuest,
+            navSlot: navInHero ? undefined : navNode,
+            openHome: homeItem.length ? () => chooseTab('home') : undefined,
           })
         : (showingFeed && (props.feed as React.ReactNode)))}
 

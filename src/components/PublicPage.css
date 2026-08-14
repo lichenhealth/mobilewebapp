@@ -290,3 +290,7 @@
   font-family: inherit; font-size: 14px; color: var(--ppage-accent, var(--peach-deep));
 }
 .ppage__more:hover { text-decoration: underline; }
+
+/* The signed-in nav lives BELOW the feed's icon row (founder 2026-08-14:
+   icons above, toggles below, everywhere) — tighter than the hero variant. */
+.ppage__nav--below { padding: var(--s-2) var(--s-2) var(--s-3); }
