@@ -124,12 +124,16 @@ export interface WowScores { byDimension: Record<Dimension, number | null>; over
  *  answer: recent entries only. A running average makes the score a GPA: one
  *  hard year drags the number forever, and getting better barely moves it.
  *  Wellbeing is a now-reading): each dimension averages its entries from the
- *  last 90 days — yours and your care team's counting equally — and a
+ *  last 60 days — yours and your care team's counting equally — and a
  *  dimension quiet longer than that carries its single latest entry forward
  *  rather than blanking. An "All" post (empty dimensions) counts toward every
  *  dimension. Overall WOW = avg of the six currents. History stays in the
  *  feed, so a trend view can come later without changing what's stored. */
-const WOW_WINDOW_DAYS = 90;
+// 60, not 30 or 90 (founder 2026-08-14): short enough to feel alive for
+// someone changing fast, wide enough that one rough entry doesn't own the
+// number. People who post rarely are untouched by the window either way —
+// their latest entry carries forward regardless of age.
+const WOW_WINDOW_DAYS = 60;
 export function computeWowScores(posts: CarePostRow[], now = new Date()): WowScores {
   const cutoff = new Date(now.getTime() - WOW_WINDOW_DAYS * 86400_000).toISOString();
   const recent: Record<string, number[]> = {};
