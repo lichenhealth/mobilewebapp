@@ -18,7 +18,7 @@ const ITEMS: NavItem[] = [
   { to: '/concierge', label: 'CONCIERGE', icon: 'concierge' },
   { to: '/chat',      label: 'CHAT',      icon: 'chat' },
   { to: '/calendar',  label: 'CALENDAR',  icon: 'calendar' },
-  { to: '/drive',     label: 'DRIVE',     icon: 'saved' },
+  { to: '/drive',     label: 'DRIVE',     icon: 'drive' },
   { to: '/maps',      label: 'MAPS',      icon: 'maps' },
   { to: '/profile',   label: 'PROFILE',   icon: 'profile' },
 ];

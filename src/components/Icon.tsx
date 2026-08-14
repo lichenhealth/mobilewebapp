@@ -59,6 +59,7 @@ export type IconName =
   | 'reply'
   | 'repeat'
   | 'rent'
+  | 'drive'
   | 'saved'
   | 'search'
   | 'send'
@@ -301,6 +302,17 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 2.4,
     content: <><path d="M9 5.5h.01M9 12h.01M9 18.5h.01M15 5.5h.01M15 12h.01M15 18.5h.01" strokeLinecap="round"/></>,
+  },
+  // Drive: a cloud with a Current-cy bolt coming out of it (founder
+  // 2026-08-14 — "since it is a cloud storage offering... a nod to
+  // current-cy"). The bookmark stays the SAVE gesture; this marks the place.
+  'drive': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <>
+      <path d="M9.6 16H7.2a4 4 0 0 1-.4-7.98 5.2 5.2 0 0 1 10.13-.9A3.6 3.6 0 0 1 16.4 16h-1.6" />
+      <path d="M13.1 10.6 10.6 14.5h2.2l-1.2 4 3.6-4.8h-2.3l1.6-3.1Z" />
+    </>,
   },
   'saved': {
     viewBox: '264 838 29 26',

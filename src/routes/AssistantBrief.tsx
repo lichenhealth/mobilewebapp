@@ -18,6 +18,8 @@ import { type Scope, type Section } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
+import { loadMyWeb, loadMyRecommendations } from '../lib/myceliumApi';
+import { listBookableTypes } from '../lib/bookingApi';
 
 // The assistant on every page (founder 2026-07-28): tap the brain, get the
 // back-from-vacation briefing for WHERE YOU ARE — organized highlights,
@@ -67,6 +69,10 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   membership: { title: 'Membership', frame: 'You help them steward their stake in the commons.' },
   saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
+  // ONE PERSON, not a section (founder 2026-08-14: "like getting a briefing
+  // on someone you're meeting with from your assistant"). Reached from the
+  // brain on another member's profile, with ?member=<id>.
+  member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
 };
 
 // One brief per section, kept until the notifications feeding it actually
@@ -98,20 +104,36 @@ export default function AssistantBrief() {
   // the AI update show up with a blue link?").
   const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(params.get('section') ?? 'home')?.refs ?? []);
   const section = params.get('section') ?? 'home';
+  // ?member=<id> — the relationship briefing for one person.
+  const memberId = params.get('member');
+  const briefKey = memberId ? `member:${memberId}` : section;
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { rows } = useNotifications();
   const [doorOn, setDoorOn] = useState(() => aiDoorOn(section));
-  const cached = cache.get(section);
+  const cached = cache.get(briefKey);
   const [brief, setBrief] = useState<string | null>(cached?.text ?? null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(cached?.at ?? null);
   const [state, setState] = useState<'thinking' | 'ready' | 'quietly-unavailable' | 'capped'>(
     cached ? 'ready' : 'thinking');
   const [refreshTick, setRefreshTick] = useState(0);
 
-  const meta = FRAMES[section] ?? FRAMES.home;
+  const meta = memberId ? FRAMES.member : (FRAMES[section] ?? FRAMES.home);
+  // The person's name arrives fast and cheap so the header reads right even
+  // on a cache hit.
+  const [briefWho, setBriefWho] = useState<string | null>(null);
+  useEffect(() => {
+    if (!memberId) { setBriefWho(null); return; }
+    let live = true;
+    void supabase.from('profiles').select('full_name').eq('id', memberId).maybeSingle()
+      .then(({ data }) => { if (live) setBriefWho((data as { full_name: string | null } | null)?.full_name ?? null); });
+    return () => { live = false; };
+  }, [memberId]);
 
   const { snapshot, fingerprint } = useMemo(() => {
+    if (memberId) {
+      return { snapshot: {}, fingerprint: `member:${memberId}:${new Date().toISOString().slice(0, 10)}` };
+    }
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as Section };
     const scoped = rows.filter((r) => scope.kind === 'global'
@@ -126,16 +148,17 @@ export default function AssistantBrief() {
     // section's brief. A new or removed one means the world has moved since
     // the cached text was written — refetch instead of showing old news.
     return { snapshot: { notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
-  }, [rows, section]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, section, memberId]);
 
   function refresh() {
-    cache.delete(section);
+    cache.delete(briefKey);
     setState('thinking');
     setRefreshTick((t) => t + 1);
   }
 
   useEffect(() => {
-    if (!me || !doorOn || cache.get(section)?.fingerprint === fingerprint) return;
+    if (!me || !doorOn || cache.get(briefKey)?.fingerprint === fingerprint) return;
     let live = true;
     void (async () => {
       // Stewarding load joins the snapshot (duty-scoped, invites excluded).
@@ -143,6 +166,7 @@ export default function AssistantBrief() {
       let desk: Record<string, number> | undefined;
       let deskNames: Record<string, string> | undefined;
       try {
+        if (memberId) throw new Error('person brief — no desks');
         const d = await listMyAdminDeskCounts(me);
         if (Object.keys(d.counts).length) {
           const spaces = await listMyMemberSpaces(me);
@@ -160,6 +184,75 @@ export default function AssistantBrief() {
       const extras: Record<string, unknown> = {};
       const today = new Date().toISOString().slice(0, 10);
       try {
+        if (memberId) {
+          // ── The relationship briefing (founder 2026-08-14) ──────────────
+          // Every read is RLS-scoped as the viewer: their profile as you may
+          // see it, YOUR signals about them, the spaces you share (their
+          // memberships are only visible where yours overlap), their recent
+          // public posts (per-post AI consent respected), their bookable
+          // sessions, and your direct thread — content included only if they
+          // let assistants read their messages.
+          const [{ data: prof }, mine, recs, { data: shared }, { data: theirPosts }, bookables] = await Promise.all([
+            supabase.from('profiles').select('full_name, headline, bio, identity_tags, assistant_readable').eq('id', memberId).maybeSingle(),
+            loadMyWeb(),
+            loadMyRecommendations(),
+            supabase.from('space_members').select('spaces(id, name)').eq('profile_id', memberId),
+            supabase.from('posts').select('id, title, body, service_areas, created_at, details').eq('author_id', memberId).order('created_at', { ascending: false }).limit(8),
+            listBookableTypes(memberId).catch(() => []),
+          ]);
+          const who = prof as { full_name: string | null; headline: string | null; bio: string | null; identity_tags: string[] | null; assistant_readable: boolean | null } | null;
+          const name = who?.full_name ?? 'This member';
+          extras.who = {
+            name,
+            headline: who?.headline ?? undefined,
+            bio: (who?.bio ?? '').slice(0, 400) || undefined,
+            identity_tags: who?.identity_tags?.length ? who.identity_tags : undefined,
+          };
+          found.push({ label: name, to: `/members/${memberId}` });
+          extras.where_you_stand = {
+            in_your_web: mine.web.has(`profile:${memberId}`),
+            you_trust_them: mine.vouched.has(`profile:${memberId}`),
+            you_recommend_their_work: [...recs].some((k) => k.includes(memberId)),
+          };
+          const sharedNames = ((shared as unknown as { spaces: { id: string; name: string } | null }[] | null) ?? [])
+            .map((r) => r.spaces).filter((x): x is { id: string; name: string } => !!x);
+          if (sharedNames.length) {
+            extras.spaces_you_share = sharedNames.map((x) => x.name);
+            sharedNames.forEach((x) => found.push({ label: x.name, to: `/spaces/${x.id}` }));
+          }
+          const posts = ((theirPosts as { id: string; title: string | null; body: string; service_areas: string[] | null; created_at: string; details: { aiExcluded?: boolean } | null }[] | null) ?? [])
+            .filter((p) => !p.details?.aiExcluded);
+          if (posts.length) {
+            extras.their_recent_posts = posts.slice(0, 6).map((p) => ({
+              title: p.title || p.body.slice(0, 60), areas: p.service_areas ?? [], on: p.created_at.slice(0, 10),
+            }));
+            posts.slice(0, 6).forEach((p) => { if (p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
+          }
+          if (bookables.length) {
+            extras.their_bookable_sessions = bookables.map((b) => `${b.title} (${b.duration_min} min)`);
+          }
+          // The direct thread, if one exists — a read-only key lookup.
+          const key = [me, memberId].sort().join(':');
+          const { data: dm } = await supabase.from('chats').select('id').eq('direct_key', key).maybeSingle();
+          if (dm) {
+            const { data: msgs } = await supabase.from('chat_messages')
+              .select('sender_id, body, created_at')
+              .eq('chat_id', (dm as { id: string }).id)
+              .order('created_at', { ascending: false }).limit(12);
+            const rows2 = (msgs as { sender_id: string; body: string | null; created_at: string }[] | null) ?? [];
+            if (rows2.length) {
+              if (who?.assistant_readable === false) {
+                extras.your_conversation = {
+                  messages_exchanged_recently: rows2.length,
+                  last_message: rows2[0].created_at.slice(0, 10),
+                  note: `${name} keeps their messages private from assistants — you can read the thread in the app, I can't.`,
+                };
+              } else {
+                extras.your_conversation = rows2.reverse().map((m) => `${m.sender_id === me ? 'me' : name}: ${(m.body ?? '').slice(0, 200)}`);
+              }
+            }
+          }
+        }
         if (section === 'market' || section === 'home') {
           const { data: mine } = await supabase.from('posts')
             .select('id, title, body, details, created_at')
@@ -320,7 +413,7 @@ export default function AssistantBrief() {
       const { data, error } = await supabase.functions.invoke('assistant-brief', {
         body: {
           section,
-          frame: (FRAMES[section] ?? FRAMES.home).frame,
+          frame: meta.frame,
           snapshot: {
             ...snapshot,
             ...extras,
@@ -339,7 +432,7 @@ export default function AssistantBrief() {
         .filter((r) => r.label && r.label.length > 3)
         .sort((a, b) => b.label.length - a.label.length);
       const at = Date.now();
-      cache.set(section, { text: d2.brief ?? '', refs: sortedRefs, fingerprint, at });
+      cache.set(briefKey, { text: d2.brief ?? '', refs: sortedRefs, fingerprint, at });
       setBrief(d2.brief ?? '');
       setRefs(sortedRefs);
       setUpdatedAt(at);
@@ -385,7 +478,11 @@ export default function AssistantBrief() {
         {/* Name, then role — the section it's briefing on moves into the
             line below, so context survives (founder 2026-08-05). */}
         <p className="abrief__scope">Your Lichen Partner</p>
-        <p className="abrief__sub">{meta.title}: what needs your attention, gathered and filtered for you.</p>
+        <p className="abrief__sub">
+          {memberId
+            ? `${briefWho ?? 'This member'}: your relationship to date, gathered before you meet.`
+            : `${meta.title}: what needs your attention, gathered and filtered for you.`}
+        </p>
       </div>
 
       <div className="abrief__card">

@@ -321,7 +321,11 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           ? [{ icon: 'plus' as const, label: 'Add', onClick: () => navigate('/compose') }]
           : []),
       ]}
-      assistantSection={ctx.guest ? undefined : 'profile'}
+      // Your own page keeps the profile thread; someone ELSE's page briefs
+      // you about THEM (founder 2026-08-14: "like getting a briefing on
+      // someone you're meeting with from your assistant").
+      assistantSection={ctx.guest ? undefined : isSelf ? 'profile' : 'member'}
+      assistantMember={ctx.guest || isSelf ? undefined : member.id}
       assistantOff={member.assistant_enabled === false}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       navSlot={ctx.navSlot}

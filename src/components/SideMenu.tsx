@@ -44,7 +44,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/chat',      label: 'Chat',      icon: 'chat' },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
   { to: '/events',    label: 'Events',    icon: 'rsvp' },
-  { to: '/drive',     label: 'Drive',     icon: 'saved' },
+  { to: '/drive',     label: 'Drive',     icon: 'drive' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },

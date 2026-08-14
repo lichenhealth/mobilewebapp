@@ -43,7 +43,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, emptyEscape }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, emptyEscape }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -56,6 +56,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   /** When set, an assistant door closes the leading group — quiet when this
    *  section's consent is off, exactly like Home's brain. */
   assistantSection?: string;
+  /** On ANOTHER member's profile the brain briefs you about THEM — the
+   *  relationship to date, like your assistant prepping you for a meeting
+   *  (founder 2026-08-14). Carries their id into /assistant. */
+  assistantMember?: string;
   /** This profile or space has opted out of the assistant (founder
    *  2026-08-05). The door still opens — a member always reaches their own
    *  assistant — it just reads as switched off for everyone who visits. */
@@ -208,7 +212,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           {assistantSection && (
             <button
               className={'cfeed__area cfeed__area--ai' + (aiOn ? '' : ' is-ai-off')}
-              onClick={() => navigate(`/assistant?section=${assistantSection}`)}
+              onClick={() => navigate(`/assistant?section=${assistantSection}${assistantMember ? `&member=${assistantMember}` : ''}`)}
               title={aiOn
                 ? 'Your assistant — a briefing for this part of your Lichen life'
                 : assistantOff
