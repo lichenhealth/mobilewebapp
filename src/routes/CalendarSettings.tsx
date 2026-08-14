@@ -68,6 +68,20 @@ export default function CalendarSettings() {
   // your vanity handle: lichen.health/book/<handle>.
   const [myHandle, setMyHandle] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // The provider's own spaces — the audience picker for space-scoped types.
+  const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void supabase.from('space_members').select('spaces(id, name)').eq('profile_id', me)
+      .then(({ data }) => {
+        if (!live) return;
+        setMySpaces(((data as unknown as { spaces: { id: string; name: string } | null }[] | null) ?? [])
+          .map((r) => r.spaces).filter((x): x is { id: string; name: string } => !!x)
+          .sort((a, b) => a.name.localeCompare(b.name)));
+      });
+    return () => { live = false; };
+  }, [me]);
   useEffect(() => {
     if (!me) return;
     let live = true;
@@ -222,7 +236,7 @@ export default function CalendarSettings() {
               <span className="cset__aud cset__extname">{bt.title}</span>
               <span className="cset__bkrow-sub">
                 {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
-                {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : ''}
+                {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ''}
               </span>
               <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit(bt); setBkOpen(true); }}>Edit</button>
               <button
@@ -300,12 +314,21 @@ export default function CalendarSettings() {
               </select>
               <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
+                <option value="public">Anyone — even outside Lichen, via your link</option>
                 <option value="everyone">Anyone on Lichen</option>
                 <option value="mycelium">My-celium only</option>
+                <option value="space">Members of one of your groups…</option>
               </select>
+              {bkEdit.audience === 'space' && (
+                <select className="cset__select" value={bkEdit.audience_space_id ?? ''}
+                  onChange={(e) => setBkEdit((c) => ({ ...c, audience_space_id: e.target.value || null }))} aria-label="Which group">
+                  <option value="">Pick the group…</option>
+                  {mySpaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+                </select>
+              )}
               <button
                 className="cedit__add cedit__add--sm"
-                disabled={!(bkEdit.title ?? '').trim()}
+                disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && !bkEdit.audience_space_id)}
                 onClick={() => act(async () => {
                   await saveBookingType(me, { ...bkEdit, title: (bkEdit.title ?? '').trim() } as Partial<BookingType> & { title: string });
                   setBkOpen(false); setBkEdit({});

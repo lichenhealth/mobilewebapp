@@ -18,7 +18,9 @@ export interface BookingType {
   price: string;
   location: string;
   approval: 'request' | 'instant';
-  audience: 'everyone' | 'mycelium' | 'public';
+  audience: 'everyone' | 'mycelium' | 'public' | 'space';
+  /** When audience='space': only members of this space see and book it. */
+  audience_space_id?: string | null;
   active: boolean;
 }
 
@@ -42,7 +44,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')

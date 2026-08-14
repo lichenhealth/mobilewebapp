@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5gI7n9T9nQ174f18xXCwUnnt9sssemmb1uLNoiLfGNvkHoiB91gfgMQQZ7SFElX
+\restrict zfc8TH1nVC8m58rQwXIRdyGZH6EKIZBmcdygV4D3Vc8w1kQNFg2QaIohIT5jQ7E
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -502,7 +502,9 @@ CREATE FUNCTION public.booking_type_visible(p_type uuid, p_viewer uuid) RETURNS 
       or t.audience in ('everyone', 'public')
       or (t.audience = 'mycelium' and exists (
         select 1 from public.mycelium m
-        where m.truster_id = t.profile_id and m.target_type = 'profile' and m.target_id = p_viewer))));
+        where m.truster_id = t.profile_id and m.target_type = 'profile' and m.target_id = p_viewer))
+      or (t.audience = 'space' and t.audience_space_id is not null
+          and public.is_space_member(t.audience_space_id, p_viewer))));
 $$;
 
 
@@ -4394,14 +4396,23 @@ CREATE TABLE public.booking_types (
     audience text DEFAULT 'everyone'::text NOT NULL,
     active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    audience_space_id uuid,
     CONSTRAINT booking_types_approval_check CHECK ((approval = ANY (ARRAY['request'::text, 'instant'::text]))),
-    CONSTRAINT booking_types_audience_check CHECK ((audience = ANY (ARRAY['everyone'::text, 'mycelium'::text, 'public'::text]))),
+    CONSTRAINT booking_types_audience_check CHECK ((audience = ANY (ARRAY['everyone'::text, 'mycelium'::text, 'public'::text, 'space'::text]))),
     CONSTRAINT booking_types_buffer_min_check CHECK (((buffer_min >= 0) AND (buffer_min <= 120))),
-    CONSTRAINT booking_types_duration_min_check CHECK (((duration_min >= 15) AND (duration_min <= 480)))
+    CONSTRAINT booking_types_duration_min_check CHECK (((duration_min >= 15) AND (duration_min <= 480))),
+    CONSTRAINT booking_types_space_audience_check CHECK (((audience <> 'space'::text) OR (audience_space_id IS NOT NULL)))
 );
 
 
 ALTER TABLE public.booking_types OWNER TO postgres;
+
+--
+-- Name: COLUMN booking_types.audience_space_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.booking_types.audience_space_id IS 'When audience=''space'': only members of this space may see and book the session.';
+
 
 --
 -- Name: bookings; Type: TABLE; Schema: public; Owner: postgres
@@ -7197,6 +7208,14 @@ ALTER TABLE ONLY public.availability_windows
 
 
 --
+-- Name: booking_types booking_types_audience_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.booking_types
+    ADD CONSTRAINT booking_types_audience_space_id_fkey FOREIGN KEY (audience_space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
+
+
+--
 -- Name: booking_types booking_types_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -8483,9 +8502,9 @@ CREATE POLICY "booking_types owner all" ON public.booking_types TO authenticated
 -- Name: booking_types booking_types visible; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "booking_types visible" ON public.booking_types FOR SELECT TO authenticated USING ((active AND ((audience = 'everyone'::text) OR (EXISTS ( SELECT 1
+CREATE POLICY "booking_types visible" ON public.booking_types FOR SELECT TO authenticated USING ((active AND ((audience = ANY (ARRAY['everyone'::text, 'public'::text])) OR ((audience = 'mycelium'::text) AND (EXISTS ( SELECT 1
    FROM public.mycelium m
-  WHERE ((m.truster_id = booking_types.profile_id) AND (m.target_type = 'profile'::text) AND (m.target_id = auth.uid())))))));
+  WHERE ((m.truster_id = booking_types.profile_id) AND (m.target_type = 'profile'::text) AND (m.target_id = auth.uid()))))) OR ((audience = 'space'::text) AND (audience_space_id IS NOT NULL) AND public.is_space_member(audience_space_id, auth.uid())))));
 
 
 --
@@ -12103,7 +12122,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5gI7n9T9nQ174f18xXCwUnnt9sssemmb1uLNoiLfGNvkHoiB91gfgMQQZ7SFElX
+\unrestrict zfc8TH1nVC8m58rQwXIRdyGZH6EKIZBmcdygV4D3Vc8w1kQNFg2QaIohIT5jQ7E
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
