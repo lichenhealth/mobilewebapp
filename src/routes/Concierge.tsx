@@ -14,6 +14,7 @@ import {
 import {
   loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
   createCarePost, DIMENSION_META,
+  getCareSettings, setWowWindowAuto, tuneWowWindow, WOW_WINDOW_DEFAULT, type CareSettings,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
   loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel,
   type CarePostRow, type Dimension, type OnCallCaregiver,
@@ -902,22 +903,41 @@ export default function Concierge() {
   // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
   const weekEnd = weekDays(weekStart)[6].iso;
   const [boardNonce, setBoardNonce] = useState(0);
+  const [careSettings, setCareSettings] = useState<CareSettings | null>(null);
+  const [tuning, setTuning] = useState(false);
   useEffect(() => {
     if (!me) return;
     let active = true;
     setDataReady(false);
     (async () => {
-      const [wow, koc] = await Promise.all([
+      const [wow, koc, settings] = await Promise.all([
         loadCarePosts(subjectId, 'wow'),
         loadCarePosts(subjectId, 'koc', { from: weekStart, to: weekEnd }),
+        getCareSettings(subjectId),
       ]);
       if (!active) return;
       setWowPosts(wow);
       setKocPosts(koc);
+      setCareSettings(settings);
       setDataReady(true);
+      // The self-driving part: with the switch on, a stale window (>7 days)
+      // quietly re-tunes on arrival — the member's evolution keeps steering.
+      if (settings?.wow_window_auto && subjectId === me) {
+        const age = settings.wow_window_set_at ? Date.now() - new Date(settings.wow_window_set_at).getTime() : Infinity;
+        if (age > 7 * 86400_000) {
+          void tuneWowWindow().then((r) => {
+            if (r && active) setCareSettings((cur) => cur ? { ...cur, wow_window_days: r.days, wow_window_reason: r.reason, wow_window_set_at: new Date().toISOString() } : cur);
+          });
+        }
+      }
     })();
     return () => { active = false; };
   }, [me, subjectId, weekStart, weekEnd, boardNonce]);
+  // The window the radar reads through: Claude's pick when the member handed
+  // it over, the platform default otherwise. Caregivers see the same number
+  // the member does — care_settings RLS lets the team read it.
+  const wowWindow = careSettings?.wow_window_auto && careSettings.wow_window_days
+    ? careSettings.wow_window_days : WOW_WINDOW_DEFAULT;
 
   // Sign any attachment paths we haven't signed yet.
   useEffect(() => {
@@ -1102,7 +1122,7 @@ export default function Concierge() {
 
       {/* Active tab content */}
       {activeTab === 'wow' && (() => {
-        const scores = computeWowScores(wowPosts);
+        const scores = computeWowScores(wowPosts, new Date(), wowWindow);
         const feed = wowFilter === 'All' ? wowPosts : wowPosts.filter((p) => p.dimensions.includes(wowFilter));
         return (
           <>
@@ -1119,6 +1139,50 @@ export default function Concierge() {
                     <button key={c} className={'wow__chip' + (wowFilter === c ? ' is-on' : '')} onClick={() => setWowFilter(c)}>{c}</button>
                   ))}
                 </div>
+                {/* THE SELF-DRIVING WINDOW (founder 2026-08-14): the score is
+                    a now-reading over a window; whose hands the window is in
+                    is the member's choice — visible, reasoned, revocable. */}
+                {!isClientView && (
+                  <div className="wowwin">
+                    {careSettings?.wow_window_auto ? (
+                      <>
+                        <p className="wowwin__line">
+                          Claude tunes your window as you evolve — currently <strong>{wowWindow} days</strong>.
+                          {careSettings.wow_window_reason && <span className="wowwin__reason"> “{careSettings.wow_window_reason}”</span>}
+                        </p>
+                        <button className="wowwin__btn" disabled={tuning}
+                          onClick={() => {
+                            setTuning(true);
+                            void setWowWindowAuto(me, false)
+                              .then(() => setCareSettings((cur) => cur ? { ...cur, wow_window_auto: false } : cur))
+                              .finally(() => setTuning(false));
+                          }}>
+                          Take the wheel back
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="wowwin__line">Scores read your last <strong>{WOW_WINDOW_DEFAULT} days</strong>.</p>
+                        <button className="wowwin__btn" disabled={tuning}
+                          title="Claude picks the window from the rhythm of your entries — always shown with its reason, always yours to take back"
+                          onClick={() => {
+                            setTuning(true);
+                            void setWowWindowAuto(me, true)
+                              .then(() => tuneWowWindow())
+                              .then((r) => setCareSettings((cur) => ({
+                                wow_window_auto: true,
+                                wow_window_days: r?.days ?? cur?.wow_window_days ?? null,
+                                wow_window_reason: r?.reason ?? cur?.wow_window_reason ?? null,
+                                wow_window_set_at: new Date().toISOString(),
+                              })))
+                              .finally(() => setTuning(false));
+                          }}>
+                          {tuning ? 'Tuning…' : 'Let Claude tune it'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
             {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (

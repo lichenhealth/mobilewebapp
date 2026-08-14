@@ -133,9 +133,9 @@ export interface WowScores { byDimension: Record<Dimension, number | null>; over
 // someone changing fast, wide enough that one rough entry doesn't own the
 // number. People who post rarely are untouched by the window either way —
 // their latest entry carries forward regardless of age.
-const WOW_WINDOW_DAYS = 60;
-export function computeWowScores(posts: CarePostRow[], now = new Date()): WowScores {
-  const cutoff = new Date(now.getTime() - WOW_WINDOW_DAYS * 86400_000).toISOString();
+export const WOW_WINDOW_DEFAULT = 60;
+export function computeWowScores(posts: CarePostRow[], now = new Date(), windowDays = WOW_WINDOW_DEFAULT): WowScores {
+  const cutoff = new Date(now.getTime() - windowDays * 86400_000).toISOString();
   const recent: Record<string, number[]> = {};
   const latest: Record<string, { at: string; score: number }> = {};
   for (const d of WOW_DIMENSIONS) recent[d] = [];
@@ -159,6 +159,44 @@ export function computeWowScores(posts: CarePostRow[], now = new Date()): WowSco
     if (v != null) { oSum += v; oCnt += 1; }
   }
   return { byDimension, overall: oCnt ? Math.round(oSum / oCnt) : null };
+}
+
+// ─── The self-driving window (founder 2026-08-14) ────────────────────────────
+// A member may hand their score window to Claude — opt-in, visible, revocable
+// ("kinda like self driving cars"). care_settings holds the consent and
+// Claude's current pick + reason; the wow-window edge function does the
+// tuning (throttled server-side to once a week).
+
+export interface CareSettings {
+  wow_window_days: number | null;
+  wow_window_auto: boolean;
+  wow_window_reason: string | null;
+  wow_window_set_at: string | null;
+}
+
+export async function getCareSettings(patientId: string): Promise<CareSettings | null> {
+  const { data, error } = await supabase.from('care_settings')
+    .select('wow_window_days, wow_window_auto, wow_window_reason, wow_window_set_at')
+    .eq('patient_id', patientId).maybeSingle();
+  if (error) { console.warn('getCareSettings:', error.message); return null; }
+  return (data as CareSettings | null);
+}
+
+/** Flip the consent switch — your own row only (RLS). */
+export async function setWowWindowAuto(me: string, on: boolean): Promise<void> {
+  const { error } = await supabase.from('care_settings')
+    .upsert({ patient_id: me, wow_window_auto: on, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+/** Ask Claude to (re)tune your window. Server-side it requires the consent
+ *  switch on, and returns the standing choice untouched if tuned <7 days ago. */
+export async function tuneWowWindow(): Promise<{ days: number; reason: string } | null> {
+  const { data, error } = await supabase.functions.invoke('wow-window', { body: {} });
+  if (error) { console.warn('tuneWowWindow:', error.message); return null; }
+  return (data as { days?: number; reason?: string } | null)?.days
+    ? { days: (data as { days: number }).days, reason: (data as { reason?: string }).reason ?? '' }
+    : null;
 }
 
 /** Build HexagonRadar axes from derived scores (null = no entries yet → "—"). */

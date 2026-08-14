@@ -1342,3 +1342,18 @@
 .selfaudit__error { font-size: 12.5px; color: var(--peach-deep); }
 .selfaudit__save { margin-top: var(--s-2); }
 .means__hint--tradeoff { color: var(--ink-soft); }
+
+/* ── The self-driving score window (founder 2026-08-14) ──────────────────── */
+.wowwin {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  justify-content: center; margin: 2px 0 var(--s-3);
+}
+.wowwin__line { margin: 0; font-size: 12px; color: var(--ink-muted); text-align: center; }
+.wowwin__line strong { font-weight: 500; color: var(--ink-soft); }
+.wowwin__reason { font-style: italic; }
+.wowwin__btn {
+  padding: 4px 14px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 11.5px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.wowwin__btn:hover { border-color: var(--peach); color: var(--peach-deep); }
