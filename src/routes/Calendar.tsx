@@ -253,19 +253,33 @@ export default function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlayOn, spaceKey, view, from, to]);
 
-  /** Free members for a 30-min slot: not busy, and (if they declared hours)
-   *  inside a declared window. Members with no declared hours count as free
-   *  whenever they're not busy. */
+  /** UNKNOWN IS NEVER YES (founder 2026-08-14, fixing the wall of green):
+   *  the shading counts only members the system actually knows something
+   *  about — declared hours (work or social; on-call is the care rota, not a
+   *  meeting invitation) or busy time their calendar shares let us see.
+   *  Members who've signaled nothing used to count as free 24/7, which
+   *  painted every slot green the moment a group had quiet members. Now they
+   *  simply aren't in the count, and the overlay says so.
+   *  (Limit: someone who shared an EMPTY calendar looks identical to someone
+   *  who shared nothing — free_busy() returns rows, not shares.) */
+  const knownIds = useMemo(() => memberIds.filter((pid) =>
+    fbRows.some((r) => r.profile_id === pid) || memberWindows.some((w) => w.profile_id === pid)),
+  [memberIds, fbRows, memberWindows]);
+
+  /** Free KNOWN members for a 30-min slot: not busy, and — if they declared
+   *  hours — inside a declared window (work or social alike: published hours
+   *  are published hours). Busy-only members are free wherever they're not
+   *  busy; that's real signal, unlike silence. */
   const freeMembersAt = (iso: string, slotStart: number): string[] => {
     const slotEnd = slotStart + 30;
     const wd = weekdayMon0(iso);
-    return memberIds.filter((pid) => {
+    return knownIds.filter((pid) => {
       const busy = fbRows.some((r) =>
         r.profile_id === pid && occursOn(r, iso)
         && (r.all_day || ((r.start_min ?? 0) < slotEnd && (r.end_min ?? 1440) > slotStart)));
       if (busy) return false;
       const wins = memberWindows.filter((w) =>
-        w.profile_id === pid && w.kind === 'available'
+        w.profile_id === pid && (w.kind === 'available' || w.kind === 'social')
         && (!w.valid_from || w.valid_from <= iso) && (!w.valid_to || w.valid_to >= iso));
       if (wins.length === 0) return true;
       return wins.some((w) => w.weekday === wd && w.start_min < slotEnd && w.end_min > slotStart);
@@ -512,8 +526,8 @@ export default function Calendar() {
           <select className="calp__vselect" value={view === 'todo' ? prevGridView : view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
             {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
-          <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Sessions & requests">
-            <Icon name="member-heart" size={15} />
+          <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Bookings">
+            <Icon name="booking-tap" size={15} />
           </button>
           <AssistantDoor section="calendar" label="Your assistant — what's coming, what's unanswered" />
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
@@ -644,6 +658,23 @@ export default function Calendar() {
               <p className="calp__result-none">No matching events or calendars.</p>
             )}
           </div>
+        )}
+
+        {/* Find-a-time tells you what it's actually going on (founder
+            2026-08-14): silence used to render as free-24/7 and the whole
+            calendar went green. Now the legend names the coverage — and at
+            zero signal there's no shading at all, just the truth. */}
+        {overlayOn && spaceSel.length > 0 && memberIds.length > 0
+          && view !== 'month' && view !== 'schedule' && view !== 'todo' && (
+          <p className="calp__ovnote">
+            {knownIds.length === 0
+              ? 'No one here has set up availability hours or shared a calendar yet, so there’s nothing to shade. Availability starts when they set it.'
+              : knownIds.length < memberIds.length
+                ? `Going on ${knownIds.length} of ${memberIds.length} members’ shared hours or calendars — the rest haven’t set any up yet. ${knownIds.length === 1 ? 'Green = that member’s free time.' : `Deeper green = all ${knownIds.length} free.`}`
+                : memberIds.length === 1
+                  ? 'Going on the one member’s shared time. Green = they’re free.'
+                  : `Going on all ${memberIds.length} members’ shared time. Deeper green = everyone’s free.`}
+          </p>
         )}
 
         {/* Overlaid calendars (from search) — dismissible, never saved */}
@@ -832,18 +863,20 @@ export default function Calendar() {
                   {Array.from({ length: 23 }, (_, h) => (
                     <span className="calp__line" key={h + 1} style={{ top: (h + 1) * HOUR_PX }} />
                   ))}
-                  {/* Find-a-time shading: greener = more members free; tap to book */}
-                  {overlayOn && spaceSel.length > 0 && memberIds.length > 0 &&
-                    Array.from({ length: 48 }, (_, s) => s * 30).map((slot) => {
+                  {/* Find-a-time shading: greener = more KNOWN members free;
+                      tap to book. Clamped to 7am–9pm — 3am being technically
+                      clear is not an invitation. */}
+                  {overlayOn && spaceSel.length > 0 && knownIds.length > 0 &&
+                    Array.from({ length: 28 }, (_, s) => 7 * 60 + s * 30).map((slot) => {
                       const free = freeMembersAt(iso, slot);
                       if (free.length === 0) return null;
-                      const strong = free.length === memberIds.length;
+                      const strong = free.length === knownIds.length;
                       return (
                         <button
                           key={`fa-${slot}`}
                           className={'calp__slot calp__slot--free' + (strong ? ' is-strong' : '')}
                           style={{ top: (slot / 60) * HOUR_PX, height: HOUR_PX / 2 }}
-                          title={`${free.length}/${memberIds.length} free at ${minToLabel(slot)}`}
+                          title={`${free.length}/${knownIds.length} free at ${minToLabel(slot)}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/calendar/new?${primarySpace ? `space=${primarySpace}&` : ""}date=${iso}&start=${slot}&inv=${free.filter((p) => p !== me).join(',')}`);

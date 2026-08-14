@@ -323,6 +323,7 @@
 .calp__addcal::placeholder { color: var(--ink-muted); }
 .calp__addcal:focus { outline: none; border-style: solid; border-color: var(--peach); background: var(--bone-warm); }
 .calp__calchip--overlay.is-on { background: var(--green); border-color: var(--green); }
+.calp__ovnote { font-size: 11px; color: var(--ink-muted); margin: 4px 2px 0; }
 .calp__slot { position: absolute; left: 0; right: 0; pointer-events: auto; }
 .calp__slot--free { background: rgba(152, 190, 77, 0.20); }
 .calp__slot--free.is-strong { background: rgba(152, 190, 77, 0.38); }

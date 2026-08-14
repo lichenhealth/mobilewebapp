@@ -132,6 +132,26 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
   return [...new Set(out)].sort((a, b) => a - b);
 }
 
+/** Nobody is bookable by default (founder 2026-08-14): no declared hours means
+ *  NOT available — unknown is never yes, same doctrine as presence and the
+ *  find-a-time shading. When a booker hits that wall, this turns their demand
+ *  into the provider's setup moment: a bell (which rides push) pointing at
+ *  Calendar settings. The human ask travels separately, as a prefilled DM the
+ *  booker sends in their own words — the platform has no voice in chat. */
+export async function nudgeAvailability(provider: string, sessionTitle: string): Promise<void> {
+  const { error } = await supabase.rpc('notify', {
+    p_recipient: provider,
+    p_section: 'calendar',
+    p_space: null,
+    p_type: 'booking_nudge',
+    p_title: 'Someone wants to book time with you',
+    p_body: `They tried to book “${sessionTitle}”, but you haven’t set up your availability hours yet. Set them in Calendar settings and they can pick a time.`,
+    p_link: '/calendar/settings',
+    p_actor: (await supabase.auth.getUser()).data.user?.id ?? null,
+  });
+  if (error) throw error;
+}
+
 // ─── Booking lifecycle (SECURITY DEFINER RPCs do the real work) ──────────────
 
 export async function createBooking(typeId: string, date: string, startMin: number, note: string): Promise<void> {

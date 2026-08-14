@@ -53,6 +53,16 @@ export default function ChatConversation({
       setDraft(`About "${label}" — ${window.location.origin}/posts/${p.id}\n\n`);
     });
   }, [aboutPost]);
+  // ?draft= — same idea with the words supplied whole (the availability nudge
+  // arrives this way): the member still presses send themselves, so whatever
+  // lands in the thread is theirs, editable and declinable.
+  const draftParam = params.get('draft');
+  const draftDone = useRef(false);
+  useEffect(() => {
+    if (!draftParam || draftDone.current) return;
+    draftDone.current = true;
+    setDraft(draftParam);
+  }, [draftParam]);
   const [pending, setPending] = useState<Pending[]>([]);
   const [uploading, setUploading] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);

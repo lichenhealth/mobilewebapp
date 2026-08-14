@@ -6,8 +6,9 @@ import { supabase } from '../lib/supabase';
 import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
-  BookingBoard, loadBookingBoard, slotsForDay, createBooking,
+  BookingBoard, loadBookingBoard, slotsForDay, createBooking, nudgeAvailability,
 } from '../lib/bookingApi';
+import { ensureDirectChat } from '../lib/chatApi';
 import './Bookings.css';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -111,7 +112,39 @@ export default function BookSession() {
 
       {error && <p className="bkg__error">{error}</p>}
 
-      {days.length === 0 && (
+      {/* No declared hours at all is a different truth than a full fortnight:
+          nobody is bookable by default (founder 2026-08-14), so say so and
+          turn the booker's interest into the provider's setup moment — one
+          button sends the bell AND opens a DM the booker sends themselves. */}
+      {board.windows.length === 0 ? (
+        <div className="bkg__nohours">
+          <p className="bkg__muted">
+            {providerName || 'This member'} hasn&rsquo;t set up their availability hours yet,
+            so there&rsquo;s nothing to pick from.
+          </p>
+          <button
+            className="btn btn-primary bkg__btn"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true); setError('');
+              try {
+                await nudgeAvailability(t.provider_id, t.title);
+                const chatId = await ensureDirectChat(t.provider_id);
+                const ask = `I was trying to book “${t.title}” with you, but your availability isn’t set up yet — if you add your hours in Calendar settings, I can pick a time.`;
+                navigate(`/chat/${chatId}?draft=${encodeURIComponent(ask)}`);
+              } catch (e) {
+                setError((e as { message?: string } | null)?.message || 'Something went wrong.');
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? 'One moment…' : 'Let them know'}
+          </button>
+          <p className="bkg__nohours-fine">
+            They&rsquo;ll get a notification, and you can send them a note in your own words.
+          </p>
+        </div>
+      ) : days.length === 0 && (
         <p className="bkg__muted">
           No open times in the next two weeks — check back, or message them
           from their profile.

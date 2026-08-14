@@ -13,6 +13,7 @@ export type IconName =
   | 'arrow-up'
   | 'bell'
   | 'book'
+  | 'booking-tap'
   | 'bookmark'
   | 'brain'
   | 'chat-about'
@@ -104,6 +105,19 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '245 216 20 21',
     strokeWidth: 1.31,
     content: <><path d="M262.857 236.25H249.286C248.717 236.25 248.172 236.013 247.77 235.591C247.369 235.169 247.143 234.597 247.143 234C247.143 233.403 247.369 232.831 247.77 232.409C248.172 231.987 248.717 231.75 249.286 231.75H261.429C261.807 231.75 262.171 231.592 262.439 231.311C262.707 231.029 262.857 230.648 262.857 230.25V218.25C262.857 217.852 262.707 217.471 262.439 217.189C262.171 216.908 261.807 216.75 261.429 216.75H249.286C248.727 216.75 248.191 216.979 247.79 217.388C247.39 217.797 247.158 218.354 247.143 218.94V233.94" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M261.428 231.75V236.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M256.502 223.503H259.809L256.295 228.712H260.016" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M250.017 224.978L251.539 220.181C251.618 219.935 251.837 219.77 252.084 219.77C252.331 219.77 252.55 219.935 252.628 220.181L254.151 224.978M250.568 223.242H253.599" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // Bookings: a calendar being tapped (founder 2026-08-14 — member-heart is
+  // the Members mark and read as "directory" on the Calendar toolbar). The
+  // word itself lives in the label; lettering dies at hairline sizes.
+  'booking-tap': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <>
+      <path d="M6.5 2.5v3M12.5 2.5v3" />
+      <path d="M16.5 8.5V6.2c0-1-.8-1.8-1.8-1.8H4.8C3.8 4.4 3 5.2 3 6.2v8.1c0 1 .8 1.8 1.8 1.8h4.7" />
+      <path d="M3 8.4h13.5" />
+      <path d="M13.8 13.6V9.9a1.2 1.2 0 0 1 2.4 0v4.6l2.8.7c.9.2 1.5 1.1 1.3 2l-.5 2.3a2 2 0 0 1-2 1.6h-2.7a2 2 0 0 1-1.5-.7l-2.4-2.8a1.1 1.1 0 0 1 1.6-1.5l1 1Z" />
+    </>,
   },
   'bookmark': {
     viewBox: '264 838 29 26',
