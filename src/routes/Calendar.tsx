@@ -45,6 +45,7 @@ import {
 import TodoView from '../components/TodoView';
 import './Calendar.css';
 import AssistantDoor from '../components/AssistantDoor';
+import { listMyBookingTypes } from '../lib/bookingApi';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -116,6 +117,15 @@ export default function Calendar() {
   // on the grid — Google used to ride Mine invisibly).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
   const [extCals, setExtCals] = useState<{ id: string; name: string }[]>([]);
+  // The Bookings door earns its slot: only once you've set up something
+  // bookable (founder 2026-08-14). The hub stays reachable from profiles.
+  const [hasBookables, setHasBookables] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void listMyBookingTypes(me).then((t) => { if (live) setHasBookables(t.length > 0); });
+    return () => { live = false; };
+  }, [me]);
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
   useEffect(() => {
     if (!me) return;
@@ -149,6 +159,7 @@ export default function Calendar() {
   // = the full membership list, so focus alone still shows everything.
   const [calQ, setCalQ] = useState('');
   const [calAddOpen, setCalAddOpen] = useState(false);
+  const calAddRef = useRef<HTMLInputElement>(null);
   // Imported calendars are deliberately NOT in here — they render as standing
   // chips (white when off), so the picker only holds group calendars.
   const calChoices = useMemo(() => {
@@ -526,21 +537,34 @@ export default function Calendar() {
         </button>
       )}
       <div className="calp__pin">
+        {/* Acting doors LEFT in Home's order (Search · + · Brain), the
+            calendar's own controls RIGHT (founder 2026-08-14: "for UI
+            consistency"). Bookings only shows once you've set up something
+            bookable. Everything shares one 34px size. */}
         <div className="calp__toolbar">
           <button
             className={'calp__tool' + (searchOpen ? ' is-on' : '')}
             onClick={() => { setSearchOpen((s) => !s); setQuery(''); }}
             aria-label="Search events"
           >
-            <Icon name="search" size={15} />
+            <Icon name="search" size={16} />
           </button>
+          <button
+            className="calp__tool calp__tool--new"
+            onClick={() => navigate('/calendar/new' + composerQS())}
+            aria-label="New event"
+          >
+            <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+          <AssistantDoor section="calendar" label="Your assistant — what's coming, what's unanswered" />
+          <span className="calp__tb-spacer" aria-hidden="true" />
           <div className="calp__nav">
             <button className="calp__navbtn" onClick={() => page(-1)} aria-label="Previous"><Icon name="chevron-left" size={16} /></button>
             <button className="calp__month" onClick={() => setAnchor(todayISO())}>{headerLabel}</button>
             <button className="calp__navbtn" onClick={() => page(1)} aria-label="Next"><Icon name="chevron-right" size={16} /></button>
           </div>
-          {/* Wrap break: search + date on row 1, action controls together on row 2 (narrow screens). */}
-          <span className="calp__tbbreak" aria-hidden="true" />
           <button
             className={'calp__todo-toggle' + (view === 'todo' ? ' is-on' : '')}
             onClick={toggleTodo}
@@ -552,21 +576,13 @@ export default function Calendar() {
           <select className="calp__vselect" value={view === 'todo' ? prevGridView : view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
             {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
-          <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Bookings">
-            <Icon name="booking-tap" size={15} />
-          </button>
-          <AssistantDoor section="calendar" label="Your assistant — what's coming, what's unanswered" />
+          {hasBookables && (
+            <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Bookings">
+              <Icon name="booking-tap" size={16} />
+            </button>
+          )}
           <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
-            <Icon name="settings" size={15} />
-          </button>
-          <button
-            className="calp__tool calp__tool--new"
-            onClick={() => navigate('/calendar/new' + composerQS())}
-            aria-label="New event"
-          >
-            <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
+            <Icon name="settings" size={16} />
           </button>
         </div>
 
@@ -614,6 +630,7 @@ export default function Calendar() {
             );
           })}
           <input
+            ref={calAddRef}
             className="calp__addcal"
             placeholder="Add a calendar…"
             value={calQ}
@@ -645,7 +662,7 @@ export default function Calendar() {
             {calChoices.map((c) => (
               <button
                 className="calp__result" key={c.key}
-                onPointerDown={(e) => { e.preventDefault(); toggleCal(c.key); setCalQ(''); }}
+                onPointerDown={(e) => { e.preventDefault(); toggleCal(c.key); setCalQ(''); setCalAddOpen(false); calAddRef.current?.blur(); }}
               >
                 <span className="calp__result-title">
                   <span className="calp__chipdot" style={{ background: c.tint }} />
