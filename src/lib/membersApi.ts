@@ -18,6 +18,7 @@ export interface MemberProfile {
    *  being tended by someone. Absent pre-migration = treat as a person. */
   kind?: string;
   aspect?: string | null;
+  jurisdiction?: string | null;
   steward_profile_id?: string | null;
   steward_space_id?: string | null;
 }
@@ -25,7 +26,7 @@ export interface MemberProfile {
 export async function loadMemberProfile(id: string): Promise<MemberProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled, kind, aspect, steward_profile_id, steward_space_id')
+    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled, kind, aspect, jurisdiction, steward_profile_id, steward_space_id')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadMemberProfile:', error.message); return null; }

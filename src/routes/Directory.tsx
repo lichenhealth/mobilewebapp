@@ -13,7 +13,7 @@ import ConsentBubble from '../components/ConsentBubble';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import './Directory.css';
 
-interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; kind: string | null; }
+interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; kind: string | null; jurisdiction: string | null; }
 interface SpaceRow { id: string; name: string; kind: string; avatar_url: string | null; description: string | null; }
 // Section order mirrors My-celium's directory (founder 2026-08-14: "they're
 // in someone's Mycelium, organized by type" — the whole-network directory
@@ -109,7 +109,7 @@ export default function Directory() {
       const [profs, sps] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, headline, avatar_url, kind')
+          .select('id, full_name, headline, avatar_url, kind, jurisdiction')
           .or('onboarded.eq.true,kind.neq.person')  // beings have no signup to complete   // half-created accounts aren't members yet
           // Honours the findable switch. RLS is the floor — it hides quiet
           // members from strangers — but anyone with a public post stays
@@ -268,7 +268,7 @@ export default function Directory() {
                 key={m.id}
                 id={m.id}
                 name={m.full_name ?? 'A being'}
-                sub={m.headline ?? undefined}
+                sub={[m.headline, m.jurisdiction ? `tended within ${m.jurisdiction}` : null].filter(Boolean).join(' · ') || undefined}
                 avatarUrl={m.avatar_url}
                 kind="space"
                 recommended={myRecs.has('profile:' + m.id)}

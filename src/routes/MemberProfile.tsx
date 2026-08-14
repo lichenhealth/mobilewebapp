@@ -248,6 +248,13 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
         </p>
       )}
+      {/* A distributed being names its scope (founder 2026-08-14): the
+          jurisdiction is part of who they are, not settings small-print. */}
+      {isBeing && member.jurisdiction && (
+        <p className="mprof__jurisdiction">
+          <Icon name="location" size={13} /> Tended within {member.jurisdiction}
+        </p>
+      )}
       {bookables.length > 0 && (
         <div className="mprof__book">
           {bookables.map((bt) => (
@@ -282,12 +289,28 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           >
             <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
           </button>
-          <button
-            className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
-            onClick={toggleTrust}
-          >
-            <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
-          </button>
+          {/* Trust is person-to-person (founder doctrine; re-affirmed
+              2026-08-14 for stewarded members): a being wears the public
+              recommend thumb, never the shield. */}
+          {isBeing ? (
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (myRecs.has('profile:' + id) ? ' is-on' : '')}
+              onClick={() => {
+                const on = !myRecs.has('profile:' + id);
+                setMyRecs((s) => { const n = new Set(s); if (on) n.add('profile:' + id); else n.delete('profile:' + id); return n; });
+                void setRecommend('profile', id, on).catch(console.error);
+              }}
+            >
+              <Icon name="thumbs-up" size={14} /> {myRecs.has('profile:' + id) ? 'Recommended ✓' : 'Recommend'}
+            </button>
+          ) : (
+            <button
+              className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+              onClick={toggleTrust}
+            >
+              <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+            </button>
+          )}
           {/* Trust and my-celium are PERSONAL edges — mycelium.truster_id and
               recommendations.recommender_id both reference a profile, so a
               space cannot hold them. While you're acting as one, these still

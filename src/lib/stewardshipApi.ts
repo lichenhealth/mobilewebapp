@@ -28,11 +28,16 @@ export interface Being {
   headline: string | null;
   kind: string;
   aspect: string | null;
+  /** The named scope a DISTRIBUTED being is tended within — "the Skagit
+   *  watershed" (founder 2026-08-14: plants and elements are in many places
+   *  at once, so their stewardship must name one; an animal is already
+   *  somewhere). Required for plant/element; optional otherwise. */
+  jurisdiction: string | null;
   steward_profile_id: string | null;
   steward_space_id: string | null;
 }
 
-const BEING_COLS = 'id, full_name, avatar_url, headline, kind, aspect, steward_profile_id, steward_space_id';
+const BEING_COLS = 'id, full_name, avatar_url, headline, kind, aspect, jurisdiction, steward_profile_id, steward_space_id';
 
 /** Beings I tend — directly, or through a space I administer. Returns [] on
  *  any error so screens keep working before the migration lands. */
@@ -61,15 +66,22 @@ export async function listMyBeings(me: string): Promise<Being[]> {
 /** Bring a being into the web. Steward is YOU unless a space is named, in
  *  which case you must administer it (the RPC re-checks server-side). */
 export async function createBeing(
-  name: string, kind: EntityKind, aspect: EntityAspect, stewardSpaceId?: string,
+  name: string, kind: EntityKind, aspect: EntityAspect,
+  opts: { stewardSpaceId?: string; jurisdiction?: string } = {},
 ): Promise<{ ok: boolean; id?: string; message: string }> {
   const { data, error } = await supabase.rpc('create_entity_profile', {
     p_name: name, p_kind: kind, p_aspect: aspect,
-    p_steward_space: stewardSpaceId ?? null,
+    p_steward_space: opts.stewardSpaceId ?? null,
+    p_jurisdiction: opts.jurisdiction?.trim() || null,
   });
   if (error) return { ok: false, message: error.message };
   return { ok: true, id: data as string, message: `${name} is woven in.` };
 }
+
+/** The kinds that exist in many places at once — their stewardship names a
+ *  specific jurisdiction now; overall/field-level stewards are a possible
+ *  later chapter. */
+export const DISTRIBUTED_KINDS: EntityKind[] = ['plant', 'element'];
 
 /** Who tends this being — for the "Stewarded by" line on its profile. */
 export async function loadSteward(

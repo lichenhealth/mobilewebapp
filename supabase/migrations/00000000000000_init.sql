@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PHNwVUN0VylUpMLtUciapRH1xGsghsUZ1JgBVzaAqdojcYcsrFe7gIjGgcovWGr
+\restrict l6pKMdUHcoRqb8qCwEGNQZXfcKShx01G5o8Kd96UgOLEbgnBBZDUgi61ZsQQDGj
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1249,10 +1249,10 @@ end; $$;
 ALTER FUNCTION public.create_booking(p_type uuid, p_date date, p_start integer, p_note text) OWNER TO postgres;
 
 --
--- Name: create_entity_profile(text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: create_entity_profile(text, text, text, uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text DEFAULT 'individual'::text, p_steward_space uuid DEFAULT NULL::uuid) RETURNS uuid
+CREATE FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text DEFAULT 'individual'::text, p_steward_space uuid DEFAULT NULL::uuid, p_jurisdiction text DEFAULT NULL::text) RETURNS uuid
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
@@ -1260,30 +1260,28 @@ declare
   v_uid uuid := auth.uid();
   v_id uuid := gen_random_uuid();
 begin
-  if v_uid is null then
-    raise exception 'sign in first';
-  end if;
+  if v_uid is null then raise exception 'sign in first'; end if;
   if p_kind = 'person' or p_kind not in ('plant','animal','place','element','collective') then
     raise exception 'a stewarded being is not a person';
   end if;
-  if btrim(coalesce(p_name, '')) = '' then
-    raise exception 'a being needs a name';
+  if btrim(coalesce(p_name, '')) = '' then raise exception 'a being needs a name'; end if;
+  if p_kind in ('plant','element') and btrim(coalesce(p_jurisdiction, '')) = '' then
+    raise exception 'Plants and elements are in many places at once — name the jurisdiction this one is tended within.';
   end if;
-  -- Stewarding through a space is the succession story: you must admin it.
   if p_steward_space is not null and not public.is_space_admin(p_steward_space, v_uid) then
     raise exception 'you do not steward that space';
   end if;
-
-  insert into public.profiles (id, full_name, kind, aspect, onboarded,
+  insert into public.profiles (id, full_name, kind, aspect, onboarded, jurisdiction,
                                steward_profile_id, steward_space_id)
   values (v_id, btrim(p_name), p_kind, coalesce(p_aspect, 'individual'), true,
+          nullif(btrim(coalesce(p_jurisdiction, '')), ''),
           case when p_steward_space is null then v_uid else null end,
           p_steward_space);
   return v_id;
 end $$;
 
 
-ALTER FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid) OWNER TO postgres;
+ALTER FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid, p_jurisdiction text) OWNER TO postgres;
 
 --
 -- Name: create_space_chat(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5203,8 +5201,10 @@ CREATE TABLE public.profiles (
     findable boolean DEFAULT true NOT NULL,
     assistant_can_edit boolean DEFAULT false NOT NULL,
     weaveable_default boolean DEFAULT true NOT NULL,
+    jurisdiction text,
     CONSTRAINT profiles_aspect_check CHECK (((aspect IS NULL) OR (aspect = ANY (ARRAY['individual'::text, 'collective'::text])))),
     CONSTRAINT profiles_birth_date_sane CHECK (((birth_date IS NULL) OR ((birth_date > '1900-01-01'::date) AND (birth_date <= CURRENT_DATE)))),
+    CONSTRAINT profiles_distributed_jurisdiction CHECK (((kind <> ALL (ARRAY['plant'::text, 'element'::text])) OR (jurisdiction IS NOT NULL))),
     CONSTRAINT profiles_kind_check CHECK ((kind = ANY (ARRAY['person'::text, 'plant'::text, 'animal'::text, 'place'::text, 'element'::text, 'collective'::text]))),
     CONSTRAINT profiles_notification_pref_check CHECK ((notification_pref = ANY (ARRAY['off'::text, 'in_app'::text, 'both'::text]))),
     CONSTRAINT profiles_steward_check CHECK (
@@ -5229,6 +5229,13 @@ COMMENT ON COLUMN public.profiles.assistant_can_edit IS 'Member consent for the 
 --
 
 COMMENT ON COLUMN public.profiles.weaveable_default IS 'Compose preselection for the per-post weaveable toggle. The per-post truth is posts.details.noWeave (stored only when switched OFF).';
+
+
+--
+-- Name: COLUMN profiles.jurisdiction; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.profiles.jurisdiction IS 'The named scope a stewarded being is tended within ("the Skagit watershed"). REQUIRED for plant/element kinds (distributed beings), optional otherwise. Public — it is part of the being''s identity.';
 
 
 --
@@ -9906,12 +9913,12 @@ GRANT ALL ON FUNCTION public.create_booking(p_type uuid, p_date date, p_start in
 
 
 --
--- Name: FUNCTION create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid, p_jurisdiction text); Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid) TO authenticated;
-GRANT ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid, p_jurisdiction text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid, p_jurisdiction text) TO authenticated;
+GRANT ALL ON FUNCTION public.create_entity_profile(p_name text, p_kind text, p_aspect text, p_steward_space uuid, p_jurisdiction text) TO service_role;
 
 
 --
@@ -11518,6 +11525,14 @@ GRANT SELECT(weaveable_default) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.jurisdiction; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(jurisdiction) ON TABLE public.profiles TO anon;
+GRANT SELECT(jurisdiction) ON TABLE public.profiles TO authenticated;
+
+
+--
 -- Name: TABLE push_subscriptions; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11819,7 +11834,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PHNwVUN0VylUpMLtUciapRH1xGsghsUZ1JgBVzaAqdojcYcsrFe7gIjGgcovWGr
+\unrestrict l6pKMdUHcoRqb8qCwEGNQZXfcKShx01G5o8Kd96UgOLEbgnBBZDUgi61ZsQQDGj
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --

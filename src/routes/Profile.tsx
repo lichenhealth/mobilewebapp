@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { listGuardianQueue, approveAsGuardian, cancelExchange, type Exchange } from '../lib/exchangeApi';
 import {
-  listMyBeings, createBeing, ENTITY_KINDS,
+  listMyBeings, createBeing, ENTITY_KINDS, DISTRIBUTED_KINDS,
   type Being, type EntityKind, type EntityAspect,
 } from '../lib/stewardshipApi';
 import { getIdentityTags, saveIdentityTags } from '../lib/meansApi';
@@ -114,6 +114,7 @@ export default function Profile() {
   const [beingName, setBeingName] = useState('');
   const [beingKind, setBeingKind] = useState<EntityKind>('animal');
   const [beingAspect, setBeingAspect] = useState<EntityAspect>('individual');
+  const [beingJurisdiction, setBeingJurisdiction] = useState('');
   const [beingBusy, setBeingBusy] = useState(false);
   const [beingMsg, setBeingMsg] = useState('');
   const [fullName, setFullName] = useState('');
@@ -1391,13 +1392,25 @@ export default function Profile() {
               Tango is an individual; Huachuma is a collective. The question isn&rsquo;t
               plant or animal — it&rsquo;s one being or many acting as one.
             </p>
-            <button className="btn btn-primary" disabled={beingBusy || !beingName.trim()}
+            {DISTRIBUTED_KINDS.includes(beingKind) && (
+              <>
+                <input className="prof__input" value={beingJurisdiction}
+                  onChange={(e) => { setBeingJurisdiction(e.target.value); setBeingMsg(''); }}
+                  placeholder="Jurisdiction — the Skagit watershed, Bainbridge Island's soil…" />
+                <p className="prof__hint">
+                  A {beingKind} is in many places at once, so this stewardship
+                  names the specific one you tend. Overall stewards may come later.
+                </p>
+              </>
+            )}
+            <button className="btn btn-primary"
+              disabled={beingBusy || !beingName.trim() || (DISTRIBUTED_KINDS.includes(beingKind) && !beingJurisdiction.trim())}
               onClick={() => {
                 setBeingBusy(true);
-                void createBeing(beingName.trim(), beingKind, beingAspect)
+                void createBeing(beingName.trim(), beingKind, beingAspect, { jurisdiction: beingJurisdiction.trim() || undefined })
                   .then(async (r) => {
                     setBeingMsg(r.message);
-                    if (r.ok) { setBeingName(''); setBeings(await listMyBeings(meId)); }
+                    if (r.ok) { setBeingName(''); setBeingJurisdiction(''); setBeings(await listMyBeings(meId)); }
                   })
                   .finally(() => setBeingBusy(false));
               }}>
