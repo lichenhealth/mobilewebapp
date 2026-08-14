@@ -169,6 +169,29 @@ export default function Saved() {
             )}
           </div>
           <AssistantDoor section="saved" size={30} label="Your assistant — what you've been keeping" />
+          {/* Area lenses ride the same row as the doors (founder 2026-08-14:
+              "design consistency with other rooms") — hairline between the
+              acting doors and the shelf's own filters, like everywhere else. */}
+          {areasPresent.length > 1 && (
+            <>
+              <span className="saved__bar-divider" aria-hidden="true" />
+              {areasPresent.map((a) => {
+                const on = areas.includes(a.value);
+                return (
+                  <button
+                    key={a.value}
+                    className={'myc__area' + (on ? ' is-on' : '')}
+                    onClick={() => toggleArea(a.value)}
+                    aria-pressed={on}
+                    aria-label={a.label}
+                    title={a.label}
+                  >
+                    <Icon name={a.icon} size={18} />
+                  </button>
+                );
+              })}
+            </>
+          )}
           <span className="saved__bar-spacer" />
           <div className="saved__folders">
             <button className="saved__folders-btn"
@@ -226,26 +249,6 @@ export default function Saved() {
           placeholder="Search what you've kept…"
           autoFocus
         />
-      )}
-
-      {areasPresent.length > 1 && (
-        <div className="myc__areas h-scroll" role="toolbar" aria-label="Service areas">
-          {areasPresent.map((a) => {
-            const on = areas.includes(a.value);
-            return (
-              <button
-                key={a.value}
-                className={'myc__area' + (on ? ' is-on' : '')}
-                onClick={() => toggleArea(a.value)}
-                aria-pressed={on}
-                aria-label={a.label}
-                title={a.label}
-              >
-                <Icon name={a.icon} size={18} />
-              </button>
-            );
-          })}
-        </div>
       )}
 
       {posts.length > 0 && (

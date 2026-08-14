@@ -9,7 +9,7 @@
 
 /* Shelf bar (founder 2026-07-30): circle icons left, folders dropdown right. */
 .saved__bar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 8px;
   padding: 0 var(--s-5); margin-bottom: var(--s-3); position: relative;
 }
 .saved__bar-spacer { flex: 1; }
@@ -58,3 +58,10 @@
 .saved__folders-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved__folders-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); }
 .saved__folders-empty { margin: 6px 4px; font-size: 13px; color: var(--ink-soft); }
+
+/* Hairline between the acting doors and the shelf's own lenses — the same
+   divider every room's icon row draws. */
+.saved__bar-divider {
+  width: 1px; align-self: stretch; background: var(--bone-edge);
+  margin: 2px 4px; flex-shrink: 0;
+}
