@@ -254,9 +254,15 @@ export default function Directory() {
             />
           );
         })}
+        {/* STEWARDED MEMBERS (founder 2026-08-14, choosing the literal name
+            over a prettier one: "per our desire to be literal versus sound
+            beautiful but not really communicate clearly") — every non-person
+            profiles.kind row: plants, animals, places, elements, collectives.
+            Each has a steward who answers for it; each carries the thumb,
+            never a shield. */}
         {beings.length > 0 && (
           <>
-            <h2 className="dir__section">Beings &amp; collectives</h2>
+            <h2 className="dir__section">Stewarded members</h2>
             {beings.map((m) => (
               <MemberRow
                 key={m.id}
