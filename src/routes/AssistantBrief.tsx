@@ -215,6 +215,37 @@ export default function AssistantBrief() {
             if (due.length) extras.reminders_today = due;
           }
         }
+        if (section === 'events') {
+          // The Events brain's real eyes (founder 2026-08-14): your answered
+          // invitations, what you're hosting, and how alive the section is.
+          const { data: att } = await supabase.from('event_attendees')
+            .select('status, events(id, title, start_date)')
+            .eq('profile_id', me).in('status', ['going', 'tentative']).limit(50);
+          const rsvps = ((att as unknown as { status: string; events: { id: string; title: string; start_date: string } | null }[] | null) ?? [])
+            .filter((r) => r.events && r.events.start_date >= today)
+            .sort((a, b) => a.events!.start_date.localeCompare(b.events!.start_date))
+            .slice(0, 10);
+          if (rsvps.length) {
+            extras.your_rsvps = rsvps.map((r) => ({ title: r.events!.title, on: r.events!.start_date, answer: r.status }));
+            rsvps.forEach((r) => found.push({ label: r.events!.title, to: `/events/${r.events!.id}` }));
+          }
+          const { data: hosting } = await supabase.from('events')
+            .select('id, title, start_date')
+            .eq('creator_id', me).gte('start_date', today)
+            .order('start_date').limit(8);
+          const hostRows = (hosting as { id: string; title: string; start_date: string }[] | null) ?? [];
+          if (hostRows.length) {
+            extras.you_are_hosting = hostRows.map((e) => ({ title: e.title, on: e.start_date }));
+            hostRows.forEach((e) => found.push({ label: e.title, to: `/events/${e.id}` }));
+          }
+          const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+          const { count } = await supabase.from('posts')
+            .select('id', { count: 'exact', head: true })
+            .contains('service_areas', ['events'])
+            .neq('author_id', me)
+            .gte('created_at', weekAgo);
+          if (count) extras.new_gatherings_posted_this_week = count;
+        }
         if (section === 'chat' || section === 'home') {
           const { data: unread } = await supabase.rpc('chat_unread_counts');
           const rows2 = (unread as { chat_id: string; unread: number }[] | null) ?? [];

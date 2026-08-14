@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
+import AssistantDoor from '../components/AssistantDoor';
 import { Icon } from '../components/Icon';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useAuth } from '../auth/AuthProvider';
@@ -287,6 +288,10 @@ export default function Events() {
                 </svg>
               </span>
             </button>
+            {/* The brain closes the doors group, same slot as Marketplace's
+                (founder 2026-08-14: "we need a brain for Events, so you can
+                click on your assistant and it can summarize your events"). */}
+            <AssistantDoor section="events" size={30} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
             <div className="evt__action-spacer" />
             {/* Free / Trade / Paid read as signals, same vocabulary as
                 Marketplace's mode lenses — text + icon, no circle, a check
