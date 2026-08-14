@@ -13,10 +13,23 @@ import ConsentBubble from '../components/ConsentBubble';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import './Directory.css';
 
-interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; }
+interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; kind: string | null; }
+interface SpaceRow { id: string; name: string; kind: string; avatar_url: string | null; description: string | null; }
+// Section order mirrors My-celium's directory (founder 2026-08-14: "they're
+// in someone's Mycelium, organized by type" — the whole-network directory
+// reads the same way).
+const SPACE_SECTIONS: { kind: string; title: string }[] = [
+  { kind: 'organization', title: 'Organizations' },
+  { kind: 'community', title: 'Communities' },
+  { kind: 'group', title: 'Groups' },
+  { kind: 'place', title: 'Places' },
+];
 
-/** Members directory — every registered member, searchable. The quickest way to
- *  find someone and start a direct message (also handy for testing with more users). */
+/** The Directory — everyone on Lichen, searchable and grouped by type:
+ *  members first, then beings & collectives, organizations, communities,
+ *  groups and places (founder 2026-08-14). People carry the private trust
+ *  shield; everything else carries the public recommend thumb — trust is
+ *  person-to-person only, by doctrine. */
 export default function Directory() {
   const { user } = useAuth();
   // FINDABILITY MEETS YOU HERE (founder 2026-08-07: the bubble should arrive
@@ -56,6 +69,7 @@ export default function Directory() {
 
   const [query, setQuery] = useState('');
   const [members, setMembers] = useState<DirRow[]>([]);
+  const [spaces, setSpaces] = useState<SpaceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [claudeInUse, setClaudeInUse] = useState<boolean | undefined>(undefined);
 
@@ -92,18 +106,29 @@ export default function Directory() {
     if (!me) return;
     let active = true;
     (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, headline, avatar_url')
-        .or('onboarded.eq.true,kind.neq.person')  // beings have no signup to complete   // half-created accounts aren't members yet
-        // Honours the findable switch. RLS is the floor — it hides quiet
-        // members from strangers — but anyone with a public post stays
-        // readable, so the browse surfaces respect the choice themselves.
-        .eq('findable', true)
-        .neq('id', me)
-        .order('full_name', { ascending: true })
-        .limit(500);
-      if (active) { setMembers((data as DirRow[] | null) ?? []); setLoading(false); }
+      const [profs, sps] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, headline, avatar_url, kind')
+          .or('onboarded.eq.true,kind.neq.person')  // beings have no signup to complete   // half-created accounts aren't members yet
+          // Honours the findable switch. RLS is the floor — it hides quiet
+          // members from strangers — but anyone with a public post stays
+          // readable, so the browse surfaces respect the choice themselves.
+          .eq('findable', true)
+          .neq('id', me)
+          .order('full_name', { ascending: true })
+          .limit(500),
+        supabase
+          .from('spaces')
+          .select('id, name, kind, avatar_url, description')
+          .eq('findable', true)
+          .order('name', { ascending: true })
+          .limit(500),
+      ]);
+      if (!active) return;
+      setMembers((profs.data as DirRow[] | null) ?? []);
+      setSpaces((sps.data as SpaceRow[] | null) ?? []);
+      setLoading(false);
     })();
     return () => { active = false; };
   }, [me]);
@@ -123,13 +148,22 @@ export default function Directory() {
     );
     return sortClaudeFirst(matches);
   }, [query, members]);
+  const people = useMemo(() => hits.filter((m) => !m.kind || m.kind === 'person'), [hits]);
+  // Non-person profiles — a collective, a place-being, someday a horse.
+  const beings = useMemo(() => hits.filter((m) => m.kind && m.kind !== 'person'), [hits]);
+  const spaceHits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return !q ? spaces : spaces.filter((sp) =>
+      sp.name.toLowerCase().includes(q) || (sp.description?.toLowerCase().includes(q) ?? false));
+  }, [query, spaces]);
+  const anyHits = hits.length > 0 || spaceHits.length > 0;
 
   return (
     <div className="dir">
       <header className="dir__head">
-        <span className="eyebrow">Directory · {members.length} {members.length === 1 ? 'member' : 'members'}</span>
+        <span className="eyebrow">Directory · {members.length} {members.length === 1 ? 'member' : 'members'}{spaces.length > 0 ? ` · ${spaces.length} more` : ''}</span>
         <h1 className="dir__title" ref={setHeadEl}><span className="display-italic">Members</span></h1>
-        <p className="dir__sub">Everyone on Lichen. Find someone and start a direct message.</p>
+        <p className="dir__sub">Everyone on Lichen — members, then the organizations, communities, groups and places they've grown.</p>
         {askFindable && findable !== null && (
           <ConsentBubble
             anchor={headEl}
@@ -181,7 +215,7 @@ export default function Directory() {
       <div className="dir__list">
         {loading && <div className="dir__empty"><p>Loading members…</p></div>}
 
-        {!loading && members.length === 0 && (
+        {!loading && members.length === 0 && spaces.length === 0 && (
           <div className="dir__empty">
             <Icon name="user-multiple" size={20} />
             <p>No other members yet</p>
@@ -189,19 +223,19 @@ export default function Directory() {
           </div>
         )}
 
-        {!loading && members.length > 0 && hits.length === 0 && (
+        {!loading && (members.length > 0 || spaces.length > 0) && !anyHits && (
           <div className="dir__empty">
             <Icon name="search" size={20} />
             <p>No matches for &ldquo;{query}&rdquo;</p>
           </div>
         )}
 
-        {/* No bare-profile thumb (founder 2026-08-06): recommending a whole
-            person implicitly endorsed everything they'd ever listed. The
-            thumb lives on their offerings instead — open their page and
-            recommend the work you actually know. So every row here is
-            kind="person" (shield only, no thumb). */}
-        {hits.map((m) => {
+        {/* No bare-profile thumb for PEOPLE (founder 2026-08-06):
+            recommending a whole person implicitly endorsed everything they'd
+            ever listed — the thumb lives on their offerings. People carry
+            the shield only; beings and spaces carry the thumb only (trust is
+            person-to-person, founder 2026-08-14). */}
+        {people.map((m) => {
           const name = m.full_name ?? 'Member';
           return (
             <MemberRow
@@ -218,6 +252,59 @@ export default function Directory() {
               onOpen={() => navigate(`/members/${m.id}`)}
               claudeInUse={claudeInUse}
             />
+          );
+        })}
+        {beings.length > 0 && (
+          <>
+            <h2 className="dir__section">Beings &amp; collectives</h2>
+            {beings.map((m) => (
+              <MemberRow
+                key={m.id}
+                id={m.id}
+                name={m.full_name ?? 'A being'}
+                sub={m.headline ?? undefined}
+                avatarUrl={m.avatar_url}
+                kind="space"
+                recommended={myRecs.has('profile:' + m.id)}
+                onRecommend={(on) => {
+                  setMyRecs((s) => withKey(s, 'profile:' + m.id, on));
+                  void setRecommend('profile', m.id, on).catch(console.error);
+                }}
+                weaveOn={myWebSet.has('profile:' + m.id)}
+                onWeave={(on) => toggleWeave(m.id, on)}
+                onOpen={() => navigate(`/members/${m.id}`)}
+              />
+            ))}
+          </>
+        )}
+        {SPACE_SECTIONS.map(({ kind, title }) => {
+          const rows = spaceHits.filter((sp) => sp.kind === kind);
+          if (rows.length === 0) return null;
+          return (
+            <div key={kind}>
+              <h2 className="dir__section">{title}</h2>
+              {rows.map((sp) => (
+                <MemberRow
+                  key={sp.id}
+                  id={sp.id}
+                  name={sp.name}
+                  sub={sp.description?.slice(0, 90) || undefined}
+                  avatarUrl={sp.avatar_url}
+                  kind="space"
+                  recommended={myRecs.has('space:' + sp.id)}
+                  onRecommend={(on) => {
+                    setMyRecs((s) => withKey(s, 'space:' + sp.id, on));
+                    void setRecommend('space', sp.id, on).catch(console.error);
+                  }}
+                  weaveOn={myWebSet.has('space:' + sp.id)}
+                  onWeave={(on) => {
+                    setMyWebSet((s) => withKey(s, 'space:' + sp.id, on));
+                    void setInWeb('space', sp.id, on).catch(console.error);
+                  }}
+                  onOpen={() => navigate(`/spaces/${sp.id}`)}
+                />
+              ))}
+            </div>
           );
         })}
       </div>

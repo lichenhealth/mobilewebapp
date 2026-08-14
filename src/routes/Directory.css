@@ -64,3 +64,11 @@
 @media (min-width: 1024px) {
   .dir { max-width: 640px; margin: 0 auto; }
 }
+
+/* Type sections (founder 2026-08-14): the network directory reads like
+   My-celium's — members, then everything they've grown, grouped by kind. */
+.dir__section {
+  margin: var(--s-5) 0 var(--s-2); font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 500;
+}
