@@ -48,7 +48,7 @@ import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
-import { spacePresentCount, spacePresentList, type AwakeMember } from '../lib/presenceApi';
+import { spacePresentCount, spacePresentList, type PresentMember } from '../lib/presenceApi';
 
 const KIND_LABEL: Record<SpaceKind, string> = {
   organization: 'Organization', community: 'Community', group: 'Group', place: 'Place',
@@ -191,12 +191,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   });
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
   // Who among THIS layer's members is around (founder 2026-08-06).
-  const [awake, setAwake] = useState<number | null>(null);
+  const [present, setPresent] = useState<number | null>(null);
   // How many posts the wall holds — null until the feed reports in. Drives
   // the land-on-Home-until-there's-a-feed default (founder 2026-08-14).
   const [feedCount, setFeedCount] = useState<number | null>(null);
-  const [awakeOpen, setAwakeOpen] = useState(false);
-  const [awakeWho, setAwakeWho] = useState<AwakeMember[]>([]);
+  const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
   // Presence and my relationship with each member — the Members tab is the one
   // place people are listed, so it carries the same gestures the directory has
   // (founder 2026-08-07: "it should allow me to trust and add those members to
@@ -326,9 +325,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const isMember = !!myRole;
 
   useEffect(() => {
-    if (!id || !isMember) { setAwake(null); return; }
+    if (!id || !isMember) { setPresent(null); return; }
     let live = true;
-    void spacePresentCount(id).then((n) => { if (live) setAwake(n); });
+    void spacePresentCount(id).then((n) => { if (live) setPresent(n); });
     return () => { live = false; };
   }, [id, isMember]);
   const isAdmin = myRole === 'admin' || myRole === 'super_admin';
@@ -346,13 +345,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     void spaceHasEvents(id).then((yes) => { if (live) setHasEvents(yes); });
     return () => { live = false; };
   }, [id]);
-  // Who's awake, ready for the Members tab to sort by.
+  // Who's present, ready for the Members tab to sort by.
   useEffect(() => {
     if (!id || !isMember) return;
     let live = true;
-    void spacePresentList(id).then((rows) => { if (live) setAwakeWho(rows); });
+    void spacePresentList(id).then((rows) => { if (live) setPresentWho(rows); });
     return () => { live = false; };
-  }, [id, isMember, awake]);
+  }, [id, isMember, present]);
   useEffect(() => {
     if (tab !== 'events' || !id) return;
     let live = true;
@@ -799,15 +798,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
   // not sure where to edit the page"). It lived only in the non-template
   // shell, which a signed-in admin never reaches.
-  const awakeLine = isMember && awake !== null ? (
-    <div className="sprof__awake">
-      <button className="sprof__awake-line" onClick={() => openTab('members')}>
-        {awake === 0
+  const presenceLine = isMember && present !== null ? (
+    <div className="sprof__presence">
+      <button className="sprof__presence-line" onClick={() => openTab('members')}>
+        {present === 0
           ? `${space.name} is out living.`
-          : awake === 1
+          : present === 1
             ? `One in ${space.name} is present.`
-            : `${awake} in ${space.name} are present.`}
-        {awake > 0 && <Icon name="chevron-right" size={13} />}
+            : `${present} in ${space.name} are present.`}
+        {present > 0 && <Icon name="chevron-right" size={13} />}
       </button>
     </div>
   ) : null;
@@ -896,7 +895,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             {!backstage && !tab && (
               <>
                 {noticeBanners}
-                {awakeLine}
+                {presenceLine}
               </>
             )}
           </>
@@ -1523,13 +1522,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             // Present, then around, then everyone else — the same order the
             // my-celium directory uses, so presence reads the same anywhere.
             const rank = (id: string) => {
-              const w = awakeWho.find((x) => x.id === id);
+              const w = presentWho.find((x) => x.id === id);
               return w ? (w.lit ? 0 : 1) : 2;
             };
             return rank(a.profile_id) - rank(b.profile_id)
               || (a.profile?.full_name ?? '').localeCompare(b.profile?.full_name ?? '');
           }), (m) => m.profile_id).map((m) => {
-            const awakeHere = awakeWho.find((x) => x.id === m.profile_id);
+            const presentHere = presentWho.find((x) => x.id === m.profile_id);
             const isMe = m.profile_id === me;
             // A scoped admin's label says what they steward ("admin · Library")
             const roleLabel = m.role === 'admin' && m.duties
@@ -1543,7 +1542,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 id={m.profile_id}
                 name={m.profile?.full_name ?? 'Member'}
                 avatarUrl={m.profile?.avatar_url}
-                presence={awakeHere ? 'lit' : null}
+                presence={presentHere ? 'lit' : null}
                 kind="person"
                 roleLabel={roleLabel}
                 trusted={myVouchedSet.has('profile:' + m.profile_id)}

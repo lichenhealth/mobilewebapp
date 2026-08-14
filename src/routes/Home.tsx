@@ -190,9 +190,9 @@ export default function Home() {
             // Stable's mycelium"; briefly re-pointed at the Members tab the
             // same day, then confirmed back here — "we point to mycelium
             // for that"). One destination; an empty web says what it is.
-            <button className="display home__awake" onClick={() => navigate('/mycelium/directory?from=home')}>
+            <button className="display home__presence" onClick={() => navigate('/mycelium/directory?from=home')}>
               {presenceLine(present, available, actor.type === 'space' ? actor.name : null)}
-              <span className="home__awake-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
+              <span className="home__presence-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
           ) : (
             <span className="display">{presenceLine(present, available, actor.type === 'space' ? actor.name : null)}</span>

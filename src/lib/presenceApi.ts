@@ -9,7 +9,7 @@ import { occursOn } from './recurrence';
 // longer a signal — these lists return only people whose candle is lit.
 // Coarse by design: names, no timestamps, no ambient dots anywhere.
 
-export interface AwakeMember {
+export interface PresentMember {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
@@ -19,10 +19,10 @@ export interface AwakeMember {
 }
 
 /** Members of your web who are PRESENT — candle lit and here this minute. */
-export async function presentList(): Promise<AwakeMember[]> {
+export async function presentList(): Promise<PresentMember[]> {
   const { data, error } = await supabase.rpc('network_present_list');
   if (error) { console.warn('network_present_list:', error.message); return []; }
-  return (data as AwakeMember[] | null) ?? [];
+  return (data as PresentMember[] | null) ?? [];
 }
 
 /** Members of your web who are AVAILABLE — inside their published hours,
@@ -37,10 +37,10 @@ export async function presentList(): Promise<AwakeMember[]> {
  *  The candidate set is only people currently in-hours, so this stays cheap.
  *  ⚠ If a web ever runs to thousands, revisit — a SQL expander or a cached
  *  rollup, not a bigger loop. */
-export async function availableList(): Promise<AwakeMember[]> {
+export async function availableList(): Promise<PresentMember[]> {
   const { data, error } = await supabase.rpc('network_available_list');
   if (error) { console.warn('network_available_list:', error.message); return []; }
-  const rows = (data as (AwakeMember & { local_date: string; local_min: number })[] | null) ?? [];
+  const rows = (data as (PresentMember & { local_date: string; local_min: number })[] | null) ?? [];
   if (!rows.length) return [];
 
   // Their own clock, not the viewer's: 2pm busy means 2pm where they are.
@@ -113,8 +113,8 @@ export async function spacePresentCount(spaceId: string): Promise<number | null>
   return (data as number) ?? 0;
 }
 
-export async function spacePresentList(spaceId: string): Promise<AwakeMember[]> {
+export async function spacePresentList(spaceId: string): Promise<PresentMember[]> {
   const { data, error } = await supabase.rpc('space_present_list', { p_space: spaceId });
   if (error) return [];
-  return (data as AwakeMember[] | null) ?? [];
+  return (data as PresentMember[] | null) ?? [];
 }

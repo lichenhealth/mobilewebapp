@@ -42,11 +42,11 @@
   color: var(--ink-faint);
 }
 
-/* The awake greeting is a doorway to your web's directory */
-.home__awake {
+/* The presence greeting is a doorway to your web's directory */
+.home__presence {
   background: transparent; border: 0; padding: 0; font: inherit; color: inherit;
   cursor: pointer; text-align: left;
   border-bottom: 1px dotted var(--peach);
 }
-.home__awake:hover { color: var(--peach-deep); }
-.home__awake-chev { color: var(--peach); margin-left: 4px; vertical-align: baseline; }
+.home__presence:hover { color: var(--peach-deep); }
+.home__presence-chev { color: var(--peach); margin-left: 4px; vertical-align: baseline; }

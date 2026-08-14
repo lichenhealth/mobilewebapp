@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // interrupted. It also beats the instant you come back, so returning to the
   // tab restores presence at once instead of up to two minutes later.
   //
-  // The DB window (network_awake_* / space_awake_*) is 5 minutes — 2.5x this
+  // The DB window (network_present_* / space_present_*) is 5 minutes — 2.5x this
   // beat, so one missed beat or a slow network doesn't blink anyone out. THE
   // TWO ARE A PAIR: shortening the window below ~2x this interval makes
   // presence strobe for someone sitting right there.
