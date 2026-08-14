@@ -602,3 +602,12 @@
 /* Delete button in the reminder editor header. */
 .cedit__delete { color: var(--rust); border: 1px solid var(--bone-edge); background: transparent; }
 .cedit__delete:hover { border-color: var(--rust); }
+
+/* Your public booking link (founder 2026-08-14, the Calendly replacement) */
+.cset__publink {
+  margin: var(--s-2) 0; padding: 10px 14px; font-size: 12.5px; line-height: 1.7;
+  color: var(--ink-soft); background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+}
+.cset__publink code { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); }
+.cset__publink a { color: var(--peach-deep); }

@@ -64,6 +64,17 @@ export default function CalendarSettings() {
 
   // Bookable sessions (the Calendly layer)
   const [bkTypes, setBkTypes] = useState<BookingType[]>([]);
+  // The PUBLIC link (founder 2026-08-14, the Calendly replacement) hangs off
+  // your vanity handle: lichen.health/book/<handle>.
+  const [myHandle, setMyHandle] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void supabase.from('profiles').select('handle').eq('id', me).maybeSingle()
+      .then(({ data }) => { if (live) setMyHandle((data as { handle: string | null } | null)?.handle ?? null); });
+    return () => { live = false; };
+  }, [me]);
   const [bkOpen, setBkOpen] = useState(false);
   const [bkEdit, setBkEdit] = useState<Partial<BookingType>>({});
 
@@ -211,7 +222,7 @@ export default function CalendarSettings() {
               <span className="cset__aud cset__extname">{bt.title}</span>
               <span className="cset__bkrow-sub">
                 {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
-                {bt.audience === 'mycelium' ? ' · mycelium' : ''}
+                {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : ''}
               </span>
               <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit(bt); setBkOpen(true); }}>Edit</button>
               <button
@@ -224,6 +235,35 @@ export default function CalendarSettings() {
               </button>
             </div>
           ))}
+
+          {bkTypes.some((t) => t.audience === 'public' && t.active) && (
+            <p className="cset__publink">
+              {myHandle ? (
+                <>
+                  Your public booking link:{' '}
+                  <code>lichen.health/book/{myHandle}</code>{' '}
+                  <button
+                    className="cedit__add cedit__add--sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}`);
+                      setLinkCopied(true);
+                      window.setTimeout(() => setLinkCopied(false), 2000);
+                    }}
+                  >
+                    {linkCopied ? 'Copied ✓' : 'Copy'}
+                  </button>
+                  <br />Anyone with it — on Lichen or not — sees your live
+                  availability and books straight in.
+                </>
+              ) : (
+                <>
+                  Your public link needs an address first —{' '}
+                  <Link to="/profile#public-page">set yours in Profile → Public page</Link>{' '}
+                  and it becomes <code>lichen.health/book/&lt;your-address&gt;</code>.
+                </>
+              )}
+            </p>
+          )}
 
           {!bkOpen ? (
             <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true }); setBkOpen(true); }}>

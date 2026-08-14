@@ -18,7 +18,7 @@ export interface BookingType {
   price: string;
   location: string;
   approval: 'request' | 'instant';
-  audience: 'everyone' | 'mycelium';
+  audience: 'everyone' | 'mycelium' | 'public';
   active: boolean;
 }
 
@@ -32,6 +32,11 @@ export interface BookingRow {
   end_min: number;
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
   note: string;
+  /** Guest bookings (the public link): no member behind them — a name, an
+   *  email, and an unguessable token that is their whole authorization. */
+  guest_name?: string | null;
+  guest_email?: string | null;
+  guest_token?: string | null;
   type?: { title: string; price: string; location: string } | null;
   provider?: { full_name: string | null } | null;
   booker?: { full_name: string | null } | null;
@@ -171,8 +176,66 @@ export async function cancelBooking(bookingId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── The public booking link (founder 2026-08-14, the Calendly replacement) ──
+// Anyone with lichen.health/book/<handle> — on Lichen or not — sees the
+// member's PUBLIC session types against their real availability (declared
+// hours minus Lichen events, imported calendars, and held bookings) and books
+// as a guest: name + email, an unguessable token as their key.
+
+export interface PublicBookingPage {
+  provider: { id: string; full_name: string | null; avatar_url: string | null; headline: string | null; timezone: string | null };
+  types: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>[];
+}
+
+export async function publicBookingPage(handle: string): Promise<PublicBookingPage | null> {
+  const { data, error } = await supabase.rpc('public_booking_page', { p_handle: handle });
+  if (error) { console.warn('public_booking_page:', error.message); return null; }
+  return (data as PublicBookingPage | null) ?? null;
+}
+
+export async function publicBookingBoard(typeId: string, from: string, to: string): Promise<BookingBoard | null> {
+  const { data, error } = await supabase.rpc('public_booking_board', { p_type: typeId, p_from: from, p_to: to });
+  if (error) { console.warn('public_booking_board:', error.message); return null; }
+  return (data as BookingBoard | null) ?? null;
+}
+
+export async function guestCreateBooking(
+  typeId: string, date: string, startMin: number,
+  name: string, email: string, note: string,
+): Promise<string> {
+  const { data, error } = await supabase.rpc('guest_create_booking', {
+    p_type: typeId, p_date: date, p_start: startMin,
+    p_name: name, p_email: email, p_note: note,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export interface GuestBookingView {
+  guest_name: string; status: string; on_date: string; start_min: number; end_min: number;
+  note: string; type_title: string; type_location: string; duration_min: number;
+  provider_name: string;
+}
+
+export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
+  const { data, error } = await supabase.rpc('guest_booking', { p_token: token });
+  if (error) { console.warn('guest_booking:', error.message); return null; }
+  return ((data as GuestBookingView[] | null) ?? [])[0] ?? null;
+}
+
+export async function guestCancelBooking(token: string): Promise<void> {
+  const { error } = await supabase.rpc('guest_cancel_booking', { p_token: token });
+  if (error) throw error;
+}
+
+/** Fire-and-forget guest email — content derives from the booking's current
+ *  DB state server-side, so callers just point at the token. */
+export function sendBookingMail(token: string): void {
+  void supabase.functions.invoke('send-booking-mail', { body: { token } }).catch(console.error);
+}
+
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, guest_name, guest_email, guest_token, ' +
   'type:booking_types(title, price, location), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';

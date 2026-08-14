@@ -17,7 +17,7 @@ import {
 } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
-import { BookingType, listBookableTypes } from '../lib/bookingApi';
+import { BookingType, listBookableTypes, publicBookingPage } from '../lib/bookingApi';
 import '../routes/Bookings.css';
 import './Profile.css';
 import './MemberProfile.css';
@@ -109,11 +109,23 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
   useEffect(() => {
     let live = true;
-    void supabase.from('profiles').select('contact, page, public_page').eq('id', id).maybeSingle()
-      .then(({ data }: { data: unknown }) => {
-        const r = data as { contact?: ContactInfo | null; page?: PageMeta | null; public_page?: boolean } | null;
-        if (live && r) setPub({ contact: r.contact ?? {}, page: r.page ?? {}, on: !!r.public_page });
-      });
+    void (async () => {
+      const { data } = await supabase.from('profiles')
+        .select('contact, page, public_page, handle').eq('id', id).maybeSingle();
+      const r = data as { contact?: ContactInfo | null; page?: PageMeta | null; public_page?: boolean; handle?: string | null } | null;
+      if (!live || !r) return;
+      // The Calendly replacement closes the loop (founder 2026-08-14): with a
+      // handle + a public session type and no hand-set booking URL, the
+      // page's "Book a time" door IS the Lichen booking page.
+      const contact = { ...(r.contact ?? {}) };
+      if (!contact.booking && r.handle) {
+        // The anon-safe door — RLS hides booking_types from signed-out
+        // viewers, and they're exactly who this CTA is for.
+        const pb = await publicBookingPage(r.handle);
+        if (pb && pb.types.length > 0) contact.booking = `/book/${r.handle}`;
+      }
+      if (live) setPub({ contact, page: r.page ?? {}, on: !!r.public_page });
+    })();
     return () => { live = false; };
   }, [id]);
   useEffect(() => {

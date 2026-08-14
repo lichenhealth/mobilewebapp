@@ -19,6 +19,8 @@ import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
 import Giving from './routes/Giving';
 import Saved from './routes/Saved';
+import BookPublic from './routes/BookPublic';
+import GuestBooking from './routes/GuestBooking';
 import Organize from './routes/Organize';
 import PostPage from './routes/PostPage';
 import CollectionPage from './routes/CollectionPage';
@@ -79,7 +81,14 @@ import { PullToRefresh } from './components/PullToRefresh';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
-const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/about'];
+function BookGate() {
+  const { param = '' } = useParams();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(param)
+    ? <BookSession />
+    : <BookPublic />;
+}
+
+const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -102,7 +111,7 @@ export default function App() {
   const { pathname, search } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
-  const isGuest = pathname.startsWith('/e/');   // external guest landing — no app chrome
+  const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
   // Rendered INSIDE a frame — the page beside the assistant conversation
   // (docs/ASSISTANT_ACTIONS.md step 4). Without this the frame shows a whole
   // second app: two top bars, two bottom navs, two identity switchers. The
@@ -315,7 +324,11 @@ export default function App() {
           <Route path="/mycelium"        element={<Mycelium />} />
           <Route path="/mycelium/directory" element={<MyceliumDirectory />} />
           <Route path="/bookings"        element={<Bookings />} />
-          <Route path="/book/:typeId"    element={<BookSession />} />
+                    {/* /book/<uuid> = a member's slot picker; /book/<handle> = the
+              PUBLIC booking page (founder 2026-08-14, the Calendly
+              replacement). One path, disambiguated by shape. */}
+          <Route path="/book/:param" element={<BookGate />} />
+          <Route path="/b/:token" element={<GuestBooking />} />
           <Route path="/mycelium/:type"  element={<Mycelium />} />
 
           {/* Communities — feed per community */}

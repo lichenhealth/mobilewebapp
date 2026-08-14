@@ -18,7 +18,8 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  calendars, held bookings), buffered. Picking a slot requests (or books)
  *  through the server, which re-validates before anything is held. */
 export default function BookSession() {
-  const { typeId = '' } = useParams();
+  const { param = '' } = useParams();
+  const typeId = param;   // /book/:param — a uuid landed here (BookGate)
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';

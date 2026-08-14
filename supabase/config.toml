@@ -43,3 +43,8 @@ verify_jwt = false
 
 [functions.join-request]
 verify_jwt = false
+
+# Guests are signed out by definition — the token in the request body is the
+# authorization, and every mail derives from DB state, never client claims.
+[functions.send-booking-mail]
+verify_jwt = false

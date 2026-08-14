@@ -7,6 +7,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { formatDateShort, todayISO } from '../lib/conciergeApi';
 import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
+  sendBookingMail,
 } from '../lib/bookingApi';
 import './Bookings.css';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -54,6 +55,16 @@ export default function Bookings() {
   const today = todayISO();
   const when = (b: BookingRow) =>
     `${formatDateShort(b.on_date)} · ${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}`;
+  // A guest row has no member behind it — name it honestly.
+  const who = (b: BookingRow) =>
+    b.booker_id ? (b.booker?.full_name ?? 'A member') : `${b.guest_name ?? 'A guest'} · from outside Lichen`;
+  // Guests hear by email, not bell — after a decision, the mail function
+  // reads the row's CURRENT status and writes accordingly.
+  const decideGuest = (b: BookingRow, accept: boolean) =>
+    act(async () => {
+      await respondBooking(b.id, accept);
+      if (!b.booker_id && b.guest_token) sendBookingMail(b.guest_token);
+    });
 
   const requests = asProvider.filter((b) => b.status === 'pending');
   const upcoming = asProvider.filter((b) => b.status === 'confirmed' && b.on_date >= today);
@@ -119,13 +130,13 @@ export default function Bookings() {
           {requests.map((b) => (
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
-                <span className="bkg__row-title">{b.booker?.full_name ?? 'A member'} · {b.type?.title ?? 'Session'}</span>
+                <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
                 {b.note && <span className="bkg__row-note">&ldquo;{b.note}&rdquo;</span>}
               </div>
               <div className="bkg__row-actions">
-                <button className="btn btn-primary bkg__btn" onClick={() => act(() => respondBooking(b.id, true))}>Accept</button>
-                <button className="btn bkg__btn" onClick={() => act(() => respondBooking(b.id, false))}>Decline</button>
+                <button className="btn btn-primary bkg__btn" onClick={() => void decideGuest(b, true)}>Accept</button>
+                <button className="btn bkg__btn" onClick={() => void decideGuest(b, false)}>Decline</button>
               </div>
             </div>
           ))}
@@ -138,7 +149,7 @@ export default function Bookings() {
           {upcoming.map((b) => (
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
-                <span className="bkg__row-title">{b.booker?.full_name ?? 'A member'} · {b.type?.title ?? 'Session'}</span>
+                <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
