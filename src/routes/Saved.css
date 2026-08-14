@@ -65,3 +65,7 @@
   width: 1px; align-self: stretch; background: var(--bone-edge);
   margin: 2px 4px; flex-shrink: 0;
 }
+
+/* Doors match the area lenses (founder 2026-08-14 polish: "search, brain
+   and + are still smaller than the room icons") — 38px like .myc__area. */
+.saved__bar .mkt__action-circle { width: 38px; height: 38px; }

@@ -175,12 +175,12 @@ export default function Saved() {
             aria-label="Search" title="Search"
             onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
           >
-            <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
+            <span className="mkt__action-circle"><Icon name="search" size={16} /></span>
           </button>
           <div className="saved__add">
             <button className="mkt__action" aria-label="Add" title="Add"
               onClick={() => { setAddOpen((v) => !v); setFoldersOpen(false); }}>
-              <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
+              <span className="mkt__action-circle"><Icon name="plus" size={16} /></span>
             </button>
             {addOpen && (
               <div className="saved__chooser">
@@ -196,13 +196,13 @@ export default function Saved() {
               </div>
             )}
           </div>
-          <AssistantDoor section="saved" size={30} label="Your assistant — what you've been keeping" />
+          <AssistantDoor section="saved" size={38} label="Your assistant — what you've been keeping" />
           {/* Area lenses ride the same row as the doors (founder 2026-08-14:
               "design consistency with other rooms") — hairline between the
               acting doors and the shelf's own filters, like everywhere else. */}
           <span className="saved__bar-divider" aria-hidden="true" />
           <button className="mkt__action is-active saved__feeddoor" aria-label="Drive feed" title="Your Drive feed">
-            <span className="mkt__action-circle"><Icon name="newsfeed" size={14} /></span>
+            <span className="mkt__action-circle"><Icon name="newsfeed" size={16} /></span>
           </button>
           {areasPresent.length > 1 && (
             <>
