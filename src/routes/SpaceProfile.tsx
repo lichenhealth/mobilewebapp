@@ -192,6 +192,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [awake, setAwake] = useState<number | null>(null);
+  // How many posts the wall holds — null until the feed reports in. Drives
+  // the land-on-Home-until-there's-a-feed default (founder 2026-08-14).
+  const [feedCount, setFeedCount] = useState<number | null>(null);
   const [awakeOpen, setAwakeOpen] = useState(false);
   const [awakeWho, setAwakeWho] = useState<AwakeMember[]>([]);
   // Presence and my relationship with each member — the Members tab is the one
@@ -685,6 +688,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     <ContributionsFeed
       spaceId={space.id}
       me={me}
+      onLoaded={setFeedCount}
       entityName={space.name}
       // The open web gets the stream, not the workshop (founder
       // 2026-08-11) — member tools drop away for a guest (or the steward
@@ -780,13 +784,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       </div>
     </section>
   );
-  const mapsButton = pinned && !backstage && (
-    <section className="prof__section">
-      <button className="btn btn-primary sprof__map-btn" onClick={() => navigate('/maps')}>
-        <Icon name="maps" size={15} /> See it on Maps
-      </button>
-    </section>
-  );
 
   // The open web (and the owner previewing) sees the shared page template —
   // one structure across every Lichen site (founder 2026-07-28). Widened
@@ -808,8 +805,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         {awake === 0
           ? `${space.name} is out living.`
           : awake === 1
-            ? `One in ${space.name} is awake.`
-            : `${awake} in ${space.name} are awake.`}
+            ? `One in ${space.name} is present.`
+            : `${awake} in ${space.name} are present.`}
         {awake > 0 && <Icon name="chevron-right" size={13} />}
       </button>
     </div>
@@ -875,6 +872,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
+        feedHasPosts={feedCount === null ? undefined : feedCount > 0}
+        // Actions in ONE place (founder 2026-08-14): the maps door sits
+        // beside the page's own CTAs instead of floating at the page's foot.
+        extraCtas={pinned && !backstage && !tab ? [{
+          label: <><Icon name="maps" size={14} /> See it on Maps</>,
+          onClick: () => navigate('/maps'),
+        }] : undefined}
         // The steward's switch sits above the masthead, so a page with a big
         // cover image doesn't bury the way to manage it.
         aboveHero={adminBar}
@@ -919,7 +923,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <>
             {plusMenu}
             {roomsSection}
-            {mapsButton}
           </>
         )}
       </PublicPage>
@@ -1749,7 +1752,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {roomsSection}
 
-      {mapsButton}
     </div>
   );
 }

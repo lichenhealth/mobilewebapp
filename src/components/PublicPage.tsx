@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
 import { Icon, type IconName } from './Icon';
@@ -137,6 +137,14 @@ export interface PublicPageProps {
    *  they keep their normal app chrome and skip the guest-facing invite
    *  doors/section; their real join/trust controls arrive via `children`. */
   signedIn?: boolean;
+  /** Whether the feed actually holds posts. Until it does, signed-in
+   *  members land on Home instead of an empty stream (founder 2026-08-14:
+   *  "until a profile has a feed, why don't we default to Home"). Omit to
+   *  keep the old land-on-feed behavior. */
+  feedHasPosts?: boolean;
+  /** Page-owner-independent actions (e.g. a space's "See it on Maps") that
+   *  belong BESIDE the page's own CTAs — one place for every action. */
+  extraCtas?: { label: React.ReactNode; onClick: () => void }[];
 }
 
 export default function PublicPage(props: PublicPageProps) {
@@ -243,14 +251,41 @@ export default function PublicPage(props: PublicPageProps) {
   // their landing is the feed in the icon row.
   // (A page driven by fully custom doors brings its own front door — Home
   // would render nothing there.)
-  const homeItem = asGuest && !doors ? [{ id: 'home', label: 'Home' }] : [];
+  // Members get Home too now (founder 2026-08-14) — it was guest/preview
+  // only, which meant Lichen View had no front page at all.
+  const homeItem = !doors ? [{ id: 'home', label: 'Home' }] : [];
   const navItems = showFeed && !feedInRow
     ? [{ id: 'feed', label: 'Feed' }, ...homeItem, ...sectionItems]
     : [...homeItem, ...sectionItems];
+  // Landing: guests always meet Home; members land on the feed ONCE IT HAS
+  // SOMETHING IN IT, and on Home until then (founder 2026-08-14) — an empty
+  // stream is a worse hello than the story and the offerings.
   const firstContentDoor = asGuest
     ? 'home'
-    : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id);
+    : (showFeed && props.feedHasPosts !== false ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : undefined));
   const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
+  // Re-land when the VIEW ITSELF changes (Lichen View ⇄ Public View swaps
+  // ?preview= in place): the old tab may not exist on the other side, which
+  // used to leave a blank page until a hand refresh re-initialized state.
+  const relandKey = asGuest ? 'guest' : 'member';
+  const relandInit = useRef(relandKey);
+  // A tab the VIEWER chose sticks; only automatic landings may be replaced.
+  const touched = useRef(false);
+  const chooseTab = (id: string) => { touched.current = true; setTab(id); };
+  useEffect(() => {
+    if (relandInit.current === relandKey) return;
+    relandInit.current = relandKey;
+    touched.current = false;
+    setTab(firstContentDoor ?? navItems[0]?.id ?? 'about');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relandKey]);
+  // The feed count arrives after the feed loads — if the automatic landing
+  // was Feed and it turns out empty, slide over to Home (never moving a tab
+  // the viewer picked themselves).
+  useEffect(() => {
+    if (props.feedHasPosts === false && tab === 'feed' && !touched.current && homeItem.length) setTab('home');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.feedHasPosts]);
   const tabbed = navItems.length > 0;
   const showingFeed = showFeed && tab === 'feed';
   // Home shows the lot — it IS the front page; a named tab narrows to its
@@ -262,7 +297,7 @@ export default function PublicPage(props: PublicPageProps) {
   // into a dead end.
   const teasing = (id: string) => tab === 'home' && navItems.some((n) => n.id === id);
   const More = ({ to, children }: { to: string; children: React.ReactNode }) => (
-    <button className="ppage__more" type="button" onClick={() => setTab(to)}>
+    <button className="ppage__more" type="button" onClick={() => chooseTab(to)}>
       {children} <span aria-hidden>&rarr;</span>
     </button>
   );
@@ -350,10 +385,13 @@ export default function PublicPage(props: PublicPageProps) {
             </p>
           )}
           {location && <p className="ppage__where"><Icon name="location" size={13} /> {location}</p>}
-          {ctas.length > 0 && navItems.length === 0 && ctas.map((c) => (
+          {navItems.length === 0 && ctas.map((c) => (
             <a className="ppage__cta" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
               {c.label}
             </a>
+          ))}
+          {navItems.length === 0 && props.extraCtas?.map((c, i) => (
+            <button className="ppage__cta" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
           ))}
         </div>
         {navItems.length > 0 && (
@@ -368,7 +406,7 @@ export default function PublicPage(props: PublicPageProps) {
                 return (
                   <button
                     className={'ppage__nav-icon' + (tab === n.id ? ' ppage__nav-icon--on' : '')}
-                    onClick={() => setTab(n.id)} key={n.id} type="button" aria-label={n.label} title={n.label}
+                    onClick={() => chooseTab(n.id)} key={n.id} type="button" aria-label={n.label} title={n.label}
                   >
                     <Icon name="newsfeed" size={18} />
                   </button>
@@ -377,7 +415,7 @@ export default function PublicPage(props: PublicPageProps) {
               return (
                 <button
                   className={'ppage__nav-link' + (tab === n.id ? ' ppage__nav-link--on' : '')}
-                  onClick={() => (d?.href ? go(d.href) : setTab(n.id))} key={n.id} type="button"
+                  onClick={() => (d?.href ? go(d.href) : chooseTab(n.id))} key={n.id} type="button"
                 >
                   {n.label}
                 </button>
@@ -388,6 +426,11 @@ export default function PublicPage(props: PublicPageProps) {
                 target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
                 {c.label}
               </a>
+            ))}
+            {/* Actions live in ONE place (founder 2026-08-14) — page-owner
+                CTAs and app doors like "See it on Maps" sit side by side. */}
+            {props.extraCtas?.map((c, i) => (
+              <button className="ppage__cta ppage__cta--nav" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
             ))}
           </nav>
         )}
@@ -413,7 +456,7 @@ export default function PublicPage(props: PublicPageProps) {
           or there'd be no way back to the feed. */}
       {showFeed && (feedInRow
         ? (props.feed as (ctx: FeedRenderCtx) => React.ReactNode)({
-            showing: showingFeed, open: () => setTab('feed'), guest: asGuest,
+            showing: showingFeed, open: () => chooseTab('feed'), guest: asGuest,
           })
         : (showingFeed && (props.feed as React.ReactNode)))}
 

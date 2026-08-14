@@ -43,7 +43,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -84,6 +84,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  previewing as one — founder 2026-08-11): cards read-only, no member
    *  actions. The doors themselves are the CALLER's to strip. */
   interactive?: boolean;
+  /** Fires once the stream loads, with how many posts it holds — lets the
+   *  page around it decide whether Feed is worth landing on (founder
+   *  2026-08-14: an empty stream defaults to Home instead). */
+  onLoaded?: (count: number) => void;
 }) {
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
@@ -114,6 +118,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
       const ov = await loadEndorsements(feed, myc);
       if (!live) return;
       setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setReady(true);
+      onLoaded?.(feed.length);
     })();
     return () => { live = false; };
   }, [profileId, spaceId]);
@@ -140,18 +145,13 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const areasPresent = useMemo(() => {
     const present = new Set<ServiceArea>();
     posts.forEach((p) => postAreas(p).forEach((a) => present.add(a)));
-    // On an ENTITY page the doors with real sections show even at zero
-    // (founder 2026-08-13: tapping into Countryman Stables' Marketplace
-    // should land on ITS marketplace with the note pointing at Lichen's for
-    // more — which can't happen if an empty section has no door). ScopeEmpty
-    // and ScopeMore are what make an empty scoped section a real place
-    // rather than a dead end, so presence-gating is only kept for the
-    // sectionless areas (places, people), whose fallback is a scoped search
-    // that IS a dead end when there's nothing to find.
-    const alwaysOn = (a: ServiceArea) =>
-      (profileId || spaceId) && SECTION_ROUTES[a] !== undefined;
+    // Presence-gated: a door appears the moment the entity's first post
+    // lands in that area, and not before (founder 2026-08-14, reversing the
+    // 08-13 always-on: a row of doors into empty rooms read as clutter, not
+    // invitation — ScopeEmpty/ScopeMore still catch anyone who arrives at a
+    // thin section by other routes).
     return SERVICE_AREAS.filter((a) =>
-      (present.has(a.value) || alwaysOn(a.value)) && !hideAreas.includes(a.value))
+      present.has(a.value) && !hideAreas.includes(a.value))
       .sort((a, b) => HOME_ORDER.indexOf(a.value) - HOME_ORDER.indexOf(b.value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts, profileId, spaceId]);
