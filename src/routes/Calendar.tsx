@@ -160,15 +160,35 @@ export default function Calendar() {
   const [calQ, setCalQ] = useState('');
   const [calAddOpen, setCalAddOpen] = useState(false);
   const calAddRef = useRef<HTMLInputElement>(null);
+  // PARKED chips (founder 2026-08-14 nit): tapping a chip's body turns it
+  // WHITE — off but still in the row, one tap from coming back. Only the
+  // explicit × removes it (back to the picker / unpinned).
+  const [parkedCals, setParkedCals] = useState<Set<string>>(new Set());
+  const [parkedOverlays, setParkedOverlays] = useState<Set<string>>(new Set());
+  const parkToggle = (id: string) => {
+    if (selectedCals.includes(id)) {
+      setSelectedCals((cur) => cur.filter((x) => x !== id));
+      setParkedCals((cur) => new Set(cur).add(id));
+      setOverlayOn(false);
+    } else {
+      setParkedCals((cur) => { const n = new Set(cur); n.delete(id); return n; });
+      setSelectedCals((cur) => [...cur, id]);
+    }
+  };
+  const removeChip = (id: string) => {
+    setSelectedCals((cur) => cur.filter((x) => x !== id));
+    setParkedCals((cur) => { const n = new Set(cur); n.delete(id); return n; });
+    setOverlayOn(false);
+  };
   // Imported calendars are deliberately NOT in here — they render as standing
   // chips (white when off), so the picker only holds group calendars.
   const calChoices = useMemo(() => {
     const q = calQ.trim().toLowerCase();
     return calendars
       .map((c) => ({ key: c.id, name: c.name, tint: colorFor(c.id) }))
-      .filter((c) => !selectedCals.includes(c.key))
+      .filter((c) => !selectedCals.includes(c.key) && !parkedCals.has(c.key))
       .filter((c) => !q || c.name.toLowerCase().includes(q));
-  }, [calendars, selectedCals, calQ]);
+  }, [calendars, selectedCals, parkedCals, calQ]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
@@ -591,6 +611,7 @@ export default function Calendar() {
             'Add a calendar' being the prompt"). Only Mine + calendars that are
             ON render as chips; everything else is found by typing. Tap a chip
             to drop it. */}
+        {view !== 'todo' && (<>
         <div className="calp__chips">
           <button
             className={'calp__calchip' + (selectedCals.includes('me') ? ' is-on' : '')}
@@ -599,18 +620,27 @@ export default function Calendar() {
           >
             Mine
           </button>
-          {calendars.filter((c) => selectedCals.includes(c.id)).map((c) => (
-            <button
-              key={c.id}
-              className="calp__calchip is-on"
-              onClick={() => toggleCal(c.id)}
-              title={`Remove ${c.name}`}
-            >
-              <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
-              {c.name}
-              <span className="calp__chipx" aria-hidden="true">×</span>
-            </button>
-          ))}
+          {calendars.filter((c) => selectedCals.includes(c.id) || parkedCals.has(c.id)).map((c) => {
+            const on = selectedCals.includes(c.id);
+            return (
+              <span
+                key={c.id}
+                role="button" tabIndex={0}
+                className={'calp__calchip calp__calchip--holds' + (on ? ' is-on' : '')}
+                onClick={() => parkToggle(c.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter') parkToggle(c.id); }}
+                title={on ? `Hide ${c.name} — the chip stays` : `Show ${c.name}`}
+              >
+                <span className="calp__chipdot" style={{ background: colorFor(c.id) }} />
+                {c.name}
+                <button
+                  className="calp__ovx"
+                  onClick={(e) => { e.stopPropagation(); removeChip(c.id); }}
+                  aria-label={`Remove ${c.name} from the row`}
+                >×</button>
+              </span>
+            );
+          })}
           {/* Imported calendars are STANDING chips, never hidden in the picker
               (founder 2026-08-14: "we likely won't be the default cal for most
               people for a while" — their Google IS their life, so it stays in
@@ -726,7 +756,7 @@ export default function Calendar() {
             calendar went green. Now the legend names the coverage — and at
             zero signal there's no shading at all, just the truth. */}
         {overlayOn && spaceSel.length > 0 && memberIds.length > 0
-          && view !== 'month' && view !== 'schedule' && view !== 'todo' && (
+          && view !== 'month' && view !== 'schedule' && (
           <p className="calp__ovnote">
             {knownIds.length === 0
               ? 'No one here has set up availability hours or shared a calendar yet, so there’s nothing to shade. Availability starts when they set it.'
@@ -741,15 +771,27 @@ export default function Calendar() {
         {/* Overlaid calendars (from search) — dismissible, never saved */}
         {overlays.length > 0 && (
           <div className="calp__ovchips">
-            {overlays.map((o) => (
-              <span className="calp__ovchip" key={o.id} style={{ borderColor: colorFor(o.id) }}>
-                <span className="calp__ovdot" style={{ background: colorFor(o.id) }} />
-                {o.name}
-                <button className="calp__ovx" onClick={() => removeOverlay(o.id)} aria-label={`Remove ${o.name}`}>×</button>
-              </span>
-            ))}
+            {overlays.map((o) => {
+              const off = parkedOverlays.has(o.id);
+              return (
+                <span
+                  className={'calp__ovchip' + (off ? ' is-off' : '')}
+                  key={o.id}
+                  style={{ borderColor: colorFor(o.id) }}
+                  role="button" tabIndex={0}
+                  onClick={() => setParkedOverlays((cur) => { const n = new Set(cur); if (off) n.delete(o.id); else n.add(o.id); return n; })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setParkedOverlays((cur) => { const n = new Set(cur); if (off) n.delete(o.id); else n.add(o.id); return n; }); }}
+                  title={off ? `Show ${o.name} again` : `Hide ${o.name} — the chip stays pinned`}
+                >
+                  <span className="calp__ovdot" style={{ background: colorFor(o.id) }} />
+                  {o.name}
+                  <button className="calp__ovx" onClick={(e) => { e.stopPropagation(); removeOverlay(o.id); }} aria-label={`Unpin ${o.name}`}>×</button>
+                </span>
+              );
+            })}
           </div>
         )}
+        </>)}
         {view !== 'month' && view !== 'schedule' && view !== 'todo' && (
           <div className="calp__days" style={gridCols}>
             <span className="calp__gutter-head" />
@@ -955,7 +997,7 @@ export default function Calendar() {
                     </span>
                   )}
                   {/* Searched-calendar overlays: their schedule beside yours */}
-                  {overlays.map((o) =>
+                  {overlays.filter((o) => !parkedOverlays.has(o.id)).map((o) =>
                     (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r, i) => {
                       const c = colorFor(o.id);
                       const top = r.all_day ? 0 : (((r.start_min ?? 0) / 60) * HOUR_PX);
