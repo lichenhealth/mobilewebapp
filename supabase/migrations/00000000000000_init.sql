@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6hbw0bDcBCOWn2RP6B2tfcsPJttZzX7VjqyvdpjnctMn7YQZUz9k3gbNxg7BWRo
+\restrict PHNwVUN0VylUpMLtUciapRH1xGsghsUZ1JgBVzaAqdojcYcsrFe7gIjGgcovWGr
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1554,6 +1554,30 @@ end; $$;
 
 
 ALTER FUNCTION public.enforce_parent_consent() OWNER TO postgres;
+
+--
+-- Name: enforce_weaveable(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.enforce_weaveable() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_author uuid; v_noweave text;
+begin
+  if new.target_type <> 'post' then return new; end if;
+  select p.author_id, p.details->>'noWeave' into v_author, v_noweave
+    from posts p where p.id = new.target_id;
+  if v_author is null then return new; end if;  -- not a post row; nothing to guard
+  if v_author <> coalesce(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid)
+     and v_noweave = 'true' then
+    raise exception 'They keep this piece out of others'' collections.';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.enforce_weaveable() OWNER TO postgres;
 
 --
 -- Name: ensure_care_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4327,6 +4351,23 @@ CREATE TABLE public.care_posts (
 ALTER TABLE public.care_posts OWNER TO postgres;
 
 --
+-- Name: care_settings; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.care_settings (
+    patient_id uuid NOT NULL,
+    wow_window_days smallint,
+    wow_window_auto boolean DEFAULT false NOT NULL,
+    wow_window_reason text,
+    wow_window_set_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT care_settings_wow_window_days_check CHECK (((wow_window_days >= 14) AND (wow_window_days <= 120)))
+);
+
+
+ALTER TABLE public.care_settings OWNER TO postgres;
+
+--
 -- Name: care_team_members; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5161,6 +5202,7 @@ CREATE TABLE public.profiles (
     age_declared_at timestamp with time zone,
     findable boolean DEFAULT true NOT NULL,
     assistant_can_edit boolean DEFAULT false NOT NULL,
+    weaveable_default boolean DEFAULT true NOT NULL,
     CONSTRAINT profiles_aspect_check CHECK (((aspect IS NULL) OR (aspect = ANY (ARRAY['individual'::text, 'collective'::text])))),
     CONSTRAINT profiles_birth_date_sane CHECK (((birth_date IS NULL) OR ((birth_date > '1900-01-01'::date) AND (birth_date <= CURRENT_DATE)))),
     CONSTRAINT profiles_kind_check CHECK ((kind = ANY (ARRAY['person'::text, 'plant'::text, 'animal'::text, 'place'::text, 'element'::text, 'collective'::text]))),
@@ -5180,6 +5222,13 @@ ALTER TABLE public.profiles OWNER TO postgres;
 --
 
 COMMENT ON COLUMN public.profiles.assistant_can_edit IS 'Member consent for the assistant to write their own public-page fields (page/contact/profile_categories) via assistant-feed tool use. Default false; never extends to private data, other members, or spaces.';
+
+
+--
+-- Name: COLUMN profiles.weaveable_default; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.profiles.weaveable_default IS 'Compose preselection for the per-post weaveable toggle. The per-post truth is posts.details.noWeave (stored only when switched OFF).';
 
 
 --
@@ -5629,6 +5678,14 @@ ALTER TABLE ONLY public.care_plans
 
 ALTER TABLE ONLY public.care_posts
     ADD CONSTRAINT care_posts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: care_settings care_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.care_settings
+    ADD CONSTRAINT care_settings_pkey PRIMARY KEY (patient_id);
 
 
 --
@@ -6659,6 +6716,13 @@ CREATE TRIGGER care_posts_touch BEFORE UPDATE ON public.care_posts FOR EACH ROW 
 
 
 --
+-- Name: collection_items enforce_weaveable; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER enforce_weaveable BEFORE INSERT ON public.collection_items FOR EACH ROW EXECUTE FUNCTION public.enforce_weaveable();
+
+
+--
 -- Name: events events_touch; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -7043,6 +7107,14 @@ ALTER TABLE ONLY public.care_posts
 
 ALTER TABLE ONLY public.care_posts
     ADD CONSTRAINT care_posts_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: care_settings care_settings_patient_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.care_settings
+    ADD CONSTRAINT care_settings_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -8295,6 +8367,26 @@ CREATE POLICY "care_posts read" ON public.care_posts FOR SELECT TO authenticated
 --
 
 CREATE POLICY "care_posts update" ON public.care_posts FOR UPDATE USING ((public.is_active_caregiver(patient_id, auth.uid()) OR ((author_id = auth.uid()) AND (patient_id = auth.uid())))) WITH CHECK (((author_id = auth.uid()) AND ((patient_id = auth.uid()) OR public.is_active_caregiver(patient_id, auth.uid()))));
+
+
+--
+-- Name: care_settings; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.care_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: care_settings care_settings care team read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_settings care team read" ON public.care_settings FOR SELECT USING (public.is_on_care_team(patient_id, auth.uid()));
+
+
+--
+-- Name: care_settings care_settings own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "care_settings own" ON public.care_settings USING ((patient_id = auth.uid())) WITH CHECK ((patient_id = auth.uid()));
 
 
 --
@@ -9904,6 +9996,15 @@ GRANT ALL ON FUNCTION public.enforce_parent_consent() TO service_role;
 
 
 --
+-- Name: FUNCTION enforce_weaveable(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.enforce_weaveable() TO anon;
+GRANT ALL ON FUNCTION public.enforce_weaveable() TO authenticated;
+GRANT ALL ON FUNCTION public.enforce_weaveable() TO service_role;
+
+
+--
 -- Name: FUNCTION ensure_care_chat(p_patient uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -10797,6 +10898,15 @@ GRANT ALL ON TABLE public.care_posts TO service_role;
 
 
 --
+-- Name: TABLE care_settings; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.care_settings TO anon;
+GRANT ALL ON TABLE public.care_settings TO authenticated;
+GRANT ALL ON TABLE public.care_settings TO service_role;
+
+
+--
 -- Name: TABLE care_team_members; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11401,6 +11511,13 @@ GRANT SELECT(assistant_can_edit) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.weaveable_default; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(weaveable_default) ON TABLE public.profiles TO authenticated;
+
+
+--
 -- Name: TABLE push_subscriptions; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11702,7 +11819,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6hbw0bDcBCOWn2RP6B2tfcsPJttZzX7VjqyvdpjnctMn7YQZUz9k3gbNxg7BWRo
+\unrestrict PHNwVUN0VylUpMLtUciapRH1xGsghsUZ1JgBVzaAqdojcYcsrFe7gIjGgcovWGr
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --

@@ -314,26 +314,27 @@ export default function Profile() {
   // Content defaults (founder 2026-08-05): pre-select Compose's per-post
   // AI-readable / downloadable toggles. Null until loaded (pre-migration →
   // stays null, group hidden).
-  const [contentDefaults, setContentDefaults] = useState<{ ai: boolean; dl: boolean } | null>(null);
+  const [contentDefaults, setContentDefaults] = useState<{ ai: boolean; dl: boolean; weave: boolean } | null>(null);
   useEffect(() => {
     if (!user) return;
     let live = true;
     void supabase.from('profiles')
-      .select('content_ai_default, content_download_default')
+      .select('content_ai_default, content_download_default, weaveable_default')
       .eq('id', user.id).maybeSingle()
       .then(({ data, error: e }) => {
         if (!live || e || !data) return;
-        const r = data as { content_ai_default?: boolean; content_download_default?: boolean };
-        setContentDefaults({ ai: r.content_ai_default !== false, dl: r.content_download_default !== false });
+        const r = data as { content_ai_default?: boolean; content_download_default?: boolean; weaveable_default?: boolean };
+        setContentDefaults({ ai: r.content_ai_default !== false, dl: r.content_download_default !== false, weave: r.weaveable_default !== false });
       });
     return () => { live = false; };
   }, [user]);
-  async function updateContentDefault(key: 'ai' | 'dl', next: boolean) {
+  async function updateContentDefault(key: 'ai' | 'dl' | 'weave', next: boolean) {
     if (!user || !contentDefaults) return;
     const prior = contentDefaults;
     setContentDefaults({ ...contentDefaults, [key]: next });
+    const col = key === 'ai' ? 'content_ai_default' : key === 'dl' ? 'content_download_default' : 'weaveable_default';
     const { error: e } = await supabase.from('profiles')
-      .update(key === 'ai' ? { content_ai_default: next } : { content_download_default: next })
+      .update({ [col]: next })
       .eq('id', user.id);
     if (e) { setError(e.message); setContentDefaults(prior); }
   }
@@ -1030,6 +1031,17 @@ export default function Profile() {
               <span>
                 <strong>New posts&rsquo; media is downloadable</strong>
                 <em>People can save the photos and videos you share. Also flippable per post.</em>
+              </span>
+            </label>
+            <label className="prof__consent">
+              <input type="checkbox" checked={contentDefaults.weave}
+                onChange={(e) => void updateContentDefault('weave', e.target.checked)} />
+              <span>
+                <strong>New posts are weaveable</strong>
+                <em>Others may include what you post in their published
+                collections — always by reference, always with your name on
+                it. Off keeps your work out of everyone else&rsquo;s weaves.
+                Also flippable per post.</em>
               </span>
             </label>
           </>

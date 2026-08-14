@@ -11,7 +11,7 @@ import {
 } from '../lib/postsApi';
 import { uploadVideo, listMyReadyVideos, videoPublicUrl, type ReadyVideo } from '../lib/videoApi';
 import { setSaved } from '../lib/savedApi';
-import { listMyCollections, createCollection, addToCollection, type CollectionRow } from '../lib/collectionsApi';
+import { listMyCollections, createCollection, addToCollection, loadCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
@@ -161,6 +161,11 @@ export default function Compose() {
   // Edit mode: ?post=<id> loads an existing post (author only) and submit
   // updates in place instead of creating.
   const editPostId = params.get('post');
+  // ?collection=<id> — PUBLISHING A COLLECTION INTO A ROOM (founder
+  // 2026-08-14): the post minted here carries the collection; the chosen
+  // room's own flow shapes how it appears (price for Marketplace, etc).
+  const collectionParam = params.get('collection');
+  const [publishingCollection, setPublishingCollection] = useState<{ id: string; name: string; count: number } | null>(null);
 
   /** After posting, land back where the + was pressed: the space's profile,
    *  else the section (Library → /library), else Home. */
@@ -170,6 +175,7 @@ export default function Compose() {
     art: '/art', food: '/food', travel: '/travel',
   };
   function afterPostDestination(isEventPost: boolean): string {
+    if (collectionParam) return `/collections/${collectionParam}`;
     if (presetSpace) return `/spaces/${presetSpace}`;
     if (isEventPost) return '/events';
     const a = params.get('area') as ServiceArea | null;
@@ -188,21 +194,41 @@ export default function Compose() {
   // doesn't enter the Home and My-celium river.
   const [quiet, setQuiet] = useState(false);
   const [downloadable, setDownloadable] = useState(true);
+  // WEAVEABLE (founder 2026-08-14): may others include this post in their
+  // published collections? Weaving is by reference — their weave points at
+  // your post, name attached — so the toggle is about association, not
+  // copies. Same storage shape as the pair above: details.noWeave only when
+  // OFF, and a DB trigger enforces it on every collection_items insert.
+  const [weaveable, setWeaveable] = useState(true);
   useEffect(() => {
     if (!user || editPostId) return;   // edits prefill from the post itself
     let live = true;
     void supabase.from('profiles')
-      .select('content_ai_default, content_download_default')
+      .select('content_ai_default, content_download_default, weaveable_default')
       .eq('id', user.id).maybeSingle()
       .then(({ data }) => {
         if (!live || !data) return;    // pre-migration: keep the true defaults
-        const r = data as { content_ai_default?: boolean; content_download_default?: boolean };
+        const r = data as { content_ai_default?: boolean; content_download_default?: boolean; weaveable_default?: boolean };
         if (r.content_ai_default === false) setAiReadable(false);
         if (r.content_download_default === false) setDownloadable(false);
+        if (r.weaveable_default === false) setWeaveable(false);
       });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, editPostId]);
+
+  useEffect(() => {
+    if (!collectionParam || editPostId) return;
+    let live = true;
+    void loadCollection(collectionParam).then((c) => {
+      if (!live || !c) return;
+      setPublishingCollection({ id: c.meta.id, name: c.meta.name, count: c.posts.length });
+      setTitle((cur) => cur || c.meta.name);
+      setBody((cur) => cur || (c.meta.description ?? ''));
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionParam, editPostId]);
 
   const [editReady, setEditReady] = useState(!editing);
   const editLinkedEvent = useRef<string | null>(null);
@@ -239,6 +265,7 @@ export default function Compose() {
       const d = p.details ?? {};
       setAiReadable(!d.aiExcluded);
       setDownloadable(!d.noDownload);
+      setWeaveable(!(d.noWeave === true));
       setQuiet(d.quiet === true);   // editing must not silently un-quiet it
       const back: Record<string, OfferMode> = {
         gift: 'free', sale: 'paid', sliding: 'paid',
@@ -496,6 +523,10 @@ export default function Compose() {
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
+      if (!weaveable) details.noWeave = true;
+      // Publishing a collection into a room: the post CARRIES the collection
+      // (founder 2026-08-14) — the card opens the whole thing.
+      if (publishingCollection) details.collectionId = publishingCollection.id;
       // Events' calendar rows show ONE location line — the address when in
       // person, else the meeting link (SmartLocation renders links as Join).
       const effLocation = inPerson && location.trim() ? location.trim()
@@ -721,6 +752,17 @@ export default function Compose() {
       </header>
 
       {error && <p className="cmp__error">{error}</p>}
+
+      {/* The context receipt for a collection publish: what this post will
+          carry. The card people meet opens the whole collection. */}
+      {publishingCollection && (
+        <p className="cmp__collection-banner">
+          <Icon name="book" size={13} /> Publishing your collection{' '}
+          <strong>{publishingCollection.name}</strong> — {publishingCollection.count}{' '}
+          {publishingCollection.count === 1 ? 'piece' : 'pieces'}. This post is
+          its door: wherever it lands, tapping it opens the whole collection.
+        </p>
+      )}
 
       {actor.type === 'space' && (
         <p className="cmp__acting">
@@ -1256,6 +1298,14 @@ export default function Compose() {
         <label className="cmp__cc">
           <input type="checkbox" checked={downloadable} onChange={(e) => setDownloadable(e.target.checked)} />
           <span><strong>Downloadable</strong> — people can save this post&rsquo;s media</span>
+        </label>
+        <label className="cmp__cc">
+          <input type="checkbox" checked={weaveable} onChange={(e) => setWeaveable(e.target.checked)} />
+          <span>
+            <strong>Weaveable</strong> — others may include this post in their
+            published collections, always with your name on it. Off keeps it
+            out of everyone else&rsquo;s weaves.
+          </span>
         </label>
         <label className="cmp__cc">
           <input type="checkbox" checked={quiet} onChange={(e) => setQuiet(e.target.checked)} />

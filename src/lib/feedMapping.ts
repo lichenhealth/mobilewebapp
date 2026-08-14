@@ -24,7 +24,10 @@ interface FeedPostLike { details: Record<string, unknown>; image_url: string | n
 /** Where a tapped post opens: its event page when it's an event post, else
  *  the post's own page (Figma 286-6331 — every post has a home). */
 export function postOpenPath(p: FeedPost): string {
-  return p.linked_event_id ? `/events/${p.id}` : `/posts/${p.id}`;
+  if (p.linked_event_id) return `/events/${p.id}`;
+  // A collection's door-post opens the whole collection (founder 2026-08-14).
+  const col = (p.details as { collectionId?: string } | null)?.collectionId;
+  return typeof col === 'string' && col ? `/collections/${col}` : `/posts/${p.id}`;
 }
 
 /** The entity a card's weave mark acts on: the DISPLAYED author — the space
@@ -151,6 +154,7 @@ export function postToCard(
     demo: p.details?.demo === true,
     // A Library piece hosted outside Lichen (founder 2026-08-10).
     isResource: p.details?.isResource === true,
+    isCollection: typeof (p.details as { collectionId?: unknown } | null)?.collectionId === 'string',
     authorIsSpace: !!p.author_space,
     areaDoors,
     // The My-celium eyebrow tells you WHY a post reached you — someone shared

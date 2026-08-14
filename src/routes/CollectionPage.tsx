@@ -61,6 +61,7 @@ export default function CollectionPage() {
   // owner editing
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [newModuleName, setNewModuleName] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -448,16 +449,26 @@ export default function CollectionPage() {
               {cohortOpen ? 'Cancel' : cohorts.length ? 'New cohort' : 'Start a cohort'}
             </button>
           )}
-          <button
-            className="btn btn-primary colp__btn"
-            disabled={busy}
-            onClick={() => void act(async () => {
-              await updateCollection(id, { is_public: !meta.is_public });
-              setMeta((m) => (m ? { ...m, is_public: !m.is_public } : m));
-            })}
-          >
-            {meta.is_public ? 'Make private' : `Publish to Lichen ${meta.kind === 'path' ? 'Library' : 'Courses'}`}
-          </button>
+          {meta.is_public ? (
+            <button
+              className="btn btn-primary colp__btn"
+              disabled={busy}
+              onClick={() => void act(async () => {
+                await updateCollection(id, { is_public: false });
+                setMeta((m) => (m ? { ...m, is_public: false } : m));
+              })}
+            >
+              Make private
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary colp__btn"
+              disabled={busy}
+              onClick={() => setPublishOpen((o) => !o)}
+            >
+              {publishOpen ? 'Not now' : 'Publish…'}
+            </button>
+          )}
           <button
             className="btn colp__btn colp__btn--danger"
             disabled={busy}
@@ -465,6 +476,37 @@ export default function CollectionPage() {
           >
             Delete
           </button>
+        </div>
+      )}
+
+      {/* PUBLISH TO ANY ROOM (founder 2026-08-14: "allow people to publish to
+          whatever they want... then they are put through a posting process
+          commensurate to the room they've chosen"): pick a room, the
+          collection goes public, and Compose mints the post that carries it —
+          shaped by that room's own flow. */}
+      {canEdit && publishOpen && !meta.is_public && (
+        <div className="colp__confirm colp__publish">
+          <span className="colp__confirm-text">
+            Where should it live? It becomes public, and you&rsquo;ll shape how it appears.
+          </span>
+          {([
+            { room: 'feed', label: 'Feed' },
+            { room: 'library', label: 'Library' },
+            { room: 'courses', label: 'Courses' },
+            { room: 'marketplace', label: 'Marketplace' },
+          ] as const).map(({ room, label }) => (
+            <button
+              key={room}
+              className="btn colp__btn"
+              disabled={busy}
+              onClick={() => void act(async () => {
+                await updateCollection(id, { is_public: true });
+                navigate(`/compose?collection=${id}${room === 'feed' ? '' : `&area=${room}`}`);
+              })}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
 

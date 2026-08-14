@@ -3,6 +3,8 @@ import { Icon } from '../components/Icon';
 import {
   listMyCollections, createCollection, addToCollection, type CollectionRow,
 } from '../lib/collectionsApi';
+import { loadPost } from '../lib/postsApi';
+import { supabase } from '../lib/supabase';
 import './CollectPrompt.css';
 
 /** The save→organize bridge (founder, 2026-07-14): Save stays one tap, but
@@ -34,6 +36,10 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
   }, []);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [cols, setCols] = useState<CollectionRow[]>([]);
+  // WEAVEABLE CONSENT (founder 2026-08-14): a post whose author keeps it out
+  // of others' collections gets a quiet notice instead of the folder rows.
+  // The DB trigger is the real wall; this is the polite sign before it.
+  const [noWeaveBy, setNoWeaveBy] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [note, setNote] = useState('');
   const toastTimer = useRef<number | null>(null);
@@ -57,7 +63,14 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
     setToastFor(null);
     setPickerFor(postId);
     setNewName('');
+    setNoWeaveBy(null);
     void listMyCollections().then(setCols).catch(console.error);
+    void (async () => {
+      const [p, { data: { user } }] = await Promise.all([loadPost(postId), supabase.auth.getUser()]);
+      if (p && user && p.author_id !== user.id && (p.details as { noWeave?: boolean } | null)?.noWeave === true) {
+        setNoWeaveBy(p.author?.full_name || 'This member');
+      }
+    })().catch(console.error);
   }, []);
 
   const flash = (text: string) => {
@@ -70,7 +83,11 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
     try {
       await addToCollection(collectionId, postId);
       flash(`Added to ${cols.find((c) => c.id === collectionId)?.name ?? 'collection'} ✓`);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      // The trigger's message is written for members — show it as-is.
+      flash((e as { message?: string } | null)?.message || 'Could not add that.');
+    }
     setPickerFor(null);
   }
 
@@ -81,7 +98,10 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
       const cid = await createCollection(nm);
       await addToCollection(cid, postId);
       flash(`Added to ${nm} ✓`);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      flash((e as { message?: string } | null)?.message || 'Could not add that.');
+    }
     setNewName('');
     setPickerFor(null);
   }
@@ -112,17 +132,23 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
           <div className="collect__scrim" onClick={() => setPickerFor(null)} />
           <div className="collect__picker" role="dialog" aria-label="Add to collection">
             <h3>Add to collection</h3>
-            {cols.length === 0 && (
+            {noWeaveBy && (
+              <p className="collect__muted">
+                {noWeaveBy} keeps this piece out of others&rsquo; collections —
+                it can&rsquo;t be woven in.
+              </p>
+            )}
+            {!noWeaveBy && cols.length === 0 && (
               <p className="collect__muted">No folders yet — name your first:</p>
             )}
-            {cols.map((c) => (
+            {!noWeaveBy && cols.map((c) => (
               <button key={c.id} className="collect__row" onClick={() => void addTo(c.id, pickerFor)}>
                 <Icon name={c.is_public ? 'book' : 'bookmark'} size={14} />
                 <span>{c.name}</span>
                 <em>{c.item_count}</em>
               </button>
             ))}
-            <div className="collect__new">
+            {!noWeaveBy && <div className="collect__new">
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -132,7 +158,7 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
               <button disabled={!newName.trim()} onClick={() => void createAndAdd(pickerFor)}>
                 Create &amp; add
               </button>
-            </div>
+            </div>}
           </div>
         </>
       )}

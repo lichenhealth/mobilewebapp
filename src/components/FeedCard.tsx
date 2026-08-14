@@ -26,6 +26,9 @@ export interface FeedCardProps {
    *  outside Lichen (founder 2026-08-10). Wears a small "external" badge
    *  beside the title; the actual preview card renders via `previews`. */
   isResource?: boolean;
+  /** details.collectionId — this post is a collection's door; tapping it
+   *  opens the whole collection (founder 2026-08-14). */
+  isCollection?: boolean;
   body: string;
   // Image-badge column on the right
   image?: {
@@ -98,6 +101,7 @@ export default function FeedCard({
   areaDoors = [],
   demo,
   isResource,
+  isCollection,
   body,
   image,
   mycelium,
@@ -198,6 +202,11 @@ export default function FeedCard({
           {isResource && (
             <span className="feed-card__resource-badge" title="Hosted outside Lichen">
               <Icon name="globe" size={11} /> External resource
+            </span>
+          )}
+          {isCollection && (
+            <span className="feed-card__resource-badge" title="Opens the whole collection">
+              <Icon name="book" size={11} /> Collection
             </span>
           )}
           <div className="feed-card__handle-row">
