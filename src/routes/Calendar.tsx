@@ -149,17 +149,15 @@ export default function Calendar() {
   // = the full membership list, so focus alone still shows everything.
   const [calQ, setCalQ] = useState('');
   const [calAddOpen, setCalAddOpen] = useState(false);
+  // Imported calendars are deliberately NOT in here — they render as standing
+  // chips (white when off), so the picker only holds group calendars.
   const calChoices = useMemo(() => {
     const q = calQ.trim().toLowerCase();
-    const all = [
-      ...calendars.map((c) => ({ key: c.id, name: c.name, tint: colorFor(c.id) })),
-      // Imported calendars join the same list — tint matches their blocks.
-      ...extCals.map((c) => ({ key: 'ext:' + c.id, name: c.name, tint: colorFor('extcal:' + c.id) })),
-    ];
-    return all
+    return calendars
+      .map((c) => ({ key: c.id, name: c.name, tint: colorFor(c.id) }))
       .filter((c) => !selectedCals.includes(c.key))
       .filter((c) => !q || c.name.toLowerCase().includes(q));
-  }, [calendars, extCals, selectedCals, calQ]);
+  }, [calendars, selectedCals, calQ]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [fbRows, setFbRows] = useState<FreeBusyRow[]>([]);
   const [memberWindows, setMemberWindows] = useState<MemberWindow[]>([]);
@@ -597,18 +595,24 @@ export default function Calendar() {
               <span className="calp__chipx" aria-hidden="true">×</span>
             </button>
           ))}
-          {extCals.filter((c) => selectedCals.includes('ext:' + c.id)).map((c) => (
-            <button
-              key={'ext:' + c.id}
-              className="calp__calchip is-on"
-              onClick={() => toggleCal('ext:' + c.id)}
-              title={`Remove ${c.name}`}
-            >
-              <span className="calp__chipdot" style={{ background: colorFor('extcal:' + c.id) }} />
-              {c.name}
-              <span className="calp__chipx" aria-hidden="true">×</span>
-            </button>
-          ))}
+          {/* Imported calendars are STANDING chips, never hidden in the picker
+              (founder 2026-08-14: "we likely won't be the default cal for most
+              people for a while" — their Google IS their life, so it stays in
+              view: white when off, lit when on, a toggle like Mine). */}
+          {extCals.map((c) => {
+            const on = selectedCals.includes('ext:' + c.id);
+            return (
+              <button
+                key={'ext:' + c.id}
+                className={'calp__calchip' + (on ? ' is-on' : '')}
+                onClick={() => toggleCal('ext:' + c.id)}
+                aria-pressed={on}
+              >
+                <span className="calp__chipdot" style={{ background: colorFor('extcal:' + c.id) }} />
+                {c.name}
+              </button>
+            );
+          })}
           <input
             className="calp__addcal"
             placeholder="Add a calendar…"
@@ -647,12 +651,12 @@ export default function Calendar() {
                   <span className="calp__chipdot" style={{ background: c.tint }} />
                   {c.name}
                 </span>
-                <span className="calp__result-when">{c.key.startsWith('ext:') ? 'imported · add' : 'add'}</span>
+                <span className="calp__result-when">add</span>
               </button>
             ))}
             {calChoices.length === 0 && !calQ.trim() && (
               <p className="calp__result-none">
-                {calendars.length === 0 && extCals.length === 0
+                {calendars.length === 0
                   ? 'When you join a group, its calendar will show up here.'
                   : 'Every calendar from your groups is already on.'}
               </p>
