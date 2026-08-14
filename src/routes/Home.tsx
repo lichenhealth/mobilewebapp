@@ -70,7 +70,12 @@ function presenceLine(present: number | null, available: number, whose: string |
   }
   if (present) return `${n(present)} in ${where} ${isAre(present)} present.`;
   if (available) return `${n(available)} in ${where} ${isAre(available)} available.`;
-  return whose ? `${whose} is resting.` : 'Your network is resting.';
+  // Nobody here is a GOOD sign (founder 2026-08-13: "they are out in the
+  // world living their lives... we want Lichen to be a utility for healthy,
+  // real engagement in the world, not a social network that's addictive").
+  // "Resting" implied being here was the natural state and everyone had
+  // lapsed from it — the addictive-network frame, the same trap "awake" was.
+  return whose ? `${whose} is out living.` : 'Your network is out living.';
 }
 
 const CATEGORY_ICONS: IconRowItem[] = [

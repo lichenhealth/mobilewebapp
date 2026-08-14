@@ -806,7 +806,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     <div className="sprof__awake">
       <button className="sprof__awake-line" onClick={() => openTab('members')}>
         {awake === 0
-          ? `${space.name} is resting.`
+          ? `${space.name} is out living.`
           : awake === 1
             ? `One in ${space.name} is awake.`
             : `${awake} in ${space.name} are awake.`}
