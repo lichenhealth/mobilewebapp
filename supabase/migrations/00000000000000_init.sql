@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mE5TSmfqRUVI21Y3GHHD4WkxYoUJNVv4aNDIcXUPIoou9erMVa2nZc8eQZL6z8h
+\restrict 6hbw0bDcBCOWn2RP6B2tfcsPJttZzX7VjqyvdpjnctMn7YQZUz9k3gbNxg7BWRo
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4318,7 +4318,7 @@ CREATE TABLE public.care_posts (
     recurrence jsonb,
     CONSTRAINT care_posts_dims_valid CHECK ((dimensions <@ ARRAY['Mental'::text, 'Physical'::text, 'Spiritual'::text, 'Social'::text, 'Environmental'::text, 'Economic'::text])),
     CONSTRAINT care_posts_kind_check CHECK ((kind = ANY (ARRAY['wow'::text, 'koc'::text]))),
-    CONSTRAINT care_posts_kind_shape CHECK ((((kind = 'wow'::text) AND (score IS NOT NULL) AND (start_date IS NULL) AND (end_date IS NULL) AND (recurrence IS NULL)) OR ((kind = 'koc'::text) AND (score IS NULL) AND (start_date IS NOT NULL) AND (cardinality(dimensions) = 0) AND (((recurrence IS NULL) AND (end_date IS NOT NULL) AND (end_date >= start_date)) OR ((recurrence IS NOT NULL) AND ((end_date IS NULL) OR (end_date >= start_date))))))),
+    CONSTRAINT care_posts_kind_shape CHECK ((((kind = 'wow'::text) AND (start_date IS NULL) AND (end_date IS NULL) AND (recurrence IS NULL)) OR ((kind = 'koc'::text) AND (score IS NULL) AND (start_date IS NOT NULL) AND (cardinality(dimensions) = 0) AND (((recurrence IS NULL) AND (end_date IS NOT NULL) AND (end_date >= start_date)) OR ((recurrence IS NOT NULL) AND ((end_date IS NULL) OR (end_date >= start_date))))))),
     CONSTRAINT care_posts_nonempty CHECK (((length(btrim(body)) > 0) OR (jsonb_array_length(attachments) > 0) OR (jsonb_array_length(links) > 0))),
     CONSTRAINT care_posts_score_check CHECK (((score >= 0) AND (score <= 100)))
 );
@@ -8273,14 +8273,14 @@ ALTER TABLE public.care_posts ENABLE ROW LEVEL SECURITY;
 -- Name: care_posts care_posts delete; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "care_posts delete" ON public.care_posts FOR DELETE TO authenticated USING (public.is_active_caregiver(patient_id, auth.uid()));
+CREATE POLICY "care_posts delete" ON public.care_posts FOR DELETE USING ((public.is_active_caregiver(patient_id, auth.uid()) OR ((author_id = auth.uid()) AND (patient_id = auth.uid()))));
 
 
 --
 -- Name: care_posts care_posts insert; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "care_posts insert" ON public.care_posts FOR INSERT TO authenticated WITH CHECK (((author_id = auth.uid()) AND public.is_active_caregiver(patient_id, auth.uid())));
+CREATE POLICY "care_posts insert" ON public.care_posts FOR INSERT WITH CHECK (((author_id = auth.uid()) AND ((patient_id = auth.uid()) OR public.is_active_caregiver(patient_id, auth.uid()))));
 
 
 --
@@ -8294,7 +8294,7 @@ CREATE POLICY "care_posts read" ON public.care_posts FOR SELECT TO authenticated
 -- Name: care_posts care_posts update; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "care_posts update" ON public.care_posts FOR UPDATE TO authenticated USING (public.is_active_caregiver(patient_id, auth.uid())) WITH CHECK (((author_id = auth.uid()) AND public.is_active_caregiver(patient_id, auth.uid())));
+CREATE POLICY "care_posts update" ON public.care_posts FOR UPDATE USING ((public.is_active_caregiver(patient_id, auth.uid()) OR ((author_id = auth.uid()) AND (patient_id = auth.uid())))) WITH CHECK (((author_id = auth.uid()) AND ((patient_id = auth.uid()) OR public.is_active_caregiver(patient_id, auth.uid()))));
 
 
 --
@@ -11702,9 +11702,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mE5TSmfqRUVI21Y3GHHD4WkxYoUJNVv4aNDIcXUPIoou9erMVa2nZc8eQZL6z8h
-
-
+\unrestrict 6hbw0bDcBCOWn2RP6B2tfcsPJttZzX7VjqyvdpjnctMn7YQZUz9k3gbNxg7BWRo
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --

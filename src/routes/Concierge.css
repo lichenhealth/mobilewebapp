@@ -1307,3 +1307,38 @@
 .means__ro { margin: 6px 0; font-size: 14px; }
 .means__ro em { font-style: normal; font-size: 12px; color: var(--ink-muted); margin-right: 8px; }
 .means__ro-words { color: var(--ink-soft); line-height: 1.5; }
+
+/* ── The audit in your own words (founder 2026-08-14) ────────────────────── */
+.selfaudit {
+  margin-top: var(--s-4); padding: var(--s-5);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+}
+.selfaudit__title { margin: 0; font-family: var(--font-display, inherit); font-size: 20px; font-weight: 400; }
+.selfaudit__sub { margin: 6px 0 var(--s-4); font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+.selfaudit__dim { margin-bottom: var(--s-4); }
+.selfaudit__dimhead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.selfaudit__dimname { font-size: 14px; font-weight: 500; }
+.selfaudit__scorebtn {
+  margin-left: auto; padding: 3px 12px; border-radius: var(--r-full);
+  border: 1px dashed var(--bone-edge); background: transparent;
+  font-size: 11.5px; color: var(--ink-muted); cursor: pointer; font-family: inherit;
+}
+.selfaudit__scorebtn:hover { border-color: var(--peach); color: var(--peach-deep); }
+.selfaudit__scorewrap { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.selfaudit__scorewrap input[type="range"] { width: 110px; accent-color: var(--peach); }
+.selfaudit__scoreval { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); min-width: 24px; text-align: right; }
+.selfaudit__scoreclear {
+  border: none; background: none; color: var(--ink-faint); cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 2px;
+}
+.selfaudit__words {
+  width: 100%; min-height: 64px; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); font: inherit; font-size: 14px; line-height: 1.5;
+}
+.selfaudit__words:focus { outline: none; border-color: var(--peach); }
+.selfaudit__fine { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; }
+.selfaudit__error { font-size: 12.5px; color: var(--peach-deep); }
+.selfaudit__save { margin-top: var(--s-2); }
+.means__hint--tradeoff { color: var(--ink-soft); }

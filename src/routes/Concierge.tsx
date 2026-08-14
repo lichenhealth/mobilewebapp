@@ -13,6 +13,7 @@ import {
 } from '../lib/chatApi';
 import {
   loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
+  createCarePost, DIMENSION_META,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
   loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel,
   type CarePostRow, type Dimension, type OnCallCaregiver,
@@ -433,6 +434,13 @@ function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
             An honest picture is what lets the network subsidize care fairly. Whether your
             care team sees it at all is yours to switch in Profile → Privacy.
           </p>
+          {!shared && (
+            <p className="means__hint means__hint--tradeoff">
+              Skipping is always OK — but without it you can&rsquo;t take part in
+              the rebalancing economy, and your care team can&rsquo;t help with
+              this piece.
+            </p>
+          )}
           <label className="means__label">Household income</label>
           <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>
             <option value="">Prefer not to say</option>
@@ -490,6 +498,105 @@ function ConciergeEmpty({ icon, title, sub, action }: {
       <p className="conc__care-gate-sub">{sub}</p>
       {action && <button className="btn btn-primary" onClick={action.onClick}>{action.label}</button>}
     </div>
+  );
+}
+
+/** THE AUDIT IN YOUR OWN WORDS (founder 2026-08-14): your Web of Wellbeing
+ *  KICKS OFF with a self-evaluation — all six dimensions, each in your own
+ *  words with an optional 0–100 self-score feeding the same radar the care
+ *  team's entries feed. Any answered dimension becomes a real WOW post
+ *  authored by you; skipped ones simply wait. Economic words live here like
+ *  any other dimension — the structured Financial position card stays its
+ *  own separate, skippable thing. */
+function SelfAudit({ me, onDone }: { me: string; onDone: () => void }) {
+  const blank = () => Object.fromEntries(
+    WOW_DIMENSIONS.map((d) => [d, { text: '', score: null as number | null }]),
+  ) as Record<Dimension, { text: string; score: number | null }>;
+  const [entries, setEntries] = useState(blank);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  // A save that fails halfway must not double-post the dimensions that
+  // already landed when the member retries.
+  const saved = useRef(new Set<Dimension>());
+  const touched = WOW_DIMENSIONS.filter((d) => entries[d].text.trim() || entries[d].score != null);
+  const set = (d: Dimension, patch: Partial<{ text: string; score: number | null }>) =>
+    setEntries((cur) => ({ ...cur, [d]: { ...cur[d], ...patch } }));
+  return (
+    <section className="selfaudit">
+      <h3 className="selfaudit__title">Start with your own words</h3>
+      <p className="selfaudit__sub">
+        Your Web of Wellbeing begins with how YOU see yourself — six aspects of
+        one life. Write as much or as little as you like, score any you want on
+        the web, and skip what isn&rsquo;t ready. Your care team can read what
+        you share here, and their entries will weave in alongside yours.
+      </p>
+      {WOW_DIMENSIONS.map((d) => (
+        <div className="selfaudit__dim" key={d}>
+          <div className="selfaudit__dimhead">
+            <Icon name={DIMENSION_META[d]} size={16} />
+            <span className="selfaudit__dimname">{d}</span>
+            {entries[d].score == null ? (
+              <button className="selfaudit__scorebtn" onClick={() => set(d, { score: 70 })}>
+                Add a score
+              </button>
+            ) : (
+              <span className="selfaudit__scorewrap">
+                <input
+                  type="range" min={0} max={100} value={entries[d].score ?? 70}
+                  onChange={(e) => set(d, { score: Number(e.target.value) })}
+                  aria-label={`${d} score`}
+                />
+                <span className="selfaudit__scoreval">{entries[d].score}</span>
+                <button className="selfaudit__scoreclear" onClick={() => set(d, { score: null })} aria-label="Remove score">×</button>
+              </span>
+            )}
+          </div>
+          <textarea
+            className="selfaudit__words"
+            value={entries[d].text}
+            onChange={(e) => set(d, { text: e.target.value })}
+            placeholder={`In your own words — how is your ${d.toLowerCase()} wellbeing right now?`}
+          />
+          {d === 'Economic' && (
+            <p className="selfaudit__fine">
+              Your words here are always just yours to give. The structured
+              Financial position card above is separate and skippable — without
+              it you can&rsquo;t take part in the rebalancing economy, and your
+              care team can&rsquo;t help with that piece.
+            </p>
+          )}
+        </div>
+      ))}
+      {error && <p className="selfaudit__error">{error}</p>}
+      <button
+        className="btn btn-primary selfaudit__save"
+        disabled={saving || touched.length === 0}
+        onClick={() => {
+          setSaving(true); setError('');
+          void (async () => {
+            try {
+              for (const d of touched) {
+                if (saved.current.has(d)) continue;
+                await createCarePost(me, {
+                  patientId: me, kind: 'wow', body: entries[d].text.trim(),
+                  dimensions: [d], score: entries[d].score ?? undefined,
+                  attachments: [], links: [], previews: [],
+                });
+                saved.current.add(d);
+              }
+              onDone();
+            } catch (e) {
+              setError((e as Error)?.message || 'Something went wrong.');
+              setSaving(false);
+            }
+          })();
+        }}
+      >
+        {saving ? 'Weaving it in…'
+          : touched.length === 0 ? 'Answer any aspect to begin'
+          : `Save your evaluation (${touched.length} of 6)`}
+      </button>
+    </section>
   );
 }
 
@@ -794,6 +901,7 @@ export default function Concierge() {
 
   // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
   const weekEnd = weekDays(weekStart)[6].iso;
+  const [boardNonce, setBoardNonce] = useState(0);
   useEffect(() => {
     if (!me) return;
     let active = true;
@@ -809,7 +917,7 @@ export default function Concierge() {
       setDataReady(true);
     })();
     return () => { active = false; };
-  }, [me, subjectId, weekStart, weekEnd]);
+  }, [me, subjectId, weekStart, weekEnd, boardNonce]);
 
   // Sign any attachment paths we haven't signed yet.
   useEffect(() => {
@@ -844,8 +952,10 @@ export default function Concierge() {
     navigate(target === 'wow' ? basePath : `${basePath}/${target}`);
   };
 
-  // Caregivers author their client's snapshots/plans; the patient's self view is read-only.
-  const canAuthor = isClientView && clientAuthorized;
+  // Caregivers author their client's snapshots/plans — and since 2026-08-14
+  // you author on YOUR OWN board too (the self-audit + updated scores;
+  // care_posts RLS gained the matching self-arm).
+  const canAuthor = isClientView ? clientAuthorized : true;
 
   // In client view, gate the WHOLE page behind access + caregiver relationship.
   if (isClientView && careReady && (careAllowed === false || !clientAuthorized)) {
@@ -1021,11 +1131,17 @@ export default function Concierge() {
                 </svg>
               </button>
             )}
-            {dataReady && wowPosts.length === 0 && (
+            {/* Your web KICKS OFF with the self-evaluation (founder
+                2026-08-14) — it shows until you've authored something
+                yourself, even if the care team spoke first. */}
+            {dataReady && !isClientView && !wowPosts.some((p) => p.author_id === me) && (
+              <SelfAudit me={me} onDone={() => setBoardNonce((n) => n + 1)} />
+            )}
+            {dataReady && isClientView && wowPosts.length === 0 && (
               <ConciergeEmpty icon="health" title="Web of Wellbeing"
                 sub={canAuthor
                   ? 'Post the first entry — add content, tag a dimension, and give it a wellbeing score.'
-                  : "Your care team hasn't posted here yet."} />
+                  : "They haven't been woven into their web yet."} />
             )}
             {feed.map((p) => (
               <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}

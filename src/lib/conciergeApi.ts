@@ -119,21 +119,38 @@ export async function loadCarePosts(patientId: string, kind: CareKind, opts: Loa
 // ─── Derived WOW radar ───────────────────────────────────────────────────────
 export interface WowScores { byDimension: Record<Dimension, number | null>; overall: number | null }
 
-/** Category score = avg of the scores of posts tagged with it; an "All" post
- *  (empty dimensions) counts toward every dimension. Overall = avg of categories. */
-export function computeWowScores(posts: CarePostRow[]): WowScores {
-  const sum: Record<string, number> = {};
-  const cnt: Record<string, number> = {};
-  for (const d of WOW_DIMENSIONS) { sum[d] = 0; cnt[d] = 0; }
+/** Category score = your CURRENT state, not a lifetime average (founder asked
+ *  2026-08-14 "should your score be the running average of your entries?" —
+ *  answer: recent entries only. A running average makes the score a GPA: one
+ *  hard year drags the number forever, and getting better barely moves it.
+ *  Wellbeing is a now-reading): each dimension averages its entries from the
+ *  last 90 days — yours and your care team's counting equally — and a
+ *  dimension quiet longer than that carries its single latest entry forward
+ *  rather than blanking. An "All" post (empty dimensions) counts toward every
+ *  dimension. Overall WOW = avg of the six currents. History stays in the
+ *  feed, so a trend view can come later without changing what's stored. */
+const WOW_WINDOW_DAYS = 90;
+export function computeWowScores(posts: CarePostRow[], now = new Date()): WowScores {
+  const cutoff = new Date(now.getTime() - WOW_WINDOW_DAYS * 86400_000).toISOString();
+  const recent: Record<string, number[]> = {};
+  const latest: Record<string, { at: string; score: number }> = {};
+  for (const d of WOW_DIMENSIONS) recent[d] = [];
   for (const p of posts) {
     if (p.kind !== 'wow' || p.score == null) continue;
     const targets = p.dimensions.length ? p.dimensions : WOW_DIMENSIONS;
-    for (const d of targets) if (d in sum) { sum[d] += p.score; cnt[d] += 1; }
+    for (const d of targets) {
+      if (!(d in recent)) continue;
+      if (p.created_at >= cutoff) recent[d].push(p.score);
+      if (!latest[d] || p.created_at > latest[d].at) latest[d] = { at: p.created_at, score: p.score };
+    }
   }
   const byDimension = {} as Record<Dimension, number | null>;
   let oSum = 0, oCnt = 0;
   for (const d of WOW_DIMENSIONS) {
-    const v = cnt[d] ? Math.round(sum[d] / cnt[d]) : null;
+    const rs = recent[d];
+    const v = rs.length
+      ? Math.round(rs.reduce((a, b) => a + b, 0) / rs.length)
+      : (latest[d]?.score ?? null);
     byDimension[d] = v;
     if (v != null) { oSum += v; oCnt += 1; }
   }

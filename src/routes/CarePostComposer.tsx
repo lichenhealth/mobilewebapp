@@ -21,8 +21,14 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const { patientId = '' } = useParams();
   const { user } = useAuth();
   const me = user?.id ?? '';
+  // No :patientId in the route = YOUR OWN board (founder 2026-08-14: you or
+  // your care team can enter an updated score any time — same composer,
+  // same dimension ticks, the entry just lands on your own web).
+  const patient = patientId || me;
   const navigate = useNavigate();
-  const back = () => navigate(kind === 'wow' ? `/concierge/client/${patientId}` : `/concierge/client/${patientId}/koc`);
+  const back = () => navigate(patientId
+    ? (kind === 'wow' ? `/concierge/client/${patientId}` : `/concierge/client/${patientId}/koc`)
+    : (kind === 'wow' ? '/concierge' : '/concierge/koc'));
 
   const [body, setBody] = useState('');
   const [pending, setPending] = useState<Pending[]>([]);
@@ -45,7 +51,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     if (file.size > MAX_BYTES) { setError('That file is too large (max 25 MB).'); return; }
     setUploading(true); setError('');
     try {
-      const path = await uploadCareMedia(patientId, file, ext);
+      const path = await uploadCareMedia(patient, file, ext);
       setPending((p) => [...p, { type, path, localUrl: URL.createObjectURL(file) }]);
     } catch (e) { setError(e instanceof Error ? e.message : 'Upload failed.'); }
     setUploading(false);
@@ -83,7 +89,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
       // Read links out of the body (Facebook-style) → rich previews stored on the post.
       const previews = await resolvePreviews(parseBodyUrls(body));
       await createCarePost(me, {
-        patientId, kind, body: body.trim(),
+        patientId: patient, kind, body: body.trim(),
         dimensions: [...dims], score,
         startDate: range.start ?? undefined,
         endDate: recurrence ? undefined : (range.end ?? undefined),

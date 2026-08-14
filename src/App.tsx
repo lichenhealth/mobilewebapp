@@ -232,6 +232,8 @@ export default function App() {
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />
           <Route path="/concierge/client/:patientId"           element={<Concierge />} />
+          {/* No :patientId = your own board — the WOW self-entry door. */}
+          <Route path="/concierge/wow/edit" element={<CarePostComposer kind="wow" />} />
           <Route path="/concierge/client/:patientId/wow/edit"  element={<CarePostComposer kind="wow" />} />
           <Route path="/concierge/client/:patientId/koc/edit"  element={<CarePostComposer kind="koc" />} />
           <Route path="/concierge/client/:patientId/:tab"      element={<Concierge />} />
