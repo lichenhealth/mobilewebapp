@@ -71,3 +71,46 @@
   font-size: 11px; font-weight: 300; color: var(--ink-faint);
   margin-top: 6px;
 }
+
+/* ONE TOOLBAR GRAMMAR (founder 2026-08-15) — constant tools as icon-only
+   circles on the left, a hairline, then relationship lenses as text chips
+   with a check when on. Same vocabulary as Marketplace, Maps and a course. */
+/* One line that scrolls, never a wrap: a lens orphaned onto a second row
+   under the divider reads as a mistake (founder's width sweep). `.h-scroll`
+   brings its own 12px gap, so the double class overrides it. */
+.sdir__bar.h-scroll {
+  display: flex; align-items: center; gap: var(--s-2);
+  margin-bottom: var(--s-3); flex-wrap: nowrap;
+}
+.sdir__door {
+  width: 36px; height: 36px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  color: var(--ink); cursor: pointer;
+}
+.sdir__door:hover { background: var(--bone-warm); }
+.sdir__door.is-on { border-color: var(--peach); color: var(--peach); }
+.sdir__bar-divider {
+  width: 1px; align-self: stretch; background: var(--bone-edge);
+  margin: 2px 6px 2px 2px; flex-shrink: 0;
+}
+.sdir__lens {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 2px; background: transparent; border: 0; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 300; color: var(--ink-soft);
+  white-space: nowrap;
+}
+.sdir__lens.is-on { color: var(--peach); font-weight: 400; }
+
+/* Icons above, toggles below — the platform rule. */
+.sdir__scope { display: flex; gap: var(--s-4); margin-bottom: var(--s-3); }
+.sdir__scopetab {
+  background: transparent; border: 0; padding: 2px 0; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 300; color: var(--ink-soft);
+  border-bottom: 1.5px solid transparent;
+}
+.sdir__scopetab.is-on { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
+.sdir__link {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: var(--peach); text-decoration: underline;
+}

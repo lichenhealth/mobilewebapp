@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { listSpacesByKind } from '../lib/spacesApi';
 import { Icon } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
 import { threadForSection } from '../lib/assistantFeedApi';
@@ -62,7 +63,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   chat: { title: 'Conversations', frame: 'You help them stay in real relationship. You are given recent exchanges across their rooms: say who is waiting on a reply, what each live thread is actually about, and anything that looks time-sensitive. Summarize in your own words — do not quote at length, and treat what people share as theirs.' },
   concierge: { title: 'Care', frame: 'You help them tend care — their own and the people they care for.' },
   communities: { title: 'Your communities', frame: 'You help them tend belonging: what their groups and communities need from them.' },
-  groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them.' },
+  groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them. Lead with activity across the groups they are IN; then, for any they STEWARD, one concrete piece of stewardship worth doing — a queue waiting, a quiet room, a member at the door. Practical, never a lecture on running groups.' },
   organizations: { title: 'Your organizations', frame: 'You help them tend belonging: what the organizations they steward or belong to need from them.' },
   places: { title: 'Your places', frame: 'You help them tend the places they steward or gather in.' },
   events: { title: 'Events', frame: 'You help them gather: invitations, RSVPs, what is coming up.' },
@@ -110,8 +111,15 @@ export default function AssistantBrief() {
   const memberId = params.get('member');
   // ?collection=<id> — the update on one course's content (founder 2026-08-15).
   const collectionId = params.get('collection');
+  // ?mine=0 — the ALL-of-them view of a spaces section (founder 2026-08-15).
+  // Different subject, different briefing: yours is activity + stewardship,
+  // all is what's new and what might fit you.
+  const allScope = params.get('mine') === '0';
+  const SPACE_SECTIONS = ['communities', 'groups', 'organizations', 'places'];
+  const spacesAll = allScope && SPACE_SECTIONS.includes(section);
   const briefKey = memberId ? `member:${memberId}`
-    : collectionId ? `course:${collectionId}` : section;
+    : collectionId ? `course:${collectionId}`
+    : spacesAll ? `${section}:all` : section;
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { rows } = useNotifications();
@@ -125,6 +133,7 @@ export default function AssistantBrief() {
 
   const meta = memberId ? FRAMES.member
     : collectionId ? FRAMES.course
+    : spacesAll ? { title: `All ${section}`, frame: `You are looking at EVERY ${section.replace(/s$/, '')} on Lichen, not just the member's own. Two jobs: say what has newly appeared or grown, and flag the few that look like a genuine fit for THIS member — name why, from what you were given (their web, what they already belong to, what they offer). Never pad the list to look useful: two real suggestions beat eight. Never imply they should join anything.` }
     : (FRAMES[section] ?? FRAMES.home);
   // The person's name arrives fast and cheap so the header reads right even
   // on a cache hit.
@@ -144,6 +153,9 @@ export default function AssistantBrief() {
     if (collectionId) {
       return { snapshot: {}, fingerprint: `course:${collectionId}:${new Date().toISOString().slice(0, 10)}` };
     }
+    if (spacesAll) {
+      return { snapshot: {}, fingerprint: `${section}:all:${new Date().toISOString().slice(0, 10)}` };
+    }
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as Section };
     const scoped = rows.filter((r) => scope.kind === 'global'
@@ -159,7 +171,7 @@ export default function AssistantBrief() {
     // the cached text was written — refetch instead of showing old news.
     return { snapshot: { notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, section, memberId, collectionId]);
+  }, [rows, section, memberId, collectionId, spacesAll]);
 
   function refresh() {
     cache.delete(briefKey);
@@ -176,7 +188,7 @@ export default function AssistantBrief() {
       let desk: Record<string, number> | undefined;
       let deskNames: Record<string, string> | undefined;
       try {
-        if (memberId || collectionId) throw new Error('scoped brief — no desks');
+        if (memberId || collectionId || spacesAll) throw new Error('scoped brief — no desks');
         const d = await listMyAdminDeskCounts(me);
         if (Object.keys(d.counts).length) {
           const spaces = await listMyMemberSpaces(me);
@@ -318,6 +330,31 @@ export default function AssistantBrief() {
             found.push({ label: c.name, to: `/collections/${collectionId}` });
             lessons.forEach((l) => { if (l.title) found.push({ label: l.title, to: `/posts/${l.id}` }); });
           }
+        }
+        if (spacesAll) {
+          // EVERY one of the kind, plus enough about the member to judge fit
+          // — their own memberships and their web. RLS-scoped throughout;
+          // `findable` is honoured by listSpacesByKind itself.
+          const KIND = section === 'communities' ? 'community'
+            : section === 'groups' ? 'group'
+            : section === 'organizations' ? 'organization' : 'place';
+          const [all, { data: mineRows }, { web }] = await Promise.all([
+            listSpacesByKind(KIND as 'community' | 'group' | 'organization' | 'place'),
+            supabase.from('space_members').select('space_id').eq('profile_id', me),
+            loadMyWeb(),
+          ]);
+          const mineIds = new Set(((mineRows as { space_id: string }[] | null) ?? []).map((r) => r.space_id));
+          extras.every_one_of_them = all.map((sp) => ({
+            name: sp.name,
+            about: sp.description ?? undefined,
+            members: sp.member_count,
+            nested_in: sp.parent?.name ?? undefined,
+            where: sp.location ?? undefined,
+            you_belong: mineIds.has(sp.id),
+            in_your_web: web.has('space:' + sp.id),
+          }));
+          extras.where_you_already_are = all.filter((sp) => mineIds.has(sp.id)).map((sp) => sp.name);
+          all.forEach((sp) => found.push({ label: sp.name, to: `/spaces/${sp.id}` }));
         }
         if (section === 'market' || section === 'home') {
           const { data: mine } = await supabase.from('posts')
