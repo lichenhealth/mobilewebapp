@@ -5,6 +5,7 @@ import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import AssistantDoor from '../components/AssistantDoor';
 import { Icon } from '../components/Icon';
+import ScopeBack from '../components/ScopeBack';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useAuth } from '../auth/AuthProvider';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -213,6 +214,7 @@ export default function Events() {
 
   return (
     <div className="evt">
+      <ScopeBack />
       {/* Scoped: a slim header in place of the personal tabs — back to the
           entity, "{Name}'s Events". */}
       {scoped ? (

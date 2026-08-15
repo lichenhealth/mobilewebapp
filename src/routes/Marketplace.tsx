@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
+import ScopeBack from '../components/ScopeBack';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useActing } from '../acting/ActingProvider';
 import { possessive } from '../lib/names';
@@ -333,6 +334,7 @@ export default function Marketplace() {
 
   return (
     <div className="mkt">
+      <ScopeBack />
       <header className="mkt__head">
         {scoped && (
           <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { supabase } from '../lib/supabase';
 import { areaLabel } from '../lib/locationApi';
 import { Icon, iconSvgMarkup, type IconName } from '../components/Icon';
+import ScopeBack from '../components/ScopeBack';
 import AssistantDoor from '../components/AssistantDoor';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
@@ -64,6 +65,14 @@ const KIND_LAYER: Record<SpaceKind, LayerKey> = {
 
 export default function MapView() {
   const navigate = useNavigate();
+  // ?space= / ?member= / ?event= — arrive pointed AT something (founder
+  // 2026-08-15: a space's Place door dropped you on a map of everything
+  // nearby, with no way to tell which pin was theirs). Flies to that pin
+  // and opens its own popup, so the answer is on screen.
+  const [mapParams] = useSearchParams();
+  const focusSpace = mapParams.get('space');
+  const focusMember = mapParams.get('member');
+  const focusEvent = mapParams.get('event');
   const { user } = useAuth();
   const me = user?.id ?? '';
   const mapEl = useRef<HTMLDivElement>(null);
@@ -268,10 +277,48 @@ export default function MapView() {
     }
   }, [visibleEvents, visibleSpaces, visiblePeople, visibleBiz, navigate]);
 
+  // Wait for the marker to exist (they're rebuilt whenever pins/layers
+  // change), then fly once. `done` keeps a later re-render from yanking the
+  // map back while someone is panning around.
+  const focusedOnce = useRef(false);
+  useEffect(() => {
+    if (focusedOnce.current) return;
+    if (focusSpace) {
+      const sp = spacePins.find((x) => x.id === focusSpace);
+      if (sp?.lat != null && sp?.lng != null) {
+        focusedOnce.current = true;
+        window.setTimeout(() => flyTo(sp.lng!, sp.lat!, 14, `spc:${sp.id}`), 350);
+      }
+      return;
+    }
+    if (focusMember) {
+      const biz = bizPins.find((b) => b.profile_id === focusMember);
+      if (biz) {
+        focusedOnce.current = true;
+        window.setTimeout(() => flyTo(biz.lng, biz.lat, 14, `biz:${biz.id}`), 350);
+        return;
+      }
+      const per = peoplePins.find((m) => m.id === focusMember);
+      if (per?.lat != null && per?.lng != null) {
+        focusedOnce.current = true;
+        window.setTimeout(() => flyTo(per.lng!, per.lat!, 14, `usr:${per.id}`), 350);
+      }
+      return;
+    }
+    if (focusEvent) {
+      const ev = eventPins.find((e) => e.post.id === focusEvent);
+      if (ev) {
+        focusedOnce.current = true;
+        window.setTimeout(() => flyTo(ev.lng, ev.lat, 14, `evt:${ev.post.id}`), 350);
+      }
+    }
+  }, [focusSpace, focusMember, focusEvent, spacePins, peoplePins, bizPins, eventPins, flyTo]);
+
   const totalPins = eventPins.length + spacePins.length + peoplePins.length + bizPins.length;
 
   return (
     <div className="mapv">
+      <ScopeBack />
       {/* One anatomy everywhere (founder 2026-08-15): acting doors on the left
           in Home's order — Search · + · AI — then a hairline, then this
           room's own lenses. */}

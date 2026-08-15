@@ -717,7 +717,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         // Pinned on the map? Then Places is one of this space's rooms, and it
         // earns a door like any other (founder 2026-08-15) — no separate CTA.
         ...(pinned
-          ? [{ icon: 'location' as const, label: 'Place', onClick: () => navigate('/maps') }]
+          ? [{ icon: 'location' as const, label: 'Place', onClick: () => navigate(`/maps?space=${space.id}`) }]
           : []),
         { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
       ]}

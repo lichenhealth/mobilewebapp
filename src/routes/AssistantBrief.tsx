@@ -67,6 +67,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   places: { title: 'Your places', frame: 'You help them tend the places they steward or gather in.' },
   events: { title: 'Events', frame: 'You help them gather: invitations, RSVPs, what is coming up.' },
   membership: { title: 'Membership', frame: 'You help them steward their stake in the commons.' },
+  maps: { title: 'The map', frame: 'You help them see what has appeared around them: places newly pinned, gatherings with a location coming up, and members who have put themselves on the map. Lead with what is NEW since they last looked, then what is worth going to. Never guess at distances you were not given.' },
   saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
   // ONE PERSON, not a section (founder 2026-08-14: "like getting a briefing
@@ -306,6 +307,31 @@ export default function AssistantBrief() {
             const rem = await listReminders(me);
             const due = remindersOn(rem, today).map((r) => r.title).slice(0, 8);
             if (due.length) extras.reminders_today = due;
+          }
+        }
+        if (section === 'maps') {
+          // What has appeared on the map lately — all RLS-scoped, so this is
+          // only ever what this member may already see.
+          const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString();
+          const { data: newSpaces } = await supabase.from('spaces')
+            .select('id, name, kind, location, created_at')
+            .not('lat', 'is', null).eq('findable', true)
+            .gte('created_at', monthAgo).order('created_at', { ascending: false }).limit(10);
+          const sp = (newSpaces as { id: string; name: string; kind: string; location: string | null; created_at: string }[] | null) ?? [];
+          if (sp.length) {
+            extras.newly_pinned_places = sp.map((x) => ({ name: x.name, kind: x.kind, where: x.location ?? undefined, since: x.created_at.slice(0, 10) }));
+            sp.forEach((x) => found.push({ label: x.name, to: `/spaces/${x.id}` }));
+          }
+          const { data: locEvents } = await supabase.from('posts')
+            .select('id, title, details, created_at')
+            .contains('service_areas', ['events'])
+            .gte('created_at', monthAgo).order('created_at', { ascending: false }).limit(20);
+          const withPlace = ((locEvents as { id: string; title: string | null; details: { location?: string; geo?: unknown; aiExcluded?: boolean } | null }[] | null) ?? [])
+            .filter((p) => !p.details?.aiExcluded && (p.details?.geo || p.details?.location));
+          if (withPlace.length) {
+            extras.gatherings_with_a_place = withPlace.slice(0, 8)
+              .map((p) => ({ title: p.title || 'A gathering', where: p.details?.location ?? 'mapped' }));
+            withPlace.slice(0, 8).forEach((p) => { if (p.title) found.push({ label: p.title, to: `/events/${p.id}` }); });
           }
         }
         if (section === 'events') {

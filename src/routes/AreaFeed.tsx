@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { webAuthorFilter } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
+import ScopeBack from '../components/ScopeBack';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { possessive } from '../lib/names';
 import FeedCard from '../components/FeedCard';
@@ -209,11 +210,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   return (
     <div className="mkt">
       <header className="mkt__head">
-        {scoped && (
-          <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
-            <Icon name="arrow-left" size={14} /> {memberName || 'Back'}
-          </button>
-        )}
+        {/* One implementation of the way back (founder 2026-08-15 made this a
+            platform rule) — AreaFeed's bespoke version was its precedent. */}
+        <ScopeBack />
         <p className="mkt__crumb">
           {/* Filtered is still the whole section, narrowed — the door back
               to all of it sits left of the mark (founder 2026-08-11). */}

@@ -1,0 +1,11 @@
+/* The way back to whose view you're in — quiet, and always in the same
+   place, so it reads as chrome rather than content (founder 2026-08-15). */
+.scope-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 0 var(--s-5) var(--s-2);
+  padding: 5px 12px; border-radius: var(--r-full);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 12px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.scope-back:hover { border-color: var(--peach); color: var(--peach-deep); }
+.scope-back svg { color: var(--peach-deep); }

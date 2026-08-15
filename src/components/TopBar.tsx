@@ -174,9 +174,16 @@ export default function TopBar({
         {section && section.prefix !== '/profile' && (
           <button
             className="top-bar__icon"
-            onClick={() => navigate('/home')}
-            aria-label="Back to Home"
-            title="Back to Home"
+            onClick={() => {
+              // A REAL back button (founder 2026-08-15: opening Maps from
+              // Melanie's page and pressing back dumped you on Home). React
+              // Router stamps an index on each in-app entry — anything above
+              // zero means there's a Lichen page behind us to return to.
+              const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+              if (idx > 0) navigate(-1); else navigate('/home');
+            }}
+            aria-label="Back"
+            title="Back"
           >
             <Icon name="arrow-left" size={18} />
           </button>
