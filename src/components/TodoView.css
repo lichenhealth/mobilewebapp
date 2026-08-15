@@ -73,3 +73,9 @@
   font-size: 11px; color: var(--ink-muted); white-space: nowrap;
 }
 .todo__chip--who { color: var(--peach-deep); border-color: var(--peach); }
+
+/* Who else is on this task — said outright, no click-through */
+.todo__with {
+  margin-left: 8px; font-size: 10.5px; color: var(--peach-deep);
+  font-family: var(--font-mono); letter-spacing: 0.02em;
+}

@@ -33,6 +33,35 @@ async function writeRecipients(reminderId: string, recipients: Recipient[]): Pro
   }
 }
 
+/** Recipients for MANY reminders at once, name-resolved — the To-Do list
+ *  says who's on a task without a click-through (founder 2026-08-14), so it
+ *  must not cost one query per row. */
+export async function loadRecipientsFor(ids: string[]): Promise<Map<string, Recipient[]>> {
+  const out = new Map<string, Recipient[]>();
+  if (ids.length === 0) return out;
+  const { data } = await supabase.from('reminder_recipients')
+    .select('reminder_id, recipient_type, recipient_id').in('reminder_id', ids);
+  const rows = (data as { reminder_id: string; recipient_type: 'profile' | 'space'; recipient_id: string }[] | null) ?? [];
+  if (rows.length === 0) return out;
+  const profIds = [...new Set(rows.filter((r) => r.recipient_type === 'profile').map((r) => r.recipient_id))];
+  const spaceIds = [...new Set(rows.filter((r) => r.recipient_type === 'space').map((r) => r.recipient_id))];
+  const [profs, spaces] = await Promise.all([
+    profIds.length ? supabase.from('profiles').select('id, full_name').in('id', profIds) : Promise.resolve({ data: [] }),
+    spaceIds.length ? supabase.from('spaces').select('id, name').in('id', spaceIds) : Promise.resolve({ data: [] }),
+  ]);
+  const pName = new Map(((profs.data as { id: string; full_name: string | null }[] | null) ?? []).map((p) => [p.id, p.full_name ?? 'Member']));
+  const sName = new Map(((spaces.data as { id: string; name: string }[] | null) ?? []).map((x) => [x.id, x.name]));
+  for (const r of rows) {
+    const list = out.get(r.reminder_id) ?? [];
+    list.push({
+      type: r.recipient_type, id: r.recipient_id,
+      name: r.recipient_type === 'profile' ? pName.get(r.recipient_id) : sName.get(r.recipient_id),
+    });
+    out.set(r.reminder_id, list);
+  }
+  return out;
+}
+
 /** Recipients of a reminder, name-resolved (for the edit composer). */
 export async function loadReminderRecipients(reminderId: string): Promise<Recipient[]> {
   const { data } = await supabase.from('reminder_recipients')

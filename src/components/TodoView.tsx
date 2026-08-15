@@ -6,6 +6,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
 import { listTodos, createTodo, setTodoDone, deleteTodo, type Todo } from '../lib/todosApi';
 import { visibleTasksOf, type VisibleTasks } from '../lib/tasksApi';
+import { loadRecipientsFor } from '../lib/remindersApi';
 import { parseTask, resolveAssignees } from '../lib/taskParse';
 import { createReminder, type Recipient } from '../lib/remindersApi';
 import { supabase } from '../lib/supabase';
@@ -89,6 +90,19 @@ export default function TodoView({
     setTodos((cur) => cur.filter((x) => x.id !== t.id));
     void deleteTodo(t.id).catch(console.error);
   };
+
+  // Who's on each task — loaded for the whole list at once so the rows can
+  // say it outright (founder 2026-08-14: "showing Gabe is included on the
+  // task, versus the click thru only").
+  const [onTask, setOnTask] = useState<Map<string, { id: string; name?: string }[]>>(new Map());
+  const remIdKey = reminders.map((r) => r.id).join(',');
+  useEffect(() => {
+    const ids = reminders.map((r) => r.id);
+    if (!ids.length) { setOnTask(new Map()); return; }
+    let live = true;
+    void loadRecipientsFor(ids).then((m) => { if (live) setOnTask(m); });
+    return () => { live = false; };
+  }, [remIdKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Someone else's list, if their rules admit you.
   const [peerQ, setPeerQ] = useState('');
@@ -193,9 +207,14 @@ export default function TodoView({
                     <button className="todo__title todo__title--btn" onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}>
                       {r.title}
                       {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
-                      {r.profile_id !== me && (
+                      {r.profile_id !== me ? (
                         <span className="todo__from">from {r.owner?.full_name ?? 'a member'}</span>
-                      )}
+                      ) : (onTask.get(r.id)?.length ? (
+                        <span className="todo__with">
+                          with {onTask.get(r.id)!.slice(0, 2).map((x) => x.name ?? 'someone').join(', ')}
+                          {onTask.get(r.id)!.length > 2 ? ` +${onTask.get(r.id)!.length - 2}` : ''}
+                        </span>
+                      ) : null)}
                     </button>
                     {r.profile_id !== me && onLeave && (
                       <button
