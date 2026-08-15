@@ -57,6 +57,7 @@ const isoDate = (y: number, mo: number, d: number) => `${y}-${pad(mo)}-${pad(d)}
 interface IcsTime { utc: number | null; date: string | null } // timed instant OR all-day date
 interface IcsEvent {
   uid: string;
+  url?: string;
   recurrenceId: string | null;    // raw value — marks an override instance
   start: IcsTime; end: IcsTime | null;
   durationMs: number | null;
@@ -119,6 +120,7 @@ function parseIcs(ics: string, fallbackTz: string): IcsEvent[] {
     const params = paramParts.join(';');
     switch (prop) {
       case 'UID': cur.uid = value; break;
+      case 'URL': cur.url = value.slice(0, 500); break;   // a door back to the source, when the file gives one
       case 'SUMMARY': cur.title = value.replace(/\\([,;nN\\])/g, (_, c) => (c === 'n' || c === 'N' ? ' ' : c)).slice(0, 200); break;
       case 'DTSTART': cur.start = parseIcsTime(params, value, fallbackTz); break;
       case 'DTEND': cur.end = parseIcsTime(params, value, fallbackTz); break;
@@ -139,7 +141,7 @@ function parseIcs(ics: string, fallbackTz: string): IcsEvent[] {
 }
 
 // ─── Expansion into per-day busy rows ────────────────────────────────────────
-interface BusyRow { on_date: string; all_day: boolean; start_min: number | null; end_min: number | null; title: string }
+interface BusyRow { on_date: string; all_day: boolean; start_min: number | null; end_min: number | null; title: string; source_url?: string | null }
 
 const DAY_MS = 86400000;
 const BYDAY: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
@@ -210,13 +212,13 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
   for (const ev of events) if (ev.recurrenceId && ev.uid) overridden.add(ev.uid + ':' + ev.recurrenceId);
 
   const rows: BusyRow[] = [];
-  const push = (startUtc: number, durMs: number, allDay: boolean, dateOnly: string | null, title: string) => {
+  const push = (startUtc: number, durMs: number, allDay: boolean, dateOnly: string | null, title: string, srcUrl: string | null = null) => {
     if (allDay && dateOnly) {
       const days = Math.max(1, Math.round(durMs / DAY_MS));
       const baseT = Date.parse(dateOnly + 'T00:00:00Z');
       for (let i = 0; i < Math.min(days, 60); i++) {
         const dd = new Date(baseT + i * DAY_MS);
-        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title });
+        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title, source_url: srcUrl });
       }
       return;
     }
@@ -229,7 +231,7 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
       const dayEndUtc = cursor + (1440 - w.min) * 60000;
       const segEnd = Math.min(endUtc, dayEndUtc);
       const endWall = w.min + Math.round((segEnd - cursor) / 60000);
-      rows.push({ on_date: isoDate(w.y, w.mo, w.d), all_day: false, start_min: w.min, end_min: Math.min(1440, endWall), title });
+      rows.push({ on_date: isoDate(w.y, w.mo, w.d), all_day: false, start_min: w.min, end_min: Math.min(1440, endWall), title, source_url: srcUrl });
       cursor = segEnd;
     }
   };
@@ -249,7 +251,7 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
       // An override instance — emit directly.
       const startT = ev.start.utc ?? Date.parse(ev.start.date + 'T00:00:00Z');
       if (startT <= windowEnd && startT + durMs >= windowStart) {
-        push(startT, durMs, isAllDay, ev.start.date, ev.title);
+        push(startT, durMs, isAllDay, ev.start.date, ev.title, ev.url ?? null);
       }
       continue;
     }
@@ -259,7 +261,7 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
       if (ev.exdates.has(ymd)) continue;
       if (ev.uid && overridden.has(ev.uid + ':' + ymd)) continue;
       const dateOnly = isAllDay ? isoDate(key.getUTCFullYear(), key.getUTCMonth() + 1, key.getUTCDate()) : null;
-      push(t, durMs, isAllDay, dateOnly, ev.title);
+      push(t, durMs, isAllDay, dateOnly, ev.title, ev.url ?? null);
     }
   }
   return rows.slice(0, 4000);
@@ -270,7 +272,7 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
 // and fresher than the secret-ICS feed. Tokens live in a deny-all table; only
 // this service-role path can read them.
 function googleItemsToRows(
-  items: { status?: string; summary?: string;
+  items: { status?: string; summary?: string; htmlLink?: string;
     start?: { date?: string; dateTime?: string };
     end?: { date?: string; dateTime?: string } }[],
   tz: string,
@@ -279,13 +281,14 @@ function googleItemsToRows(
   for (const it of items) {
     if (it.status === 'cancelled') continue;
     const title = (it.summary ?? '').slice(0, 200);
+    const source_url = it.htmlLink ?? null;   // Google's direct link to this event
     if (it.start?.date) {
       const startT = Date.parse(it.start.date + 'T00:00:00Z');
       const endT = it.end?.date ? Date.parse(it.end.date + 'T00:00:00Z') : startT + DAY_MS;
       const days = Math.max(1, Math.round((endT - startT) / DAY_MS));
       for (let i = 0; i < Math.min(days, 60); i++) {
         const dd = new Date(startT + i * DAY_MS);
-        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title });
+        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title, source_url });
       }
     } else if (it.start?.dateTime) {
       let cursor = Date.parse(it.start.dateTime);
@@ -296,7 +299,7 @@ function googleItemsToRows(
         const segEnd = Math.min(endUtc, cursor + (1440 - w.min) * 60000);
         rows.push({
           on_date: isoDate(w.y, w.mo, w.d), all_day: false,
-          start_min: w.min, end_min: Math.min(1440, w.min + Math.round((segEnd - cursor) / 60000)), title,
+          start_min: w.min, end_min: Math.min(1440, w.min + Math.round((segEnd - cursor) / 60000)), title, source_url,
         });
         cursor = segEnd;
       }
@@ -331,7 +334,7 @@ async function fetchGoogleRows(
   for (let page = 0; page < 3; page++) {
     const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
       + `?timeMin=${new Date(windowStart).toISOString()}&timeMax=${new Date(windowEnd).toISOString()}`
-      + '&singleEvents=true&maxResults=2500&fields=items(status,summary,start,end),nextPageToken'
+      + '&singleEvents=true&maxResults=2500&fields=items(status,summary,start,end,htmlLink),nextPageToken'
       + (pageToken ? `&pageToken=${pageToken}` : '');
     const res = await fetch(url, { headers: { Authorization: `Bearer ${access_token}` } });
     if (!res.ok) throw new Error(`Google Calendar answered ${res.status}`);

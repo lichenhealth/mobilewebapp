@@ -618,3 +618,10 @@
 .calp__calchip--holds .calp__ovx { color: inherit; opacity: 0.8; margin: -2px -4px -2px 0; }
 .calp__ovchip { cursor: pointer; }
 .calp__ovchip.is-off { opacity: 0.5; background: transparent; }
+
+/* The way back to an imported event's home calendar */
+.calp__sheet-extlink {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 12.5px; color: var(--peach-deep); text-decoration: none;
+}
+.calp__sheet-extlink:hover { text-decoration: underline; }

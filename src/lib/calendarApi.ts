@@ -32,6 +32,12 @@ export interface EventRow {
   external?: boolean;
   /** Per-source hue for layered-calendar rendering (external rows). */
   tint?: string;
+  /** Direct link back to this event where it actually lives (Google's
+   *  htmlLink, or an ICS URL) — "edit it there" needs a there to go to
+   *  (founder 2026-08-14). */
+  sourceUrl?: string | null;
+  /** Which imported calendar this row came from (external rows only). */
+  extCalId?: string;
 }
 
 const EVENT_COLS =
@@ -439,13 +445,14 @@ export interface ExternalBusyRow {
   start_min: number | null;
   end_min: number | null;
   title: string | null;
+  source_url?: string | null;
 }
 
 /** The owner's own imported blocks (titles included) for the calendar grid. */
 export async function loadMyExternalBusy(me: string, from: string, to: string): Promise<ExternalBusyRow[]> {
   const { data, error } = await supabase
     .from('external_busy')
-    .select('id, calendar_id, on_date, all_day, start_min, end_min, title')
+    .select('id, calendar_id, on_date, all_day, start_min, end_min, title, source_url')
     .eq('profile_id', me)
     .gte('on_date', from)
     .lte('on_date', to);

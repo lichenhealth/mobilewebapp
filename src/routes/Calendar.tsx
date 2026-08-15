@@ -116,7 +116,7 @@ export default function Calendar() {
   // (founder 2026-08-14: the chip row must tell the truth about every source
   // on the grid — Google used to ride Mine invisibly).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
-  const [extCals, setExtCals] = useState<{ id: string; name: string }[]>([]);
+  const [extCals, setExtCals] = useState<{ id: string; name: string; url: string }[]>([]);
   // The Bookings door earns its slot: only once you've set up something
   // bookable (founder 2026-08-14). The hub stays reachable from profiles.
   const [hasBookables, setHasBookables] = useState(false);
@@ -129,7 +129,7 @@ export default function Calendar() {
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
   useEffect(() => {
     if (!me) return;
-    (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name }))))();
+    (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name, url: c.url }))))();
   }, [me]);
   // Follows whoever the TopBar says you're acting as (founder 2026-08-10) —
   // acting as a space shows ITS calendar, not "Mine" (Galyn's) by default.
@@ -254,6 +254,7 @@ export default function Calendar() {
           start_date: b.on_date, end_date: b.on_date, all_day: b.all_day,
           start_min: b.start_min, end_min: b.end_min, recurrence: null,
           created_at: '', external: true, tint: colorFor('extcal:' + b.calendar_id),
+          sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
         });
       }
     }
@@ -545,6 +546,31 @@ export default function Calendar() {
     ]));
   };
   const onColCancel = () => { dragRef.current = null; setDrag(null); };
+
+  /** Where an imported block came from, and what to call the way back. The
+   *  per-event link when the source gave one; otherwise that day in the
+   *  source calendar (we know the source from the calendar's stored url). */
+  const externalDoor = (e: EventRow): { href: string; label: string } | null => {
+    if (!e.external) return null;
+    if (e.sourceUrl) {
+      const host = extHostOf(e);
+      return { href: e.sourceUrl, label: host === 'google' ? 'Open in Google Calendar' : 'Open where it lives' };
+    }
+    const host = extHostOf(e);
+    if (host !== 'google') return null;
+    const d = localDate(e.start_date);
+    return {
+      href: `https://calendar.google.com/calendar/u/0/r/day/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`,
+      label: 'Open that day in Google Calendar',
+    };
+  };
+  /** Which service an imported row came from — 'google:<id>' for the OAuth
+   *  connection, else sniffed from the ICS host. */
+  const extHostOf = (e: EventRow): 'google' | 'other' => {
+    const cal = extCals.find((c) => c.id === e.extCalId);
+    if (!cal) return 'other';
+    return cal.url.startsWith('google:') || cal.url.includes('calendar.google.com') ? 'google' : 'other';
+  };
 
   const gridCols = { gridTemplateColumns: `44px repeat(${days.length}, 1fr)` };
 
@@ -1065,7 +1091,22 @@ export default function Calendar() {
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
             {selected.external && (
-              <p className="calp__sheet-ext">Imported from your external calendar — edit it there; Lichen re-syncs on its own.</p>
+              <>
+                <p className="calp__sheet-ext">Imported from your external calendar — edit it there; Lichen re-syncs on its own.</p>
+                {/* A door back to where it actually lives (founder 2026-08-14).
+                    Google hands us a per-event link; an ICS may carry one.
+                    With neither, we still land you on the right DAY in the
+                    source calendar rather than leaving you to hunt. */}
+                {externalDoor(selected) && (
+                  <a
+                    className="calp__sheet-extlink"
+                    href={externalDoor(selected)!.href}
+                    target="_blank" rel="noopener noreferrer"
+                  >
+                    <Icon name="arrow-right" size={13} /> {externalDoor(selected)!.label}
+                  </a>
+                )}
+              </>
             )}
             {selected.location && <SmartLocation loc={selected.location} className="calp__sheet-loc" />}
             {selected.description && <p className="calp__sheet-desc"><LinkifiedText text={selected.description} /></p>}
