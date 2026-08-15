@@ -455,3 +455,32 @@
 }
 .feed-card__trust:hover { color: var(--ink); }
 .feed-card__trust.is-on { color: var(--peach-deep); }
+
+/* AN ACTIVITY LINE, NOT A STORY (founder 2026-08-15) — course material
+   reaches the feed as the fact that it arrived, and opens on its own page. */
+.feed-activity {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 10px 12px; background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+}
+.feed-activity__who { background: none; border: 0; padding: 0; cursor: pointer; flex-shrink: 0; }
+.feed-activity__line {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; text-align: left; color: inherit;
+}
+.feed-activity__line:disabled { cursor: default; }
+.feed-activity__said { font-size: 11.5px; color: var(--ink-soft); }
+.feed-activity__said strong { color: var(--ink); font-weight: 600; }
+.feed-activity__what {
+  font-size: 13.5px; color: var(--ink); line-height: 1.3;
+  /* Wraps to two lines rather than truncating — the app-shell column stays
+     430px well past 1024px, so a viewport media query can't tell how much
+     room this row actually has. Never guess; just let it wrap. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+/* A row, not a card: an activity line spans the feed's columns rather than
+   sitting in one, so a list of them reads as a list (the same reason member
+   rows never go multi-column) and a title never truncates to fit a column. */
+.feed-card-shell--activity { grid-column: 1 / -1; }

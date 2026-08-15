@@ -155,6 +155,16 @@ export function postToCard(
     // A Library piece hosted outside Lichen (founder 2026-08-10).
     isResource: p.details?.isResource === true,
     isCollection: typeof (p.details as { collectionId?: unknown } | null)?.collectionId === 'string',
+    // COURSE MATERIAL IS NOT A STORY (founder 2026-08-15). A lesson published
+    // to Courses reaches the feed as the event that it arrived — "Galyn posted
+    // … to the course library" — and opens the lesson. A post that CARRIES a
+    // collection (the door-post a publish mints) is the announcement itself,
+    // so it keeps its card.
+    activity: (p.service_areas ?? []).includes('courses')
+      && typeof (p.details as { collectionId?: unknown } | null)?.collectionId !== 'string'
+      ? 'posted to the course library'
+      : undefined,
+    activityWho: name,
     authorIsSpace: !!p.author_space,
     areaDoors,
     // The My-celium eyebrow tells you WHY a post reached you — someone shared

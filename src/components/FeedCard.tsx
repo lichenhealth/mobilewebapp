@@ -29,6 +29,15 @@ export interface FeedCardProps {
   /** details.collectionId — this post is a collection's door; tapping it
    *  opens the whole collection (founder 2026-08-14). */
   isCollection?: boolean;
+  /** THE FEED IS WHAT HAPPENED, NOT THE THING ITSELF (founder 2026-08-15:
+   *  "Galyn posted Module 6 to the course library, and it takes you to
+   *  module 6. Module 6's content is not a story"). When set, the card
+   *  renders as a single activity line — who did what, where — instead of
+   *  unrolling material that belongs on its own page. */
+  activity?: string;
+  /** Plain name for the activity line — "Galyn Burke posted…" reads as
+   *  something that happened; "@galyn-burke posted…" reads as metadata. */
+  activityWho?: string;
   body: string;
   // Image-badge column on the right
   image?: {
@@ -102,6 +111,8 @@ export default function FeedCard({
   demo,
   isResource,
   isCollection,
+  activity,
+  activityWho,
   body,
   image,
   mycelium,
@@ -157,6 +168,30 @@ export default function FeedCard({
       )}
     </div>
   );
+
+  // An activity line, not a story: the material stays on its own page and
+  // the feed just says it arrived. Everything else a card carries — trust,
+  // recommend, save, the menu — belongs with the piece, so it lives there.
+  if (activity) {
+    return (
+      <div className={'feed-card-shell feed-card-shell--activity' + (demo ? ' feed-card-shell--demo' : '')}>
+        <article className="feed-activity">
+          {onAuthor ? (
+            <button className="feed-activity__who" onClick={onAuthor} aria-label={`Open ${handle}'s profile`}>
+              {avatarEl}
+            </button>
+          ) : avatarEl}
+          <button className="feed-activity__line" onClick={onOpen} disabled={!onOpen}>
+            <span className="feed-activity__said">
+              <strong>{activityWho ?? handle}</strong> {activity}
+            </span>
+            <span className="feed-activity__what">{title}</span>
+          </button>
+          <Icon name="chevron-right" size={13} />
+        </article>
+      </div>
+    );
+  }
 
   return (
     // The shell exists for the example bubble: the card itself clips overflow
