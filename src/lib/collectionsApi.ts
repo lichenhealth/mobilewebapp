@@ -31,6 +31,13 @@ export interface OfferingMeta {
    *  course never read by any assistant. Shown to students as a standing
    *  promise on the course page. */
   protectedTeaching?: boolean;
+  /** The three content promises, split out of the old single
+   *  `protectedTeaching` switch (founder 2026-08-15) so a teacher can hold
+   *  one thing closed without closing all three. Absent = open; the legacy
+   *  bundled flag still closes all three (see `contentPromises`). */
+  shareable?: boolean;
+  downloadable?: boolean;
+  aiReadable?: boolean;
 }
 
 export interface CollectionRow {

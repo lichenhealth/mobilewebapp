@@ -85,6 +85,11 @@ export default function Calendar() {
   // Arrived via Events > My Calendar → offer the way back (maps' ?from= pattern)
   const [urlParams] = useSearchParams();
   const fromEvents = urlParams.get('from') === 'events';
+  // ONE CALENDAR, FILTERED (founder 2026-08-15): a course's cohort no longer
+  // carries its own "Find a time" door — it sends you here with `?space=<id>`,
+  // which lands the grid on that cohort's calendar alone. Find-a-time is a
+  // feature of Calendar, not a separate room per group.
+  const focusSpace = urlParams.get('space');
   const today = todayISO();
 
   // Schedule (agenda list) is the phone default — a 7-column grid through a
@@ -137,11 +142,12 @@ export default function Calendar() {
   // your time too); as a space, the space's calendar stands alone.
   const extKey = extCals.map((c) => c.id).join(',');
   useEffect(() => {
+    if (focusSpace) { setSelectedCals([focusSpace]); return; }
     setSelectedCals(actor.type === 'space'
       ? [actor.id]
       : ['me', ...extCals.map((c) => 'ext:' + c.id)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actor, extKey]);
+  }, [actor, extKey, focusSpace]);
   const [overlayOn, setOverlayOn] = useState(false);
   // Find-a-time spans EVERY selected space (founder 2026-07-22): the more
   // groups you add, the more availability narrows toward when ALL their

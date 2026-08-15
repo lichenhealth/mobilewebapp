@@ -224,6 +224,10 @@
   padding: 2px; display: inline-flex; line-height: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
+/* The mycelium mark draws on transparent — give it the same bone disc an
+   avatar brings with it so both badges read as one shape. */
+.top-bar__scope-badge--web { padding: 3px; }
+.top-bar__scope-badge--web svg { display: block; }
 
 /* Signed out, the chip says so instead of showing a "?" avatar — a lost
    session should read as a state with one obvious door, not as breakage. */

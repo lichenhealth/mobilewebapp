@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import CollapsibleSection from '../components/CollapsibleSection';
 import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
 import OfferingChips from '../components/OfferingChips';
@@ -59,9 +60,7 @@ export default function CollectionPage() {
   const [enrolled, setEnrolled] = useState(false);
   const [done, setDone] = useState<Set<string>>(new Set());
   // owner editing
-  const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
   const [newModuleName, setNewModuleName] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -107,9 +106,35 @@ export default function CollectionPage() {
   }, [id, me]);
   useEffect(() => { void load(); }, [load]);
 
+  /** The three content promises. Absent = open; the legacy bundled
+   *  `protectedTeaching` flag closes all three, so old courses keep the
+   *  promise they were published under. */
+  function promises(d: OfferingMeta) {
+    const legacy = !!d.protectedTeaching;
+    return {
+      shareable:    legacy ? false : d.shareable !== false,
+      downloadable: legacy ? false : d.downloadable !== false,
+      aiReadable:   legacy ? false : d.aiReadable !== false,
+    };
+  }
   const isOwner = !!me && meta?.owner_id === me;
   // The curators: the human who made it + any space admin stewarding this duty.
   const canEdit = isOwner || spaceDuty;
+  /** ADMIN VIEW vs PUBLIC VIEW (founder 2026-08-15): a course page used to
+   *  wear its whole toolbox — Edit / Add lessons / New cohort / Make private /
+   *  Delete — in front of every learner. Same split as Profile and a space's
+   *  backstage now: `?manage=1` is where everything is edited, in the same
+   *  CollapsibleSection accordion, and the page itself reads as the course.
+   *  One "Manage this course" pill is the door. */
+  const [pageParams] = useSearchParams();
+  const managing = canEdit && pageParams.get('manage') === '1';
+  // Accordion state — independent sections, same as Profile/SpaceProfile.
+  const [openSects, setOpenSects] = useState<Set<string>>(new Set());
+  const toggleSect = (k: string) => setOpenSects((cur) => {
+    const next = new Set(cur);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
 
   // ── Canvas-style modules (founder + Melanie 2026-07-26): named groups of
   // lessons, stored in details.modules — display groups + owner assignment.
@@ -301,7 +326,38 @@ export default function CollectionPage() {
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
 
-  const editing = canEdit && editOpen;
+  // What the header says about the three promises — named plainly, so a
+  // student reads exactly which door is shut rather than one blanket word.
+  const pr = promises(meta.details);
+  const closed = [
+    !pr.shareable && 'Sharing',
+    !pr.downloadable && 'Downloads',
+    !pr.aiReadable && 'AI',
+  ].filter(Boolean) as string[];
+  const closedCount = closed.length;
+  const closedLabel = closed.length === 3 ? 'Sharing, downloads & AI'
+    : closed.join(' & ');
+
+  const editing = managing;
+  // ONE SAVE for the whole backstage (founder 2026-08-15: streamline the
+  // controls) — sections edit local state, the bar at the foot commits it.
+  const dirty = !!meta && (
+    name !== meta.name
+    || description !== (meta.description ?? '')
+    || JSON.stringify(form) !== JSON.stringify(meta.details ?? {})
+  );
+  function resetForm() {
+    if (!meta) return;
+    setName(meta.name);
+    setDescription(meta.description ?? '');
+    setForm(meta.details ?? {});
+  }
+  async function saveMeta() {
+    if (!meta) return;
+    const patch = { name: name.trim(), description: description.trim() || null, details: form };
+    await updateCollection(id, patch);
+    setMeta((m) => (m ? { ...m, ...patch } : m));
+  }
 
   return (
     <>
@@ -329,13 +385,13 @@ export default function CollectionPage() {
         </p>
         {meta.description && <p className="colp__desc">{meta.description}</p>}
         {structured && <OfferingChips meta={meta.details} lessonCount={posts.length} itemWord={itemWord(meta.kind)} />}
-        {meta.kind === 'course' && meta.details.protectedTeaching && (
+        {meta.kind === 'course' && closedCount > 0 && (
           /* One line by default; the WHY opens underneath — in the teacher's
              own words when they wrote some (founder 2026-08-05). */
           <div className="colp__protect">
             <button className="colp__protect-head" onClick={() => setWhyOpen((o) => !o)}
               aria-expanded={whyOpen}>
-              <span><strong>Downloads, recordings &amp; AI</strong> — disabled</span>
+              <span><strong>{closedLabel}</strong> &mdash; held closed</span>
               <Icon name={whyOpen ? 'chevron-left' : 'chevron-right'} size={13} />
             </button>
             {whyOpen && (
@@ -359,15 +415,15 @@ export default function CollectionPage() {
       {meta.kind === 'course' && myCohort && (
         <div className="colp__doors" role="toolbar" aria-label="Cohort">
           {myCohort.member && myCohort.chatId && (
-            <button className="colp__door" onClick={() => navigate(`/chat/${myCohort.chatId}`)}>
+            <button className="colp__door" onClick={() => navigate(`/chat/${myCohort.chatId}?from=/collections/${id}`)}>
               <span className="colp__door-circle"><Icon name="chat" size={14} /></span>
               <span className="colp__door-label">Chat</span>
             </button>
           )}
           {myCohort.member && (
-            <button className="colp__door" onClick={() => navigate('/calendar')}>
+            <button className="colp__door" onClick={() => navigate(`/calendar?space=${myCohort.id}`)}>
               <span className="colp__door-circle"><Icon name="calendar" size={14} /></span>
-              <span className="colp__door-label">Find a time</span>
+              <span className="colp__door-label">Calendar</span>
             </button>
           )}
           <button className="colp__door" onClick={() => navigate(`/spaces/${myCohort.id}?tab=events`)}>
@@ -387,28 +443,9 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {cohortOpen && canEdit && (
-        <div className="colp__cohortnew">
-          <input
-            className="colp__input"
-            value={cohortTerm}
-            onChange={(e) => setCohortTerm(e.target.value)}
-            placeholder="Name this turn — e.g. Colorado Kapulli 2026, Fall 2026, New hires Q3"
-            autoFocus
-          />
-          <button className="btn btn-primary colp__btn" disabled={busy} onClick={() => void act(startCohort)}>
-            Start it
-          </button>
-          <p className="colp__hint">
-            A cohort is a real group: its own chat, calendar and find-a-time. Members join
-            through the group&rsquo;s own consent flow, and the course keeps running after
-            this cohort finishes.
-          </p>
-        </div>
-      )}
 
       {/* Learner loop: enroll + progress (structured, signed-in non-curators, has lessons). */}
-      {structured && !canEdit && me && posts.length > 0 && (
+      {structured && !managing && me && posts.length > 0 && (
         <div className="colp__learn">
           {enrolled && (
             <div className="colp__progress">
@@ -432,207 +469,17 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {canEdit && (
-        <div className="colp__controls">
-          <button className="btn colp__btn" onClick={() => setEditOpen((o) => !o)}>
-            {editOpen ? 'Done' : 'Edit'}
-          </button>
-          {structured && (
-            <button className="btn colp__btn" onClick={() => void openLessonPicker()}>
-              {pickOpen ? 'Close' : `Add ${itemWord(meta.kind)}s`}
-            </button>
-          )}
-          {meta.kind === 'course' && (
-            <button className="btn colp__btn" disabled={busy}
-              title="A cohort is a real Lichen group — chat, events and find-a-time come with it"
-              onClick={() => setCohortOpen((o) => !o)}>
-              {cohortOpen ? 'Cancel' : cohorts.length ? 'New cohort' : 'Start a cohort'}
-            </button>
-          )}
-          {meta.is_public ? (
-            <button
-              className="btn btn-primary colp__btn"
-              disabled={busy}
-              onClick={() => void act(async () => {
-                await updateCollection(id, { is_public: false });
-                setMeta((m) => (m ? { ...m, is_public: false } : m));
-              })}
-            >
-              Make private
-            </button>
-          ) : (
-            <button
-              className="btn btn-primary colp__btn"
-              disabled={busy}
-              onClick={() => setPublishOpen((o) => !o)}
-            >
-              {publishOpen ? 'Not now' : 'Publish…'}
-            </button>
-          )}
-          <button
-            className="btn colp__btn colp__btn--danger"
-            disabled={busy}
-            onClick={() => setConfirmDelete((c) => !c)}
-          >
-            Delete
-          </button>
-        </div>
-      )}
 
       {/* PUBLISH TO ANY ROOM (founder 2026-08-14: "allow people to publish to
           whatever they want... then they are put through a posting process
           commensurate to the room they've chosen"): pick a room, the
           collection goes public, and Compose mints the post that carries it —
           shaped by that room's own flow. */}
-      {canEdit && publishOpen && !meta.is_public && (
-        <div className="colp__confirm colp__publish">
-          <span className="colp__confirm-text">
-            Where should it live? It becomes public, and you&rsquo;ll shape how it appears.
-          </span>
-          {([
-            { room: 'feed', label: 'Feed' },
-            { room: 'library', label: 'Library' },
-            { room: 'courses', label: 'Courses' },
-            { room: 'marketplace', label: 'Marketplace' },
-          ] as const).map(({ room, label }) => (
-            <button
-              key={room}
-              className="btn colp__btn"
-              disabled={busy}
-              onClick={() => void act(async () => {
-                await updateCollection(id, { is_public: true });
-                navigate(`/compose?collection=${id}${room === 'feed' ? '' : `&area=${room}`}`);
-              })}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Inline delete confirm — no browser dialog (founder 2026-07-24). */}
-      {canEdit && confirmDelete && (
-        <div className="colp__confirm">
-          <span className="colp__confirm-text">
-            Delete <em>&ldquo;{meta.name}&rdquo;</em>? The pieces themselves are untouched.
-          </span>
-          <button
-            className="btn colp__btn colp__btn--danger"
-            disabled={busy}
-            onClick={() => void act(async () => { await deleteCollection(id); navigate('/saved'); })}
-          >
-            Yes, delete
-          </button>
-          <button className="btn colp__btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
-        </div>
-      )}
 
-      {editing && (
-        <div className="colp__edit">
-          <input
-            className="prof__input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={`${kindWord(meta.kind)} name`}
-          />
-          <textarea
-            className="prof__textarea"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What is this for? What will people come away with? (shown when published)"
-          />
-          {structured && (
-            <div className="colp__meta-edit">
-              <span className="colp__meta-label">Level</span>
-              <div className="colp__chips">
-                {LEVELS.map((l) => (
-                  <button key={l} type="button"
-                    className={'colp__chip' + (form.level === l ? ' is-on' : '')}
-                    onClick={() => setForm((f) => ({ ...f, level: f.level === l ? undefined : l }))}>{l}</button>
-                ))}
-              </div>
-              <span className="colp__meta-label">Format</span>
-              <div className="colp__chips">
-                {FORMATS.map((l) => (
-                  <button key={l} type="button"
-                    className={'colp__chip' + (form.format === l ? ' is-on' : '')}
-                    onClick={() => setForm((f) => ({ ...f, format: f.format === l ? undefined : l }))}>{l}</button>
-                ))}
-              </div>
-              <input className="prof__input" value={form.length ?? ''} placeholder={`Length (e.g. 6 weeks, 4 ${itemWord(meta.kind)}s)`}
-                onChange={(e) => setForm((f) => ({ ...f, length: e.target.value || undefined }))} />
-              <input className="prof__input" value={form.forWhom ?? ''} placeholder="Who it's for (e.g. new practitioners)"
-                onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
-              <input className="prof__input" value={form.price ?? ''} placeholder="Price / access (e.g. Free, $120, Sliding $40–$120)"
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value || undefined }))} />
-              {meta.kind === 'course' && (
-                <label className="colp__protect-toggle">
-                  <input type="checkbox" checked={!!form.protectedTeaching}
-                    onChange={(e) => setForm((f) => ({ ...f, protectedTeaching: e.target.checked || undefined }))} />
-                  <span>
-                    <strong>Protected teaching</strong> — downloads off, recordings watermarked
-                    with each viewer's name, and this course is never read by any assistant.
-                    Shown to students as a standing promise.
-                  </span>
-                </label>
-              )}
-              {meta.kind === 'course' && form.protectedTeaching && (
-                <textarea className="prof__input colp__protect-note" rows={3}
-                  value={form.protectedNote ?? ''}
-                  placeholder="Why this teaching is held closed — in your words. Students see this when they open the line."
-                  onChange={(e) => setForm((f) => ({ ...f, protectedNote: e.target.value || undefined }))} />
-              )}
-              {meta.kind === 'course' && (
-                <>
-                  <span className="colp__meta-label">Modules</span>
-                  {(meta.details.modules ?? []).length > 0 && (
-                    <div className="colp__chips">
-                      {(meta.details.modules ?? []).map((m) => (
-                        <span key={m.title} className="colp__chip is-on colp__modchip">
-                          {m.title}
-                          <button className="colp__modchip-x" aria-label={`Remove module ${m.title}`}
-                            onClick={() => void act(() => removeModule(m.title))}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="colp__modadd">
-                    <input className="prof__input" value={newModuleName}
-                      onChange={(e) => setNewModuleName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') void act(addModule); }}
-                      placeholder="New module (e.g. Week 1 — Foundations)" />
-                    <button className="btn colp__btn" disabled={busy || !newModuleName.trim()}
-                      onClick={() => void act(addModule)}>Add module</button>
-                  </div>
-                  <p className="colp__addhint">Assign each lesson to a module with the selector beside it below.</p>
-                </>
-              )}
-            </div>
-          )}
-          <button
-            className="btn btn-primary colp__btn"
-            disabled={busy || !name.trim()}
-            onClick={() => void act(async () => {
-              await updateCollection(id, { name: name.trim(), description: description.trim() || null, details: form });
-              setMeta((m) => (m ? { ...m, name: name.trim(), description: description.trim() || null, details: form } : m));
-              setEditOpen(false);
-            })}
-          >
-            Save
-          </button>
-          {structured && (
-            <p className="colp__addhint">
-              Add {itemWord(meta.kind)}s: open any of your posts (or make one via{' '}
-              {meta.kind === 'course'
-                ? <Link to="/compose?area=courses">Teach</Link>
-                : <Link to="/compose?area=library">Contribute</Link>}),
-              tap ⋯ → “Add to collection…”, and pick this {kindWord(meta.kind).toLowerCase()}.
-            </p>
-          )}
-        </div>
-      )}
 
-      {me && pickOpen && (
+      {me && !canEdit && pickOpen && (
         <div className="colp__picker">
           {!canEdit && (
             <textarea
@@ -676,37 +523,339 @@ export default function CollectionPage() {
       )}
 
       {/* Pending suggestions — the curators decide, quietly. */}
-      {canEdit && suggestions.length > 0 && (
-        <div className="colp__suggs">
-          <p className="colp__suggs-label">Suggested by members</p>
-          {suggestions.map((s) => (
-            <div className="colp__sugg" key={s.id}>
-              <span className="colp__sugg-text">
-                <em>{s.suggester?.full_name ?? 'A member'}</em>
-                {s.post_id ? (
-                  <button className="colp__sugg-title"
-                    onClick={() => { const p = suggPostOf(s.post_id); if (p) navigate(postOpenPath(p)); }}>
-                    {suggPostOf(s.post_id)?.title || suggPostOf(s.post_id)?.body.slice(0, 64) || 'a piece'}
-                  </button>
-                ) : (
-                  <span className="colp__sugg-noteview">&ldquo;{s.note}&rdquo;</span>
+
+      {/* PUBLIC VIEW keeps a single door; the toolbox lives backstage. */}
+      {canEdit && !managing && (
+        <div className="colp__controls">
+          <button className="btn colp__manage" onClick={() => navigate(`/collections/${id}?manage=1`)}>
+            <Icon name="settings" size={14} />
+            Manage this {kindWord(meta.kind).toLowerCase()}
+          </button>
+        </div>
+      )}
+
+      {managing && (
+        <div className="colp__backstage">
+          {/* Two views, not three: a course has no separate public website
+              layer, so Admin sits beside the course itself. */}
+          <div className="colp__viewtoggle" role="tablist">
+            <button className="colp__viewtab is-on" role="tab" aria-selected>Admin</button>
+            <button className="colp__viewtab" role="tab" aria-selected={false}
+              onClick={() => navigate(`/collections/${id}`)}>
+              {kindWord(meta.kind)} view
+            </button>
+          </div>
+
+          <CollapsibleSection id="colp-build" title={`${kindWord(meta.kind)} Builder & Editor`}
+            open={openSects.has('build')} onToggle={() => toggleSect('build')}>
+            <input
+              className="prof__input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`${kindWord(meta.kind)} name`}
+            />
+            <textarea
+              className="prof__textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this for? What will people come away with? (shown when published)"
+            />
+            {structured && (
+              <div className="colp__meta-edit">
+                <span className="colp__meta-label">Level</span>
+                <div className="colp__chips">
+                  {LEVELS.map((l) => (
+                    <button key={l} type="button"
+                      className={'colp__chip' + (form.level === l ? ' is-on' : '')}
+                      onClick={() => setForm((f) => ({ ...f, level: f.level === l ? undefined : l }))}>{l}</button>
+                  ))}
+                </div>
+                <span className="colp__meta-label">Format</span>
+                <div className="colp__chips">
+                  {FORMATS.map((l) => (
+                    <button key={l} type="button"
+                      className={'colp__chip' + (form.format === l ? ' is-on' : '')}
+                      onClick={() => setForm((f) => ({ ...f, format: f.format === l ? undefined : l }))}>{l}</button>
+                  ))}
+                </div>
+                <input className="prof__input" value={form.length ?? ''} placeholder={`Length (e.g. 6 weeks, 4 ${itemWord(meta.kind)}s)`}
+                  onChange={(e) => setForm((f) => ({ ...f, length: e.target.value || undefined }))} />
+                <input className="prof__input" value={form.forWhom ?? ''} placeholder="Who it's for (e.g. new practitioners)"
+                  onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
+                {meta.kind === 'course' && (
+                  <>
+                    <span className="colp__meta-label">Modules</span>
+                    {(meta.details.modules ?? []).length > 0 && (
+                      <div className="colp__chips">
+                        {(meta.details.modules ?? []).map((m) => (
+                          <span key={m.title} className="colp__chip is-on colp__modchip">
+                            {m.title}
+                            <button className="colp__modchip-x" aria-label={`Remove module ${m.title}`}
+                              onClick={() => void act(() => removeModule(m.title))}>&times;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="colp__modadd">
+                      <input className="prof__input" value={newModuleName}
+                        onChange={(e) => setNewModuleName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') void act(addModule); }}
+                        placeholder="New module (e.g. Week 1 — Foundations)" />
+                      <button className="btn colp__btn" disabled={busy || !newModuleName.trim()}
+                        onClick={() => void act(addModule)}>Add module</button>
+                    </div>
+                    <p className="colp__addhint">Assign each lesson to a module with the selector beside it below.</p>
+                  </>
                 )}
-              </span>
-              <span className="colp__sugg-actions">
-                {s.post_id && (
-                  <button className="btn btn-primary colp__btn" disabled={busy}
-                    onClick={() => void act(() => decideSuggestion(s.id, true))}>Add</button>
-                )}
-                {!s.post_id && (
-                  <button className="btn btn-primary colp__btn" disabled={busy}
-                    title="Mark taken on board — the suggester hears a thank-you"
-                    onClick={() => void act(() => decideSuggestion(s.id, true))}>Noted</button>
-                )}
+              </div>
+            )}
+          </CollapsibleSection>
+
+          {/* PRIVACY (founder 2026-08-15): the three content promises, each on
+              its own switch — a teacher can close one door without closing
+              all three, and students read exactly which one is shut. */}
+          <CollapsibleSection id="colp-privacy" title="Privacy" active={closedCount > 0}
+            open={openSects.has('privacy')} onToggle={() => toggleSect('privacy')}>
+            {([
+              { key: 'shareable',    label: 'Shareable',  hint: 'Others may weave these pieces into their own collections.' },
+              { key: 'downloadable', label: 'Downloadable', hint: 'Recordings and files can be saved; when off, every recording is watermarked with the viewer\u2019s name.' },
+              { key: 'aiReadable',   label: 'AI enabled', hint: 'Assistants may read this material when helping a member.' },
+            ] as const).map(({ key, label, hint }) => (
+              <label className="colp__promise" key={key}>
+                <input type="checkbox" checked={promises(form)[key]}
+                  onChange={(e) => setForm((f) => ({
+                    ...f, protectedTeaching: undefined,
+                    shareable:    key === 'shareable'    ? e.target.checked : promises(f).shareable,
+                    downloadable: key === 'downloadable' ? e.target.checked : promises(f).downloadable,
+                    aiReadable:   key === 'aiReadable'   ? e.target.checked : promises(f).aiReadable,
+                  }))} />
+                <span><strong>{label}</strong> — {hint}</span>
+              </label>
+            ))}
+            {(!promises(form).shareable || !promises(form).downloadable || !promises(form).aiReadable) && (
+              <textarea className="prof__input colp__protect-note" rows={3}
+                value={form.protectedNote ?? ''}
+                placeholder="Why this teaching is held closed — in your words. Students see this when they open the line."
+                onChange={(e) => setForm((f) => ({ ...f, protectedNote: e.target.value || undefined }))} />
+            )}
+          </CollapsibleSection>
+
+          {/* What it costs — a course's answer to a space's Current-cy
+              section (founder 2026-08-15). */}
+          <CollapsibleSection id="colp-cost" title="Cost &amp; access" active={!!form.price}
+            open={openSects.has('cost')} onToggle={() => toggleSect('cost')}>
+            <input className="prof__input" value={form.price ?? ''}
+              placeholder="Free, $120, Sliding $40–$120, By donation…"
+              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value || undefined }))} />
+            <p className="colp__addhint">
+              Shown as a chip on the {kindWord(meta.kind).toLowerCase()}. Leave it empty and nothing is claimed
+              about price; write &ldquo;Free&rdquo; to say so out loud.
+            </p>
+          </CollapsibleSection>
+
+          {structured && (
+            <CollapsibleSection id="colp-pieces" title={`${itemWord(meta.kind).charAt(0).toUpperCase()}${itemWord(meta.kind).slice(1)}s`}
+              active={posts.length > 0}
+              open={openSects.has('pieces')} onToggle={() => { toggleSect('pieces'); if (!picksLoaded) void openLessonPicker(); }}>
+                <div className="colp__picker">
+                  {!canEdit && (
+                    <textarea
+                      className="prof__textarea colp__sugg-note"
+                      placeholder="Suggest a change — ordering, gaps, anything the organizers should hear…"
+                      value={suggNote}
+                      onChange={(e) => setSuggNote(e.target.value)}
+                    />
+                  )}
+                  {!canEdit && suggNote.trim() && (
+                    <button className="btn btn-primary colp__btn" disabled={busy}
+                      onClick={() => void act(sendNote)}>Send suggestion</button>
+                  )}
+                  <input
+                    className="prof__input"
+                    placeholder={canEdit
+                      ? `Search your posts to add as ${itemWord(meta.kind)}s…`
+                      : 'Or search your posts to suggest a piece…'}
+                    value={pickQ}
+                    onChange={(e) => setPickQ(e.target.value)}
+                  />
+                  {pickable.length === 0 ? (
+                    <p className="colp__muted">
+                      {!picksLoaded
+                        ? 'Loading your posts…'
+                        : meta.kind === 'course'
+                          ? <>No posts to add — create one via <Link to="/compose?area=courses">Teach</Link>.</>
+                          : <>No posts to add — create one via <Link to="/compose?area=library">Contribute</Link>.</>}
+                    </p>
+                  ) : (
+                    <div className="colp__picker-list">
+                      {pickable.map((p) => (
+                        <button key={p.id} className="colp__picker-row" onClick={() => void act(() => addLesson(p))}>
+                          <span className="colp__picker-title">{p.title || p.body.slice(0, 64)}</span>
+                          <Icon name="plus" size={15} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              <p className="colp__addhint">
+                Order and modules are set on each {itemWord(meta.kind)} in the list below.
+              </p>
+            </CollapsibleSection>
+          )}
+
+          {meta.kind === 'course' && (
+            <CollapsibleSection id="colp-cohorts" title="Cohorts" active={cohorts.length > 0}
+              open={openSects.has('cohorts')} onToggle={() => toggleSect('cohorts')}>
+              {cohorts.length > 0 && (
+                <div className="colp__chips">
+                  {cohorts.map((co) => (
+                    <button key={co.id} className="colp__chip" onClick={() => navigate(`/spaces/${co.id}`)}>
+                      {co.term || co.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!cohortOpen && (
                 <button className="btn colp__btn" disabled={busy}
-                  onClick={() => void act(() => decideSuggestion(s.id, false))}>Decline</button>
-              </span>
+                  onClick={() => setCohortOpen(true)}>
+                  {cohorts.length ? 'New cohort' : 'Start a cohort'}
+                </button>
+              )}
+              {cohortOpen && (
+                  <div className="colp__cohortnew">
+                    <input
+                      className="colp__input"
+                      value={cohortTerm}
+                      onChange={(e) => setCohortTerm(e.target.value)}
+                      placeholder="Name this turn — e.g. Colorado Kapulli 2026, Fall 2026, New hires Q3"
+                      autoFocus
+                    />
+                    <button className="btn btn-primary colp__btn" disabled={busy} onClick={() => void act(startCohort)}>
+                      Start it
+                    </button>
+                    <p className="colp__hint">
+                      A cohort is a real group: its own chat, calendar and find-a-time. Members join
+                      through the group&rsquo;s own consent flow, and the course keeps running after
+                      this cohort finishes.
+                    </p>
+                  </div>
+              )}
+            </CollapsibleSection>
+          )}
+
+          <CollapsibleSection id="colp-publishing" title="Publishing" active={meta.is_public}
+            open={openSects.has('publishing')} onToggle={() => toggleSect('publishing')}>
+            {meta.is_public ? (
+              <>
+                <p className="colp__addhint">
+                  Published — anyone who can see it may open it. Making it private closes it again;
+                  any post that carries it stays up, pointing at a door that no longer opens.
+                </p>
+                <button className="btn colp__btn" disabled={busy}
+                  onClick={() => void act(async () => {
+                    await updateCollection(id, { is_public: false });
+                    setMeta((m) => (m ? { ...m, is_public: false } : m));
+                  })}>
+                  Make private
+                </button>
+              </>
+            ) : (
+                <div className="colp__confirm colp__publish">
+                  <span className="colp__confirm-text">
+                    Where should it live? It becomes public, and you&rsquo;ll shape how it appears.
+                  </span>
+                  {([
+                    { room: 'feed', label: 'Feed' },
+                    { room: 'library', label: 'Library' },
+                    { room: 'courses', label: 'Courses' },
+                    { room: 'marketplace', label: 'Marketplace' },
+                  ] as const).map(({ room, label }) => (
+                    <button
+                      key={room}
+                      className="btn colp__btn"
+                      disabled={busy}
+                      onClick={() => void act(async () => {
+                        await updateCollection(id, { is_public: true });
+                        navigate(`/compose?collection=${id}${room === 'feed' ? '' : `&area=${room}`}`);
+                      })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+            )}
+          </CollapsibleSection>
+
+          {suggestions.length > 0 && (
+            <CollapsibleSection id="colp-suggs" title="Suggested by members" active
+              open={openSects.has('suggs')} onToggle={() => toggleSect('suggs')}>
+              <div className="colp__suggs">
+                <p className="colp__suggs-label">Suggested by members</p>
+                {suggestions.map((s) => (
+                  <div className="colp__sugg" key={s.id}>
+                    <span className="colp__sugg-text">
+                      <em>{s.suggester?.full_name ?? 'A member'}</em>
+                      {s.post_id ? (
+                        <button className="colp__sugg-title"
+                          onClick={() => { const p = suggPostOf(s.post_id); if (p) navigate(postOpenPath(p)); }}>
+                          {suggPostOf(s.post_id)?.title || suggPostOf(s.post_id)?.body.slice(0, 64) || 'a piece'}
+                        </button>
+                      ) : (
+                        <span className="colp__sugg-noteview">&ldquo;{s.note}&rdquo;</span>
+                      )}
+                    </span>
+                    <span className="colp__sugg-actions">
+                      {s.post_id && (
+                        <button className="btn btn-primary colp__btn" disabled={busy}
+                          onClick={() => void act(() => decideSuggestion(s.id, true))}>Add</button>
+                      )}
+                      {!s.post_id && (
+                        <button className="btn btn-primary colp__btn" disabled={busy}
+                          title="Mark taken on board — the suggester hears a thank-you"
+                          onClick={() => void act(() => decideSuggestion(s.id, true))}>Noted</button>
+                      )}
+                      <button className="btn colp__btn" disabled={busy}
+                        onClick={() => void act(() => decideSuggestion(s.id, false))}>Decline</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          <CollapsibleSection id="colp-delete" title={`Delete this ${kindWord(meta.kind).toLowerCase()}`}
+            open={openSects.has('delete')} onToggle={() => toggleSect('delete')}>
+            {!confirmDelete ? (
+              <button className="btn colp__btn colp__btn--danger" disabled={busy}
+                onClick={() => setConfirmDelete(true)}>
+                Delete {kindWord(meta.kind).toLowerCase()}
+              </button>
+            ) : (
+                <div className="colp__confirm">
+                  <span className="colp__confirm-text">
+                    Delete <em>&ldquo;{meta.name}&rdquo;</em>? The pieces themselves are untouched.
+                  </span>
+                  <button
+                    className="btn colp__btn colp__btn--danger"
+                    disabled={busy}
+                    onClick={() => void act(async () => { await deleteCollection(id); navigate('/saved'); })}
+                  >
+                    Yes, delete
+                  </button>
+                  <button className="btn colp__btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                </div>
+            )}
+          </CollapsibleSection>
+
+          {/* One save for the whole backstage — no per-section buttons. */}
+          {dirty && (
+            <div className="colp__savebar">
+              <span className="colp__savebar-text">Unsaved changes</span>
+              <button className="btn colp__btn" disabled={busy} onClick={resetForm}>Discard</button>
+              <button className="btn btn-primary colp__btn" disabled={busy || !name.trim()}
+                onClick={() => void act(saveMeta)}>Save</button>
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -717,17 +866,86 @@ export default function CollectionPage() {
             {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}
-        {lessonGroups.map((g) => (
-          <div key={g.title} className="colp__modgroup">
-            {showModules && (
-              <div className="colp__module">
-                <span className="colp__module-title">{g.title}</span>
-                <span className="colp__module-count">{g.posts.length} {g.posts.length === 1 ? 'lesson' : 'lessons'}</span>
-              </div>
-            )}
-            {g.posts.map((p, i) => {
-          const gi = posts.indexOf(p);
-          const card = (
+        {/* SYLLABUS (founder 2026-08-15): a course reads as a path you walk,
+            not a stack of cards — modules in order, each lesson a row you
+            check off, the next one marked so the platform is always pointing
+            at what comes next. Curator affordances (reorder, module, remove)
+            ride the same rows, but only in Admin view. */}
+        {structured ? lessonGroups.map((g) => {
+          const gdone = g.posts.filter((x) => done.has(x.id)).length;
+          return (
+            <div key={g.title} className="colp__modgroup">
+              {showModules && (
+                <div className="colp__module">
+                  <span className="colp__module-title">{g.title}</span>
+                  <span className="colp__module-count">
+                    {gdone === g.posts.length && g.posts.length > 0
+                      ? 'Complete'
+                      : `${gdone}/${g.posts.length} done`}
+                  </span>
+                </div>
+              )}
+              <ol className="colp__syl">
+                {g.posts.map((p) => {
+                  const gi = posts.indexOf(p);
+                  const isDone = done.has(p.id);
+                  const isNext = !isDone && firstUnfinished?.id === p.id;
+                  return (
+                    <li key={p.id}
+                      className={'colp__sylrow' + (isDone ? ' is-done' : '') + (isNext ? ' is-next' : '')}>
+                      {me && !managing ? (
+                        <button className="colp__tick" onClick={() => toggleLesson(p.id)}
+                          aria-pressed={isDone} aria-label={isDone ? 'Mark not done' : 'Mark done'}>
+                          {isDone ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}
+                        </button>
+                      ) : (
+                        <span className="colp__tick colp__tick--static" aria-hidden>
+                          {isDone ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}
+                        </span>
+                      )}
+                      <button className="colp__sylopen" onClick={() => navigate(postOpenPath(p))}>
+                        <span className="colp__syl-n">{gi + 1}</span>
+                        <span className="colp__syl-title">{p.title || p.body.slice(0, 72)}</span>
+                        {isDone && <span className="colp__syl-mark">Completed</span>}
+                        {isNext && <span className="colp__syl-mark colp__syl-mark--next">Up next</span>}
+                        <Icon name="chevron-right" size={13} />
+                      </button>
+                      {managing && (
+                        <span className="colp__sylrow-admin">
+                          {meta.kind === 'course' && (meta.details.modules?.length ?? 0) > 0 && (
+                            <select className="colp__modsel" value={moduleOf(p.id)}
+                              onChange={(e) => void act(() => setLessonModule(p.id, e.target.value))}
+                              aria-label="Module">
+                              <option value="">— module —</option>
+                              {(meta.details.modules ?? []).map((m) => (
+                                <option key={m.title} value={m.title}>{m.title}</option>
+                              ))}
+                            </select>
+                          )}
+                          <span className="colp__reorder">
+                            <button onClick={() => move(gi, -1)} disabled={gi === 0} aria-label="Move up">
+                              <Icon name="arrow-up" size={13} />
+                            </button>
+                            <button className="colp__reorder-down" onClick={() => move(gi, 1)}
+                              disabled={gi === posts.length - 1} aria-label="Move down">
+                              <Icon name="arrow-up" size={13} />
+                            </button>
+                          </span>
+                          <button className="colp__sylremove" aria-label="Remove from this course"
+                            onClick={() => {
+                              void removeFromCollection(id, p.id)
+                                .then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id)))
+                                .catch(console.error);
+                            }}>&times;</button>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          );
+        }) : posts.map((p) => (
             <FeedCard
               key={p.id}
               {...postToCard(p, me || undefined)}
@@ -760,43 +978,6 @@ export default function CollectionPage() {
               onOpen={() => navigate(postOpenPath(p))}
               onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             />
-          );
-          if (!structured) return card;
-          return (
-            <div className={'colp__lesson' + (done.has(p.id) ? ' is-done' : '')} key={p.id}>
-              <div className="colp__lesson-rail">
-                {me && !canEdit && (
-                  <button className="colp__tick" onClick={() => toggleLesson(p.id)}
-                    aria-pressed={done.has(p.id)} aria-label={done.has(p.id) ? 'Mark not done' : 'Mark done'}>
-                    {done.has(p.id) ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}
-                  </button>
-                )}
-                <span className="colp__lesson-n">{i + 1}</span>
-                {editing && meta.kind === 'course' && (meta.details.modules?.length ?? 0) > 0 && (
-                  <select
-                    className="colp__modsel"
-                    value={moduleOf(p.id)}
-                    onChange={(e) => void act(() => setLessonModule(p.id, e.target.value))}
-                    aria-label="Module"
-                  >
-                    <option value="">— module —</option>
-                    {(meta.details.modules ?? []).map((m) => (
-                      <option key={m.title} value={m.title}>{m.title}</option>
-                    ))}
-                  </select>
-                )}
-                {editing && (
-                  <span className="colp__reorder">
-                    <button onClick={() => move(gi, -1)} disabled={gi === 0} aria-label="Move up"><Icon name="arrow-up" size={13} /></button>
-                    <button className="colp__reorder-down" onClick={() => move(gi, 1)} disabled={gi === posts.length - 1} aria-label="Move down"><Icon name="arrow-up" size={13} /></button>
-                  </span>
-                )}
-              </div>
-              <div className="colp__lesson-body">{card}</div>
-            </div>
-          );
-            })}
-          </div>
         ))}
       </section>
     </div>

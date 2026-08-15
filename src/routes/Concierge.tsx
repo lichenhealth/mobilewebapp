@@ -430,18 +430,21 @@ function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
       </button>
       {open && own && (
         <div className="means__body">
-          <p className="means__hint">
-            Only you and your active care team can see this — never a score, never public.
-            An honest picture is what lets the network subsidize care fairly. Whether your
-            care team sees it at all is yours to switch in Profile → Privacy.
+          <p className="means__hint means__hint--flag">
+            <Icon name="dollar" size={13} />
+            <span>
+              <strong>Subsidised care asks for transparency.</strong> If you
+              want the network to help carry your costs, this is the piece that
+              lets it decide fairly. Skipping is always OK — you keep every
+              other part of Lichen; you just can&rsquo;t be subsidised on a
+              picture nobody can see.
+            </span>
           </p>
-          {!shared && (
-            <p className="means__hint means__hint--tradeoff">
-              Skipping is always OK — but without it you can&rsquo;t take part in
-              the rebalancing economy, and your care team can&rsquo;t help with
-              this piece.
-            </p>
-          )}
+          <p className="means__hint">
+            Only you and your active care team can see this — never a score, never
+            public, never shown to admins or other members. Whether your care team
+            sees it at all is yours to switch in Profile → Privacy.
+          </p>
           <label className="means__label">Household income</label>
           <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>
             <option value="">Prefer not to say</option>
@@ -1185,9 +1188,6 @@ export default function Concierge() {
                 )}
               </>
             )}
-            {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (
-              <MeansCard subjectId={subjectId} me={me} />
-            )}
             {canAuthor && (
               <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)} aria-label="Post to Web of Wellbeing">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -1200,6 +1200,13 @@ export default function Concierge() {
                 yourself, even if the care team spoke first. */}
             {dataReady && !isClientView && !wowPosts.some((p) => p.author_id === me) && (
               <SelfAudit me={me} onDone={() => setBoardNonce((n) => n + 1)} />
+            )}
+            {/* The financial picture sits UNDER the self-evaluation (founder
+                2026-08-15): it's the sixth aspect's structured companion, not
+                a banner over the whole board — and it carries the honest
+                condition for subsidised care. */}
+            {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (
+              <MeansCard subjectId={subjectId} me={me} />
             )}
             {dataReady && isClientView && wowPosts.length === 0 && (
               <ConciergeEmpty icon="health" title="Web of Wellbeing"

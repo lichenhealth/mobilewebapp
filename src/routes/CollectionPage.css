@@ -226,3 +226,80 @@
 }
 .colp__protect-toggle input { margin-top: 3px; flex-shrink: 0; }
 .colp__protect-toggle strong { color: var(--ink); }
+
+/* ADMIN VIEW (founder 2026-08-15) — the course's backstage, built from the
+   same CollapsibleSection accordion Profile and a space backstage use, with
+   the blue "tending the structure" tint the platform reserves for admin. */
+.colp__manage {
+  display: inline-flex; align-items: center; gap: 7px;
+  color: var(--blue); border-color: var(--blue);
+}
+.colp__backstage { margin-bottom: var(--s-4); }
+.colp__viewtoggle {
+  display: inline-flex; margin-bottom: var(--s-3);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  background: var(--bone-warm); overflow: hidden;
+}
+.colp__viewtab {
+  padding: 7px 15px; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-weight: 300; color: var(--ink-soft);
+}
+.colp__viewtab.is-on { background: var(--blue); color: #fff; font-weight: 400; }
+.colp__promise {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 7px 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
+}
+.colp__promise input { margin-top: 3px; flex-shrink: 0; }
+.colp__promise strong { color: var(--ink); font-weight: 600; }
+.colp__savebar {
+  position: sticky; bottom: var(--s-3); z-index: 2;
+  display: flex; align-items: center; gap: var(--s-2);
+  margin-top: var(--s-3); padding: 10px 12px;
+  background: var(--bone); border: 1px solid var(--blue);
+  border-radius: var(--r-md); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.colp__savebar-text { flex: 1; font-size: 12px; color: var(--ink-soft); }
+
+/* SYLLABUS (founder 2026-08-15) — the course as a path you check your way
+   through: modules in order, each lesson a row, the next one named. */
+.colp__syl { list-style: none; margin: 0 0 var(--s-1); padding: 0; }
+.colp__sylrow {
+  display: flex; align-items: center; gap: var(--s-2);
+  border-bottom: 1px solid var(--bone-edge);
+}
+.colp__sylrow:last-child { border-bottom: 0; }
+.colp__sylrow .colp__tick { flex-shrink: 0; }
+.colp__tick--static { opacity: 0.45; }
+.colp__sylopen {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2);
+  padding: 12px 4px; background: transparent; border: 0; cursor: pointer;
+  font: inherit; text-align: left; color: var(--ink);
+}
+.colp__sylopen:hover { background: var(--bone-warm); border-radius: var(--r-md); }
+.colp__syl-n {
+  flex-shrink: 0; width: 20px; font-size: 11px; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.colp__syl-title {
+  flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.colp__sylrow.is-done .colp__syl-title { color: var(--ink-soft); }
+.colp__syl-mark {
+  flex-shrink: 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--green); border: 1px solid var(--green);
+  border-radius: var(--r-full); padding: 2px 8px;
+}
+.colp__syl-mark--next { color: var(--peach); border-color: var(--peach); }
+.colp__sylrow.is-next { background: var(--peach-tint, var(--bone-warm)); border-radius: var(--r-md); }
+.colp__sylrow-admin { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.colp__sylremove {
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--ink-soft); font-size: 17px; line-height: 1; padding: 4px 6px;
+}
+.colp__sylremove:hover { color: #c0564f; }
+@media (max-width: 520px) {
+  .colp__syl-title { white-space: normal; }
+  .colp__sylrow-admin { flex-wrap: wrap; justify-content: flex-end; max-width: 42%; }
+}

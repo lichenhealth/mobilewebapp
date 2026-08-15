@@ -94,9 +94,18 @@ export default function TopBar({
     return () => { live = false; };
   }, [scopeSpace, scopeMember, section]);
 
+  // YOUR WEB IS A SCOPE TOO (founder 2026-08-15): `?web=1` filters a section
+  // to your own mycelium, so it wears the mycelium mark exactly the way
+  // Melanie's Marketplace wears her logo — same badge, same meaning.
+  const scopeWeb = topParams.get('web') === '1' && !!section;
+
   const scopeBadge = scopeMark ? (
     <span className="top-bar__scope-badge" title={scopeMark.name}>
       <Avatar id={scopeMark.id} name={scopeMark.name} url={scopeMark.url ?? undefined} size={26} />
+    </span>
+  ) : scopeWeb ? (
+    <span className="top-bar__scope-badge top-bar__scope-badge--web" title="Your My-celium">
+      <MyceliumMark size={26} label="" />
     </span>
   ) : null;
 
