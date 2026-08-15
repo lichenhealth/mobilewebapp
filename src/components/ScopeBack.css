@@ -1,7 +1,11 @@
 /* The way back to whose view you're in — quiet, and always in the same
    place, so it reads as chrome rather than content (founder 2026-08-15). */
 .scope-back {
-  display: inline-flex; align-items: center; gap: 6px;
+  /* align-self, not just inline-flex: these pages are flex COLUMNS, and a
+     flex child stretches to full width unless told otherwise (founder
+     2026-08-15 — it spanned the page). */
+  display: inline-flex; align-self: flex-start; width: fit-content;
+  align-items: center; gap: 6px;
   margin: 0 var(--s-5) var(--s-2);
   padding: 5px 12px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
