@@ -22,6 +22,7 @@ import {
   type NestingRequestRow,
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
+  cohortInfo,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
 import { loadPostsByIds, loadAuthorFeed, postAreas, spaceHasEvents, type FeedPost } from '../lib/postsApi';
@@ -340,6 +341,22 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (!id) return;
     let live = true;
     void spaceHasEvents(id).then((yes) => { if (live) setHasEvents(yes); });
+    return () => { live = false; };
+  }, [id]);
+  // THE COURSE THIS GROUP IS A COHORT OF (founder 2026-08-15: "the Course
+  // created the cohort, but the Group has a course assigned to it") — the
+  // `cohort_of` FK already lives on the space, so the door is just reading
+  // it. The course side has had a Cohort door all along; this makes the
+  // toggle go both ways.
+  const [ofCourse, setOfCourse] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!id) { setOfCourse(null); return; }
+    let live = true;
+    void cohortInfo(id).then(async (info) => {
+      if (!live || !info) { if (live) setOfCourse(null); return; }
+      const { data } = await supabase.from('collections').select('name').eq('id', info.courseId).maybeSingle();
+      if (live) setOfCourse({ id: info.courseId, name: (data as { name: string } | null)?.name ?? 'the course' });
+    });
     return () => { live = false; };
   }, [id]);
   // Who's present, ready for the Members tab to sort by.
@@ -704,6 +721,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       trailing={ctx.guest ? [] : [
         // The founder's Marketplace-icon analogy: a Groups door appears only
         // when this space actually has groups nested under it.
+        // A cohort's way back to what it's a cohort OF.
+        ...(ofCourse
+          ? [{ icon: 'graduation-cap' as const, label: 'Course',
+               onClick: () => navigate(`/collections/${ofCourse.id}`) }]
+          : []),
         ...(childGroups.length > 0
           ? [{ icon: 'groups' as const, label: 'Groups', onClick: () => openTab('groups') }]
           : []),

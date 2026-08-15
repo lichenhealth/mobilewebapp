@@ -108,6 +108,13 @@
   font-variation-settings: '"opsz" 144';
   color: var(--bone-warm);
 }
+/* One member is not a stack: it fills the slot instead of sitting as a
+   small disc pinned to the corner of the decorative one behind it (that
+   read as a broken avatar — founder 2026-08-15). */
+.thread__head-group span:only-child {
+  position: static; width: 38px; height: 38px;
+  font-size: 16px; border: 0;
+}
 .thread__head-group span:nth-child(1) { top: 0; left: 0; }
 .thread__head-group span:nth-child(2) { top: 6px; left: 8px; }
 .thread__head-group span:nth-child(3) { top: 12px; left: 16px; }

@@ -52,6 +52,11 @@ export default function Chat() {
     }
   }
   function closeThread() {
+    // A conversation reached FROM somewhere (a course's cohort chat, say)
+    // closes back to there, not to the inbox — same `?from=` doctrine as
+    // ChatThread's back button (founder 2026-08-15).
+    const from = new URLSearchParams(window.location.search).get('from');
+    if (from && from.startsWith('/')) { navigate(from); return; }
     setSelectedId(undefined);
     const url = new URL(window.location.href);
     url.searchParams.delete('open');
