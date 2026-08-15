@@ -22,7 +22,7 @@ export default function TodoView({
 }: {
   me: string;
   reminders: ReminderRow[];
-  remDone: Set<string>;
+  remDone: Map<string, { profileId: string; name: string | null }>;
   onToggleRem: (r: ReminderRow, iso: string) => void;
   /** Step out of a task someone assigned to you — removes it from your list,
    *  leaves the owner's untouched. */
@@ -196,7 +196,8 @@ export default function TodoView({
             <div className="todo__day" key={iso}>
               <p className="todo__daylbl">{dayLabel(iso)}</p>
               {rems.map((r) => {
-                const done = remDone.has(`${r.id}:${iso}`);
+                const doneBy = remDone.get(`${r.id}:${iso}`);
+                const done = !!doneBy;
                 return (
                   <div className={'todo__row todo__row--rem' + (done ? ' is-done' : '')} key={r.id + iso}>
                     <button
@@ -207,6 +208,9 @@ export default function TodoView({
                     <button className="todo__title todo__title--btn" onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}>
                       {r.title}
                       {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
+                      {done && doneBy && doneBy.profileId !== me && (
+                        <span className="todo__doneby">done by {doneBy.name ?? 'someone on it'}</span>
+                      )}
                       {r.profile_id !== me ? (
                         <span className="todo__from">from {r.owner?.full_name ?? 'a member'}</span>
                       ) : (onTask.get(r.id)?.length ? (

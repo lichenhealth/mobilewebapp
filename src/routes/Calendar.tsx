@@ -102,7 +102,7 @@ export default function Calendar() {
   const [events, setEvents] = useState<EventRow[]>([]);
   // Private nudges — never busy, never shared (Gabe's Reminders, 2026-07-18).
   const [reminders, setReminders] = useState<ReminderRow[]>([]);
-  const [remDone, setRemDone] = useState<Set<string>>(new Set());
+  const [remDone, setRemDone] = useState<Map<string, { profileId: string; name: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EventRow | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -263,8 +263,8 @@ export default function Calendar() {
     if (selectedCals.includes('me')) {
       const rems = await listReminders(me);
       setReminders(rems);
-      setRemDone(await listDone(me, rems.map((r) => r.id), from, to));
-    } else setReminders([]);
+      setRemDone(await listDone(me, rems, from, to));
+    } else { setReminders([]); setRemDone(new Map()); }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, from, to, selectedCals.join(',')]);
@@ -465,11 +465,13 @@ export default function Calendar() {
     const k = remKey(r, iso);
     const done = remDone.has(k);
     setRemDone((cur) => {
-      const n = new Set(cur);
-      if (done) n.delete(k); else n.add(k);
+      const n = new Map(cur);
+      // A SHARED task closes for everyone the moment anyone ticks it — the
+      // optimistic row names you until the next load names whoever it was.
+      if (done) n.delete(k); else n.set(k, { profileId: me, name: null });
       return n;
     });
-    void setDone(me, r.id, iso, !done).catch(console.error);
+    void setDone(me, r.id, iso, !done, r.done_mode ?? 'shared').catch(console.error);
   };
   const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
   const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || remsOn(d).length > 0);

@@ -14,6 +14,10 @@ export interface Reminder {
   at_min: number | null;    // null = day reminder (morning nudge)
   lead_min: number;
   recurrence: Recurrence | null;
+  /** shared = whoever ticks it completes it for everyone (the default for an
+   *  assigned task — the horses only need bringing in once); each = every
+   *  recipient ticks their own copy (founder 2026-08-14). */
+  done_mode?: 'shared' | 'each';
   /** The owner's name — set on rows ASSIGNED to you (profile_id ≠ you), so
    *  the list can say whose task it is. */
   owner?: { full_name: string | null } | null;
@@ -22,7 +26,7 @@ export interface Reminder {
 // A shared-nudge recipient — a person or a whole space (org/group/community).
 export interface Recipient { type: 'profile' | 'space'; id: string; name?: string }
 
-const COLS = 'id, profile_id, title, start_date, end_date, at_min, lead_min, recurrence';
+const COLS = 'id, profile_id, title, start_date, end_date, at_min, lead_min, recurrence, done_mode';
 
 async function writeRecipients(reminderId: string, recipients: Recipient[]): Promise<void> {
   await supabase.from('reminder_recipients').delete().eq('reminder_id', reminderId);
@@ -109,12 +113,13 @@ export async function leaveReminder(reminderId: string, me: string): Promise<voi
 
 export async function createReminder(
   me: string,
-  r: { title: string; date: string; atMin: number | null; leadMin: number; recurrence: Recurrence | null },
+  r: { title: string; date: string; atMin: number | null; leadMin: number; recurrence: Recurrence | null; doneMode?: 'shared' | 'each' },
   recipients: Recipient[] = [],
 ): Promise<void> {
   const { data, error } = await supabase.from('reminders').insert({
     profile_id: me, title: r.title, start_date: r.date, end_date: r.date,
     at_min: r.atMin, lead_min: r.leadMin, recurrence: r.recurrence,
+    done_mode: r.doneMode ?? 'shared',
   }).select('id').single();
   if (error) throw error;
   if (recipients.length) await writeRecipients((data as { id: string }).id, recipients);
@@ -129,12 +134,13 @@ export async function getReminder(id: string): Promise<Reminder | null> {
 
 export async function updateReminder(
   me: string, id: string,
-  r: { title: string; date: string; atMin: number | null; leadMin: number; recurrence: Recurrence | null },
+  r: { title: string; date: string; atMin: number | null; leadMin: number; recurrence: Recurrence | null; doneMode?: 'shared' | 'each' },
   recipients?: Recipient[],
 ): Promise<void> {
   const { error } = await supabase.from('reminders').update({
     title: r.title, start_date: r.date, end_date: r.date,
     at_min: r.atMin, lead_min: r.leadMin, recurrence: r.recurrence,
+    ...(r.doneMode ? { done_mode: r.doneMode } : {}),
   }).eq('id', id).eq('profile_id', me);
   if (error) throw error;
   if (recipients) await writeRecipients(id, recipients);
@@ -150,25 +156,50 @@ export function remindersOn(all: Reminder[], iso: string): Reminder[] {
   return all.filter((r) => occursOn(r, iso));
 }
 
-export async function listDone(me: string, reminderIds: string[], from: string, to: string): Promise<Set<string>> {
-  if (reminderIds.length === 0) return new Set();
+/** Who finished a task on a day. On a SHARED task anyone's tick counts (and
+ *  names them); on an EACH task only your own does. */
+export interface DoneBy { profileId: string; name: string | null }
+
+export async function listDone(
+  me: string, reminders: Reminder[] | string[], from: string, to: string,
+): Promise<Map<string, DoneBy>> {
+  const out = new Map<string, DoneBy>();
+  // Tolerates the old id-array shape; ids alone mean "treat as each-of-us".
+  const rems: Reminder[] = (reminders as unknown[]).every((r) => typeof r === 'string')
+    ? (reminders as string[]).map((id) => ({ id, done_mode: 'each' } as Reminder))
+    : (reminders as Reminder[]);
+  if (rems.length === 0) return out;
+  const modeOf = new Map(rems.map((r) => [r.id, r.done_mode ?? 'shared']));
   const { data, error } = await supabase.from('reminder_done')
-    .select('reminder_id, on_date')
-    .eq('profile_id', me)
-    .in('reminder_id', reminderIds).gte('on_date', from).lte('on_date', to);
-  if (error) { console.warn('listDone:', error.message); return new Set(); }
-  return new Set(((data as { reminder_id: string; on_date: string }[] | null) ?? [])
-    .map((d) => `${d.reminder_id}:${d.on_date}`));
+    .select('reminder_id, profile_id, on_date, profiles(full_name)')
+    .in('reminder_id', rems.map((r) => r.id)).gte('on_date', from).lte('on_date', to);
+  if (error) { console.warn('listDone:', error.message); return out; }
+  for (const d of ((data as unknown as { reminder_id: string; profile_id: string; on_date: string; profiles?: { full_name: string | null } | null }[] | null) ?? [])) {
+    const shared = modeOf.get(d.reminder_id) !== 'each';
+    if (!shared && d.profile_id !== me) continue;   // their copy, not yours
+    const key = `${d.reminder_id}:${d.on_date}`;
+    // Your own tick wins the label when both exist.
+    if (!out.has(key) || d.profile_id === me) {
+      out.set(key, { profileId: d.profile_id, name: d.profiles?.full_name ?? null });
+    }
+  }
+  return out;
 }
 
-export async function setDone(me: string, reminderId: string, iso: string, done: boolean): Promise<void> {
+export async function setDone(
+  me: string, reminderId: string, iso: string, done: boolean,
+  mode: 'shared' | 'each' = 'shared',
+): Promise<void> {
   if (done) {
     const { error } = await supabase.from('reminder_done')
       .upsert({ reminder_id: reminderId, profile_id: me, on_date: iso }, { onConflict: 'reminder_id,profile_id,on_date' });
     if (error) throw error;
   } else {
-    const { error } = await supabase.from('reminder_done')
-      .delete().eq('reminder_id', reminderId).eq('profile_id', me).eq('on_date', iso);
+    // Reopening a SHARED job clears whoever's tick closed it; on an
+    // each-of-us task you only ever clear your own.
+    let q = supabase.from('reminder_done').delete().eq('reminder_id', reminderId).eq('on_date', iso);
+    if (mode === 'each') q = q.eq('profile_id', me);
+    const { error } = await q;
     if (error) throw error;
   }
 }

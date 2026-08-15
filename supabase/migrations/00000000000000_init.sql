@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 88acGkSGICV6ySrd50V1q7YI5aC6P2cSbzZhAeiNTQhrCGOtaaYg3w0evrvilVt
+\restrict iYkGKUgf2N6bSB3aSc9FZp4lw03AOBhC04j6gKhYYXsNlY4o6t7DpTtXaPPbf2l
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -2518,6 +2518,25 @@ $$;
 
 
 ALTER FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) OWNER TO postgres;
+
+--
+-- Name: is_on_reminder(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.is_on_reminder(p_reminder uuid, p_uid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from public.reminders r where r.id = p_reminder and r.profile_id = p_uid)
+      or exists (
+        select 1 from public.reminder_recipients rr
+        where rr.reminder_id = p_reminder
+          and ((rr.recipient_type = 'profile' and rr.recipient_id = p_uid)
+            or (rr.recipient_type = 'space' and public.is_space_member(rr.recipient_id, p_uid))));
+$$;
+
+
+ALTER FUNCTION public.is_on_reminder(p_reminder uuid, p_uid uuid) OWNER TO postgres;
 
 --
 -- Name: is_resource_steward(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5627,11 +5646,20 @@ CREATE TABLE public.reminders (
     at_min integer,
     lead_min integer DEFAULT 0 NOT NULL,
     recurrence jsonb,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    done_mode text DEFAULT 'shared'::text NOT NULL,
+    CONSTRAINT reminders_done_mode_check CHECK ((done_mode = ANY (ARRAY['shared'::text, 'each'::text])))
 );
 
 
 ALTER TABLE public.reminders OWNER TO postgres;
+
+--
+-- Name: COLUMN reminders.done_mode; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reminders.done_mode IS 'shared = whoever ticks it completes it for everyone (default); each = every recipient ticks their own copy.';
+
 
 --
 -- Name: resource_bookings; Type: TABLE; Schema: public; Owner: postgres
@@ -9695,10 +9723,33 @@ CREATE POLICY "recs: read" ON public.recommendations FOR SELECT TO authenticated
 ALTER TABLE public.reminder_done ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: reminder_done reminder_done_self; Type: POLICY; Schema: public; Owner: postgres
+-- Name: reminder_done reminder_done read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY reminder_done_self ON public.reminder_done USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+CREATE POLICY "reminder_done read" ON public.reminder_done FOR SELECT USING (((profile_id = auth.uid()) OR public.is_on_reminder(reminder_id, auth.uid())));
+
+
+--
+-- Name: reminder_done reminder_done tick; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reminder_done tick" ON public.reminder_done FOR INSERT WITH CHECK ((profile_id = auth.uid()));
+
+
+--
+-- Name: reminder_done reminder_done untick; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reminder_done untick" ON public.reminder_done FOR DELETE USING (((profile_id = auth.uid()) OR (public.is_on_reminder(reminder_id, auth.uid()) AND (EXISTS ( SELECT 1
+   FROM public.reminders r
+  WHERE ((r.id = reminder_done.reminder_id) AND (r.done_mode = 'shared'::text)))))));
+
+
+--
+-- Name: reminder_done reminder_done update own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "reminder_done update own" ON public.reminder_done FOR UPDATE USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
 
 
 --
@@ -10692,6 +10743,15 @@ GRANT ALL ON FUNCTION public.is_minor(p_profile uuid) TO service_role;
 GRANT ALL ON FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) TO anon;
 GRANT ALL ON FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.is_on_care_team(p_patient uuid, p_uid uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION is_on_reminder(p_reminder uuid, p_uid uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.is_on_reminder(p_reminder uuid, p_uid uuid) TO anon;
+GRANT ALL ON FUNCTION public.is_on_reminder(p_reminder uuid, p_uid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_on_reminder(p_reminder uuid, p_uid uuid) TO service_role;
 
 
 --
@@ -12301,7 +12361,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 88acGkSGICV6ySrd50V1q7YI5aC6P2cSbzZhAeiNTQhrCGOtaaYg3w0evrvilVt
+\unrestrict iYkGKUgf2N6bSB3aSc9FZp4lw03AOBhC04j6gKhYYXsNlY4o6t7DpTtXaPPbf2l
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --

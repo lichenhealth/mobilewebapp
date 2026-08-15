@@ -42,6 +42,10 @@ export default function EventComposer() {
   const [remHasTime, setRemHasTime] = useState(false);
   const [remAtMin, setRemAtMin] = useState(9 * 60);
   const [remLead, setRemLead] = useState(0);   // default: alert exactly at the set time
+  // ONE JOB, SHARED by default (founder 2026-08-14): whoever ticks it closes
+  // it for everyone. 'each' is the other real shape — "everyone submit your
+  // hours" — and only matters once someone else is on the task.
+  const [doneEach, setDoneEach] = useState(false);
   // Shared nudge: recipients (people/orgs/groups) who also get this reminder.
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [recQ, setRecQ] = useState('');
@@ -484,6 +488,7 @@ export default function EventComposer() {
       setRecurrence(r.recurrence);
       if (r.at_min != null) { setRemHasTime(true); setRemAtMin(r.at_min); setRemLead(r.lead_min); }
       else setRemHasTime(false);
+      setDoneEach(r.done_mode === 'each');
       const recs = await loadReminderRecipients(reminderId);
       if (live) setRecipients(recs);
     })();
@@ -522,6 +527,7 @@ export default function EventComposer() {
         atMin: remHasTime ? remAtMin : null,
         leadMin: remHasTime ? remLead : 0,
         recurrence,
+        doneMode: (doneEach ? 'each' : 'shared') as 'each' | 'shared',
       };
       if (reminderId) await updateReminder(me, reminderId, payload, recipients);
       else await createReminder(me, payload, recipients);
