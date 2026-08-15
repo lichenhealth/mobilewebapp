@@ -82,6 +82,10 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
   });
   const [web, setWeb] = useState<Set<string>>(new Set());
   const [recDegree, setRecDegree] = useState<Map<string, 'mine' | 'second'>>(new Map());
+  // The search says WHICH pile it's about (founder 2026-08-15) — the toggle
+  // already scopes the results, so the field should admit it rather than
+  // leaving you to guess whether you're searching yours or all of them.
+  const searchWhat = `${scope === 'mine' ? 'your' : 'all'} ${copy.title.toLowerCase()}`;
 
   useEffect(() => {
     let live = true;
@@ -195,7 +199,7 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
       <ScrollHintRow className="sdir__bar h-scroll" role="toolbar" ariaLabel={copy.title} fade>
         <button className={'sdir__door' + (searchOpen ? ' is-on' : '')}
           onClick={() => { setSearchOpen((o) => !o); if (searchOpen) setQ(''); }}
-          aria-label={`Search ${copy.title.toLowerCase()}`} aria-expanded={searchOpen}>
+          aria-label={`Search ${searchWhat}`} aria-expanded={searchOpen}>
           <Icon name="search" size={14} />
         </button>
         {canCreate && (
@@ -231,7 +235,7 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={`Search ${copy.title.toLowerCase()}\u2026`}
+            placeholder={`Search ${searchWhat}…`}
           />
           {q && (
             <button className="sdir__clear" onClick={() => setQ('')} aria-label="Clear">
