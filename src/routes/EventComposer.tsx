@@ -237,6 +237,11 @@ export default function EventComposer() {
   useEffect(() => {
     if (eventId) return;
     const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qEnd = params.get('end'), qInv = params.get('inv');
+    // A to-do typed in the To-Do view carries its words here when you ask
+    // for a time or people (founder 2026-08-14: the quick-add box gave no
+    // way in).
+    const qTitle = params.get('title');
+    if (qTitle) setTitle(qTitle);
     // Explicit link target wins; otherwise default to whoever you're acting as.
     if (qSpace) setCalendar(qSpace);
     else if (actor.type === 'space') setCalendar(actor.id);

@@ -100,6 +100,16 @@ export default function TodoView({
         />
         <button className="btn btn-primary todo__addbtn" onClick={() => void add()} disabled={!draft.trim()}>Add</button>
       </div>
+      {/* The quick-add makes a plain to-do — no time, nobody else. The tiers
+          and assignment live in the reminder composer, and nothing used to
+          point there (founder 2026-08-14: "it lets me add it, but not add a
+          time for it"). This carries your words across. */}
+      <button
+        className="todo__more"
+        onClick={() => navigate(`/calendar/new?kind=reminder${draft.trim() ? `&title=${encodeURIComponent(draft.trim())}` : ''}`)}
+      >
+        <Icon name="plus" size={11} /> Add a time, a repeat, or assign it to someone
+      </button>
 
       {ready && openTodos.length === 0 && doneTodos.length === 0 && remDays.length === 0 && (
         <p className="todo__empty">Nothing on your list — add a to-do, or your reminders will gather here by day.</p>
