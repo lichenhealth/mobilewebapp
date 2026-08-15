@@ -43,7 +43,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, emptyEscape }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, signals, emptyEscape }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -94,6 +94,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  tabs land here so every screen reads icons-above, toggles-below
    *  (founder 2026-08-14: "I would prefer consistency"). */
   navSlot?: React.ReactNode;
+  /** Your relationship with this entity (Member ✓ / My-celium ✓ /
+   *  Recommended ✓) — it rides the END of the icon row (founder 2026-08-15
+   *  mockup) rather than floating above the masthead. */
+  signals?: React.ReactNode;
   /** Where an EMPTY feed sends the viewer. An entity page kicks them UP to
    *  its own Home tab ("No feed content yet — visit the homepage"), never
    *  away to the global feed (founder 2026-08-14). */
@@ -261,6 +265,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
               <span className="cfeed__area-label">{l.label}</span>
             </button>
           ))}
+          {signals && <span className="cfeed__signals">{signals}</span>}
         </div>
       )}
       {navSlot}

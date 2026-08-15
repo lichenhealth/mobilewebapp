@@ -293,4 +293,8 @@
 
 /* The signed-in nav lives BELOW the feed's icon row (founder 2026-08-14:
    icons above, toggles below, everywhere) — tighter than the hero variant. */
-.ppage__nav--below { padding: var(--s-2) var(--s-2) var(--s-3); }
+.ppage__nav--below {
+  padding: var(--s-2) var(--s-2) var(--s-3);
+  justify-content: flex-start;   /* Home hugs the left (founder 2026-08-15) */
+  max-width: none; margin-inline: 0;
+}

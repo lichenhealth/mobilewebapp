@@ -714,6 +714,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         ...(hasEvents
           ? [{ icon: 'rsvp' as const, label: 'Events', onClick: () => openTab('events') }]
           : []),
+        // Pinned on the map? Then Places is one of this space's rooms, and it
+        // earns a door like any other (founder 2026-08-15) — no separate CTA.
+        ...(pinned
+          ? [{ icon: 'location' as const, label: 'Place', onClick: () => navigate('/maps') }]
+          : []),
         { icon: 'member-heart' as const, label: 'Members', onClick: () => openTab('members') },
       ]}
       // The Events door below opens the real gatherings list — an
@@ -721,6 +726,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       hideAreas={hasEvents ? ['events'] : []}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       navSlot={ctx.navSlot}
+      signals={ctx.guest ? undefined : actionRow}
       emptyEscape={ctx.openHome ? { label: 'Visit the homepage to engage', onGo: ctx.openHome } : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
@@ -871,10 +877,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         signedIn={!!me}
         // Actions in ONE place (founder 2026-08-14): the maps door sits
         // beside the page's own CTAs instead of floating at the page's foot.
-        extraCtas={pinned && !backstage && !tab ? [{
-          label: <><Icon name="maps" size={14} /> See it on Maps</>,
-          onClick: () => navigate('/maps'),
-        }] : undefined}
         // The steward's switch sits above the masthead, so a page with a big
         // cover image doesn't bury the way to manage it.
         aboveHero={adminBar}
@@ -883,7 +885,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         // Member ✓ / My-celium ✓ / Recommended ✓ are Lichen relationships,
         // not website furniture — Public View is what the open web sees, so
         // they step out of it (founder 2026-08-11).
-        heroSignals={!backstage && !tab && !previewing ? actionRow : null}
         beforeContent={me ? (
           <>
             {/* Join / my-celium / trust ride ABOVE the page, not below every

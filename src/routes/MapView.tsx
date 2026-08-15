@@ -5,7 +5,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { supabase } from '../lib/supabase';
 import { areaLabel } from '../lib/locationApi';
-import { Icon } from '../components/Icon';
+import { Icon, iconSvgMarkup, type IconName } from '../components/Icon';
+import AssistantDoor from '../components/AssistantDoor';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
 import { useAuth } from '../auth/AuthProvider';
@@ -42,14 +43,21 @@ const KIND_LABEL: Record<SpaceKind, string> = {
 };
 
 type LayerKey = 'events' | 'places' | 'orgs' | 'communities' | 'groups' | 'people';
-const LAYERS: { key: LayerKey; label: string }[] = [
-  { key: 'events', label: 'Events' },
-  { key: 'places', label: 'Places' },
-  { key: 'orgs', label: 'Orgs' },
-  { key: 'communities', label: 'Communities' },
-  { key: 'groups', label: 'Groups' },
-  { key: 'people', label: 'People' },
+// Each layer wears the mark that section wears everywhere else, so a pin and
+// its filter read as the same thing (founder 2026-08-15).
+const LAYERS: { key: LayerKey; label: string; icon: IconName }[] = [
+  { key: 'events', label: 'Events', icon: 'rsvp' },
+  { key: 'places', label: 'Places', icon: 'location' },
+  { key: 'orgs', label: 'Orgs', icon: 'globe' },
+  { key: 'communities', label: 'Communities', icon: 'user-multiple' },
+  { key: 'groups', label: 'Groups', icon: 'groups' },
+  { key: 'people', label: 'People', icon: 'member-heart' },
 ];
+/** The pin's glyph, drawn straight from Icon.tsx so map and app never drift. */
+const LAYER_ICON: Record<LayerKey, IconName> = {
+  events: 'rsvp', places: 'location', orgs: 'globe',
+  communities: 'user-multiple', groups: 'groups', people: 'member-heart',
+};
 const KIND_LAYER: Record<SpaceKind, LayerKey> = {
   place: 'places', organization: 'orgs', community: 'communities', group: 'groups',
 };
@@ -164,10 +172,24 @@ export default function MapView() {
       return new mapboxgl.Popup({ offset: 26, closeButton: false, maxWidth: '260px' }).setDOMContent(el);
     };
 
-    visibleEvents.forEach(({ post, lat, lng }) => {
+    /** A pin that says WHAT it is (founder 2026-08-15). The teardrop is
+     *  rotated 45°, so the glyph rides in a counter-rotated child to stay
+     *  upright. Markup is built by hand (not React) because mapbox markers
+     *  take a raw DOM element — the paths still come from ICON_SVG, so map
+     *  and app can't drift. */
+    const makePin = (extraClass: string, layer: LayerKey, label: string) => {
       const el = document.createElement('button');
-      el.className = 'mapv__pin';
-      el.setAttribute('aria-label', post.title ?? 'Event');
+      el.className = 'mapv__pin' + (extraClass ? ' ' + extraClass : '');
+      el.setAttribute('aria-label', label);
+      const glyph = document.createElement('span');
+      glyph.className = 'mapv__pin-glyph';
+      glyph.innerHTML = iconSvgMarkup(LAYER_ICON[layer], 15);
+      el.appendChild(glyph);
+      return el;
+    };
+
+    visibleEvents.forEach(({ post, lat, lng }) => {
+      const el = makePin('', 'events', post.title ?? 'Event');
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([lng, lat])
         .setPopup(makePopup(
@@ -183,9 +205,7 @@ export default function MapView() {
     });
 
     visibleSpaces.forEach((s) => {
-      const el = document.createElement('button');
-      el.className = 'mapv__pin mapv__pin--space';
-      el.setAttribute('aria-label', s.name);
+      const el = makePin('mapv__pin--space', KIND_LAYER[s.kind], s.name);
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([s.lng!, s.lat!])
         .setPopup(makePopup(
@@ -203,9 +223,7 @@ export default function MapView() {
     visiblePeople.forEach((m) => {
       if (m.lat == null || m.lng == null) return; // state-level: findable, not pinnable
       const name = m.full_name ?? 'Member';
-      const el = document.createElement('button');
-      el.className = 'mapv__pin mapv__pin--person';
-      el.setAttribute('aria-label', name);
+      const el = makePin('mapv__pin--person', 'people', name);
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([m.lng, m.lat])
         .setPopup(makePopup(
@@ -223,9 +241,7 @@ export default function MapView() {
     // A member's goods & services spots (founder 2026-08-11) — place-style
     // pins whose door opens the member behind them.
     visibleBiz.forEach((b) => {
-      const el = document.createElement('button');
-      el.className = 'mapv__pin mapv__pin--space';
-      el.setAttribute('aria-label', b.label || b.location);
+      const el = makePin('mapv__pin--person', 'people', b.label || b.location);
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([b.lng, b.lat])
         .setPopup(makePopup(
@@ -256,8 +272,17 @@ export default function MapView() {
 
   return (
     <div className="mapv">
-      {/* Controls live ABOVE the map (founder mockup): + · search · layer pills */}
+      {/* One anatomy everywhere (founder 2026-08-15): acting doors on the left
+          in Home's order — Search · + · AI — then a hairline, then this
+          room's own lenses. */}
       <div className="mapv__bar">
+        <button
+          className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
+          onClick={() => setSearchOpen((o) => !o)}
+          aria-label="Search the map"
+        >
+          <Icon name="search" size={16} />
+        </button>
         <div className="mapv__add-wrap">
           <button
             className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
@@ -277,23 +302,24 @@ export default function MapView() {
             />
           )}
         </div>
-        <button
-          className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
-          onClick={() => setSearchOpen((o) => !o)}
-          aria-label="Search the map"
-        >
-          <Icon name="search" size={16} />
-        </button>
+        <AssistantDoor section="maps" size={34} label="Your assistant — what's near you and worth knowing" />
+        <span className="mapv__bar-divider" aria-hidden="true" />
         <ScrollHintRow className="mapv__layers h-scroll" role="toolbar" ariaLabel="Map layers">
-          {LAYERS.map((l) => (
-            <button
-              key={l.key}
-              className={'mapv__layer' + (layers[l.key] ? ' is-on' : '')}
-              onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
-            >
-              {l.label}
-            </button>
-          ))}
+          {LAYERS.map((l) => {
+            const on = layers[l.key];
+            return (
+              <button
+                key={l.key}
+                className={'mapv__layer' + (on ? ' is-on' : '')}
+                onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
+                aria-pressed={on}
+              >
+                <Icon name={l.icon} size={14} />
+                {l.label}
+                {on && <Icon name="check" size={12} />}
+              </button>
+            );
+          })}
         </ScrollHintRow>
       </div>
 

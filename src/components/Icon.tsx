@@ -5,6 +5,8 @@
  * Each icon carries its own viewBox + strokeWidth so visual weight stays
  * consistent across icons that came from different source sizes.
  */
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactElement } from 'react';
 import { SVGProps } from 'react';
 
 export type IconName =
@@ -488,4 +490,16 @@ export function Icon({
       {icon.content}
     </svg>
   );
+}
+/** The same glyphs, as a raw SVG string — for consumers that take DOM rather
+ *  than React (mapbox markers). Reads the SAME ICONS table, so a mark can
+ *  never drift between the app and the map (founder 2026-08-15).
+ *  Only the geometry is emitted; colour comes from the host element. */
+export function iconSvgMarkup(name: IconName, size = 16): string {
+  const e = ICONS[name];
+  if (!e) return '';
+  const body = renderToStaticMarkup(e.content as ReactElement);
+  return `<svg viewBox="${e.viewBox}" width="${size}" height="${size}" fill="none" `
+    + `stroke="currentColor" stroke-width="${e.strokeWidth}" stroke-linecap="round" `
+    + `stroke-linejoin="round" vector-effect="non-scaling-stroke" aria-hidden="true">${body}</svg>`;
 }
