@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import CollapsibleSection from '../components/CollapsibleSection';
+import AssistantDoor from '../components/AssistantDoor';
 import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
 import OfferingChips from '../components/OfferingChips';
@@ -24,6 +25,8 @@ import {
   addToCollection, loadProgress, enroll, setLessonDone,
   suggestToCollection, listPendingSuggestions, resolveSuggestion,
   type CollectionRow, type OfferingMeta, type CollectionSuggestionRow,
+  listCourseNotes, addCourseNote, updateCourseNote, deleteCourseNote, courseFolder,
+  type CourseNote,
 } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import './CollectionPage.css';
@@ -195,6 +198,20 @@ export default function CollectionPage() {
   }
   // Cohorts: many turns of one course, each a real group with its own chat,
   // calendar and consented membership (founder 2026-07-28).
+  // YOUR NOTEBOOK ON THIS COURSE (founder 2026-08-15) — private, tied to the
+  // course so it's waiting where you left it, and the course's own Drive
+  // folder is named beside it so Drive organizes itself as you go.
+  const [notes, setNotes] = useState<CourseNote[]>([]);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [folder, setFolder] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!me || !id) return;
+    let live = true;
+    void listCourseNotes(id).then((n) => { if (live) setNotes(n); }).catch(console.error);
+    void courseFolder(id).then((f) => { if (live) setFolder(f); }).catch(console.error);
+    return () => { live = false; };
+  }, [me, id, enrolled]);
   const [cohorts, setCohorts] = useState<CohortRow[]>([]);
   const [cohortOpen, setCohortOpen] = useState(false);
   const [cohortTerm, setCohortTerm] = useState('');
@@ -412,8 +429,27 @@ export default function CollectionPage() {
           (founder 2026-07-28) — the same doors a learner meets everywhere
           else. Calendar/Find-a-time only means something inside the cohort,
           so it appears for members; everyone can knock on the cohort itself. */}
-      {meta.kind === 'course' && myCohort && (
-        <div className="colp__doors" role="toolbar" aria-label="Cohort">
+      {/* DOORS LEFT, ROOMS RIGHT (founder 2026-08-15) — the platform's one
+          toolbar grammar: constant tools (search, post, the assistant) as
+          icon-only circles on the left, a hairline, then this course's own
+          rooms. The brain here is the update on THIS course's content. */}
+      <div className="colp__doors colp__bar" role="toolbar" aria-label="Course">
+        <button className="colp__door" onClick={() => navigate(`/search?area=courses&collection=${id}`)}>
+          <span className="colp__door-circle"><Icon name="search" size={14} /></span>
+        </button>
+        {canEdit && (
+          <button className="colp__door" onClick={() => navigate(`/compose?area=courses&collection=${id}`)}
+            title={`Add a ${itemWord(meta.kind)}`}>
+            <span className="colp__door-circle"><Icon name="plus" size={14} /></span>
+          </button>
+        )}
+        <span className="colp__door colp__door--ai">
+          <AssistantDoor section="courses" size={36} scope={`collection=${id}`}
+            label="Your update on this course" />
+        </span>
+        {meta.kind === 'course' && myCohort && <span className="colp__bar-divider" aria-hidden />}
+        {meta.kind === 'course' && myCohort && (
+          <>
           {myCohort.member && myCohort.chatId && (
             <button className="colp__door" onClick={() => navigate(`/chat/${myCohort.chatId}?from=/collections/${id}`)}>
               <span className="colp__door-circle"><Icon name="chat" size={14} /></span>
@@ -440,8 +476,9 @@ export default function CollectionPage() {
               <span className="colp__door-label">{co.term || 'Cohort'}</span>
             </button>
           ))}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
 
       {/* Learner loop: enroll + progress (structured, signed-in non-curators, has lessons). */}
@@ -857,6 +894,69 @@ export default function CollectionPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* NOTES (founder 2026-08-15): private, tied to the course, and the
+          folder Drive made for you named right beside them — so the place to
+          put things exists before you have anything to put there. */}
+      {me && structured && !managing && (
+        <section className="colp__notes">
+          <button className="colp__notes-head" onClick={() => setNotesOpen((o) => !o)}
+            aria-expanded={notesOpen}>
+            <span className="colp__notes-title">
+              <Icon name="bookmark" size={13} />
+              My notes
+              {notes.length > 0 && <span className="colp__notes-n">{notes.length}</span>}
+            </span>
+            <Icon name={notesOpen ? 'chevron-left' : 'chevron-right'} size={13} />
+          </button>
+          {notesOpen && (
+            <div className="colp__notes-body">
+              <p className="colp__notes-hint">
+                Yours alone — nobody on this course can see them, not the teacher, not the platform.
+                {folder && (
+                  <> They live alongside <Link to={`/collections/${folder.id}`}>your {folder.name} folder</Link> in Drive.</>
+                )}
+              </p>
+              <textarea
+                className="prof__textarea"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                placeholder="What landed? What do you want to come back to?"
+              />
+              <button className="btn btn-primary colp__btn" disabled={busy || !noteDraft.trim()}
+                onClick={() => void act(async () => {
+                  const n = await addCourseNote(id, noteDraft.trim());
+                  setNotes((cur) => [n, ...cur]);
+                  setNoteDraft('');
+                })}>
+                Save note
+              </button>
+              {notes.map((n) => (
+                <div className="colp__note" key={n.id}>
+                  <textarea
+                    className="prof__textarea colp__note-body"
+                    defaultValue={n.body}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (!v || v === n.body) return;
+                      void updateCourseNote(n.id, v)
+                        .then(() => setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, body: v } : x))))
+                        .catch(console.error);
+                    }}
+                  />
+                  <div className="colp__note-foot">
+                    <span className="colp__note-when">{n.created_at.slice(0, 10)}</span>
+                    <button className="colp__note-x" aria-label="Delete note"
+                      onClick={() => void deleteCourseNote(n.id)
+                        .then(() => setNotes((cur) => cur.filter((x) => x.id !== n.id)))
+                        .catch(console.error)}>&times;</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       <section className="colp__list">

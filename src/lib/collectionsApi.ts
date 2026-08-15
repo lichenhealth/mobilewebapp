@@ -298,3 +298,64 @@ export async function loadCollection(id: string): Promise<{ meta: CollectionRow;
   posts.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   return { meta, posts };
 }
+
+/** COURSE NOTES (founder 2026-08-15) — your own notebook, tied to the course
+ *  so it's waiting where you left it. Private by construction: RLS is
+ *  `profile_id = auth.uid()` with no visibility branching, so there is no
+ *  audience to get wrong. A note may point at one lesson or at the course
+ *  as a whole. */
+export interface CourseNote {
+  id: string;
+  collection_id: string;
+  post_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listCourseNotes(collectionId: string): Promise<CourseNote[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase.from('course_notes')
+    .select('id, collection_id, post_id, body, created_at, updated_at')
+    .eq('collection_id', collectionId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data as CourseNote[] | null) ?? [];
+}
+
+export async function addCourseNote(
+  collectionId: string, body: string, postId?: string | null,
+): Promise<CourseNote> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { data, error } = await supabase.from('course_notes')
+    .insert({ profile_id: user.id, collection_id: collectionId, body, post_id: postId ?? null })
+    .select('id, collection_id, post_id, body, created_at, updated_at')
+    .single();
+  if (error) throw error;
+  return data as CourseNote;
+}
+
+export async function updateCourseNote(id: string, body: string): Promise<void> {
+  const { error } = await supabase.from('course_notes').update({ body }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteCourseNote(id: string): Promise<void> {
+  const { error } = await supabase.from('course_notes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** The Drive folder a course made for you on the way in (`details.forCourse`),
+ *  if you still have it — deleting it is a real answer, so this may be null. */
+export async function courseFolder(collectionId: string): Promise<{ id: string; name: string } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('collections')
+    .select('id, name, details')
+    .eq('owner_id', user.id)
+    .contains('details', { forCourse: collectionId })
+    .maybeSingle();
+  return (data as { id: string; name: string } | null) ?? null;
+}

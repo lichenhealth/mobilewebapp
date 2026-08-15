@@ -73,6 +73,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   // ONE PERSON, not a section (founder 2026-08-14: "like getting a briefing
   // on someone you're meeting with from your assistant"). Reached from the
   // brain on another member's profile, with ?member=<id>.
+  course: { title: 'This course', frame: 'You are briefing the member on ONE course they are walking or teaching. The snapshot holds the course itself (what it is, who leads it, its modules and the lessons in order), where THIS member stands in it (what they have completed, what is next), and its cohort life if there is any. If they teach it, speak to the shape of the material and what is thin or missing; if they are learning it, pick up where they left off — name the next lesson and what it covers, in a sentence. Never invent a lesson that is not in the outline.' },
   member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
 };
 
@@ -107,7 +108,10 @@ export default function AssistantBrief() {
   const section = params.get('section') ?? 'home';
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
-  const briefKey = memberId ? `member:${memberId}` : section;
+  // ?collection=<id> — the update on one course's content (founder 2026-08-15).
+  const collectionId = params.get('collection');
+  const briefKey = memberId ? `member:${memberId}`
+    : collectionId ? `course:${collectionId}` : section;
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { rows } = useNotifications();
@@ -119,7 +123,9 @@ export default function AssistantBrief() {
     cached ? 'ready' : 'thinking');
   const [refreshTick, setRefreshTick] = useState(0);
 
-  const meta = memberId ? FRAMES.member : (FRAMES[section] ?? FRAMES.home);
+  const meta = memberId ? FRAMES.member
+    : collectionId ? FRAMES.course
+    : (FRAMES[section] ?? FRAMES.home);
   // The person's name arrives fast and cheap so the header reads right even
   // on a cache hit.
   const [briefWho, setBriefWho] = useState<string | null>(null);
@@ -134,6 +140,9 @@ export default function AssistantBrief() {
   const { snapshot, fingerprint } = useMemo(() => {
     if (memberId) {
       return { snapshot: {}, fingerprint: `member:${memberId}:${new Date().toISOString().slice(0, 10)}` };
+    }
+    if (collectionId) {
+      return { snapshot: {}, fingerprint: `course:${collectionId}:${new Date().toISOString().slice(0, 10)}` };
     }
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as Section };
@@ -150,7 +159,7 @@ export default function AssistantBrief() {
     // the cached text was written — refetch instead of showing old news.
     return { snapshot: { notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, section, memberId]);
+  }, [rows, section, memberId, collectionId]);
 
   function refresh() {
     cache.delete(briefKey);
@@ -167,7 +176,7 @@ export default function AssistantBrief() {
       let desk: Record<string, number> | undefined;
       let deskNames: Record<string, string> | undefined;
       try {
-        if (memberId) throw new Error('person brief — no desks');
+        if (memberId || collectionId) throw new Error('scoped brief — no desks');
         const d = await listMyAdminDeskCounts(me);
         if (Object.keys(d.counts).length) {
           const spaces = await listMyMemberSpaces(me);
@@ -252,6 +261,62 @@ export default function AssistantBrief() {
                 extras.your_conversation = rows2.reverse().map((m) => `${m.sender_id === me ? 'me' : name}: ${(m.body ?? '').slice(0, 200)}`);
               }
             }
+          }
+        }
+        if (collectionId) {
+          // ── The course update (founder 2026-08-15) ──────────────────────
+          // What the course IS, its outline in order, and where this member
+          // stands in it. All RLS-scoped as the viewer; per-post AI consent
+          // is respected the same way it is everywhere else.
+          // `collection_items.target_id` is polymorphic — no FK, so no embed.
+          // Ids first, then the posts, in the collection's own order.
+          const [{ data: col }, { data: items }, { data: prog }] = await Promise.all([
+            supabase.from('collections')
+              .select('name, description, kind, details, owner_id, owner:profiles!collections_owner_id_fkey(full_name)')
+              .eq('id', collectionId).maybeSingle(),
+            supabase.from('collection_items')
+              .select('position, target_id')
+              .eq('collection_id', collectionId).eq('target_type', 'post')
+              .order('position', { ascending: true }),
+            supabase.from('collection_progress')
+              .select('post_id').eq('collection_id', collectionId).eq('profile_id', me),
+          ]);
+          const order = ((items as { target_id: string }[] | null) ?? []).map((r) => r.target_id);
+          const { data: lessonRows } = order.length
+            ? await supabase.from('posts').select('id, title, body, details').in('id', order)
+            : { data: [] };
+          const c = col as { name: string; description: string | null; kind: string;
+            details: Record<string, unknown> | null; owner_id: string;
+            owner: { full_name: string | null } | null } | null;
+          if (c) {
+            const doneIds = new Set(((prog as { post_id: string }[] | null) ?? []).map((r) => r.post_id));
+            const byId = new Map(((lessonRows as {
+              id: string; title: string | null; body: string;
+              details: Record<string, unknown> | null }[] | null) ?? []).map((p) => [p.id, p]));
+            const lessons = order.map((x) => byId.get(x)).filter(Boolean) as {
+              id: string; title: string | null; body: string; details: Record<string, unknown> | null }[];
+            extras.the_course = {
+              name: c.name,
+              what_it_is: c.description ?? undefined,
+              led_by: c.owner?.full_name ?? undefined,
+              you_lead_it: c.owner_id === me,
+              modules: (c.details?.modules as { title: string }[] | undefined)?.map((m) => m.title),
+              level: c.details?.level, format: c.details?.format, price: c.details?.price,
+            };
+            extras.the_outline = lessons.map((l, i) => ({
+              n: i + 1,
+              title: l.title || l.body.slice(0, 60),
+              about: l.details?.aiExcluded ? undefined : l.body.slice(0, 200),
+              module: (l.details?.module as string | undefined),
+              you_completed: doneIds.has(l.id),
+            }));
+            const next = lessons.find((l) => !doneIds.has(l.id));
+            extras.where_you_are = {
+              completed: doneIds.size, of: lessons.length,
+              up_next: next ? (next.title || next.body.slice(0, 60)) : 'nothing — you have finished it',
+            };
+            found.push({ label: c.name, to: `/collections/${collectionId}` });
+            lessons.forEach((l) => { if (l.title) found.push({ label: l.title, to: `/posts/${l.id}` }); });
           }
         }
         if (section === 'market' || section === 'home') {

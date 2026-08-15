@@ -18,14 +18,18 @@ export const setAiDoor = (section: string, on: boolean): void =>
  *  30px in a row of mkt__action circles (founder 2026-08-08: the brain must
  *  not read larger than the magnifier and the +). Size means "you are here"
  *  now; it mustn't also mean "assistant". */
-export default function AssistantDoor({ section, label, size = 34 }: { section: string; label?: string; size?: number }) {
+export default function AssistantDoor({ section, label, size = 34, scope }:
+  { section: string; label?: string; size?: number;
+    /** Extra query the briefing needs to know WHICH thing in the section it's
+     *  reading — e.g. `collection=<id>` for one course. */
+    scope?: string }) {
   const navigate = useNavigate();
   const on = aiDoorOn(section);
   return (
     <button
       className={'ai-door' + (on ? '' : ' is-off')}
       style={size === 34 ? undefined : { width: size, height: size }}
-      onClick={() => navigate(`/assistant?section=${section}`)}
+      onClick={() => navigate(`/assistant?section=${section}${scope ? `&${scope}` : ''}`)}
       aria-label={on ? 'Your assistant’s briefing for this section' : 'Assistant is off here — tap to review'}
       title={on
         ? (label ?? 'Your assistant — a briefing for this part of your Lichen life')
