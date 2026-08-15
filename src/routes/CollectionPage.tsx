@@ -202,9 +202,12 @@ export default function CollectionPage() {
   // course so it's waiting where you left it, and the course's own Drive
   // folder is named beside it so Drive organizes itself as you go.
   const [notes, setNotes] = useState<CourseNote[]>([]);
-  const [noteDraft, setNoteDraft] = useState('');
+  // Which piece's notepad is open (null = none). Notes are per-lesson when
+  // taken from a row, course-wide when taken from the summary at the top.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [folder, setFolder] = useState<{ id: string; name: string } | null>(null);
+  const notesOn = (postId: string | null) => notes.filter((n) => n.post_id === postId);
   useEffect(() => {
     if (!me || !id) return;
     let live = true;
@@ -380,6 +383,37 @@ export default function CollectionPage() {
     <>
     {!me && <SiteHeader />}
     <div className="colp">
+      {/* ONE TOP ROW (founder 2026-08-15): the view toggle sits where Profile
+          and a space put theirs — top left, in BOTH views, so Admin is a
+          place you switch to rather than a pill buried under the content —
+          and the way into the course sits opposite it, top right. */}
+      {(canEdit || (structured && me && posts.length > 0)) && (
+        <div className="colp__topbar">
+          {canEdit ? (
+            <div className="colp__viewtoggle" role="tablist">
+              <button className={'colp__viewtab' + (managing ? ' is-on' : '')} role="tab"
+                aria-selected={managing}
+                onClick={() => navigate(`/collections/${id}?manage=1`)}>Admin</button>
+              <button className={'colp__viewtab' + (!managing ? ' is-on' : '')} role="tab"
+                aria-selected={!managing}
+                onClick={() => navigate(`/collections/${id}`)}>
+                {kindWord(meta.kind)} view
+              </button>
+            </div>
+          ) : <span />}
+          {structured && !managing && me && posts.length > 0 && (
+            <div className="colp__learn">
+              {enrolled && (
+                <span className="colp__progress-label">{done.size}/{posts.length}</span>
+              )}
+              <button className="btn btn-primary colp__start" onClick={() => void act(startOrContinue)} disabled={busy}>
+                {!enrolled ? (meta.kind === 'course' ? 'Start course' : 'Start') : pct === 100 ? 'Revisit' : 'Continue'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <header className="colp__head">
         {meta.details.coverUrl && (
           <img className="colp__cover" src={meta.details.coverUrl} alt="" />
@@ -481,21 +515,6 @@ export default function CollectionPage() {
       </div>
 
 
-      {/* Learner loop: enroll + progress (structured, signed-in non-curators, has lessons). */}
-      {structured && !managing && me && posts.length > 0 && (
-        <div className="colp__learn">
-          {enrolled && (
-            <div className="colp__progress">
-              <div className="colp__progress-bar"><span style={{ width: `${pct}%` }} /></div>
-              <span className="colp__progress-label">{pct}% · {done.size}/{posts.length}</span>
-            </div>
-          )}
-          <button className="btn btn-primary colp__start" onClick={() => void act(startOrContinue)} disabled={busy}>
-            {!enrolled ? (meta.kind === 'course' ? 'Start course' : 'Start') : pct === 100 ? 'Revisit' : 'Continue'}
-          </button>
-        </div>
-      )}
-
       {/* Members who don't curate can SUGGEST — a piece from their posts, or a note. */}
       {me && !canEdit && (
         <div className="colp__controls">
@@ -561,28 +580,8 @@ export default function CollectionPage() {
 
       {/* Pending suggestions — the curators decide, quietly. */}
 
-      {/* PUBLIC VIEW keeps a single door; the toolbox lives backstage. */}
-      {canEdit && !managing && (
-        <div className="colp__controls">
-          <button className="btn colp__manage" onClick={() => navigate(`/collections/${id}?manage=1`)}>
-            <Icon name="settings" size={14} />
-            Manage this {kindWord(meta.kind).toLowerCase()}
-          </button>
-        </div>
-      )}
-
       {managing && (
         <div className="colp__backstage">
-          {/* Two views, not three: a course has no separate public website
-              layer, so Admin sits beside the course itself. */}
-          <div className="colp__viewtoggle" role="tablist">
-            <button className="colp__viewtab is-on" role="tab" aria-selected>Admin</button>
-            <button className="colp__viewtab" role="tab" aria-selected={false}
-              onClick={() => navigate(`/collections/${id}`)}>
-              {kindWord(meta.kind)} view
-            </button>
-          </div>
-
           <CollapsibleSection id="colp-build" title={`${kindWord(meta.kind)} Builder & Editor`}
             open={openSects.has('build')} onToggle={() => toggleSect('build')}>
             <input
@@ -896,9 +895,10 @@ export default function CollectionPage() {
         </div>
       )}
 
-      {/* NOTES (founder 2026-08-15): private, tied to the course, and the
-          folder Drive made for you named right beside them — so the place to
-          put things exists before you have anything to put there. */}
+      {/* THE NOTES SUMMARY (founder 2026-08-15): every note you've taken on
+          this course in one place at the top, each saying which piece it
+          belongs to and each opening the Drive folder the course made for
+          you. Per-piece notes are taken on the rows themselves, below. */}
       {me && structured && !managing && (
         <section className="colp__notes">
           <button className="colp__notes-head" onClick={() => setNotesOpen((o) => !o)}
@@ -914,46 +914,67 @@ export default function CollectionPage() {
             <div className="colp__notes-body">
               <p className="colp__notes-hint">
                 Yours alone — nobody on this course can see them, not the teacher, not the platform.
-                {folder && (
-                  <> They live alongside <Link to={`/collections/${folder.id}`}>your {folder.name} folder</Link> in Drive.</>
-                )}
+                {folder
+                  ? <> They live in <Link to={`/collections/${folder.id}`}>your {folder.name} folder</Link> in Drive.</>
+                  : <> Start the {kindWord(meta.kind).toLowerCase()} and Drive makes you a folder for it.</>}
               </p>
-              <textarea
-                className="prof__textarea"
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                placeholder="What landed? What do you want to come back to?"
-              />
-              <button className="btn btn-primary colp__btn" disabled={busy || !noteDraft.trim()}
-                onClick={() => void act(async () => {
-                  const n = await addCourseNote(id, noteDraft.trim());
-                  setNotes((cur) => [n, ...cur]);
-                  setNoteDraft('');
-                })}>
-                Save note
-              </button>
-              {notes.map((n) => (
-                <div className="colp__note" key={n.id}>
-                  <textarea
-                    className="prof__textarea colp__note-body"
-                    defaultValue={n.body}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (!v || v === n.body) return;
-                      void updateCourseNote(n.id, v)
-                        .then(() => setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, body: v } : x))))
-                        .catch(console.error);
-                    }}
-                  />
-                  <div className="colp__note-foot">
-                    <span className="colp__note-when">{n.created_at.slice(0, 10)}</span>
-                    <button className="colp__note-x" aria-label="Delete note"
-                      onClick={() => void deleteCourseNote(n.id)
-                        .then(() => setNotes((cur) => cur.filter((x) => x.id !== n.id)))
-                        .catch(console.error)}>&times;</button>
+              {notes.length === 0 && (
+                <p className="colp__muted">
+                  Nothing yet — take a note on any {itemWord(meta.kind)} with the
+                  {' '}<Icon name="bookmark" size={11} /> beside it, or write one about the
+                  {' '}{kindWord(meta.kind).toLowerCase()} as a whole.
+                </p>
+              )}
+              {notes.map((n) => {
+                const on = n.post_id ? posts.find((p) => p.id === n.post_id) : null;
+                return (
+                  <div className="colp__note" key={n.id}>
+                    <div className="colp__note-on">
+                      {on
+                        ? <button className="colp__note-where" onClick={() => navigate(postOpenPath(on))}>
+                            {on.title || on.body.slice(0, 48)}
+                          </button>
+                        : <span className="colp__note-where colp__note-where--all">
+                            The whole {kindWord(meta.kind).toLowerCase()}
+                          </span>}
+                      {folder && (
+                        <Link className="colp__note-drive" to={`/collections/${folder.id}`}>
+                          <Icon name="drive" size={12} /> Drive
+                        </Link>
+                      )}
+                    </div>
+                    <textarea
+                      className="prof__textarea colp__note-body"
+                      defaultValue={n.body}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (!v || v === n.body) return;
+                        void updateCourseNote(n.id, v)
+                          .then(() => setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, body: v } : x))))
+                          .catch(console.error);
+                      }}
+                    />
+                    <div className="colp__note-foot">
+                      <span className="colp__note-when">{n.created_at.slice(0, 10)}</span>
+                      <button className="colp__note-x" aria-label="Delete note"
+                        onClick={() => void deleteCourseNote(n.id)
+                          .then(() => setNotes((cur) => cur.filter((x) => x.id !== n.id)))
+                          .catch(console.error)}>&times;</button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              <NotePad
+                notes={[]}
+                busy={busy}
+                onAdd={(body) => act(async () => {
+                  const n = await addCourseNote(id, body, null);
+                  setNotes((cur) => [n, ...cur]);
+                })}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                placeholder={`A note about the whole ${kindWord(meta.kind).toLowerCase()}…`}
+              />
             </div>
           )}
         </section>
@@ -1003,13 +1024,28 @@ export default function CollectionPage() {
                           {isDone ? <Icon name="check" size={14} /> : <span className="colp__tick-dot" />}
                         </span>
                       )}
+                      {/* The way IN sits left with the tick (founder
+                          2026-08-15), which frees the right of the row for
+                          your own notes on this piece. */}
                       <button className="colp__sylopen" onClick={() => navigate(postOpenPath(p))}>
+                        <Icon name="chevron-right" size={13} />
                         <span className="colp__syl-n">{gi + 1}</span>
                         <span className="colp__syl-title">{p.title || p.body.slice(0, 72)}</span>
                         {isDone && <span className="colp__syl-mark">Completed</span>}
                         {isNext && <span className="colp__syl-mark colp__syl-mark--next">Up next</span>}
-                        <Icon name="chevron-right" size={13} />
                       </button>
+                      {me && !managing && (
+                        <button
+                          className={'colp__sylnote' + (noteFor === p.id ? ' is-on' : '') + (notesOn(p.id).length ? ' has-notes' : '')}
+                          onClick={() => setNoteFor(noteFor === p.id ? null : p.id)}
+                          aria-expanded={noteFor === p.id}
+                          title={notesOn(p.id).length
+                            ? `${notesOn(p.id).length} note${notesOn(p.id).length === 1 ? '' : 's'} on this ${itemWord(meta.kind)}`
+                            : `Take a note on this ${itemWord(meta.kind)}`}>
+                          <Icon name="bookmark" size={13} />
+                          {notesOn(p.id).length > 0 && <span>{notesOn(p.id).length}</span>}
+                        </button>
+                      )}
                       {managing && (
                         <span className="colp__sylrow-admin">
                           {meta.kind === 'course' && (meta.details.modules?.length ?? 0) > 0 && (
@@ -1043,6 +1079,23 @@ export default function CollectionPage() {
                   );
                 })}
               </ol>
+              {g.posts.some((p) => p.id === noteFor) && (
+                <NotePad
+                  notes={notesOn(noteFor!)}
+                  busy={busy}
+                  onAdd={(body) => act(async () => {
+                    const n = await addCourseNote(id, body, noteFor!);
+                    setNotes((cur) => [n, ...cur]);
+                  })}
+                  onEdit={(nid, body) => { void updateCourseNote(nid, body)
+                    .then(() => setNotes((cur) => cur.map((x) => (x.id === nid ? { ...x, body } : x))))
+                    .catch(console.error); }}
+                  onDelete={(nid) => { void deleteCourseNote(nid)
+                    .then(() => setNotes((cur) => cur.filter((x) => x.id !== nid)))
+                    .catch(console.error); }}
+                  placeholder="What landed here? What do you want to come back to?"
+                />
+              )}
             </div>
           );
         }) : posts.map((p) => (
@@ -1082,5 +1135,50 @@ export default function CollectionPage() {
       </section>
     </div>
     </>
+  );
+}
+
+/** One notepad, used twice: under a syllabus row for a note about that
+ *  piece, and at the top for a note about the whole thing. Editing and
+ *  deleting live with the note in the summary, so this stays a composer
+ *  when `notes` is empty. */
+function NotePad({ notes, busy, onAdd, onEdit, onDelete, placeholder }: {
+  notes: CourseNote[];
+  busy: boolean;
+  onAdd: (body: string) => void | Promise<void>;
+  onEdit: (id: string, body: string) => void;
+  onDelete: (id: string) => void;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState('');
+  return (
+    <div className="colp__notepad">
+      {notes.map((n) => (
+        <div className="colp__note" key={n.id}>
+          <textarea
+            className="prof__textarea colp__note-body"
+            defaultValue={n.body}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== n.body) onEdit(n.id, v);
+            }}
+          />
+          <div className="colp__note-foot">
+            <span className="colp__note-when">{n.created_at.slice(0, 10)}</span>
+            <button className="colp__note-x" aria-label="Delete note" onClick={() => onDelete(n.id)}>&times;</button>
+          </div>
+        </div>
+      ))}
+      <textarea
+        className="prof__textarea"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={placeholder}
+      />
+      <button className="btn btn-primary colp__btn" disabled={busy || !draft.trim()}
+        onClick={() => { void Promise.resolve(onAdd(draft.trim())).then(() => setDraft('')); }}>
+        Save note
+      </button>
+    </div>
   );
 }

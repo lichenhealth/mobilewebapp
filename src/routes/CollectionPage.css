@@ -34,12 +34,8 @@
 
 .colp__head .offer-chips { margin-top: var(--s-2); }
 
-/* Learner loop: progress bar + Start/Continue */
-.colp__learn {
-  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
-  padding: var(--s-3); margin-bottom: var(--s-3);
-  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-lg);
-}
+/* Learner loop: the bar it used to live in is gone (founder 2026-08-15) —
+   Start/Continue rides the top row now. See .colp__topbar below. */
 .colp__progress { flex: 1; min-width: 140px; display: flex; align-items: center; gap: var(--s-2); }
 .colp__progress-bar { flex: 1; height: 7px; border-radius: var(--r-full); background: var(--bone-edge); overflow: hidden; }
 .colp__progress-bar > span { display: block; height: 100%; background: var(--green); transition: width var(--d-mid) var(--ease-out); }
@@ -230,10 +226,16 @@
 /* ADMIN VIEW (founder 2026-08-15) — the course's backstage, built from the
    same CollapsibleSection accordion Profile and a space backstage use, with
    the blue "tending the structure" tint the platform reserves for admin. */
-.colp__manage {
-  display: inline-flex; align-items: center; gap: 7px;
-  color: var(--blue); border-color: var(--blue);
+/* Toggle left, the way in right — one row above everything else. */
+.colp__topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-3);
 }
+.colp__learn {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  margin: 0; padding: 0; background: transparent; border: 0;
+}
+.colp__progress-label { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .colp__backstage { margin-bottom: var(--s-4); }
 .colp__viewtoggle {
   display: inline-flex; margin-bottom: var(--s-3);
@@ -344,3 +346,35 @@
   color: var(--ink-soft); font-size: 16px; line-height: 1; padding: 2px 6px;
 }
 .colp__note-x:hover { color: #c0564f; }
+
+/* Chevron left with the tick; your notes on the right of the row. */
+.colp__sylopen .colp__syl-n { margin-left: 2px; }
+.colp__sylnote {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 9px; border-radius: var(--r-full);
+  background: transparent; border: 1px solid transparent;
+  color: var(--ink-faint); cursor: pointer; font: inherit; font-size: 11px;
+}
+.colp__sylnote:hover { background: var(--bone-warm); color: var(--ink-soft); }
+.colp__sylnote.has-notes { color: var(--peach); }
+.colp__sylnote.is-on { border-color: var(--peach); color: var(--peach); }
+.colp__notepad {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-2) 0 var(--s-3);
+}
+.colp__notepad .colp__btn { align-self: flex-start; }
+.colp__note-on {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-2); margin-bottom: 4px;
+}
+.colp__note-where {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 11px; color: var(--peach); text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.colp__note-where--all { color: var(--ink-soft); cursor: default; }
+.colp__note-drive {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--ink-soft); text-decoration: none;
+}
+.colp__note-drive:hover { color: var(--peach); }
