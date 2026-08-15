@@ -121,7 +121,7 @@ export default function App() {
   const isAbout = pathname === '/about';         // About page has its own header
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
-  const { user, loading, onboarded, isAdmin } = useAuth();
+  const { user, loading, onboarded, isAdmin, reconnecting } = useAuth();
   useEffect(() => {
     if (loading || onboarded === null) return;
     if (user && onboarded === false && !isAuth) {
@@ -133,9 +133,12 @@ export default function App() {
   // the desktop sidebar hides on EVERY page for them (CSS scopes to >=1024;
   // the mobile drawer still works via the hamburger).
   useEffect(() => {
-    document.documentElement.classList.toggle('is-signed-out', !loading && !user);
+    // RECONNECTING IS NOT SIGNED OUT (2026-08-14): stripping the app's chrome
+    // from a member whose session is merely unreachable is what made them
+    // think they'd been logged out.
+    document.documentElement.classList.toggle('is-signed-out', !loading && !user && !reconnecting);
     return () => document.documentElement.classList.remove('is-signed-out');
-  }, [user, loading]);
+  }, [user, loading, reconnecting]);
 
   // MEMBERSHIP GATE (2026-07-15, founder): Lichen is a membership — every
   // non-admin needs an active subscription (Stripe, or gifted — either from

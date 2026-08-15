@@ -102,7 +102,7 @@ export default function TopBar({
 
   const { unreadForScope } = useNotifications();
   const { actor, setActor, options, beings, self } = useActing();
-  const { user } = useAuth();
+  const { user, reconnecting } = useAuth();
   const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
@@ -222,11 +222,17 @@ export default function TopBar({
         <button
           className={'top-bar__acting' + (actor.type !== 'self' ? ' is-entity' : '')}
           onClick={() => (user ? setSwitchOpen((o) => !o)
+            : reconnecting ? undefined
             : navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`))}
           title={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name} — tap to switch` : 'Acting as yourself — tap to switch'}
           aria-label={!user ? 'Sign in' : actor.type !== 'self' ? `Acting as ${actor.name}. Open profile switcher.` : 'Acting as yourself. Open profile switcher.'}
         >
-          {!user ? (
+          {!user && reconnecting ? (
+            /* Your session is on disk but momentarily unreachable — you are
+               NOT signed out, and saying so would send you to re-enter a
+               password you never needed (2026-08-14 root-cause fix). */
+            <span className="top-bar__signin top-bar__signin--wait">Reconnecting…</span>
+          ) : !user ? (
             /* Signed out is a STATE, not a broken avatar (founder 2026-08-13:
                "side nav disappeared" was a lost session presenting as a "?"
                circle). Say the one thing that fixes everything. */

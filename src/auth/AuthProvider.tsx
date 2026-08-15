@@ -1,19 +1,25 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, storedSession } from '../lib/supabase';
 
 type AuthState = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /** We hold a session the browser saved, but the client can't currently use
+   *  it (a refresh failed — asleep laptop, flapping wifi, a server hiccup).
+   *  NOT the same as signed out: the member's identity is intact and we're
+   *  retrying. Chrome must not show them the door on this. */
+  reconnecting: boolean;
   onboarded: boolean | null;   // null = not yet known
   isAdmin: boolean;
   markOnboarded: () => void;
 };
 
 const AuthContext = createContext<AuthState>({
-  session: null, user: null, loading: true, onboarded: null, isAdmin: false, markOnboarded: () => {},
+  session: null, user: null, loading: true, reconnecting: false,
+  onboarded: null, isAdmin: false, markOnboarded: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -22,16 +28,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // ── SESSIONS THAT SURVIVE A BAD MOMENT ─────────────────────────────────────
+  // Diagnosed 2026-08-14 after the founder was repeatedly "signed out" while
+  // signed in. The mechanism, reproduced end to end:
+  //   • A rejected refresh (server says the token is dead) clears storage —
+  //     that IS a real sign-out, and showing the door is right.
+  //   • A FAILED refresh (network unreachable) leaves the token intact in
+  //     storage, but the client's in-memory session goes null and NEVER comes
+  //     back on its own — auto-refresh only ticks for a session it still
+  //     holds. The app then rendered the signed-out chrome to someone whose
+  //     session was perfectly valid, so they signed in again.
+  // The fix is re-hydration: while the browser still holds a session, we are
+  // RECONNECTING, not signed out — retry on every natural cue until it takes.
+  const [reconnecting, setReconnecting] = useState(false);
+  const rehydrating = useRef(false);
+
+  const rehydrate = useCallback(async (): Promise<boolean> => {
+    if (rehydrating.current) return false;
+    const stored = storedSession();
+    if (!stored) { setReconnecting(false); return false; }
+    rehydrating.current = true;
+    try {
+      // setSession (not refreshSession): the client has no session in memory
+      // to refresh — it has to adopt the stored one first.
+      const { data, error } = await supabase.auth.setSession(stored);
+      if (!error && data.session) { setSession(data.session); setReconnecting(false); return true; }
+      // A server rejection clears storage; anything left means keep trying.
+      setReconnecting(!!storedSession());
+      return false;
+    } catch {
+      setReconnecting(!!storedSession());
+      return false;
+    } finally { rehydrating.current = false; }
+  }, []);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    let live = true;
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!live) return;
+      if (data.session) { setSession(data.session); setLoading(false); return; }
+      // No usable session — but is that "signed out" or "can't reach it"?
+      if (storedSession()) { setReconnecting(true); await rehydrate(); }
+      if (live) setLoading(false);
+    })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      // Losing the session while the token is still on disk is a gap, not a
+      // goodbye. (A real sign-out clears storage, so this stays false then.)
+      if (!s) setReconnecting(!!storedSession());
+      else setReconnecting(false);
     });
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => { live = false; subscription.unsubscribe(); };
+  }, [rehydrate]);
+
+  // A WATCHDOG, not a retry queue. Gating this on "we noticed the gap" meant
+  // recovery depended on an auth event firing — and a gap can be entered
+  // without one. So it watches the only thing that actually matters: no
+  // session in hand while the browser still holds one. Cheap when idle (a
+  // localStorage read), silent when genuinely signed out.
+  useEffect(() => {
+    if (session) { setReconnecting(false); return; }
+    const attempt = () => {
+      if (!storedSession()) { setReconnecting(false); return; }
+      setReconnecting(true);
+      void rehydrate();
+    };
+    window.addEventListener('online', attempt);
+    document.addEventListener('visibilitychange', attempt);
+    const t = window.setInterval(attempt, 8_000);
+    attempt();
+    return () => {
+      window.removeEventListener('online', attempt);
+      document.removeEventListener('visibilitychange', attempt);
+      window.clearInterval(t);
+    };
+  }, [session, rehydrate]);
 
   const userId = session?.user?.id ?? null;
   useEffect(() => {
@@ -96,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const markOnboarded = useCallback(() => setOnboarded(true), []);
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, onboarded, isAdmin, markOnboarded }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, reconnecting, onboarded, isAdmin, markOnboarded }}>
       {children}
     </AuthContext.Provider>
   );

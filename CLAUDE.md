@@ -32,6 +32,30 @@ Fallback (only if the account doesn't exist yet, or the service-role key isn't a
 
 **Standing protocol (founder, 2026-08-09): test before declaring UI work done.** For any UI/frontend push, sign in as the test account and actually click through the changed flow at both mobile and desktop widths in the Browser pane — not just a code read or a single screenshot — before reporting complete. Fix whatever's found, re-verify, then report. This is load-bearing, not optional polish; it's already caught real bugs (a popover-overlap and an off-screen-clipping bug) that a code read alone missed.
 
+## Sessions — why "signed in but signed out" kept happening
+Root-caused 2026-08-14 (reproduced end to end, not guessed). Two different
+failures wore the same face:
+- **A rejected refresh** (server says the token is dead — revocation, rotation
+  reuse, an explicit sign-out elsewhere) CLEARS storage. That is a real sign
+  out; showing the Sign-in pill is correct.
+- **A failed refresh** (network unreachable: asleep laptop, flapping wifi, a
+  power cut) leaves the token INTACT in storage, but supabase-js's in-memory
+  session goes null and **never returns on its own** — auto-refresh only ticks
+  for a session it still holds. The app then rendered full signed-out chrome
+  (Sign in pill, no sidebar) to a member whose session was perfectly valid, so
+  they signed in again. One badly-timed refresh was enough.
+The fix is re-hydration + honesty, in `AuthProvider.tsx`: `storedSession()`
+(`src/lib/supabase.ts`, which also now pins `storageKey` explicitly) tells
+"signed out" from "temporarily unreachable"; a **watchdog** (on `online`, on
+tab-visible, and every 8s while there's no session) re-adopts the stored
+session via `setSession()` — `refreshSession()` is wrong here, the client has
+nothing in memory to refresh. While the gap lasts the app says
+**"Reconnecting…"**, keeps the sidebar, and never sends anyone to /login.
+⚠ Never gate recovery on having NOTICED the gap (an auth event may never
+fire); watch the condition itself. ⚠ Verified live: unreachable-auth boot →
+Reconnecting + token preserved; network back → signed in again in ~1.2s with
+no reload; genuinely signed out → Sign in, as it should be.
+
 ## Conventions
 - Design tokens live in `src/styles/tokens.css` (peach accent `--peach`, blue `--blue` for admin/stewardship affordances, green `--green` for availability/free, bone canvas, Archivo body, display serif). Reuse token vars; match existing BEM-ish class names (`.onb__`, `.prof__`, `.cat__`, `.adminc__`, `.conv-row`, `.thread__`).
 - Logo: `src/components/LichenMark.tsx`. Icons: `src/components/Icon.tsx` (`<Icon name=... size=... />`; top-bar section marks force 1.2px hairline strokes via `vector-effect: non-scaling-stroke` — native strokeWidths are tuned for small sizes).

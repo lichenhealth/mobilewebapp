@@ -232,3 +232,7 @@
   border-radius: var(--r-full); background: var(--peach); color: #fff;
   font-size: 13px; font-weight: 500; white-space: nowrap;
 }
+
+/* Reconnecting — a session on disk we can't reach yet. Quieter than the
+   Sign in pill: nothing is wrong with the member, only the network. */
+.top-bar__signin--wait { opacity: 0.65; font-style: italic; cursor: default; }
