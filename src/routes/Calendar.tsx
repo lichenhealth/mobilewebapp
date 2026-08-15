@@ -849,6 +849,7 @@ export default function Calendar() {
             setReminders((cur) => cur.filter((x) => x.id !== r.id));
             void leaveReminder(r.id, me).catch(console.error);
           }}
+          onTaskAdded={() => { void listReminders(me).then(setReminders); }}
           days={Array.from({ length: 30 }, (_, i) => addDays(today, i))}
           today={today}
         />

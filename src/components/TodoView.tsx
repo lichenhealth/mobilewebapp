@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { localDate } from '../lib/conciergeApi';
@@ -6,6 +6,8 @@ import { minToLabel } from '../lib/calendarApi';
 import { remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
 import { listTodos, createTodo, setTodoDone, deleteTodo, type Todo } from '../lib/todosApi';
 import { visibleTasksOf, type VisibleTasks } from '../lib/tasksApi';
+import { parseTask, resolveAssignees } from '../lib/taskParse';
+import { createReminder, type Recipient } from '../lib/remindersApi';
 import { supabase } from '../lib/supabase';
 import './TodoView.css';
 
@@ -15,7 +17,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  calendar grid does. Free-form to-dos up top; reminders auto-populate below,
  *  grouped by day. Tick a reminder to mark that day done; tap it to edit. */
 export default function TodoView({
-  me, reminders, remDone, onToggleRem, onLeave, days, today,
+  me, reminders, remDone, onToggleRem, onLeave, onTaskAdded, days, today,
 }: {
   me: string;
   reminders: ReminderRow[];
@@ -24,6 +26,8 @@ export default function TodoView({
   /** Step out of a task someone assigned to you — removes it from your list,
    *  leaves the owner's untouched. */
   onLeave?: (r: ReminderRow) => void;
+  /** A smart add creates a REMINDER — the parent owns that list. */
+  onTaskAdded?: () => void;
   days: string[];
   today: string;
 }) {
@@ -39,11 +43,42 @@ export default function TodoView({
     return () => { live = false; };
   }, [me]);
 
+  // THE SMART COMPOSER (founder 2026-08-14): one sentence — "return amazon
+  // package to staples in Conifer and add Gabe Miltner to the task" — read
+  // deterministically (no AI call, nothing leaves the device) into a title,
+  // a day, a time and real people. The reading is SHOWN before anything is
+  // created, and a name that doesn't resolve to a member simply stays in the
+  // title rather than vanishing.
+  const parsed = useMemo(() => parseTask(draft), [draft]);
+  const [people, setPeople] = useState<Recipient[]>([]);
+  useEffect(() => {
+    if (!parsed.assigneeNames.length || !me) { setPeople([]); return; }
+    let live = true;
+    const t = window.setTimeout(() => {
+      void resolveAssignees(parsed.assigneeNames, me).then((r) => { if (live) setPeople(r); });
+    }, 300);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [parsed.assigneeNames.join('|'), me]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const smart = !!parsed.date || parsed.atMin != null || !!parsed.recurrence || people.length > 0;
+
   const add = async () => {
-    const title = draft.trim();
-    if (!title) return;
-    setDraft('');
-    const t = await createTodo(me, title);
+    const raw = draft.trim();
+    if (!raw) return;
+    setDraft(''); setPeople([]);
+    // A plain line stays a plain to-do; a sentence with a day, a time, a
+    // repeat or a person becomes a real reminder carrying all of it.
+    if (smart) {
+      await createReminder(me, {
+        title: parsed.title || raw,
+        date: parsed.date ?? today,
+        atMin: parsed.atMin,
+        leadMin: 0,
+        recurrence: parsed.recurrence,
+      }, people);
+      onTaskAdded?.();
+      return;
+    }
+    const t = await createTodo(me, raw);
     if (t) setTodos((cur) => [t, ...cur]);
   };
   const toggle = (t: Todo) => {
@@ -96,10 +131,27 @@ export default function TodoView({
           className="todo__input" value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void add(); }}
-          placeholder="Add a to-do…"
+          placeholder="Add a to-do — or a sentence: “call the roofer friday at 3 with Gabe”"
         />
         <button className="btn btn-primary todo__addbtn" onClick={() => void add()} disabled={!draft.trim()}>Add</button>
       </div>
+      {/* What it understood — always visible before anything is created. */}
+      {draft.trim() && smart && (
+        <p className="todo__reading">
+          <Icon name="check" size={11} />
+          <span className="todo__reading-title">{parsed.title || draft.trim()}</span>
+          {parsed.date && (
+            <span className="todo__chip">
+              {parsed.date === today ? 'today' : dayLabel(parsed.date)}
+              {parsed.atMin == null && ' · finish by'}
+            </span>
+          )}
+          {parsed.atMin != null && <span className="todo__chip">{minToLabel(parsed.atMin)}</span>}
+          {parsed.recurrence && <span className="todo__chip">repeats {parsed.recurrence.freq}</span>}
+          {people.map((p) => <span className="todo__chip todo__chip--who" key={p.id}>with {p.name}</span>)}
+        </p>
+      )}
+
       {/* The quick-add makes a plain to-do — no time, nobody else. The tiers
           and assignment live in the reminder composer, and nothing used to
           point there (founder 2026-08-14: "it lets me add it, but not add a

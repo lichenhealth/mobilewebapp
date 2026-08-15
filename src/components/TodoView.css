@@ -57,3 +57,19 @@
   font-size: 12px; color: var(--peach-deep);
 }
 .todo__more:hover { text-decoration: underline; }
+
+/* What the smart composer understood — shown before anything is created */
+.todo__reading {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin: -2px 0 var(--s-2); padding: 7px 10px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); font-size: 12px; color: var(--ink-soft);
+}
+.todo__reading svg { color: var(--peach-deep); flex-shrink: 0; }
+.todo__reading-title { color: var(--ink); }
+.todo__chip {
+  padding: 2px 9px; border-radius: var(--r-full);
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  font-size: 11px; color: var(--ink-muted); white-space: nowrap;
+}
+.todo__chip--who { color: var(--peach-deep); border-color: var(--peach); }
