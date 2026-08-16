@@ -103,7 +103,33 @@ export default function Calendar() {
     if (view === 'todo') setView(prevGridView);
     else { setPrevGridView(view as GridView); setView('todo'); }
   };
-  const [anchor, setAnchor] = useState(todayISO());
+  /** WHICH DAY YOU'RE LOOKING AT LIVES IN THE URL (founder 2026-08-16:
+   *  editing an event and coming back "drops you back on the present day,
+   *  not the day of the event"). The anchor was plain component state seeded
+   *  from today, so ANY remount — the editor, a refresh, browser back —
+   *  threw away where you were. As `?d=YYYY-MM-DD` it survives all three and
+   *  a link to a day becomes shareable, the same way `?open=` made a chat
+   *  linkable. */
+  const isISO = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const [anchor, setAnchor] = useState(() => {
+    const d = new URLSearchParams(window.location.search).get('d');
+    return isISO(d) ? d : todayISO();
+  });
+  // Write it back without touching history: the entry you LEAVE from then
+  // carries the day, so coming back lands there.
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (u.searchParams.get('d') === anchor) return;
+    u.searchParams.set('d', anchor);
+    window.history.replaceState(window.history.state, '', u);
+  }, [anchor]);
+  // Follow the URL when it changes under us (back/forward, or an explicit
+  // ?d= from the event composer).
+  const dParam = urlParams.get('d');
+  useEffect(() => {
+    if (isISO(dParam) && dParam !== anchor) setAnchor(dParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dParam]);
   const [events, setEvents] = useState<EventRow[]>([]);
   // Private nudges — never busy, never shared (Gabe's Reminders, 2026-07-18).
   const [reminders, setReminders] = useState<ReminderRow[]>([]);

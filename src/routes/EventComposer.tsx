@@ -32,7 +32,10 @@ export default function EventComposer() {
   const { eventId } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const back = () => navigate('/calendar');
+  // Back to the day you were editing, not to today (founder 2026-08-16).
+  // `range.start` is the event's own date, so this works for a save, a
+  // cancel and a delete alike.
+  const back = () => navigate(`/calendar?d=${range.start}`);
 
   // Events vs Reminders (Gabe, 2026-07-18): an event is a social object; a
   // reminder is a private nudge — no guests, no busy weight.
