@@ -169,6 +169,46 @@ Deno.serve(async (req) => {
   const nameOf: Record<string, string> = {};
   for (const p of (Array.isArray(profs) ? profs : [])) nameOf[p.id] = p.full_name || 'A member';
 
+  // WHO ELSE IS ACTUALLY HERE (founder 2026-08-16: asked in help whether Ai
+  // and Oi were both in the room, and the assistant could confirm itself but
+  // not the human). The facts already exist — chat_members.last_read_at is a
+  // read receipt, and presence is the platform's own three states. Reading
+  // them lets the room answer honestly instead of guessing, and lets it say
+  // "they haven't seen this yet, but they've been notified" rather than
+  // implying someone is listening when they aren't.
+  let rosterNote = '';
+  if (isHelp) {
+    const roster = await (await sb(
+      `chat_members?chat_id=eq.${chat_id}&select=profile_id,last_read_at,profiles(full_name,pronouns,last_seen_at,presence_always_present,presence_lit_until)`)).json();
+    const newest = rows.length ? rows[rows.length - 1] : null;
+    const lines = (Array.isArray(roster) ? roster : []).map((r: {
+      profile_id: string; last_read_at: string | null;
+      profiles?: { full_name?: string; pronouns?: string | null; last_seen_at?: string | null;
+                   presence_always_present?: boolean; presence_lit_until?: string | null };
+    }) => {
+      const p = r.profiles ?? {};
+      if (r.profile_id === assistant_id) return `- ${p.full_name ?? 'The assistant'} (you) — always here.`;
+      // PRESENT = candle lit AND a heartbeat in the last 5 minutes. Both arms
+      // matter: a hand-lit candle must not outlive the session that lit it.
+      const beat = p.last_seen_at ? Date.parse(p.last_seen_at) : 0;
+      const fresh = beat > Date.now() - 5 * 60 * 1000;
+      const lit = p.presence_always_present === true
+        || (p.presence_lit_until ? Date.parse(p.presence_lit_until) > Date.now() : false);
+      const present = fresh && lit;
+      const seen = r.last_read_at && newest?.created_at
+        ? (Date.parse(r.last_read_at) >= Date.parse(newest.created_at)
+            ? 'has read everything here'
+            : 'has NOT yet read the latest message')
+        : 'has not opened this room yet';
+      const pron = p.pronouns?.trim() ? ` (${p.pronouns.trim()})` : '';
+      return `- ${p.full_name ?? 'A member'}${pron} — ${present ? 'PRESENT right now' : 'not present right now'}; ${seen}.`;
+    });
+    if (lines.length) {
+      rosterNote = `\n\nWHO IS IN THIS ROOM, as of this moment:\n${lines.join('\n')}\n`
+        + `Answer honestly if asked. A human not being present does NOT mean they are ignoring anyone — they are notified on their phone and will pick it up. Never imply someone is reading along when the facts above say they aren't.`;
+    }
+  }
+
   const messages = rows.map((m: { sender_id: string; body: string }) =>
     m.sender_id === assistant_id
       ? { role: 'assistant', content: m.body }
@@ -180,13 +220,20 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 400,
-      system: [{
-        type: 'text',
-        text: isHelp
-          ? `${ident.persona}\n\n${HELP_FRAME}\n\n${PLATFORM_MAP}\n\n${BASE_RULES}`
-          : `${ident.persona}\n\n${BASE_RULES}`,
-        cache_control: { type: 'ephemeral' },
-      }],
+      // Two blocks on purpose: the persona, frame, map and rules are stable
+      // and worth caching (the map is long). The roster changes with every
+      // message — presence and read cursors move — so it goes in its own
+      // UNCACHED block rather than busting the cache on each reply.
+      system: [
+        {
+          type: 'text',
+          text: isHelp
+            ? `${ident.persona}\n\n${HELP_FRAME}\n\n${PLATFORM_MAP}\n\n${BASE_RULES}`
+            : `${ident.persona}\n\n${BASE_RULES}`,
+          cache_control: { type: 'ephemeral' },
+        },
+        ...(rosterNote ? [{ type: 'text', text: rosterNote }] : []),
+      ],
       messages,
     }),
   });
