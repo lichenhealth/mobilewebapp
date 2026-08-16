@@ -139,3 +139,9 @@
   display: flex; align-items: center; justify-content: center; gap: 5px;
   margin: 2px 0 0; font-size: 13px; color: var(--ink-muted);
 }
+
+/* Pronouns sit under the name, quieter than the headline — a fact about how
+   to refer to someone, not a claim about them. */
+.mprof__pronouns {
+  margin: 2px 0 0; font-size: 12px; font-weight: 300; color: var(--ink-soft);
+}

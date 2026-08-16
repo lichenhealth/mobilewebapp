@@ -43,7 +43,7 @@ type SpaceRole = 'super_admin' | 'admin' | 'member';
 type MySpace = { id: string; name: string; kind: SpaceKind; role: SpaceRole };
 type NotifPref = 'off' | 'in_app' | 'both';
 
-type ProfileRow = { created_at: string; full_name: string | null; first_name: string | null; last_name: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref; avatar_url: string | null };
+type ProfileRow = { created_at: string; full_name: string | null; first_name: string | null; last_name: string | null; pronouns: string | null; headline: string | null; bio: string | null; notification_pref?: NotifPref; avatar_url: string | null };
 type MemberRow = { role: SpaceRole; spaces: { id: string; name: string; kind: SpaceKind } | null };
 type CareRow = {
   id: string;
@@ -121,6 +121,7 @@ export default function Profile() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [pronouns, setPronouns] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
   // Public identity tags ("Firefighter, Veteran") — comma-entered, chip-shown;
@@ -175,7 +176,7 @@ export default function Profile() {
     if (!user) return;
     setLoadingData(true);
     const [pRes, cRes, mRes, catRes, pcRes, subRes, myPhone] = await Promise.all([
-      supabase.from('profiles').select('created_at,full_name,first_name,last_name,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
+      supabase.from('profiles').select('created_at,full_name,first_name,last_name,pronouns,headline,bio,notification_pref,avatar_url').eq('id', user.id).single(),
       supabase.from('profile_capabilities').select('capability').eq('profile_id', user.id),
       supabase.from('space_members').select('role, spaces(id,name,kind)').eq('profile_id', user.id),
       supabase.from('categories').select('*').order('sort', { ascending: true }),
@@ -192,6 +193,7 @@ export default function Profile() {
       setFullName(p.full_name ?? '');
       setFirstName(p.first_name ?? '');
       setLastName(p.last_name ?? '');
+      setPronouns(p.pronouns ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
       void getIdentityTags(user.id).then((tags) => setIdentity(tags.join(', ')));
@@ -548,6 +550,7 @@ export default function Profile() {
         first_name: firstName.trim() || null,
         last_name: lastName.trim() || null,
         phone: phone.trim() || null,
+        pronouns: pronouns.trim() || null,
         headline: headline.trim() || null,
         bio: bio.trim() || null,
       })
@@ -914,6 +917,15 @@ export default function Profile() {
           <label className="prof__label">Phone</label>
           <input className="prof__input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
           <p className="prof__hint">So your care team can reach you when someone&rsquo;s on call. Only your care team can see it.</p>
+        </div>
+        {/* Optional and free text — presets exclude people, and nobody should
+            have to justify the answer. Empty means they/them everywhere,
+            which is what the assistant already does (founder 2026-08-16). */}
+        <div className="prof__field">
+          <label className="prof__label">Pronouns <span className="prof__optional">optional</span></label>
+          <input className="prof__input" value={pronouns} maxLength={40}
+            onChange={(e) => setPronouns(e.target.value)} placeholder="she/her · he/him · they/them · anything you like" />
+          <p className="prof__hint">Shown on your profile, and used whenever Lichen or the assistant writes about you.</p>
         </div>
         <div className="prof__field">
           <label className="prof__label">Headline</label>

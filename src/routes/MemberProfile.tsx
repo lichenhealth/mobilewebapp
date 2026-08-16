@@ -381,6 +381,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         id={id}
         name={name}
         kindLabel={member.headline ?? undefined}
+        pronouns={member.pronouns}
         avatarUrl={member.avatar_url}
         description={member.bio}
         location={homeSpot?.place
@@ -449,6 +450,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
             )}
           </p>
         )}
+        {member.pronouns && <p className="mprof__pronouns">{member.pronouns}</p>}
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
         {member.bio && <p className="mprof__bio">{member.bio}</p>}
       </div>

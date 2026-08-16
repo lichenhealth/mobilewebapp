@@ -95,6 +95,9 @@ export interface PublicPageProps {
   id: string;
   name: string;
   kindLabel?: string;          // "Place", "Organization", or a person's headline
+  /** Optional, stated by the member. Sits under the name — a fact about how
+   *  to refer to someone, not a claim about them. */
+  pronouns?: string | null;
   /** The kind's mark, shown beside its word — spaces only (founder
    *  2026-08-05: the kind belongs under the name, not in the top bar). */
   kindIcon?: IconName;
@@ -417,6 +420,7 @@ export default function PublicPage(props: PublicPageProps) {
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
             size={props.signedIn ? 96 : 128} />
           <h1 className="ppage__name">{name}</h1>
+          {props.pronouns && <p className="ppage__pronouns">{props.pronouns}</p>}
           {(page.tagline || kindLabel) && (
             <p className="ppage__tagline">
               {page.tagline || kindLabel}

@@ -275,3 +275,10 @@
 
 /* Door to Snapshot — building the page from what you already have. */
 .snap__door { display: inline-flex; align-items: center; gap: 8px; margin: var(--s-2) 0 4px; }
+
+/* "optional" beside a label — quieter than the label, so the field reads as
+   an invitation rather than a question you owe an answer to. */
+.prof__optional {
+  margin-left: 6px; font-size: 10px; font-weight: 300; letter-spacing: 0.04em;
+  text-transform: lowercase; color: var(--ink-faint);
+}

@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 export interface MemberProfile {
   id: string;
   full_name: string | null;
+  pronouns: string | null;
   headline: string | null;
   bio: string | null;
   avatar_url: string | null;
@@ -26,7 +27,7 @@ export interface MemberProfile {
 export async function loadMemberProfile(id: string): Promise<MemberProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, headline, bio, avatar_url, location, assistant_enabled, kind, aspect, jurisdiction, steward_profile_id, steward_space_id')
+    .select('id, full_name, pronouns, headline, bio, avatar_url, location, assistant_enabled, kind, aspect, jurisdiction, steward_profile_id, steward_space_id')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadMemberProfile:', error.message); return null; }

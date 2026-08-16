@@ -75,7 +75,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   // on someone you're meeting with from your assistant"). Reached from the
   // brain on another member's profile, with ?member=<id>.
   course: { title: 'This course', frame: 'You are briefing the member on ONE course they are walking or teaching. The snapshot holds the course itself (what it is, who leads it, its modules and the lessons in order), where THIS member stands in it (what they have completed, what is next), and its cohort life if there is any. If they teach it, speak to the shape of the material and what is thin or missing; if they are learning it, pick up where they left off — name the next lesson and what it covers, in a sentence. Never invent a lesson that is not in the outline.' },
-  member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
+  member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Use the pronouns given in the snapshot and never infer them from a name. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
 };
 
 // One brief per section, kept until the notifications feeding it actually
@@ -215,17 +215,19 @@ export default function AssistantBrief() {
           // sessions, and your direct thread — content included only if they
           // let assistants read their messages.
           const [{ data: prof }, mine, recs, { data: shared }, { data: theirPosts }, bookables] = await Promise.all([
-            supabase.from('profiles').select('full_name, headline, bio, identity_tags, assistant_readable').eq('id', memberId).maybeSingle(),
+            supabase.from('profiles').select('full_name, pronouns, headline, bio, identity_tags, assistant_readable').eq('id', memberId).maybeSingle(),
             loadMyWeb(),
             loadMyRecommendations(),
             supabase.from('space_members').select('spaces(id, name)').eq('profile_id', memberId),
             supabase.from('posts').select('id, title, body, service_areas, created_at, details').eq('author_id', memberId).order('created_at', { ascending: false }).limit(8),
             listBookableTypes(memberId).catch(() => []),
           ]);
-          const who = prof as { full_name: string | null; headline: string | null; bio: string | null; identity_tags: string[] | null; assistant_readable: boolean | null } | null;
+          const who = prof as { full_name: string | null; pronouns: string | null; headline: string | null; bio: string | null; identity_tags: string[] | null; assistant_readable: boolean | null } | null;
           const name = who?.full_name ?? 'This member';
           extras.who = {
             name,
+            // Stated, or they/them — NEVER inferred from the name.
+            pronouns: who?.pronouns?.trim() || 'they/them (not stated — do not guess from their name)',
             headline: who?.headline ?? undefined,
             bio: (who?.bio ?? '').slice(0, 400) || undefined,
             identity_tags: who?.identity_tags?.length ? who.identity_tags : undefined,
