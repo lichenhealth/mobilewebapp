@@ -77,7 +77,7 @@ export default function ChatConversation({
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
         supabase.from('chats').select('id, kind, title, space_id').eq('id', chatId).maybeSingle(),
-        supabase.from('chat_members').select('profile_id, profiles(full_name)').eq('chat_id', chatId),
+        supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
@@ -85,8 +85,12 @@ export default function ChatConversation({
       const c = cRes.data as { id: string; kind: ChatKind; title: string | null; space_id: string | null };
       setChat({ id: c.id, kind: c.kind, title: c.title, space_id: c.space_id });
       const map: Record<string, MemberInfo> = {};
-      for (const r of (mRes.data as { profile_id: string; profiles: { full_name: string | null } | null }[] | null) ?? []) {
-        map[r.profile_id] = { profile_id: r.profile_id, name: r.profiles?.full_name ?? 'Member' };
+      for (const r of (mRes.data as { profile_id: string; profiles: { full_name: string | null; avatar_url: string | null } | null }[] | null) ?? []) {
+        map[r.profile_id] = {
+          profile_id: r.profile_id,
+          name: r.profiles?.full_name ?? 'Member',
+          avatarUrl: r.profiles?.avatar_url ?? null,
+        };
       }
       setMembers(map);
       setMessages(((msgRes.data as MessageRow[] | null) ?? []));
@@ -293,7 +297,9 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
 function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void }) {
   const navigate = useNavigate();
   const profilePath = profilePathFor(chat, members, me);
-  const isDirect = chat.kind === 'direct' || chat.kind === 'help';
+  // Help is no longer DM-shaped: with two possible responders, a message
+  // has to say WHO sent it, and the header has to show both faces.
+  const isDirect = chat.kind === 'direct';
   const other = otherMember(members, me);
   return (
     <header className="thread__head">
@@ -320,10 +326,20 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
             </div>
           ) : (
             <div className="thread__head-group">
-              {members.slice(0, 3).map((mem, i) => (
-                <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: 3 - i }}>
-                  {monogramFor(mem.name)}
-                </span>
+              {/* THE FACES YOU'RE TALKING TO (founder 2026-08-16): use real
+                  avatars when they exist — a help room's whole point is
+                  seeing that both Lichen Health and the assistant are here,
+                  and monogram discs couldn't show that. Your OWN face is
+                  dropped: you're in every chat you can see, so it carries no
+                  information and costs a slot. */}
+              {members.filter((m) => m.profile_id !== me).slice(0, 3).map((mem, i) => (
+                mem.avatarUrl
+                  ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 3 - i }} />
+                  : (
+                    <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: 3 - i }}>
+                      {monogramFor(mem.name)}
+                    </span>
+                  )
               ))}
             </div>
           )}
@@ -346,7 +362,9 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
 
 function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string }) {
   const navigate = useNavigate();
-  const isDirect = chat.kind === 'direct' || chat.kind === 'help';
+  // Help is no longer DM-shaped: with two possible responders, a message
+  // has to say WHO sent it, and the header has to show both faces.
+  const isDirect = chat.kind === 'direct';
   const other = otherMember(members, me);
   const profilePath = profilePathFor(chat, members, me);
   return (
@@ -363,10 +381,17 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
           </div>
         ) : (
           <div className="thread__intro-group">
-            {members.slice(0, 4).map((mem, i) => (
-              <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: 4 - i }}>
-                {monogramFor(mem.name)}
-              </span>
+            {/* Same rule as the header: real faces, and not your own — this
+                mark is the first thing you see in an empty room, so it should
+                show WHO is waiting for you. */}
+            {members.filter((m) => m.profile_id !== me).slice(0, 4).map((mem, i) => (
+              mem.avatarUrl
+                ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 4 - i }} />
+                : (
+                  <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: 4 - i }}>
+                    {monogramFor(mem.name)}
+                  </span>
+                )
             ))}
           </div>
         )}

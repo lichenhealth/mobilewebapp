@@ -11,7 +11,7 @@ export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
 export interface Attachment { type: MediaType; url: string; }
 
-export interface MemberInfo { profile_id: string; name: string; }
+export interface MemberInfo { profile_id: string; name: string; avatarUrl?: string | null; }
 export interface MessageRow {
   id: string;
   chat_id: string;
@@ -106,7 +106,12 @@ export function chatTitle(
   members: MemberInfo[],
   me: string,
 ): string {
-  if (kind === 'direct' || kind === 'help') {
+  // A help room holds MORE than one responder now — Lichen Health and the
+  // assistant both sit in it (founder 2026-08-16) — so naming it after
+  // whichever member happened to sort first was arbitrary, and it started
+  // reading "Claude". It has one true name.
+  if (kind === 'help') return 'Lichen Help';
+  if (kind === 'direct') {
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
   }

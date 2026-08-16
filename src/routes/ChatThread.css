@@ -723,3 +723,23 @@
   font: inherit; color: inherit;
 }
 .msg-run__sender-link:hover { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
+/* Real avatars in the header stack sit exactly where the monogram discs do. */
+.thread__head-group img {
+  position: absolute; width: 22px; height: 22px; border-radius: var(--r-full);
+  border: 2px solid var(--bone); object-fit: cover;
+}
+.thread__head-group img:only-child { position: static; width: 38px; height: 38px; border: 0; }
+.thread__head-group img:nth-child(1) { top: 0; left: 0; }
+.thread__head-group img:nth-child(2) { top: 6px; left: 8px; }
+.thread__head-group img:nth-child(3) { top: 12px; left: 16px; }
+/* Real avatars in the intro mark, matching the monogram discs' geometry. */
+.thread__intro-group img {
+  position: absolute; width: 40px; height: 40px; border-radius: var(--r-full);
+  border: 2px solid var(--bone); object-fit: cover;
+}
+.thread__intro-group img:only-child { position: static; width: 72px; height: 72px; border: 0; }
+/* Same offsets the monogram discs use, so a mixed group doesn't jump. */
+.thread__intro-group img:nth-child(1) { top: 0; left: 0; }
+.thread__intro-group img:nth-child(2) { top: 0; left: 18px; }
+.thread__intro-group img:nth-child(3) { top: 16px; left: 9px; }
+.thread__intro-group img:nth-child(4) { top: 16px; left: 27px; }
