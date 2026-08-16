@@ -591,13 +591,20 @@ export default function Calendar() {
     try {
       const u = new URL(url);
       const eid = u.searchParams.get('eid');
-      if (!eid || u.searchParams.has('authuser')) return url;
+      if (!eid) return url;
       const b64 = eid.replace(/-/g, '+').replace(/_/g, '/');
       const decoded = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
       const calId = decoded.split(' ')[1];
-      if (!calId || !calId.includes('@')) return url;
-      u.searchParams.set('authuser', calId);
-      return u.toString();
+      // ⚠ Go to calendar.google.com DIRECTLY. Google's stored htmlLink points
+      // at the legacy www.google.com/calendar/event endpoint, which redirects
+      // to calendar.google.com/calendar/u/0/r — dropping every query param we
+      // added and hardcoding account index 0 on the way. That's why naming
+      // the account did nothing: it never survived the hop (founder's landed
+      // URL, 2026-08-16: ".../u/0/r?msg=Could+not+find+the+requested+event").
+      const out = new URL('https://calendar.google.com/calendar/event');
+      out.searchParams.set('eid', eid);
+      if (calId && calId.includes('@')) out.searchParams.set('authuser', calId);
+      return out.toString();
     } catch { return url; }
   };
 
