@@ -281,7 +281,19 @@ export async function spaceHasEvents(spaceId: string): Promise<boolean> {
 export async function loadFeed(limit = 50, opts: { river?: boolean } = {}): Promise<FeedPost[]> {
   // Hidden posts drop here, centrally — every feed surface inherits it.
   let q = supabase.from('posts').select(FEED_SELECT);
-  if (opts.river) q = q.or('details->>quiet.is.null,details->>quiet.neq.true');
+  if (opts.river) {
+    q = q.or('details->>quiet.is.null,details->>quiet.neq.true');
+    // COURSE MATERIAL IS NOT A STORY (founder 2026-08-15): "administrative
+    // and managerial work around posting courses, etc, shouldn't be in there
+    // at all, ever. Only someone actively deciding to post something to the
+    // feed should render a story." Publishing a module is filing material in
+    // a room, not addressing the network — so it never enters the river. It
+    // still lives in Courses, in its collection, in search and in the
+    // author's Drive. The one exception is a DOOR post (details.collectionId)
+    // — the thing Compose mints when you deliberately announce a collection.
+    // That IS the decision to post, so it keeps its place.
+    q = q.or('service_areas.not.cs.{courses},details->>collectionId.not.is.null');
+  }
   const [{ data, error }, hidden] = await Promise.all([
     q.order('created_at', { ascending: false }).limit(limit),
     loadMyHidden(),
