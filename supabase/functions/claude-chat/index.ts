@@ -90,7 +90,12 @@ MEMBERSHIP & INVITES
 /** The help room's own frame. Two intelligences sit in it with the member,
  *  and the routing is by KIND of question, not by who types first — a race
  *  the assistant would win every time, leaving the human no room. */
-const HELP_FRAME = `You are in a member's private HELP room on Lichen. Three people are here: the member, Lichen Architect (Galyn, a human — carbon), and you, Lichen Builder (silicon). Be transparent about that whenever it matters: the member should always know which of you is speaking, and that a human reads this room too.
+const HELP_FRAME = `You are in a member's private HELP room on Lichen. Three parties are here:
+- THE MEMBER who opened the room.
+- LICHEN HEALTH — the support account, staffed by Galyn, a real human (she/her). Also called Lichen Architect, or "Oi" (organic intelligence, carbon, Ca). When someone asks whether "a real person" is here, the answer is yes: Lichen Health is a human, and you should say whether they are present and whether they've read the room.
+- YOU — Lichen Builder, also called "Ai" (silicon, Si). You are not a person and never pretend to be.
+
+Members may use any of those names. "Ai" means you; "Oi" means the human. Don't say you don't know what they mean. Be transparent about that whenever it matters: the member should always know which of you is speaking, and that a human reads this room too.
 
 HOW THE TWO OF YOU DIVIDE THE WORK — follow this, it is the whole point:
 
@@ -142,10 +147,13 @@ Deno.serve(async (req) => {
     if (!trigger.body.toLowerCase().includes(mention)) return json({ ok: true, skipped: 'not-addressed' });
   }
   // Never answer the human steward's own messages — when Galyn replies in a
-  // help room, that's the answer, not a prompt for one.
+  // help room, that's the answer, not a prompt for one. Held at function
+  // scope because the roster below needs it too, to say WHICH of the people
+  // in the room is the human.
+  let supportId: string | null = null;
   if (isHelp) {
     const support = await (await sb('profiles?email=eq.connect@lichen.health&select=id')).json();
-    const supportId = Array.isArray(support) ? support[0]?.id : null;
+    supportId = Array.isArray(support) ? support[0]?.id : null;
     if (supportId && trigger.sender_id === supportId) return json({ ok: true, skipped: 'steward-spoke' });
   }
 
@@ -187,7 +195,10 @@ Deno.serve(async (req) => {
                    presence_always_present?: boolean; presence_lit_until?: string | null };
     }) => {
       const p = r.profiles ?? {};
-      if (r.profile_id === assistant_id) return `- ${p.full_name ?? 'The assistant'} (you) — always here.`;
+      if (r.profile_id === assistant_id) return `- ${p.full_name ?? 'The assistant'} — YOU, the assistant (Ai). Always here.`;
+      const role = r.profile_id === supportId
+        ? 'LICHEN HEALTH, the human support account (Galyn / Oi — a real person)'
+        : 'the member who opened this room';
       // PRESENT = candle lit AND a heartbeat in the last 5 minutes. Both arms
       // matter: a hand-lit candle must not outlive the session that lit it.
       const beat = p.last_seen_at ? Date.parse(p.last_seen_at) : 0;
@@ -201,7 +212,7 @@ Deno.serve(async (req) => {
             : 'has NOT yet read the latest message')
         : 'has not opened this room yet';
       const pron = p.pronouns?.trim() ? ` (${p.pronouns.trim()})` : '';
-      return `- ${p.full_name ?? 'A member'}${pron} — ${present ? 'PRESENT right now' : 'not present right now'}; ${seen}.`;
+      return `- ${p.full_name ?? 'A member'}${pron} — ${role}. ${present ? 'PRESENT right now' : 'NOT present right now'}; ${seen}.`;
     });
     if (lines.length) {
       rosterNote = `\n\nWHO IS IN THIS ROOM, as of this moment:\n${lines.join('\n')}\n`
@@ -219,7 +230,11 @@ Deno.serve(async (req) => {
     headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 400,
+      // 400 cut a help reply mid-sentence ("As for \"getting them into the
+      // con") — the same trap wow-window hit at 300. A support answer that
+      // stops halfway is worse than a short one, and the cap is a ceiling,
+      // not a target: short replies still cost what they cost.
+      max_tokens: 900,
       // Two blocks on purpose: the persona, frame, map and rules are stable
       // and worth caching (the map is long). The roster changes with every
       // message — presence and read cursors move — so it goes in its own
