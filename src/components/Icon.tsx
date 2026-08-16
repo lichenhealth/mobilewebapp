@@ -319,11 +319,19 @@ const ICONS: Record<IconName, IconEntry> = {
     // tall and can't fill the box vertically without ceasing to look like a
     // cloud, so the bolt carries the height — and gets to be the subject,
     // which is what was asked for.
-    viewBox: '0 0 24 24',
-    strokeWidth: 1.6,
+    // Then 15% bigger again, by CROPPING the viewBox to the glyph rather than
+    // scaling the path — the drawing had already reached the edges, so scaling
+    // further clipped it under the stroke. The box is now the glyph's own
+    // bounds, which puts the outer half-stroke flush at the left and right
+    // edges exactly as Maps' circle does — that flush edge is what buys the
+    // full 15%. Measured at size 20: 17.4px drawn before, 20.0px now, the same
+    // as Maps. strokeWidth drops to 1.36 so the line still lands at ~1.3px,
+    // like Chat, Calendar, Maps and Profile.
+    viewBox: '1.53 2.81 20.94 20.94',
+    strokeWidth: 1.36,
     content: <>
       <path d="M9.02 19.34H6.21a4.68 4.68 0 0 1-.47-9.34 6.08 6.08 0 0 1 11.85-1.05A4.21 4.21 0 0 1 16.97 19.34h-1.87" />
-      <path d="M13.5 7.6 9.9 14h2.6l-1 7 3.5-7.8h-2.6l1.1-5.6Z" />
+      <path d="M13.5 8.5 9.9 14.9h2.6l-1 7 3.5-7.8h-2.6l1.1-5.6Z" />
     </>,
   },
   'saved': {
