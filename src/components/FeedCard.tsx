@@ -172,7 +172,12 @@ export default function FeedCard({
   // An activity line, not a story: the material stays on its own page and
   // the feed just says it arrived. Everything else a card carries — trust,
   // recommend, save, the menu — belongs with the piece, so it lives there.
-  if (activity) {
+  // ...but never on the piece's OWN page. `expanded` means this card IS the
+  // thing rather than a mention of it, so an activity line there rendered a
+  // one-liner that linked to itself — a lesson opened to a stub saying
+  // someone had posted it (founder 2026-08-16: "Why Lichen Exists doesn't
+  // click through to anything").
+  if (activity && !expanded) {
     return (
       <div className={'feed-card-shell feed-card-shell--activity' + (demo ? ' feed-card-shell--demo' : '')}>
         <article className="feed-activity">
