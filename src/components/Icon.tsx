@@ -309,11 +309,21 @@ const ICONS: Record<IconName, IconEntry> = {
   // 2026-08-14 — "since it is a cloud storage offering... a nod to
   // current-cy"). The bookmark stays the SAVE gesture; this marks the place.
   'drive': {
+    // Sized to its neighbours (founder 2026-08-15: "the cloud is smaller than
+    // the other icons"). The original filled 52% of the viewBox height where
+    // profile/calendar fill 83–93%, so it read small in the nav. Same shape,
+    // scaled 1.17× about its own centre and re-centred in the box, with a
+    // taller bolt — coordinates rewritten rather than wrapped in a transform,
+    // so the stroke stays 1.6 like everything around it. The bolt drops THROUGH
+    // the gap in the cloud's baseline and past it: a cloud is wider than it is
+    // tall and can't fill the box vertically without ceasing to look like a
+    // cloud, so the bolt carries the height — and gets to be the subject,
+    // which is what was asked for.
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <>
-      <path d="M9.6 16H7.2a4 4 0 0 1-.4-7.98 5.2 5.2 0 0 1 10.13-.9A3.6 3.6 0 0 1 16.4 16h-1.6" />
-      <path d="M13.1 10.6 10.6 14.5h2.2l-1.2 4 3.6-4.8h-2.3l1.6-3.1Z" />
+      <path d="M9.02 19.34H6.21a4.68 4.68 0 0 1-.47-9.34 6.08 6.08 0 0 1 11.85-1.05A4.21 4.21 0 0 1 16.97 19.34h-1.87" />
+      <path d="M13.5 7.6 9.9 14h2.6l-1 7 3.5-7.8h-2.6l1.1-5.6Z" />
     </>,
   },
   'saved': {
