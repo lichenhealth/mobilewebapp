@@ -579,6 +579,28 @@ export default function Calendar() {
   };
   const onColCancel = () => { dragRef.current = null; setDrag(null); };
 
+  /** NAME THE ACCOUNT (founder 2026-08-16: the link "lands me on the month
+   *  view, with the day correct, but it says it can't find the event").
+   *  Google resolves an `eid` against whichever account the browser happens
+   *  to be using; signed into more than one, it reads the date out of the
+   *  eid but looks for the event in the wrong account. The eid itself is
+   *  base64 of "<eventId> <calendarId>", so the calendar it belongs to is
+   *  right there — hand it to Google as `authuser` and it looks in the right
+   *  place. Anything unexpected falls through to the original link. */
+  const googleAuthUser = (url: string): string => {
+    try {
+      const u = new URL(url);
+      const eid = u.searchParams.get('eid');
+      if (!eid || u.searchParams.has('authuser')) return url;
+      const b64 = eid.replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+      const calId = decoded.split(' ')[1];
+      if (!calId || !calId.includes('@')) return url;
+      u.searchParams.set('authuser', calId);
+      return u.toString();
+    } catch { return url; }
+  };
+
   /** Where an imported block came from, and what to call the way back. The
    *  per-event link when the source gave one; otherwise that day in the
    *  source calendar (we know the source from the calendar's stored url). */
@@ -586,7 +608,10 @@ export default function Calendar() {
     if (!e.external) return null;
     if (e.sourceUrl) {
       const host = extHostOf(e);
-      return { href: e.sourceUrl, label: host === 'google' ? 'Open in Google Calendar' : 'Open where it lives' };
+      return {
+        href: host === 'google' ? googleAuthUser(e.sourceUrl) : e.sourceUrl,
+        label: host === 'google' ? 'Open in Google Calendar' : 'Open where it lives',
+      };
     }
     const host = extHostOf(e);
     if (host !== 'google') return null;
