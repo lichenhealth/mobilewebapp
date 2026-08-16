@@ -402,3 +402,6 @@
   }
   .conv-row.is-active { background: var(--peach-tint); }
 }
+/* Real avatars in inbox rows — same geometry as the monogram bubbles. */
+.conv-row__avatar--img { object-fit: cover; }
+img.conv-row__group-bub { object-fit: cover; }

@@ -240,8 +240,9 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
 }
 
 function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
-  // Direct/help + solo chats show a single monogram, keyed off the OTHER member.
-  const dmLike = chat.kind === 'direct' || chat.kind === 'help';
+  // A help room holds Lichen Health AND the assistant now, so it stacks like
+  // any group rather than showing one face (founder 2026-08-16).
+  const dmLike = chat.kind === 'direct';
   const single =
     dmLike
       ? (chat.members.find((m) => m.profile_id !== me) ?? chat.members[0])
@@ -250,6 +251,9 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
         : null;
 
   if (dmLike || chat.members.length <= 1) {
+    if (single?.avatarUrl) {
+      return <img className="conv-row__avatar conv-row__avatar--img" src={single.avatarUrl} alt="" />;
+    }
     const color = single ? colorFor(single.profile_id) : undefined;
     return (
       <div className="conv-row__avatar" style={color ? { background: color, color: 'var(--bone-warm)' } : undefined}>
@@ -258,17 +262,22 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
     );
   }
 
-  const sample = chat.members.slice(0, 3);
+  // Your own face carries no information — you're in every chat you can see.
+  const sample = chat.members.filter((m) => m.profile_id !== me).slice(0, 3);
   return (
     <div className="conv-row__group">
       {sample.map((mem, i) => (
-        <div
-          key={mem.profile_id}
-          className="conv-row__group-bub"
-          style={{ zIndex: 3 - i, background: colorFor(mem.profile_id) }}
-        >
-          {monogramFor(mem.name)}
-        </div>
+        mem.avatarUrl
+          ? <img key={mem.profile_id} className="conv-row__group-bub" src={mem.avatarUrl} alt="" style={{ zIndex: 3 - i }} />
+          : (
+            <div
+              key={mem.profile_id}
+              className="conv-row__group-bub"
+              style={{ zIndex: 3 - i, background: colorFor(mem.profile_id) }}
+            >
+              {monogramFor(mem.name)}
+            </div>
+          )
       ))}
     </div>
   );

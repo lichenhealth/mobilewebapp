@@ -743,3 +743,11 @@
 .thread__intro-group img:nth-child(2) { top: 0; left: 18px; }
 .thread__intro-group img:nth-child(3) { top: 16px; left: 9px; }
 .thread__intro-group img:nth-child(4) { top: 16px; left: 27px; }
+
+/* CENTRE THE STACK ON ITS CONTENT (founder 2026-08-16: "the profile icons
+   are off center to the left"). Both boxes are sized for a full 3–4 person
+   cluster; with exactly TWO — the help room's shape — the discs filled only
+   the left of that box and read as misaligned. Size the box to what's
+   actually in it. */
+.thread__intro-group:has(> :nth-child(2):last-child) { width: 58px; height: 40px; }
+.thread__head-group:has(> :nth-child(2):last-child) { width: 30px; height: 28px; }

@@ -94,12 +94,12 @@ export function dayLabel(iso: string): string {
   });
 }
 
-interface MemberRowRaw { chat_id: string; profile_id: string; profiles: { full_name: string | null } | null }
+interface MemberRowRaw { chat_id: string; profile_id: string; profiles: { full_name: string | null; avatar_url: string | null } | null }
 
-/** Title for a chat: for a direct or help chat, the OTHER member's name (title
- *  is null in the DB); otherwise the stored title, falling back to the kind
- *  label. In a help room the "other" is the Lichen support account for the
- *  member, and the member for support — exactly the DM behavior. */
+/** Title for a chat: a help room is always "Lichen Help" (it holds more than
+ *  one responder now, so naming it after a member was arbitrary); a direct
+ *  chat takes the OTHER member's name (title is null in the DB); otherwise
+ *  the stored title, falling back to the kind label. */
 export function chatTitle(
   kind: ChatKind,
   storedTitle: string | null,
@@ -144,7 +144,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
     supabase.from('chats').select('id, kind, title, created_at').not('kind', 'in', '("care_team","event")'),
-    supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name)'),
+    supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
       .select(MESSAGE_COLS)
       .order('created_at', { ascending: false })
@@ -154,7 +154,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const membersByChat = new Map<string, MemberInfo[]>();
   for (const r of (mRes.data as MemberRowRaw[] | null) ?? []) {
     const arr = membersByChat.get(r.chat_id) ?? [];
-    arr.push({ profile_id: r.profile_id, name: r.profiles?.full_name ?? 'Member' });
+    arr.push({ profile_id: r.profile_id, name: r.profiles?.full_name ?? 'Member', avatarUrl: r.profiles?.avatar_url ?? null });
     membersByChat.set(r.chat_id, arr);
   }
 

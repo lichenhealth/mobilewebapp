@@ -397,7 +397,17 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
         )}
       </div>
       <h3 className="thread__intro-name">{title}</h3>
-      <p className="thread__intro-desc">{isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} chat`}</p>
+      {/* A help room says who's in it and what they're for (founder
+          2026-08-16) — the two intelligences, and that feedback is welcome
+          rather than merely tolerated. */}
+      {chat.kind === 'help' ? (
+        <p className="thread__intro-desc">
+          Claude <em>(Lichen Builder)</em> and Galyn <em>(Lichen Architect)</em> are both here —
+          to help you use the platform, and to make it better with what you tell us.
+        </p>
+      ) : (
+        <p className="thread__intro-desc">{isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} chat`}</p>
+      )}
       <p className="thread__intro-hint">
         Lichen keeps this conversation between members. No third-party tracking.
       </p>
