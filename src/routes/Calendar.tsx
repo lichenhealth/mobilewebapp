@@ -601,6 +601,25 @@ export default function Calendar() {
     } catch { return url; }
   };
 
+  /** That day in the source calendar. Always resolves — no event id to look
+   *  up — so it's the door that can't fail (founder 2026-08-16: the per-event
+   *  link still errors, so the popup offers both rather than one dead end). */
+  const googleDayDoor = (e: EventRow): string | null => {
+    if (extHostOf(e) !== 'google') return null;
+    const d = localDate(e.start_date);
+    const cal = (() => {
+      try {
+        const eid = new URL(e.sourceUrl ?? '').searchParams.get('eid');
+        if (!eid) return null;
+        const b64 = eid.replace(/-/g, '+').replace(/_/g, '/');
+        const id = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)).split(' ')[1];
+        return id && id.includes('@') ? id : null;
+      } catch { return null; }
+    })();
+    const base = `https://calendar.google.com/calendar/r/day/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    return cal ? `${base}?authuser=${encodeURIComponent(cal)}` : base;
+  };
+
   /** Where an imported block came from, and what to call the way back. The
    *  per-event link when the source gave one; otherwise that day in the
    *  source calendar (we know the source from the calendar's stored url). */
@@ -1161,6 +1180,18 @@ export default function Calendar() {
                     target="_blank" rel="noopener noreferrer"
                   >
                     <Icon name="arrow-right" size={13} /> {externalDoor(selected)!.label}
+                  </a>
+                )}
+                {/* The deep link depends on Google resolving an event id
+                    against the right account; when it can't, this one still
+                    lands you next to the event instead of on an error. */}
+                {selected.sourceUrl && googleDayDoor(selected) && (
+                  <a
+                    className="calp__sheet-extlink calp__sheet-extlink--alt"
+                    href={googleDayDoor(selected)!}
+                    target="_blank" rel="noopener noreferrer"
+                  >
+                    <Icon name="calendar" size={13} /> Or open that day
                   </a>
                 )}
               </>
