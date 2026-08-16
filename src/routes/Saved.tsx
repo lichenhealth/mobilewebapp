@@ -160,8 +160,8 @@ export default function Saved() {
         </p>
         <h1 className="myc__title">Your Drive</h1>
         <p className="myc__sub">
-          What you&rsquo;ve saved and what you&rsquo;ve created — held quietly in
-          one place, visible only to you, ready to publish out from when you are.
+          What you&rsquo;ve saved and what you&rsquo;ve created — organized for
+          you to edit, develop and publish as desired.
         </p>
       </header>
 
