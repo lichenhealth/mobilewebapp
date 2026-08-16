@@ -154,8 +154,10 @@ export default function Saved() {
   return (
     <div className="myc">
       <header className="myc__head">
+        {/* No glyph here: the top bar's section mark is already the Drive
+            cloud, and Drive is the one section whose crumb repeated it
+            (My-celium's crumb uses sparkle, not the mycelium mark). */}
         <p className="myc__crumb">
-          <Icon name="drive" size={12} />
           <span>Drive</span>
         </p>
         <h1 className="myc__title">Your Drive</h1>
