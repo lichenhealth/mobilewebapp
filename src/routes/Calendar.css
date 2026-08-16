@@ -627,3 +627,9 @@
 .calp__sheet-extlink:hover { text-decoration: underline; }
 /* The secondary way out to Google — quieter than the event link above it. */
 .calp__sheet-extlink--alt { opacity: 0.72; font-size: 12px; }
+/* Which Google account the event lives in — the difference between a broken
+   link and a link you're signed out of. */
+.calp__sheet-extnote {
+  margin: 2px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-soft);
+}
+.calp__sheet-extnote strong { color: var(--ink); font-weight: 600; word-break: break-all; }

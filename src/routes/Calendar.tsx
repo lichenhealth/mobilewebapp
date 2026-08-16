@@ -608,6 +608,18 @@ export default function Calendar() {
     } catch { return url; }
   };
 
+  /** The Google account an imported event belongs to — the second half of its
+   *  eid, which is base64 of "<eventId> <calendarId>". */
+  const googleCalIdOf = (e: EventRow): string | null => {
+    try {
+      const eid = new URL(e.sourceUrl ?? '').searchParams.get('eid');
+      if (!eid) return null;
+      const b64 = eid.replace(/-/g, '+').replace(/_/g, '/');
+      const id = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)).split(' ')[1];
+      return id && id.includes('@') ? id : null;
+    } catch { return null; }
+  };
+
   /** That day in the source calendar. Always resolves — no event id to look
    *  up — so it's the door that can't fail (founder 2026-08-16: the per-event
    *  link still errors, so the popup offers both rather than one dead end). */
@@ -630,13 +642,20 @@ export default function Calendar() {
   /** Where an imported block came from, and what to call the way back. The
    *  per-event link when the source gave one; otherwise that day in the
    *  source calendar (we know the source from the calendar's stored url). */
-  const externalDoor = (e: EventRow): { href: string; label: string } | null => {
+  const externalDoor = (e: EventRow): { href: string; label: string; account?: string } | null => {
     if (!e.external) return null;
     if (e.sourceUrl) {
       const host = extHostOf(e);
       return {
         href: host === 'google' ? googleAuthUser(e.sourceUrl) : e.sourceUrl,
         label: host === 'google' ? 'Open in Google Calendar' : 'Open where it lives',
+        // WHICH ACCOUNT IT NEEDS (founder 2026-08-16). The event lives in one
+        // Google account; a browser signed into a different one gets "Could
+        // not find the requested event" — which reads as a broken link when
+        // it's really the wrong account. Naming it makes the failure legible
+        // and tells you what to do about it. We can't know which account the
+        // browser is using, so we say which one the event is IN.
+        account: host === 'google' ? (googleCalIdOf(e) ?? undefined) : undefined,
       };
     }
     const host = extHostOf(e);
@@ -1188,6 +1207,12 @@ export default function Calendar() {
                   >
                     <Icon name="arrow-right" size={13} /> {externalDoor(selected)!.label}
                   </a>
+                )}
+                {externalDoor(selected)?.account && (
+                  <p className="calp__sheet-extnote">
+                    Lives in <strong>{externalDoor(selected)!.account}</strong> — open it in a
+                    browser signed into that account.
+                  </p>
                 )}
                 {/* The deep link depends on Google resolving an event id
                     against the right account; when it can't, this one still
