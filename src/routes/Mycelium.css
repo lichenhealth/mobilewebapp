@@ -154,6 +154,11 @@
 }
 
 .myc__empty {
+  /* Spans the feed's columns (founder 2026-08-16: "it's not centered on the
+     page"). At >=1024px .myc__feed is an auto-fill grid, so an empty state
+     landed in column ONE and centred itself there — a quarter of the way
+     across. Shared by My-celium and Drive, so both were off. */
+  grid-column: 1 / -1;
   padding: var(--s-7) var(--s-5);
   text-align: center;
   color: var(--ink-muted);

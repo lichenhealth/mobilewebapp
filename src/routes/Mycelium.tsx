@@ -197,11 +197,15 @@ export default function Mycelium() {
             ) : (
               <>
                 {/* Your web IS a filter on Lichen (founder 2026-08-11) — an
-                    empty one should say so and point at the whole. */}
-                <span className="display-italic">No Marketplace content from your web yet!</span>
-                <p>Weave more people and places in — or see what the whole network is offering.</p>
-                <button className="btn myc__empty-go" onClick={() => navigate('/market')}>
-                  Visit the Lichen Marketplace
+                    empty one should say so and point at the whole. ⚠ This is
+                    the FEED, not one area: the copy said "No Marketplace
+                    content" and offered a door to /market, which made no
+                    sense on a page showing everything your web shares
+                    (founder 2026-08-16). */}
+                <span className="display-italic">Nothing from your web yet!</span>
+                <p>Weave more people and places in — or see what the whole network is sharing.</p>
+                <button className="btn myc__empty-go" onClick={() => navigate('/home')}>
+                  Visit Lichen
                 </button>
               </>
             )}
