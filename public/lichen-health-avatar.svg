@@ -5,11 +5,16 @@
        life, blue is tending the structure. In a help room both are present,
        and the element tells you which intelligence is speaking. -->
   <circle cx="48" cy="48" r="48" fill="#E8916A"/>
-  <g transform="translate(9.6,7.5) scale(3.2)" fill="none" stroke="#FFFFFF" stroke-width="1.3">
+  <g transform="translate(15,6) scale(2.75)" fill="none" stroke="#FFFFFF" stroke-width="1.3">
     <path d="M9.5 3.5a3 3 0 00-3 3v.6a3 3 0 00-2.5 2.95V12a3 3 0 002.5 2.95v.6a3 3 0 003 3h2.5V3.5H9.5z" stroke-linejoin="round"/>
     <path d="M14.5 3.5a3 3 0 013 3v.6a3 3 0 012.5 2.95V12a3 3 0 01-2.5 2.95v.6a3 3 0 01-3 3H12V3.5h2.5z" stroke-linejoin="round"/>
     <path d="M9.5 8h-1M9.5 11.5h-1M14.5 8h1M14.5 11.5h1" stroke-linecap="round"/>
   </g>
-  <text x="48" y="89" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"
-        font-size="24" font-weight="700" fill="#FFFFFF" opacity="0.95">Ca</text>
+  <!-- A heartbeat instead of "Ca" (founder 2026-08-16). A pulse says organic
+       intelligence to anyone, where two letters of the periodic table say it
+       only to people who already know — and a glyph survives the 26px badge
+       where letters turned to mud. Same trace language as the Concierge
+       heart. -->
+  <path d="M33 74h6l3.5-8 4.5 15 3.5-7H63" fill="none" stroke="#FFFFFF"
+        stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
