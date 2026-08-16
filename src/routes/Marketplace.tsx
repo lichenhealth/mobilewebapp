@@ -341,10 +341,8 @@ export default function Marketplace() {
             <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
           </button>
         )}
+        {/* No glyph: the top bar already wears the store mark. */}
         <p className="mkt__crumb">
-          {/* A filtered Marketplace is still the Marketplace — the way to
-              the whole of it sits left of the mark (founder 2026-08-11). */}
-          <Icon name="store" size={11} />
           <span>Marketplace</span>
         </p>
         <h1 className="mkt__title">
@@ -556,10 +554,13 @@ export default function Marketplace() {
         />
       )}
 
-      <footer className="mkt__end">
-        <span className="eyebrow">End of market</span>
-        <Icon name="sparkle" size={14} />
-      </footer>
+      {/* Same rule as AreaFeed: no "end of" before there's a list. */}
+      {ready && filtered.length > 0 && (
+        <footer className="mkt__end">
+          <span className="eyebrow">End of market</span>
+          <Icon name="sparkle" size={14} />
+        </footer>
+      )}
       </>}
     </div>
   );

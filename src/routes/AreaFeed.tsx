@@ -213,10 +213,10 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         {/* One implementation of the way back (founder 2026-08-15 made this a
             platform rule) — AreaFeed's bespoke version was its precedent. */}
         <ScopeBack />
+        {/* No glyph: the top bar's section mark is already this section's
+            icon, so the crumb was showing it twice (founder 2026-08-16, on
+            Drive — same duplication across every area). */}
         <p className="mkt__crumb">
-          {/* Filtered is still the whole section, narrowed — the door back
-              to all of it sits left of the mark (founder 2026-08-11). */}
-          <Icon name={icon} size={11} />
           <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
@@ -484,10 +484,16 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         />
       )}
 
-      <footer className="mkt__end">
-        <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>
-        <Icon name="sparkle" size={14} />
-      </footer>
+      {/* Only claim the end of a list that HAS loaded and HAS something in
+          it (founder's audit, 2026-08-16): this rendered unconditionally, so
+          an empty section read "0 posts · Loading… · End of art" all at
+          once — three contradictory states stacked. */}
+      {ready && filtered.length > 0 && (
+        <footer className="mkt__end">
+          <span className="eyebrow">{`End of ${crumb.toLowerCase()}`}</span>
+          <Icon name="sparkle" size={14} />
+        </footer>
+      )}
 
       <ShareToClaudeSheet post={shareTarget} onClose={() => setShareTarget(null)} />
     </div>
