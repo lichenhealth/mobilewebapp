@@ -31,6 +31,72 @@ const sb = (path: string, init?: RequestInit) =>
     headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY!}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
 
+/** LOOK, DON'T GUESS (founder 2026-08-16). The doctrine tells the assistant
+ *  how Lichen works; these tell it how THIS member's Lichen is actually set
+ *  up. "Why can't people book me?" has a real answer sitting in the database,
+ *  and inferring it from a document is how you get a confident wrong answer.
+ *
+ *  ⚠ THE SAFETY RULE, same as the profile-editing tools: no tool takes a
+ *  target. Every one is scoped server-side to the profile that sent the
+ *  triggering message, so there is no argument a model could pass — or a
+ *  member could talk it into passing — that would read someone else's data.
+ *  Read-only throughout; nothing here writes. */
+const LOOKUP_TOOLS = [
+  {
+    name: 'my_setup',
+    description: "Read the ASKING member's own Lichen settings: handle, public page, findability, pronouns, timezone, membership, their availability hours by kind, and whether they have any bookable session types. Use this before answering 'why can't people find/book me' — the answer is usually a setting they haven't set.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'my_spaces',
+    description: "List the spaces (organizations, communities, groups, places) the ASKING member belongs to, and whether they steward each one. Use it when they ask how to manage something, or which of their groups a feature applies to.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+];
+
+/** Run a lookup for ONE profile — the sender of the triggering message. */
+async function runLookup(
+  name: string,
+  who: string,
+  sb: (path: string, init?: RequestInit) => Promise<Response>,
+): Promise<Record<string, unknown>> {
+  const one = async (path: string) => {
+    const r = await sb(path);
+    const j = await r.json();
+    return Array.isArray(j) ? j : [];
+  };
+  if (name === 'my_setup') {
+    const [prof] = await one(`profiles?id=eq.${who}&select=handle,public_page,findable,pronouns,timezone,assistant_readable`);
+    const hours = await one(`availability_windows?profile_id=eq.${who}&select=kind`);
+    const types = await one(`booking_types?profile_id=eq.${who}&select=title,audience,active`);
+    const [sub] = await one(`subscriptions?profile_id=eq.${who}&select=tier,status&order=current_period_end.desc&limit=1`);
+    const byKind: Record<string, number> = {};
+    for (const h of hours as { kind: string }[]) byKind[h.kind] = (byKind[h.kind] ?? 0) + 1;
+    return {
+      handle: (prof as { handle?: string })?.handle ?? null,
+      public_page_on: (prof as { public_page?: boolean })?.public_page ?? false,
+      findable: (prof as { findable?: boolean })?.findable ?? null,
+      pronouns: (prof as { pronouns?: string })?.pronouns ?? null,
+      timezone: (prof as { timezone?: string })?.timezone ?? null,
+      assistant_readable: (prof as { assistant_readable?: boolean })?.assistant_readable ?? null,
+      availability_windows_by_kind: Object.keys(byKind).length ? byKind : 'none set — so they are not bookable and not counted as available',
+      booking_types: (types as { title: string; audience: string; active: boolean }[]).map((t) => `${t.title} (${t.audience}${t.active ? '' : ', inactive'})`),
+      membership: sub ? `${(sub as { tier: string }).tier} (${(sub as { status: string }).status})` : 'none on file',
+    };
+  }
+  if (name === 'my_spaces') {
+    const rows = await one(`space_members?profile_id=eq.${who}&select=role,duties,spaces(name,kind,handle)`);
+    return {
+      spaces: (rows as { role: string; duties: string[] | null; spaces?: { name: string; kind: string } }[]).map((r) => ({
+        name: r.spaces?.name, kind: r.spaces?.kind, your_role: r.role,
+        stewards_it: r.role === 'admin' || r.role === 'super_admin',
+        duties: r.duties ?? undefined,
+      })),
+    };
+  }
+  return { error: 'unknown lookup' };
+}
+
 /** The hand-typed PLATFORM_MAP that used to live here is gone (founder
  *  2026-08-16). It was a 900-token summary of a 26,000-token document and it
  *  had already drifted within hours of being written. Assistants now read the
@@ -174,36 +240,72 @@ Deno.serve(async (req) => {
       ? { role: 'assistant', content: m.body }
       : { role: 'user', content: `${nameOf[m.sender_id] ?? 'A member'}: ${m.body}` });
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      // 400 cut a help reply mid-sentence ("As for \"getting them into the
-      // con") — the same trap wow-window hit at 300. A support answer that
-      // stops halfway is worse than a short one, and the cap is a ceiling,
-      // not a target: short replies still cost what they cost.
-      max_tokens: 900,
-      // Two blocks on purpose: the persona, frame, map and rules are stable
-      // and worth caching (the map is long). The roster changes with every
-      // message — presence and read cursors move — so it goes in its own
-      // UNCACHED block rather than busting the cache on each reply.
-      system: [
-        {
-          type: 'text',
-          text: isHelp
-            ? `${ident.persona}\n\n${HELP_FRAME}\n\n${BASE_RULES}\n\n${LICHEN_DOCTRINE}`
-            : `${ident.persona}\n\n${BASE_RULES}`,
-          cache_control: { type: 'ephemeral' },
-        },
-        ...(rosterNote ? [{ type: 'text', text: rosterNote }] : []),
-      ],
-      messages,
-    }),
-  });
-  if (!res.ok) return json({ error: 'Anthropic call failed', detail: (await res.text()).slice(0, 300) }, 502);
-  const data = await res.json();
-  const reply = (data?.content ?? []).filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n').trim();
+  // A BOUNDED LOOK-THEN-ANSWER LOOP (founder 2026-08-16). Help rooms may
+  // consult the member's own setup before answering; every other surface
+  // stays single-shot. Two rounds is enough to look and then speak, and the
+  // last round forces tool_choice 'none' so it always ends in an answer
+  // rather than another lookup.
+  const MAX_LOOKUP_ROUNDS = 2;
+  let data: Record<string, unknown> | undefined;
+  let inTok = 0, outTok = 0, round = 0;
+  const convo = [...messages];
+
+  while (true) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        // 400 cut a help reply mid-sentence ("As for \"getting them into the
+        // con") — the same trap wow-window hit at 300. A support answer that
+        // stops halfway is worse than a short one.
+        max_tokens: 900,
+        // Two blocks on purpose: persona, frame, rules and the doctrine are
+        // stable and worth caching (the doctrine is ~27k tokens). The roster
+        // changes every message as presence and read cursors move, so it goes
+        // in its own UNCACHED block rather than busting the cache each reply.
+        system: [
+          {
+            type: 'text',
+            text: isHelp
+              ? `${ident.persona}\n\n${HELP_FRAME}\n\n${BASE_RULES}\n\n${LICHEN_DOCTRINE}`
+              : `${ident.persona}\n\n${BASE_RULES}`,
+            cache_control: { type: 'ephemeral' },
+          },
+          ...(rosterNote ? [{ type: 'text', text: rosterNote }] : []),
+        ],
+        messages: convo,
+        ...(isHelp
+          ? { tools: LOOKUP_TOOLS, ...(round >= MAX_LOOKUP_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
+          : {}),
+      }),
+    });
+    if (!res.ok) return json({ error: 'Anthropic call failed', detail: (await res.text()).slice(0, 300) }, 502);
+    data = await res.json();
+    inTok += (data as { usage?: { input_tokens?: number } })?.usage?.input_tokens ?? 0;
+    outTok += (data as { usage?: { output_tokens?: number } })?.usage?.output_tokens ?? 0;
+
+    const calls = ((data as { content?: { type: string; id?: string; name?: string }[] })?.content ?? [])
+      .filter((c) => c.type === 'tool_use');
+    if (!calls.length) break;
+
+    convo.push({ role: 'assistant', content: (data as { content: unknown }).content });
+    const results = [];
+    for (const c of calls) {
+      // ⚠ `trigger.sender_id`, never anything the model supplied.
+      const out = await runLookup(c.name ?? '', trigger.sender_id, sb);
+      results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(out) });
+    }
+    convo.push({ role: 'user', content: results });
+    round++;
+  }
+
+  const reply = ((data as { content?: { type: string; text?: string }[] })?.content ?? [])
+    .filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
   if (!reply) return json({ ok: true, skipped: 'empty-reply' });
 
   await sb('chat_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
@@ -213,7 +315,7 @@ Deno.serve(async (req) => {
   // UVA seed: record the silicon contribution with its exact cost.
   await sb('assistant_queries', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id: trigger.sender_id, context: 'chat', model: MODEL,
-    input_tokens: data?.usage?.input_tokens ?? null, output_tokens: data?.usage?.output_tokens ?? null,
+    input_tokens: inTok || null, output_tokens: outTok || null,
   }) });
 
   return json({ ok: true, replied: true });

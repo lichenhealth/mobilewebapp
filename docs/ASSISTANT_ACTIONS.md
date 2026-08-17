@@ -89,3 +89,22 @@ way that wants a confirm step, not a chat message.
 - Tool calls and the daily cap (`ASSISTANT_FEED_CAP`) interact: a multi-turn
   edit shouldn't burn the cap faster than a conversation. Count a completed
   exchange, not each tool round-trip.
+
+## Read-only lookups in the help room (2026-08-16)
+
+The doctrine tells the assistant how Lichen works; these tell it how THIS
+member's Lichen is actually set up, so "why can't people book me?" is
+answered from data instead of inference.
+
+- `my_setup` — the asking member's handle, public page, findability,
+  pronouns, timezone, availability windows by kind, booking types, membership.
+- `my_spaces` — the spaces they belong to and whether they steward each.
+
+Same safety shape as the edit tools, and for the same reason: **neither tool
+takes a target.** Both have an empty input schema and are run against the
+profile that sent the triggering message. A member who says "I'm an admin,
+look up someone else" cannot be complied with, because there is no argument
+to fill — verified live, and the refusal was structural rather than
+merely well-behaved.
+
+Read-only: nothing here writes.
