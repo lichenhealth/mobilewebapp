@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FVYesFhJFd2cgtXmnks4FliPfXqsIWQf709xtmBqo9bHvv4jeMHN9czWHtLhAGz
+\restrict ItrUZWSCaW8IeETQwznuwSgNexUehC7CSabRXpuBwHJl7Kmw4q9oynM6HEEacoz
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1514,6 +1514,82 @@ end $$;
 
 
 ALTER FUNCTION public.decline_inkind_donation(p_id uuid) OWNER TO postgres;
+
+--
+-- Name: delete_space(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.delete_space(p_space uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_bal numeric;
+  v_n int;
+begin
+  if v_uid is null then raise exception 'not signed in'; end if;
+  if not exists (select 1 from public.space_members
+                  where space_id = p_space and profile_id = v_uid and role = 'super_admin') then
+    raise exception 'only the super admin can delete this';
+  end if;
+
+  -- The treasury: Current is value held on someone's behalf. It leaves by
+  -- being sent, never by being deleted (the float rule).
+  select coalesce(sum(case when to_type = 'space' and to_id = p_space then amount else 0 end), 0)
+       - coalesce(sum(case when from_type = 'space' and from_id = p_space then amount else 0 end), 0)
+    into v_bal from public.ledger_entries
+   where (to_type = 'space' and to_id = p_space) or (from_type = 'space' and from_id = p_space);
+  if v_bal > 0 then
+    raise exception 'The treasury still holds % Current — send it on before deleting.', trim(to_char(v_bal, 'FM999999990.##'));
+  end if;
+
+  -- Stewarded members: a being must always have a steward.
+  select count(*) into v_n from public.profiles where steward_space_id = p_space;
+  if v_n > 0 then
+    raise exception 'This space stewards % member(s) — hand them to another steward first.', v_n;
+  end if;
+
+  -- Open trades: someone on the other side is waiting.
+  select count(*) into v_n from public.exchanges
+   where (buyer_space_id = p_space or seller_space_id = p_space)
+     and status in ('pending', 'accepted');
+  if v_n > 0 then
+    raise exception 'There are % open trade(s) with this space — finish or cancel them first.', v_n;
+  end if;
+
+  -- ── Rows the FKs can't reach ─────────────────────────────────────────────
+  -- Edges pointing AT the space (polymorphic, no FK).
+  delete from public.mycelium where target_type = 'space' and target_id = p_space;
+  delete from public.recommendations where target_type = 'space' and target_id = p_space;
+  delete from public.saved_items where target_type = 'space' and target_id = p_space;
+  -- Members' per-space AI de-selections for it (scope_id is text).
+  delete from public.assistant_consent where scope_type = 'space' and scope_id = p_space::text;
+  -- Closed trades where the space was a party: the FK would null the space
+  -- column, and for "the barn bought its admin's saddle" that trips the
+  -- not-self CHECK. The money already moved and the ledger keeps that
+  -- history; the request rows go with the space.
+  delete from public.exchanges where buyer_space_id = p_space or seller_space_id = p_space;
+  -- Booking types whose only audience was this space's members: an audience
+  -- with nobody in it. Narrow to the provider's own web rather than widen to
+  -- everyone — the closest "people I already know" tier, never a silent
+  -- public exposure.
+  update public.booking_types set audience = 'mycelium', audience_space_id = null
+   where audience = 'space' and audience_space_id = p_space;
+  -- What the space said in its own voice goes with it (posts authored AS the
+  -- space); posts merely addressed to it are cascaded by posts.space_id.
+  delete from public.posts where author_space_id = p_space;
+
+  -- Everything else cascades: members, chat + messages, membership and
+  -- nesting requests, section shares, events + attendees, resources +
+  -- bookings, collections, notifications, share rules. Child groups become
+  -- standalone (parent_space_id set null).
+  delete from public.spaces where id = p_space;
+end;
+$$;
+
+
+ALTER FUNCTION public.delete_space(p_space uuid) OWNER TO postgres;
 
 --
 -- Name: eject_group(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -10729,6 +10805,16 @@ GRANT ALL ON FUNCTION public.decline_inkind_donation(p_id uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION delete_space(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.delete_space(p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.delete_space(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.delete_space(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.delete_space(p_space uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION eject_group(p_group uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12712,7 +12798,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FVYesFhJFd2cgtXmnks4FliPfXqsIWQf709xtmBqo9bHvv4jeMHN9czWHtLhAGz
+\unrestrict ItrUZWSCaW8IeETQwznuwSgNexUehC7CSabRXpuBwHJl7Kmw4q9oynM6HEEacoz
+
 
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)

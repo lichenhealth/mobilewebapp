@@ -15,7 +15,7 @@ import type { GeoPoint } from '../lib/geoApi';
 import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
-  approveJoin, acceptInvite, leaveSpace, listChildGroups, createSpaceWithLocation,
+  approveJoin, acceptInvite, leaveSpace, deleteSpace, listChildGroups, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
   listPendingSectionShares, decideSectionShare, type SectionShareRow, type SectionArea,
@@ -211,6 +211,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
@@ -1478,6 +1481,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         </CollapsibleSection>
       )}
 
+
       {tab && !backstage && (
         <button className="cmp__back calp__backchip sprof__tabback" onClick={() => openTab('')}>
           <Icon name="arrow-left" size={14} /> Back to {space.name}
@@ -1770,6 +1774,42 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {roomsSection}
+
+      {/* Delete — the super admin's alone, and last (founder 2026-08-17: a
+          member asked the help room how, and the answer was "you can't").
+          One RPC either removes everything in one transaction or refuses
+          with a reason you can go act on; child groups stand on their own. */}
+      {backstage && myRole === 'super_admin' && (
+        <CollapsibleSection id="delete" title={`Delete this ${kindLabel.toLowerCase()}`} open={openSections.has('delete')} onToggle={() => toggleSection('delete')}>
+          <p className="prof__hint sprof__delete-hint">
+            Removes the {kindLabel.toLowerCase()} for good — its members, chat, events, bookable
+            areas, collections and everything it posted in its own voice. Groups nested inside it
+            stay, on their own. Current in its treasury has to be sent on first, and any member it
+            stewards needs a new steward.
+          </p>
+          {!confirmDelete ? (
+            <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => setConfirmDelete(true)}>
+              Delete {kindLabel.toLowerCase()}
+            </button>
+          ) : (
+            <div className="sprof__confirm">
+              <span className="sprof__confirm-text">
+                Delete <em>&ldquo;{space.name}&rdquo;</em>? This can&rsquo;t be undone.
+              </span>
+              <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => {
+                setDeleting(true); setDeleteError('');
+                deleteSpace(id)
+                  .then(() => navigate(`/${space.kind === 'community' ? 'communities' : space.kind + 's'}`, { replace: true }))
+                  .catch((e: Error) => { setDeleteError(e.message); setDeleting(false); });
+              }}>
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button className="btn" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(''); }}>Cancel</button>
+              {deleteError && <p className="sprof__delete-err">{deleteError}</p>}
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
 
     </div>
   );

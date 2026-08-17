@@ -399,6 +399,15 @@ export async function leaveSpace(spaceId: string, me: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Super-admin-only. One SECURITY DEFINER RPC does the whole removal — or
+ *  refuses with a reason the person can act on (a treasury still holding
+ *  Current, a member the space stewards, an open trade). The message from
+ *  the server IS the copy: it names what to go do first. */
+export async function deleteSpace(spaceId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_space', { p_space: spaceId });
+  if (error) throw new Error(error.message);
+}
+
 // ─── Group nesting proposals (consensual: parent admins approve) ──────────────
 
 export interface NestingRequestRow {

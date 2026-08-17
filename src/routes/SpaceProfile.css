@@ -285,3 +285,16 @@
   .prof.is-space { max-width: 720px; }
 }
 
+
+/* ── Delete (super admin only, last in the accordion) ─────────────────────── */
+.sprof__delete-hint { margin: 0 0 var(--s-3); line-height: 1.5; }
+.sprof__btn--danger { color: #c0564f; border-color: #c0564f; }
+.sprof__confirm {
+  margin: 0 0 var(--s-3); padding: var(--s-3);
+  background: var(--bone-warm); border: 1px solid #c0564f; border-radius: var(--r-lg);
+  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+}
+.sprof__confirm-text { flex: 1; min-width: 200px; font-size: 13px; color: var(--ink); }
+.sprof__confirm-text em { font-style: italic; font-family: var(--font-display); }
+/* The server's refusal IS the copy — it names what to go do first. */
+.sprof__delete-err { flex-basis: 100%; margin: 0; font-size: 13px; color: #c0564f; }
