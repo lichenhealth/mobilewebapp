@@ -15,6 +15,7 @@
 // (default claude-sonnet-5 — founder-picked) and ASSISTANT_CHAT_CAP (default 20).
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
+import { assistantConsentOff } from '../_shared/consent.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
@@ -170,6 +171,13 @@ Deno.serve(async (req) => {
     const support = await (await sb('profiles?email=eq.connect@lichen.health&select=id')).json();
     supportId = Array.isArray(support) ? support[0]?.id : null;
     if (supportId && trigger.sender_id === supportId) return json({ ok: true, skipped: 'steward-spoke' });
+  }
+
+  // PER-IDENTITY AI CONSENT (founder 2026-08-17): the sender's own door for
+  // this kind of room. A member who switched the assistant off in chat asked
+  // for exactly this silence — the same shape as not being addressed.
+  if (await assistantConsentOff(trigger.sender_id, [{ type: 'section', id: isHelp ? 'help' : 'chat' }])) {
+    return json({ ok: true, skipped: 'consent-off' });
   }
 
   // Per-member daily cap (spend control; logged in the UVA seed ledger).

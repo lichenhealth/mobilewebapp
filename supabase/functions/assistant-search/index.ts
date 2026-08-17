@@ -16,6 +16,8 @@
 // Secrets: ANTHROPIC_API_KEY. Raw fetch to the Messages API (repo convention
 // for Deno edge — same reason the Stripe functions use raw fetch).
 
+import { assistantConsentOff } from '../_shared/consent.ts';
+
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const MODEL = Deno.env.get('ASSISTANT_MODEL') ?? 'claude-opus-4-8';
 const DAILY_CAP = Number(Deno.env.get('ASSISTANT_DAILY_CAP') ?? '30');
@@ -66,6 +68,7 @@ narrate those results helpfully. Rules:
 
 interface Payload {
   q?: string;
+  section?: string;   // which section's AI door governs this narration
   chips?: string[];
   counts?: { people: number; posts: number; spaces: number };
   trust_degree?: string | null;
@@ -166,6 +169,17 @@ Deno.serve(async (req) => {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid request body.' }, 400);
+  }
+
+  // PER-IDENTITY AI CONSENT (founder 2026-08-17): a de-selection for the
+  // section this search is scoped to (or for search itself) means no
+  // narration — the card quietly steps aside, search itself is untouched.
+  const section = String(body.section ?? 'search').slice(0, 60);
+  if (await assistantConsentOff(caller, [
+    { type: 'section', id: section },
+    { type: 'section', id: 'search' },
+  ])) {
+    return json({ available: false, consent: 'off' });
   }
 
   const counts = body.counts ?? { people: 0, posts: 0, spaces: 0 };

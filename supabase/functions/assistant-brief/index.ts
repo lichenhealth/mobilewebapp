@@ -15,6 +15,7 @@
 // and costs a fraction).
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
+import { assistantConsentOff } from '../_shared/consent.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const MODEL = Deno.env.get('ASSISTANT_BRIEF_MODEL') ?? 'claude-sonnet-5';
@@ -114,6 +115,14 @@ Deno.serve(async (req) => {
   let body: { section?: string; frame?: string; snapshot?: unknown };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
   const section = String(body.section ?? 'home').slice(0, 60);
+
+  // PER-IDENTITY AI CONSENT (founder 2026-08-17): the check lives where the
+  // data is gathered. A de-selection row for this section means no briefing —
+  // the client shows its quiet no-card state, same as an unconfigured key.
+  if (await assistantConsentOff(caller, [{ type: 'section', id: section }])) {
+    return json({ available: false, consent: 'off' });
+  }
+
   const frame = String(body.frame ?? '').slice(0, 300);
   const snapshot = JSON.stringify(body.snapshot ?? {}).slice(0, 12000);
 

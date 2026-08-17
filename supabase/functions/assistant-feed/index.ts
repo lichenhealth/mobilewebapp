@@ -25,6 +25,7 @@
 // (default claude-sonnet-5) and ASSISTANT_FEED_CAP (default 20).
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
+import { assistantConsentOff } from '../_shared/consent.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
@@ -144,6 +145,19 @@ Deno.serve(async (req) => {
   const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread`)).json();
   const trigger = Array.isArray(posts) ? posts[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-post' });
+
+  // PER-IDENTITY AI CONSENT (founder 2026-08-17). The member wrote into this
+  // thread deliberately, so silence would be the failure mode: answer ONCE
+  // with the honest state and where to change it, never again until they do.
+  if (await assistantConsentOff(profile_id, [{ type: 'section', id: trigger.thread ?? 'general' }])) {
+    const note = 'You’ve switched the assistant off for this part of your Lichen life, so I won’t work here. The brain on that section’s page is where you can change that, anytime.';
+    const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${trigger.thread ?? 'general'}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
+    if (Array.isArray(last) && last[0]?.body === note) return json({ ok: true, skipped: 'consent-off' });
+    await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      profile_id, author: 'claude', thread: trigger.thread ?? 'general', body: note,
+    }) });
+    return json({ ok: true, skipped: 'consent-off' });
+  }
 
   // Per-member daily cap (spend control; logged in the UVA seed ledger).
   const since = new Date(); since.setUTCHours(0, 0, 0, 0);

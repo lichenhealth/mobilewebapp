@@ -42,6 +42,23 @@
   white-space: nowrap;
 }
 
+/* The mutual-consent disclosure (founder 2026-08-17): a caregiver is told
+   plainly when their client works without AI at the Concierge level. */
+.conc__ai-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin: 0 var(--s-5) var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md, 10px);
+  background: var(--bone-warm);
+  font-size: var(--t-xs);
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+.conc__ai-note svg { flex-shrink: 0; margin-top: 2px; }
+
 .conc__title {
   font-family: var(--font-body);
   font-weight: 100;

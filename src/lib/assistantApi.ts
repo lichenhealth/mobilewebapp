@@ -44,10 +44,14 @@ export async function askAssistant(
   chips: string[],
   criteria: SearchCriteria,
   results: SmartResults,
+  section?: string,
 ): Promise<AssistantAnswer> {
   const { data, error } = await supabase.functions.invoke('assistant-search', {
     body: {
       q,
+      // Which section's AI door governs this narration — the server checks the
+      // same assistant_consent rows the door writes (founder 2026-08-17).
+      section,
       chips,
       counts: {
         people: results.people.length,

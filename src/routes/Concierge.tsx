@@ -26,6 +26,7 @@ import {
 } from '../lib/careTeamApi';
 import { occursOn } from '../lib/recurrence';
 import { useAuth } from '../auth/AuthProvider';
+import { consentOn, setConsent, careConsent } from '../lib/assistantConsentApi';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'team';
@@ -615,6 +616,9 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
   const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
   const [links, setLinks] = useState<CareLink[]>([]);
   const [invites, setInvites] = useState<CareInvite[]>([]);
+  // Caregivers who work without an assistant in Concierge — told to the
+  // client plainly (founder 2026-08-17: consent is mutual, mutually visible).
+  const [noAi, setNoAi] = useState<Set<string>>(new Set());
   const [myName, setMyName] = useState('');
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState('');
@@ -633,10 +637,21 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
       managing ? supabase.from('profiles').select('full_name').eq('id', me).maybeSingle() : Promise.resolve(null),
     ]);
     setRoster(r);
-    setLinks(care.links.filter((l) => l.patient_id === me));
+    const myLinks = care.links.filter((l) => l.patient_id === me);
+    setLinks(myLinks);
     setInvites(care.invites.filter((i) => i.role === 'caregiver'));
     setMyName((prof?.data as { full_name: string | null } | null)?.full_name ?? '');
     setReady(true);
+    if (managing) {
+      // Each active caregiver's own concierge-level choice, via the two-party
+      // resolver — a caregiver working without AI is worth the client knowing.
+      const activeIds = myLinks.filter((l) => l.status === 'active').map((l) => l.caregiver_id);
+      const answers = await Promise.all(activeIds.map(async (id) => {
+        const cc = await careConsent(me, id).catch(() => null);
+        return cc && !cc.caregiverOn ? id : null;
+      }));
+      setNoAi(new Set(answers.filter((id): id is string => !!id)));
+    }
   }, [subjectId, me, managing]);
   useEffect(() => { setReady(false); void load(); }, [load]);
 
@@ -723,6 +738,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
               <span className="conc__team-sub">
                 Caregiver{row.rich?.headline ? ` · ${row.rich.headline}` : ''}
                 {row.rich && row.rich.windows.length > 0 ? ' · takes on-call shifts' : ''}
+                {noAi.has(row.personId) ? ' · works without an AI assistant here' : ''}
               </span>
             </span>
           </button>
@@ -840,7 +856,15 @@ export default function Concierge() {
   const isClientView = !!patientId;
   const subjectId = patientId ?? me;
 
-  const [aiOn, setAiOn] = useState(true);
+  // The Concierge brain is the member's REAL concierge-level AI consent now
+  // (founder 2026-08-17) — one row in assistant_consent that the edge
+  // functions check server-side. It used to be component state: reset on
+  // every mount, controlled nothing. Care is the highest-stakes room, so it
+  // was the worst place for a switch to be theatre.
+  const [aiOn, setAiOn] = useState(() => consentOn('section', 'concierge'));
+  // Mutual visibility (founder 2026-08-17): each side is told what the other
+  // chose — silence in either direction is the failure.
+  const [clientAiOff, setClientAiOff] = useState(false);
   const [scope, setScope] = useState<'Day' | 'Week' | 'Month'>('Day');
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
@@ -882,6 +906,13 @@ export default function Concierge() {
         const link = linkRes.data as { patient: { full_name: string | null } | null } | null;
         authorized = !!link;
         name = link?.patient?.full_name ?? 'Client';
+        // Their consent, told to you (founder 2026-08-17): if the client has
+        // switched AI off at the Concierge level, their caregiver must know —
+        // an assistant assumed to be reading a chart it can't is the failure.
+        if (authorized) {
+          const cc = await careConsent(subjectId, me).catch(() => null);
+          if (active) setClientAiOff(cc ? !cc.patientOn : false);
+        }
       }
       if (!active) return;
       setCareAllowed(allowed);
@@ -1026,6 +1057,19 @@ export default function Concierge() {
         {isClientView && <span className="conc__client-tag">Client view</span>}
       </header>
 
+      {/* Consent is mutual, and mutually visible (founder 2026-08-17): the
+          client's choice governs both assistants here, and their caregiver is
+          told rather than left assuming. */}
+      {isClientView && clientAiOff && (
+        <p className="conc__ai-note">
+          <Icon name="brain" size={13} />
+          <span>
+            {clientName ?? 'This member'} has switched AI off for their care —
+            no assistant, yours included, reads or helps with this board.
+          </span>
+        </p>
+      )}
+
       {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
       <nav className="conc__tabs">
         <button
@@ -1074,9 +1118,15 @@ export default function Concierge() {
         </button>
         <button
           className={'conc__brain' + (aiOn ? ' is-on' : '')}
-          onClick={() => setAiOn((v) => !v)}
+          onClick={() => {
+            const next = !aiOn;
+            setAiOn(next);
+            setConsent('section', 'concierge', next);
+          }}
           aria-pressed={aiOn}
-          title={aiOn ? 'AI assistance on \u2014 tap to disable' : 'AI assistance off \u2014 tap to enable'}
+          title={aiOn
+            ? 'Your assistant is part of your care here \u2014 tap to switch it off. Your care team can see your choice.'
+            : 'You\u2019ve switched AI off for your care \u2014 no assistant reads or helps here, and your care team can see that. Tap to change.'}
         >
           <Icon name="brain" size={20} />
         </button>

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
+import { consentOn, setConsent } from '../lib/assistantConsentApi';
 import './AssistantDoor.css';
 
 // The brain lives IN each page (founder 2026-07-28), so it reads as "the
@@ -8,11 +9,15 @@ import './AssistantDoor.css';
 // never gathers or sends that section's data to the assistant; you lose the
 // integrated help there, and that's a fine choice. Nothing is ambient either
 // way — data only ever moves when YOU tap the brain.
+//
+// Since 2026-08-17 the decision itself lives in the DATABASE
+// (assistant_consent — see assistantConsentApi.ts): a new phone is not a
+// changed mind, and the edge functions check the same rows server-side.
 
 export const aiDoorOn = (section: string): boolean =>
-  localStorage.getItem(`ai-door-${section}`) !== 'off';
+  consentOn('section', section);
 export const setAiDoor = (section: string, on: boolean): void =>
-  localStorage.setItem(`ai-door-${section}`, on ? 'on' : 'off');
+  setConsent('section', section, on);
 
 /** `size` matches the door to the circles it sits beside — 34px on its own,
  *  30px in a row of mkt__action circles (founder 2026-08-08: the brain must

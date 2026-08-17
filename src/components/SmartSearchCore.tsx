@@ -356,7 +356,7 @@ export default function SmartSearchCore({
     setAssistant(null);
     setAssistantBusy(assistantAlive.current);
     const t = window.setTimeout(async () => {
-      const a = await askAssistant(q.trim(), chips, criteria, results);
+      const a = await askAssistant(q.trim(), chips, criteria, results, assistantSection);
       if (!a.available && !a.capped) assistantDead.current = true;
       else { assistantAlive.current = true; assistantCache.set(key, a); }
       if (assistantRun.current === run) { setAssistant(a.available ? a : null); setAssistantBusy(false); }

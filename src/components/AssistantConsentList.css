@@ -1,0 +1,27 @@
+.aicl { margin-top: var(--s-2); }
+
+/* Compact two-up grid — 19 rooms as full consent rows would bury the rest of
+   Privacy (design rule: compact, above the fold). */
+.aicl__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px var(--s-4);
+}
+
+.aicl__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 3px 0;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.aicl__item input { accent-color: var(--peach); flex-shrink: 0; }
+.aicl__item.is-off span { color: var(--ink-faint); }
+
+.aicl__note {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-xs);
+  line-height: 1.45;
+  color: var(--ink-faint);
+}

@@ -31,6 +31,7 @@ import { listMyBookingTypes } from '../lib/bookingApi';
 import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
@@ -1001,10 +1002,11 @@ export default function Profile() {
             </em>
           </span>
         </label>
-        <p className="prof__hint">
-          Your own assistant switches on and off per section — the brain icon on Home,
-          Marketplace, Calendar, Chat and your shelf each carry their own choice.
-        </p>
+        <p className="prof__privacy-sub">Where your own assistant works</p>
+        {/* Per-identity consent (founder 2026-08-17): all on by default —
+            collaboration is the premise — and every de-selection is one DB
+            row the edge functions check, so a new phone changes nothing. */}
+        <AssistantConsentList />
 
         <p className="prof__privacy-sub">What the assistant may change</p>
         <label className="prof__consent">

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, storedSession } from '../lib/supabase';
+import { syncAssistantConsent } from '../lib/assistantConsentApi';
 
 type AuthState = {
   session: Session | null;
@@ -106,6 +107,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, rehydrate]);
 
   const userId = session?.user?.id ?? null;
+
+  // AI consent lives in the DB (assistant_consent); pull it down once per
+  // sign-in so the synchronous door reads are true from the first paint on
+  // any device. Fire-and-forget: a failed sync keeps the last known state.
+  useEffect(() => {
+    if (userId) void syncAssistantConsent(userId);
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) { setOnboarded(null); setIsAdmin(false); return; }
     let active = true;
