@@ -407,7 +407,9 @@ export default function App() {
       </main>
       {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-      {!isChatThread && !isAuth && <InstallPrompt />}
+      {/* The install nudge lives IN Home's page now, not floating over every
+          screen (founder 2026-08-17: it covered two listing tiles). See
+          Home.tsx — an invitation belongs where you land, once, in the flow. */}
     </div>
     </CollectPromptProvider>
     </ConfirmProvider>

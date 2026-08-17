@@ -7,6 +7,7 @@ import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
+import InstallPrompt from '../components/InstallPrompt';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
@@ -201,6 +202,15 @@ export default function Home() {
         {/* The creed — captions the presence doorway it explains. */}
         <p className="home__creed">Being present is a gift.</p>
       </section>
+
+      {/* IN THE PAGE, NOT OVER IT (founder 2026-08-17). It was fixed above the
+          bottom nav on every route, so it sat on top of whatever you were
+          reading — two marketplace tiles, in the case that surfaced it. Here
+          it scrolls with the page, covers nothing, and asks once where you
+          land rather than following you around the app. Below the greeting,
+          not above it: the greeting is what Home is for. */}
+      <InstallPrompt />
+
 
       <section className="home__feed">
         {posts.filter((p) => matchesTab(tab, p.content_type)).map((p) => (
