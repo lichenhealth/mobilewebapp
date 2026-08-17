@@ -405,3 +405,6 @@
 /* Real avatars in inbox rows — same geometry as the monogram bubbles. */
 .conv-row__avatar--img { object-fit: cover; }
 img.conv-row__group-bub { object-fit: cover; }
+/* Two faces don't fill a box drawn for three — size it to what's in it, so a
+   pair centres in the avatar column instead of hugging its left edge. */
+.conv-row__group:has(> :nth-child(2):last-child) { width: 44px; height: 30px; }

@@ -243,14 +243,17 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // A help room holds Lichen Health AND the assistant now, so it stacks like
   // any group rather than showing one face (founder 2026-08-16).
   const dmLike = chat.kind === 'direct';
-  const single =
-    dmLike
-      ? (chat.members.find((m) => m.profile_id !== me) ?? chat.members[0])
-      : chat.members.length <= 1
-        ? chat.members[0]
-        : null;
+  const single = chat.members.find((m) => m.profile_id !== me) ?? chat.members[0];
 
-  if (dmLike || chat.members.length <= 1) {
+  // ONE FACE IS NOT A STACK (founder 2026-08-16: "melanie mentorship group
+  // icon is off center and so is Lichen's as an org"). A two-person group
+  // leaves exactly one face once your own is dropped, and it was still being
+  // drawn in the 52px stack box at the 30px stacked size — small, and pinned
+  // to that box's top-left instead of filling the avatar slot. Keep the logo
+  // big until there are actually several to clump together, which is the
+  // founder's own instinct in the same message.
+  const others = chat.members.filter((m) => m.profile_id !== me);
+  if (dmLike || others.length <= 1) {
     if (single?.avatarUrl) {
       return <img className="conv-row__avatar conv-row__avatar--img" src={single.avatarUrl} alt="" />;
     }
@@ -263,7 +266,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   }
 
   // Your own face carries no information — you're in every chat you can see.
-  const sample = chat.members.filter((m) => m.profile_id !== me).slice(0, 3);
+  const sample = others.slice(0, 3);
   return (
     <div className="conv-row__group">
       {sample.map((mem, i) => (
