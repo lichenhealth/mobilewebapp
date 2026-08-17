@@ -62,6 +62,8 @@ export type IconName =
   | 'repeat'
   | 'rent'
   | 'drive'
+  | 'pulse'
+  | 'chip'
   | 'saved'
   | 'search'
   | 'send'
@@ -308,6 +310,25 @@ const ICONS: Record<IconName, IconEntry> = {
   // Drive: a cloud with a Current-cy bolt coming out of it (founder
   // 2026-08-14 — "since it is a cloud storage offering... a nod to
   // current-cy"). The bookmark stays the SAVE gesture; this marks the place.
+  /** THE TWO INTELLIGENCES (founder 2026-08-16/17). A pulse for carbon — a
+   *  human steward answering for a place or a being — and a chip for silicon.
+   *  Extracted out of the two hand-drawn avatars so ANY member or space can
+   *  wear one as a badge, which is what a per-entity assistant needs: you
+   *  should always be able to see which kind of mind you're talking to. */
+  'pulse': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 2.2,
+    content: <><path d="M2 12h4.5l2.5-7 3.5 14 2.5-7H22" strokeLinecap="round" strokeLinejoin="round" /></>,
+  },
+  'chip': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.9,
+    content: <>
+      <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" />
+      <path d="M10.5 10.5h3v3h-3z" />
+      <path d="M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3" strokeLinecap="round" />
+    </>,
+  },
   'drive': {
     // Sized to its neighbours (founder 2026-08-15: "the cloud is smaller than
     // the other icons"). The original filled 52% of the viewBox height where

@@ -3,3 +3,25 @@
   display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-style: italic; color: var(--bone-warm);
 }
+
+/* The mind mark — a small badge on the avatar saying which KIND of
+   intelligence this is (founder 2026-08-17). Peach for carbon, blue for
+   silicon: the platform's own colours, life vs tending the structure. */
+.avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.avatar__mark {
+  position: absolute; right: -2px; bottom: -2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-full); border: 2px solid var(--bone);
+  line-height: 0;
+}
+.avatar__mark--pulse { background: var(--peach); color: #fff; }
+.avatar__mark--chip  { background: var(--blue); color: #fff; }
+/* A steward's face in the badge slot — bone ring so it reads as a second
+   identity rather than part of the first. */
+.avatar__mark--face { overflow: hidden; background: var(--bone); }
+.avatar__mark--face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar__mark-mono {
+  width: 100%; height: 100%; display: inline-flex; align-items: center;
+  justify-content: center; color: var(--bone-warm);
+  font-family: var(--font-display); font-style: italic;
+}
