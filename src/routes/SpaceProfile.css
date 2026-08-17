@@ -287,7 +287,9 @@
 
 
 /* ── Delete (super admin only, last in the accordion) ─────────────────────── */
-.sprof__delete-hint { margin: 0 0 var(--s-3); line-height: 1.5; }
+/* Foot of the backstage: a hairline, then the one button. */
+.sprof__delete { margin-top: var(--s-6); padding-top: var(--s-5); border-top: 1px solid var(--bone-edge-soft); }
+.sprof__delete .sprof__confirm { margin: 0; }
 .sprof__btn--danger { color: #c0564f; border-color: #c0564f; }
 .sprof__confirm {
   margin: 0 0 var(--s-3); padding: var(--s-3);

@@ -1777,24 +1777,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {/* Delete — the super admin's alone, and last (founder 2026-08-17: a
           member asked the help room how, and the answer was "you can't").
-          One RPC either removes everything in one transaction or refuses
-          with a reason you can go act on; child groups stand on their own. */}
+          A plain button, not an accordion section — there is never more to
+          say than the act itself (founder, same day). The confirm opens in
+          place and carries what the act means; the server's refusal, when
+          there is one, IS the copy. One RPC either removes everything in one
+          transaction or refuses with a reason you can go act on. */}
       {backstage && myRole === 'super_admin' && (
-        <CollapsibleSection id="delete" title={`Delete this ${kindLabel.toLowerCase()}`} open={openSections.has('delete')} onToggle={() => toggleSection('delete')}>
-          <p className="prof__hint sprof__delete-hint">
-            Removes the {kindLabel.toLowerCase()} for good — its members, chat, events, bookable
-            areas, collections and everything it posted in its own voice. Groups nested inside it
-            stay, on their own. Current in its treasury has to be sent on first, and any member it
-            stewards needs a new steward.
-          </p>
+        <div className="sprof__delete">
           {!confirmDelete ? (
             <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => setConfirmDelete(true)}>
-              Delete {kindLabel.toLowerCase()}
+              Delete this {kindLabel.toLowerCase()}
             </button>
           ) : (
             <div className="sprof__confirm">
               <span className="sprof__confirm-text">
-                Delete <em>&ldquo;{space.name}&rdquo;</em>? This can&rsquo;t be undone.
+                Delete <em>&ldquo;{space.name}&rdquo;</em> for good? Its members, chat, events,
+                bookable areas, collections and everything it posted in its own voice go with it;
+                groups nested inside it stay, on their own. This can&rsquo;t be undone.
               </span>
               <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => {
                 setDeleting(true); setDeleteError('');
@@ -1808,7 +1807,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {deleteError && <p className="sprof__delete-err">{deleteError}</p>}
             </div>
           )}
-        </CollapsibleSection>
+        </div>
       )}
 
     </div>
