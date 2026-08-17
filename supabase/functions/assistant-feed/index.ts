@@ -24,6 +24,8 @@
 // Env: ANTHROPIC_API_KEY (set), PUSH_HOOK_SECRET, optional ASSISTANT_FEED_MODEL
 // (default claude-sonnet-5) and ASSISTANT_FEED_CAP (default 20).
 
+import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
+
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -390,7 +392,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: canEdit ? 1000 : 400,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${elsewhere}`, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round

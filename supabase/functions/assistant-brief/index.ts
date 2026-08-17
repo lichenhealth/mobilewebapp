@@ -14,6 +14,8 @@
 // claude-sonnet-5 (briefs are longer than narrations; sonnet reads well
 // and costs a fraction).
 
+import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
+
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const MODEL = Deno.env.get('ASSISTANT_BRIEF_MODEL') ?? 'claude-sonnet-5';
 const DAILY_CAP = Number(Deno.env.get('ASSISTANT_DAILY_CAP') ?? '30');
@@ -122,7 +124,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 500,
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: `${SYSTEM}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages: [{
           role: 'user',
           content: `SECTION: ${section}\n${frame ? `FRAMING: ${frame}\n` : ''}SNAPSHOT:\n${snapshot}\n\nBrief me.`,
