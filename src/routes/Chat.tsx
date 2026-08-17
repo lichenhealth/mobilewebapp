@@ -268,7 +268,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // Your own face carries no information — you're in every chat you can see.
   const sample = others.slice(0, 3);
   return (
-    <div className="conv-row__group">
+    <div className={`conv-row__group conv-row__group--${sample.length}`}>
       {sample.map((mem, i) => (
         mem.avatarUrl
           ? <img key={mem.profile_id} className="conv-row__group-bub" src={mem.avatarUrl} alt="" style={{ zIndex: 3 - i }} />
