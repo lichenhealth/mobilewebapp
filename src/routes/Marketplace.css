@@ -537,7 +537,9 @@
    was sharing the row on wide screens where it happened to fit, inconsistent
    with the stacked mobile layout. flex-basis:100% forces the wrap
    regardless of available width. */
-.mkt__trustlens { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; flex-basis: 100%; }
+/* One line that scrolls. `.h-scroll` brings its own 12px gap, so the double
+   class is needed to keep this row's own spacing. */
+.mkt__trustlens.h-scroll { display: flex; align-items: center; gap: var(--s-2); flex-wrap: nowrap; flex-basis: 100%; }
 .mkt__trustlens-chip {
   flex: 0 0 auto; background: none; border: 0; padding: 4px 2px;
   font-family: inherit; font-size: 11.5px; letter-spacing: 0.02em;

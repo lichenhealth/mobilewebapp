@@ -438,8 +438,13 @@ export default function Marketplace() {
             )
           ))}
         </div>
+        {/* Scrolls rather than wraps (design audit, 2026-08-17): at phone width
+            the five chips broke to a second line and stranded "Recommended
+            (2nd)" on its own — the same orphan the Groups directory had. Fade
+            mode, because hide-mode leaves a hidden chip's box as a hole in a
+            text row. */}
         {me && (
-          <div className="mkt__trustlens" role="group" aria-label="Who you'll do business with">
+          <ScrollHintRow className="mkt__trustlens h-scroll" role="group" ariaLabel="Who you'll do business with" fade>
             <button className={'mkt__trustlens-chip' + (trustLenses.size === 0 ? ' is-on' : '')}
               onClick={clearLenses}>Anyone</button>
             {([
@@ -454,7 +459,7 @@ export default function Marketplace() {
                   onClick={() => toggleLens(v)} title={title}>{l}{on ? ' ✓' : ''}</button>
               );
             })}
-          </div>
+          </ScrollHintRow>
         )}
       </div>
 
