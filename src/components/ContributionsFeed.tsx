@@ -4,6 +4,7 @@ import FeedCard from './FeedCard';
 import { Icon, IconName } from './Icon';
 import { ScopeEmpty } from './ScopeEscape';
 import { aiDoorOn } from './AssistantDoor';
+import { consentOn } from '../lib/assistantConsentApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
@@ -144,8 +145,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   // Places · Library.
   const HOME_ORDER: ServiceArea[] = ['marketplace', 'events', 'work', 'courses', 'food', 'art', 'places', 'library', 'people'];
   // Off when the owner has opted out, or when the viewer has switched this
-  // section off for themselves. Either way the door still opens.
-  const aiOn = !assistantOff && !!assistantSection && aiDoorOn(assistantSection);
+  // section — or, on a space's page, THIS space (founder 2026-08-17:
+  // per-identity consent) — off for themselves. Either way the door opens.
+  const aiOn = !assistantOff && !!assistantSection && aiDoorOn(assistantSection)
+    && (!spaceId || consentOn('space', spaceId));
 
   // An entity's area icon opens the REAL section, scoped to it ("Melanie's
   // Courses", "Pine Valley Grange's Marketplace" — founder 2026-07-24/25:
@@ -221,7 +224,9 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
                 ? 'Your assistant — a briefing for this part of your Lichen life'
                 : assistantOff
                   ? 'This one works without the assistant. Your own is still a tap away.'
-                  : 'You’ve switched the assistant off for this section. Tap to change that.'}
+                  : spaceId && !consentOn('space', spaceId)
+                    ? 'You’ve switched the assistant off for yourself here. Tap to change that.'
+                    : 'You’ve switched the assistant off for this section. Tap to change that.'}
             >
               <span className="cfeed__area-circle">
                 <Icon name="brain" size={14} />

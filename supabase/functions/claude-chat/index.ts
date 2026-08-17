@@ -151,8 +151,21 @@ Deno.serve(async (req) => {
   const msgs = await (await sb(`chat_messages?id=eq.${message_id}&select=sender_id,body`)).json();
   const trigger = Array.isArray(msgs) ? msgs[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-message' });
-  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind`)).json();
+  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind,space_id`)).json();
   const kind = Array.isArray(chats) ? chats[0]?.kind : null;
+  const chatSpaceId: string | null = Array.isArray(chats) ? chats[0]?.space_id ?? null : null;
+
+  // A SPACE'S OWN AI CHOICE, enforced where it matters (founder 2026-08-17:
+  // "one group may want to be in the Ai fabric of lichen while another
+  // doesn't"). spaces.assistant_enabled used to only hide the brain in the
+  // browser; in the space's chat room it now actually governs. Silent skip —
+  // the same shape as not being addressed.
+  if (chatSpaceId) {
+    const sp = await (await sb(`spaces?id=eq.${chatSpaceId}&select=assistant_enabled`)).json();
+    if (Array.isArray(sp) && sp[0]?.assistant_enabled === false) {
+      return json({ ok: true, skipped: 'space-ai-off' });
+    }
+  }
 
   // Group manners: outside direct chats, speak only when spoken to — EXCEPT
   // in a help room, which exists to be answered in. Nobody should have to
@@ -174,9 +187,14 @@ Deno.serve(async (req) => {
   }
 
   // PER-IDENTITY AI CONSENT (founder 2026-08-17): the sender's own door for
-  // this kind of room. A member who switched the assistant off in chat asked
-  // for exactly this silence — the same shape as not being addressed.
-  if (await assistantConsentOff(trigger.sender_id, [{ type: 'section', id: isHelp ? 'help' : 'chat' }])) {
+  // this kind of room — and, in a space's chat, their own choice for THAT
+  // space ("Ai for me in community, but not concierge" scales down to "in
+  // WAG, but not Melanie's group"). A member who switched the assistant off
+  // asked for exactly this silence — the same shape as not being addressed.
+  if (await assistantConsentOff(trigger.sender_id, [
+    { type: 'section', id: isHelp ? 'help' : 'chat' },
+    ...(chatSpaceId ? [{ type: 'space' as const, id: chatSpaceId }] : []),
+  ])) {
     return json({ ok: true, skipped: 'consent-off' });
   }
 

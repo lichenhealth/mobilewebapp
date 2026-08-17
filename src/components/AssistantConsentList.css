@@ -19,6 +19,18 @@
 .aicl__item input { accent-color: var(--peach); flex-shrink: 0; }
 .aicl__item.is-off span { color: var(--ink-faint); }
 
+.aicl__group {
+  margin: var(--s-3) 0 2px;
+  font-family: var(--font-mono);
+  font-size: var(--t-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/* Space names run longer than room names — one column keeps them whole. */
+.aicl__grid--spaces { grid-template-columns: 1fr; }
+.aicl__space-note { font-style: normal; color: var(--ink-faint); }
+
 .aicl__note {
   margin: var(--s-2) 0 0;
   font-size: var(--t-xs);

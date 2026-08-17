@@ -69,6 +69,7 @@ narrate those results helpfully. Rules:
 interface Payload {
   q?: string;
   section?: string;   // which section's AI door governs this narration
+  space_ids?: string[]; // spaces the search is scoped to — their consent governs too
   chips?: string[];
   counts?: { people: number; posts: number; spaces: number };
   trust_degree?: string | null;
@@ -174,12 +175,26 @@ Deno.serve(async (req) => {
   // PER-IDENTITY AI CONSENT (founder 2026-08-17): a de-selection for the
   // section this search is scoped to (or for search itself) means no
   // narration — the card quietly steps aside, search itself is untouched.
+  // A search scoped to specific spaces answers to them too: the member's own
+  // per-space choice, and each space's own assistant_enabled switch.
   const section = String(body.section ?? 'search').slice(0, 60);
+  const spaceIds = (Array.isArray(body.space_ids) ? body.space_ids : [])
+    .filter((s): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/.test(s))
+    .slice(0, 12);
   if (await assistantConsentOff(caller, [
     { type: 'section', id: section },
     { type: 'section', id: 'search' },
+    ...spaceIds.map((id) => ({ type: 'space' as const, id })),
   ])) {
     return json({ available: false, consent: 'off' });
+  }
+  if (spaceIds.length) {
+    const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
+    const spRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/spaces?id=in.(${spaceIds.join(',')})&assistant_enabled=eq.false&select=id&limit=1`,
+      { headers: svc });
+    const off = spRes.ok ? await spRes.json() : [];
+    if (Array.isArray(off) && off.length) return json({ available: false, consent: 'off' });
   }
 
   const counts = body.counts ?? { people: 0, posts: 0, spaces: 0 };

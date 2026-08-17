@@ -52,6 +52,9 @@ export async function askAssistant(
       // Which section's AI door governs this narration — the server checks the
       // same assistant_consent rows the door writes (founder 2026-08-17).
       section,
+      // Spaces the search is scoped to: the member's own per-space choice and
+      // each space's assistant_enabled govern too, checked server-side.
+      space_ids: criteria.spaceScope.length ? criteria.spaceScope : undefined,
       chips,
       counts: {
         people: results.people.length,
