@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iYkGKUgf2N6bSB3aSc9FZp4lw03AOBhC04j6gKhYYXsNlY4o6t7DpTtXaPPbf2l
+\restrict FVYesFhJFd2cgtXmnks4FliPfXqsIWQf709xtmBqo9bHvv4jeMHN9czWHtLhAGz
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -354,6 +354,67 @@ end; $$;
 
 
 ALTER FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) OWNER TO postgres;
+
+--
+-- Name: assistant_consent_all(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid DEFAULT NULL::uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select public.assistant_consent_for(p_profile, 'section', coalesce(p_section, 'general'))
+     and (p_space is null
+          or public.assistant_consent_for(p_profile, 'space', p_space::text));
+$$;
+
+
+ALTER FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid) OWNER TO postgres;
+
+--
+-- Name: assistant_consent_care(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) RETURNS TABLE(effective boolean, patient_enabled boolean, caregiver_enabled boolean)
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_p boolean; v_c boolean;
+begin
+  if auth.uid() is null
+     or auth.uid() not in (p_patient, p_caregiver)
+     or not (p_patient = p_caregiver
+             or public.is_on_care_team(p_patient, p_caregiver)) then
+    raise exception 'not a party to this care relationship';
+  end if;
+
+  v_p := public.assistant_consent_for(p_patient, 'section', 'concierge');
+  v_c := public.assistant_consent_for(p_caregiver, 'section', 'concierge');
+  return query select (v_p and v_c), v_p, v_c;
+end;
+$$;
+
+
+ALTER FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) OWNER TO postgres;
+
+--
+-- Name: assistant_consent_for(uuid, text, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select coalesce(
+    (select c.enabled from public.assistant_consent c
+      where c.profile_id = p_profile
+        and c.scope_type = p_scope_type
+        and c.scope_id = p_scope_id),
+    true);
+$$;
+
+
+ALTER FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) OWNER TO postgres;
 
 --
 -- Name: assistant_on_feed_post(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1600,6 +1661,40 @@ end; $$;
 
 
 ALTER FUNCTION public.ensure_care_chat(p_patient uuid) OWNER TO postgres;
+
+--
+-- Name: ensure_course_folder(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_course_folder() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_name text;
+begin
+  -- Already has one (or had one and deleted it on purpose)? Leave it alone.
+  if exists (
+    select 1 from collections
+     where owner_id = new.profile_id
+       and details ->> 'forCourse' = new.collection_id::text
+  ) then
+    return new;
+  end if;
+
+  select name into v_name from collections where id = new.collection_id;
+  if v_name is null then return new; end if;
+
+  insert into collections (owner_id, name, kind, is_public, details)
+  values (new.profile_id, v_name, 'collection', false,
+          jsonb_build_object('forCourse', new.collection_id::text));
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.ensure_course_folder() OWNER TO postgres;
 
 --
 -- Name: ensure_direct_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4264,6 +4359,22 @@ end $$;
 ALTER FUNCTION public.tick_reminders() OWNER TO postgres;
 
 --
+-- Name: touch_course_note(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.touch_course_note() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.touch_course_note() OWNER TO postgres;
+
+--
 -- Name: touch_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4387,6 +4498,22 @@ ALTER FUNCTION public.visible_tasks_of(p_owner uuid) OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: assistant_consent; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.assistant_consent (
+    profile_id uuid NOT NULL,
+    scope_type text NOT NULL,
+    scope_id text NOT NULL,
+    enabled boolean NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT assistant_consent_scope_type_check CHECK ((scope_type = ANY (ARRAY['section'::text, 'space'::text, 'aspect'::text])))
+);
+
+
+ALTER TABLE public.assistant_consent OWNER TO postgres;
 
 --
 -- Name: assistant_feed_posts; Type: TABLE; Schema: public; Owner: postgres
@@ -4906,6 +5033,23 @@ CREATE TABLE public.collections (
 ALTER TABLE public.collections OWNER TO postgres;
 
 --
+-- Name: course_notes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.course_notes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    profile_id uuid NOT NULL,
+    collection_id uuid NOT NULL,
+    post_id uuid,
+    body text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.course_notes OWNER TO postgres;
+
+--
 -- Name: donations; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5054,11 +5198,19 @@ CREATE TABLE public.external_busy (
     all_day boolean DEFAULT false NOT NULL,
     start_min integer,
     end_min integer,
-    title text
+    title text,
+    source_url text
 );
 
 
 ALTER TABLE public.external_busy OWNER TO postgres;
+
+--
+-- Name: COLUMN external_busy.source_url; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.external_busy.source_url IS 'Direct link to this event in the calendar it came FROM (Google htmlLink, or an ICS URL property). Null when the source offers none — the client then falls back to that day in the source calendar.';
+
 
 --
 -- Name: external_calendars; Type: TABLE; Schema: public; Owner: postgres
@@ -5521,11 +5673,13 @@ CREATE TABLE public.profiles (
     assistant_can_edit boolean DEFAULT false NOT NULL,
     weaveable_default boolean DEFAULT true NOT NULL,
     jurisdiction text,
+    pronouns text,
     CONSTRAINT profiles_aspect_check CHECK (((aspect IS NULL) OR (aspect = ANY (ARRAY['individual'::text, 'collective'::text])))),
     CONSTRAINT profiles_birth_date_sane CHECK (((birth_date IS NULL) OR ((birth_date > '1900-01-01'::date) AND (birth_date <= CURRENT_DATE)))),
     CONSTRAINT profiles_distributed_jurisdiction CHECK (((kind <> ALL (ARRAY['plant'::text, 'element'::text])) OR (jurisdiction IS NOT NULL))),
     CONSTRAINT profiles_kind_check CHECK ((kind = ANY (ARRAY['person'::text, 'plant'::text, 'animal'::text, 'place'::text, 'element'::text, 'collective'::text]))),
     CONSTRAINT profiles_notification_pref_check CHECK ((notification_pref = ANY (ARRAY['off'::text, 'in_app'::text, 'both'::text]))),
+    CONSTRAINT profiles_pronouns_len CHECK (((pronouns IS NULL) OR (char_length(pronouns) <= 40))),
     CONSTRAINT profiles_steward_check CHECK (
 CASE
     WHEN (kind = 'person'::text) THEN ((steward_profile_id IS NULL) AND (steward_space_id IS NULL))
@@ -5555,6 +5709,13 @@ COMMENT ON COLUMN public.profiles.weaveable_default IS 'Compose preselection for
 --
 
 COMMENT ON COLUMN public.profiles.jurisdiction IS 'The named scope a stewarded being is tended within ("the Skagit watershed"). REQUIRED for plant/element kinds (distributed beings), optional otherwise. Public — it is part of the being''s identity.';
+
+
+--
+-- Name: COLUMN profiles.pronouns; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.profiles.pronouns IS 'Optional, free text, public. NULL means they/them — never guess from a name.';
 
 
 --
@@ -5924,6 +6085,14 @@ CREATE TABLE public.video_jobs (
 ALTER TABLE public.video_jobs OWNER TO postgres;
 
 --
+-- Name: assistant_consent assistant_consent_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.assistant_consent
+    ADD CONSTRAINT assistant_consent_pkey PRIMARY KEY (profile_id, scope_type, scope_id);
+
+
+--
 -- Name: assistant_feed_posts assistant_feed_posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6161,6 +6330,14 @@ ALTER TABLE ONLY public.collection_suggestions
 
 ALTER TABLE ONLY public.collections
     ADD CONSTRAINT collections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: course_notes course_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.course_notes
+    ADD CONSTRAINT course_notes_pkey PRIMARY KEY (id);
 
 
 --
@@ -6688,6 +6865,13 @@ CREATE INDEX collections_space_idx ON public.collections USING btree (space_id);
 
 
 --
+-- Name: course_notes_owner_course_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX course_notes_owner_course_idx ON public.course_notes USING btree (profile_id, collection_id, created_at DESC);
+
+
+--
 -- Name: csugg_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7101,6 +7285,13 @@ CREATE TRIGGER enforce_weaveable BEFORE INSERT ON public.collection_items FOR EA
 
 
 --
+-- Name: collection_enrollments ensure_course_folder; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER ensure_course_folder AFTER INSERT ON public.collection_enrollments FOR EACH ROW EXECUTE FUNCTION public.ensure_course_folder();
+
+
+--
 -- Name: events events_touch; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -7301,6 +7492,21 @@ CREATE TRIGGER recommendations_check_voice BEFORE INSERT OR UPDATE ON public.rec
 --
 
 CREATE TRIGGER sync_attendee_event_chat_trg AFTER INSERT OR DELETE OR UPDATE ON public.event_attendees FOR EACH ROW EXECUTE FUNCTION public.sync_attendee_to_event_chat();
+
+
+--
+-- Name: course_notes touch_course_note; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER touch_course_note BEFORE UPDATE ON public.course_notes FOR EACH ROW EXECUTE FUNCTION public.touch_course_note();
+
+
+--
+-- Name: assistant_consent assistant_consent_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.assistant_consent
+    ADD CONSTRAINT assistant_consent_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -7741,6 +7947,30 @@ ALTER TABLE ONLY public.collections
 
 ALTER TABLE ONLY public.collections
     ADD CONSTRAINT collections_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: course_notes course_notes_collection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.course_notes
+    ADD CONSTRAINT course_notes_collection_id_fkey FOREIGN KEY (collection_id) REFERENCES public.collections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: course_notes course_notes_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.course_notes
+    ADD CONSTRAINT course_notes_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: course_notes course_notes_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.course_notes
+    ADD CONSTRAINT course_notes_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -8615,6 +8845,40 @@ CREATE POLICY "aliases: readable" ON public.category_aliases FOR SELECT TO authe
 
 
 --
+-- Name: assistant_consent; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.assistant_consent ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: assistant_consent assistant_consent: own delete; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "assistant_consent: own delete" ON public.assistant_consent FOR DELETE TO authenticated USING ((profile_id = auth.uid()));
+
+
+--
+-- Name: assistant_consent assistant_consent: own read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "assistant_consent: own read" ON public.assistant_consent FOR SELECT TO authenticated USING ((profile_id = auth.uid()));
+
+
+--
+-- Name: assistant_consent assistant_consent: own update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "assistant_consent: own update" ON public.assistant_consent FOR UPDATE TO authenticated USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
+
+
+--
+-- Name: assistant_consent assistant_consent: own write; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "assistant_consent: own write" ON public.assistant_consent FOR INSERT TO authenticated WITH CHECK ((profile_id = auth.uid()));
+
+
+--
 -- Name: assistant_feed_posts; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -8978,6 +9242,19 @@ CREATE POLICY "collections: read own, public, or space" ON public.collections FO
 --
 
 CREATE POLICY "collections: update own or stewarded" ON public.collections FOR UPDATE TO authenticated USING (((owner_id = auth.uid()) OR ((space_id IS NOT NULL) AND public.has_space_duty(space_id, auth.uid(), public.collection_duty(kind))))) WITH CHECK (((owner_id = auth.uid()) OR ((space_id IS NOT NULL) AND public.has_space_duty(space_id, auth.uid(), public.collection_duty(kind)))));
+
+
+--
+-- Name: course_notes; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.course_notes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: course_notes course_notes are your own; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "course_notes are your own" ON public.course_notes USING ((profile_id = auth.uid())) WITH CHECK ((profile_id = auth.uid()));
 
 
 --
@@ -10126,6 +10403,36 @@ GRANT ALL ON FUNCTION public.approve_join_request(p_space uuid, p_profile uuid) 
 
 
 --
+-- Name: FUNCTION assistant_consent_all(p_profile uuid, p_section text, p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.assistant_consent_all(p_profile uuid, p_section text, p_space uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION assistant_consent_care(p_patient uuid, p_caregiver uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) TO anon;
+GRANT ALL ON FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.assistant_consent_care(p_patient uuid, p_caregiver uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) TO anon;
+GRANT ALL ON FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) TO authenticated;
+GRANT ALL ON FUNCTION public.assistant_consent_for(p_profile uuid, p_scope_type text, p_scope_id text) TO service_role;
+
+
+--
 -- Name: FUNCTION assistant_on_feed_post(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -10464,6 +10771,15 @@ GRANT ALL ON FUNCTION public.enforce_weaveable() TO service_role;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO anon;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.ensure_care_chat(p_patient uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION ensure_course_folder(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.ensure_course_folder() TO anon;
+GRANT ALL ON FUNCTION public.ensure_course_folder() TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_course_folder() TO service_role;
 
 
 --
@@ -11279,6 +11595,15 @@ GRANT ALL ON FUNCTION public.tick_reminders() TO service_role;
 
 
 --
+-- Name: FUNCTION touch_course_note(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.touch_course_note() TO anon;
+GRANT ALL ON FUNCTION public.touch_course_note() TO authenticated;
+GRANT ALL ON FUNCTION public.touch_course_note() TO service_role;
+
+
+--
 -- Name: FUNCTION touch_updated_at(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11312,6 +11637,15 @@ GRANT ALL ON FUNCTION public.trust_edges_for_targets(p_targets jsonb) TO service
 REVOKE ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.visible_tasks_of(p_owner uuid) TO service_role;
+
+
+--
+-- Name: TABLE assistant_consent; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.assistant_consent TO anon;
+GRANT ALL ON TABLE public.assistant_consent TO authenticated;
+GRANT ALL ON TABLE public.assistant_consent TO service_role;
 
 
 --
@@ -11546,6 +11880,15 @@ GRANT ALL ON TABLE public.collection_suggestions TO service_role;
 GRANT ALL ON TABLE public.collections TO anon;
 GRANT ALL ON TABLE public.collections TO authenticated;
 GRANT ALL ON TABLE public.collections TO service_role;
+
+
+--
+-- Name: TABLE course_notes; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.course_notes TO anon;
+GRANT ALL ON TABLE public.course_notes TO authenticated;
+GRANT ALL ON TABLE public.course_notes TO service_role;
 
 
 --
@@ -12051,6 +12394,14 @@ GRANT SELECT(jurisdiction) ON TABLE public.profiles TO authenticated;
 
 
 --
+-- Name: COLUMN profiles.pronouns; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT(pronouns) ON TABLE public.profiles TO authenticated;
+GRANT SELECT(pronouns) ON TABLE public.profiles TO anon;
+
+
+--
 -- Name: TABLE push_subscriptions; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12361,7 +12712,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iYkGKUgf2N6bSB3aSc9FZp4lw03AOBhC04j6gKhYYXsNlY4o6t7DpTtXaPPbf2l
+\unrestrict FVYesFhJFd2cgtXmnks4FliPfXqsIWQf709xtmBqo9bHvv4jeMHN9czWHtLhAGz
+
 
 -- MANUAL ADDITION — trigger on auth.users (outside the public schema)
 --
