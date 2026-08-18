@@ -770,6 +770,10 @@
   border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink-soft);
   font-size: 16px; line-height: 1; cursor: pointer;
 }
-/* A conversation WITH a space: one logo (wearing the answering admin's face) */
-.thread__head-group--party, .thread__intro-party { display: inline-flex; }
-.thread__intro-party .avatar { width: 84px !important; height: 84px !important; font-size: 30px !important; }
+/* A conversation WITH a space: one logo wearing the answering admin's face.
+   Its OWN box — the stacked-faces rules above position every child span/img
+   absolutely and would drag the badge to the top-left. */
+.thread__head-party { display: inline-flex; margin-right: 6px; }
+.thread__intro-party { display: inline-flex; margin: 0 0 var(--s-3); }
+.thread__intro-party .avatar-wrap, .thread__intro-party .avatar { width: 84px !important; height: 84px !important; font-size: 30px !important; }
+.thread__intro-party .avatar__mark--face { width: 42px !important; height: 42px !important; }

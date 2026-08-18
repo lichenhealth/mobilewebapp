@@ -384,7 +384,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
       >
         <div className="thread__head-avatar">
           {partyView ? (
-            <div className="thread__head-group thread__head-group--party">{partyView.avatar}</div>
+            <div className="thread__head-party">{partyView.avatar}</div>
           ) : isDirect && other ? (
             <div className="thread__head-group">
               <span style={{ position: 'static', width: 38, height: 38, fontSize: 16, background: colorFor(other.profile_id) }}>

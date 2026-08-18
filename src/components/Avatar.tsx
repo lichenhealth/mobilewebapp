@@ -42,9 +42,12 @@ export default function Avatar({
   if (!mark && !stewardFace) return face;
   // Below ~28px any badge is a smudge; the avatar stands alone there.
   if (size < 28) return face;
-  const badge = Math.round(size * 0.42);
+  // The person in FRONT, lower right, at least half the logo, and hanging a
+  // little past its edge — a face on a space, not a pin in it (founder
+  // 2026-08-18 mockup). Marks (pulse/chip) keep the small corner badge.
+  const badge = stewardFace && !mark ? Math.round(size * 0.5) : Math.round(size * 0.42);
   return (
-    <span className="avatar-wrap" style={style}>
+    <span className={'avatar-wrap' + (stewardFace && !mark ? ' avatar-wrap--face' : '')} style={style}>
       {face}
       {/* WHO answers beats THAT someone answers (founder 2026-08-17): when the
           steward has a face, show it — it's the same move the TopBar already

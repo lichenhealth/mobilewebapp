@@ -16,9 +16,13 @@
 }
 .avatar__mark--pulse { background: var(--peach); color: #fff; }
 .avatar__mark--chip  { background: var(--blue); color: #fff; }
-/* A steward's face in the badge slot — bone ring so it reads as a second
-   identity rather than part of the first. */
-.avatar__mark--face { overflow: hidden; background: var(--bone); }
+/* A steward's face on a space (founder 2026-08-18): in FRONT, lower right,
+   half the logo, overhanging its edge by a quarter of itself, and ringed in
+   PEACH — the nod to the human connection behind the space. The wrap keeps
+   its own box (the logo's size); the overhang is deliberate, so give the
+   wrap room on the right/bottom where it sits next to text. */
+.avatar__mark--face { overflow: hidden; background: var(--bone); border: 2px solid var(--peach); z-index: 1; }
+.avatar-wrap--face .avatar__mark--face { right: -14%; bottom: -8%; }
 .avatar__mark--face img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar__mark-mono {
   width: 100%; height: 100%; display: inline-flex; align-items: center;
