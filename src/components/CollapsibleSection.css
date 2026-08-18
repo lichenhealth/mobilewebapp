@@ -1,16 +1,20 @@
 .coll { border-top: 1px solid var(--bone-edge); scroll-margin-top: calc(var(--top-h) + var(--s-4)); }
+.coll__row { display: flex; align-items: center; gap: var(--s-2); padding-right: 14px; }
+.coll__row:hover { background: var(--bone-warm); border-radius: var(--r-md); }
 .coll__head {
-  display: flex; align-items: center; gap: var(--s-3); width: 100%;
+  display: flex; align-items: center; gap: var(--s-3); flex: 1; min-width: 0;
   padding: 13px 14px; background: transparent; border: 0;
   cursor: pointer; text-align: left; font: inherit; color: inherit;
 }
-.coll__head:hover { background: var(--bone-warm); border-radius: var(--r-md); }
-.coll__chev {
+.coll.is-flat .coll__head { cursor: default; }
+.coll__meta { font-weight: 400; color: var(--ink-faint); }
+.coll__chev, .coll__action {
   width: 26px; height: 26px; border-radius: var(--r-full); flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  color: var(--ink-soft);
+  color: var(--ink-soft); cursor: pointer; padding: 0;
 }
+.coll__action:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
 .coll__chev svg { transition: transform 140ms; }
 .coll.is-open .coll__chev svg { transform: rotate(90deg); }
 .coll.is-open .coll__chev { background: var(--peach-tint, var(--bone-warm)); border-color: var(--peach); color: var(--peach-deep, var(--peach)); }

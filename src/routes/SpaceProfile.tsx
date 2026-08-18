@@ -127,7 +127,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [knockNote, setKnockNote] = useState<Record<string, string>>({});
   const [knockBusy, setKnockBusy] = useState<string | null>(null);
   const [knockErr, setKnockErr] = useState('');
-  const [childGroups, setChildGroups] = useState<SpaceDirectoryRow[]>([]);
+  // Every space nested here (parent_space_id), any kind — split by kind below.
+  const [childSpaces, setChildSpaces] = useState<SpaceDirectoryRow[]>([]);
+  const childGroups = childSpaces.filter((c) => c.kind === 'group');
+  const childPlaces = childSpaces.filter((c) => c.kind === 'place');
   const [memBusy, setMemBusy] = useState(false);
   // admin invite type-ahead
   const [invQ, setInvQ] = useState('');
@@ -135,6 +138,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // + New group (admins of a community/organization)
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  // Places nest too (founder 2026-08-17) — same machinery, admin-created.
+  const [newPlaceOpen, setNewPlaceOpen] = useState(false);
+  const [newPlaceName, setNewPlaceName] = useState('');
   // "Part of" picker: a group can join (or leave) a community/org home later.
   // Setting a parent you don't admin becomes a PROPOSAL its admins approve.
   const [parentPick, setParentPick] = useState<{ id: string; name: string } | null>(null);
@@ -260,7 +266,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setMembers(m);
     setChatId(c);
     setMyRequest(req);
-    setChildGroups(kids);
+    setChildSpaces(kids);
     setInWebState(mine.web.has(`space:${id}`));
     setMyWebSet(mine.web);
     setMyVouchedSet(mine.vouched);
@@ -503,6 +509,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       navigate(`/spaces/${gid}`);
     } catch (e) {
       setError((e as Error)?.message || 'Could not create the group.');
+      setMemBusy(false);
+    }
+  }
+  async function createChildPlace() {
+    const nm = newPlaceName.trim();
+    if (!nm) return;
+    setMemBusy(true); setError('');
+    try {
+      const pid = await createSpaceWithLocation(me, nm, 'place', '', null, id);
+      navigate(`/spaces/${pid}`);
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not create the place.');
       setMemBusy(false);
     }
   }
@@ -1759,92 +1777,186 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       </MembersShell>
       )}
 
-      {/* Nested groups — the community's smaller circles. */}
-      {(tab === 'groups' || backstage)
-        && (space.kind === 'community' || space.kind === 'organization') && (childGroups.length > 0 || !!me) && (
-        <section className="prof__section" ref={groupsRef}>
-          <h2 className="prof__h2">Groups</h2>
-          {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
-          <div className="sprof__members">
-            {childGroups.map((g) => (
-              <div className="sprof__grouprow" key={g.id}>
-                <button className="sprof__member" onClick={() => navigate(`/spaces/${g.id}`)}>
-                  <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
-                  <span className="sprof__member-name">{g.name}</span>
-                  <span className="sprof__member-role">
-                    {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
-                  </span>
-                </button>
-                {adminTools && (
-                  <button
-                    className="btn sprof__invite-btn"
-                    disabled={memBusy}
-                    title="Release this group — it becomes standalone; nothing else changes"
-                    onClick={() => {
-                      void confirmDialog({ message: `Release ${g.name} from ${space.name}? It becomes a standalone group — its members, chat, and posts are untouched.`, confirmLabel: 'Release' }).then((ok) => {
-                        if (ok) void act(() => ejectGroup(g.id));
-                      });
-                    }}
-                  >
-                    Release
+      {/* Nested groups and places — the community's smaller circles and its
+          grounds. In BACKSTAGE they sit in the accordion like everything else
+          (founder 2026-08-17: title, "No groups yet" on the same line, a +
+          instead of a drawer to open); on ?tab=groups the list stands open. */}
+      {(() => {
+        const canNest = space.kind === 'community' || space.kind === 'organization';
+        if (!canNest || !(childGroups.length > 0 || childPlaces.length > 0 || me)) return null;
+        const groupList = (
+          <>
+            <div className="sprof__members">
+              {childGroups.map((g) => (
+                <div className="sprof__grouprow" key={g.id}>
+                  <button className="sprof__member" onClick={() => navigate(`/spaces/${g.id}`)}>
+                    <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
+                    <span className="sprof__member-name">{g.name}</span>
+                    <span className="sprof__member-role">
+                      {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
+                    </span>
                   </button>
-                )}
+                  {adminTools && (
+                    <button
+                      className="btn sprof__invite-btn"
+                      disabled={memBusy}
+                      title="Release this group — it becomes standalone; nothing else changes"
+                      onClick={() => {
+                        void confirmDialog({ message: `Release ${g.name} from ${space.name}? It becomes a standalone group — its members, chat, and posts are untouched.`, confirmLabel: 'Release' }).then((ok) => {
+                          if (ok) void act(() => ejectGroup(g.id));
+                        });
+                      }}
+                    >
+                      Release
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Groups knocking on the door — admins decide. */}
+            {adminTools && proposals.length > 0 && proposals.map((pr) => (
+              <div className="sprof__req" key={pr.group_id}>
+                <Avatar id={pr.group_id} name={pr.group?.name ?? 'Group'} url={pr.group?.avatar_url} size={34} />
+                <span className="sprof__req-name">
+                  {pr.group?.name ?? 'A group'}
+                  <em className="sprof__req-tag"> proposed by {pr.proposer?.full_name ?? 'a member'}</em>
+                </span>
+                <span className="sprof__req-actions">
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => approveNesting(pr.group_id))}>Approve</button>
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => void act(() => removeNesting(pr.group_id))}>Decline</button>
+                </span>
               </div>
             ))}
-          </div>
-          {/* Groups knocking on the door — admins decide. */}
-          {adminTools && proposals.length > 0 && proposals.map((pr) => (
-            <div className="sprof__req" key={pr.group_id}>
-              <Avatar id={pr.group_id} name={pr.group?.name ?? 'Group'} url={pr.group?.avatar_url} size={34} />
-              <span className="sprof__req-name">
-                {pr.group?.name ?? 'A group'}
-                <em className="sprof__req-tag"> proposed by {pr.proposer?.full_name ?? 'a member'}</em>
-              </span>
-              <span className="sprof__req-actions">
-                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
-                  onClick={() => void act(() => approveNesting(pr.group_id))}>Approve</button>
-                <button className="btn sprof__invite-btn" disabled={memBusy}
-                  onClick={() => void act(() => removeNesting(pr.group_id))}>Decline</button>
-              </span>
+            {adminTools ? (
+              !newGroupOpen ? null : (
+                <div className="sprof__newgroup">
+                  <input
+                    className="prof__input"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder={`Name the new group (it lives inside ${space.name})`}
+                    autoFocus
+                  />
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newGroupName.trim()}
+                    onClick={() => void createChildGroup()}>Create</button>
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => { setNewGroupOpen(false); setNewGroupName(''); }}>Cancel</button>
+                </div>
+              )
+            ) : me ? (
+              /* Opened from the +: anyone can propose a group; the admins
+                 here decide whether it joins. It's theirs to run either way. */
+              !proposeOpen ? null : (
+                <div className="sprof__newgroup">
+                  <input
+                    className="prof__input"
+                    value={proposeName}
+                    onChange={(e) => setProposeName(e.target.value)}
+                    placeholder={`Name your group — ${space.name}'s admins will review it`}
+                    autoFocus
+                  />
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !proposeName.trim()}
+                    onClick={() => void proposeNewGroup()}>Propose</button>
+                  <button className="btn sprof__invite-btn" disabled={memBusy}
+                    onClick={() => { setProposeOpen(false); setProposeName(''); }}>Cancel</button>
+                </div>
+              )
+            ) : null}
+          </>
+        );
+        const placeList = (
+          <>
+            <div className="sprof__members">
+              {childPlaces.map((g) => (
+                <div className="sprof__grouprow" key={g.id}>
+                  <button className="sprof__member" onClick={() => navigate(`/spaces/${g.id}`)}>
+                    <Avatar id={g.id} name={g.name} url={g.avatar_url} size={34} />
+                    <span className="sprof__member-name">{g.name}</span>
+                    {g.location && <span className="sprof__member-role">{g.location}</span>}
+                  </button>
+                  {adminTools && (
+                    <button
+                      className="btn sprof__invite-btn"
+                      disabled={memBusy}
+                      title="Release this place — it becomes standalone; nothing else changes"
+                      onClick={() => {
+                        void confirmDialog({ message: `Release ${g.name} from ${space.name}? It becomes a standalone place — nothing else changes.`, confirmLabel: 'Release' }).then((ok) => {
+                          if (ok) void act(() => ejectGroup(g.id));
+                        });
+                      }}
+                    >
+                      Release
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-          {adminTools ? (
-            !newGroupOpen ? null : (
+            {adminTools && newPlaceOpen && (
               <div className="sprof__newgroup">
                 <input
                   className="prof__input"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder={`Name the new group (it lives inside ${space.name})`}
+                  value={newPlaceName}
+                  onChange={(e) => setNewPlaceName(e.target.value)}
+                  placeholder={`Name the new place (it lives inside ${space.name})`}
                   autoFocus
                 />
-                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newGroupName.trim()}
-                  onClick={() => void createChildGroup()}>Create</button>
+                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !newPlaceName.trim()}
+                  onClick={() => void createChildPlace()}>Create</button>
                 <button className="btn sprof__invite-btn" disabled={memBusy}
-                  onClick={() => { setNewGroupOpen(false); setNewGroupName(''); }}>Cancel</button>
+                  onClick={() => { setNewPlaceOpen(false); setNewPlaceName(''); }}>Cancel</button>
               </div>
-            )
-          ) : me ? (
-            /* Opened from the + menu: anyone can propose a group; the admins
-               here decide whether it joins. It's theirs to run either way. */
-            !proposeOpen ? null : (
-              <div className="sprof__newgroup">
-                <input
-                  className="prof__input"
-                  value={proposeName}
-                  onChange={(e) => setProposeName(e.target.value)}
-                  placeholder={`Name your group — ${space.name}'s admins will review it`}
-                  autoFocus
-                />
-                <button className="btn btn-primary sprof__invite-btn" disabled={memBusy || !proposeName.trim()}
-                  onClick={() => void proposeNewGroup()}>Propose</button>
-                <button className="btn sprof__invite-btn" disabled={memBusy}
-                  onClick={() => { setProposeOpen(false); setProposeName(''); }}>Cancel</button>
-              </div>
-            )
-          ) : null}
-        </section>
-      )}
+            )}
+          </>
+        );
+        const count = (n: number, one: string) => n === 0 ? `No ${one}s yet` : `${n} ${one}${n === 1 ? '' : 's'}`;
+        if (backstage) {
+          const groupsOpenable = childGroups.length > 0 || (adminTools && proposals.length > 0) || newGroupOpen || proposeOpen;
+          const placesOpenable = childPlaces.length > 0 || newPlaceOpen;
+          return (
+            <>
+              <CollapsibleSection id="groups" title="Groups" meta={count(childGroups.length, 'group')}
+                expandable={groupsOpenable}
+                open={openSections.has('groups') || newGroupOpen || proposeOpen}
+                onToggle={() => toggleSection('groups')}
+                action={me ? {
+                  label: adminTools ? 'Add a group' : 'Propose a group',
+                  onClick: () => {
+                    if (adminTools) setNewGroupOpen(true); else setProposeOpen(true);
+                    setOpenSections((s2) => new Set(s2).add('groups'));
+                  },
+                } : undefined}>
+                {groupList}
+              </CollapsibleSection>
+              <CollapsibleSection id="places" title="Places" meta={count(childPlaces.length, 'place')}
+                expandable={placesOpenable}
+                open={openSections.has('places') || newPlaceOpen}
+                onToggle={() => toggleSection('places')}
+                action={adminTools ? {
+                  label: 'Add a place',
+                  onClick: () => { setNewPlaceOpen(true); setOpenSections((s2) => new Set(s2).add('places')); },
+                } : undefined}>
+                {placeList}
+              </CollapsibleSection>
+            </>
+          );
+        }
+        if (tab !== 'groups') return null;
+        return (
+          <section className="prof__section" ref={groupsRef}>
+            <h2 className="prof__h2">Groups</h2>
+            {childGroups.length === 0 && <p className="sprof__muted">No groups here yet.</p>}
+            {groupList}
+            {childPlaces.length > 0 && (
+              <>
+                <h2 className="prof__h2">Places</h2>
+                {placeList}
+              </>
+            )}
+          </section>
+        );
+      })()}
 
       {roomsSection}
 
