@@ -1201,7 +1201,10 @@ export default function Compose() {
             </div>
             <label className="cmp__label">How it changes hands</label>
             <div className="cmp__attend cmp__fulfill">
-              {([['pickup', 'Pickup'], ['deliver', 'Deliver'], ['ship', 'Ship'], ['in_store', 'In store']] as const).map(([v, l]) => (
+              {/* Digital (founder 2026-08-17): a lot of content is digital now, not
+                  paper — a PDF, a recording, a course file — and it changes hands
+                  by link, not by post. */}
+              {([['pickup', 'Pickup'], ['deliver', 'Deliver'], ['ship', 'Ship'], ['in_store', 'In store'], ['digital', 'Digital']] as const).map(([v, l]) => (
                 <label className="cmp__sliding" key={v}>
                   <input type="checkbox" checked={fulfillment.has(v)}
                     onChange={() => setFulfillment((cur) => { const n = new Set(cur); n.has(v) ? n.delete(v) : n.add(v); return n; })} />
@@ -1213,6 +1216,12 @@ export default function Compose() {
               <p className="cmp__hint-ev">
                 Meeting someone new? A <a href="/places" target="_blank" rel="noopener">Lichen place</a> —
                 a known community spot — makes good ground for the handoff.
+              </p>
+            )}
+            {fulfillment.has('digital') && (
+              <p className="cmp__hint-ev">
+                Digital hands over by link or file — send it in the exchange chat once it&rsquo;s agreed;
+                nothing is uploaded here.
               </p>
             )}
             {fulfillment.has('deliver') && (
@@ -1264,6 +1273,9 @@ export default function Compose() {
           {inPerson && (
             <LocationField
               className="cmp__input"
+              // In person means a place (founder 2026-08-17: "a video link is
+              // not in person") — the meeting link has its own box above.
+              placeholder="Address or place"
               value={location}
               geo={locGeo}
               onChange={(text, g) => { setLocation(text); setLocGeo(g); }}

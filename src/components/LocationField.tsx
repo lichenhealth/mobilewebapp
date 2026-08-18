@@ -72,7 +72,7 @@ export default function LocationField({
         value={value}
         onChange={(e) => { setDirty(true); onChange(e.target.value, null); }}   // edits always clear geo
         onFocus={() => { if (suggestions.length) setOpen(true); }}
-        placeholder={placeholder ?? 'Address, place, or video link'}
+        placeholder={placeholder ?? 'Address or place'}
         autoComplete="off"
       />
       {geo && (

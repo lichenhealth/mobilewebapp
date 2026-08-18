@@ -14,6 +14,7 @@ const FULFILMENT: { id: string; label: string }[] = [
   { id: 'deliver', label: 'Delivered' },
   { id: 'ship', label: 'Shipped' },
   { id: 'in_store', label: 'In store' },
+  { id: 'digital', label: 'Digital — a link or file' },
 ];
 
 /** The exchange, on a listing (founder 2026-08-05). Before: the only door

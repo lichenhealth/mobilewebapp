@@ -138,7 +138,7 @@ export default function PostPage() {
     new: 'New', like_new: 'Like new', good: 'Good', fair: 'Fair',
   };
   const FULFILMENT: Record<string, string> = {
-    pickup: 'Pick up', deliver: 'Delivered', ship: 'Shipped', in_store: 'In store',
+    pickup: 'Pick up', deliver: 'Delivered', ship: 'Shipped', in_store: 'In store', digital: 'Digital',
   };
   const listOf = (v: unknown, map: Record<string, string>) =>
     Array.isArray(v) ? (v as string[]).map((x) => map[x] ?? x).join(' · ') : '';
