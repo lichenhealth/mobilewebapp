@@ -28,6 +28,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
 import ContactFields, { type ContactInfo, type ContactSuggestion } from '../components/ContactFields';
 import { listMyBookingTypes } from '../lib/bookingApi';
+import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } from '../lib/spacesApi';
 import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -135,6 +136,12 @@ export default function Profile() {
   const [pushMsg, setPushMsg] = useState('');
   const [caps, setCaps] = useState<string[]>([]);
   const [spaces, setSpaces] = useState<MySpace[]>([]);
+  // Spaces I've taken off the network — the ONLY door back to them (founder
+  // 2026-08-17). Loaded through its own RPC: RLS hides them everywhere else.
+  const [offlineSpaces, setOfflineSpaces] = useState<OfflineSpace[]>([]);
+  const [offlineBusy, setOfflineBusy] = useState<string | null>(null);
+  const [offlineErr, setOfflineErr] = useState('');
+  const [offlineConfirmDelete, setOfflineConfirmDelete] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceCats, setServiceCats] = useState<string[]>([]);
   const [goodCats, setGoodCats] = useState<string[]>([]);
@@ -224,6 +231,7 @@ export default function Profile() {
     setSpaces(mRows.filter((r) => r.spaces).map((r) => ({
       id: r.spaces!.id, name: r.spaces!.name, kind: r.spaces!.kind, role: r.role,
     })));
+    void listMyOfflineSpaces().then(setOfflineSpaces);
     setCategories(((catRes.data as Category[] | null) ?? []));
     const pcRows = (pcRes.data as { category_id: string; categories: { domain: 'good' | 'service' | 'place' } | null }[] | null) ?? [];
     setServiceCats(pcRows.filter((r) => r.categories?.domain === 'service').map((r) => r.category_id));
@@ -1484,6 +1492,53 @@ export default function Profile() {
           </CollapsibleSection>
         );
       })}
+
+      {/* OFF THE NETWORK — spaces this member took offline (super admin only
+          sees their own; founder 2026-08-17). Two doors per row: put it back
+          online, or delete for good. Shown only when there's something held —
+          an empty section would be a drawer with nothing in it. */}
+      {offlineSpaces.length > 0 && (
+        <CollapsibleSection id="offline" title="Off the network" open={openSections.has('offline')} onToggle={() => toggleSection('offline')}>
+          <p className="prof__care-lead">
+            Held with everything intact and invisible to everyone, including their members, until you put them back.
+          </p>
+          <div className="prof__spaces">
+            {offlineSpaces.map((s) => (
+              <div className="prof__space prof__space--offline" key={s.id}>
+                <span className="prof__space-name prof__space-name--static">{s.name}</span>
+                <span className="prof__space-role">{s.kind} · since {new Date(s.status_changed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                {offlineConfirmDelete === s.id ? (
+                  <>
+                    <button className="btn prof__offline-btn prof__offline-btn--danger" disabled={offlineBusy === s.id}
+                      onClick={() => {
+                        setOfflineBusy(s.id); setOfflineErr('');
+                        deleteSpace(s.id)
+                          .then(() => { setOfflineSpaces((cur) => cur.filter((x) => x.id !== s.id)); setOfflineConfirmDelete(null); })
+                          .catch((e: Error) => setOfflineErr(e.message))
+                          .finally(() => setOfflineBusy(null));
+                      }}>{offlineBusy === s.id ? 'Deleting…' : 'Yes, delete for good'}</button>
+                    <button className="btn prof__offline-btn" disabled={offlineBusy === s.id} onClick={() => setOfflineConfirmDelete(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn prof__offline-btn" disabled={offlineBusy === s.id}
+                      onClick={() => {
+                        setOfflineBusy(s.id); setOfflineErr('');
+                        restoreSpace(s.id)
+                          .then(() => { setOfflineSpaces((cur) => cur.filter((x) => x.id !== s.id)); void loadAll(); })
+                          .catch((e: Error) => setOfflineErr(e.message))
+                          .finally(() => setOfflineBusy(null));
+                      }}>{offlineBusy === s.id ? 'Restoring…' : 'Put back online'}</button>
+                    <button className="btn prof__offline-btn prof__offline-btn--danger" disabled={offlineBusy === s.id}
+                      onClick={() => setOfflineConfirmDelete(s.id)}>Delete</button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          {offlineErr && <p className="prof__offline-err">{offlineErr}</p>}
+        </CollapsibleSection>
+      )}
 
       {isAdmin && (
         <CollapsibleSection id="admin" title="Admin" open={openSections.has('admin')} onToggle={() => toggleSection('admin')}>

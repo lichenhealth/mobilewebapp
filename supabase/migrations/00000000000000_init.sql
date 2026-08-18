@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ItrUZWSCaW8IeETQwznuwSgNexUehC7CSabRXpuBwHJl7Kmw4q9oynM6HEEacoz
+\restrict u4MlSl0fHHdrkbAo8F0aCcAca36xVAajjbH9cRZ8f1rrFmH39hk2cKwaFmiZzSg
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -2574,7 +2574,10 @@ CREATE FUNCTION public.is_chat_member(p_chat uuid, p_uid uuid) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select exists (select 1 from public.chat_members m where m.chat_id = p_chat and m.profile_id = p_uid);
+  select exists (select 1 from public.chat_members m where m.chat_id = p_chat and m.profile_id = p_uid)
+     and not exists (select 1 from public.chats c
+                      where c.id = p_chat and c.space_id is not null
+                        and not public.space_alive(c.space_id));
 $$;
 
 
@@ -3109,6 +3112,25 @@ $$;
 
 
 ALTER FUNCTION public.my_minors() OWNER TO postgres;
+
+--
+-- Name: my_offline_spaces(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.my_offline_spaces() RETURNS TABLE(id uuid, name text, kind text, avatar_url text, status_changed_at timestamp with time zone)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select s.id, s.name, s.kind::text, s.avatar_url, s.status_changed_at
+    from public.spaces s
+    join public.space_members m on m.space_id = s.id
+   where m.profile_id = auth.uid() and m.role = 'super_admin'
+     and s.status = 'offline'
+   order by s.status_changed_at desc;
+$$;
+
+
+ALTER FUNCTION public.my_offline_spaces() OWNER TO postgres;
 
 --
 -- Name: my_phone(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4023,6 +4045,29 @@ end; $$;
 ALTER FUNCTION public.respond_booking(p_booking uuid, p_accept boolean) OWNER TO postgres;
 
 --
+-- Name: restore_space(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.restore_space(p_space uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  if not exists (select 1 from public.space_members
+                  where space_id = p_space and profile_id = auth.uid() and role = 'super_admin') then
+    raise exception 'only the super admin can restore this';
+  end if;
+  update public.spaces
+     set status = 'live', status_changed_at = now(), status_changed_by = auth.uid()
+   where id = p_space and status = 'offline';
+end;
+$$;
+
+
+ALTER FUNCTION public.restore_space(p_space uuid) OWNER TO postgres;
+
+--
 -- Name: revoke_subscription(text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4231,6 +4276,20 @@ $$;
 ALTER FUNCTION public.set_space_public_page_default() OWNER TO postgres;
 
 --
+-- Name: space_alive(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.space_alive(p_space uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select coalesce((select s.status = 'live' from public.spaces s where s.id = p_space), false);
+$$;
+
+
+ALTER FUNCTION public.space_alive(p_space uuid) OWNER TO postgres;
+
+--
 -- Name: space_present_count(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4366,6 +4425,59 @@ end; $$;
 
 
 ALTER FUNCTION public.sync_member_to_chat() OWNER TO postgres;
+
+--
+-- Name: take_space_offline(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.take_space_offline(p_space uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_bal numeric;
+  v_n int;
+  v_name text;
+begin
+  if v_uid is null then raise exception 'not signed in'; end if;
+  if not exists (select 1 from public.space_members
+                  where space_id = p_space and profile_id = v_uid and role = 'super_admin') then
+    raise exception 'only the super admin can do this';
+  end if;
+  select coalesce(sum(case when to_type = 'space' and to_id = p_space then amount else 0 end), 0)
+       - coalesce(sum(case when from_type = 'space' and from_id = p_space then amount else 0 end), 0)
+    into v_bal from public.ledger_entries
+   where (to_type = 'space' and to_id = p_space) or (from_type = 'space' and from_id = p_space);
+  if v_bal > 0 then
+    raise exception 'The treasury still holds % Current — send it on first.', trim(to_char(v_bal, 'FM999999990.##'));
+  end if;
+  select count(*) into v_n from public.profiles where steward_space_id = p_space;
+  if v_n > 0 then
+    raise exception 'This space stewards % member(s) — hand them to another steward first.', v_n;
+  end if;
+  select count(*) into v_n from public.exchanges
+   where (buyer_space_id = p_space or seller_space_id = p_space) and status in ('pending', 'accepted');
+  if v_n > 0 then
+    raise exception 'There are % open trade(s) with this space — finish or cancel them first.', v_n;
+  end if;
+
+  update public.spaces
+     set status = 'offline', status_changed_at = now(), status_changed_by = v_uid
+   where id = p_space and status = 'live'
+   returning name into v_name;
+
+  -- The bell says where the way back is.
+  perform public.notify(
+    v_uid, 'profile', null, 'space_offline',
+    v_name || ' is off the network',
+    'Held with everything intact. Put it back online any time from your Profile.',
+    '/profile#offline', null);
+end;
+$$;
+
+
+ALTER FUNCTION public.take_space_offline(p_space uuid) OWNER TO postgres;
 
 --
 -- Name: task_level(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -6046,7 +6158,11 @@ CREATE TABLE public.spaces (
     findable boolean DEFAULT true NOT NULL,
     assistant_readable boolean DEFAULT true NOT NULL,
     content_ai_default boolean DEFAULT true NOT NULL,
-    content_download_default boolean DEFAULT true NOT NULL
+    content_download_default boolean DEFAULT true NOT NULL,
+    status text DEFAULT 'live'::text NOT NULL,
+    status_changed_at timestamp with time zone,
+    status_changed_by uuid,
+    CONSTRAINT spaces_status_check CHECK ((status = ANY (ARRAY['live'::text, 'offline'::text])))
 );
 
 
@@ -8730,6 +8846,14 @@ ALTER TABLE ONLY public.spaces
 
 
 --
+-- Name: spaces spaces_status_changed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spaces
+    ADD CONSTRAINT spaces_status_changed_by_fkey FOREIGN KEY (status_changed_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
 -- Name: subscriptions subscriptions_granted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -8826,7 +8950,7 @@ CREATE POLICY "Categories readable by authenticated" ON public.categories FOR SE
 -- Name: space_members Memberships readable by authenticated; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Memberships readable by authenticated" ON public.space_members FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Memberships readable by authenticated" ON public.space_members FOR SELECT TO authenticated USING (public.space_alive(space_id));
 
 
 --
@@ -8861,7 +8985,7 @@ CREATE POLICY "Proposer reads own suggestions" ON public.category_suggestions FO
 -- Name: spaces Spaces readable by authenticated; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Spaces readable by authenticated" ON public.spaces FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Spaces readable by authenticated" ON public.spaces FOR SELECT TO authenticated USING ((status = 'live'::text));
 
 
 --
@@ -9301,16 +9425,16 @@ CREATE POLICY "collections: insert own or stewarded" ON public.collections FOR I
 -- Name: collections collections: public read (anon); Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "collections: public read (anon)" ON public.collections FOR SELECT TO anon USING (is_public);
+CREATE POLICY "collections: public read (anon)" ON public.collections FOR SELECT TO anon USING ((is_public AND ((space_id IS NULL) OR public.space_alive(space_id))));
 
 
 --
 -- Name: collections collections: read own, public, or space; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "collections: read own, public, or space" ON public.collections FOR SELECT TO authenticated USING (((owner_id = auth.uid()) OR is_public OR ((space_id IS NOT NULL) AND (EXISTS ( SELECT 1
+CREATE POLICY "collections: read own, public, or space" ON public.collections FOR SELECT TO authenticated USING ((((space_id IS NULL) OR public.space_alive(space_id)) AND ((owner_id = auth.uid()) OR is_public OR ((space_id IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM public.space_members m
-  WHERE ((m.space_id = collections.space_id) AND (m.profile_id = auth.uid())))))));
+  WHERE ((m.space_id = collections.space_id) AND (m.profile_id = auth.uid()))))))));
 
 
 --
@@ -9471,9 +9595,9 @@ CREATE POLICY "events insert" ON public.events FOR INSERT TO authenticated WITH 
 -- Name: events events read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING (((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR public.is_event_attendee(id, auth.uid()) OR (EXISTS ( SELECT 1
+CREATE POLICY "events read" ON public.events FOR SELECT TO authenticated USING ((((owner_space_id IS NULL) OR public.space_alive(owner_space_id)) AND ((creator_id = auth.uid()) OR (owner_profile_id = auth.uid()) OR ((owner_space_id IS NOT NULL) AND public.is_space_member(owner_space_id, auth.uid())) OR public.is_event_attendee(id, auth.uid()) OR (EXISTS ( SELECT 1
    FROM public.posts p
-  WHERE (p.linked_event_id = events.id)))));
+  WHERE (p.linked_event_id = events.id))))));
 
 
 --
@@ -9919,18 +10043,18 @@ CREATE POLICY "posts: insert own" ON public.posts FOR INSERT TO authenticated WI
 -- Name: posts posts: public read (anon); Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "posts: public read (anon)" ON public.posts FOR SELECT TO anon USING ((visibility = 'public'::text));
+CREATE POLICY "posts: public read (anon)" ON public.posts FOR SELECT TO anon USING (((visibility = 'public'::text) AND ((author_space_id IS NULL) OR public.space_alive(author_space_id))));
 
 
 --
 -- Name: posts posts: read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "posts: read" ON public.posts FOR SELECT TO authenticated USING ((is_public OR (author_id = auth.uid()) OR (to_mycelium AND (EXISTS ( SELECT 1
+CREATE POLICY "posts: read" ON public.posts FOR SELECT TO authenticated USING ((((author_space_id IS NULL) OR public.space_alive(author_space_id)) AND (is_public OR (author_id = auth.uid()) OR (to_mycelium AND (EXISTS ( SELECT 1
    FROM public.mycelium my
   WHERE ((my.truster_id = auth.uid()) AND (((my.target_type = 'profile'::text) AND (my.target_id = posts.author_id)) OR ((my.target_type = 'space'::text) AND (my.target_id = posts.author_space_id))))))) OR (EXISTS ( SELECT 1
    FROM public.space_members m
-  WHERE ((m.profile_id = auth.uid()) AND (m.space_id = ANY (posts.audience_space_ids)))))));
+  WHERE ((m.profile_id = auth.uid()) AND (m.space_id = ANY (posts.audience_space_ids))))))));
 
 
 --
@@ -10180,7 +10304,7 @@ ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
 -- Name: resources resources: read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "resources: read" ON public.resources FOR SELECT TO authenticated USING (true);
+CREATE POLICY "resources: read" ON public.resources FOR SELECT TO authenticated USING (((space_id IS NULL) OR public.space_alive(space_id)));
 
 
 --
@@ -10281,7 +10405,7 @@ ALTER TABLE public.spaces ENABLE ROW LEVEL SECURITY;
 -- Name: spaces spaces: public pages; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "spaces: public pages" ON public.spaces FOR SELECT TO anon USING ((public_page = true));
+CREATE POLICY "spaces: public pages" ON public.spaces FOR SELECT TO anon USING (((public_page = true) AND (status = 'live'::text)));
 
 
 --
@@ -11302,6 +11426,16 @@ GRANT ALL ON FUNCTION public.my_minors() TO service_role;
 
 
 --
+-- Name: FUNCTION my_offline_spaces(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.my_offline_spaces() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.my_offline_spaces() TO anon;
+GRANT ALL ON FUNCTION public.my_offline_spaces() TO authenticated;
+GRANT ALL ON FUNCTION public.my_offline_spaces() TO service_role;
+
+
+--
 -- Name: FUNCTION my_phone(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11573,6 +11707,16 @@ GRANT ALL ON FUNCTION public.respond_booking(p_booking uuid, p_accept boolean) T
 
 
 --
+-- Name: FUNCTION restore_space(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.restore_space(p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.restore_space(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.restore_space(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.restore_space(p_space uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION revoke_subscription(p_email text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11618,6 +11762,16 @@ GRANT ALL ON FUNCTION public.set_space_public_page_default() TO service_role;
 
 
 --
+-- Name: FUNCTION space_alive(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.space_alive(p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.space_alive(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.space_alive(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.space_alive(p_space uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION space_present_count(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11660,6 +11814,16 @@ GRANT ALL ON FUNCTION public.sync_is_adult() TO service_role;
 GRANT ALL ON FUNCTION public.sync_member_to_chat() TO anon;
 GRANT ALL ON FUNCTION public.sync_member_to_chat() TO authenticated;
 GRANT ALL ON FUNCTION public.sync_member_to_chat() TO service_role;
+
+
+--
+-- Name: FUNCTION take_space_offline(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.take_space_offline(p_space uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.take_space_offline(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.take_space_offline(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.take_space_offline(p_space uuid) TO service_role;
 
 
 --
@@ -12798,7 +12962,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ItrUZWSCaW8IeETQwznuwSgNexUehC7CSabRXpuBwHJl7Kmw4q9oynM6HEEacoz
+\unrestrict u4MlSl0fHHdrkbAo8F0aCcAca36xVAajjbH9cRZ8f1rrFmH39hk2cKwaFmiZzSg
 
 
 

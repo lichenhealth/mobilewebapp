@@ -408,6 +408,28 @@ export async function deleteSpace(spaceId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/** TAKE OFFLINE (founder 2026-08-17): the door short of delete. The space
+ *  vanishes from Lichen — directories, maps, search, every member's inbox and
+ *  calendar — with everything held intact; the super admin can put it back
+ *  online any time from Profile → Admin. Same refusals as delete. */
+export async function takeSpaceOffline(spaceId: string): Promise<void> {
+  const { error } = await supabase.rpc('take_space_offline', { p_space: spaceId });
+  if (error) throw new Error(error.message);
+}
+export async function restoreSpace(spaceId: string): Promise<void> {
+  const { error } = await supabase.rpc('restore_space', { p_space: spaceId });
+  if (error) throw new Error(error.message);
+}
+export interface OfflineSpace {
+  id: string; name: string; kind: SpaceKind; avatar_url: string | null; status_changed_at: string;
+}
+/** The super admin's held list — the only door to an offline space. */
+export async function listMyOfflineSpaces(): Promise<OfflineSpace[]> {
+  const { data, error } = await supabase.rpc('my_offline_spaces');
+  if (error) { console.warn('listMyOfflineSpaces:', error.message); return []; }
+  return (data as OfflineSpace[] | null) ?? [];
+}
+
 // ─── Group nesting proposals (consensual: parent admins approve) ──────────────
 
 export interface NestingRequestRow {

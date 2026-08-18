@@ -15,7 +15,7 @@ import type { GeoPoint } from '../lib/geoApi';
 import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
-  approveJoin, acceptInvite, leaveSpace, deleteSpace, listChildGroups, createSpaceWithLocation,
+  approveJoin, acceptInvite, leaveSpace, deleteSpace, takeSpaceOffline, listChildGroups, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
   listPendingSectionShares, decideSectionShare, type SectionShareRow, type SectionArea,
@@ -211,7 +211,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [retireMode, setRetireMode] = useState<'offline' | 'delete' | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -1775,39 +1775,49 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {roomsSection}
 
-      {/* Delete — the super admin's alone, and last (founder 2026-08-17: a
-          member asked the help room how, and the answer was "you can't").
-          A plain button, not an accordion section — there is never more to
-          say than the act itself (founder, same day). The confirm opens in
-          place and carries what the act means; the server's refusal, when
-          there is one, IS the copy. One RPC either removes everything in one
-          transaction or refuses with a reason you can go act on. */}
+      {/* Two doors at the foot, the super admin's alone (founder 2026-08-17):
+          TAKE OFFLINE — off the network, held intact, put back online any time
+          from Profile → Off the network; and DELETE — permanent, immediate.
+          Plain buttons, not accordion sections: there is never more to say
+          than the act itself. Each confirm opens in place; the server's
+          refusal (treasury Current, a stewarded member, an open trade), when
+          there is one, IS the copy. */}
       {backstage && myRole === 'super_admin' && (
         <div className="sprof__delete">
-          {!confirmDelete ? (
-            <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => setConfirmDelete(true)}>
-              Delete this {kindLabel.toLowerCase()}
-            </button>
+          {retireMode === null ? (
+            <div className="sprof__delete-row">
+              <button className="btn" disabled={deleting} onClick={() => setRetireMode('offline')}>
+                Take this {kindLabel.toLowerCase()} offline
+              </button>
+              <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => setRetireMode('delete')}>
+                Delete this {kindLabel.toLowerCase()}
+              </button>
+            </div>
           ) : (
-            <div className="sprof__confirm">
+            <div className={'sprof__confirm' + (retireMode === 'offline' ? ' sprof__confirm--soft' : '')}>
               <span className="sprof__confirm-text">
-                Delete <em>&ldquo;{space.name}&rdquo;</em> for good? Its members, chat, events,
-                bookable areas, collections and everything it posted in its own voice go with it
-                {/* Only communities and organizations can hold groups — a group or place has
-                    nothing nested, so the clause would be false there (founder 2026-08-17). */}
-                {(space.kind === 'community' || space.kind === 'organization')
-                  ? '; groups nested inside it stay, on their own'
-                  : ''}. This can&rsquo;t be undone.
+                {retireMode === 'offline' ? (
+                  <>Take <em>&ldquo;{space.name}&rdquo;</em> off the network? It disappears from Lichen
+                    for everyone, members included — chat, events, posts and all — but nothing is lost.
+                    You can put it back online any time from your Profile.</>
+                ) : (
+                  <>Delete <em>&ldquo;{space.name}&rdquo;</em> for good? Its members, chat, events,
+                    bookable areas, collections and everything it posted in its own voice go with it
+                    {(space.kind === 'community' || space.kind === 'organization')
+                      ? '; groups nested inside it stay, on their own'
+                      : ''}. This can&rsquo;t be undone.</>
+                )}
               </span>
-              <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => {
+              <button className={'btn' + (retireMode === 'delete' ? ' sprof__btn--danger' : ' btn-primary')} disabled={deleting} onClick={() => {
                 setDeleting(true); setDeleteError('');
-                deleteSpace(id)
-                  .then(() => navigate(`/${space.kind === 'community' ? 'communities' : space.kind + 's'}`, { replace: true }))
+                const dir = `/${space.kind === 'community' ? 'communities' : space.kind + 's'}`;
+                (retireMode === 'delete' ? deleteSpace(id) : takeSpaceOffline(id))
+                  .then(() => navigate(retireMode === 'delete' ? dir : '/profile#offline', { replace: true }))
                   .catch((e: Error) => { setDeleteError(e.message); setDeleting(false); });
               }}>
-                {deleting ? 'Deleting…' : 'Yes, delete'}
+                {deleting ? (retireMode === 'delete' ? 'Deleting…' : 'Taking offline…') : (retireMode === 'delete' ? 'Yes, delete' : 'Yes, take it offline')}
               </button>
-              <button className="btn" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(''); }}>Cancel</button>
+              <button className="btn" disabled={deleting} onClick={() => { setRetireMode(null); setDeleteError(''); }}>Cancel</button>
               {deleteError && <p className="sprof__delete-err">{deleteError}</p>}
             </div>
           )}

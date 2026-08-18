@@ -282,3 +282,15 @@
   margin-left: 6px; font-size: 10px; font-weight: 300; letter-spacing: 0.04em;
   text-transform: lowercase; color: var(--ink-faint);
 }
+
+/* ── Off the network (spaces taken offline; the way back) ─────────────────── */
+.prof__space--offline { flex-wrap: wrap; row-gap: var(--s-2); }
+.prof__space-name--static { cursor: default; flex: 1 1 100%; white-space: normal; padding: 0 6px; }
+.prof__space--offline .prof__space-role { flex: 1 1 auto; padding-left: 6px; }
+.prof__offline-btn { font-size: 12px; padding: 4px 10px; flex-shrink: 0; }
+@media (min-width: 700px) {
+  .prof__space-name--static { flex: 1 1 auto; }
+  .prof__space--offline .prof__space-role { flex: 0 0 auto; }
+}
+.prof__offline-btn--danger { color: #c0564f; border-color: #c0564f; }
+.prof__offline-err { margin: var(--s-2) 0 0; font-size: 13px; color: #c0564f; }

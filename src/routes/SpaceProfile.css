@@ -300,3 +300,6 @@
 .sprof__confirm-text em { font-style: italic; font-family: var(--font-display); }
 /* The server's refusal IS the copy — it names what to go do first. */
 .sprof__delete-err { flex-basis: 100%; margin: 0; font-size: 13px; color: #c0564f; }
+.sprof__delete-row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+/* Offline is a hold, not an ending — no red edge. */
+.sprof__confirm--soft { border-color: var(--bone-edge); }
