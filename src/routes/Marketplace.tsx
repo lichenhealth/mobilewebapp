@@ -144,7 +144,12 @@ export default function Marketplace() {
   // though the latter already implies the former; comfort over strict logic.
   // NOT sticky (founder 2026-08-03): every visit to Marketplace starts at
   // Anyone — the lens is a within-visit narrowing, not a standing filter.
-  type TrustLens = 'second' | 'mine' | 'rec-mine' | 'rec-second';
+  // ONE catch-all per degree (founder 2026-08-18: "we trust members and
+  // recommend services, goods, places, groups… a catch-all 1st or 2nd
+  // endorsement is the right simplification"): 'first' = the seller is someone
+  // you trust OR the listing/seller is recommended by someone you trust;
+  // 'second' = the same, one hop out (and includes first).
+  type TrustLens = 'first' | 'second';
   const [trustLenses, setTrustLenses] = useState<Set<TrustLens>>(new Set());
   const toggleLens = (l: TrustLens) => {
     setTrustLenses((prev) => {
@@ -295,10 +300,9 @@ export default function Marketplace() {
     }
     if (trustLenses.size > 0) {
       list = list.filter((p) => {
-        if (trustLenses.has('mine') && (p.author_id === me || sellerPaths.get(p.id)?.degree === 'mine')) return true;
-        if (trustLenses.has('second') && (p.author_id === me || sellerPaths.get(p.id))) return true;
-        if (trustLenses.has('rec-mine') && recPaths.get(p.id)?.degree === 'mine') return true;
-        if (trustLenses.has('rec-second') && recPaths.get(p.id)) return true;
+        if (p.author_id === me) return true;
+        if (trustLenses.has('first') && (sellerPaths.get(p.id)?.degree === 'mine' || recPaths.get(p.id)?.degree === 'mine')) return true;
+        if (trustLenses.has('second') && (sellerPaths.get(p.id) || recPaths.get(p.id))) return true;
         return false;
       });
     }
@@ -320,10 +324,8 @@ export default function Marketplace() {
     }
     if (catFilter.length) seed.categories = allCats.filter((c) => catFilter.includes(c.id));
     // Broader degree wins when both are on — 'second' already includes 'mine'.
-    if (trustLenses.has('second')) seed.trust = { degree: 'second', personId: null };
-    else if (trustLenses.has('mine')) seed.trust = { degree: 'mine', personId: null };
-    if (trustLenses.has('rec-second')) seed.rec = { degree: 'second', personId: null };
-    else if (trustLenses.has('rec-mine')) seed.rec = { degree: 'mine', personId: null };
+    if (trustLenses.has('second')) { seed.trust = { degree: 'second', personId: null }; seed.rec = { degree: 'second', personId: null }; }
+    else if (trustLenses.has('first')) { seed.trust = { degree: 'mine', personId: null }; seed.rec = { degree: 'mine', personId: null }; }
     return seed;
   }, [activeChips, catFilter, allCats, trustLenses]);
 
@@ -451,10 +453,8 @@ export default function Marketplace() {
             <button className={'mkt__trustlens-chip' + (trustLenses.size === 0 ? ' is-on' : '')}
               onClick={clearLenses}>Anyone</button>
             {([
-              ['mine', 'Trusted (1st)', 'Someone you trust, directly'],
-              ['second', 'Trusted (2nd)', 'Trusted by someone you trust'],
-              ['rec-mine', 'Recommended (1st)', 'Recommended by someone you trust'],
-              ['rec-second', 'Recommended (2nd)', 'Recommended by someone trusted by someone you trust'],
+              ['first', 'Trusted / Recommended (1st)', 'The seller is someone you trust, or this is recommended by someone you trust'],
+              ['second', 'Trusted / Recommended (2nd)', 'One hop out: trusted or recommended by someone trusted by someone you trust'],
             ] as const).map(([v, l, title]) => {
               const on = trustLenses.has(v);
               return (
