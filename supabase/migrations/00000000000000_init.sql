@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict u4MlSl0fHHdrkbAo8F0aCcAca36xVAajjbH9cRZ8f1rrFmH39hk2cKwaFmiZzSg
+\restrict VyUxkIWiMBUcO4cDMYrGm5R8qchFhNW5M31Zl4kdKXedP3mXpMYyHVzPm9ONZQQ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -2787,6 +2787,31 @@ end $$;
 ALTER FUNCTION public.keep_donation_for_operations(p_donation uuid) OWNER TO postgres;
 
 --
+-- Name: knock_becomes_membership_request(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.knock_becomes_membership_request() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.email is null then return new; end if;
+  insert into public.space_membership_requests (space_id, profile_id, initiated_by)
+  select distinct k.space_id, new.id, new.id
+    from public.join_requests k
+    join public.spaces s on s.id = k.space_id
+   where k.space_id is not null
+     and lower(k.email) = lower(new.email)
+     and s.status = 'live'
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.knock_becomes_membership_request() OWNER TO postgres;
+
+--
 -- Name: ledger_balance(text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -5565,6 +5590,7 @@ CREATE TABLE public.join_requests (
     story text,
     status text DEFAULT 'new'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    space_id uuid,
     CONSTRAINT join_requests_status_check CHECK ((status = ANY (ARRAY['new'::text, 'invited'::text, 'declined'::text])))
 );
 
@@ -7183,6 +7209,13 @@ CREATE INDEX inkind_status_idx ON public.inkind_donations USING btree (status, c
 
 
 --
+-- Name: join_requests_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX join_requests_space_idx ON public.join_requests USING btree (space_id) WHERE (space_id IS NOT NULL);
+
+
+--
 -- Name: ledger_from_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7495,6 +7528,13 @@ CREATE TRIGGER events_touch BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE 
 --
 
 CREATE TRIGGER health_snapshots_touch BEFORE UPDATE ON public.health_snapshots FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: profiles knock_becomes_membership_request; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER knock_becomes_membership_request AFTER INSERT ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.knock_becomes_membership_request();
 
 
 --
@@ -8419,6 +8459,14 @@ ALTER TABLE ONLY public.invite_tokens
 
 ALTER TABLE ONLY public.invite_tokens
     ADD CONSTRAINT invite_tokens_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: join_requests join_requests_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.join_requests
+    ADD CONSTRAINT join_requests_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
 
 
 --
@@ -9770,6 +9818,20 @@ CREATE POLICY "knocks: admins" ON public.join_requests FOR SELECT TO authenticat
 CREATE POLICY "knocks: admins decide" ON public.join_requests FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.profiles p
   WHERE ((p.id = auth.uid()) AND p.is_admin))));
+
+
+--
+-- Name: join_requests knocks: space stewards; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "knocks: space stewards" ON public.join_requests FOR SELECT TO authenticated USING (((space_id IS NOT NULL) AND public.is_space_admin(space_id, auth.uid())));
+
+
+--
+-- Name: join_requests knocks: space stewards decide; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "knocks: space stewards decide" ON public.join_requests FOR UPDATE TO authenticated USING (((space_id IS NOT NULL) AND public.is_space_admin(space_id, auth.uid()))) WITH CHECK (((space_id IS NOT NULL) AND public.is_space_admin(space_id, auth.uid())));
 
 
 --
@@ -11314,6 +11376,15 @@ GRANT ALL ON FUNCTION public.is_space_member(p_space uuid, p_uid uuid) TO servic
 GRANT ALL ON FUNCTION public.keep_donation_for_operations(p_donation uuid) TO anon;
 GRANT ALL ON FUNCTION public.keep_donation_for_operations(p_donation uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.keep_donation_for_operations(p_donation uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION knock_becomes_membership_request(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.knock_becomes_membership_request() TO anon;
+GRANT ALL ON FUNCTION public.knock_becomes_membership_request() TO authenticated;
+GRANT ALL ON FUNCTION public.knock_becomes_membership_request() TO service_role;
 
 
 --
@@ -12962,7 +13033,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict u4MlSl0fHHdrkbAo8F0aCcAca36xVAajjbH9cRZ8f1rrFmH39hk2cKwaFmiZzSg
+\unrestrict VyUxkIWiMBUcO4cDMYrGm5R8qchFhNW5M31Zl4kdKXedP3mXpMYyHVzPm9ONZQQ
 
 
 

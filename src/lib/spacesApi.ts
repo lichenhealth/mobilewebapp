@@ -558,14 +558,21 @@ export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
     return !!d && holdsDuty(d.role as SpaceRole, d.duties, duty);
   };
   const bump = (sid: string) => { desk.counts[sid] = (desk.counts[sid] ?? 0) + 1; };
-  const [shares, reqs, nests] = await Promise.all([
+  const [shares, reqs, nests, knocks] = await Promise.all([
     supabase.from('space_section_shares').select('space_id, area')
       .eq('status', 'pending').in('space_id', ids),
     supabase.from('space_membership_requests').select('space_id, profile_id, initiated_by')
       .in('space_id', ids),
     supabase.from('space_nesting_requests').select('parent_id')
       .in('parent_id', ids),
+    // Knocks from the public page (founder 2026-08-17) — someone waiting to be
+    // let into Lichen through this door. A steward's move.
+    supabase.from('join_requests').select('space_id')
+      .eq('status', 'new').in('space_id', ids),
   ]);
+  for (const r of (knocks.data as { space_id: string }[] | null) ?? []) {
+    if (has(r.space_id, 'members')) bump(r.space_id);
+  }
   for (const r of (shares.data as { space_id: string; area: string }[] | null) ?? []) {
     if (has(r.space_id, r.area === 'courses' ? 'courses' : 'library')) bump(r.space_id);
   }
@@ -625,4 +632,39 @@ export async function cohortInfo(spaceId: string): Promise<{ term: string | null
   if (error) return null;
   const row = data as { term: string | null; cohort_of: string | null } | null;
   return row?.cohort_of ? { term: row.term, courseId: row.cohort_of } : null;
+}
+
+// ─── Knocks at a space's door (founder 2026-08-17: public pages are gateways) ─
+export interface SpaceKnock {
+  id: string; name: string; email: string; story: string | null; status: 'new' | 'invited' | 'declined'; created_at: string;
+}
+/** Strangers who asked to join THIS space from its public page. RLS: the
+ *  space's admins (and platform admins). Only the still-asking ones. */
+export async function listSpaceKnocks(spaceId: string): Promise<SpaceKnock[]> {
+  const { data, error } = await supabase.from('join_requests')
+    .select('id, name, email, story, status, created_at')
+    .eq('space_id', spaceId).eq('status', 'new')
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('listSpaceKnocks:', error.message); return []; }
+  return (data as SpaceKnock[] | null) ?? [];
+}
+export async function decideSpaceKnock(id: string, status: 'invited' | 'declined'): Promise<void> {
+  const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+/** The steward sends the invitation themselves — the same email every member
+ *  can send from /invite. Their vouch: they judge the person; Lichen admits.
+ *  Signup then files a membership request for this space automatically
+ *  (knock_becomes_membership_request trigger). */
+export async function inviteKnocker(knock: SpaceKnock, inviterName: string, note: string): Promise<void> {
+  const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: knock.email });
+  if (((existing as unknown[] | null) ?? []).length > 0) {
+    await decideSpaceKnock(knock.id, 'invited');
+    throw new Error(`${knock.email} is already on Lichen — invite them into the group from Members instead.`);
+  }
+  const { error } = await supabase.functions.invoke('send-invite', {
+    body: { email: knock.email, inviterName, note },
+  });
+  if (error) throw new Error('Couldn’t send the invite just now. Please try again in a moment.');
+  await decideSpaceKnock(knock.id, 'invited');
 }

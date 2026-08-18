@@ -303,3 +303,15 @@
 .sprof__delete-row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 /* Offline is a hold, not an ending — no red edge. */
 .sprof__confirm--soft { border-color: var(--bone-edge); }
+
+/* ── Knocks from the public page (founder 2026-08-17: a gateway) ─────────── */
+.sprof__req--knock { flex-wrap: wrap; align-items: flex-start; }
+.sprof__req--knock .sprof__req-name { flex: 1 1 100%; }
+.sprof__knock-story { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); white-space: pre-wrap; }
+.sprof__knock-acts { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; flex: 1 1 100%; }
+.sprof__knock-note {
+  flex: 1 1 220px; min-width: 0; padding: 6px 10px; font: inherit; font-size: 12.5px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: var(--bone);
+}
+.sprof__knock-err { margin: var(--s-2) 0 0; font-size: 13px; color: #c0564f; }
+.sprof__knock-email { color: var(--ink-soft); font-weight: 400; }

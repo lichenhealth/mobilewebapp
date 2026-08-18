@@ -5,6 +5,7 @@ import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
 import { tabById, tabHasContent, type PageTab } from '../lib/pageTabs';
+import KnockForm from './KnockForm';
 import './PublicPage.css';
 
 // One structure for every Lichen site (founder 2026-07-28): hero, story,
@@ -152,6 +153,10 @@ export interface PublicPageProps {
    *  they keep their normal app chrome and skip the guest-facing invite
    *  doors/section; their real join/trust controls arrive via `children`. */
   signedIn?: boolean;
+  /** A SPACE's page is a gateway into Lichen (founder 2026-08-17): a
+   *  signed-out visitor can knock right here — "Request to join «name»" —
+   *  and the knock carries the space, so its stewards can answer it. */
+  knockSpace?: { id: string; name: string; kindLabel: string };
   /** Page-owner-independent actions (e.g. a space's "See it on Maps") that
    *  belong BESIDE the page's own CTAs — one place for every action. */
   extraCtas?: { label: React.ReactNode; onClick: () => void }[];
@@ -684,6 +689,31 @@ export default function PublicPage(props: PublicPageProps) {
           This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
           {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>
         </p>
+      ) : props.knockSpace ? (
+        /* A space's page is a GATEWAY (founder 2026-08-17): the ask is to
+           join THIS group, and joining the group means joining Lichen — the
+           person will be a member of the whole platform, not a user of one
+           group's software, so they get told what they'd be joining. The
+           knock carries the space; its stewards can send the invitation. */
+        <section className="ppage__join">
+          <p className="ppage__join-lead">Request to join <strong>{name}</strong></p>
+          <p className="ppage__join-sub">
+            {name} lives on <strong>Lichen</strong> — a member-run network for care, work,
+            offerings and a fairer economy, where trust is a path through real relationships,
+            not a star rating. Joining this {props.knockSpace.kindLabel.toLowerCase()} means becoming
+            a Lichen member (there&rsquo;s a membership fee), so it&rsquo;s worth a look at
+            what you&rsquo;d be part of. Introduce yourself below and {name}&rsquo;s stewards
+            write back.
+          </p>
+          <KnockForm spaceId={props.knockSpace.id} spaceName={name} />
+          <div className="ppage__join-acts">
+            <button className="btn" onClick={() => go('/about')}>What is Lichen?</button>
+          </div>
+          <p className="ppage__join-member">
+            Already a member?{' '}
+            <button className="ppage__join-quiet-link" onClick={() => go('/login')}>Sign in</button>
+          </p>
+        </section>
       ) : (
         <section className="ppage__join">
           <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>

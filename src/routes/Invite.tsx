@@ -31,7 +31,7 @@ export default function Invite() {
     created_at: string; created_by?: string;
     claimed_name?: string; inviter_name?: string;
   };
-  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string };
+  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; space?: { name: string } | null };
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [knocks, setKnocks] = useState<KnockRow[]>([]);
   const loadLedger = useCallback(async () => {
@@ -59,7 +59,7 @@ export default function Invite() {
     setInvites(rows);
     if (isAdmin) {
       const { data: k } = await supabase.from('join_requests')
-        .select('id, name, email, story, status').order('created_at', { ascending: false }).limit(50);
+        .select('id, name, email, story, status, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
       setKnocks((k as KnockRow[] | null) ?? []);
     }
   }, [user, isAdmin]);
@@ -410,6 +410,7 @@ export default function Invite() {
                   <li className="invite__row invite__row--knock" key={k.id}>
                     <span className="invite__row-who">
                       <strong>{k.name}</strong> · {k.email}
+                      {k.space && <span className="invite__knock-door"> · knocked at {k.space.name} — its stewards can answer too</span>}
                       {k.story && <em className="invite__story">{k.story}</em>}
                     </span>
                     <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : k.status === 'declined' ? ' is-declined' : '')}>{k.status}</span>

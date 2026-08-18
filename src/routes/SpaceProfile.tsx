@@ -15,7 +15,8 @@ import type { GeoPoint } from '../lib/geoApi';
 import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
-  approveJoin, acceptInvite, leaveSpace, deleteSpace, takeSpaceOffline, listChildGroups, createSpaceWithLocation,
+  approveJoin, acceptInvite, leaveSpace, deleteSpace, takeSpaceOffline, listChildGroups,
+  listSpaceKnocks, inviteKnocker, decideSpaceKnock, type SpaceKnock, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
   listPendingSectionShares, decideSectionShare, type SectionShareRow, type SectionArea,
@@ -120,6 +121,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // membership machinery (request + approval / admin invites)
   const [myRequest, setMyRequest] = useState<MyRequestState>(null);
   const [pendingReqs, setPendingReqs] = useState<PendingRequestRow[]>([]);
+  // Knocks from the public page (founder 2026-08-17: a gateway) — strangers
+  // who asked to join THIS space; the steward can send the invitation.
+  const [knocks, setKnocks] = useState<SpaceKnock[]>([]);
+  const [knockNote, setKnockNote] = useState<Record<string, string>>({});
+  const [knockBusy, setKnockBusy] = useState<string | null>(null);
+  const [knockErr, setKnockErr] = useState('');
   const [childGroups, setChildGroups] = useState<SpaceDirectoryRow[]>([]);
   const [memBusy, setMemBusy] = useState(false);
   // admin invite type-ahead
@@ -416,15 +423,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (!isAdmin) { setPendingReqs([]); setProposals([]); return; }
     let live = true;
     (async () => {
-      const [rows, props, shr, rbk] = await Promise.all([
+      const [rows, props, shr, rbk, kn] = await Promise.all([
         listPendingRequests(id),
         (space?.kind === 'community' || space?.kind === 'organization')
           ? listNestingProposals(id) : Promise.resolve([]),
         listPendingSectionShares(id),
         listPendingResourceBookings(id),
+        listSpaceKnocks(id),
       ]);
       const shrPosts = shr.length ? await loadPostsByIds(shr.map((r) => r.post_id)) : [];
-      if (live) { setPendingReqs(rows); setProposals(props); setShares(shr); setSharePosts(shrPosts); setResBookings(rbk); }
+      if (live) { setPendingReqs(rows); setProposals(props); setShares(shr); setSharePosts(shrPosts); setResBookings(rbk); setKnocks(kn); }
     })();
     return () => { live = false; };
   }, [id, isAdmin, members.length, space?.kind]);
@@ -925,6 +933,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={pageMeta}
         preview={previewing}
         signedIn={!!me}
+        // A space's page is a gateway into Lichen (founder 2026-08-17): a
+        // signed-out visitor knocks right here, and the knock names us.
+        knockSpace={{ id: space.id, name: space.name, kindLabel }}
         // Actions in ONE place (founder 2026-08-14): the maps door sits
         // beside the page's own CTAs instead of floating at the page's foot.
         // The steward's switch sits above the masthead, so a page with a big
@@ -1460,8 +1471,45 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         </CollapsibleSection>
       )}
 
-      {memberTools && pendingReqs.length > 0 && (
+      {memberTools && (pendingReqs.length > 0 || knocks.length > 0) && (
         <CollapsibleSection id="waiting" title="Waiting at the door" open={openSections.has('waiting')} onToggle={() => toggleSection('waiting')}>
+          {/* Knocks from the open web (founder 2026-08-17): not yet on Lichen at
+              all. The steward's invitation is the vouch; membership here is
+              filed automatically when they sign up. */}
+          {knocks.map((k) => (
+            <div className="sprof__req sprof__req--knock" key={k.id}>
+              <span className="sprof__req-name">
+                {k.name} <span className="sprof__knock-email">· {k.email}</span>
+                <em className="sprof__req-tag"> knocked from the public page · not on Lichen yet</em>
+                {k.story && <span className="sprof__knock-story">{k.story}</span>}
+              </span>
+              <div className="sprof__knock-acts">
+                <input
+                  className="sprof__knock-note"
+                  value={knockNote[k.id] ?? ''}
+                  onChange={(e) => setKnockNote((m) => ({ ...m, [k.id]: e.target.value }))}
+                  placeholder={`A line for ${k.name.split(' ')[0]} to read when the invitation lands`}
+                />
+                <button className="btn btn-primary sprof__invite-btn" disabled={knockBusy === k.id}
+                  onClick={() => {
+                    setKnockBusy(k.id); setKnockErr('');
+                    inviteKnocker(k, myRow?.profile?.full_name ?? '', knockNote[k.id] ?? '')
+                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
+                      .catch((e: Error) => { setKnockErr(e.message); setKnocks((cur) => cur.filter((x) => x.id !== k.id || !/already on Lichen/.test(e.message))); })
+                      .finally(() => setKnockBusy(null));
+                  }}>{knockBusy === k.id ? 'Sending…' : 'Send the invitation'}</button>
+                <button className="btn sprof__invite-btn" disabled={knockBusy === k.id}
+                  onClick={() => {
+                    setKnockBusy(k.id);
+                    decideSpaceKnock(k.id, 'declined')
+                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
+                      .catch((e: Error) => setKnockErr(e.message))
+                      .finally(() => setKnockBusy(null));
+                  }}>Not a fit</button>
+              </div>
+            </div>
+          ))}
+          {knockErr && <p className="sprof__knock-err">{knockErr}</p>}
           {pendingReqs.map((r) => {
             const initiatorRole = members.find((m) => m.profile_id === r.initiated_by)?.role;
             const kind = r.initiated_by === r.profile_id ? 'request'
