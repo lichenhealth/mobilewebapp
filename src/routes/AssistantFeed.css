@@ -161,3 +161,8 @@
 @media (max-width: 420px) {
   .afeed__ctx-list li { grid-template-columns: 1fr; gap: 1px; }
 }
+
+/* The way back is a chip, not a bar (founder 2026-08-17: "smaller, not full
+   width"). A flex child stretches by default — align-self is what makes it hug
+   left; compound selector so import order can't lose the tie. */
+.cmp__back.afeed__back { align-self: flex-start; margin-bottom: var(--s-4); }

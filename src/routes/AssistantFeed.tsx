@@ -126,7 +126,7 @@ export default function AssistantFeed() {
 
   return (
     <div className="afeed">
-      <button className="cmp__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
+      <button className="cmp__back afeed__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
         ← {back ? 'Back to manual mode' : 'Back'}
       </button>
 
@@ -284,7 +284,7 @@ export default function AssistantFeed() {
                   )}
                 </div>
               )}
-              <SnapshotPanel back={back} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
+              <SnapshotPanel back={back} openInitially={params.get('build') === '1'} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
             </>
           )}
         </>

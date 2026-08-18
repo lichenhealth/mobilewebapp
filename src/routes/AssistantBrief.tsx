@@ -18,6 +18,7 @@ import { postToAssistantFeed } from '../lib/assistantFeedApi';
 import { type Scope, type Section } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
+import './Snapshot.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
 import { loadMyWeb, loadMyRecommendations } from '../lib/myceliumApi';
 import { listBookableTypes } from '../lib/bookingApi';
@@ -109,6 +110,12 @@ export default function AssistantBrief() {
   const section = params.get('section') ?? 'home';
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
+  // ?back= — the way home to whatever sent you here (a builder's "Back to
+  // manual mode"); ?intent=build — you came from a Build-with-Claude door,
+  // so the page leads with the build card (founder 2026-08-17: the same
+  // brain door as anywhere, with the context that you're here to build).
+  const backTo = params.get('back') || '';
+  const buildIntent = params.get('intent') === 'build';
   // ?collection=<id> — the update on one course's content (founder 2026-08-15).
   const collectionId = params.get('collection');
   // ?mine=0 — the ALL-of-them view of a spaces section (founder 2026-08-15).
@@ -590,9 +597,25 @@ export default function AssistantBrief() {
     navigate(`/assistant/feed?thread=${threadForSection(section)}`);
   }
 
+  // The build door on the profile brief (founder 2026-08-17: Build with
+  // Claude is the brain's own page, arriving with the context that you came
+  // to build). Leads the page when that's why you came; sits under the
+  // briefing otherwise. Lands in the profile thread with the builder open.
+  const buildCard = (
+    <button
+      className="snap__invite abrief__build"
+      onClick={() => navigate(`/assistant/feed?thread=profile${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}&build=1`)}
+    >
+      <strong>Build your page from what you&rsquo;ve already got</strong>
+      <em>Tell me about yourself, or paste your website — I&rsquo;ll draft the whole thing.</em>
+    </button>
+  );
+
   return (
     <div className="abrief">
-      <button className="cmp__back calp__backchip" onClick={() => navigate(-1)}>← Back</button>
+      <button className="cmp__back calp__backchip" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
+        ← {backTo ? 'Back to manual mode' : 'Back'}
+      </button>
       {/* Shaped like every other profile on Lichen (founder 2026-08-05):
           picture, then the name under it. The mark wears an Si badge in the
           silicon blue the About page already gives it — the assistant is a
@@ -614,6 +637,24 @@ export default function AssistantBrief() {
             : `${meta.title}: what needs your attention, gathered and filtered for you.`}
         </p>
       </div>
+
+      {/* The consent switch sits ABOVE what it governs (founder 2026-08-17:
+          "move the toggle up the page") — you see the door before the room. */}
+      <label className="abrief__consent">
+        <input
+          type="checkbox"
+          checked={doorOn}
+          onChange={(e) => {
+            const on = e.target.checked;
+            setAiDoor(section, on);
+            setDoorOn(on);
+            if (!on) cache.delete(section);
+          }}
+        />
+        <span>Let the assistant see this section <em>— off means its data never reaches the assistant</em></span>
+      </label>
+
+      {section === 'profile' && buildIntent && buildCard}
 
       <div className="abrief__card">
         {!doorOn && (
@@ -641,19 +682,7 @@ export default function AssistantBrief() {
         )}
       </div>
 
-      <label className="abrief__consent">
-        <input
-          type="checkbox"
-          checked={doorOn}
-          onChange={(e) => {
-            const on = e.target.checked;
-            setAiDoor(section, on);
-            setDoorOn(on);
-            if (!on) cache.delete(section);
-          }}
-        />
-        <span>Let the assistant see this section <em>— off means its data never reaches the assistant</em></span>
-      </label>
+      {section === 'profile' && !buildIntent && buildCard}
 
       <div className="abrief__acts">
         <button className="btn" onClick={() => talkToClaude()}>Open your feed</button>

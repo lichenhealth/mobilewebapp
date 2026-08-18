@@ -20,7 +20,11 @@ export default function BuildModeSplit({ back }: { back: string }) {
       <button
         className="bmode__side bmode__side--ai"
         type="button"
-        onClick={() => navigate(`/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`)}
+        // The same door as the brain anywhere else — the assistant's page for
+        // this section, with the context that you came to build a profile
+        // (founder 2026-08-17: consistency; a brain in Marketplace knows
+        // you're in Marketplace, this one knows you're building).
+        onClick={() => navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`)}
       >
         <strong><Icon name="brain" size={14} /> Build with Claude</strong>
         <em>Tell it about you, or paste your website</em>
@@ -43,7 +47,7 @@ export function FillWithClaude({ back, label = 'Fill this out with Claude', ask 
       className="bmode__inline"
       type="button"
       onClick={() => navigate(
-        `/assistant/feed?thread=profile&back=${encodeURIComponent(back)}`
+        `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`
         + (ask ? `&ask=${encodeURIComponent(ask)}` : ''),
       )}
     >

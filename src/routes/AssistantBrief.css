@@ -61,3 +61,9 @@
    accent platform-wide; this is the one room that overrides it. */
 .abrief input[type="checkbox"],
 .abrief input[type="radio"] { accent-color: var(--blue); }
+
+/* The build card on the profile brief (founder 2026-08-17: Build with Claude
+   is the brain's own door, arriving with the context that you came to build).
+   Snapshot.css owns .snap__invite; this only orders it when it's the reason
+   you came. */
+.abrief__build { margin-bottom: var(--s-3); }
