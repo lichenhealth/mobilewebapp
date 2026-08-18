@@ -268,7 +268,7 @@ export default function Events() {
             {/* The brain closes the doors group, same slot as Marketplace's
                 (founder 2026-08-14: "we need a brain for Events, so you can
                 click on your assistant and it can summarize your events"). */}
-            <AssistantDoor section="events" size={30} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
+            <AssistantDoor section="events" size={36} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
             <div className="evt__action-spacer" />
             {/* Free / Trade / Paid read as signals, same vocabulary as
                 Marketplace's mode lenses — text + icon, no circle, a check
