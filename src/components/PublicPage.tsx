@@ -23,8 +23,12 @@ export type FeedRenderCtx = {
    *  below the icon row — icons above, toggles below on every screen
    *  (founder 2026-08-14). Absent for guests (nav stays in the hero). */
   navSlot?: React.ReactNode;
-  /** Switches to the page's Home tab — where an empty feed sends people. */
+  /** Switches to the page's Home tab — where an empty feed sends people.
+   *  Offered ONLY when Home has something to show (founder 2026-08-17: the
+   *  escape used to open a bare Home — a door into an empty room). */
   openHome?: () => void;
+  /** Home exists but has nothing on it yet — the owner should build it. */
+  homeBare?: boolean;
 };
 
 export interface PageMeta {
@@ -165,6 +169,9 @@ export default function PublicPage(props: PublicPageProps) {
   const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
   const accent = page.accent || 'var(--peach)';
   const story = (page.story || description || '').trim();
+  // Is there anything on Home worth sending someone to? A tagline, a story
+  // or an offering counts; the name and kind alone are the empty room.
+  const homeHasContent = !!(page.tagline?.trim() || story || offerings.length);
 
   // "How do you want people to get in touch" (founder 2026-08-11) —
   // multi-select now; the old one-action doctrine is retired. New saves
@@ -464,7 +471,8 @@ export default function PublicPage(props: PublicPageProps) {
         ? (props.feed as (ctx: FeedRenderCtx) => React.ReactNode)({
             showing: showingFeed, open: () => chooseTab('feed'), guest: asGuest,
             navSlot: navInHero ? undefined : navNode,
-            openHome: homeItem.length ? () => chooseTab('home') : undefined,
+            openHome: homeItem.length && homeHasContent ? () => chooseTab('home') : undefined,
+            homeBare: !!homeItem.length && !homeHasContent,
           })
         : (showingFeed && (props.feed as React.ReactNode)))}
 

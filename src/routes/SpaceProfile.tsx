@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
@@ -25,6 +25,7 @@ import {
   cohortInfo,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
+import { possessive } from '../lib/names';
 import { loadPostsByIds, loadAuthorFeed, postAreas, spaceHasEvents, type FeedPost } from '../lib/postsApi';
 import {
   listSpaceResources, createResource, deleteResource, resourceBusy,
@@ -190,6 +191,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
+  // The deep-link promise, kept (2026-08-17: the comment above said
+  // ?manage=1#about opened its target; nothing ever read the hash, so
+  // "Back to manual mode" and "Build the homepage" landed on a closed
+  // accordion). Same handler Profile.tsx uses.
+  const { hash: sectionHash } = useLocation();
+  useEffect(() => {
+    if (!sectionHash) return;
+    const id = sectionHash.slice(1);
+    setOpenSections((s) => (s.has(id) ? s : new Set(s).add(id)));
+    let tries = 0;
+    const tick = window.setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.clearInterval(tick); }
+      if (++tries > 20) window.clearInterval(tick);
+    }, 100);
+    return () => window.clearInterval(tick);
+  }, [sectionHash]);
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
@@ -752,7 +770,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       navSlot={ctx.navSlot}
       signals={ctx.guest ? undefined : actionRow}
-      emptyEscape={ctx.openHome ? { label: 'Visit the homepage to engage', onGo: ctx.openHome } : undefined}
+      // Honest escape (founder 2026-08-17): a homepage with something on it,
+      // or — for a steward — the builder; a visitor to a bare page gets
+      // ScopeEmpty's own door to Lichen's feed instead of an empty room.
+      emptyEscape={ctx.openHome
+        ? { label: 'Visit the homepage to engage', onGo: ctx.openHome }
+        : ctx.homeBare && isAdmin
+          ? { label: `Build ${possessive(space.name)} homepage`, onGo: () => navigate(`/spaces/${id}?manage=1#about`) }
+          : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
     />

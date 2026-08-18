@@ -364,7 +364,14 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       assistantOff={member.assistant_enabled === false}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
       navSlot={ctx.navSlot}
-      emptyEscape={ctx.openHome ? { label: 'Visit the homepage to engage', onGo: ctx.openHome } : undefined}
+      // The escape is honest about what's behind it (founder 2026-08-17): a
+      // homepage with something on it, or — for the owner — the builder; a
+      // visitor to a bare page gets ScopeEmpty's own door to Lichen's feed.
+      emptyEscape={ctx.openHome
+        ? { label: 'Visit the homepage to engage', onGo: ctx.openHome }
+        : ctx.homeBare && isSelf
+          ? { label: 'Build your homepage', onGo: () => navigate('/profile#public-page') }
+          : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
     />
