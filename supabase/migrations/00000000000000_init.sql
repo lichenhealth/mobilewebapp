@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict P8VuEPiRN9Qa8M8zRwnWJyFz9DMjKxYRvftyeYNPeO58c2KzcXdg1kIUGpRm2rH
+\restrict 5wkwQxQrDlKRWF82AbdVNqni8My9JB3UaAdqu0NET7KRGc5mSieODzETwfiTMFa
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3780,6 +3780,45 @@ $$;
 
 
 ALTER FUNCTION public.reject_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
+
+--
+-- Name: remove_space_member(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_me record; v_them record; v_name text;
+begin
+  if v_uid is null then raise exception 'not signed in'; end if;
+  if p_profile = v_uid then raise exception 'To leave, use Leave — this door is for removing someone else.'; end if;
+  select role, duties into v_me from public.space_members where space_id = p_space and profile_id = v_uid;
+  select role into v_them from public.space_members where space_id = p_space and profile_id = p_profile;
+  if v_them.role is null then return; end if;   -- already gone
+  if v_them.role = 'super_admin' then raise exception 'The super admin can''t be removed.'; end if;
+  if v_me.role = 'super_admin' then
+    null;
+  elsif v_me.role = 'admin' and (v_me.duties is null or 'members' = any (v_me.duties)) then
+    if v_them.role = 'admin' then raise exception 'Only the super admin can remove another admin.'; end if;
+  else
+    raise exception 'Only an admin who tends members can do this.';
+  end if;
+
+  delete from public.space_members where space_id = p_space and profile_id = p_profile;
+  select name into v_name from public.spaces where id = p_space;
+  perform public.notify(
+    p_profile, 'home', p_space, 'space_member_removed',
+    'You''re no longer part of ' || coalesce(v_name, 'a space'),
+    'A steward removed you. Your own posts and everything else of yours are untouched.',
+    null, v_uid);
+end;
+$$;
+
+
+ALTER FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) OWNER TO postgres;
 
 --
 -- Name: request_exchange(uuid, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -11737,6 +11776,16 @@ GRANT ALL ON FUNCTION public.reject_category_suggestion(p_suggestion_id uuid) TO
 
 
 --
+-- Name: FUNCTION remove_space_member(p_space uuid, p_profile uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) TO anon;
+GRANT ALL ON FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.remove_space_member(p_space uuid, p_profile uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13056,7 +13105,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict P8VuEPiRN9Qa8M8zRwnWJyFz9DMjKxYRvftyeYNPeO58c2KzcXdg1kIUGpRm2rH
+\unrestrict 5wkwQxQrDlKRWF82AbdVNqni8My9JB3UaAdqu0NET7KRGc5mSieODzETwfiTMFa
 
 
 

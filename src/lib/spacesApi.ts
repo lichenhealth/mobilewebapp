@@ -399,6 +399,14 @@ export async function leaveSpace(spaceId: string, me: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Remove someone else from a space (founder 2026-08-17). Server rules: an
+ *  admin with the members duty removes members; only the super admin removes
+ *  an admin; nobody removes the super admin. The person is told, once. */
+export async function removeSpaceMember(spaceId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_space_member', { p_space: spaceId, p_profile: profileId });
+  if (error) throw new Error(error.message);
+}
+
 /** Super-admin-only. One SECURITY DEFINER RPC does the whole removal — or
  *  refuses with a reason the person can act on (a treasury still holding
  *  Current, a member the space stewards, an open trade). The message from

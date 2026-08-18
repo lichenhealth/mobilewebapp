@@ -315,3 +315,5 @@
 }
 .sprof__knock-err { margin: var(--s-2) 0 0; font-size: 13px; color: #c0564f; }
 .sprof__knock-email { color: var(--ink-soft); font-weight: 400; }
+.sprof__memberacts { display: inline-flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.sprof__rolebtn--remove:hover { border-color: #c0564f; color: #c0564f; }

@@ -16,7 +16,7 @@ import {
   loadSpaceProfile, loadSpaceMembers, loadSpaceChatId, updateSpaceProfile, uploadSpaceAvatar,
   loadMyRequestFor, requestToJoin, removeRequest, listPendingRequests, inviteMember,
   approveJoin, acceptInvite, leaveSpace, deleteSpace, takeSpaceOffline, listChildGroups,
-  listSpaceKnocks, inviteKnocker, decideSpaceKnock, type SpaceKnock, createSpaceWithLocation,
+  listSpaceKnocks, inviteKnocker, decideSpaceKnock, type SpaceKnock, removeSpaceMember, createSpaceWithLocation,
   amIAdminOf, proposeNesting, loadNestingFor, listNestingProposals, approveNesting, removeNesting, ejectGroup,
   suggestMember, endorseSuggestion, setMemberRole, holdsDuty, SPACE_DUTIES,
   listPendingSectionShares, decideSectionShare, type SectionShareRow, type SectionArea,
@@ -75,16 +75,21 @@ const ROLE_LABEL: Record<string, string> = {
  *  edit name, story, photo, and location (a picked address pins it on Maps). */
 /** Members wears the accordion backstage and stands open on its own tab —
  *  one body, two frames (founder 2026-08-11). */
-function MembersShell({ backstage, open, onToggle, sectionRef, children }: {
+function MembersShell({ backstage, open, onToggle, sectionRef, children, meta, onAdd }: {
   backstage: boolean;
   open: boolean;
   onToggle: () => void;
   sectionRef: React.RefObject<HTMLElement | null>;
   children: React.ReactNode;
+  /** "3 members" on the header line; + opens the row and lands you in the
+   *  invite box (founder 2026-08-17). */
+  meta?: string;
+  onAdd?: () => void;
 }) {
   if (backstage) {
     return (
-      <CollapsibleSection id="members" title="Members" open={open} onToggle={onToggle}>
+      <CollapsibleSection id="members" title="Members" meta={meta} open={open} onToggle={onToggle}
+        action={onAdd ? { label: 'Add a member', onClick: onAdd } : undefined}>
         {children}
       </CollapsibleSection>
     );
@@ -135,6 +140,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // admin invite type-ahead
   const [invQ, setInvQ] = useState('');
   const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  const invInputRef = useRef<HTMLInputElement | null>(null);
   // + New group (admins of a community/organization)
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -1630,6 +1636,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         open={openSections.has('members')}
         onToggle={() => toggleSection('members')}
         sectionRef={membersRef}
+        meta={members.length === 0 ? 'No members yet' : `${members.length} member${members.length === 1 ? '' : 's'}`}
+        onAdd={memberTools ? () => {
+          setOpenSections((s2) => new Set(s2).add('members'));
+          window.setTimeout(() => invInputRef.current?.focus(), 80);
+        } : undefined}
       >
         {members.length === 0 && <p className="sprof__muted">No members yet.</p>}
         <div className="sprof__members">
@@ -1651,6 +1662,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               : ROLE_LABEL[m.role] ?? m.role;
             const canManage = adminTools && myRole === 'super_admin'
               && m.role !== 'super_admin' && m.profile_id !== me;
+            // Remove (founder 2026-08-17): the members duty removes members;
+            // only the super admin removes an admin — the server enforces the
+            // same rule, this just hides doors that would refuse.
+            const canRemove = m.profile_id !== me && m.role !== 'super_admin'
+              && (myRole === 'super_admin' || (memberTools && m.role === 'member'));
             return (
               <MemberRow
                 key={m.profile_id}
@@ -1682,21 +1698,41 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 onOpen={() => navigate(`/members/${m.profile_id}`)}
                 hideActions={!me || isMe}
                 claudeInUse={claudeInUse}
-                trailing={canManage ? (
-                  <button
-                    className="sprof__rolebtn"
-                    title="Change what this member stewards"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (manage?.id === m.profile_id) { setManage(null); return; }
-                      setManage({ id: m.profile_id, name: m.profile?.full_name ?? 'this member' });
-                      setMAdmin(m.role === 'admin');
-                      setMAll(!m.duties);
-                      setMDuties(m.duties ?? []);
-                    }}
-                  >
-                    Role <Icon name="chevron-right" size={12} />
-                  </button>
+                trailing={(canManage || canRemove) ? (
+                  <span className="sprof__memberacts">
+                    {canManage && (
+                      <button
+                        className="sprof__rolebtn"
+                        title="Member or admin, and what they steward"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (manage?.id === m.profile_id) { setManage(null); return; }
+                          setManage({ id: m.profile_id, name: m.profile?.full_name ?? 'this member' });
+                          setMAdmin(m.role === 'admin');
+                          setMAll(!m.duties);
+                          setMDuties(m.duties ?? []);
+                        }}
+                      >
+                        Role <Icon name="chevron-right" size={12} />
+                      </button>
+                    )}
+                    {canRemove && (
+                      <button
+                        className="sprof__rolebtn sprof__rolebtn--remove"
+                        title={`Remove ${m.profile?.full_name ?? 'this member'} from ${space.name}`}
+                        disabled={memBusy}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void confirmDialog({
+                            message: `Remove ${m.profile?.full_name ?? 'this member'} from ${space.name}? They'll be told. Their own posts and everything else of theirs stay theirs.`,
+                            confirmLabel: 'Remove', danger: true,
+                          }).then((ok) => { if (ok) void act(() => removeSpaceMember(id, m.profile_id)); });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </span>
                 ) : undefined}
               />
             );
@@ -1751,6 +1787,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         {(memberTools || (isMember && !backstage && !holdsDuty(myRole, myRow?.duties, 'members'))) && (
           <div className="sprof__invitebox">
             <input
+              ref={invInputRef}
               className="prof__input"
               value={invQ}
               onChange={(e) => setInvQ(e.target.value)}
