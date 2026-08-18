@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VyUxkIWiMBUcO4cDMYrGm5R8qchFhNW5M31Zl4kdKXedP3mXpMYyHVzPm9ONZQQ
+\restrict P8VuEPiRN9Qa8M8zRwnWJyFz9DMjKxYRvftyeYNPeO58c2KzcXdg1kIUGpRm2rH
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1514,6 +1514,18 @@ end $$;
 
 
 ALTER FUNCTION public.decline_inkind_donation(p_id uuid) OWNER TO postgres;
+
+--
+-- Name: decline_invite(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.decline_invite(p_token uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$ declare v record; begin update public.invite_tokens set declined_at = now() where token = p_token and claimed_by is null and declined_at is null returning created_by, invitee_email into v; if v.created_by is null then return; end if; perform public.notify(v.created_by, 'home', null, 'invite_declined', 'An invitation was declined', split_part(v.invitee_email, '@', 1) || '@… decided Lichen isn''t for them right now. No reminder will go their way.', '/invite', null); end; $$;
+
+
+ALTER FUNCTION public.decline_invite(p_token uuid) OWNER TO postgres;
 
 --
 -- Name: delete_space(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5566,7 +5578,8 @@ CREATE TABLE public.invite_tokens (
     claimed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     for_minor boolean DEFAULT false NOT NULL,
-    opened_at timestamp with time zone
+    opened_at timestamp with time zone,
+    declined_at timestamp with time zone
 );
 
 
@@ -10991,6 +11004,16 @@ GRANT ALL ON FUNCTION public.decline_inkind_donation(p_id uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION decline_invite(p_token uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.decline_invite(p_token uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.decline_invite(p_token uuid) TO anon;
+GRANT ALL ON FUNCTION public.decline_invite(p_token uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.decline_invite(p_token uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION delete_space(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13033,7 +13056,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VyUxkIWiMBUcO4cDMYrGm5R8qchFhNW5M31Zl4kdKXedP3mXpMYyHVzPm9ONZQQ
+\unrestrict P8VuEPiRN9Qa8M8zRwnWJyFz9DMjKxYRvftyeYNPeO58c2KzcXdg1kIUGpRm2rH
 
 
 

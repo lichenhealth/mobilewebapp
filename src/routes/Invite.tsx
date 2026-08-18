@@ -27,7 +27,7 @@ export default function Invite() {
   // The ledger: my invitations (RLS: created_by = me) + the knocks (admins).
   type InviteRow = {
     token: string; invitee_email: string | null; claimed_by: string | null;
-    opened_at: string | null;
+    opened_at: string | null; declined_at?: string | null;
     created_at: string; created_by?: string;
     claimed_name?: string; inviter_name?: string;
   };
@@ -39,7 +39,7 @@ export default function Invite() {
     // Admins see the whole picture — every invitation, and who sent it.
     // Members see their own (RLS decides; the query is the same shape).
     let q = supabase.from('invite_tokens')
-      .select('token, invitee_email, claimed_by, opened_at, created_at, created_by')
+      .select('token, invitee_email, claimed_by, opened_at, declined_at, created_at, created_by')
       .order('created_at', { ascending: false }).limit(200);
     if (!isAdmin) q = q.eq('created_by', user.id);
     const { data } = await q;
@@ -68,8 +68,8 @@ export default function Invite() {
   // One truth per row (founder 2026-08-11): invited → opened (they reached
   // the signup page through their link) → joined. The old page derived
   // "invited" pills by cross-referencing two tables — one list, one status.
-  const inviteStatus = (i: InviteRow): 'joined' | 'opened' | 'invited' =>
-    i.claimed_by ? 'joined' : i.opened_at ? 'opened' : 'invited';
+  const inviteStatus = (i: InviteRow): 'joined' | 'declined' | 'opened' | 'invited' =>
+    i.claimed_by ? 'joined' : i.declined_at ? 'declined' : i.opened_at ? 'opened' : 'invited';
   // Handling a knock moves it off the "waiting" tally and the side-menu
   // badge (founder 2026-08-02) — the row stays visible here either way, so
   // nothing is ever truly lost, just no longer flagged as needing you.
@@ -360,8 +360,9 @@ export default function Invite() {
           {isAdmin ? 'Invitations across Lichen' : 'Your invitations'}
           {invites.length > 0 && (
             <span className="invite__tally">
-              {(['invited', 'opened', 'joined'] as const)
+              {(['invited', 'opened', 'joined', 'declined'] as const)
                 .map((s) => `${invites.filter((i) => inviteStatus(i) === s).length} ${s}`)
+                .filter((t) => !t.startsWith('0 declined'))
                 .join(' · ')}
             </span>
           )}
@@ -384,7 +385,7 @@ export default function Invite() {
                   {/* invited → opened (reached the signup page through
                       their link) → joined. One list, one status per row
                       (founder 2026-08-11). */}
-                  <span className={'invite__pill' + (s === 'joined' ? ' is-in' : s === 'opened' ? ' is-opened' : '')}>
+                  <span className={'invite__pill' + (s === 'joined' ? ' is-in' : s === 'opened' ? ' is-opened' : s === 'declined' ? ' is-declined' : '')}>
                     {s}
                   </span>
                   <span className="invite__row-when">{i.created_at.slice(0, 10)}</span>

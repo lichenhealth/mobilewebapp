@@ -51,6 +51,7 @@ import Profile from './routes/Profile';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
 import SignUp from './routes/SignUp';
+import InviteDecline from './routes/InviteDecline';
 import Login from './routes/Login';
 import ResetPassword from './routes/ResetPassword';
 import Onboarding from './routes/Onboarding';
@@ -88,7 +89,7 @@ function BookGate() {
     : <BookPublic />;
 }
 
-const GATE_EXEMPT = ['/login', '/signup', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
+const GATE_EXEMPT = ['/login', '/signup', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -110,7 +111,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname, search } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
-  const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
+  const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding' || pathname === '/invite/decline';
   const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
   // Rendered INSIDE a frame — the page beside the assistant conversation
   // (docs/ASSISTANT_ACTIONS.md step 4). Without this the frame shows a whole
@@ -317,6 +318,7 @@ export default function App() {
           <Route path="/login"     element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup"    element={<SignUp />} />
+          <Route path="/invite/decline" element={<InviteDecline />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/supporters" element={<AdminSupporters />} />

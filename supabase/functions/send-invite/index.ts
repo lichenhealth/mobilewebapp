@@ -44,6 +44,9 @@ const esc = (s: string) =>
 
 function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string) {
   const signup = token ? `${APP_URL}/signup?invite=${token}` : `${APP_URL}/signup`;
+  // A way to say no (founder 2026-08-17): closes the invitation, tells the
+  // inviter quietly, and no reminder ever follows.
+  const decline = token ? `${APP_URL}/invite/decline?token=${token}` : null;
   const subject = `${inviterName} invited you to Lichen`;
   const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
@@ -78,7 +81,9 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   if (note) parts.push(`They added a note:\n"${note}"`);
   if (giftLine) parts.push(giftLine);
   else if (trial) parts.push(trial);
-  const text = parts.join('\n\n') + `\n\nJoin here:\n${signup}\n\n— Lichen`;
+  const text = parts.join('\n\n') + `\n\nJoin here:\n${signup}`
+    + (decline ? `\n\nNot for you right now? Let us know and we won't follow up:\n${decline}` : '')
+    + `\n\n— Lichen`;
 
   // A rewritten mission is escaped and paragraphed; the default keeps its
   // hand-set emphasis.
@@ -107,7 +112,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
     <p style="margin:0 0 28px">
       <a href="${signup}" style="display:inline-block;background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">Join on Lichen</a>
     </p>
-    <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0">If you weren't expecting this, you can safely ignore it.</p>
+    <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0">If you weren't expecting this, you can safely ignore it.${decline ? ` Not for you right now? <a href="${decline}" style="color:#8a857c">Decline the invitation</a> and we won't follow up.` : ''}</p>
   </div></body></html>`;
 
   return { subject, text, html };
