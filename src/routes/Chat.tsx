@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import {
@@ -208,6 +209,11 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
   const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
+  // A conversation WITH a space (founder 2026-08-17): the visitor's row wears
+  // the space's logo; an admin's row wears the visitor's face and says which
+  // space it's about. Sender prefixes stay on — WHO answered matters here.
+  const party = chat.kind === 'space_dm' ? chat.party : undefined;
+  const iAmVisitor = !!party && party.visitorId === me;
   const senderName = last
     ? chat.members.find((m) => m.profile_id === last.sender_id)?.name.split(' ')[0]
     : undefined;
@@ -222,7 +228,8 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
         <div className="conv-row__top">
           <span className="conv-row__name">
             {highlightText(chat.title, highlight)}
-            {!isDirect && <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>}
+            {!isDirect && chat.kind !== 'space_dm' && <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>}
+            {party && !iAmVisitor && <span className="conv-row__muted"> · via {party.name}</span>}
           </span>
           <span className="conv-row__time">{last ? formatRelative(last.created_at) : ''}</span>
         </div>
@@ -244,6 +251,22 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // any group rather than showing one face (founder 2026-08-16).
   const dmLike = chat.kind === 'direct';
   const single = chat.members.find((m) => m.profile_id !== me) ?? chat.members[0];
+
+  // A conversation WITH a space: the visitor sees the space's logo wearing the
+  // answering admin's face; the admin sees the visitor.
+  if (chat.kind === 'space_dm' && chat.party) {
+    const party = chat.party;
+    if (party.visitorId === me) {
+      const answerers = chat.members.filter((m) => m.profile_id !== party.visitorId);
+      const one = answerers.length === 1 ? answerers[0] : null;
+      return (
+        <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={48} className="conv-row__avatar--party"
+          stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />
+      );
+    }
+    const visitor = chat.members.find((m) => m.profile_id === party.visitorId);
+    return <Avatar id={visitor?.profile_id ?? 'v'} name={visitor?.name ?? 'Member'} url={visitor?.avatarUrl} size={48} className="conv-row__avatar--party" />;
+  }
 
   // ONE FACE IS NOT A STACK (founder 2026-08-16: "melanie mentorship group
   // icon is off center and so is Lichen's as an org"). A two-person group

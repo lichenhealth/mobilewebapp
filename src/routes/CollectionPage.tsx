@@ -8,7 +8,7 @@ import FeedCard from '../components/FeedCard';
 import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
-import { ensureDirectChat } from '../lib/chatApi';
+import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { deletePost, loadAuthorFeed, loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
@@ -272,9 +272,12 @@ export default function CollectionPage() {
     setBusy(false);
   }
 
-  async function messageAuthor(otherId: string, aboutPostId?: string) {
-    try { navigate(`/chat/${await ensureDirectChat(otherId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
-    catch (e) { console.error(e); }
+  // One rule for every feed's chat door (founder 2026-08-17): a post in a
+  // space's voice opens the conversation WITH that space, answered by the
+  // admin who wrote it; a personal post opens the DM. The post rides along.
+  async function messageAbout(post: { id: string; author_id: string; author_space_id?: string | null }) {
+    try { navigate(await chatPathForPost(post)); }
+    catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
   // Start / Continue: enroll (once), then open the first unfinished lesson.
@@ -1127,7 +1130,7 @@ export default function CollectionPage() {
               onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
               onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-              onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
+              onMessage={me && p.author_id !== me ? () => messageAbout(p) : undefined}
               onOpen={() => navigate(postOpenPath(p))}
               onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             />

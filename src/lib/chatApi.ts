@@ -5,7 +5,7 @@ import { supabase } from './supabase';
  *  about this" DM escalation) reads this one constant. */
 export const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm';
 
 export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
@@ -27,12 +27,21 @@ export interface ReactionRow {
   profile_id: string;
   emoji: string;
 }
+/** A space that is a PARTY to a chat (kind 'space_dm' — founder 2026-08-17:
+ *  a space can be a chat member). The visitor sees its logo; its admins see
+ *  the visitor. `visitorId` comes off the direct_key ('space:<sid>:<visitor>[:responder]'). */
+export interface PartySpace { id: string; name: string; avatarUrl: string | null; visitorId: string | null }
 export interface ChatVM {
   id: string;
   kind: ChatKind;
   title: string;
   members: MemberInfo[];
   last?: MessageRow;
+  party?: PartySpace;
+}
+export function visitorIdOfKey(key: string | null | undefined): string | null {
+  if (!key || !key.startsWith('space:')) return null;
+  return key.split(':')[2] ?? null;
 }
 
 /** Columns to fetch for a message everywhere (list + thread + realtime re-fetch). */
@@ -46,6 +55,7 @@ export const KIND_LABEL: Record<ChatKind, string> = {
   care_team: 'Care team',
   direct: 'Direct',
   help: 'Help',
+  space_dm: 'Message',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
@@ -105,6 +115,7 @@ export function chatTitle(
   storedTitle: string | null,
   members: MemberInfo[],
   me: string,
+  party?: PartySpace,
 ): string {
   // A help room holds MORE than one responder now — Lichen Health and the
   // assistant both sit in it (founder 2026-08-16) — so naming it after
@@ -114,6 +125,12 @@ export function chatTitle(
   if (kind === 'direct') {
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
+  }
+  if (kind === 'space_dm' && party) {
+    // The visitor sees the SPACE; the space's admins see the visitor.
+    if (party.visitorId === me) return party.name;
+    const v = members.find((m) => m.profile_id === party.visitorId);
+    return v?.name ?? 'A member';
   }
   return storedTitle ?? KIND_LABEL[kind];
 }
@@ -143,7 +160,9 @@ export function messagePreview(msg: MessageRow): string {
 export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
-    supabase.from('chats').select('id, kind, title, created_at').not('kind', 'in', '("care_team","event")'),
+    supabase.from('chats')
+      .select('id, kind, title, created_at, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)')
+      .not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
       .select(MESSAGE_COLS)
@@ -163,14 +182,20 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
     if (!lastByChat.has(m.chat_id)) lastByChat.set(m.chat_id, m); // desc → first is latest
   }
 
-  const vms: ChatVM[] = ((cRes.data as { id: string; kind: ChatKind; title: string | null }[] | null) ?? []).map((c) => {
+  type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null;
+    party: { id: string; name: string; avatar_url: string | null } | null };
+  const vms: ChatVM[] = ((cRes.data as unknown as ChatRaw[] | null) ?? []).map((c) => {
     const members = membersByChat.get(c.id) ?? [];
+    const party: PartySpace | undefined = c.party
+      ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) }
+      : undefined;
     return {
       id: c.id,
       kind: c.kind,
-      title: chatTitle(c.kind, c.title, members, me),
+      title: chatTitle(c.kind, c.title, members, me, party),
       members,
       last: lastByChat.get(c.id),
+      party,
     };
   });
 
@@ -195,6 +220,26 @@ export async function loadUnreadCounts(): Promise<Map<string, number>> {
 export async function markChatRead(chatId: string): Promise<void> {
   const { error } = await supabase.rpc('mark_chat_read', { p_chat: chatId });
   if (error) console.warn('mark_chat_read:', error.message);
+}
+
+/** Find-or-create my conversation WITH A SPACE (founder 2026-08-17). With a
+ *  responder (the admin who wrote the post), that person answers; without,
+ *  the general thread — every current admin may reply. */
+export async function ensureSpaceChat(spaceId: string, responderId?: string | null): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_space_chat', { p_space: spaceId, p_responder: responderId ?? null });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Where a post's chat door goes (one rule for every feed): a post in a
+ *  SPACE's voice opens the conversation with that space, answered by the
+ *  admin who wrote it; a personal post opens the DM. Returns the /chat path
+ *  with the post pinned (?about=). */
+export async function chatPathForPost(post: { id: string; author_id: string; author_space_id?: string | null }): Promise<string> {
+  const chatId = post.author_space_id
+    ? await ensureSpaceChat(post.author_space_id, post.author_id)
+    : await ensureDirectChat(post.author_id);
+  return `/chat/${chatId}?about=${post.id}`;
 }
 
 export async function ensureDirectChat(otherId: string): Promise<string> {

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5wkwQxQrDlKRWF82AbdVNqni8My9JB3UaAdqu0NET7KRGc5mSieODzETwfiTMFa
+\restrict M8bhzbJtVk1zQClrAjwKUioA5L7RP8RHEZH5Ki2YSeM7zP7XqS2a5VwjjpGuq5T
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1908,6 +1908,56 @@ end; $$;
 ALTER FUNCTION public.ensure_help_chat() OWNER TO postgres;
 
 --
+-- Name: ensure_space_chat(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid DEFAULT NULL::uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_me uuid := auth.uid();
+  v_key text;
+  v_chat uuid;
+  v_resp uuid := null;
+begin
+  if v_me is null then raise exception 'Not signed in'; end if;
+  if not public.space_alive(p_space) then raise exception 'That space isn''t reachable right now.'; end if;
+  if public.is_space_admin(p_space, v_me) then
+    raise exception 'You steward this space — its conversations are in your inbox.';
+  end if;
+  if p_responder is not null and p_responder <> v_me
+     and public.is_space_admin(p_space, p_responder) then
+    v_resp := p_responder;
+  end if;
+  v_key := 'space:' || p_space::text || ':' || v_me::text || coalesce(':' || v_resp::text, '');
+  select id into v_chat from public.chats where direct_key = v_key;
+  if v_chat is null then
+    insert into public.chats (kind, party_space_id, direct_key, title)
+    values ('space_dm', p_space, v_key, null)
+    on conflict (direct_key) where direct_key is not null do nothing
+    returning id into v_chat;
+    if v_chat is null then select id into v_chat from public.chats where direct_key = v_key; end if;
+  end if;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me) on conflict do nothing;
+  if v_resp is not null then
+    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_resp) on conflict do nothing;
+  else
+    -- General thread: every current admin sits in it (re-run adds any new
+    -- admin the next time the visitor opens the door).
+    insert into public.chat_members (chat_id, profile_id)
+    select v_chat, m.profile_id from public.space_members m
+     where m.space_id = p_space and m.role in ('admin', 'super_admin')
+    on conflict do nothing;
+  end if;
+  return v_chat;
+end;
+$$;
+
+
+ALTER FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) OWNER TO postgres;
+
+--
 -- Name: external_calendar_level(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -2588,8 +2638,9 @@ CREATE FUNCTION public.is_chat_member(p_chat uuid, p_uid uuid) RETURNS boolean
     AS $$
   select exists (select 1 from public.chat_members m where m.chat_id = p_chat and m.profile_id = p_uid)
      and not exists (select 1 from public.chats c
-                      where c.id = p_chat and c.space_id is not null
-                        and not public.space_alive(c.space_id));
+                      where c.id = p_chat
+                        and ((c.space_id is not null and not public.space_alive(c.space_id))
+                          or (c.party_space_id is not null and not public.space_alive(c.party_space_id))));
 $$;
 
 
@@ -3546,15 +3597,18 @@ CREATE FUNCTION public.on_message_notify() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_kind text; v_name text;
+declare v_kind text; v_name text; v_space text;
 begin
-  select kind into v_kind from public.chats where id = new.chat_id;
-  if v_kind not in ('direct', 'care_team', 'help') then return new; end if;
+  select c.kind, s.name into v_kind, v_space
+    from public.chats c left join public.spaces s on s.id = c.party_space_id
+   where c.id = new.chat_id;
+  if v_kind not in ('direct', 'care_team', 'help', 'space_dm') then return new; end if;
   select coalesce(nullif(full_name, ''), email, 'A member')
     into v_name from public.profiles where id = new.sender_id;
   insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
   select m.profile_id, 'chat', 'dm_message',
-         v_name, left(coalesce(new.body, 'Sent an attachment'), 140),
+         case when v_kind = 'space_dm' and v_space is not null then v_name || ' · ' || v_space else v_name end,
+         left(coalesce(new.body, 'Sent an attachment'), 140),
          '/chat/' || new.chat_id, new.sender_id
   from public.chat_members m
   where m.chat_id = new.chat_id and m.profile_id <> new.sender_id;
@@ -5208,7 +5262,8 @@ CREATE TABLE public.chats (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     direct_key text,
     event_id uuid,
-    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text, 'event'::text, 'help'::text])))
+    party_space_id uuid,
+    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text, 'event'::text, 'help'::text, 'space_dm'::text])))
 );
 
 
@@ -7107,6 +7162,13 @@ CREATE UNIQUE INDEX chats_event_uniq ON public.chats USING btree (event_id) WHER
 
 
 --
+-- Name: chats_party_space_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX chats_party_space_idx ON public.chats USING btree (party_space_id) WHERE (party_space_id IS NOT NULL);
+
+
+--
 -- Name: chats_patient_uidx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8127,6 +8189,14 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chats
     ADD CONSTRAINT chats_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: chats chats_party_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chats
+    ADD CONSTRAINT chats_party_space_id_fkey FOREIGN KEY (party_space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
 
 
 --
@@ -11144,6 +11214,16 @@ GRANT ALL ON FUNCTION public.ensure_help_chat() TO service_role;
 
 
 --
+-- Name: FUNCTION ensure_space_chat(p_space uuid, p_responder uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) TO anon;
+GRANT ALL ON FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION external_calendar_level(p_cal uuid, p_owner uuid, p_viewer uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13105,7 +13185,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5wkwQxQrDlKRWF82AbdVNqni8My9JB3UaAdqu0NET7KRGc5mSieODzETwfiTMFa
+\unrestrict M8bhzbJtVk1zQClrAjwKUioA5L7RP8RHEZH5Ki2YSeM7zP7XqS2a5VwjjpGuq5T
 
 
 

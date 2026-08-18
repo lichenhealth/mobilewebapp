@@ -5,7 +5,7 @@ import { Icon, IconName } from './Icon';
 import { ScopeEmpty } from './ScopeEscape';
 import { aiDoorOn } from './AssistantDoor';
 import { consentOn } from '../lib/assistantConsentApi';
-import { ensureDirectChat } from '../lib/chatApi';
+import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import { minToLabel } from '../lib/calendarApi';
@@ -190,9 +190,12 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     return posts.filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
   }, [posts, areas]);
 
-  async function messageAuthor(otherId: string, aboutPostId?: string) {
-    const chatId = await ensureDirectChat(otherId);
-    navigate(`/chat/${chatId}${aboutPostId ? `?about=${aboutPostId}` : ''}`);
+  // One rule for every feed's chat door (founder 2026-08-17): a post in a
+  // space's voice opens the conversation WITH that space, answered by the
+  // admin who wrote it; a personal post opens the DM. The post rides along.
+  async function messageAbout(post: { id: string; author_id: string; author_space_id?: string | null }) {
+    try { navigate(await chatPathForPost(post)); }
+    catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
   if (!ready) return <p className="cfeed__empty">Loading…</p>;
@@ -319,7 +322,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
             onDelete={interactive && !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={interactive && me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={interactive && me && p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
+            onMessage={interactive && me && p.author_id !== me ? () => messageAbout(p) : undefined}
           />
         ))}
       </div>}

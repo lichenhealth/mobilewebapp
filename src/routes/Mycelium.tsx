@@ -6,7 +6,7 @@ import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
-import { ensureDirectChat } from '../lib/chatApi';
+import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -70,8 +70,11 @@ export default function Mycelium() {
   // space's web instead of the wrong person's.
   const asSpace = actor.type === 'space' ? actor.id : undefined;
 
-  async function messageAuthor(authorId: string, aboutPostId?: string) {
-    try { navigate(`/chat/${await ensureDirectChat(authorId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
+  // One rule for every feed's chat door (founder 2026-08-17): a post in a
+  // space's voice opens the conversation WITH that space, answered by the
+  // admin who wrote it; a personal post opens the DM. The post rides along.
+  async function messageAbout(post: { id: string; author_id: string; author_space_id?: string | null }) {
+    try { navigate(await chatPathForPost(post)); }
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
@@ -138,7 +141,7 @@ export default function Mycelium() {
           onEdit: !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined,
           onDelete: !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined,
           onHide: user ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined,
-          onMessage: p.author_id !== user?.id ? () => messageAuthor(p.author_id, p.id) : undefined,
+          onMessage: p.author_id !== user?.id ? () => messageAbout(p) : undefined,
           onOpen: () => navigate(postOpenPath(p)),
           onAuthor: () => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`),
         },

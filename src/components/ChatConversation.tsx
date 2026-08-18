@@ -7,14 +7,15 @@ import {
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
   colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
-  markChatRead,
+  markChatRead, visitorIdOfKey, type PartySpace,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
+import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import '../routes/ChatThread.css';
 
-interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; }
+interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -87,14 +88,18 @@ export default function ChatConversation({
     (async () => {
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
-        supabase.from('chats').select('id, kind, title, space_id').eq('id', chatId).maybeSingle(),
+        supabase.from('chats').select('id, kind, title, space_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
         supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
       if (!cRes.data) { setMissing(true); setLoading(false); return; }
-      const c = cRes.data as { id: string; kind: ChatKind; title: string | null; space_id: string | null };
-      setChat({ id: c.id, kind: c.kind, title: c.title, space_id: c.space_id });
+      const c = cRes.data as unknown as { id: string; kind: ChatKind; title: string | null; space_id: string | null; direct_key: string | null;
+        party: { id: string; name: string; avatar_url: string | null } | null };
+      setChat({
+        id: c.id, kind: c.kind, title: c.title, space_id: c.space_id,
+        party: c.party ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) } : undefined,
+      });
       const map: Record<string, MemberInfo> = {};
       for (const r of (mRes.data as { profile_id: string; profiles: { full_name: string | null; avatar_url: string | null } | null }[] | null) ?? []) {
         map[r.profile_id] = {
@@ -253,7 +258,7 @@ export default function ChatConversation({
   }
 
   const memberList = Object.values(members);
-  const title = chatTitle(chat.kind, chat.title, memberList, me);
+  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party);
 
   return (
     <div className="conv">
@@ -291,7 +296,9 @@ export default function ChatConversation({
             <span className="thread__about-title">{about.title}</span>
             {about.spaceName && (
               <span className="thread__about-who">
-                Posted by {about.spaceName} — you&rsquo;re writing to {otherMember(Object.values(members), me)?.name ?? 'the person'} who posted it
+                {chat?.kind === 'space_dm'
+                  ? <>Posted by {about.spaceName} — {otherMember(Object.values(members), me)?.name ?? 'the steward'} who posted it answers here</>
+                  : <>Posted by {about.spaceName} — you&rsquo;re writing to {otherMember(Object.values(members), me)?.name ?? 'the person'} who posted it</>}
               </span>
             )}
           </button>
@@ -320,7 +327,35 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
   if (chat.space_id && ['organization', 'community', 'group', 'place'].includes(chat.kind)) {
     return `/spaces/${chat.space_id}`;
   }
+  // A conversation WITH a space: the visitor's link goes to the space, the
+  // space's admins' link goes to the visitor.
+  if (chat.kind === 'space_dm' && chat.party) {
+    return chat.party.visitorId === me ? `/spaces/${chat.party.id}` : (chat.party.visitorId ? `/members/${chat.party.visitorId}` : null);
+  }
   return null;
+}
+
+/** For a space_dm: what the header/intro shows as the counterpart, and the
+ *  line under the name. The visitor sees the space's logo wearing the face
+ *  of the admin who answers; an admin sees the visitor. */
+function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { avatar: React.ReactNode; sub: string } | null {
+  if (chat.kind !== 'space_dm' || !chat.party) return null;
+  const party = chat.party;
+  const iAmVisitor = party.visitorId === me;
+  const answerers = members.filter((m) => m.profile_id !== party.visitorId);
+  if (iAmVisitor) {
+    const one = answerers.length === 1 ? answerers[0] : null;
+    return {
+      avatar: <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={38}
+        stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />,
+      sub: one ? `${one.name} answers for ${party.name}` : `${party.name}'s stewards answer here`,
+    };
+  }
+  const visitor = members.find((m) => m.profile_id === party.visitorId);
+  return {
+    avatar: <Avatar id={visitor?.profile_id ?? 'v'} name={visitor?.name ?? 'Member'} url={visitor?.avatarUrl} size={38} />,
+    sub: `Writing to ${party.name} — you answer for it`,
+  };
 }
 
 function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void }) {
@@ -330,6 +365,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
   // has to say WHO sent it, and the header has to show both faces.
   const isDirect = chat.kind === 'direct';
   const other = otherMember(members, me);
+  const partyView = spacePartyView(chat, members, me);
   return (
     <header className="thread__head">
       {onBack ? (
@@ -347,7 +383,9 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         onKeyDown={profilePath ? (e) => { if (e.key === 'Enter') navigate(profilePath); } : undefined}
       >
         <div className="thread__head-avatar">
-          {isDirect && other ? (
+          {partyView ? (
+            <div className="thread__head-group thread__head-group--party">{partyView.avatar}</div>
+          ) : isDirect && other ? (
             <div className="thread__head-group">
               <span style={{ position: 'static', width: 38, height: 38, fontSize: 16, background: colorFor(other.profile_id) }}>
                 {monogramFor(other.name)}
@@ -376,7 +414,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-text">
           <h2 className="thread__head-name">{title}</h2>
           <p className="thread__head-sub">
-            {chat.kind === 'help' ? 'Lichen help' : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+            {partyView ? partyView.sub : chat.kind === 'help' ? 'Lichen help' : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </p>
         </div>
       </div>
@@ -396,6 +434,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
   const isDirect = chat.kind === 'direct';
   const other = otherMember(members, me);
   const profilePath = profilePathFor(chat, members, me);
+  const partyView = spacePartyView(chat, members, me);
   return (
     <div className="thread__intro">
       <div
@@ -404,7 +443,9 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
         role={profilePath ? 'link' : undefined}
         tabIndex={profilePath ? 0 : undefined}
       >
-        {isDirect && other ? (
+        {partyView ? (
+          <div className="thread__intro-party">{partyView.avatar}</div>
+        ) : isDirect && other ? (
           <div className="thread__intro-single" style={{ background: colorFor(other.profile_id), color: 'var(--bone-warm)' }}>
             {monogramFor(other.name)}
           </div>
@@ -435,7 +476,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
           to help you use the platform, and to make it better with what you tell us.
         </p>
       ) : (
-        <p className="thread__intro-desc">{isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} chat`}</p>
+        <p className="thread__intro-desc">{partyView ? partyView.sub : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} chat`}</p>
       )}
       <p className="thread__intro-hint">
         Lichen keeps this conversation between members. No third-party tracking.
