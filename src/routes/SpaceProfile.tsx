@@ -1792,8 +1792,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <div className="sprof__confirm">
               <span className="sprof__confirm-text">
                 Delete <em>&ldquo;{space.name}&rdquo;</em> for good? Its members, chat, events,
-                bookable areas, collections and everything it posted in its own voice go with it;
-                groups nested inside it stay, on their own. This can&rsquo;t be undone.
+                bookable areas, collections and everything it posted in its own voice go with it
+                {/* Only communities and organizations can hold groups — a group or place has
+                    nothing nested, so the clause would be false there (founder 2026-08-17). */}
+                {(space.kind === 'community' || space.kind === 'organization')
+                  ? '; groups nested inside it stay, on their own'
+                  : ''}. This can&rsquo;t be undone.
               </span>
               <button className="btn sprof__btn--danger" disabled={deleting} onClick={() => {
                 setDeleting(true); setDeleteError('');
