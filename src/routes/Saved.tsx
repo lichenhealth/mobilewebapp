@@ -146,8 +146,8 @@ export default function Saved() {
     } catch (e) { console.error(e); }
   }
 
-  async function messageAuthor(otherId: string) {
-    try { navigate(`/chat/${await ensureDirectChat(otherId)}`); }
+  async function messageAuthor(otherId: string, aboutPostId?: string) {
+    try { navigate(`/chat/${await ensureDirectChat(otherId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
     catch (e) { console.error(e); }
   }
 
@@ -333,7 +333,7 @@ export default function Saved() {
               hint: collections.length ? undefined : 'Create your first folder above',
               onClick: () => openPicker(p.id),
             }]}
-            onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+            onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />

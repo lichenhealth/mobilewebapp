@@ -10,7 +10,8 @@ import {
   markChatRead,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
-import { loadPost } from '../lib/postsApi';
+import { loadPost, loadSpaceNames } from '../lib/postsApi';
+import { postOpenPath } from '../lib/feedMapping';
 import '../routes/ChatThread.css';
 
 interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; }
@@ -33,26 +34,36 @@ export default function ChatConversation({
   const [chat, setChat] = useState<ChatInfo | null>(null);
   const [members, setMembers] = useState<Record<string, MemberInfo>>({});
   const [messages, setMessages] = useState<MessageRow[]>([]);
+  const navigate = useNavigate();
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [draft, setDraft] = useState('');
-  // "Chat about this post": the card's two-bubble door carries the post here
-  // (?about=<id>) so the conversation starts with what it's about — the
-  // member still writes their own words; we only set the opening line.
+  // "Chat about this post" (founder 2026-08-17): the card's chat door carries
+  // the post here (?about=<id>) and it sits PINNED above the composer as a
+  // card — title, who posted it, and when it was posted as a space, WHICH
+  // human you're actually writing to (chat is person-to-person; a space
+  // can't be in a chat, so the door goes to the person who posted). The
+  // member can × it and just talk. While it's there, the first message
+  // carries a line naming the post, so the other side has the context too.
   const [params] = useSearchParams();
-  const aboutPost = params.get('about');
+  const aboutId = params.get('about');
+  const [about, setAbout] = useState<{ id: string; title: string; path: string; spaceName: string | null } | null>(null);
   const aboutDone = useRef(false);
   useEffect(() => {
-    if (!aboutPost || aboutDone.current) return;
+    if (!aboutId || aboutDone.current) return;
     aboutDone.current = true;
-    void loadPost(aboutPost).then((p) => {
+    void loadPost(aboutId).then(async (p) => {
       if (!p) return;
-      const label = p.title || p.body.slice(0, 60);
-      setDraft(`About "${label}" — ${window.location.origin}/posts/${p.id}\n\n`);
+      let spaceName: string | null = null;
+      if (p.author_space_id) {
+        const names = await loadSpaceNames([p.author_space_id]);
+        spaceName = names.get(p.author_space_id) ?? null;
+      }
+      setAbout({ id: p.id, title: p.title || p.body.slice(0, 60), path: postOpenPath(p), spaceName });
     });
-  }, [aboutPost]);
+  }, [aboutId]);
   // ?draft= — same idea with the words supplied whole (the availability nudge
   // arrives this way): the member still presses send themselves, so whatever
   // lands in the thread is theirs, editable and declinable.
@@ -192,15 +203,19 @@ export default function ChatConversation({
 
   const sendMessage = async () => {
     const text = draft.trim();
-    if ((!text && pending.length === 0) || !me || !chat || uploading) return;
+    if ((!text && pending.length === 0 && !about) || !me || !chat || uploading) return;
     const attachments: Attachment[] | null = pending.length
       ? pending.map((p) => ({ type: p.type, url: p.path }))
       : null;
     const reply = replyTo?.id ?? null;
-    setDraft(''); setPending([]); setReplyTo(null);
+    // The pinned post rides along on the first message, then steps aside.
+    const bodyText = about
+      ? `About "${about.title}" — ${window.location.origin}${about.path}${text ? `\n\n${text}` : ''}`
+      : (text || null);
+    setDraft(''); setPending([]); setReplyTo(null); setAbout(null);
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ chat_id: chat.id, sender_id: me, body: text || null, attachments, reply_to: reply })
+      .insert({ chat_id: chat.id, sender_id: me, body: bodyText, attachments, reply_to: reply })
       .select(MESSAGE_COLS)
       .single();
     if (!error && data) {
@@ -269,6 +284,20 @@ export default function ChatConversation({
           );
         })}
       </div>
+      {about && (
+        <div className="thread__about" role="note">
+          <button className="thread__about-body" onClick={() => navigate(about.path)} title="Open the post">
+            <span className="thread__about-kicker">About this post</span>
+            <span className="thread__about-title">{about.title}</span>
+            {about.spaceName && (
+              <span className="thread__about-who">
+                Posted by {about.spaceName} — you&rsquo;re writing to {otherMember(Object.values(members), me)?.name ?? 'the person'} who posted it
+              </span>
+            )}
+          </button>
+          <button className="thread__about-x" onClick={() => setAbout(null)} aria-label="Just chat, without the post">×</button>
+        </div>
+      )}
       <ChatInputBar
         draft={draft} setDraft={setDraft} onSend={sendMessage} inputRef={inputRef}
         pending={pending} onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}

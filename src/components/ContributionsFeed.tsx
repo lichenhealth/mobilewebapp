@@ -190,9 +190,9 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     return posts.filter((p) => (areas.length === 0 || postAreas(p).some((a) => areas.includes(a))));
   }, [posts, areas]);
 
-  async function messageAuthor(otherId: string) {
+  async function messageAuthor(otherId: string, aboutPostId?: string) {
     const chatId = await ensureDirectChat(otherId);
-    navigate(`/chat/${chatId}`);
+    navigate(`/chat/${chatId}${aboutPostId ? `?about=${aboutPostId}` : ''}`);
   }
 
   if (!ready) return <p className="cfeed__empty">Loading…</p>;
@@ -319,7 +319,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
             onDelete={interactive && !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={interactive && me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={interactive && me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+            onMessage={interactive && me && p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
           />
         ))}
       </div>}

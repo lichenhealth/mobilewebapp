@@ -175,9 +175,9 @@ export default function Events() {
     return { src, topLabel: top, bottomLabel: bottom };
   }
 
-  async function messageAuthor(otherId: string) {
+  async function messageAuthor(otherId: string, aboutPostId?: string) {
     const chatId = await ensureDirectChat(otherId);
-    navigate(`/chat/${chatId}`);
+    navigate(`/chat/${chatId}${aboutPostId ? `?about=${aboutPostId}` : ''}`);
   }
 
   const card = (p: FeedPost, eyebrow?: string) => (
@@ -208,7 +208,7 @@ export default function Events() {
       viewerIsAuthor={p.author_id === me}
       onManage={() => navigate(`/events/${p.id}`)}
       onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-      onMessage={p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+      onMessage={p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
     />
   );
 

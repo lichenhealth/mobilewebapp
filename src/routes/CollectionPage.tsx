@@ -272,8 +272,8 @@ export default function CollectionPage() {
     setBusy(false);
   }
 
-  async function messageAuthor(otherId: string) {
-    try { navigate(`/chat/${await ensureDirectChat(otherId)}`); }
+  async function messageAuthor(otherId: string, aboutPostId?: string) {
+    try { navigate(`/chat/${await ensureDirectChat(otherId)}${aboutPostId ? `?about=${aboutPostId}` : ''}`); }
     catch (e) { console.error(e); }
   }
 
@@ -1127,7 +1127,7 @@ export default function CollectionPage() {
               onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
               onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-              onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id) : undefined}
+              onMessage={me && p.author_id !== me ? () => messageAuthor(p.author_id, p.id) : undefined}
               onOpen={() => navigate(postOpenPath(p))}
               onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             />

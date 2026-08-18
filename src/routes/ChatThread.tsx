@@ -25,7 +25,8 @@ export default function ChatThread() {
     const go = () => {
       if (!mq.matches) return;
       const from = params.get('from');
-      navigate(`/chat?open=${id}${from ? `&from=${encodeURIComponent(from)}` : ''}`, { replace: true });
+      const about = params.get('about');
+      navigate(`/chat?open=${id}${from ? `&from=${encodeURIComponent(from)}` : ''}${about ? `&about=${encodeURIComponent(about)}` : ''}`, { replace: true });
     };
     go();
     mq.addEventListener('change', go);
