@@ -389,12 +389,15 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
           ) : chat.kind === 'help' ? (
-            /* THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): Lichen Help's
-               identity at the top and in the inbox; the humans who answer
-               show up on their own messages, ringed peach. One day more than
-               one steward will answer here, and this stays true. */
-            <div className="thread__head-party">
-              <Avatar id={LICHEN_HEALTH_PROFILE_ID} name="Lichen Health" url={members.find((m) => m.profile_id === LICHEN_HEALTH_PROFILE_ID)?.avatarUrl} size={38} />
+            /* All three parties, tiered lower→higher like the inbox stacks
+               (founder 2026-08-19: the single brain read flat; the intro
+               keeps its side-by-side row). Fixed order: member, orange, blue. */
+            <div className="thread__head-help" aria-hidden>
+              {helpPartyOrder(members).slice(0, 3).map((mem, i) => (
+                mem.avatarUrl
+                  ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: i + 1 }} />
+                  : <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: i + 1 }}>{monogramFor(mem.name)}</span>
+              ))}
             </div>
           ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
             <div className="thread__head-party">

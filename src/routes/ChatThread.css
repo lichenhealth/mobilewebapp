@@ -793,3 +793,16 @@
   background: var(--peach); color: #fff; border: 1.5px solid var(--bone);
   display: inline-flex; align-items: center; justify-content: center; line-height: 0;
 }
+/* Help header: the three parties tiered corner to corner in the 38px slot —
+   the inbox diagonal, in miniature. Own box: NOT thread__head-group, whose
+   stacked rules fight per-child sizing. */
+.thread__head-help { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
+.thread__head-help img, .thread__head-help span {
+  position: absolute; width: 22px; height: 22px; border-radius: var(--r-full);
+  border: 1.5px solid var(--bone); object-fit: cover;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-style: italic; font-size: 10px; color: var(--bone-warm);
+}
+.thread__head-help > :nth-child(1) { top: 0; left: 0; }
+.thread__head-help > :nth-child(2) { top: 8px; left: 8px; }
+.thread__head-help > :nth-child(3) { top: 16px; left: 16px; }
