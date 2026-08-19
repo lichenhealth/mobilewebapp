@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import MemberRow from '../components/MemberRow';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { sortClaudeFirst } from '../lib/chatApi';
 import { hasClaudeFeedActivity } from '../lib/assistantFeedApi';
 import {
-  loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend,
+  loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend, recommendKey,
 } from '../lib/myceliumApi';
 import ConsentBubble from '../components/ConsentBubble';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
@@ -80,11 +81,20 @@ export default function Directory() {
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myVouched, setMyVouched] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
+  // THE WEB FOLLOWS WHOEVER YOU'RE ACTING AS (founder 2026-08-18: acting as
+  // Lichen, the Directory lit Galyn's weave marks and showed trust shields —
+  // "when logged in as Lichen I haven't done my mycelium vetting yet"). A
+  // space reads and writes ITS OWN web (mycelium.truster_space_id), starts
+  // empty until its admins weave, and holds no trust at all — the shield is
+  // a person's, so it doesn't render while you wear a space's hat.
+  const { actor } = useActing();
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
   useEffect(() => {
     if (!me) return;
-    void loadMyWeb().then(({ web, vouched }) => { setMyWebSet(web); setMyVouched(vouched); });
+    setMyWebSet(new Set()); setMyVouched(new Set()); setMyRecs(new Set());
+    void loadMyWeb(asSpace).then(({ web, vouched }) => { setMyWebSet(web); setMyVouched(vouched); });
     void loadMyRecommendations().then(setMyRecs);
-  }, [me]);
+  }, [me, asSpace]);
 
   const withKey = (set: Set<string>, key: string, on: boolean) => {
     const next = new Set(set);
@@ -94,7 +104,7 @@ export default function Directory() {
   const toggleWeave = (id: string, on: boolean) => {
     setMyWebSet((s) => withKey(s, 'profile:' + id, on));
     if (!on) setMyVouched((s) => withKey(s, 'profile:' + id, false)); // unweave withdraws trust
-    void setInWeb('profile', id, on).catch(console.error);
+    void setInWeb('profile', id, on, asSpace).catch(console.error);
   };
   const toggleVouch = (id: string, on: boolean) => {
     setMyVouched((s) => withKey(s, 'profile:' + id, on));
@@ -245,8 +255,8 @@ export default function Directory() {
               sub={m.headline ?? undefined}
               avatarUrl={m.avatar_url}
               kind="person"
-              trusted={myVouched.has('profile:' + m.id)}
-              onTrust={(on) => toggleVouch(m.id, on)}
+              trusted={asSpace ? false : myVouched.has('profile:' + m.id)}
+              onTrust={asSpace ? undefined : (on) => toggleVouch(m.id, on)}
               weaveOn={myWebSet.has('profile:' + m.id)}
               onWeave={(on) => toggleWeave(m.id, on)}
               onOpen={() => navigate(`/members/${m.id}`)}
@@ -271,10 +281,10 @@ export default function Directory() {
                 sub={[m.headline, m.jurisdiction ? `tended within ${m.jurisdiction}` : null].filter(Boolean).join(' · ') || undefined}
                 avatarUrl={m.avatar_url}
                 kind="space"
-                recommended={myRecs.has('profile:' + m.id)}
+                recommended={myRecs.has(recommendKey('profile', m.id, undefined, asSpace))}
                 onRecommend={(on) => {
-                  setMyRecs((s) => withKey(s, 'profile:' + m.id, on));
-                  void setRecommend('profile', m.id, on).catch(console.error);
+                  setMyRecs((s) => withKey(s, recommendKey('profile', m.id, undefined, asSpace), on));
+                  void setRecommend('profile', m.id, on, undefined, asSpace).catch(console.error);
                 }}
                 weaveOn={myWebSet.has('profile:' + m.id)}
                 onWeave={(on) => toggleWeave(m.id, on)}
@@ -297,15 +307,15 @@ export default function Directory() {
                   sub={sp.description?.slice(0, 90) || undefined}
                   avatarUrl={sp.avatar_url}
                   kind="space"
-                  recommended={myRecs.has('space:' + sp.id)}
+                  recommended={myRecs.has(recommendKey('space', sp.id, undefined, asSpace))}
                   onRecommend={(on) => {
-                    setMyRecs((s) => withKey(s, 'space:' + sp.id, on));
-                    void setRecommend('space', sp.id, on).catch(console.error);
+                    setMyRecs((s) => withKey(s, recommendKey('space', sp.id, undefined, asSpace), on));
+                    void setRecommend('space', sp.id, on, undefined, asSpace).catch(console.error);
                   }}
                   weaveOn={myWebSet.has('space:' + sp.id)}
                   onWeave={(on) => {
                     setMyWebSet((s) => withKey(s, 'space:' + sp.id, on));
-                    void setInWeb('space', sp.id, on).catch(console.error);
+                    void setInWeb('space', sp.id, on, asSpace).catch(console.error);
                   }}
                   onOpen={() => navigate(`/spaces/${sp.id}`)}
                 />
