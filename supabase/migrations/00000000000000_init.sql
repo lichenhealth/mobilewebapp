@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict M8bhzbJtVk1zQClrAjwKUioA5L7RP8RHEZH5Ki2YSeM7zP7XqS2a5VwjjpGuq5T
+\restrict GYNO7b8LAvV0KLNBQ56wbDFxte4hu6jfXJIHFZ744ONHxzxxV3dacq1UClO3G7N
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1874,33 +1874,25 @@ CREATE FUNCTION public.ensure_help_chat() RETURNS uuid
 declare
   v_me      uuid := auth.uid();
   v_support uuid;
+  v_claude  uuid := '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
   v_key     text;
   v_chat    uuid;
 begin
   if v_me is null then raise exception 'Not signed in'; end if;
-
-  select id into v_support from public.profiles
-  where lower(email) = 'connect@lichen.health' limit 1;
+  select id into v_support from public.profiles where lower(email) = 'connect@lichen.health' limit 1;
   if v_support is null then raise exception 'Help is not available yet'; end if;
   if v_support = v_me then raise exception 'This is the help account'; end if;
-
   v_key := 'help:' || v_me::text;
-
   select id into v_chat from public.chats where direct_key = v_key;
   if v_chat is null then
-    insert into public.chats (kind, direct_key, title)
-    values ('help', v_key, null)
+    insert into public.chats (kind, direct_key, title) values ('help', v_key, null)
     on conflict (direct_key) where direct_key is not null do nothing
     returning id into v_chat;
-
-    if v_chat is null then
-      select id into v_chat from public.chats where direct_key = v_key;
-    end if;
-
-    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me)      on conflict do nothing;
-    insert into public.chat_members (chat_id, profile_id) values (v_chat, v_support) on conflict do nothing;
+    if v_chat is null then select id into v_chat from public.chats where direct_key = v_key; end if;
   end if;
-
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me)      on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_support) on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_claude)  on conflict do nothing;
   return v_chat;
 end; $$;
 
@@ -13185,7 +13177,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M8bhzbJtVk1zQClrAjwKUioA5L7RP8RHEZH5Ki2YSeM7zP7XqS2a5VwjjpGuq5T
+\unrestrict GYNO7b8LAvV0KLNBQ56wbDFxte4hu6jfXJIHFZ744ONHxzxxV3dacq1UClO3G7N
 
 
 

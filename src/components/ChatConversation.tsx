@@ -385,11 +385,9 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-avatar">
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
-          ) : isDirect && other ? (
-            <div className="thread__head-group">
-              <span style={{ position: 'static', width: 38, height: 38, fontSize: 16, background: colorFor(other.profile_id) }}>
-                {monogramFor(other.name)}
-              </span>
+          ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
+            <div className="thread__head-party">
+              <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={38} />
             </div>
           ) : (
             <div className="thread__head-group">
@@ -445,9 +443,9 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
       >
         {partyView ? (
           <div className="thread__intro-party">{partyView.avatar}</div>
-        ) : isDirect && other ? (
-          <div className="thread__intro-single" style={{ background: colorFor(other.profile_id), color: 'var(--bone-warm)' }}>
-            {monogramFor(other.name)}
+        ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
+          <div className="thread__intro-party">
+            <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={64} />
           </div>
         ) : (
           <div className="thread__intro-group">

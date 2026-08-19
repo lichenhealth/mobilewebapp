@@ -188,13 +188,16 @@ export default function Home() {
         <h1 className="home__title">
           <span className="display-italic">{salutation()}</span>{' '}
           {user ? (
-            // The doorway: present members lead a WEB — yours as yourself,
-            // and the space's own while you're acting as one (founder
-            // 2026-08-13: "have the network tagline go... to Countryman
-            // Stable's mycelium"; briefly re-pointed at the Members tab the
-            // same day, then confirmed back here — "we point to mycelium
-            // for that"). One destination; an empty web says what it is.
-            <button className="display home__presence" onClick={() => navigate('/mycelium/directory?from=home')}>
+            // The doorway opens WHAT THE LINE COUNTS. As yourself: your web
+            // (network_present_count) → My-celium. Acting as a space: the
+            // space's MEMBERS present (space_present_count) → its Members tab,
+            // present-first. The 2026-08-13 choice to send a space to its web
+            // read as a bug once seen live (founder 2026-08-18: "says 1 in my
+            // network is present… then gives me a blank mycelium screen") —
+            // the count and the door disagreed. A door must open on the
+            // people it counted.
+            <button className="display home__presence" onClick={() => navigate(
+              actor.type === 'space' ? `/spaces/${actor.id}?tab=members` : '/mycelium/directory?from=home')}>
               {presenceLine(present, available, actor.type === 'space' ? actor.name : null)}
               <span className="home__presence-chev" aria-hidden><Icon name="chevron-right" size={16} /></span>
             </button>
