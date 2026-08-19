@@ -7,7 +7,7 @@ import {
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
   colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
-  markChatRead, visitorIdOfKey, type PartySpace,
+  markChatRead, visitorIdOfKey, helpPartyOrder, type PartySpace,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
@@ -385,7 +385,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-avatar">
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
-          ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
+          ) : (isDirect || (chat.kind !== 'help' && members.filter((m) => m.profile_id !== me).length === 1)) && other ? (
             <div className="thread__head-party">
               <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={38} />
             </div>
@@ -397,7 +397,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
                   and monogram discs couldn't show that. Your OWN face is
                   dropped: you're in every chat you can see, so it carries no
                   information and costs a slot. */}
-              {members.filter((m) => m.profile_id !== me).slice(0, 3).map((mem, i) => (
+              {(chat.kind === 'help' ? helpPartyOrder(members) : members.filter((m) => m.profile_id !== me)).slice(0, 3).map((mem, i) => (
                 mem.avatarUrl
                   ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 3 - i }} />
                   : (
@@ -443,7 +443,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
       >
         {partyView ? (
           <div className="thread__intro-party">{partyView.avatar}</div>
-        ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
+        ) : (isDirect || (chat.kind !== 'help' && members.filter((m) => m.profile_id !== me).length === 1)) && other ? (
           <div className="thread__intro-party">
             <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={64} />
           </div>
@@ -452,7 +452,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
             {/* Same rule as the header: real faces, and not your own — this
                 mark is the first thing you see in an empty room, so it should
                 show WHO is waiting for you. */}
-            {members.filter((m) => m.profile_id !== me).slice(0, 4).map((mem, i) => (
+            {(chat.kind === 'help' ? helpPartyOrder(members) : members.filter((m) => m.profile_id !== me)).slice(0, 4).map((mem, i) => (
               mem.avatarUrl
                 ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 4 - i }} />
                 : (

@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import {
   loadChatList, loadUnreadCounts, ensureDirectChat, messagePreview,
-  colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM,
+  colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM, helpPartyOrder,
 } from '../lib/chatApi';
 import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
@@ -276,7 +276,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // big until there are actually several to clump together, which is the
   // founder's own instinct in the same message.
   const others = chat.members.filter((m) => m.profile_id !== me);
-  if (dmLike || others.length <= 1) {
+  if (dmLike || (chat.kind !== 'help' && others.length <= 1)) {
     if (single?.avatarUrl) {
       return <img className="conv-row__avatar conv-row__avatar--img" src={single.avatarUrl} alt="" />;
     }
@@ -289,7 +289,11 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   }
 
   // Your own face carries no information — you're in every chat you can see.
-  const sample = others.slice(0, 3);
+  // EXCEPT in a help room (founder 2026-08-18): its identity IS "Lichen Health
+  // + Claude", so both responders show even to the steward signed in as one
+  // of them — the member, the orange brain, the blue brain. Every party, in
+  // every help room, from every side.
+  const sample = (chat.kind === 'help' ? helpPartyOrder(chat.members) : others).slice(0, 3);
   return (
     <div className={`conv-row__group conv-row__group--${sample.length}`}>
       {sample.map((mem, i) => (

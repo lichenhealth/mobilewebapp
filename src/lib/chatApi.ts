@@ -4,6 +4,14 @@ import { supabase } from './supabase';
  *  surface that special-cases Claude's row (avatar, sort order, the "Ask
  *  about this" DM escalation) reads this one constant. */
 export const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+/** Lichen Health — the help account (connect@lichen.health). */
+export const LICHEN_HEALTH_PROFILE_ID = 'a5cdbca1-b254-442a-b857-808ef4abf0db';
+/** A help room's faces in one fixed order everywhere (founder 2026-08-18):
+ *  the member, then Lichen Health (orange), then Claude (blue). */
+export function helpPartyOrder<T extends { profile_id: string }>(members: T[]): T[] {
+  const rank = (id: string) => id === CLAUDE_PROFILE_ID ? 2 : id === LICHEN_HEALTH_PROFILE_ID ? 1 : 0;
+  return [...members].sort((a, b) => rank(a.profile_id) - rank(b.profile_id));
+}
 
 export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm';
 
