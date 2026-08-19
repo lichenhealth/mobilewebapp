@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import {
   loadChatList, loadUnreadCounts, ensureDirectChat, messagePreview,
-  colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM, helpPartyOrder,
+  colorFor, monogramFor, formatRelative, KIND_LABEL, ChatVM, LICHEN_HEALTH_PROFILE_ID,
 } from '../lib/chatApi';
 import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
@@ -252,6 +252,14 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   const dmLike = chat.kind === 'direct';
   const single = chat.members.find((m) => m.profile_id !== me) ?? chat.members[0];
 
+  // THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): a help room's row
+  // wears Lichen Health's avatar — its identity — from every side. The humans
+  // who answer show on their own messages inside, ringed peach.
+  if (chat.kind === 'help') {
+    const lh = chat.members.find((m) => m.profile_id === LICHEN_HEALTH_PROFILE_ID);
+    return <Avatar id={LICHEN_HEALTH_PROFILE_ID} name="Lichen Health" url={lh?.avatarUrl} size={48} className="conv-row__avatar--party" />;
+  }
+
   // A conversation WITH a space: the visitor sees the space's logo wearing the
   // answering admin's face; the admin sees the visitor.
   if (chat.kind === 'space_dm' && chat.party) {
@@ -276,7 +284,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // big until there are actually several to clump together, which is the
   // founder's own instinct in the same message.
   const others = chat.members.filter((m) => m.profile_id !== me);
-  if (dmLike || (chat.kind !== 'help' && others.length <= 1)) {
+  if (dmLike || others.length <= 1) {
     if (single?.avatarUrl) {
       return <img className="conv-row__avatar conv-row__avatar--img" src={single.avatarUrl} alt="" />;
     }
@@ -293,7 +301,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // + Claude", so both responders show even to the steward signed in as one
   // of them — the member, the orange brain, the blue brain. Every party, in
   // every help room, from every side.
-  const sample = (chat.kind === 'help' ? helpPartyOrder(chat.members) : others).slice(0, 3);
+  const sample = others.slice(0, 3);
   return (
     <div className={`conv-row__group conv-row__group--${sample.length}`}>
       {sample.map((mem, i) => (

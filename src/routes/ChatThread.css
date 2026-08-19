@@ -779,3 +779,17 @@
 .thread__intro-party .avatar__mark--face { width: 42px !important; height: 42px !important; }
 /* A lone face (DM, or a room with one other) — the same 64px as intro-single. */
 .thread__intro-party > .avatar { width: 64px; height: 64px; font-size: 26px; }
+
+/* ── Help room anatomy (founder 2026-08-18) ───────────────────────────────── */
+/* Every party side by side, legible — not a clump. */
+.thread__intro-row { display: inline-flex; gap: 14px; align-items: center; margin: 0 0 var(--s-3); }
+/* The human behind the orange icon: a steward's face on their own messages
+   wears a peach ring and a small heart at the lower left. */
+.msg-run__avatar { position: relative; }
+.msg-run__avatar--steward .avatar { box-shadow: 0 0 0 2px var(--peach); }
+.msg-run__steward-mark {
+  position: absolute; left: -4px; bottom: -3px;
+  width: 15px; height: 15px; border-radius: var(--r-full);
+  background: var(--peach); color: #fff; border: 1.5px solid var(--bone);
+  display: inline-flex; align-items: center; justify-content: center; line-height: 0;
+}

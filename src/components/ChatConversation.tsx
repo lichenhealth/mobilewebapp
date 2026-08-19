@@ -7,7 +7,7 @@ import {
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
   colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
-  markChatRead, visitorIdOfKey, helpPartyOrder, type PartySpace,
+  markChatRead, visitorIdOfKey, helpPartyOrder, CLAUDE_PROFILE_ID, LICHEN_HEALTH_PROFILE_ID, type PartySpace,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
@@ -15,7 +15,7 @@ import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import '../routes/ChatThread.css';
 
-interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; }
+interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; helpMemberId?: string | null; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -99,6 +99,8 @@ export default function ChatConversation({
       setChat({
         id: c.id, kind: c.kind, title: c.title, space_id: c.space_id,
         party: c.party ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) } : undefined,
+        // A help room is keyed 'help:<member>' — the person being helped.
+        helpMemberId: c.kind === 'help' && c.direct_key?.startsWith('help:') ? c.direct_key.slice(5) : null,
       });
       const map: Record<string, MemberInfo> = {};
       for (const r of (mRes.data as { profile_id: string; profiles: { full_name: string | null; avatar_url: string | null } | null }[] | null) ?? []) {
@@ -276,6 +278,7 @@ export default function ChatConversation({
               <MessageRun
                 run={run}
                 me={me}
+                helpMemberId={chat.helpMemberId}
                 members={members}
                 messagesById={messagesById}
                 reactionsByMessage={reactionsByMessage}
@@ -385,7 +388,15 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-avatar">
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
-          ) : (isDirect || (chat.kind !== 'help' && members.filter((m) => m.profile_id !== me).length === 1)) && other ? (
+          ) : chat.kind === 'help' ? (
+            /* THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): Lichen Help's
+               identity at the top and in the inbox; the humans who answer
+               show up on their own messages, ringed peach. One day more than
+               one steward will answer here, and this stays true. */
+            <div className="thread__head-party">
+              <Avatar id={LICHEN_HEALTH_PROFILE_ID} name="Lichen Health" url={members.find((m) => m.profile_id === LICHEN_HEALTH_PROFILE_ID)?.avatarUrl} size={38} />
+            </div>
+          ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
             <div className="thread__head-party">
               <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={38} />
             </div>
@@ -397,7 +408,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
                   and monogram discs couldn't show that. Your OWN face is
                   dropped: you're in every chat you can see, so it carries no
                   information and costs a slot. */}
-              {(chat.kind === 'help' ? helpPartyOrder(members) : members.filter((m) => m.profile_id !== me)).slice(0, 3).map((mem, i) => (
+              {members.filter((m) => m.profile_id !== me).slice(0, 3).map((mem, i) => (
                 mem.avatarUrl
                   ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 3 - i }} />
                   : (
@@ -443,7 +454,15 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
       >
         {partyView ? (
           <div className="thread__intro-party">{partyView.avatar}</div>
-        ) : (isDirect || (chat.kind !== 'help' && members.filter((m) => m.profile_id !== me).length === 1)) && other ? (
+        ) : chat.kind === 'help' ? (
+          /* Every party, side by side and legible — not a clump (founder
+             2026-08-18: "move the 3 profile icons out farther"). */
+          <div className="thread__intro-row">
+            {helpPartyOrder(members).slice(0, 4).map((mem) => (
+              <Avatar key={mem.profile_id} id={mem.profile_id} name={mem.name} url={mem.avatarUrl} size={52} />
+            ))}
+          </div>
+        ) : (isDirect || members.filter((m) => m.profile_id !== me).length === 1) && other ? (
           <div className="thread__intro-party">
             <Avatar id={other.profile_id} name={other.name} url={other.avatarUrl} size={64} />
           </div>
@@ -452,7 +471,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
             {/* Same rule as the header: real faces, and not your own — this
                 mark is the first thing you see in an empty room, so it should
                 show WHO is waiting for you. */}
-            {(chat.kind === 'help' ? helpPartyOrder(members) : members.filter((m) => m.profile_id !== me)).slice(0, 4).map((mem, i) => (
+            {members.filter((m) => m.profile_id !== me).slice(0, 4).map((mem, i) => (
               mem.avatarUrl
                 ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: 4 - i }} />
                 : (
@@ -500,10 +519,12 @@ function groupRuns(msgs: MessageRow[]): Run[] {
 }
 
 function MessageRun({
-  run, me, members, messagesById, reactionsByMessage, mediaUrls, menuFor, setMenuFor, onReply, onReact,
+  run, me, members, messagesById, reactionsByMessage, mediaUrls, menuFor, setMenuFor, onReply, onReact, helpMemberId,
 }: {
   run: Run;
   me: string;
+  /** Set in a help room: the person being helped (from the room's key). */
+  helpMemberId?: string | null;
   members: Record<string, MemberInfo>;
   messagesById: Record<string, MessageRow>;
   reactionsByMessage: Record<string, ReactionRow[]>;
@@ -518,12 +539,20 @@ function MessageRun({
   const sender = members[run.senderId];
   const showSender = !isMe;
   const openSender = () => navigate(`/members/${run.senderId}`);
+  // THE HUMAN BEHIND THE ORANGE ICON (founder 2026-08-18): in a help room,
+  // a person answering who isn't the member being helped, Lichen Health
+  // itself, or Claude is a steward — their face wears a peach ring and a
+  // small heart, the cue that they speak for Lichen Help.
+  const steward = helpMemberId !== undefined && helpMemberId !== null
+    && run.senderId !== helpMemberId && run.senderId !== CLAUDE_PROFILE_ID && run.senderId !== LICHEN_HEALTH_PROFILE_ID;
 
   return (
     <div className={'msg-run' + (isMe ? ' msg-run--me' : '')}>
       {!isMe && (
-        <button className="msg-run__avatar msg-run__avatar--link" onClick={openSender} aria-label={`${sender?.name ?? 'Member'}'s profile`}>
-          <span style={{ background: colorFor(run.senderId) }}>{monogramFor(sender?.name ?? '?')}</span>
+        <button className={'msg-run__avatar msg-run__avatar--link' + (steward ? ' msg-run__avatar--steward' : '')} onClick={openSender}
+          aria-label={`${sender?.name ?? 'Member'}'s profile`} title={steward ? `${sender?.name ?? 'A steward'} — answering for Lichen Health` : undefined}>
+          <Avatar id={run.senderId} name={sender?.name ?? '?'} url={sender?.avatarUrl} size={28} />
+          {steward && <span className="msg-run__steward-mark" aria-hidden><Icon name="heart-line" size={9} /></span>}
         </button>
       )}
       <div className="msg-run__bubbles">
