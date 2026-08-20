@@ -4,6 +4,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { SmartLocation } from './Calendar';
 import { useAuth } from '../auth/AuthProvider';
@@ -198,6 +199,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [assistantReadable, setAssistantReadable] = useState(true);
   const [contentAiDefault, setContentAiDefault] = useState(true);
   const [contentDownloadDefault, setContentDownloadDefault] = useState(true);
+  // A community can be identity-based, not just local (founder 2026-08-20) —
+  // same governed vocabulary + suggest flow as a member's own Identity field.
+  const [idCats, setIdCats] = useState<Category[]>([]);
+  const [identityIds, setIdentityIds] = useState<string[]>([]);
+  const [identityLegacy, setIdentityLegacy] = useState<string[]>([]);
   // Each backstage section opens inline to edit, then collapses back down
   // (founder 2026-08-10 profile-features spreadsheet — same interaction as
   // Profile's own sections, lifted from the manual-search criteria panel).
@@ -295,6 +301,22 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContentDownloadDefault(s.content_download_default !== false);
       setPageEdit(((sx as { page?: PageMeta }).page ?? {}) as PageMeta);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
+      if (s.kind === 'community') {
+        // Identity vocabulary — names stored on the row map onto picker ids;
+        // anything unmatched stays as a legacy chip, never silently dropped.
+        const { data: cats } = await supabase.from('categories')
+          .select('*').eq('domain', 'identity').order('name');
+        const pool = ((cats as Category[] | null) ?? []);
+        setIdCats(pool);
+        const byName = new Map(pool.map((c) => [c.name.trim().toLowerCase(), c.id]));
+        const ids: string[] = []; const legacy: string[] = [];
+        for (const t of s.identity_tags ?? []) {
+          const cid = byName.get(t.trim().toLowerCase());
+          if (cid) { if (!ids.includes(cid)) ids.push(cid); }
+          else legacy.push(t);
+        }
+        setIdentityIds(ids); setIdentityLegacy(legacy);
+      }
     }
     setLoading(false);
   }, [id, me]);
@@ -587,6 +609,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           // `page` before today, and a mis-seeded save would wipe a built page
           // (Countryman Stables lives in this column).
           ...(Object.keys(pageEdit).length ? { page: pageEdit } : {}),
+          ...(space.kind === 'community' ? {
+            identity_tags: (() => {
+              const names = new Map(idCats.map((c) => [c.id, c.name]));
+              const all = [
+                ...identityIds.map((cid) => names.get(cid)).filter((n): n is string => !!n),
+                ...identityLegacy,
+              ];
+              return all.length ? all : null;
+            })(),
+          } : {}),
         })
         .eq('id', id);
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
@@ -1143,6 +1175,35 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             />
             <FillWithClaude back={`/spaces/${id}?manage=1#about`} label="Fill out with Claude" />
           </div>
+          {space.kind === 'community' && (
+            <div className="prof__field">
+              <label className="prof__label">Identity</label>
+              {/* A community can be local OR identity-based (founder
+                  2026-08-20: the community of founders). Same vocabulary and
+                  suggest-to-Lichen flow as a member's own Identity field. */}
+              <CategoryPicker
+                domain="identity"
+                categories={idCats}
+                selected={identityIds}
+                onChange={setIdentityIds}
+                userId={me || undefined}
+              />
+              {identityLegacy.length > 0 && (
+                <div className="prof__legacy-tags">
+                  {identityLegacy.map((t) => (
+                    <button
+                      key={t} type="button" className="cat__chip"
+                      title="From before the identity list existed — tap to remove"
+                      onClick={() => setIdentityLegacy((l) => l.filter((x) => x !== t))}
+                    >
+                      {t} <span className="cat__chip-x">&times;</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="prof__hint">Communities can be local, or identity-based — say which identities this one gathers.</p>
+            </div>
+          )}
           {space.kind === 'group' && (
             <div className="prof__field">
               <label className="prof__label">Part of</label>

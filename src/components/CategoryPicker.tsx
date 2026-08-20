@@ -4,7 +4,7 @@ import './CategoryPicker.css';
 
 export type Category = {
   id: string;
-  domain: 'good' | 'service' | 'place';
+  domain: 'good' | 'service' | 'place' | 'identity';
   name: string;
   sort: number;
   /** Two labeled worlds (founder 2026-07-28): the healing taxonomy in one
@@ -16,7 +16,7 @@ export type Category = {
 type Pending = { id: string; name: string };
 
 type Props = {
-  domain: 'good' | 'service' | 'place';
+  domain: 'good' | 'service' | 'place' | 'identity';
   categories: Category[];
   selected: string[];
   onChange: (ids: string[]) => void;
@@ -103,8 +103,9 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
 
-  const noun = domain === 'good' ? 'goods' : domain === 'service' ? 'services' : 'places & spaces';
-  const singular = domain === 'good' ? 'good' : 'service';
+  const noun = domain === 'good' ? 'goods' : domain === 'service' ? 'services'
+    : domain === 'identity' ? 'identities' : 'places & spaces';
+  const singular = domain === 'good' ? 'good' : domain === 'identity' ? 'identity' : 'service';
 
   const pool = useMemo(
     () => categories.filter((c) => c.domain === domain).sort((a, b) => a.name.localeCompare(b.name)),
@@ -248,7 +249,11 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
 
           {userId && (
             <div className="cat__suggest">
-              <p className="cat__suggest-lead">Don’t see your {singular}? Suggest one:</p>
+              <p className="cat__suggest-lead">
+                {domain === 'identity'
+                  ? 'Don’t see yours? Suggest an identity to Lichen:'
+                  : `Don’t see your ${singular}? Suggest one:`}
+              </p>
               <div className="cat__suggest-row">
                 <input
                   className="cat__search"

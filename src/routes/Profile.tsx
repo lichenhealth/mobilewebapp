@@ -126,10 +126,13 @@ export default function Profile() {
   const [pronouns, setPronouns] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
-  // Public identity tags ("Firefighter, Veteran") — comma-entered, chip-shown;
-  // what gift-targeted offers will one day match against. Fetched separately
-  // so the page keeps working before the column migration runs.
-  const [identity, setIdentity] = useState('');
+  // Public identity tags ("Firefighter, Veteran") — picked from the governed
+  // identity vocabulary (founder 2026-08-20: exists → add it; missing →
+  // "suggest an identity to Lichen"), stored as NAMES in identity_tags so
+  // gift-to-identity matching stays string-simple. Tags that predate the
+  // vocabulary and match nothing stay as legacy chips — never dropped.
+  const [identityIds, setIdentityIds] = useState<string[]>([]);
+  const [identityLegacy, setIdentityLegacy] = useState<string[]>([]);
   const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
   const [pushState, setPushState] = useState<PushState>('off');
   const [pushBusy, setPushBusy] = useState(false);
@@ -204,7 +207,18 @@ export default function Profile() {
       setPronouns(p.pronouns ?? '');
       setHeadline(p.headline ?? '');
       setBio(p.bio ?? '');
-      void getIdentityTags(user.id).then((tags) => setIdentity(tags.join(', ')));
+      void getIdentityTags(user.id).then((tags) => {
+        // Map stored names onto vocabulary ids; anything unmatched is legacy.
+        const cats = ((catRes.data as Category[] | null) ?? []).filter((c) => c.domain === 'identity');
+        const byName = new Map(cats.map((c) => [c.name.trim().toLowerCase(), c.id]));
+        const ids: string[] = []; const legacy: string[] = [];
+        for (const t of tags) {
+          const cid = byName.get(t.trim().toLowerCase());
+          if (cid) { if (!ids.includes(cid)) ids.push(cid); }
+          else legacy.push(t);
+        }
+        setIdentityIds(ids); setIdentityLegacy(legacy);
+      });
       setNotifPref(p.notification_pref ?? 'in_app');
       // '*' select elsewhere would be heavy; read this one on its own so the
       // page keeps working before the column exists.
@@ -570,8 +584,13 @@ export default function Profile() {
         bio: bio.trim() || null,
       })
       .eq('id', user.id);
-    // Identity tags ride the same Save — quietly skipped pre-migration.
-    await saveIdentityTags(identity.split(',').map((t) => t.trim()).filter(Boolean));
+    // Identity tags ride the same Save: picked vocabulary names + any legacy
+    // free-text tags that predate the vocabulary.
+    const idName = new Map(categories.filter((c) => c.domain === 'identity').map((c) => [c.id, c.name]));
+    await saveIdentityTags([
+      ...identityIds.map((cid) => idName.get(cid)).filter((n): n is string => !!n),
+      ...identityLegacy,
+    ]);
     setSavingProfile(false);
     if (e) { setError(e.message); return; }
     setFullName(`${firstName.trim()} ${lastName.trim()}`.trim());
@@ -765,12 +784,29 @@ export default function Profile() {
         </div>
         <div className="prof__field">
           <label className="prof__label">Identity</label>
-          <input
-            className="prof__input"
-            value={identity}
-            onChange={(e) => setIdentity(e.target.value)}
-            placeholder="Public identities, comma-separated — Firefighter, Veteran, Nurse…"
+          {/* The governed vocabulary (founder 2026-08-20): an existing identity
+              adds with a tap; a missing one is suggested to Lichen and rides
+              the same admin approval as category suggestions. */}
+          <CategoryPicker
+            domain="identity"
+            categories={categories}
+            selected={identityIds}
+            onChange={setIdentityIds}
+            userId={user?.id}
           />
+          {identityLegacy.length > 0 && (
+            <div className="prof__legacy-tags">
+              {identityLegacy.map((t) => (
+                <button
+                  key={t} type="button" className="cat__chip"
+                  title="From before the identity list existed — tap to remove"
+                  onClick={() => setIdentityLegacy((l) => l.filter((x) => x !== t))}
+                >
+                  {t} <span className="cat__chip-x">&times;</span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="prof__hint">Shown on your public profile. Offers gifted to an identity (&ldquo;Gift to First Responders&rdquo;) will find you through these.</p>
         </div>
         <div className="prof__save-row">

@@ -76,6 +76,9 @@ export interface SpaceProfileRow {
   assistant_readable?: boolean;
   content_ai_default?: boolean;
   content_download_default?: boolean;
+  /** A community can be identity-based, not just local (founder 2026-08-20) —
+   *  names from the identity vocabulary, same storage shape as profiles'. */
+  identity_tags?: string[] | null;
   parent: { id: string; name: string } | null;   // a group's home community/org
 }
 
@@ -84,7 +87,7 @@ export async function loadSpaceProfile(id: string): Promise<SpaceProfileRow | nu
   // CHILDREN direction (an array), not the parent. Fetch the parent by id.
   const { data, error } = await supabase
     .from('spaces')
-    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page, assistant_enabled, findable, assistant_readable, content_ai_default, content_download_default')
+    .select('id, kind, name, handle, description, avatar_url, location, lat, lng, created_by, parent_space_id, contact, public_page, page, assistant_enabled, findable, assistant_readable, content_ai_default, content_download_default, identity_tags')
     .eq('id', id)
     .maybeSingle();
   if (error) { console.warn('loadSpaceProfile:', error.message); return null; }

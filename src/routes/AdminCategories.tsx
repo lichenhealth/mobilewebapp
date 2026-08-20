@@ -6,7 +6,7 @@ import './AdminCategories.css';
 
 type Suggestion = {
   id: string;
-  domain: 'good' | 'service';
+  domain: 'good' | 'service' | 'place' | 'identity';
   name: string;
   created_at: string;
   proposer: { full_name: string | null } | null;

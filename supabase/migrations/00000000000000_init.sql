@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict g8RCEIeppJ0yiHGBw5XeoxT6yp1qFoL2xuMR45CWGVzZfQz4sjssWSt51R44Hyp
+\restrict U2095H7YkFJxiBJPFyBYT16g3wmD8rUA7aOQqvGzmch6xo6L0KHXduT72FJxae5
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -239,9 +239,18 @@ begin
   insert into public.categories (id, domain, name, sort)
   values (v_slug, s.domain, s.name, 1000);
 
-  insert into public.profile_categories (profile_id, category_id)
-  values (s.proposer_id, v_slug)
-  on conflict do nothing;
+  if s.domain = 'identity' then
+    update public.profiles
+      set identity_tags = case
+        when coalesce(identity_tags, '{}') @> array[s.name] then identity_tags
+        else coalesce(identity_tags, '{}') || s.name
+      end
+      where id = s.proposer_id;
+  else
+    insert into public.profile_categories (profile_id, category_id)
+    values (s.proposer_id, v_slug)
+    on conflict do nothing;
+  end if;
 
   update public.category_suggestions
     set status = 'approved', category_id = v_slug, decided_at = now(), decided_by = v_caller
@@ -5209,7 +5218,7 @@ CREATE TABLE public.categories (
     name text NOT NULL,
     sort integer DEFAULT 0 NOT NULL,
     section text DEFAULT 'everyday'::text NOT NULL,
-    CONSTRAINT categories_domain_check CHECK ((domain = ANY (ARRAY['good'::text, 'service'::text, 'place'::text]))),
+    CONSTRAINT categories_domain_check CHECK ((domain = ANY (ARRAY['good'::text, 'service'::text, 'place'::text, 'identity'::text]))),
     CONSTRAINT categories_section_check CHECK ((section = ANY (ARRAY['healing'::text, 'everyday'::text])))
 );
 
@@ -5244,7 +5253,7 @@ CREATE TABLE public.category_suggestions (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     decided_at timestamp with time zone,
     decided_by uuid,
-    CONSTRAINT category_suggestions_domain_check CHECK ((domain = ANY (ARRAY['good'::text, 'service'::text, 'place'::text]))),
+    CONSTRAINT category_suggestions_domain_check CHECK ((domain = ANY (ARRAY['good'::text, 'service'::text, 'place'::text, 'identity'::text]))),
     CONSTRAINT category_suggestions_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 );
 
@@ -6356,6 +6365,7 @@ CREATE TABLE public.spaces (
     status text DEFAULT 'live'::text NOT NULL,
     status_changed_at timestamp with time zone,
     status_changed_by uuid,
+    identity_tags text[],
     CONSTRAINT spaces_status_check CHECK ((status = ANY (ARRAY['live'::text, 'offline'::text])))
 );
 
@@ -13267,7 +13277,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict g8RCEIeppJ0yiHGBw5XeoxT6yp1qFoL2xuMR45CWGVzZfQz4sjssWSt51R44Hyp
+\unrestrict U2095H7YkFJxiBJPFyBYT16g3wmD8rUA7aOQqvGzmch6xo6L0KHXduT72FJxae5
+
 
 
 

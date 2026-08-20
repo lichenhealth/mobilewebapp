@@ -250,7 +250,10 @@ export default function SmartSearchCore({
   useEffect(() => {
     (async () => {
       const [catRes, aliasRes, spRes, memRes] = await Promise.all([
-        supabase.from('categories').select('id, name, domain').order('name'),
+        // Identity rows stay out of SEARCH's category vocabulary: posts never
+        // carry identity ids, so matching "veteran" as a category filter
+        // would silently zero the results (founder 2026-08-20 vocabulary).
+        supabase.from('categories').select('id, name, domain').neq('domain', 'identity').order('name'),
         // Aliases are other words for the SAME category (founder 2026-08-06),
         // so search understands a member's own vocabulary without the filter
         // list growing. Absent pre-migration — the query just returns nothing.

@@ -384,7 +384,9 @@ export default function Compose() {
         setAllCats(cats);
       }
       const { data, error } = await supabase.functions.invoke('listing-autofill', {
-        body: { title: title.trim(), text: body.trim(), categories: cats.map((c) => ({ id: c.id, name: c.name })) },
+        // Identity rows are member identities, not listing categories — keep
+        // them out of the model's pickable vocabulary.
+        body: { title: title.trim(), text: body.trim(), categories: cats.filter((c) => c.domain !== 'identity').map((c) => ({ id: c.id, name: c.name })) },
       });
       if (error) throw error;
       const d = (data ?? {}) as { categories?: string[]; condition?: string[]; tradeTags?: string[] };

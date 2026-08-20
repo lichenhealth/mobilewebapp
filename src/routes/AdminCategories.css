@@ -16,8 +16,9 @@
   font-size: var(--t-2xs); text-transform: uppercase; letter-spacing: 0.04em;
   padding: 2px 8px; border-radius: var(--r-full); font-weight: 700;
 }
-.adminc__badge--good    { color: var(--peach-deep); background: var(--peach-tint); }
-.adminc__badge--service { color: #4a6b52; background: #e7efe4; }
+.adminc__badge--good     { color: var(--peach-deep); background: var(--peach-tint); }
+.adminc__badge--service  { color: #4a6b52; background: #e7efe4; }
+.adminc__badge--identity { color: #4a5d6b; background: #e4eaef; }
 .adminc__name { font-weight: 600; color: var(--ink); }
 .adminc__by { font-size: var(--t-xs); color: var(--ink-faint); }
 .adminc__actions { display: flex; gap: var(--s-2); flex-shrink: 0; }

@@ -294,3 +294,6 @@
 }
 .prof__offline-btn--danger { color: #c0564f; border-color: #c0564f; }
 .prof__offline-err { margin: var(--s-2) 0 0; font-size: 13px; color: #c0564f; }
+
+/* Legacy identity tags — free text from before the vocabulary existed */
+.prof__legacy-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
