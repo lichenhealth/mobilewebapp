@@ -6,7 +6,7 @@ import { minToLabel } from './calendarApi';
 import { youtubeId } from './linkify';
 
 // ─── Wellbeing dimensions — single source of truth (HexagonRadar order) ──────
-export const WOW_DIMENSIONS = ['Mental', 'Physical', 'Social', 'Spiritual', 'Economic', 'Environmental'] as const;
+export const WOW_DIMENSIONS = ['Mental', 'Physical', 'Social', 'Spiritual', 'Environmental', 'Economic'] as const;
 export type Dimension = typeof WOW_DIMENSIONS[number];
 export const DIMENSION_META: Record<Dimension, IconName> = {
   Mental: 'brain', Physical: 'health', Social: 'user-multiple',
