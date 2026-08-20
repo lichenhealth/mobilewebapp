@@ -52,6 +52,8 @@ export interface ChatVM {
   members: MemberInfo[];
   last?: MessageRow;
   party?: PartySpace;
+  /** The space whose OWN room this is (org/community/group/place chats). */
+  spaceId?: string | null;
   /** help rooms: the member being helped (off the 'help:<id>' key). For a
    *  steward, rooms where this isn't them are DESK work, not their life. */
   helpMemberId?: string | null;
@@ -190,7 +192,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
     supabase.from('chats')
-      .select('id, kind, title, created_at, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)')
+      .select('id, kind, title, created_at, direct_key, space_id, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)')
       .not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
@@ -211,7 +213,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
     if (!lastByChat.has(m.chat_id)) lastByChat.set(m.chat_id, m); // desc → first is latest
   }
 
-  type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null;
+  type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null; space_id: string | null;
     party: { id: string; name: string; avatar_url: string | null } | null };
   const vms: ChatVM[] = ((cRes.data as unknown as ChatRaw[] | null) ?? []).map((c) => {
     const members = membersByChat.get(c.id) ?? [];
@@ -226,6 +228,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
       members,
       last: lastByChat.get(c.id),
       party,
+      spaceId: c.space_id,
       helpMemberId,
     };
   });

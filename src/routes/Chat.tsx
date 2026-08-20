@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import {
   loadChatList, loadUnreadCounts, ensureDirectChat, messagePreview,
@@ -41,6 +42,14 @@ export default function Chat() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  // ACTING AS A SPACE, THIS IS THE SPACE'S INBOX (founder 2026-08-19:
+  // "I don't just want to be the Help center for that space, I want to be
+  // its identity"). The list REPLACES your personal one: the space's own
+  // member room plus every conversation where the space is the party —
+  // all the ways people have engaged it. Your own life is one toggle away.
+  const { actor } = useActing();
+  const asSpace = actor.type === 'space' ? actor.id : undefined;
+  const spaceName = actor.type === 'space' ? actor.name : '';
 
   function openChat(id: string) {
     if (window.matchMedia('(min-width: 1024px)').matches) {
@@ -72,15 +81,21 @@ export default function Chat() {
     return () => { active = false; };
   }, [me]);
 
+  const scoped = useMemo(() => (
+    asSpace
+      ? chats.filter((c) => c.spaceId === asSpace || c.party?.id === asSpace)
+      : chats
+  ), [chats, asSpace]);
+
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return chats;
-    return chats.filter((c) =>
+    if (!q) return scoped;
+    return scoped.filter((c) =>
       c.title.toLowerCase().includes(q) ||
       (c.last?.body?.toLowerCase().includes(q) ?? false) ||
       c.members.some((m) => m.name.toLowerCase().includes(q)),
     );
-  }, [query, chats]);
+  }, [query, scoped]);
 
   return (
     <div className="chat">
@@ -88,17 +103,18 @@ export default function Chat() {
       <header className="chat__head">
         <div className="chat__head-row">
           <div>
-            <span className="eyebrow">Chat · {chats.length} {chats.length === 1 ? 'thread' : 'threads'}</span>
+            <span className="eyebrow">{asSpace ? `${spaceName} · ` : 'Chat · '}{scoped.length} {scoped.length === 1 ? 'thread' : 'threads'}</span>
             <h1 className="chat__title">
               <span className="display-italic">Messages</span>
             </h1>
           </div>
           <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
-          <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
+          {/* A space doesn't start DMs — conversations come to it. */}
+          {!asSpace && <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
-          </button>
+          </button>}
         </div>
       </header>
 
@@ -120,7 +136,17 @@ export default function Chat() {
       <div className="chat__list">
         {loading && <div className="chat__empty"><p>Loading your chats…</p></div>}
 
-        {!loading && chats.length === 0 && (
+        {!loading && asSpace && scoped.length === 0 && (
+          <div className="chat__empty">
+            <Icon name="message" size={20} />
+            <p>Nobody has written to {spaceName} yet</p>
+            <p className="chat__empty-sub">
+              Its public page's Message door and its posts' chat doors all land here —
+              every conversation where {spaceName} is the one being written to.
+            </p>
+          </div>
+        )}
+        {!loading && !asSpace && chats.length === 0 && (
           <div className="chat__empty">
             <Icon name="message" size={20} />
             <p>No chats yet</p>
@@ -142,8 +168,8 @@ export default function Chat() {
         {msgHits.length > 0 && (
           <div className="chat__msghits">
             <p className="chat__msghits-head">In messages</p>
-            {msgHits.map((m) => {
-              const room = chats.find((c) => c.id === m.chat_id);
+            {msgHits.filter((m) => !asSpace || scoped.some((c) => c.id === m.chat_id)).map((m) => {
+              const room = scoped.find((c) => c.id === m.chat_id) ?? chats.find((c) => c.id === m.chat_id);
               return (
                 <button
                   key={m.id}
@@ -171,6 +197,7 @@ export default function Chat() {
             unread={unread.get(c.id) ?? 0}
             active={c.id === selectedId}
             onClick={() => openChat(c.id)}
+            inSpaceInbox={!!asSpace}
           />
         ))}
         {/* THE DESK, apart from your life (founder 2026-08-19): a steward's
@@ -224,7 +251,7 @@ export default function Chat() {
   );
 }
 
-function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void }) {
+function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick, inSpaceInbox = false }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void; inSpaceInbox?: boolean }) {
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
   const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
@@ -248,7 +275,7 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
           <span className="conv-row__name">
             {highlightText(chat.title, highlight)}
             {!isDirect && chat.kind !== 'space_dm' && <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>}
-            {party && !iAmVisitor && <span className="conv-row__muted"> · via {party.name}</span>}
+            {party && !iAmVisitor && !inSpaceInbox && <span className="conv-row__muted"> · via {party.name}</span>}
           </span>
           <span className="conv-row__time">{last ? formatRelative(last.created_at) : ''}</span>
         </div>
