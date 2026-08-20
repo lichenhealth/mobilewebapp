@@ -51,7 +51,7 @@ export const TAB_TEMPLATES: TabTemplate[] = [
   { id: 'faq', label: 'FAQ', icon: 'chat',
     blurb: 'The questions you answer over and over.',
     starter: 'The things people ask most.' },
-  { id: 'team', label: 'The people', icon: 'user-multiple',
+  { id: 'team', label: 'People', icon: 'user-multiple',
     blurb: 'Who does the work.',
     starter: 'Who you’ll be working with.' },
   { id: 'gallery', label: 'Gallery', icon: 'image',
