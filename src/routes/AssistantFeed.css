@@ -70,12 +70,23 @@
 }
 .afeed__thread.is-on em { color: var(--peach-deep); }
 
-/* Snapshot, hosted inside the profile thread rather than a page of its own. */
+/* Snapshot, hosted inside the profile thread rather than a page of its own —
+   a composed card in the thread's own rhythm (founder 2026-08-20: the bare
+   version read as floating text with wonky margins). */
 .snap--panel {
-  max-width: none; padding: var(--s-3) 0 var(--s-4);
-  border-bottom: 1px solid var(--bone-edge); margin-bottom: var(--s-3);
+  max-width: none;
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--s-3);
 }
-.snap--panel .snap__title { font-size: var(--t-lg); margin-top: 0; }
+.snap--panel .snap__title { font-size: var(--t-lg); margin-top: 0; margin-bottom: var(--s-1); }
+.snap--panel .snap__lead { font-size: 14px; margin-bottom: var(--s-4); }
+/* Inputs sit on the warm card — they take the page ground so they read as
+   wells, not patches of the same color. */
+.snap--panel .prof__input { background: var(--bone); }
+.snap--panel .snap__can { background: var(--bone); }
 
 /* Your page beside Claude — talk about what to change while looking at it. */
 .afeed__split { display: flex; gap: 6px; margin-bottom: var(--s-3); }
