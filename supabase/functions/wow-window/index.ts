@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     // ── The rhythm of the board (dates/dims/scores only — not the words) ──
     const postsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/care_posts?patient_id=eq.${me}&kind=eq.wow&select=created_at,dimensions,score&order=created_at.desc&limit=200`,
+      `${SUPABASE_URL}/rest/v1/care_posts?patient_id=eq.${me}&kind=eq.wow&ai_omit=is.null&select=created_at,dimensions,score&order=created_at.desc&limit=200`,
       { headers: svc },
     );
     const posts: { created_at: string; dimensions: string[]; score: number | null }[] =

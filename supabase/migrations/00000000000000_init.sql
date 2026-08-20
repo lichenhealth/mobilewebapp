@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Fjdqy0HPs9mbTT4RmNgJWTNWoEYYREAuPlOZw5e42IwS8zgdbJwdkxQnB66VBgd
+\restrict g8RCEIeppJ0yiHGBw5XeoxT6yp1qFoL2xuMR45CWGVzZfQz4sjssWSt51R44Hyp
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -5151,6 +5151,8 @@ CREATE TABLE public.care_posts (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     previews jsonb DEFAULT '[]'::jsonb NOT NULL,
     recurrence jsonb,
+    ai_omit text,
+    CONSTRAINT care_posts_ai_omit_check CHECK (((ai_omit IS NULL) OR (ai_omit = ANY (ARRAY['medical'::text, 'financial'::text, 'other'::text])))),
     CONSTRAINT care_posts_dims_valid CHECK ((dimensions <@ ARRAY['Mental'::text, 'Physical'::text, 'Spiritual'::text, 'Social'::text, 'Environmental'::text, 'Economic'::text])),
     CONSTRAINT care_posts_kind_check CHECK ((kind = ANY (ARRAY['wow'::text, 'koc'::text]))),
     CONSTRAINT care_posts_kind_shape CHECK ((((kind = 'wow'::text) AND (start_date IS NULL) AND (end_date IS NULL) AND (recurrence IS NULL)) OR ((kind = 'koc'::text) AND (score IS NULL) AND (start_date IS NOT NULL) AND (cardinality(dimensions) = 0) AND (((recurrence IS NULL) AND (end_date IS NOT NULL) AND (end_date >= start_date)) OR ((recurrence IS NOT NULL) AND ((end_date IS NULL) OR (end_date >= start_date))))))),
@@ -5616,6 +5618,8 @@ CREATE TABLE public.financial_positions (
     monthly_expenses numeric,
     needs text[] DEFAULT '{}'::text[] NOT NULL,
     obstacles text,
+    ai_omit_fields text[] DEFAULT '{}'::text[] NOT NULL,
+    CONSTRAINT financial_positions_ai_omit_fields_check CHECK ((ai_omit_fields <@ ARRAY['assets'::text, 'debt'::text, 'monthly_income'::text, 'monthly_expenses'::text, 'income_band'::text, 'household_size'::text, 'circumstances'::text, 'obstacles'::text, 'needs'::text])),
     CONSTRAINT financial_positions_household_size_check CHECK (((household_size >= 1) AND (household_size <= 20))),
     CONSTRAINT financial_positions_income_band_check CHECK ((income_band = ANY (ARRAY['under_25k'::text, '25k_50k'::text, '50k_100k'::text, '100k_200k'::text, 'over_200k'::text]))),
     CONSTRAINT financial_positions_needs_check CHECK ((needs <@ ARRAY['care'::text, 'goods'::text, 'services'::text, 'time_off'::text]))
@@ -13263,7 +13267,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Fjdqy0HPs9mbTT4RmNgJWTNWoEYYREAuPlOZw5e42IwS8zgdbJwdkxQnB66VBgd
+\unrestrict g8RCEIeppJ0yiHGBw5XeoxT6yp1qFoL2xuMR45CWGVzZfQz4sjssWSt51R44Hyp
 
 
 

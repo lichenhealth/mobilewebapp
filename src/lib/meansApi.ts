@@ -28,6 +28,23 @@ export const SUBSIDY_NEEDS = [
 ] as const;
 export type SubsidyNeed = typeof SUBSIDY_NEEDS[number]['value'];
 
+/** Every line the profile holds, so each can be withheld from AI on its own
+ *  (founder 2026-08-20). The help is real — the right intervention for a
+ *  diagnosis, a way through a financial hole — so it's available by default
+ *  and each line is the member's to hold back. */
+export const MEANS_FIELDS = [
+  { key: 'monthly_income', label: 'Monthly income' },
+  { key: 'monthly_expenses', label: 'Monthly expenses' },
+  { key: 'assets', label: 'Assets' },
+  { key: 'debt', label: 'Debt' },
+  { key: 'income_band', label: 'Household income band' },
+  { key: 'household_size', label: 'Household size' },
+  { key: 'needs', label: 'What you need' },
+  { key: 'obstacles', label: "What's in the way" },
+  { key: 'circumstances', label: 'Anything else' },
+] as const;
+export type MeansField = typeof MEANS_FIELDS[number]['key'];
+
 export interface FinancialPosition {
   profile_id: string;
   income_band: IncomeBand | null;
@@ -40,6 +57,8 @@ export interface FinancialPosition {
   monthly_income: number | null;
   monthly_expenses: number | null;
   needs: SubsidyNeed[];
+  /** Lines held back from every assistant — case by case, the member's call. */
+  ai_omit_fields: MeansField[];
   /** What money alone doesn't fix — an employer's leave policy, a lease,
    *  a licence. The part a coordinator actually works through with them. */
   obstacles: string | null;
@@ -55,7 +74,7 @@ export interface FinancialPosition {
 export async function getFinancialPosition(profileId: string): Promise<FinancialPosition | null> {
   const { data, error } = await supabase
     .from('financial_positions')
-    .select('profile_id, income_band, household_size, circumstances, assets, debt, monthly_income, monthly_expenses, needs, obstacles, care_team_visible, updated_at')
+    .select('profile_id, income_band, household_size, circumstances, assets, debt, monthly_income, monthly_expenses, needs, obstacles, ai_omit_fields, care_team_visible, updated_at')
     .eq('profile_id', profileId)
     .maybeSingle();
   if (error) return null;
@@ -67,7 +86,7 @@ export async function saveFinancialPosition(
     income_band: IncomeBand | null; household_size: number | null; circumstances: string | null;
     assets?: number | null; debt?: number | null;
     monthly_income?: number | null; monthly_expenses?: number | null;
-    needs?: SubsidyNeed[]; obstacles?: string | null;
+    needs?: SubsidyNeed[]; obstacles?: string | null; ai_omit_fields?: MeansField[];
   },
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();

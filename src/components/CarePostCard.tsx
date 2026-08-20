@@ -96,7 +96,16 @@ export default function CarePostCard({
         <span className="cpost__avatar" style={{ background: colorFor(post.author_id) }}>{monogramFor(name)}</span>
         <span className="cpost__head-text">
           <span className="cpost__author">{name}</span>
-          <span className="cpost__time">{formatRelative(post.created_at)}</span>
+          <span className="cpost__time">
+            {formatRelative(post.created_at)}
+            {/* The promise this entry is keeping, said on its face
+                (founder 2026-08-20). */}
+            {post.ai_omit && (
+              <em className="cpost__omit" title={`Held back from every assistant — sensitive ${post.ai_omit} information`}>
+                {' · '}no AI · sensitive {post.ai_omit}
+              </em>
+            )}
+          </span>
         </span>
         {post.kind === 'wow' && post.score != null && <span className="cpost__score">{post.score}%</span>}
         {canDelete && (

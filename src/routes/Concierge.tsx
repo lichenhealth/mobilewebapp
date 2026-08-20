@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
-import { getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator, INCOME_BANDS, SUBSIDY_NEEDS, bandLabel, type FinancialPosition, type SubsidyNeed } from '../lib/meansApi';
+import { getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator, INCOME_BANDS, SUBSIDY_NEEDS, MEANS_FIELDS, bandLabel, type FinancialPosition, type SubsidyNeed, type MeansField } from '../lib/meansApi';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
@@ -418,6 +418,7 @@ function MeansCard({ subjectId, me, openSignal, web }: {
   const [expenses, setExpenses] = useState('');
   const [needs, setNeeds] = useState<SubsidyNeed[]>([]);
   const [obstacles, setObstacles] = useState('');
+  const [omit, setOmit] = useState<MeansField[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   useEffect(() => {
@@ -429,7 +430,7 @@ function MeansCard({ subjectId, me, openSignal, web }: {
         setBand(r.income_band ?? ''); setHousehold(r.household_size?.toString() ?? ''); setWords(r.circumstances ?? '');
         setAssets(r.assets?.toString() ?? ''); setDebt(r.debt?.toString() ?? '');
         setIncome(r.monthly_income?.toString() ?? ''); setExpenses(r.monthly_expenses?.toString() ?? '');
-        setNeeds(r.needs ?? []); setObstacles(r.obstacles ?? '');
+        setNeeds(r.needs ?? []); setObstacles(r.obstacles ?? ''); setOmit(r.ai_omit_fields ?? []);
       }
     });
     return () => { live = false; };
@@ -567,6 +568,34 @@ function MeansCard({ subjectId, me, openSignal, web }: {
               <textarea className="means__input means__words" value={words} onChange={(e) => setWords(e.target.value)}
                 placeholder="Anything that shapes your financial picture — care costs, seasonal work, supporting family…" />
 
+              {/* WHAT CLAUDE MAY HELP WITH — case by case (founder 2026-08-20:
+                  "maybe you don't want your credit score in there, but you do
+                  want your monthly expenses, in case Claude can help you
+                  streamline your budgeting"). Switching a line off holds it
+                  back from every assistant; your care team still sees it. */}
+              <p className="means__section">What Claude may help with</p>
+              <p className="means__hint">
+                This intelligence can be worth a great deal here — the right
+                intervention, the right way through a hole. Every line is yours
+                to hold back, one at a time. Anything switched off never reaches
+                an assistant; your coordinator and care team still see it.
+                {' '}Switch AI off for all of Concierge in Profile → Privacy.
+              </p>
+              <div className="means__omit">
+                {MEANS_FIELDS.map((f) => {
+                  const held = omit.includes(f.key);
+                  return (
+                    <button type="button" key={f.key}
+                      className={'means__omit-chip' + (held ? ' is-held' : '')}
+                      aria-pressed={!held}
+                      title={held ? `${f.label} is held back from AI — tap to allow` : `Claude may use ${f.label.toLowerCase()} — tap to hold back`}
+                      onClick={() => setOmit((cur) => held ? cur.filter((x) => x !== f.key) : [...cur, f.key])}>
+                      {f.label}{held ? ' · held back' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="means__save">
                 <button className="btn btn-primary" disabled={saving}
                   onClick={() => {
@@ -579,7 +608,7 @@ function MeansCard({ subjectId, me, openSignal, web }: {
                       circumstances: words.trim() || null,
                       assets: num(assets), debt: num(debt),
                       monthly_income: num(income), monthly_expenses: num(expenses),
-                      needs, obstacles: obstacles.trim() || null,
+                      needs, obstacles: obstacles.trim() || null, ai_omit_fields: omit,
                     }).then(async () => {
                       if (firstTime) await requestFinancialCoordinator();
                       setMsg(firstTime

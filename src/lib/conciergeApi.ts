@@ -29,6 +29,8 @@ export interface CarePostPreview {
 
 export interface CarePostRow {
   id: string;
+  /** Set = no assistant reads this entry; the reason shows on the card. */
+  ai_omit?: 'medical' | 'financial' | 'other' | null;
   patient_id: string;
   author_id: string;
   kind: CareKind;
@@ -46,7 +48,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at';
+  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -211,6 +213,9 @@ export interface CarePostInput {
   startDate?: string; endDate?: string;          // koc
   recurrence?: Recurrence | null;                // koc (null = plain day/range)
   attachments: CareAttachment[]; links: CareLink[]; previews: CarePostPreview[];
+  /** 'medical' | 'financial' | 'other' — held back from every assistant,
+   *  chosen when writing (founder 2026-08-20). Absent = Claude may help. */
+  aiOmit?: 'medical' | 'financial' | 'other' | null;
 }
 export async function createCarePost(me: string, input: CarePostInput): Promise<string> {
   const recurring = input.kind === 'koc' && !!input.recurrence;
@@ -223,6 +228,8 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     end_date: input.kind === 'koc' && !recurring ? input.endDate : null,
     recurrence: input.kind === 'koc' ? (input.recurrence ?? null) : null,
     attachments: input.attachments, links: input.links, previews: input.previews,
+    // Per-entry AI omission with its reason (founder 2026-08-20).
+    ai_omit: input.aiOmit ?? null,
   };
   const { data, error } = await supabase.from('care_posts').insert(row).select('id').single();
   if (error) throw error;

@@ -39,6 +39,11 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const [range, setRange] = useState<DateRange>({ start: null, end: null }); // koc
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
+  // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20): importing a
+  // cancer scan, you say so here and no assistant ever reads this entry —
+  // you keep every detail. null = Claude may help with it, which is often
+  // the point (the right intervention for a diagnosis, a way through).
+  const [aiOmit, setAiOmit] = useState<'medical' | 'financial' | null>(null);
   const [error, setError] = useState('');
 
   const photoRef = useRef<HTMLInputElement>(null);
@@ -95,7 +100,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
         endDate: recurrence ? undefined : (range.end ?? undefined),
         recurrence: kind === 'koc' ? recurrence : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
-        links: cleanedLinks, previews,
+        links: cleanedLinks, previews, aiOmit,
       });
       back();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); setSaving(false); }
@@ -112,6 +117,25 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
       </header>
 
       {error && <p className="cedit__error">{error}</p>}
+
+      {/* Sensitive by name, held back by choice — case by case. */}
+      <div className="cedit__omit">
+        <span className="cedit__omit-lead">
+          {aiOmit
+            ? `Held back from AI — sensitive ${aiOmit} information. You keep every detail; no assistant reads this entry.`
+            : 'Claude may help with this entry — useful when you want an intervention found, or a way through. Sensitive? Hold it back:'}
+        </span>
+        <span className="cedit__omit-btns">
+          {(['medical', 'financial'] as const).map((r) => (
+            <button key={r} type="button"
+              className={'cedit__omit-btn' + (aiOmit === r ? ' is-on' : '')}
+              aria-pressed={aiOmit === r}
+              onClick={() => setAiOmit((cur) => cur === r ? null : r)}>
+              Omit from AI — sensitive {r}
+            </button>
+          ))}
+        </span>
+      </div>
 
       <div className="cedit__body">
         <textarea className="cedit__textarea" rows={4} placeholder="Write something…" value={body}
