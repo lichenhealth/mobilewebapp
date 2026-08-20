@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
 import { getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator, INCOME_BANDS, SUBSIDY_NEEDS, MEANS_FIELDS, bandLabel, type FinancialPosition, type SubsidyNeed, type MeansField } from '../lib/meansApi';
@@ -400,9 +400,9 @@ function MeansCard({ subjectId, me, openSignal, web, standalone }: {
   subjectId: string; me: string; openSignal?: number;
   /** On its own screen (/concierge/financial): no collapsed row, always open. */
   standalone?: boolean;
-  /** THE WEB COMES FIRST (founder 2026-08-20): the whole self-assessment is
-   *  the picture a coordinator needs, so the profile is gated on all six
-   *  aspects and then SHOWS them — the member never retypes their life. */
+  /** The self-assessment RIDES ALONG, never gates (founder 2026-08-20): the
+   *  answered aspects show back so nothing is retyped, and an unfinished web
+   *  invites — with a link — rather than blocking the form. */
   web?: { answered: Dimension[]; latest: Partial<Record<Dimension, { body: string; score: number | null }>> };
 }) {
   const own = subjectId === me;
@@ -456,28 +456,24 @@ function MeansCard({ subjectId, me, openSignal, web, standalone }: {
       )}
       {open && own && (
         <div className="means__body">
-          {/* THE WEB COMES FIRST (founder 2026-08-20). Not gatekeeping for
-              its own sake: the six aspects ARE the picture a coordinator
-              works from, and asking someone in crisis to retype their life
-              into a second form is exactly what the old system does. */}
-          {web && web.answered.length < WOW_DIMENSIONS.length ? (
+          {/* THE WEB TRAVELS WITH IT, but never bars the door (founder
+              2026-08-20, reversing same-day gating): someone in a financial
+              hole may need to start HERE — the form always opens, and an
+              unfinished web gets a linked invitation instead of a wall. */}
+          {web && web.answered.length < WOW_DIMENSIONS.length && (
+            <p className="means__hint means__hint--flag">
+              <Icon name="health" size={13} />
+              <span>
+                It is important to look at the causes and solutions to your
+                financial needs holistically in order to best support you.
+                Please fill out the rest of your{' '}
+                <Link className="means__web-link" to="/concierge/wow/edit">Web of Wellbeing</Link>{' '}
+                to get started.
+              </span>
+            </p>
+          )}
             <>
-              <p className="means__hint means__hint--flag">
-                <Icon name="health" size={13} />
-                <span>
-                  <strong>Your Web of Wellbeing comes first.</strong> All six
-                  aspects — {web.answered.length} of {WOW_DIMENSIONS.length} so far.
-                  A coordinator reads the whole picture, not a number: what&rsquo;s
-                  happening in your life is what makes sense of what you need.
-                </span>
-              </p>
-              <p className="means__hint">
-                Still to answer: {WOW_DIMENSIONS.filter((d) => !web.answered.includes(d)).join(', ')}.
-              </p>
-            </>
-          ) : (
-            <>
-              {web && (
+              {web && web.answered.length > 0 && (
                 <div className="means__web">
                   <p className="means__web-head">Your web, as you told it</p>
                   {WOW_DIMENSIONS.map((d) => {
@@ -626,7 +622,6 @@ function MeansCard({ subjectId, me, openSignal, web, standalone }: {
                 {msg && <span className="means__msg">{msg}</span>}
               </div>
             </>
-          )}
         </div>
       )}
 
@@ -1563,7 +1558,8 @@ export default function Concierge() {
 /** THE FINANCIAL HEALTH PROFILE, on its own screen (founder 2026-08-20:
  *  "create a financial health profile should click you through to the loan
  *  app form"). Reached from the Economic bubble of the Web-of-Wellbeing
- *  self-assessment; gated on the whole web, which it then shows back. */
+ *  self-assessment; always fillable — an unfinished web shows a linked
+ *  invitation to complete it, and answered aspects show back. */
 export function FinancialProfilePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
