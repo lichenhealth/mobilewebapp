@@ -265,21 +265,31 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   aria-expanded={expanded[s.key]}
                 >
                   <span className="side-menu__header-label">{s.title}</span>
+                  {/* A shut list must not hide what waits at its desks
+                      (2026-08-20, when admin view stopped auto-opening):
+                      the header carries the kind's summed count until the
+                      list is open and the per-space badges take over. */}
+                  {!expanded[s.key] && (() => {
+                    const sum = items.reduce((n, it) => n + it.count, 0);
+                    return sum > 0
+                      ? <span className={'side-menu__deskbadge' + (adminView ? '' : ' side-menu__deskbadge--peach')}>{sum > 9 ? '9+' : sum}</span>
+                      : null;
+                  })()}
                   {items.length > 0 && (
                     <span
                       className={
                         'side-menu__chevron' +
-                        // The arrow tells the truth about the list below it:
-                        // admin view holds every list open, so the chevron
-                        // opens with it (founder 2026-08-19 nit — it pointed
-                        // sideways over a visibly open list).
-                        (expanded[s.key] || adminView ? ' is-open' : '')
+                        // The arrow tells the truth about the list below it.
+                        // Admin view used to hold every list open; shut by
+                        // default since 2026-08-20 (founder) — both views
+                        // open on tap now.
+                        (expanded[s.key] ? ' is-open' : '')
                       }
                       aria-hidden="true"
                     />
                   )}
                 </button>
-                {(expanded[s.key] || adminView) && items.length > 0 && (
+                {expanded[s.key] && items.length > 0 && (
                   <ul className="side-menu__sub-list">
                     {items.map((item) => (
                       <li key={item.href}>
