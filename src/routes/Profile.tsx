@@ -724,11 +724,63 @@ export default function Profile() {
 
       {error && <p className="prof__error">{error}</p>}
 
+      {/* YOUR LICHEN PROFILE leads (founder 2026-08-20 consolidation):
+          who you are inside the network — name, story, how you show up. */}
+      <CollapsibleSection id="about" title="Build / edit your Lichen profile" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
+        <div className="prof__field">
+          <label className="prof__label">First name</label>
+          <input className="prof__input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Last name</label>
+          <input className="prof__input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Phone</label>
+          <input className="prof__input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
+          <p className="prof__hint">So your care team can reach you when someone&rsquo;s on call. Only your care team can see it.</p>
+        </div>
+        {/* Optional and free text — presets exclude people, and nobody should
+            have to justify the answer. Empty means they/them everywhere,
+            which is what the assistant already does (founder 2026-08-16). */}
+        <div className="prof__field">
+          <label className="prof__label">Pronouns <span className="prof__optional">optional</span></label>
+          <input className="prof__input" value={pronouns} maxLength={40}
+            onChange={(e) => setPronouns(e.target.value)} placeholder="she/her · he/him · they/them · anything you like" />
+          <p className="prof__hint">Shown on your profile, and used whenever Lichen or the assistant writes about you.</p>
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Headline</label>
+          <input className="prof__input" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Somatic practitioner & land steward" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Bio</label>
+          <textarea className="prof__textarea" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you and your work" />
+        </div>
+        <div className="prof__field">
+          <label className="prof__label">Identity</label>
+          <input
+            className="prof__input"
+            value={identity}
+            onChange={(e) => setIdentity(e.target.value)}
+            placeholder="Public identities, comma-separated — Firefighter, Veteran, Nurse…"
+          />
+          <p className="prof__hint">Shown on your public profile. Offers gifted to an identity (&ldquo;Gift to First Responders&rdquo;) will find you through these.</p>
+        </div>
+        <div className="prof__save-row">
+          <button className="btn btn-primary" onClick={saveProfile} disabled={savingProfile}>
+            {savingProfile ? 'Saving...' : 'Save'}
+          </button>
+          {profileMsg && <span className="prof__msg">{profileMsg}</span>}
+        </div>
+      </CollapsibleSection>
+
       {/* Public View content (founder 2026-08-11): the website layer of
           public tabs — managed HERE like everything else, viewed via the
-          Public View toggle. Leads the accordion, same as a space
-          backstage's Public Profile Builder. */}
-      <CollapsibleSection id="public-page" title="Public page" open={openSections.has('public-page')} onToggle={() => toggleSection('public-page')}>
+          Public View toggle. SECOND in the accordion since 2026-08-20
+          (founder consolidation): your Lichen profile first, the open-web
+          page as the add-on it is. */}
+      <CollapsibleSection id="public-page" title="Add a public page" meta="like a website, visible to the open web" open={openSections.has('public-page')} onToggle={() => toggleSection('public-page')}>
           <p className="prof__care-lead">
             This is what someone finds when they search your name or follow a link — no Lichen
             account needed. Everything deeper (recommending you, booking, messaging, your
@@ -913,54 +965,6 @@ export default function Profile() {
       </CollapsibleSection>
 
 
-      <CollapsibleSection id="about" title="About you" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
-        <div className="prof__field">
-          <label className="prof__label">First name</label>
-          <input className="prof__input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
-        </div>
-        <div className="prof__field">
-          <label className="prof__label">Last name</label>
-          <input className="prof__input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
-        </div>
-        <div className="prof__field">
-          <label className="prof__label">Phone</label>
-          <input className="prof__input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
-          <p className="prof__hint">So your care team can reach you when someone&rsquo;s on call. Only your care team can see it.</p>
-        </div>
-        {/* Optional and free text — presets exclude people, and nobody should
-            have to justify the answer. Empty means they/them everywhere,
-            which is what the assistant already does (founder 2026-08-16). */}
-        <div className="prof__field">
-          <label className="prof__label">Pronouns <span className="prof__optional">optional</span></label>
-          <input className="prof__input" value={pronouns} maxLength={40}
-            onChange={(e) => setPronouns(e.target.value)} placeholder="she/her · he/him · they/them · anything you like" />
-          <p className="prof__hint">Shown on your profile, and used whenever Lichen or the assistant writes about you.</p>
-        </div>
-        <div className="prof__field">
-          <label className="prof__label">Headline</label>
-          <input className="prof__input" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Somatic practitioner & land steward" />
-        </div>
-        <div className="prof__field">
-          <label className="prof__label">Bio</label>
-          <textarea className="prof__textarea" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you and your work" />
-        </div>
-        <div className="prof__field">
-          <label className="prof__label">Identity</label>
-          <input
-            className="prof__input"
-            value={identity}
-            onChange={(e) => setIdentity(e.target.value)}
-            placeholder="Public identities, comma-separated — Firefighter, Veteran, Nurse…"
-          />
-          <p className="prof__hint">Shown on your public profile. Offers gifted to an identity (&ldquo;Gift to First Responders&rdquo;) will find you through these.</p>
-        </div>
-        <div className="prof__save-row">
-          <button className="btn btn-primary" onClick={saveProfile} disabled={savingProfile}>
-            {savingProfile ? 'Saving...' : 'Save'}
-          </button>
-          {profileMsg && <span className="prof__msg">{profileMsg}</span>}
-        </div>
-      </CollapsibleSection>
 
       {/* Privacy: the one place that answers "who can see what, and what can
           AI assist with" (founder 2026-07-28). Settings whose subject lives
