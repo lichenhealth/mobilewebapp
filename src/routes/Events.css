@@ -127,3 +127,42 @@
 
 /* Below the icon row now (founder 2026-08-14: icons above, toggles below). */
 .evt__nav--below { margin-top: var(--s-2); }
+
+/* ── Lit Feed door + right-pushed lenses (founder 2026-08-20) ───────────── */
+.evt__action--here .evt__action-circle {
+  background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
+}
+.evt__action-push { flex: 1 1 0; min-width: var(--s-2); }
+
+/* ── The calendar rail: upcoming events by date, beside the feed ────────── */
+.evt__body { display: block; }
+.evt__agenda { display: none; }
+@media (min-width: 1024px) {
+  .evt__body {
+    display: grid; grid-template-columns: 1fr 280px;
+    gap: var(--s-5); align-items: start;
+    padding-right: var(--s-5);
+  }
+  .evt__body .evt__feed { grid-template-columns: 1fr 1fr; }
+  .evt__agenda {
+    display: flex; flex-direction: column; gap: 2px;
+    position: sticky; top: calc(var(--top-h) + var(--s-4));
+    background: var(--bone-warm); border: 1px solid var(--bone-edge);
+    border-radius: var(--r-lg); padding: var(--s-3) var(--s-3) var(--s-4);
+  }
+  .evt__agenda-head {
+    margin: 0 0 var(--s-2); padding: 0 6px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .evt__agenda-empty { margin: 0; padding: 0 6px; font-size: 13px; color: var(--ink-faint); }
+  .evt__agenda-row {
+    display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: baseline;
+    padding: 6px; border: 0; background: transparent; border-radius: var(--r-md);
+    text-align: left; cursor: pointer; font-family: inherit;
+  }
+  .evt__agenda-row:hover { background: var(--bone); }
+  .evt__agenda-date { font-family: var(--font-mono); font-size: 11px; color: var(--peach-deep); white-space: nowrap; }
+  .evt__agenda-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .evt__agenda-time { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+}

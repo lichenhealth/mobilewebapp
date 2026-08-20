@@ -183,6 +183,14 @@ export default function Events() {
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
 
+  // The calendar rail's rows: every visible event with a real upcoming date,
+  // chronological — the feed's own posts, just sorted by when.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const agenda = visible
+    .filter((p) => p.linked_event && (p.linked_event.end_date ?? p.linked_event.start_date) >= todayStr)
+    .map((p) => ({ p, ev: p.linked_event! }))
+    .sort((a, b) => a.ev.start_date.localeCompare(b.ev.start_date) || (a.ev.start_min ?? 0) - (b.ev.start_min ?? 0));
+
   const card = (p: FeedPost, eyebrow?: string) => (
     <FeedCard
       key={p.id}
@@ -273,6 +281,12 @@ export default function Events() {
                 click on your assistant and it can summarize your events"). */}
             <AssistantDoor section="events" size={36} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
             <div className="evt__action-spacer" />
+            {/* The lit Feed door — this page IS the events feed, said the way
+                Home says it (founder 2026-08-20: consistency). */}
+            <button className="evt__action evt__action--here" aria-current="page" title="The events feed — you're here">
+              <span className="evt__action-circle"><Icon name="newsfeed" size={14} /></span>
+            </button>
+            <div className="evt__action-push" />
             {/* Free / Trade / Paid read as signals, same vocabulary as
                 Marketplace's mode lenses — text + icon, no circle, a check
                 when it's on. */}
@@ -317,6 +331,7 @@ export default function Events() {
             </div>
           )}
 
+          <div className="evt__body">
           <section className="evt__feed">
             {visible.length === 0 && (scoped ? (
               <ScopeEmpty
@@ -337,6 +352,26 @@ export default function Events() {
               />
             )}
           </section>
+
+          {/* THE CALENDAR RAIL (founder 2026-08-20): upcoming events in
+              chronological order beside the feed — sort by date at a glance.
+              Desktop only; phones keep the single stream. */}
+          <aside className="evt__agenda" aria-label="Upcoming events by date">
+            <p className="evt__agenda-head">Coming up</p>
+            {agenda.length === 0 && <p className="evt__agenda-empty">Nothing scheduled ahead.</p>}
+            {agenda.map(({ p, ev }) => (
+              <button key={p.id} className="evt__agenda-row" onClick={() => navigate(`/events/${p.id}`)}>
+                <span className="evt__agenda-date">
+                  {localDate(ev.start_date).toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' })}
+                </span>
+                <span className="evt__agenda-title">{p.title || p.body.slice(0, 40)}</span>
+                {ev.start_min != null && !ev.all_day && (
+                  <span className="evt__agenda-time">{minToLabel(ev.start_min)}</span>
+                )}
+              </button>
+            ))}
+          </aside>
+          </div>
         </>
       )}
 
