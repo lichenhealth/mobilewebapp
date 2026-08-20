@@ -51,6 +51,20 @@ export default function CalendarSettings() {
   const confirmDialog = useConfirm();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+  // ON CALL IS A JOB, NOT A LIFESTYLE (founder 2026-08-19: it belongs to
+  // being on someone's care team — a first-responder-shaped duty — and
+  // shouldn't surface for everyone). The kind is offered only to active
+  // caregivers; existing on-call rows always render (data is never hidden).
+  const [isCaregiver, setIsCaregiver] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void supabase.from('care_team_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('caregiver_id', me).eq('status', 'active')
+      .then(({ count }) => { if (live) setIsCaregiver((count ?? 0) > 0); });
+    return () => { live = false; };
+  }, [me]);
   const [rules, setRules] = useState<ShareRule[]>([]);
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [myPhone, setMyPhone] = useState<string | null>(null);
@@ -174,39 +188,46 @@ export default function CalendarSettings() {
         <div className="cedit__field">
           <span className="cedit__label">My hours</span>
           <p className="cedit__hint">
-            Three kinds, because they're genuinely different hours.
+            {isCaregiver ? 'Three kinds' : 'Two kinds'}, because they're genuinely different hours.
             <strong> Work</strong> is when you'd take a booking — groups also use it
             (plus your events) to find meeting times.
             <strong> Social</strong> is when you'd welcome a chat; it's what shows your
             web that you&rsquo;re available, without you having to be in the app.
-            <strong> On call</strong> powers your care team&rsquo;s urgent coverage.
-            Anything booked takes you out of work and social hours automatically —
+            {isCaregiver && <>
+              <strong> On call</strong> powers your care team&rsquo;s urgent coverage.
+            </>}
+            {' '}Anything booked takes you out of work and social hours automatically —
             people can still message you, they just know not to expect you.
           </p>
           {windows.map((w) => (
             <div className="cset__row" key={w.id}>
-              <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
-              <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
               <span className={'cset__kind'
                 + (w.kind === 'on_call' ? ' is-oncall' : '')
                 + (w.kind === 'social' ? ' is-social' : '')}>
                 {w.kind === 'on_call' ? 'On call' : w.kind === 'social' ? 'Social' : 'Work'}
               </span>
+              <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
+              <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
               <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
             </div>
           ))}
           <div className="cset__add">
+            {/* The KIND leads (founder 2026-08-19): what these hours ARE, then
+                when. On call is offered only to active caregivers — a duty of
+                a role, not a general setting; rows someone already has always
+                render, and the option returns while any exist so they can be
+                understood and removed. */}
+            <select className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
+              <option value="available">Work</option>
+              <option value="social">Social</option>
+              {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
+            </select>
             <select className="cset__select" value={wDay} onChange={(e) => setWDay(Number(e.target.value))} aria-label="Weekday">
               {WEEKDAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
             </select>
             <TimeField value={wStart} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
             <span className="rec__lbl">to</span>
             <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
-            <select className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
-              <option value="available">Work</option>
-              <option value="social">Social</option>
-              <option value="on_call">On call</option>
-            </select>
             <button
               className="cedit__add cedit__add--sm"
               onClick={() => act(() => addAvailability(me, { weekday: wDay, startMin: wStart, endMin: wEnd, kind: wKind }))}
