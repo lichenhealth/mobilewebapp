@@ -165,24 +165,27 @@ export default function AssistantBrief() {
     }
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as Section };
-    // Bells are HISTORY, not a queue — an old one may be long since handled
-    // (founder 2026-08-19: the brief presented July's category-suggestion
-    // bells as "still waiting" weeks after they were approved). Only recent
-    // bells feed the brief; live queue truth rides in as extras below.
-    const bellCutoff = new Date(Date.now() - 14 * 864e5).toISOString();
+    // ONLY WHAT THEY HAVEN'T SEEN (founder 2026-08-19: "the assistant is
+    // aware in real time of what their member hasn't seen and needs to
+    // know"). A read bell is a seen bell — it never re-enters a brief, no
+    // matter how recent; an unread one does, no matter how old. Reading
+    // your bells shrinks this set, the fingerprint moves, and the next
+    // brief regenerates — that's the real-time part. Live queue truth
+    // (the admin desks) rides in as extras below.
     const scoped = rows.filter((r) => (scope.kind === 'global'
       || (r.space_id == null && r.section === section))
-      && r.created_at >= bellCutoff);
+      && !r.read_at);
     const relevant = scoped
       .slice(0, 25)
       .map((r) => ({
         type: r.type, title: r.title, body: (r.body ?? '').slice(0, 120),
-        unread: !r.read_at, when: r.created_at.slice(0, 10),
+        when: r.created_at.slice(0, 10),
       }));
+    // Every bell here is UNSEEN — that's the contract; say so to the model.
     // What the cache is invalidated against: which notifications feed this
     // section's brief. A new or removed one means the world has moved since
     // the cached text was written — refetch instead of showing old news.
-    return { snapshot: { notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
+    return { snapshot: { unseen_notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, section, memberId, collectionId, spacesAll]);
 
