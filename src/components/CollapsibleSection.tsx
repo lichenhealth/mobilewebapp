@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import './CollapsibleSection.css';
 
@@ -31,8 +31,24 @@ export interface CollapsibleSectionProps {
  *  or exclusive-accordion behavior. */
 export default function CollapsibleSection({ id, title, active, open, onToggle, children, meta, action, expandable = true }: CollapsibleSectionProps) {
   const canOpen = expandable;
+  // A LONG section offers the way closed at its foot too (founder
+  // 2026-08-20: "so you don't have to scroll up to close the drop down").
+  // Short sections skip it — a second chevron under four lines is noise.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [tall, setTall] = useState(false);
+  useLayoutEffect(() => {
+    if (open && canOpen && bodyRef.current) setTall(bodyRef.current.offsetHeight > 420);
+    else setTall(false);
+  }, [open, canOpen, children]);
+  const wrapUp = () => {
+    onToggle();
+    // Closing from the foot of something long: bring the header back in
+    // view, so you land where you closed it rather than mid-nowhere.
+    window.setTimeout(() => rootRef.current?.scrollIntoView({ block: 'start' }), 120);
+  };
   return (
-    <div id={id} className={'coll' + (open && canOpen ? ' is-open' : '') + (canOpen ? '' : ' is-flat')}>
+    <div id={id} ref={rootRef} className={'coll' + (open && canOpen ? ' is-open' : '') + (canOpen ? '' : ' is-flat')}>
       <div className="coll__row">
         <button className="coll__head" onClick={canOpen ? onToggle : undefined} aria-expanded={canOpen ? open : undefined} disabled={!canOpen}>
           <span className="coll__label">
@@ -52,7 +68,16 @@ export default function CollapsibleSection({ id, title, active, open, onToggle, 
           </button>
         )}
       </div>
-      {open && canOpen && <div className="coll__body">{children}</div>}
+      {open && canOpen && (
+        <div className="coll__body" ref={bodyRef}>
+          {children}
+          {tall && (
+            <button className="coll__wrapup" onClick={wrapUp} aria-label={`Collapse ${title}`} title="Wrap this back up">
+              <Icon name="chevron-right" size={13} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

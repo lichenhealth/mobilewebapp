@@ -27,3 +27,18 @@
   background: var(--peach); flex-shrink: 0;
 }
 .coll__body { padding: var(--s-1) 14px var(--s-4) 14px; }
+
+/* The way closed, at the foot of a long open section (founder 2026-08-20).
+   Same circle as the header's chevron, pointing up, hugging the right edge. */
+.coll__wrapup {
+  /* flex (block-level), so margin-left:auto right-aligns it in block flow */
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--r-full);
+  background: var(--peach-tint, var(--bone-warm));
+  border: 1px solid var(--peach); color: var(--peach-deep, var(--peach));
+  cursor: pointer; padding: 0;
+  /* display:flex makes the button block-level, so margin-left:auto
+     right-aligns it in normal block flow — no layout change to the body. */
+  margin: var(--s-3) 0 0 auto;
+}
+.coll__wrapup svg { transform: rotate(-90deg); }
