@@ -1271,3 +1271,47 @@
 }
 .means__hint--flag svg { flex-shrink: 0; margin-top: 2px; color: var(--peach-deep); }
 .means__hint--flag strong { color: var(--ink); }
+
+/* The subsidy door, inside the Economic bubble (founder 2026-08-20). */
+.selfaudit__meanslink {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--peach-deep); text-decoration: underline;
+}
+.selfaudit__meanslink:hover { color: var(--ink); }
+/* Who arrives with the profile — a promise with a keeper. */
+.means__hint--coord { display: flex; gap: 8px; align-items: flex-start; }
+.means__hint--coord strong { color: var(--ink); }
+
+/* ── Financial health profile: the loan-application shape (2026-08-20) ──── */
+.means__section {
+  margin: var(--s-4) 0 var(--s-1); font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+}
+.means__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2) var(--s-3); }
+.means__grid > span { display: flex; flex-direction: column; min-width: 0; }
+.means__needs { display: grid; gap: 6px; }
+.means__need {
+  display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: var(--bone);
+  cursor: pointer;
+}
+.means__need.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.means__need span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.means__need strong { font-size: 13px; font-weight: 500; color: var(--ink); }
+.means__need em { font-style: normal; font-size: 11.5px; color: var(--ink-soft); }
+/* Their web, pulled in — never retyped. */
+.means__web {
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: var(--s-3);
+}
+.means__web-head {
+  margin: 0 0 6px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+}
+.means__web-row { display: flex; gap: 8px; align-items: baseline; margin: 0 0 4px; min-width: 0; }
+.means__web-row em { font-style: normal; font-size: 11.5px; color: var(--peach-deep); flex: 0 0 84px; }
+.means__web-score { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); }
+.means__web-words {
+  font-size: 12px; color: var(--ink-soft); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

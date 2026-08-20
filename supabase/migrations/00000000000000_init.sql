@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rYYDc7S2x8BIA5duYRT6mdhdgjVC0cKLVQ1HZzP9odjSsNXOAbRITrJKmh2mTnj
+\restrict Fjdqy0HPs9mbTT4RmNgJWTNWoEYYREAuPlOZw5e42IwS8zgdbJwdkxQnB66VBgd
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3961,6 +3961,31 @@ end $_$;
 ALTER FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfillment text, p_note text, p_as_space uuid) OWNER TO postgres;
 
 --
+-- Name: request_financial_coordinator(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.request_financial_coordinator() RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v_me uuid := auth.uid(); v_name text;
+begin
+  if v_me is null then raise exception 'not signed in'; end if;
+  select coalesce(nullif(full_name, ''), email, 'A member') into v_name
+    from public.profiles where id = v_me;
+  insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
+  select p.id, 'home', 'financial_coordinator_wanted',
+         v_name || ' created a financial health profile',
+         'They''re asking the network for subsidy help — offer to join their care team as their financial coordinator.',
+         '/members/' || v_me::text, v_me
+    from public.profiles p where p.is_admin;
+end;
+$$;
+
+
+ALTER FUNCTION public.request_financial_coordinator() OWNER TO postgres;
+
+--
 -- Name: request_resource_booking(uuid, date, date, integer, integer, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -5585,8 +5610,15 @@ CREATE TABLE public.financial_positions (
     circumstances text,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     care_team_visible boolean DEFAULT true NOT NULL,
+    assets numeric,
+    debt numeric,
+    monthly_income numeric,
+    monthly_expenses numeric,
+    needs text[] DEFAULT '{}'::text[] NOT NULL,
+    obstacles text,
     CONSTRAINT financial_positions_household_size_check CHECK (((household_size >= 1) AND (household_size <= 20))),
-    CONSTRAINT financial_positions_income_band_check CHECK ((income_band = ANY (ARRAY['under_25k'::text, '25k_50k'::text, '50k_100k'::text, '100k_200k'::text, 'over_200k'::text])))
+    CONSTRAINT financial_positions_income_band_check CHECK ((income_band = ANY (ARRAY['under_25k'::text, '25k_50k'::text, '50k_100k'::text, '100k_200k'::text, 'over_200k'::text]))),
+    CONSTRAINT financial_positions_needs_check CHECK ((needs <@ ARRAY['care'::text, 'goods'::text, 'services'::text, 'time_off'::text]))
 );
 
 
@@ -11901,6 +11933,16 @@ GRANT ALL ON FUNCTION public.request_exchange(p_post uuid, p_mode text, p_fulfil
 
 
 --
+-- Name: FUNCTION request_financial_coordinator(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.request_financial_coordinator() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.request_financial_coordinator() TO anon;
+GRANT ALL ON FUNCTION public.request_financial_coordinator() TO authenticated;
+GRANT ALL ON FUNCTION public.request_financial_coordinator() TO service_role;
+
+
+--
 -- Name: FUNCTION request_resource_booking(p_resource uuid, p_start date, p_end date, p_start_min integer, p_end_min integer, p_note text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13221,7 +13263,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rYYDc7S2x8BIA5duYRT6mdhdgjVC0cKLVQ1HZzP9odjSsNXOAbRITrJKmh2mTnj
+\unrestrict Fjdqy0HPs9mbTT4RmNgJWTNWoEYYREAuPlOZw5e42IwS8zgdbJwdkxQnB66VBgd
 
 
 

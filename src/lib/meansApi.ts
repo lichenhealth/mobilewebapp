@@ -17,11 +17,32 @@ export type IncomeBand = typeof INCOME_BANDS[number]['value'];
 export const bandLabel = (v: string | null | undefined) =>
   INCOME_BANDS.find((b) => b.value === v)?.label ?? null;
 
+/** What someone is asking the network to help carry (founder 2026-08-20).
+ *  Time off is here because it's the one the ordinary system handles worst:
+ *  money can cover the wage and STILL not get the leave approved. */
+export const SUBSIDY_NEEDS = [
+  { value: 'care', label: 'Care', hint: 'sessions, treatment, someone to help' },
+  { value: 'goods', label: 'Goods', hint: 'food, equipment, the material things' },
+  { value: 'services', label: 'Services', hint: 'repairs, childcare, transport, trades' },
+  { value: 'time_off', label: 'Time off', hint: 'paid room to stop, heal, or care for someone' },
+] as const;
+export type SubsidyNeed = typeof SUBSIDY_NEEDS[number]['value'];
+
 export interface FinancialPosition {
   profile_id: string;
   income_band: IncomeBand | null;
   household_size: number | null;
   circumstances: string | null;
+  /** The loan-application shape, in the words people already know. All
+   *  optional — a half-answered profile is still a profile. */
+  assets: number | null;
+  debt: number | null;
+  monthly_income: number | null;
+  monthly_expenses: number | null;
+  needs: SubsidyNeed[];
+  /** What money alone doesn't fix — an employer's leave policy, a lease,
+   *  a licence. The part a coordinator actually works through with them. */
+  obstacles: string | null;
   /** Web of Wellbeing consent (founder 2026-08-11): true = active care
    *  team may read this; false = private to everyone — and the help built
    *  on it (money conversations, coaching, subsidies) can't reach them.
@@ -34,7 +55,7 @@ export interface FinancialPosition {
 export async function getFinancialPosition(profileId: string): Promise<FinancialPosition | null> {
   const { data, error } = await supabase
     .from('financial_positions')
-    .select('profile_id, income_band, household_size, circumstances, care_team_visible, updated_at')
+    .select('profile_id, income_band, household_size, circumstances, assets, debt, monthly_income, monthly_expenses, needs, obstacles, care_team_visible, updated_at')
     .eq('profile_id', profileId)
     .maybeSingle();
   if (error) return null;
@@ -42,7 +63,12 @@ export async function getFinancialPosition(profileId: string): Promise<Financial
 }
 
 export async function saveFinancialPosition(
-  fields: { income_band: IncomeBand | null; household_size: number | null; circumstances: string | null },
+  fields: {
+    income_band: IncomeBand | null; household_size: number | null; circumstances: string | null;
+    assets?: number | null; debt?: number | null;
+    monthly_income?: number | null; monthly_expenses?: number | null;
+    needs?: SubsidyNeed[]; obstacles?: string | null;
+  },
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
@@ -50,6 +76,15 @@ export async function saveFinancialPosition(
     profile_id: user.id, ...fields, updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+}
+
+/** Creating a financial health profile asks the network for a coordinator
+ *  (founder 2026-08-20). Bells platform admins, who then OFFER care the
+ *  ordinary consensual way — nothing joins a care team by itself. Called
+ *  once, when the profile first holds anything. */
+export async function requestFinancialCoordinator(): Promise<void> {
+  const { error } = await supabase.rpc('request_financial_coordinator');
+  if (error) console.warn('requestFinancialCoordinator:', error.message);
 }
 
 // ── Identity tags (PUBLIC half — fetched separately so profile screens keep

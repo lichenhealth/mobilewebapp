@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
 import HexagonRadar from '../components/HexagonRadar';
-import { getFinancialPosition, saveFinancialPosition, INCOME_BANDS, bandLabel, type FinancialPosition } from '../lib/meansApi';
+import { getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator, INCOME_BANDS, SUBSIDY_NEEDS, bandLabel, type FinancialPosition, type SubsidyNeed } from '../lib/meansApi';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
@@ -396,14 +396,28 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
  *  member's honest financial picture. Owner edits; the active care team reads
  *  (RLS enforces it). Never a score, never counted, never compared — it
  *  informs subsidies and means-aware pricing in the exchange algorithm. */
-function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
+function MeansCard({ subjectId, me, openSignal, web }: {
+  subjectId: string; me: string; openSignal?: number;
+  /** THE WEB COMES FIRST (founder 2026-08-20): the whole self-assessment is
+   *  the picture a coordinator needs, so the profile is gated on all six
+   *  aspects and then SHOWS them — the member never retypes their life. */
+  web?: { answered: Dimension[]; latest: Partial<Record<Dimension, { body: string; score: number | null }>> };
+}) {
   const own = subjectId === me;
   const [open, setOpen] = useState(false);
+  // The self-audit's Economic bubble opens this and scrolls to it.
+  useEffect(() => { if (openSignal) setOpen(true); }, [openSignal]);
   const [row, setRow] = useState<FinancialPosition | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [band, setBand] = useState<string>('');
   const [household, setHousehold] = useState('');
   const [words, setWords] = useState('');
+  const [assets, setAssets] = useState('');
+  const [debt, setDebt] = useState('');
+  const [income, setIncome] = useState('');
+  const [expenses, setExpenses] = useState('');
+  const [needs, setNeeds] = useState<SubsidyNeed[]>([]);
+  const [obstacles, setObstacles] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   useEffect(() => {
@@ -411,14 +425,21 @@ function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
     void getFinancialPosition(subjectId).then((r) => {
       if (!live) return;
       setRow(r); setLoaded(true);
-      if (r) { setBand(r.income_band ?? ''); setHousehold(r.household_size?.toString() ?? ''); setWords(r.circumstances ?? ''); }
+      if (r) {
+        setBand(r.income_band ?? ''); setHousehold(r.household_size?.toString() ?? ''); setWords(r.circumstances ?? '');
+        setAssets(r.assets?.toString() ?? ''); setDebt(r.debt?.toString() ?? '');
+        setIncome(r.monthly_income?.toString() ?? ''); setExpenses(r.monthly_expenses?.toString() ?? '');
+        setNeeds(r.needs ?? []); setObstacles(r.obstacles ?? '');
+      }
     });
     return () => { live = false; };
   }, [subjectId]);
   if (!loaded) return null;
-  const shared = !!row && (row.income_band || row.household_size || row.circumstances);
+  const shared = !!row && !!(row.income_band || row.household_size || row.circumstances
+    || row.assets != null || row.debt != null || row.monthly_income != null || row.monthly_expenses != null
+    || (row.needs && row.needs.length) || row.obstacles);
   return (
-    <div className="means">
+    <div className="means" id="financial">
       <button className="means__row" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <Icon name="dollar" size={15} />
         <span className="means__title">Financial position</span>
@@ -431,56 +452,166 @@ function MeansCard({ subjectId, me }: { subjectId: string; me: string }) {
       </button>
       {open && own && (
         <div className="means__body">
-          <p className="means__hint means__hint--flag">
-            <Icon name="dollar" size={13} />
-            <span>
-              <strong>Subsidised care asks for transparency.</strong> If you
-              want the network to help carry your costs, this is the piece that
-              lets it decide fairly. Skipping is always OK — you keep every
-              other part of Lichen; you just can&rsquo;t be subsidised on a
-              picture nobody can see.
-            </span>
-          </p>
-          <p className="means__hint">
-            Only you and your active care team can see this — never a score, never
-            public, never shown to admins or other members. Whether your care team
-            sees it at all is yours to switch in Profile → Privacy.
-          </p>
-          <label className="means__label">Household income</label>
-          <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>
-            <option value="">Prefer not to say</option>
-            {INCOME_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-          </select>
-          <label className="means__label">People in your household</label>
-          <input className="means__input" type="number" min={1} max={20} value={household}
-            onChange={(e) => setHousehold(e.target.value)} placeholder="e.g. 3" />
-          <label className="means__label">In your own words (optional)</label>
-          <textarea className="means__input means__words" value={words} onChange={(e) => setWords(e.target.value)}
-            placeholder="Anything that shapes your financial picture — care costs, seasonal work, supporting family…" />
-          <div className="means__save">
-            <button className="btn btn-primary" disabled={saving}
-              onClick={() => {
-                setSaving(true); setMsg('');
-                void saveFinancialPosition({
-                  income_band: (band || null) as FinancialPosition['income_band'],
-                  household_size: household ? Number(household) : null,
-                  circumstances: words.trim() || null,
-                }).then(() => setMsg('Saved — visible to you and your care team.'))
-                  .catch((e) => setMsg((e as Error).message))
-                  .finally(() => setSaving(false));
-              }}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            {msg && <span className="means__msg">{msg}</span>}
-          </div>
+          {/* THE WEB COMES FIRST (founder 2026-08-20). Not gatekeeping for
+              its own sake: the six aspects ARE the picture a coordinator
+              works from, and asking someone in crisis to retype their life
+              into a second form is exactly what the old system does. */}
+          {web && web.answered.length < WOW_DIMENSIONS.length ? (
+            <>
+              <p className="means__hint means__hint--flag">
+                <Icon name="health" size={13} />
+                <span>
+                  <strong>Your Web of Wellbeing comes first.</strong> All six
+                  aspects — {web.answered.length} of {WOW_DIMENSIONS.length} so far.
+                  A coordinator reads the whole picture, not a number: what&rsquo;s
+                  happening in your life is what makes sense of what you need.
+                </span>
+              </p>
+              <p className="means__hint">
+                Still to answer: {WOW_DIMENSIONS.filter((d) => !web.answered.includes(d)).join(', ')}.
+              </p>
+            </>
+          ) : (
+            <>
+              {web && (
+                <div className="means__web">
+                  <p className="means__web-head">Your web, as you told it</p>
+                  {WOW_DIMENSIONS.map((d) => {
+                    const e = web.latest[d];
+                    if (!e) return null;
+                    return (
+                      <p className="means__web-row" key={d}>
+                        <em>{d}</em>
+                        {e.score != null && <span className="means__web-score">{e.score}</span>}
+                        <span className="means__web-words">{e.body.slice(0, 120)}</span>
+                      </p>
+                    );
+                  })}
+                  <p className="means__hint">Pulled in from your self-assessment — nothing to retype.</p>
+                </div>
+              )}
+
+              <p className="means__hint means__hint--coord">
+                <Icon name="user-multiple" size={13} />
+                <span>
+                  <strong>A financial coordinator joins your care team.</strong> Saving
+                  this asks Lichen for someone whose job is exactly this piece —
+                  subsidies, money conversations, and the parts money alone
+                  doesn&rsquo;t fix. They offer, you approve like any caregiver,
+                  and you can remove them any time.
+                </span>
+              </p>
+              <p className="means__hint">
+                Only you and your active care team can see this — never a score, never
+                public, never shown to admins or other members. Whether your care team
+                sees it at all is yours to switch in Profile → Privacy.
+              </p>
+
+              <p className="means__section">Where you stand</p>
+              <div className="means__grid">
+                <span>
+                  <label className="means__label">Monthly income</label>
+                  <input className="means__input" type="number" min={0} value={income}
+                    onChange={(e) => setIncome(e.target.value)} placeholder="$" />
+                </span>
+                <span>
+                  <label className="means__label">Monthly expenses</label>
+                  <input className="means__input" type="number" min={0} value={expenses}
+                    onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
+                </span>
+                <span>
+                  <label className="means__label">Assets</label>
+                  <input className="means__input" type="number" min={0} value={assets}
+                    onChange={(e) => setAssets(e.target.value)} placeholder="$" />
+                </span>
+                <span>
+                  <label className="means__label">Debt</label>
+                  <input className="means__input" type="number" min={0} value={debt}
+                    onChange={(e) => setDebt(e.target.value)} placeholder="$" />
+                </span>
+              </div>
+              <label className="means__label">Household income band</label>
+              <select className="means__input" value={band} onChange={(e) => setBand(e.target.value)}>
+                <option value="">Prefer not to say</option>
+                {INCOME_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+              </select>
+              <label className="means__label">People in your household</label>
+              <input className="means__input" type="number" min={1} max={20} value={household}
+                onChange={(e) => setHousehold(e.target.value)} placeholder="e.g. 3" />
+
+              <p className="means__section">What you need</p>
+              <div className="means__needs">
+                {SUBSIDY_NEEDS.map((n) => {
+                  const on = needs.includes(n.value);
+                  return (
+                    <label className={'means__need' + (on ? ' is-on' : '')} key={n.value}>
+                      <input type="checkbox" checked={on}
+                        onChange={() => setNeeds((cur) => on ? cur.filter((x) => x !== n.value) : [...cur, n.value])} />
+                      <span><strong>{n.label}</strong><em>{n.hint}</em></span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <label className="means__label">What&rsquo;s in the way?</label>
+              <p className="means__hint">
+                The part money alone doesn&rsquo;t fix. Lichen can cover paid time
+                off and your employer still has to approve the leave; a repair needs
+                a landlord&rsquo;s yes. Say it here — that&rsquo;s the work your
+                coordinator does with you.
+              </p>
+              <textarea className="means__input means__words" value={obstacles} onChange={(e) => setObstacles(e.target.value)}
+                placeholder="e.g. my job allows unpaid leave but I can't afford to take it, and HR needs 30 days' notice…" />
+
+              <label className="means__label">Anything else (optional)</label>
+              <textarea className="means__input means__words" value={words} onChange={(e) => setWords(e.target.value)}
+                placeholder="Anything that shapes your financial picture — care costs, seasonal work, supporting family…" />
+
+              <div className="means__save">
+                <button className="btn btn-primary" disabled={saving}
+                  onClick={() => {
+                    setSaving(true); setMsg('');
+                    const num = (v: string) => v.trim() ? Number(v) : null;
+                    const firstTime = !shared;
+                    void saveFinancialPosition({
+                      income_band: (band || null) as FinancialPosition['income_band'],
+                      household_size: household ? Number(household) : null,
+                      circumstances: words.trim() || null,
+                      assets: num(assets), debt: num(debt),
+                      monthly_income: num(income), monthly_expenses: num(expenses),
+                      needs, obstacles: obstacles.trim() || null,
+                    }).then(async () => {
+                      if (firstTime) await requestFinancialCoordinator();
+                      setMsg(firstTime
+                        ? 'Saved — your care team can see it, and Lichen has been asked for a financial coordinator.'
+                        : 'Saved — visible to you and your care team.');
+                    })
+                      .catch((e) => setMsg((e as Error).message))
+                      .finally(() => setSaving(false));
+                  }}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                {msg && <span className="means__msg">{msg}</span>}
+              </div>
+            </>
+          )}
         </div>
       )}
+
       {open && !own && (
         <div className="means__body">
           {shared ? (
             <>
+              {row?.needs && row.needs.length > 0 && (
+                <p className="means__ro"><em>Asking for</em> {row.needs.map((n) => SUBSIDY_NEEDS.find((x) => x.value === n)?.label ?? n).join(', ')}</p>
+              )}
+              {row?.monthly_income != null && <p className="means__ro"><em>Monthly income</em> ${row.monthly_income}</p>}
+              {row?.monthly_expenses != null && <p className="means__ro"><em>Monthly expenses</em> ${row.monthly_expenses}</p>}
+              {row?.assets != null && <p className="means__ro"><em>Assets</em> ${row.assets}</p>}
+              {row?.debt != null && <p className="means__ro"><em>Debt</em> ${row.debt}</p>}
               {row?.income_band && <p className="means__ro"><em>Household income</em> {bandLabel(row.income_band)}</p>}
               {row?.household_size != null && <p className="means__ro"><em>Household</em> {row.household_size} {row.household_size === 1 ? 'person' : 'people'}</p>}
+              {row?.obstacles && <p className="means__ro means__ro-words"><em>In the way</em> {row.obstacles}</p>}
               {row?.circumstances && <p className="means__ro means__ro-words">{row.circumstances}</p>}
             </>
           ) : (
@@ -513,7 +644,7 @@ function ConciergeEmpty({ icon, title, sub, action }: {
  *  authored by you; skipped ones simply wait. Economic words live here like
  *  any other dimension — the structured Financial position card stays its
  *  own separate, skippable thing. */
-function SelfAudit({ me, onDone }: { me: string; onDone: () => void }) {
+function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void; onOpenMeans: () => void }) {
   const blank = () => Object.fromEntries(
     WOW_DIMENSIONS.map((d) => [d, { text: '', score: null as number | null }]),
   ) as Record<Dimension, { text: string; score: number | null }>;
@@ -562,20 +693,27 @@ function SelfAudit({ me, onDone }: { me: string; onDone: () => void }) {
             onChange={(e) => set(d, { text: e.target.value })}
             placeholder={`In your own words — how is your ${d.toLowerCase()} wellbeing right now?`}
           />
+          {/* The door to the structured piece lives IN the bubble it belongs
+              to (founder 2026-08-20) — words here are always just yours to
+              give; the subsidy ask is a separate, deliberate step. */}
           {d === 'Economic' && (
             <p className="selfaudit__fine">
-              Your words here are always just yours to give. The structured
-              Financial position card above is separate and skippable — without
-              it you can&rsquo;t take part in the rebalancing economy, and your
-              care team can&rsquo;t help with that piece.
+              In need of subsidies within the network?{' '}
+              <button type="button" className="selfaudit__meanslink" onClick={onOpenMeans}>
+                Create a financial health profile
+              </button>
             </p>
           )}
         </div>
       ))}
       {error && <p className="selfaudit__error">{error}</p>}
+      {/* No dead button (founder 2026-08-20: "Answer any aspect to begin
+          doesn't go anywhere and is misleading") — the save appears when
+          there is something to save. */}
+      {touched.length > 0 && (
       <button
         className="btn btn-primary selfaudit__save"
-        disabled={saving || touched.length === 0}
+        disabled={saving}
         onClick={() => {
           setSaving(true); setError('');
           void (async () => {
@@ -597,10 +735,9 @@ function SelfAudit({ me, onDone }: { me: string; onDone: () => void }) {
           })();
         }}
       >
-        {saving ? 'Weaving it in…'
-          : touched.length === 0 ? 'Answer any aspect to begin'
-          : `Save your evaluation (${touched.length} of 6)`}
+        {saving ? 'Weaving it in…' : `Save your evaluation (${touched.length} of 6)`}
       </button>
+      )}
     </section>
   );
 }
@@ -956,6 +1093,8 @@ export default function Concierge() {
   // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
   const weekEnd = weekDays(weekStart)[6].iso;
   const [boardNonce, setBoardNonce] = useState(0);
+  // Bumped by the self-audit's Economic bubble to open the financial profile.
+  const [meansOpen, setMeansOpen] = useState(0);
   const [careSettings, setCareSettings] = useState<CareSettings | null>(null);
   const [tuning, setTuning] = useState(false);
   useEffect(() => {
@@ -1195,6 +1334,16 @@ export default function Concierge() {
       {/* Active tab content */}
       {activeTab === 'wow' && (() => {
         const scores = computeWowScores(wowPosts, new Date(), wowWindow);
+        // The member's OWN answers, latest per aspect — the gate for the
+        // financial profile and the picture it shows (founder 2026-08-20).
+        const mine = wowPosts.filter((p) => p.author_id === subjectId);
+        const latest: Partial<Record<Dimension, { body: string; score: number | null }>> = {};
+        for (const p of [...mine].reverse()) {
+          for (const d of p.dimensions) if (!latest[d] && (p.body.trim() || p.score != null)) {
+            latest[d] = { body: p.body, score: p.score };
+          }
+        }
+        const ownWeb = { answered: WOW_DIMENSIONS.filter((d) => !!latest[d]), latest };
         const feed = wowFilter === 'All' ? wowPosts : wowPosts.filter((p) => p.dimensions.includes(wowFilter));
         return (
           <>
@@ -1268,14 +1417,21 @@ export default function Concierge() {
                 2026-08-14) — it shows until you've authored something
                 yourself, even if the care team spoke first. */}
             {dataReady && !isClientView && !wowPosts.some((p) => p.author_id === me) && (
-              <SelfAudit me={me} onDone={() => setBoardNonce((n) => n + 1)} />
+              <SelfAudit
+                me={me}
+                onDone={() => setBoardNonce((n) => n + 1)}
+                onOpenMeans={() => {
+                  setMeansOpen((n) => n + 1);
+                  window.setTimeout(() => document.getElementById('financial')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+                }}
+              />
             )}
             {/* The financial picture sits UNDER the self-evaluation (founder
                 2026-08-15): it's the sixth aspect's structured companion, not
                 a banner over the whole board — and it carries the honest
                 condition for subsidised care. */}
             {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (
-              <MeansCard subjectId={subjectId} me={me} />
+              <MeansCard subjectId={subjectId} me={me} openSignal={meansOpen} web={ownWeb} />
             )}
             {dataReady && isClientView && wowPosts.length === 0 && (
               <ConciergeEmpty icon="health" title="Web of Wellbeing"
