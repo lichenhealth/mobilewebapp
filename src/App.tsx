@@ -9,7 +9,7 @@ import Terms from './routes/Terms';
 import Bookings from './routes/Bookings';
 import BookSession from './routes/BookSession';
 import Marketplace from './routes/Marketplace';
-import Concierge from './routes/Concierge';
+import Concierge, { FinancialProfilePage } from './routes/Concierge';
 import Caregiver from './routes/Caregiver';
 import CarePostComposer from './routes/CarePostComposer';
 import Directory from './routes/Directory';
@@ -244,6 +244,7 @@ export default function App() {
           } />
           <Route path="/home"      element={<Home />} />
           <Route path="/concierge"      element={<Concierge />} />
+          <Route path="/concierge/financial" element={<FinancialProfilePage />} />
           <Route path="/concierge/client/:patientId"           element={<Concierge />} />
           {/* No :patientId = your own board — the WOW self-entry door. */}
           <Route path="/concierge/wow/edit" element={<CarePostComposer kind="wow" />} />

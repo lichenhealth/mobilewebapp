@@ -396,16 +396,17 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
  *  member's honest financial picture. Owner edits; the active care team reads
  *  (RLS enforces it). Never a score, never counted, never compared — it
  *  informs subsidies and means-aware pricing in the exchange algorithm. */
-function MeansCard({ subjectId, me, openSignal, web }: {
+function MeansCard({ subjectId, me, openSignal, web, standalone }: {
   subjectId: string; me: string; openSignal?: number;
+  /** On its own screen (/concierge/financial): no collapsed row, always open. */
+  standalone?: boolean;
   /** THE WEB COMES FIRST (founder 2026-08-20): the whole self-assessment is
    *  the picture a coordinator needs, so the profile is gated on all six
    *  aspects and then SHOWS them — the member never retypes their life. */
   web?: { answered: Dimension[]; latest: Partial<Record<Dimension, { body: string; score: number | null }>> };
 }) {
   const own = subjectId === me;
-  const [open, setOpen] = useState(false);
-  // The self-audit's Economic bubble opens this and scrolls to it.
+  const [open, setOpen] = useState(!!standalone);
   useEffect(() => { if (openSignal) setOpen(true); }, [openSignal]);
   const [row, setRow] = useState<FinancialPosition | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -440,10 +441,11 @@ function MeansCard({ subjectId, me, openSignal, web }: {
     || row.assets != null || row.debt != null || row.monthly_income != null || row.monthly_expenses != null
     || (row.needs && row.needs.length) || row.obstacles);
   return (
-    <div className="means" id="financial">
+    <div className={'means' + (standalone ? ' means--page' : '')} id="financial">
+      {!standalone && (
       <button className="means__row" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <Icon name="dollar" size={15} />
-        <span className="means__title">Financial position</span>
+        <span className="means__title">Financial health profile</span>
         <span className="means__state">
           {row && row.care_team_visible === false
             ? 'private — only you'
@@ -451,6 +453,7 @@ function MeansCard({ subjectId, me, openSignal, web }: {
         </span>
         <Icon name="chevron-right" size={13} />
       </button>
+      )}
       {open && own && (
         <div className="means__body">
           {/* THE WEB COMES FIRST (founder 2026-08-20). Not gatekeeping for
@@ -1122,8 +1125,7 @@ export default function Concierge() {
   // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
   const weekEnd = weekDays(weekStart)[6].iso;
   const [boardNonce, setBoardNonce] = useState(0);
-  // Bumped by the self-audit's Economic bubble to open the financial profile.
-  const [meansOpen, setMeansOpen] = useState(0);
+
   const [careSettings, setCareSettings] = useState<CareSettings | null>(null);
   const [tuning, setTuning] = useState(false);
   useEffect(() => {
@@ -1449,18 +1451,20 @@ export default function Concierge() {
               <SelfAudit
                 me={me}
                 onDone={() => setBoardNonce((n) => n + 1)}
-                onOpenMeans={() => {
-                  setMeansOpen((n) => n + 1);
-                  window.setTimeout(() => document.getElementById('financial')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
-                }}
+                onOpenMeans={() => navigate('/concierge/financial')}
               />
             )}
             {/* The financial picture sits UNDER the self-evaluation (founder
                 2026-08-15): it's the sixth aspect's structured companion, not
                 a banner over the whole board — and it carries the honest
                 condition for subsidised care. */}
-            {dataReady && (wowFilter === 'All' || wowFilter === 'Economic') && (
-              <MeansCard subjectId={subjectId} me={me} openSignal={meansOpen} web={ownWeb} />
+            {/* THE OWNER'S FORM MOVED OUT (founder 2026-08-20): "create a
+                financial health profile should click you through to the loan
+                app form" — it's /concierge/financial now, not a bubble at the
+                foot of the board. What stays here is the READ side: a
+                caregiver looking at their client's picture. */}
+            {dataReady && isClientView && (
+              <MeansCard subjectId={subjectId} me={me} web={ownWeb} />
             )}
             {dataReady && isClientView && wowPosts.length === 0 && (
               <ConciergeEmpty icon="health" title="Web of Wellbeing"
@@ -1551,6 +1555,51 @@ export default function Concierge() {
 
       {activeTab === 'urgent' && <UrgentCare subjectId={subjectId} me={me} />}
       {activeTab === 'team' && <CareTeamDirectory subjectId={subjectId} me={me} />}
+    </div>
+  );
+}
+
+
+/** THE FINANCIAL HEALTH PROFILE, on its own screen (founder 2026-08-20:
+ *  "create a financial health profile should click you through to the loan
+ *  app form"). Reached from the Economic bubble of the Web-of-Wellbeing
+ *  self-assessment; gated on the whole web, which it then shows back. */
+export function FinancialProfilePage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const me = user?.id ?? '';
+  const [posts, setPosts] = useState<CarePostRow[]>([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadCarePosts(me, 'wow').then((rows) => { if (live) { setPosts(rows); setReady(true); } });
+    return () => { live = false; };
+  }, [me]);
+
+  const latest: Partial<Record<Dimension, { body: string; score: number | null }>> = {};
+  for (const p of [...posts].filter((p) => p.author_id === me).reverse()) {
+    for (const d of p.dimensions) if (!latest[d] && (p.body.trim() || p.score != null)) {
+      latest[d] = { body: p.body, score: p.score };
+    }
+  }
+  const web = { answered: WOW_DIMENSIONS.filter((d) => !!latest[d]), latest };
+
+  if (!me) return null;
+  return (
+    <div className="cedit">
+      <header className="cedit__head">
+        <button className="conc__back" onClick={() => navigate('/concierge')} aria-label="Back">
+          <Icon name="arrow-left" size={18} />
+        </button>
+        <h1 className="cedit__title">Financial health profile</h1>
+      </header>
+      <p className="means__pagelead">
+        What the network needs in order to help carry your costs — and what
+        money alone won&rsquo;t fix. Only you and your active care team ever see it.
+      </p>
+      {!ready ? <p className="conc__team-muted">Loading…</p>
+        : <MeansCard subjectId={me} me={me} web={web} standalone />}
     </div>
   );
 }

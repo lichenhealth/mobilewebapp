@@ -1336,3 +1336,7 @@
   border: 1px solid var(--peach); background: var(--peach-tint); font-size: 12px; color: var(--ink);
 }
 .means__omit-chip.is-held { border-color: var(--bone-edge); background: var(--bone); color: var(--ink-faint); text-decoration: line-through; }
+/* The profile on its own screen — no collapsed row, it IS the page. */
+.means--page { border: 0; background: transparent; padding: 0; }
+.means--page .means__body { padding: 0 var(--s-4) var(--s-8); }
+.means__pagelead { margin: 0 var(--s-4) var(--s-3); font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
