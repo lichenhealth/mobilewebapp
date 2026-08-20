@@ -437,7 +437,13 @@ export default function Profile() {
       .then(({ data }) => {
         const r = data as { contact?: ContactInfo | null; public_page?: boolean; page?: PageMeta | null; handle?: string | null } | null;
         if (r) {
-          setContact(r.contact ?? {}); setPublicPage(!!r.public_page); setPageMeta(r.page ?? {});
+          // Default CHECKED for a page not yet begun (founder 2026-08-20:
+          // "the entire point of a public profile is to be findable") —
+          // publishing still only happens when they press Save, and the DB
+          // default stays false, so a member who never opens this section
+          // exposes nothing. An explicit earlier choice always wins.
+          const untouched = !r.public_page && !r.handle && (!r.page || Object.keys(r.page).length === 0);
+          setContact(r.contact ?? {}); setPublicPage(untouched ? true : !!r.public_page); setPageMeta(r.page ?? {});
           setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
         }
       });
@@ -798,9 +804,9 @@ export default function Profile() {
             <span>
               <strong>Publish my page to the open web</strong>
               <em>
-                Off by default. When on, your name, headline, story, offerings and the contact
-                details below can be read by anyone — including search engines. Your location,
-                calendar, messages and everything else stay exactly as private as they are now.
+                When on, your name, headline, story, offerings and the contact details you add
+                below can be read by anyone — including search engines. Your Lichen settings
+                (e.g. location, calendar, messages, etc) stay private.
               </em>
             </span>
           </label>
