@@ -229,7 +229,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
       })}
       </div>
 
-      {!adding && spare.length > 0 && (
+      {!adding && (
         <button className="btn ptabs__add" onClick={() => setAdding(true)}>
           <Icon name="plus" size={14} /> Add a tab
         </button>
@@ -237,6 +237,22 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
 
       {adding && (
         <div className="ptabs__picker">
+          {/* A tab of your own (founder 2026-08-20): name it, write it — the
+              same Write editor every template tab gets, and the public page
+              renders it like any other. Claude can make these too. */}
+          <button className="ptabs__pick" key="blank"
+            onClick={() => {
+              const id = 'custom-' + Math.random().toString(36).slice(2, 8);
+              onChange([...tabs, { id, label: '' }]);
+              setAdding(false);
+              setOpenId(id);
+            }}>
+            <span className="ptabs__icon"><Icon name="plus" size={15} /></span>
+            <span className="ptabs__pick-body">
+              <strong>Blank tab</strong>
+              <em>Name it and write it yourself — anything your page needs.</em>
+            </span>
+          </button>
           {spare.map((tpl) => (
             <button className="ptabs__pick" key={tpl.id}
               onClick={() => {
@@ -255,9 +271,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
         </div>
       )}
 
-      {spare.length === 0 && tabs.length === TAB_TEMPLATES.length && (
-        <p className="ptabs__note">Every tab is on your page.</p>
-      )}
+
     </div>
   );
 }

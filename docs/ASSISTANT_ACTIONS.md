@@ -129,3 +129,16 @@ creating a session type without hours must be reported as such.
 Verified end-to-end 2026-08-19: one conversational ask produced the
 social window + session type, correctly, with the no-work-hours caveat
 in the report.
+
+
+## Custom page tabs (2026-08-20)
+
+`set_page_tab` joins the profile tools: create or rewrite ANY tab by its
+title ("My horses", "Seasonal Rhythms"), lead + body; empty body+lead
+removes a written tab; built-ins (about/services/goods/contact/gallery)
+refuse — they fill themselves. Custom tabs are ordinary `page.tabs` rows
+(`custom-<rand>` ids), so THE TWO MODES ARE ONE DOCUMENT: what Claude
+writes appears in the manual editor's same Write fields (PageTabsEditor,
+which also gained a "Blank tab" option), and both render on the public
+page like any template tab. Verified round-trip: a hand-made tab
+rewritten by Claude by title, a Claude-made tab editable by hand.

@@ -121,6 +121,19 @@ const EDIT_TOOLS = [
       required: ['category_ids'],
     },
   },
+  {
+    name: 'set_page_tab',
+    description: 'Create or rewrite a TAB on their public page — any tab they can name ("My horses", "Retreats 2027"), not just the standard set. Matches an existing tab by its title (case-insensitive); otherwise creates a new custom tab. lead is the first line under the heading; body is the rest, paragraphs separated by blank lines. Passing an empty body AND empty lead REMOVES a written tab (built-in tabs like About/Services/Contact fill themselves and cannot be written or removed here). Everything you write appears in their manual editor too — it is the same page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The tab name as shown to visitors.' },
+        lead: { type: 'string', description: 'One first line. Optional.' },
+        body: { type: 'string', description: 'The tab text, blank lines between paragraphs. Empty (with empty lead) removes the tab.' },
+      },
+      required: ['title', 'body'],
+    },
+  },
 ];
 
 // CALENDAR TOOLS (founder 2026-08-19, rung 1 of "Claude codes with members"):
@@ -462,6 +475,37 @@ Deno.serve(async (req) => {
         ok: true, unknown: unknown.length ? unknown : undefined,
         change: `${name === 'add_categories' ? 'added' : 'removed'} ${names}`,
       };
+    }
+
+    if (name === 'set_page_tab') {
+      const title = String(input.title ?? '').trim().slice(0, 60);
+      if (!title) return { ok: false, error: 'A tab needs a name.' };
+      const lead = String(input.lead ?? '').trim();
+      const bodyText = String(input.body ?? '').trim();
+      const BUILT_IN = ['about', 'services', 'goods', 'contact', 'gallery'];
+      const { page } = await readPage();
+      const tabs = (Array.isArray(page.tabs) ? page.tabs : []) as { id: string; label?: string; lead?: string; body?: string }[];
+      const norm = (x: string) => x.toLowerCase().trim();
+      const hit = tabs.find((t) => norm(t.label ?? '') === norm(title) || norm(t.id) === norm(title));
+      if (hit && BUILT_IN.includes(hit.id)) {
+        return { ok: false, error: `"${title}" is a built-in tab — it fills itself from their profile and cannot be written or removed here.` };
+      }
+      if (!bodyText && !lead) {
+        if (!hit) return { ok: false, error: `No tab named "${title}" to remove.` };
+        page.tabs = tabs.filter((t) => t !== hit);
+        await patchMe({ page });
+        return { ok: true, previous: hit.body ?? null, change: `removed the "${hit.label ?? hit.id}" tab` };
+      }
+      if (hit) {
+        const previous = { lead: hit.lead ?? null, body: hit.body ?? null };
+        hit.label = title; hit.lead = lead || undefined; hit.body = bodyText || undefined;
+        await patchMe({ page });
+        return { ok: true, previous, change: `rewrote the "${title}" tab`, note: 'Tell them what it said before if it held anything.' };
+      }
+      const id = 'custom-' + Math.random().toString(36).slice(2, 8);
+      page.tabs = [...tabs, { id, label: title, lead: lead || undefined, body: bodyText || undefined }];
+      await patchMe({ page });
+      return { ok: true, previous: null, change: `created the "${title}" tab and put it on their page` };
     }
 
     // ── Calendar tools (rung 1, founder 2026-08-19) — sender-scoped, no targets.
