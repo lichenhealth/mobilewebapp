@@ -165,8 +165,14 @@ export default function AssistantBrief() {
     }
     const scope: Scope = section === 'home'
       ? { kind: 'global' } : { kind: 'section', section: section as Section };
-    const scoped = rows.filter((r) => scope.kind === 'global'
-      || (r.space_id == null && r.section === section));
+    // Bells are HISTORY, not a queue — an old one may be long since handled
+    // (founder 2026-08-19: the brief presented July's category-suggestion
+    // bells as "still waiting" weeks after they were approved). Only recent
+    // bells feed the brief; live queue truth rides in as extras below.
+    const bellCutoff = new Date(Date.now() - 14 * 864e5).toISOString();
+    const scoped = rows.filter((r) => (scope.kind === 'global'
+      || (r.space_id == null && r.section === section))
+      && r.created_at >= bellCutoff);
     const relevant = scoped
       .slice(0, 25)
       .map((r) => ({
@@ -364,6 +370,22 @@ export default function AssistantBrief() {
           }));
           extras.where_you_already_are = all.filter((sp) => mineIds.has(sp.id)).map((sp) => sp.name);
           all.forEach((sp) => found.push({ label: sp.name, to: `/spaces/${sp.id}` }));
+        }
+        if (section === 'home' || section === 'profile') {
+          // The LIVE state of the admin desks — so the model reports the
+          // queue's truth, never a bell's memory. RLS returns nothing to
+          // non-admins; zeroes are stated so "all clear" is sayable.
+          const [sugg, knocks] = await Promise.all([
+            supabase.from('category_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+            supabase.from('join_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+          ]);
+          if (sugg.count !== null || knocks.count !== null) {
+            extras.admin_desks_right_now = {
+              note: 'This is the CURRENT queue state, checked just now. If a notification mentions an item not counted here, it was already handled — never present it as waiting.',
+              pending_category_suggestions: sugg.count ?? 0,
+              people_knocking_to_join: knocks.count ?? 0,
+            };
+          }
         }
         if (section === 'market' || section === 'home') {
           const { data: mine } = await supabase.from('posts')
