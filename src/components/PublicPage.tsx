@@ -35,6 +35,10 @@ export type FeedRenderCtx = {
 export interface PageMeta {
   tagline?: string;
   story?: string;
+  /** A live page with the link, but search engines asked to leave it alone
+   *  (founder 2026-08-20: "a functional web page to send to people" without
+   *  "a presence on Google"). Rendered as meta robots noindex. */
+  noindex?: boolean;
   /** What Home shows instead of the story's opening (founder 2026-08-11:
    *  "a smart summary… versus just the first part of the story"). Written
    *  by the owner or drafted by Claude; falls back to the first two
@@ -166,6 +170,17 @@ export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
   // Lichen doors cross back to Lichen's own origin when this page is served
   // from a member's custom domain.
+  // Ask crawlers to leave a noindex page alone. Client-side meta is honored
+  // by the major engines' renderers; api/page.ts adds it server-side too for
+  // the share routes it covers.
+  useEffect(() => {
+    if (!props.page.noindex) return;
+    const m = document.createElement('meta');
+    m.name = 'robots'; m.content = 'noindex';
+    document.head.appendChild(m);
+    return () => { m.remove(); };
+  }, [props.page.noindex]);
+
   const go = (path: string) => {
     const u = appUrl(path);
     if (u.startsWith('http')) window.location.href = u; else navigate(u);

@@ -811,6 +811,20 @@ export default function Profile() {
             </span>
           </label>
 
+          {publicPage && (
+            <label className="prof__consent">
+              <input type="checkbox" checked={!!pageMeta.noindex}
+                onChange={(e) => setPageMeta((m) => ({ ...m, noindex: e.target.checked || undefined }))} />
+              <span>
+                <strong>Hide my page from search engines</strong>
+                <em>
+                  For when you want a functional web page to send to people, without building
+                  a presence on Google and the rest. Anyone with your link can still open it.
+                </em>
+              </span>
+            </label>
+          )}
+
           <div className="prof__field">
             <label className="prof__label">Your address</label>
             <div className="prof__handle">

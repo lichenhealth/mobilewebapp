@@ -24,8 +24,8 @@ const esc = (s: string) =>
 
 async function fetchRow(kind: 'spaces' | 'profiles', id: string) {
   const cols = kind === 'spaces'
-    ? 'name,kind,description,avatar_url,location,contact'
-    : 'full_name,headline,bio,avatar_url,identity_tags,contact';
+    ? 'name,kind,description,avatar_url,location,contact,page'
+    : 'full_name,headline,bio,avatar_url,identity_tags,contact,page';
   const r = await fetch(
     `${SUPABASE_URL}/rest/v1/${kind}?id=eq.${encodeURIComponent(id)}&select=${cols}`,
     { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } },
@@ -44,6 +44,7 @@ export default async function handler(req: Request): Promise<Response> {
   let title = 'Lichen — a community that heals, grows and creates a better future, together';
   let desc = 'A member-run network for care, work, offerings, events, places, and a fairer economy.';
   let image = `${SITE}/icons/icon-512.png`;
+  let noindex = false;
 
   if (m) {
     const row = await fetchRow(m[1] === 'spaces' ? 'spaces' : 'profiles', m[2]);
@@ -59,6 +60,7 @@ export default async function handler(req: Request): Promise<Response> {
         desc = (body ? body.slice(0, 180) : `${name} on Lichen`) + where;
         if (row.avatar_url) image = row.avatar_url;
       }
+      noindex = !!(row.page && (row.page as { noindex?: boolean }).noindex);
     }
   }
 
@@ -71,6 +73,9 @@ export default async function handler(req: Request): Promise<Response> {
     `<meta property="og:image" content="${esc(image)}" />`,
     `<meta property="og:url" content="${esc(SITE + url.pathname)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
+    // A published-but-unlisted page (page.noindex): served to anyone with
+    // the link, but crawlers asked to leave it alone (founder 2026-08-20).
+    ...(noindex ? ['<meta name="robots" content="noindex" />'] : []),
     `<link rel="canonical" href="${esc(SITE + url.pathname)}" />`,
   ].join('\n    ');
 
