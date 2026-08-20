@@ -1258,8 +1258,8 @@ export default function Profile() {
             ? 'No one on your care team yet.'
             : `${myTeam.length} ${myTeam.length === 1 ? 'person' : 'people'} on your care team.`}
         </p>
-        <button className="prof__care-dash" onClick={() => navigate('/concierge/team?from=profile')}>
-          Manage my care team
+        <button className="prof__care-dash" onClick={() => navigate('/concierge/team?from=profile&manage=1')}>
+          Manage my Concierge profile
           <span aria-hidden="true"> →</span>
         </button>
 

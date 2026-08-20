@@ -612,6 +612,13 @@ function SelfAudit({ me, onDone }: { me: string; onDone: () => void }) {
 function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string }) {
   const navigate = useNavigate();
   const managing = !!me && subjectId === me;
+  // ADMIN vs LICHEN view (founder 2026-08-20): living your care team is a
+  // LIST — the people who hold you, calm. Tending it (invite, approve,
+  // remove) is admin work, behind the same toggle the rest of the platform
+  // uses. ?manage=1 arrives already wearing the admin hat.
+  const [searchParams] = useSearchParams();
+  const [adminMode, setAdminMode] = useState(() => searchParams.get('manage') === '1');
+  const admin = managing && adminMode;
 
   const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
   const [links, setLinks] = useState<CareLink[]>([]);
@@ -709,16 +716,28 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
 
   return (
     <section className="conc__team">
+      {managing && (
+        <div className="view-toggle-row">
+          <span className="view-toggle" role="group" aria-label="Care team view">
+            <button className={'view-toggle__side view-toggle__side--admin' + (adminMode ? ' is-on' : '')}
+              onClick={() => setAdminMode(true)}>Admin</button>
+            <button className={'view-toggle__side' + (!adminMode ? ' is-on' : '')}
+              onClick={() => setAdminMode(false)}>Lichen view</button>
+          </span>
+        </div>
+      )}
       <p className="conc__team-lead">
-        {managing
+        {admin
           ? 'The people who help care for you. Invite by email — they approve before joining.'
-          : 'The people actively caring here. Tap a name for their profile.'}
+          : managing
+            ? 'The people who hold you. Admin is where the team is tended.'
+            : 'The people actively caring here. Tap a name for their profile.'}
       </p>
       {!ready && <p className="conc__team-muted">Loading…</p>}
 
       {ready && activeRows.length === 0 && pending.length === 0 && invites.length === 0 && (
         <p className="conc__team-muted">
-          {managing ? 'No one on your care team yet — invite your first caregiver below.'
+          {admin ? 'No one on your care team yet — invite your first caregiver below.'
             : 'No active care team yet.'}
         </p>
       )}
@@ -745,7 +764,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
           <span className="conc__team-actions">
             {row.rich?.phone && <a className="btn conc__team-btn" href={`tel:${row.rich.phone}`}>Call</a>}
             {row.rich?.phone && <a className="btn conc__team-btn" href={`sms:${row.rich.phone}`}>Text</a>}
-            {managing && (
+            {admin && (
               <button className="btn conc__team-btn" disabled={busy}
                 onClick={() => { void act(() => removeCare(row.linkId)); }}>Remove</button>
             )}
@@ -753,7 +772,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
         </div>
       ))}
 
-      {ready && managing && pending.map((l) => {
+      {ready && admin && pending.map((l) => {
         const incoming = l.initiated_by !== me;
         return (
           <div className="conc__team-row" key={l.id}>
@@ -779,7 +798,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
         );
       })}
 
-      {ready && managing && invites.map((i) => (
+      {ready && admin && invites.map((i) => (
         <div className="conc__team-row" key={i.id}>
           <span className="conc__team-who conc__team-who--static">
             <span className="urgent__avatar urgent__avatar--sm"
@@ -800,7 +819,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
         </div>
       ))}
 
-      {ready && managing && (
+      {ready && admin && (
         <div className="conc__team-addwrap">
           <div className="conc__team-add">
             <input className="conc__team-input" value={email}
