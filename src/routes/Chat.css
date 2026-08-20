@@ -398,13 +398,25 @@
    inline via ChatConversation (the same self-contained component
    ChatThread and Concierge's care tab already reuse) instead. ────── */
 @media (min-width: 1024px) {
-  .chat { display: grid; grid-template-columns: 380px 1fr; align-items: start; }
-  .chat__list-pane { min-width: 0; }
-  .chat__thread-pane {
-    position: sticky;
-    top: calc(var(--top-h) + var(--s-6));
-    align-self: start;
+  /* Signal's wisdom (founder 2026-08-19): the pane under the cursor scrolls,
+     the other holds still. No JS — the grid takes the viewport's height and
+     each pane is its own scroll container, so native wheel routing does the
+     rest. (Before this, the thread pane HAD a height but its .conv child was
+     flex:1 inside a non-flex parent — never bounded, so messages never
+     overflowed internally and the wheel fell through to the page.) */
+  .chat {
+    display: grid; grid-template-columns: 380px 1fr;
     height: calc(100vh - var(--top-h) - var(--s-6));
+    overflow: hidden;
+  }
+  .chat__list-pane {
+    min-width: 0; min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .chat__thread-pane {
+    min-height: 0;
+    display: flex; flex-direction: column;
     border-left: 1px solid var(--bone-edge);
     background: var(--bone);
   }
