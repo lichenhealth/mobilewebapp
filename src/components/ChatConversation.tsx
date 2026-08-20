@@ -260,7 +260,7 @@ export default function ChatConversation({
   }
 
   const memberList = Object.values(members);
-  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party);
+  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId);
 
   return (
     <div className="conv">
@@ -393,7 +393,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
                (founder 2026-08-19: the single brain read flat; the intro
                keeps its side-by-side row). Fixed order: member, orange, blue. */
             <div className="thread__head-help" aria-hidden>
-              {helpPartyOrder(members).slice(0, 3).map((mem, i) => (
+              {helpPartyOrder(members, chat.helpMemberId).slice(0, 3).map((mem, i) => (
                 mem.avatarUrl
                   ? <img key={mem.profile_id} src={mem.avatarUrl} alt="" style={{ zIndex: i + 1 }} />
                   : <span key={mem.profile_id} style={{ background: colorFor(mem.profile_id), zIndex: i + 1 }}>{monogramFor(mem.name)}</span>
@@ -426,7 +426,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-text">
           <h2 className="thread__head-name">{title}</h2>
           <p className="thread__head-sub">
-            {partyView ? partyView.sub : chat.kind === 'help' ? 'Lichen help' : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+            {partyView ? partyView.sub : chat.kind === 'help' ? (chat.helpMemberId && chat.helpMemberId !== me ? 'Help desk — you answer for Lichen Help' : 'Lichen help') : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </p>
         </div>
       </div>
@@ -461,7 +461,7 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
           /* Every party, side by side and legible — not a clump (founder
              2026-08-18: "move the 3 profile icons out farther"). */
           <div className="thread__intro-row">
-            {helpPartyOrder(members).slice(0, 4).map((mem) => (
+            {helpPartyOrder(members, chat.helpMemberId).slice(0, 4).map((mem) => (
               <Avatar key={mem.profile_id} id={mem.profile_id} name={mem.name} url={mem.avatarUrl} size={52} />
             ))}
           </div>

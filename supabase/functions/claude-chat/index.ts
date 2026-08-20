@@ -108,7 +108,7 @@ async function runLookup(
  *  the assistant would win every time, leaving the human no room. */
 const HELP_FRAME = `You are in a member's private HELP room on Lichen. Three parties are here:
 - THE MEMBER who opened the room.
-- LICHEN HEALTH — the support account, staffed by Galyn, a real human (she/her). Also called Lichen Architect, or "Oi" (organic intelligence, carbon, Ca). When someone asks whether "a real person" is here, the answer is yes: Lichen Health is a human, and you should say whether they are present and whether they've read the room.
+- LICHEN HEALTH — the help desk's identity (the orange brain). No human types as it anymore: real people called HELP STEWARDS (Galyn, she/her, is one — also called Lichen Architect, or "Oi": organic intelligence, carbon, Ca) sit in this room as THEMSELVES and answer under their own names. When someone asks whether "a real person" is here, the answer is yes: name the steward(s) in the roster, whether they are present, and whether they've read the room.
 - YOU — Lichen Builder, also called "Ai" (silicon, Si). You are not a person and never pretend to be.
 
 Members may use any of those names. "Ai" means you; "Oi" means the human. Don't say you don't know what they mean. Be transparent about that whenever it matters: the member should always know which of you is speaking, and that a human reads this room too.
@@ -184,6 +184,10 @@ Deno.serve(async (req) => {
     const support = await (await sb('profiles?email=eq.connect@lichen.health&select=id')).json();
     supportId = Array.isArray(support) ? support[0]?.id : null;
     if (supportId && trigger.sender_id === supportId) return json({ ok: true, skipped: 'steward-spoke' });
+    // Human help stewards answer as THEMSELVES now (founder 2026-08-19, the
+    // connect@ login sunset) — their message IS the answer, never a prompt.
+    const snd = await (await sb(`profiles?id=eq.${trigger.sender_id}&select=help_steward`)).json();
+    if (Array.isArray(snd) && snd[0]?.help_steward) return json({ ok: true, skipped: 'steward-spoke' });
   }
 
   // PER-IDENTITY AI CONSENT (founder 2026-08-17): the sender's own door for

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GYNO7b8LAvV0KLNBQ56wbDFxte4hu6jfXJIHFZ744ONHxzxxV3dacq1UClO3G7N
+\restrict rYYDc7S2x8BIA5duYRT6mdhdgjVC0cKLVQ1HZzP9odjSsNXOAbRITrJKmh2mTnj
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -153,12 +153,12 @@ ALTER FUNCTION public.admin_list_supporters() OWNER TO postgres;
 -- Name: admin_search_members(text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.admin_search_members(p_q text) RETURNS TABLE(profile_id uuid, full_name text, email text, tier text, source text, status text, current_period_end timestamp with time zone)
+CREATE FUNCTION public.admin_search_members(p_q text) RETURNS TABLE(profile_id uuid, full_name text, email text, tier text, source text, status text, current_period_end timestamp with time zone, help_steward boolean)
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
   select p.id, p.full_name, p.email,
-         s.tier, s.source, s.status, s.current_period_end
+         s.tier, s.source, s.status, s.current_period_end, p.help_steward
   from public.profiles p
   left join public.subscriptions s on s.profile_id = p.id
   where (select is_admin from public.profiles where id = auth.uid())
@@ -1893,6 +1893,9 @@ begin
   insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me)      on conflict do nothing;
   insert into public.chat_members (chat_id, profile_id) values (v_chat, v_support) on conflict do nothing;
   insert into public.chat_members (chat_id, profile_id) values (v_chat, v_claude)  on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id)
+  select v_chat, p.id from public.profiles p where p.help_steward and p.id <> v_me
+  on conflict do nothing;
   return v_chat;
 end; $$;
 
@@ -4332,6 +4335,35 @@ end $$;
 ALTER FUNCTION public.send_currentcy(p_from_type text, p_from_id uuid, p_to_type text, p_to_id uuid, p_amount numeric, p_memo text) OWNER TO postgres;
 
 --
+-- Name: set_help_steward(uuid, boolean); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin) then
+    raise exception 'admins only';
+  end if;
+  update public.profiles set help_steward = p_on where id = p_profile;
+  -- Granting seats them in every existing help room; revoking stands them up.
+  if p_on then
+    insert into public.chat_members (chat_id, profile_id)
+    select c.id, p_profile from public.chats c where c.kind = 'help'
+      and c.direct_key <> 'help:' || p_profile::text
+    on conflict do nothing;
+  else
+    delete from public.chat_members m using public.chats c
+     where c.id = m.chat_id and c.kind = 'help' and m.profile_id = p_profile
+       and c.direct_key <> 'help:' || p_profile::text;
+  end if;
+end; $$;
+
+
+ALTER FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) OWNER TO postgres;
+
+--
 -- Name: set_member_role(uuid, uuid, text, text[]); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -5987,6 +6019,7 @@ CREATE TABLE public.profiles (
     weaveable_default boolean DEFAULT true NOT NULL,
     jurisdiction text,
     pronouns text,
+    help_steward boolean DEFAULT false NOT NULL,
     CONSTRAINT profiles_aspect_check CHECK (((aspect IS NULL) OR (aspect = ANY (ARRAY['individual'::text, 'collective'::text])))),
     CONSTRAINT profiles_birth_date_sane CHECK (((birth_date IS NULL) OR ((birth_date > '1900-01-01'::date) AND (birth_date <= CURRENT_DATE)))),
     CONSTRAINT profiles_distributed_jurisdiction CHECK (((kind <> ALL (ARRAY['plant'::text, 'element'::text])) OR (jurisdiction IS NOT NULL))),
@@ -10729,6 +10762,7 @@ GRANT ALL ON FUNCTION public.admin_list_supporters() TO service_role;
 --
 
 REVOKE ALL ON FUNCTION public.admin_search_members(p_q text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.admin_search_members(p_q text) TO anon;
 GRANT ALL ON FUNCTION public.admin_search_members(p_q text) TO authenticated;
 GRANT ALL ON FUNCTION public.admin_search_members(p_q text) TO service_role;
 
@@ -11959,6 +11993,16 @@ GRANT ALL ON FUNCTION public.send_currentcy(p_from_type text, p_from_id uuid, p_
 
 
 --
+-- Name: FUNCTION set_help_steward(p_profile uuid, p_on boolean); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) TO anon;
+GRANT ALL ON FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.set_help_steward(p_profile uuid, p_on boolean) TO service_role;
+
+
+--
 -- Name: FUNCTION set_member_role(p_space uuid, p_profile uuid, p_role text, p_duties text[]); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13177,7 +13221,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GYNO7b8LAvV0KLNBQ56wbDFxte4hu6jfXJIHFZ744ONHxzxxV3dacq1UClO3G7N
+\unrestrict rYYDc7S2x8BIA5duYRT6mdhdgjVC0cKLVQ1HZzP9odjSsNXOAbRITrJKmh2mTnj
 
 
 

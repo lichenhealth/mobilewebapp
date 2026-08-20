@@ -418,3 +418,10 @@ img.conv-row__group-bub { object-fit: cover; }
    the clump still hung off-centre. The count-modifier offsets above run the
    diagonal corner to corner instead: every clump fills its 52px slot exactly,
    nothing to re-centre.) */
+
+/* The steward's desk section (founder 2026-08-19) */
+.chat__desk-head {
+  margin: var(--s-4) 0 2px; padding: 0 4px;
+  font-family: var(--font-mono); font-size: var(--t-2xs, 10px);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+}

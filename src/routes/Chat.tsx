@@ -162,7 +162,7 @@ export default function Chat() {
           </div>
         )}
 
-        {hits.map((c) => (
+        {hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
           <ConversationRow
             key={c.id}
             chat={c}
@@ -173,6 +173,25 @@ export default function Chat() {
             onClick={() => openChat(c.id)}
           />
         ))}
+        {/* THE DESK, apart from your life (founder 2026-08-19): a steward's
+            help rooms sit under their own header, each named for the person
+            being helped. Only stewards ever have rows here. */}
+        {hits.some((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) && (
+          <>
+            <p className="chat__desk-head">Help desk — you answer for Lichen Help</p>
+            {hits.filter((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me).map((c) => (
+              <ConversationRow
+                key={c.id}
+                chat={c}
+                me={me}
+                highlight={query}
+                unread={unread.get(c.id) ?? 0}
+                active={c.id === selectedId}
+                onClick={() => openChat(c.id)}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       {picking && (
@@ -256,6 +275,12 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // wears Lichen Health's avatar — its identity — from every side. The humans
   // who answer show on their own messages inside, ringed peach.
   if (chat.kind === 'help') {
+    // A steward's desk row wears the HELPED MEMBER's face; your own help
+    // room wears the desk's orange brain.
+    if (chat.helpMemberId && chat.helpMemberId !== me) {
+      const helped = chat.members.find((m) => m.profile_id === chat.helpMemberId);
+      return <Avatar id={chat.helpMemberId} name={helped?.name ?? 'Member'} url={helped?.avatarUrl} size={48} className="conv-row__avatar--party" />;
+    }
     const lh = chat.members.find((m) => m.profile_id === LICHEN_HEALTH_PROFILE_ID);
     return <Avatar id={LICHEN_HEALTH_PROFILE_ID} name="Lichen Health" url={lh?.avatarUrl} size={48} className="conv-row__avatar--party" />;
   }

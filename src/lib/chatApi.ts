@@ -8,8 +8,14 @@ export const CLAUDE_PROFILE_ID = '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
 export const LICHEN_HEALTH_PROFILE_ID = 'a5cdbca1-b254-442a-b857-808ef4abf0db';
 /** A help room's faces in one fixed order everywhere (founder 2026-08-18):
  *  the member, then Lichen Health (orange), then Claude (blue). */
-export function helpPartyOrder<T extends { profile_id: string }>(members: T[]): T[] {
-  const rank = (id: string) => id === CLAUDE_PROFILE_ID ? 2 : id === LICHEN_HEALTH_PROFILE_ID ? 1 : 0;
+export function helpPartyOrder<T extends { profile_id: string }>(members: T[], helpMemberId?: string | null): T[] {
+  // The helped member leads, then the desk (orange), then Claude (blue);
+  // other human stewards trail — the trio slots show the room's identity.
+  const rank = (id: string) =>
+    helpMemberId && id === helpMemberId ? 0
+    : id === LICHEN_HEALTH_PROFILE_ID ? 1
+    : id === CLAUDE_PROFILE_ID ? 2
+    : helpMemberId ? 3 : 0;
   return [...members].sort((a, b) => rank(a.profile_id) - rank(b.profile_id));
 }
 
@@ -46,10 +52,16 @@ export interface ChatVM {
   members: MemberInfo[];
   last?: MessageRow;
   party?: PartySpace;
+  /** help rooms: the member being helped (off the 'help:<id>' key). For a
+   *  steward, rooms where this isn't them are DESK work, not their life. */
+  helpMemberId?: string | null;
 }
 export function visitorIdOfKey(key: string | null | undefined): string | null {
   if (!key || !key.startsWith('space:')) return null;
   return key.split(':')[2] ?? null;
+}
+export function helpMemberOfKey(key: string | null | undefined): string | null {
+  return key?.startsWith('help:') ? key.slice(5) : null;
 }
 
 /** Columns to fetch for a message everywhere (list + thread + realtime re-fetch). */
@@ -124,12 +136,21 @@ export function chatTitle(
   members: MemberInfo[],
   me: string,
   party?: PartySpace,
+  helpMemberId?: string | null,
 ): string {
   // A help room holds MORE than one responder now — Lichen Health and the
   // assistant both sit in it (founder 2026-08-16) — so naming it after
   // whichever member happened to sort first was arbitrary, and it started
   // reading "Claude". It has one true name.
-  if (kind === 'help') return 'Lichen Help';
+  if (kind === 'help') {
+    // A steward's desk row is named for the PERSON being helped (founder
+    // 2026-08-19: their help chats must read apart from their own life);
+    // the member's own room keeps the desk's name.
+    if (helpMemberId && helpMemberId !== me) {
+      return members.find((m) => m.profile_id === helpMemberId)?.name ?? 'A member';
+    }
+    return 'Lichen Help';
+  }
   if (kind === 'direct') {
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
@@ -197,13 +218,15 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
     const party: PartySpace | undefined = c.party
       ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) }
       : undefined;
+    const helpMemberId = c.kind === 'help' ? helpMemberOfKey(c.direct_key) : null;
     return {
       id: c.id,
       kind: c.kind,
-      title: chatTitle(c.kind, c.title, members, me, party),
+      title: chatTitle(c.kind, c.title, members, me, party, helpMemberId),
       members,
       last: lastByChat.get(c.id),
       party,
+      helpMemberId,
     };
   });
 

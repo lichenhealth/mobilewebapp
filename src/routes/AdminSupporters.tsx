@@ -42,6 +42,7 @@ type FoundMember = {
   source: string | null;
   status: string | null;
   current_period_end: string | null;
+  help_steward?: boolean;
 };
 
 // The chip and the email say the same thing: 1 month, 2 months… 1 year, 2 years.
@@ -74,6 +75,8 @@ export default function AdminSupporters() {
   const [findOpen, setFindOpen] = useState(false);
   const [findQ, setFindQ] = useState('');
   const [found, setFound] = useState<FoundMember[]>([]);
+  const [stewardOn, setStewardOn] = useState(false);
+  const [stewardBusy, setStewardBusy] = useState(false);
   const [picked, setPicked] = useState<FoundMember | null>(null);
   useEffect(() => {
     const q = findQ.trim();
@@ -290,7 +293,7 @@ export default function AdminSupporters() {
                 onChange={(e) => setFindQ(e.target.value)}
               />
               {found.map((m) => (
-                <button key={m.profile_id} className="adminc__btn" onClick={() => { setPicked(m); setPMsg(''); setPTier((m.tier === 'community' ? 'community' : 'concierge')); setPMonths(m.source === 'gift' && m.current_period_end === null ? null : 12); }}>
+                <button key={m.profile_id} className="adminc__btn" onClick={() => { setPicked(m); setStewardOn(!!m.help_steward); setPMsg(''); setPTier((m.tier === 'community' ? 'community' : 'concierge')); setPMonths(m.source === 'gift' && m.current_period_end === null ? null : 12); }}>
                   {m.full_name || m.email} — {m.tier ? `${m.tier} · ${m.source} · ${m.status}` : 'no membership'}
                 </button>
               ))}
@@ -307,6 +310,31 @@ export default function AdminSupporters() {
                       {picked.current_period_end ? ` · through ${new Date(picked.current_period_end).toLocaleDateString()}` : picked.source === 'gift' ? ' · no end date' : ''}</>
                   : 'No membership.'}
               </p>
+              {/* HELP STEWARD (founder 2026-08-19, the connect@ login sunset):
+                  an explicit per-person grant — never inherited from any role.
+                  A steward sits in every help room as themselves, gets the
+                  bells, answers under their own name with the peach ring;
+                  Claude defers to their messages. */}
+              <button
+                type="button"
+                className={'adminc__tier-btn' + (stewardOn ? ' is-on' : '')}
+                disabled={stewardBusy}
+                onClick={() => {
+                  const next = !stewardOn;
+                  setStewardBusy(true);
+                  void supabase.rpc('set_help_steward', { p_profile: picked.profile_id, p_on: next })
+                    .then(({ error: e }) => {
+                      setStewardBusy(false);
+                      if (e) { setPMsg(e.message); return; }
+                      setStewardOn(next);
+                      setPMsg(next
+                        ? `${picked.full_name || picked.email} now answers help — seated in every help room, as themselves.`
+                        : `${picked.full_name || picked.email} no longer answers help.`);
+                    });
+                }}
+              >
+                Answers help {stewardOn ? '✓' : ''}
+              </button>
               <div className="adminc__gift-tiers">
                 {TIERS.map((t) => (
                   <button key={t.id} type="button"
