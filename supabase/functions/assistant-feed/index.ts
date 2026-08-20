@@ -309,6 +309,11 @@ Deno.serve(async (req) => {
     ? '\n\nYou are in their GENERAL thread — anything goes here, and you may draw on their other threads when it helps.'
     : `\n\nYou are in their ${thread.toUpperCase()} thread, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which thread it belongs in so it stays findable — one short sentence, never a lecture.`;
 
+  // BUILDING WHAT DOESN'T EXIST YET (founder 2026-08-19): shape it here,
+  // loop Galyn in at the help room — this thread is private by construction,
+  // so SHE CANNOT SEE IT; the member carries the idea over, by choice.
+  const featureRule = '\n\nWHEN THEY WANT SOMETHING LICHEN DOES NOT HAVE YET: think it through WITH them — what are they actually trying to do, what would the smallest good version be. When the idea has a real shape, tell them plainly: this thread is private, so Galyn (who builds Lichen with Claude) has not seen it — and invite them to bring the shaped idea to their Lichen Help room, where she reads every conversation and the three of you can take it further. Offer to summarize the idea in a few crisp lines they can paste there. Never claim she can see this thread, never promise a feature will be built or when, and never submit anything anywhere on their behalf.';
+
   // THE HAND THAT WRITES (docs/ASSISTANT_ACTIONS.md). Off unless the member
   // turned it on, and only in the thread this work belongs to — asked in
   // Marketplace, the threadRule above points them at Profile instead of
@@ -584,7 +589,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: (canEdit || canCalendar) ? 1000 : 400,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${calendarRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${calendarRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round
