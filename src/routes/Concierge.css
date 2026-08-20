@@ -1124,7 +1124,10 @@
 }
 .conc__team-actions { display: inline-flex; gap: 6px; flex-shrink: 0; }
 .btn.conc__team-btn { padding: 6px 13px; font-size: 12px; text-decoration: none; }
-.conc__team { padding: var(--s-4); max-width: 720px; margin: 0 auto; }
+/* min-width: 0 — as a flex item of .conc, the default min-width:auto let a
+   nowrap sub-line's intrinsic width force this panel past the viewport, so
+   the ellipsis never engaged (founder 2026-08-20: text ran off the page). */
+.conc__team { padding: var(--s-4); max-width: 720px; width: 100%; min-width: 0; margin: 0 auto; }
 .conc__team-lead { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 var(--s-2); }
 .conc__team-muted { font-size: 13px; color: var(--ink-faint); }
 .conc__team-who--static { cursor: default; }
