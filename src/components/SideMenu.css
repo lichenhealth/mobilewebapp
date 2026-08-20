@@ -126,7 +126,8 @@
 .side-menu__sub-list {
   list-style: none;
   margin: 8px 0 0;
-  padding: 0 0 0 16px;
+  /* Children nest visibly under their open header (founder 2026-08-19). */
+  padding: 0 0 0 26px;
   display: flex;
   flex-direction: column;
   gap: 4px;

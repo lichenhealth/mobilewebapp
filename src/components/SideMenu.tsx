@@ -269,7 +269,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                     <span
                       className={
                         'side-menu__chevron' +
-                        (expanded[s.key] ? ' is-open' : '')
+                        // The arrow tells the truth about the list below it:
+                        // admin view holds every list open, so the chevron
+                        // opens with it (founder 2026-08-19 nit — it pointed
+                        // sideways over a visibly open list).
+                        (expanded[s.key] || adminView ? ' is-open' : '')
                       }
                       aria-hidden="true"
                     />
