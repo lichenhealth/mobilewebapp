@@ -11,24 +11,26 @@ import './BuildModeSplit.css';
  *  founder's words: "back to manual mode". */
 export default function BuildModeSplit({ back }: { back: string }) {
   const navigate = useNavigate();
+  // The app's ONE segmented-toggle idiom (view-toggle — the same control as
+  // ADMIN | LICHEN VIEW | PUBLIC VIEW right above it; founder 2026-08-20:
+  // "the other button doesn't go away, it just signifies a toggle"). Manual
+  // is the side you're on; the other side switches to building with Claude —
+  // the assistant's page for this section, arriving with build context.
   return (
-    <div className="bmode">
-      <button className="bmode__side is-on" type="button">
-        <strong>Build manually</strong>
-        <em>Fill in the fields yourself</em>
-      </button>
-      <button
-        className="bmode__side bmode__side--ai"
-        type="button"
-        // The same door as the brain anywhere else — the assistant's page for
-        // this section, with the context that you came to build a profile
-        // (founder 2026-08-17: consistency; a brain in Marketplace knows
-        // you're in Marketplace, this one knows you're building).
-        onClick={() => navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`)}
-      >
-        <strong><Icon name="brain" size={14} /> Build with Claude</strong>
-        <em>Tell it about you, or paste your website</em>
-      </button>
+    <div className="view-toggle-row bmode-row">
+      <span className="view-toggle" role="group" aria-label="How to build this page">
+        <button className="view-toggle__side is-on" type="button">
+          Build manually
+        </button>
+        <button
+          className="view-toggle__side"
+          type="button"
+          onClick={() => navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`)}
+        >
+          <Icon name="brain" size={12} /> Build with Claude
+        </button>
+      </span>
+      <span className="bmode-row__hint">Fill in the fields yourself, or tell Claude about you.</span>
     </div>
   );
 }

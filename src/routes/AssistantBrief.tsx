@@ -638,9 +638,22 @@ export default function AssistantBrief() {
 
   return (
     <div className="abrief">
-      <button className="cmp__back calp__backchip" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
-        ← {backTo ? 'Back to manual mode' : 'Back'}
-      </button>
+      {buildIntent && backTo ? (
+        /* The SAME segmented toggle the builder shows, from this side — Build
+           with Claude is where you stand, Build manually is the way back
+           (founder 2026-08-20: "the other button doesn't go away, it just
+           signifies a toggle"). */
+        <div className="view-toggle-row">
+          <span className="view-toggle" role="group" aria-label="How to build this page">
+            <button className="view-toggle__side" onClick={() => navigate(backTo)}>Build manually</button>
+            <button className="view-toggle__side is-on"><Icon name="brain" size={12} /> Build with Claude</button>
+          </span>
+        </div>
+      ) : (
+        <button className="cmp__back calp__backchip" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
+          ← {backTo ? 'Back to manual mode' : 'Back'}
+        </button>
+      )}
       {/* Shaped like every other profile on Lichen (founder 2026-08-05):
           picture, then the name under it. The mark wears an Si badge in the
           silicon blue the About page already gives it — the assistant is a
