@@ -108,3 +108,24 @@ to fill — verified live, and the refusal was structural rather than
 merely well-behaved.
 
 Read-only: nothing here writes.
+
+
+## Rung 2 of the ladder: calendar settings (2026-08-19)
+
+The same flag, the same doctrine, a second room. In the member's CALENDAR
+thread (and only there), `assistant_can_edit` arms five tools in
+`assistant-feed`: `my_calendar_setup` (read — always first),
+`add_hours` / `remove_hours` (work | social | on_call weekly windows;
+on_call REFUSES server-side unless the sender is an active caregiver —
+the same rule the Calendar-settings UI enforces), `add_booking_type`
+(title/duration/price-words/approval/audience everyone|mycelium|public —
+never space, which needs an id and a confirm step), and
+`set_booking_type_active` (off/on by exact title; DELETING a type stays
+by-hand — it takes booking history with it). Every write is scoped to the
+trigger's sender; no tool takes a target. The model is told the
+default-nothing doctrine out loud: no work hours means not bookable, and
+creating a session type without hours must be reported as such.
+
+Verified end-to-end 2026-08-19: one conversational ask produced the
+social window + session type, correctly, with the no-work-hours caveat
+in the report.

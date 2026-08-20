@@ -123,6 +123,71 @@ const EDIT_TOOLS = [
   },
 ];
 
+// CALENDAR TOOLS (founder 2026-08-19, rung 1 of "Claude codes with members"):
+// the member's OWN hours and bookable sessions, by conversation. Same doctrine
+// as the page tools: armed only in the CALENDAR thread, only behind the same
+// opt-in flag, every write scoped to the sender, no tool takes a target.
+// Weekdays are 0=Monday … 6=Sunday. Times are minutes since midnight
+// (9am = 540). "work" maps to the DB kind 'available'.
+const CALENDAR_TOOLS = [
+  {
+    name: 'my_calendar_setup',
+    description: 'Read their current hours and bookable session types. Always call this FIRST before changing anything, and use it to confirm what you did.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'add_hours',
+    description: 'Add one weekly hours window. kind: "work" (bookable, meeting-findable), "social" (their web sees them as available), or "on_call" (care-team urgent coverage — ONLY offer or use this if the setup read says they are an active caregiver; for anyone else it will refuse). weekday: 0=Monday … 6=Sunday. start_min/end_min: minutes since midnight (9am=540, 5pm=1020).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['work', 'social', 'on_call'] },
+        weekday: { type: 'number' },
+        start_min: { type: 'number' },
+        end_min: { type: 'number' },
+      },
+      required: ['kind', 'weekday', 'start_min', 'end_min'],
+    },
+  },
+  {
+    name: 'remove_hours',
+    description: 'Remove hours windows. Removes every window matching the given weekday + kind (and start_min when given, to single one out). Read the setup first so you remove exactly what they mean.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['work', 'social', 'on_call'] },
+        weekday: { type: 'number' },
+        start_min: { type: 'number', description: 'Optional — the exact window to remove.' },
+      },
+      required: ['kind', 'weekday'],
+    },
+  },
+  {
+    name: 'add_booking_type',
+    description: 'Create a bookable session type on their profile. Open slots come from their WORK hours minus their calendar, so if the setup read shows no work hours, say so — a session type with no hours can never be booked. price is words, not billing ("$90", "Free", "sliding $20–60"). audience: everyone = any Lichen member, mycelium = their web only, public = the open web via their booking link.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        duration_min: { type: 'number', description: '15–480 minutes.' },
+        price: { type: 'string' },
+        approval: { type: 'string', enum: ['request', 'instant'], description: 'request = they approve each booking; instant = it books straight in.' },
+        audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
+      },
+      required: ['title', 'duration_min', 'approval', 'audience'],
+    },
+  },
+  {
+    name: 'set_booking_type_active',
+    description: 'Switch one of their session types off (or back on) by its exact title from the setup read. Off means nobody can book it; its history is untouched. You cannot delete a type — deleting takes its booking history with it, so that stays a by-hand act in Calendar settings.',
+    input_schema: {
+      type: 'object',
+      properties: { title: { type: 'string' }, active: { type: 'boolean' } },
+      required: ['title', 'active'],
+    },
+  },
+];
+
 /** What a tool call did, in one plain line — the fallback report if the model
  *  writes and then says nothing (a write with no report is a bug). */
 type ToolOutcome = { ok: boolean; change?: string; [k: string]: unknown };
@@ -249,9 +314,14 @@ Deno.serve(async (req) => {
   // Marketplace, the threadRule above points them at Profile instead of
   // quietly rewriting their page from the wrong room.
   let canEdit = false;
+  let canCalendar = false;
   {
     const me = await (await sb(`profiles?id=eq.${profile_id}&select=assistant_can_edit`)).json();
-    canEdit = thread === 'profile' && !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
+    const flag = !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
+    canEdit = thread === 'profile' && flag;
+    // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
+    // hand-that-writes flag arms CALENDAR tools in the calendar thread.
+    canCalendar = thread === 'calendar' && flag;
   }
 
   // The real taxonomy travels with the request, so a category can only ever be
@@ -267,6 +337,16 @@ Deno.serve(async (req) => {
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
       + (lines.length ? `\n\nThe only category ids that exist:\n${lines.join('\n')}` : '');
+  }
+
+  let calendarRule = '';
+  if (canCalendar) {
+    calendarRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR CALENDAR SETTINGS. They have turned on "Let Claude edit my page directly", which arms your calendar tools here. How to hold it:'
+      + '\n- Read my_calendar_setup FIRST, act, then read again if needed and report plainly what changed.'
+      + '\n- Make the change when they ask; never hand back instructions to click through instead.'
+      + '\n- Change only what they asked about. Name every change; a change you did not name is a broken promise.'
+      + '\n- No hours means NOT available and NOT bookable — unknown is never yes on Lichen. If they want to be bookable, work hours come first.'
+      + '\n- on_call belongs to active caregivers only; the tool refuses otherwise — do not offer it to anyone else.';
   }
 
   const readPage = async () => {
@@ -379,6 +459,104 @@ Deno.serve(async (req) => {
       };
     }
 
+    // ── Calendar tools (rung 1, founder 2026-08-19) — sender-scoped, no targets.
+    const minLabel = (m: number) => {
+      const h = Math.floor(m / 60) % 24, mm = m % 60;
+      const ap = h < 12 ? 'am' : 'pm'; const hh = h % 12 === 0 ? 12 : h % 12;
+      return `${hh}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
+    };
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const kindIn = (k: string) => k === 'work' ? 'available' : k;
+    const kindOut = (k: string) => k === 'available' ? 'work' : k;
+
+    if (name === 'my_calendar_setup') {
+      const [hours, types, care] = await Promise.all([
+        (await sb(`availability_windows?profile_id=eq.${profile_id}&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=title,duration_min,price,approval,audience,active&order=created_at`)).json(),
+        (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
+      ]);
+      const hs = (Array.isArray(hours) ? hours : []) as { weekday: number; start_min: number; end_min: number; kind: string }[];
+      return {
+        ok: true,
+        hours: hs.length
+          ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
+          : 'none set — they are not bookable and never counted available',
+        booking_types: (Array.isArray(types) ? types : []).map((t: { title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean }) =>
+          `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}${t.active ? '' : ', OFF'})`),
+        is_active_caregiver: Array.isArray(care) && care.length > 0,
+      };
+    }
+
+    if (name === 'add_hours') {
+      const kind = String(input.kind ?? '');
+      const weekday = Number(input.weekday), start = Number(input.start_min), end = Number(input.end_min);
+      if (!['work', 'social', 'on_call'].includes(kind)) return { ok: false, error: 'kind must be work, social, or on_call.' };
+      if (!(weekday >= 0 && weekday <= 6)) return { ok: false, error: 'weekday must be 0 (Monday) through 6 (Sunday).' };
+      if (!(start >= 0 && end > start && end <= 1440)) return { ok: false, error: 'Times must satisfy 0 <= start < end <= 1440 (minutes since midnight).' };
+      if (kind === 'on_call') {
+        const care = await (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json();
+        if (!Array.isArray(care) || care.length === 0) {
+          return { ok: false, error: 'On call is a care-team duty — they are not an active caregiver on anyone\'s team, so this kind is not theirs to set. Offer work or social instead.' };
+        }
+      }
+      const r = await sb('availability_windows', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ profile_id, weekday, start_min: start, end_min: end, kind: kindIn(kind) }),
+      });
+      if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 140)}` };
+      return { ok: true, change: `added ${kind} hours: ${DAYS[weekday]} ${minLabel(start)}–${minLabel(end)}` };
+    }
+
+    if (name === 'remove_hours') {
+      const kind = String(input.kind ?? '');
+      const weekday = Number(input.weekday);
+      const start = input.start_min !== undefined ? Number(input.start_min) : null;
+      if (!['work', 'social', 'on_call'].includes(kind) || !(weekday >= 0 && weekday <= 6)) {
+        return { ok: false, error: 'Give a valid kind and weekday (0=Monday … 6=Sunday).' };
+      }
+      const q = `availability_windows?profile_id=eq.${profile_id}&weekday=eq.${weekday}&kind=eq.${kindIn(kind)}` + (start !== null ? `&start_min=eq.${start}` : '');
+      const rows = await (await sb(q + '&select=id')).json();
+      const n = Array.isArray(rows) ? rows.length : 0;
+      if (!n) return { ok: false, error: 'No matching hours window — read my_calendar_setup and match exactly what is there.' };
+      const r = await sb(q, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!r.ok) return { ok: false, error: 'The delete failed — try again.' };
+      return { ok: true, change: `removed ${n} ${kind} window${n === 1 ? '' : 's'} on ${DAYS[weekday]}` };
+    }
+
+    if (name === 'add_booking_type') {
+      const title = String(input.title ?? '').trim().slice(0, 80);
+      const duration = Number(input.duration_min);
+      const approval = String(input.approval ?? '');
+      const audience = String(input.audience ?? '');
+      if (!title) return { ok: false, error: 'A session needs a title.' };
+      if (!(duration >= 15 && duration <= 480)) return { ok: false, error: 'duration_min must be 15–480.' };
+      if (!['request', 'instant'].includes(approval) || !['everyone', 'mycelium', 'public'].includes(audience)) {
+        return { ok: false, error: 'approval must be request|instant; audience everyone|mycelium|public.' };
+      }
+      const r = await sb('booking_types', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ profile_id, title, duration_min: duration, price: String(input.price ?? '').trim() || null, approval, audience, active: true }),
+      });
+      if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 140)}` };
+      const hours = await (await sb(`availability_windows?profile_id=eq.${profile_id}&kind=eq.available&select=id&limit=1`)).json();
+      return {
+        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience})`,
+        note: (Array.isArray(hours) && hours.length) ? undefined : 'They have NO work hours — nothing is bookable until they add some. Say so.',
+      };
+    }
+
+    if (name === 'set_booking_type_active') {
+      const title = String(input.title ?? '').trim();
+      const active = !!input.active;
+      const rows = await (await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}&select=id,active`)).json();
+      if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: `No session type titled "${title}" — read my_calendar_setup and use the exact title.` };
+      const r = await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ active }),
+      });
+      if (!r.ok) return { ok: false, error: 'The update failed — try again.' };
+      return { ok: true, change: `${active ? 'switched on' : 'switched off'} the session "${title}"` };
+    }
+
     return { ok: false, error: `No such tool: ${name}` };
   }
 
@@ -405,14 +583,14 @@ Deno.serve(async (req) => {
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: canEdit ? 1000 : 400,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
+        max_tokens: (canEdit || canCalendar) ? 1000 : 400,
+        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${calendarRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round
         // tool_choice 'none' forces the report instead of another edit.
-        ...(canEdit
-          ? { tools: EDIT_TOOLS, ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
+        ...((canEdit || canCalendar)
+          ? { tools: canEdit ? EDIT_TOOLS : CALENDAR_TOOLS, ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
           : {}),
       }),
     });
