@@ -79,6 +79,18 @@
 
 /* Answering a suggestion by mapping it (founder 2026-08-06) — the default,
    because every new category makes search less precise. */
+/* Which world(s) an approval lands in — text-chip lenses, the platform grammar */
+.adminc__domains {
+  flex-basis: 100%; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.adminc__domains-lead { font-size: var(--t-xs); color: var(--ink-faint); margin-right: 2px; }
+.adminc__domain {
+  font-size: var(--t-xs); padding: 3px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: transparent; color: var(--ink-soft);
+  font-weight: 300; cursor: pointer;
+}
+.adminc__domain.is-on { border-color: var(--peach); color: var(--peach-deep); font-weight: 400; }
+
 .adminc__map { flex-basis: 100%; margin-top: var(--s-3); }
 .adminc__map-q {
   width: 100%; border: 1px solid var(--bone-edge); border-radius: var(--r-md);

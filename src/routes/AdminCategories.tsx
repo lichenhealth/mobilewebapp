@@ -12,10 +12,17 @@ type Suggestion = {
   proposer: { full_name: string | null } | null;
 };
 
+const DOMAINS = ['good', 'service', 'place', 'identity'] as const;
+type Domain = (typeof DOMAINS)[number];
+
 export default function AdminCategories() {
   const { loading, user, isAdmin } = useAuth();
   const [items, setItems] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  // Approve into the right domain(s) (founder 2026-08-20): "Beekeeper" typed
+  // as an identity may honestly also be a service. Defaults to the domain it
+  // was suggested in; the reviewer widens or moves it before approving.
+  const [approveDomains, setApproveDomains] = useState<Record<string, Domain[]>>({});
   const [mapping, setMapping] = useState<string | null>(null);
   const [mapQ, setMapQ] = useState('');
   const [allCats, setAllCats] = useState<{ id: string; name: string; domain: string }[]>([]);
@@ -57,11 +64,27 @@ export default function AdminCategories() {
   async function decide(id: string, approve: boolean) {
     setBusy(id);
     setError('');
-    const fn = approve ? 'approve_category_suggestion' : 'reject_category_suggestion';
-    const { error } = await supabase.rpc(fn, { p_suggestion_id: id });
+    const chosen = approveDomains[id];
+    const { error } = approve
+      ? await supabase.rpc('approve_category_suggestion', {
+          p_suggestion_id: id,
+          // Only sent when the reviewer changed it — null keeps the RPC's
+          // "as suggested" default.
+          p_domains: chosen && chosen.length ? chosen : null,
+        })
+      : await supabase.rpc('reject_category_suggestion', { p_suggestion_id: id });
     setBusy(null);
     if (error) { setError(error.message); return; }
     setItems((list) => list.filter((s) => s.id !== id));
+  }
+
+  function toggleDomain(s: Suggestion, d: Domain) {
+    setApproveDomains((m) => {
+      const cur = m[s.id] ?? [s.domain];
+      const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d];
+      // Never empty — approving into no world is not a choice.
+      return { ...m, [s.id]: next.length ? next : cur };
+    });
   }
 
   if (loading) return <div className="adminc"><p className="adminc__muted">Loading…</p></div>;
@@ -118,6 +141,24 @@ export default function AdminCategories() {
               >
                 Reject
               </button>
+            </div>
+            {/* The same word can live in more than one world — "Beekeeper"
+                typed as an identity may also be a service (founder
+                2026-08-20). "New category" lands it in exactly the checked
+                worlds; identity → the proposer's identity tags, provider
+                domains → their offerings. */}
+            <div className="adminc__domains">
+              <span className="adminc__domains-lead">Approve as</span>
+              {DOMAINS.map((d) => {
+                const on = (approveDomains[s.id] ?? [s.domain]).includes(d);
+                return (
+                  <button key={d} type="button"
+                    className={'adminc__domain' + (on ? ' is-on' : '')}
+                    onClick={() => toggleDomain(s, d)} disabled={busy === s.id}>
+                    {on ? '✓ ' : ''}{d}
+                  </button>
+                );
+              })}
             </div>
             {mapping === s.id && (
               <div className="adminc__map">

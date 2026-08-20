@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict U2095H7YkFJxiBJPFyBYT16g3wmD8rUA7aOQqvGzmch6xo6L0KHXduT72FJxae5
+\restrict MaUqY8JGz9TOvuloLj2fQDeUH2aFihiVppFa2jfWmQ72faTnRhm2vwhcIaM9pRn
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -203,10 +203,10 @@ end $$;
 ALTER FUNCTION public.alias_category_suggestion(p_suggestion uuid, p_category text) OWNER TO postgres;
 
 --
--- Name: approve_category_suggestion(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: approve_category_suggestion(uuid, text[]); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) RETURNS void
+CREATE FUNCTION public.approve_category_suggestion(p_suggestion_id uuid, p_domains text[] DEFAULT NULL::text[]) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
@@ -214,9 +214,12 @@ declare
   s public.category_suggestions;
   v_caller   uuid := auth.uid();
   v_is_admin boolean;
+  v_domains text[];
+  v_domain text;
   v_base text;
   v_slug text;
-  v_n int := 0;
+  v_n int;
+  v_first_slug text;
 begin
   select is_admin into v_is_admin from public.profiles where id = v_caller;
   if not coalesce(v_is_admin, false) then
@@ -227,39 +230,55 @@ begin
   if s.id is null then raise exception 'Suggestion not found'; end if;
   if s.status <> 'pending' then raise exception 'Already decided'; end if;
 
-  v_base := left(s.domain, 1) || '_' || regexp_replace(lower(s.name), '[^a-z0-9]+', '_', 'g');
-  v_base := trim(both '_' from v_base);
-  if v_base = '' or v_base = left(s.domain,1) || '_' then v_base := left(s.domain,1) || '_custom'; end if;
-  v_slug := v_base;
-  while exists (select 1 from public.categories where id = v_slug) loop
-    v_n := v_n + 1;
-    v_slug := v_base || '_' || v_n;
+  v_domains := coalesce(p_domains, array[s.domain]);
+  if coalesce(array_length(v_domains, 1), 0) = 0 then v_domains := array[s.domain]; end if;
+
+  foreach v_domain in array v_domains loop
+    if v_domain not in ('good', 'service', 'place', 'identity') then
+      raise exception 'Unknown domain: %', v_domain;
+    end if;
+
+    -- Reuse a same-name category already in this domain, else mint one.
+    select id into v_slug from public.categories
+      where domain = v_domain and lower(name) = lower(s.name) limit 1;
+    if v_slug is null then
+      v_base := left(v_domain, 1) || '_' || regexp_replace(lower(s.name), '[^a-z0-9]+', '_', 'g');
+      v_base := trim(both '_' from v_base);
+      if v_base = '' or v_base = left(v_domain, 1) || '_' then v_base := left(v_domain, 1) || '_custom'; end if;
+      v_slug := v_base; v_n := 0;
+      while exists (select 1 from public.categories where id = v_slug) loop
+        v_n := v_n + 1;
+        v_slug := v_base || '_' || v_n;
+      end loop;
+      insert into public.categories (id, domain, name, sort)
+      values (v_slug, v_domain, s.name, 1000);
+    end if;
+    if v_first_slug is null then v_first_slug := v_slug; end if;
+
+    if v_domain = 'identity' then
+      -- "I am this" lands in the proposer's public identity tags.
+      update public.profiles
+        set identity_tags = case
+          when coalesce(identity_tags, '{}') @> array[s.name] then identity_tags
+          else coalesce(identity_tags, '{}') || s.name
+        end
+        where id = s.proposer_id;
+    else
+      -- "I offer this" lands in their provider categories.
+      insert into public.profile_categories (profile_id, category_id)
+      values (s.proposer_id, v_slug)
+      on conflict do nothing;
+    end if;
   end loop;
 
-  insert into public.categories (id, domain, name, sort)
-  values (v_slug, s.domain, s.name, 1000);
-
-  if s.domain = 'identity' then
-    update public.profiles
-      set identity_tags = case
-        when coalesce(identity_tags, '{}') @> array[s.name] then identity_tags
-        else coalesce(identity_tags, '{}') || s.name
-      end
-      where id = s.proposer_id;
-  else
-    insert into public.profile_categories (profile_id, category_id)
-    values (s.proposer_id, v_slug)
-    on conflict do nothing;
-  end if;
-
   update public.category_suggestions
-    set status = 'approved', category_id = v_slug, decided_at = now(), decided_by = v_caller
+    set status = 'approved', category_id = v_first_slug, decided_at = now(), decided_by = v_caller
     where id = p_suggestion_id;
 end;
 $$;
 
 
-ALTER FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) OWNER TO postgres;
+ALTER FUNCTION public.approve_category_suggestion(p_suggestion_id uuid, p_domains text[]) OWNER TO postgres;
 
 --
 -- Name: approve_exchange_guardian(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -10823,12 +10842,12 @@ GRANT ALL ON FUNCTION public.alias_category_suggestion(p_suggestion uuid, p_cate
 
 
 --
--- Name: FUNCTION approve_category_suggestion(p_suggestion_id uuid); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION approve_category_suggestion(p_suggestion_id uuid, p_domains text[]); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO anon;
-GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO authenticated;
-GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid) TO service_role;
+GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid, p_domains text[]) TO anon;
+GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid, p_domains text[]) TO authenticated;
+GRANT ALL ON FUNCTION public.approve_category_suggestion(p_suggestion_id uuid, p_domains text[]) TO service_role;
 
 
 --
@@ -13277,7 +13296,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict U2095H7YkFJxiBJPFyBYT16g3wmD8rUA7aOQqvGzmch6xo6L0KHXduT72FJxae5
+\unrestrict MaUqY8JGz9TOvuloLj2fQDeUH2aFihiVppFa2jfWmQ72faTnRhm2vwhcIaM9pRn
 
 
 
