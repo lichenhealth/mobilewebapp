@@ -588,7 +588,10 @@ Deno.serve(async (req) => {
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: (canEdit || canCalendar) ? 1000 : 400,
+        // 400 silently starved long asks into 'empty-reply' (the wow-window
+        // lesson, again — 2026-08-20: a multi-part message got no reply at
+        // all). Headroom is cheap; silence is not.
+        max_tokens: (canEdit || canCalendar) ? 1600 : 1000,
         system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${calendarRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
