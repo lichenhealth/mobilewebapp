@@ -45,3 +45,13 @@
   font-size: 10px; font-family: var(--font-mono);
   color: var(--ink-faint); letter-spacing: 0.04em;
 }
+
+/* Desktop: job rows tile two abreast like every other feed (founder
+   2026-08-20) — same idiom as .mkt__list / .home__feed. */
+@media (min-width: 1024px) {
+  .row-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    align-items: start;
+  }
+}

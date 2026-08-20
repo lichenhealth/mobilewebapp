@@ -483,4 +483,8 @@
 /* A row, not a card: an activity line spans the feed's columns rather than
    sitting in one, so a list of them reads as a list (the same reason member
    rows never go multi-column) and a title never truncates to fit a column. */
-.feed-card-shell--activity { grid-column: 1 / -1; }
+/* Activity rows used to span the whole feed grid (grid-column: 1/-1) —
+   right when one row sat among tall cards, wrong when a whole section is
+   rows (Courses' feed read as one long column while Art sat two abreast —
+   founder 2026-08-20: formatting be consistent). They tile like any card
+   now; their wrap-don't-truncate width rule is unchanged. */
