@@ -1014,8 +1014,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <>
             {/* Join / my-celium / trust ride ABOVE the page, not below every
                 section of it (founder 2026-08-06: "it gets pushed to the
-                bottom... seems important enough to keep at the top"). */}
-            {!backstage && !tab && (
+                bottom... seems important enough to keep at the top").
+                NOT in Public View (founder 2026-08-21: presence leaked onto
+                the website preview) — same rule as the relationship signals:
+                member chrome steps out of what the open web sees. */}
+            {!backstage && !tab && !previewing && !forcePublic && (
               <>
                 {noticeBanners}
                 {presenceLine}
