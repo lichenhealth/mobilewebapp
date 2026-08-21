@@ -12,7 +12,7 @@ import './ScopeEscape.css';
  *  (The separate header escape chip retired 2026-08-13 — founder: with the
  *  link living where the content should be, the extra button was redundant
  *  and made the UI busy.) */
-export function ScopeEmpty({ icon, section, who, to, label, onGo }: {
+export function ScopeEmpty({ icon, section, who, to, label, onGo, prep = 'from' }: {
   icon: Parameters<typeof Icon>[0]['name'];
   /** The section's own name — "Library", "Marketplace". */
   section: string;
@@ -24,13 +24,16 @@ export function ScopeEmpty({ icon, section, who, to, label, onGo }: {
    *  navigation — an entity's empty feed kicks you UP, not away
    *  (founder 2026-08-14). */
   onGo?: () => void;
+  /** "from Countryman Stables" for an author scope; an identity scope reads
+   *  "for Veterans" — content aimed AT them, not written BY them. */
+  prep?: string;
 }) {
   const navigate = useNavigate();
   return (
     <div className="scope-empty">
       <Icon name={icon} size={20} />
       <p className="scope-empty__line">
-        No {section} content from {who} yet!
+        No {section} content {prep} {who} yet!
       </p>
       <button className="scope-empty__link" onClick={() => (onGo ? onGo() : navigate(to))}>{label}</button>
     </div>
@@ -44,20 +47,23 @@ export function ScopeEmpty({ icon, section, who, to, label, onGo }: {
  *  the point; this only says where the rest lives. */
 export const FEW_RESULTS = 5;
 
-export function ScopeMore({ count, section, who, to, label }: {
+export function ScopeMore({ count, section, who, to, label, phrase }: {
   count: number;
   section: string;
   who: string;
   to: string;
   label: string;
+  /** Overrides the "{who} has" clause — an identity scope passes
+   *  "for Veterans" (aimed at them, not held by them). */
+  phrase?: string;
 }) {
   const navigate = useNavigate();
   if (count === 0 || count >= FEW_RESULTS) return null;   // 0 is ScopeEmpty's job
   return (
     <div className="scope-more">
       <p className="scope-more__line">
-        That&rsquo;s all {count === 1 ? 'the one thing' : `${count} things`} {who} has
-        in {section} so far.
+        That&rsquo;s all {count === 1 ? 'the one thing' : `${count} things`} {phrase ?? `${who} has`}
+        {' '}in {section} so far.
       </p>
       <button className="scope-more__link" onClick={() => navigate(to)}>{label}</button>
     </div>

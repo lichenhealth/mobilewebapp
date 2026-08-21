@@ -22,16 +22,16 @@ import './Identities.css';
  *  ONLY when someone has aimed content at this identity (founder 2026-08-21:
  *  "something doesn't show up in identity unless someone adds content within
  *  it") — the door-appears-because-something-is-behind-it rule. */
-const IDENTITY_AREAS: { key: string; label: string; icon: IconName }[] = [
-  { key: 'courses', label: 'Courses', icon: 'graduation-cap' },
-  { key: 'marketplace', label: 'Marketplace', icon: 'store' },
-  { key: 'events', label: 'Events', icon: 'rsvp' },
-  { key: 'work', label: 'Work', icon: 'briefcase' },
-  { key: 'library', label: 'Library', icon: 'book' },
-  { key: 'art', label: 'Art', icon: 'palette' },
-  { key: 'food', label: 'Food', icon: 'fork-spoon' },
-  { key: 'travel', label: 'Travel', icon: 'plane' },
-  { key: 'places', label: 'Places', icon: 'location' },
+const IDENTITY_AREAS: { key: string; label: string; icon: IconName; route?: string }[] = [
+  { key: 'courses', label: 'Courses', icon: 'graduation-cap', route: '/courses' },
+  { key: 'marketplace', label: 'Marketplace', icon: 'store', route: '/market' },
+  { key: 'events', label: 'Events', icon: 'rsvp', route: '/events' },
+  { key: 'work', label: 'Work', icon: 'briefcase', route: '/work' },
+  { key: 'library', label: 'Library', icon: 'book', route: '/library' },
+  { key: 'art', label: 'Art', icon: 'palette', route: '/art' },
+  { key: 'food', label: 'Food', icon: 'fork-spoon', route: '/food' },
+  { key: 'travel', label: 'Travel', icon: 'plane', route: '/travel' },
+  { key: 'places', label: 'Places', icon: 'location' },   // no post-feed page yet — stays on-page
 ];
 
 /* IDENTITIES ARE NOT COMMUNITIES (founder 2026-08-20): "Communities should
@@ -285,12 +285,18 @@ export default function IdentityPage() {
             </button>
           )}
         </div>
-        {/* The doors row — only rooms with something behind them. */}
+        {/* The doors row — only rooms with something behind them, and each
+            opens the REAL section scoped to this identity (founder
+            2026-08-21: "marketplace with the filter of first responder
+            already added") — ScopeBack there offers Back-to-the-gathering
+            and an explicit clear-the-filter step. */}
         {liveAreas.length > 0 && (
           <div className="idn__doors">
             {liveAreas.map((a) => (
               <button key={a.key} type="button" className="idn__door" title={`${a.label} for ${cat.name}s`}
-                onClick={() => document.getElementById(`idnsec-${a.key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+                onClick={() => a.route
+                  ? navigate(`${a.route}?identity=${cat.id}`)
+                  : document.getElementById(`idnsec-${a.key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
                 <Icon name={a.icon} size={18} />
               </button>
             ))}

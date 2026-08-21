@@ -20,7 +20,8 @@ import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
 import { webAuthorFilter } from '../lib/myceliumApi';
-import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
+import { loadFeed, loadAuthorFeed, loadForIdentity, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
+import { resolveIdentityScope } from '../lib/identityScope';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend, recommendKey,
@@ -95,7 +96,10 @@ export default function Marketplace() {
   // not a search hand-off); /market?member=<id> likewise.
   const member = params.get('member');
   const space = params.get('space');
-  const scoped = member || space;
+  // /market?identity=<catId> = "Marketplace for Veterans" (founder
+  // 2026-08-21) — the identity page's door opens the REAL room, filtered.
+  const identity = params.get('identity');
+  const scoped = member || space || identity;
   const [scopeName, setScopeName] = useState('');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const { promptSaved, openPicker } = useCollect();
@@ -256,10 +260,14 @@ export default function Marketplace() {
     let live = true;
     setReady(false);
     (async () => {
+      let idScope = null as Awaited<ReturnType<typeof resolveIdentityScope>>;
+      if (identity) idScope = await resolveIdentityScope(identity);
       const raw = member ? await loadAuthorFeed({ profileId: member })
         : space ? await loadAuthorFeed({ spaceId: space })
+        : idScope ? await loadForIdentity(idScope.name)
         : await loadFeed(200);
       let feed = raw.filter((p) => postAreas(p).includes('marketplace'));
+      if (identity && live) setScopeName(idScope?.plural ?? '');
       // ?web=1 — you came here from My-celium; stay in it (founder 2026-08-07).
       if (params.get('web') === '1') {
         const inWeb = await webAuthorFilter();
@@ -278,7 +286,7 @@ export default function Marketplace() {
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, [member, space]);
+  }, [member, space, identity]);
 
   const filtered = useMemo(() => {
     const wanted = new Set(activeChips.flatMap((c) => CHIP_MODES[c]));
@@ -339,9 +347,9 @@ export default function Marketplace() {
 
   return (
     <div className="mkt">
-      <ScopeBack />
+      <ScopeBack sectionLabel="Marketplace" />
       <header className="mkt__head">
-        {scoped && (
+        {(member || space) && (
           <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
             <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
           </button>
@@ -351,7 +359,9 @@ export default function Marketplace() {
           <span>Marketplace</span>
         </p>
         <h1 className="mkt__title">
-          {scoped
+          {identity
+            ? <><span className="display-italic">Marketplace</span> for {scopeName || '…'}</>
+            : scoped
             ? <>{possessive(scopeName)} <span className="display-italic">Marketplace</span></>
             : <>What members are <span className="display-italic">offering &amp; seeking.</span></>}
         </h1>
@@ -481,6 +491,7 @@ export default function Marketplace() {
           icon="store"
           section="Marketplace"
           who={scopeName || 'them'}
+          prep={identity ? 'for' : 'from'}
           to="/market"
           label="Visit the Lichen Marketplace"
         />
@@ -557,6 +568,7 @@ export default function Marketplace() {
           count={filtered.length}
           section="Marketplace"
           who={scopeName || 'they'}
+          phrase={identity ? `for ${scopeName || 'this identity'}` : undefined}
           to="/market"
           label="Browse the Lichen Marketplace"
         />

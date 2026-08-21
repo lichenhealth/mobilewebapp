@@ -21,7 +21,8 @@ import ListingRow from '../components/ListingRow';
 import ViewToggle from '../components/ViewToggle';
 import OfferingChips from '../components/OfferingChips';
 import { setHidden } from '../lib/hiddenApi';
-import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { loadFeed, loadAuthorFeed, loadForIdentity, deletePost, postAreas, type FeedPost, type ServiceArea } from '../lib/postsApi';
+import { resolveIdentityScope } from '../lib/identityScope';
 import { postOpenPath, postToCard, postMedium, weaveProps, type PostMedium } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -74,7 +75,11 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   // space area icons open the REAL section, not an inline sub-feed).
   const member = params.get('member');
   const space = params.get('space');
-  const scoped = member || space;
+  // /courses?identity=<catId> = "Courses for Veterans" (founder 2026-08-21):
+  // the identity page's door opens the REAL section, filtered to content
+  // aimed at that identity.
+  const identity = params.get('identity');
+  const scoped = member || space || identity;
   const [memberName, setMemberName] = useState('');
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
   const { promptSaved, openPicker } = useCollect();
@@ -119,10 +124,14 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
     let live = true;
     setReady(false);
     (async () => {
+      let idScope = null as Awaited<ReturnType<typeof resolveIdentityScope>>;
+      if (identity) idScope = await resolveIdentityScope(identity);
       const raw = member ? await loadAuthorFeed({ profileId: member })
         : space ? await loadAuthorFeed({ spaceId: space })
+        : idScope ? await loadForIdentity(idScope.name)
         : await loadFeed(200);
       let feed = raw.filter((p) => postAreas(p).includes(area));
+      if (identity && live) setMemberName(idScope?.plural ?? '');
       // ?web=1 — arrived from My-celium, so stay inside it (founder 2026-08-07).
       if (params.get('web') === '1') {
         const inWeb = await webAuthorFilter();
@@ -165,7 +174,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();
     return () => { live = false; };
-  }, [area, member, space]);
+  }, [area, member, space, identity]);
 
   const filtered = useMemo(() => {
     let list = posts;
@@ -215,7 +224,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
       <header className="mkt__head">
         {/* One implementation of the way back (founder 2026-08-15 made this a
             platform rule) — AreaFeed's bespoke version was its precedent. */}
-        <ScopeBack />
+        <ScopeBack sectionLabel={crumb} />
         {/* No glyph: the top bar's section mark is already this section's
             icon, so the crumb was showing it twice (founder 2026-08-16, on
             Drive — same duplication across every area). */}
@@ -223,7 +232,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <span>{crumb}</span>
         </p>
         <h1 className="mkt__title">
-          {scoped
+          {identity
+            ? <><span className="display-italic">{crumb}</span> for {memberName || '…'}</>
+            : scoped
             ? <>{possessive(memberName)} <span className="display-italic">{crumb}</span></>
             : <>{title} <span className="display-italic">{italic}</span></>}
         </h1>
@@ -407,6 +418,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           icon={icon}
           section={crumb}
           who={memberName || 'them'}
+          prep={identity ? 'for' : 'from'}
           to={`/${area}`}
           label={`Visit the Lichen ${crumb}`}
         />
@@ -482,6 +494,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           count={filtered.length}
           section={crumb}
           who={memberName || 'they'}
+          phrase={identity ? `for ${memberName || 'this identity'}` : undefined}
           to={`/${area}`}
           label={`Browse the Lichen ${crumb}`}
         />

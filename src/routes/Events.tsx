@@ -12,7 +12,7 @@ import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import {
-  loadFeed, loadAuthorFeed, postAreas, loadMyRsvpStatuses, rsvpToEvent, unRsvp,
+  loadFeed, loadAuthorFeed, loadForIdentity, postAreas, loadMyRsvpStatuses, rsvpToEvent, unRsvp,
   EVENT_CATEGORIES, EVENT_MODES,
   type FeedPost, type EventCategory, type EventMode, type MyRsvpStatus,
 } from '../lib/postsApi';
@@ -24,6 +24,7 @@ import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard, weaveProps } from '../lib/feedMapping';
+import { resolveIdentityScope } from '../lib/identityScope';
 import './Events.css';
 
 const TABS = ['All', ...EVENT_CATEGORIES.map((c) => c.label)];
@@ -55,7 +56,9 @@ export default function Events() {
   // personal, reachable via the plain tabs).
   const member = params.get('member');
   const space = params.get('space');
-  const scoped = member || space;
+  // /events?identity=<catId> = "Events for Veterans" (founder 2026-08-21).
+  const identity = params.get('identity');
+  const scoped = member || space || identity;
   const [scopeName, setScopeName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
@@ -72,10 +75,14 @@ export default function Events() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   const load = useCallback(async () => {
+    let idScope = null as Awaited<ReturnType<typeof resolveIdentityScope>>;
+    if (identity) idScope = await resolveIdentityScope(identity);
     const raw = member ? await loadAuthorFeed({ profileId: member })
       : space ? await loadAuthorFeed({ spaceId: space })
+      : idScope ? await loadForIdentity(idScope.name)
       : await loadFeed();
     const feed = raw.filter((p) => postAreas(p).includes('events'));
+    if (identity) setScopeName(idScope?.plural ?? '');
     if (member) {
       const { data } = await supabase.from('profiles').select('full_name').eq('id', member).maybeSingle();
       setScopeName((data as { full_name: string | null } | null)?.full_name ?? '');
@@ -89,7 +96,7 @@ export default function Events() {
       ? await loadMyRsvpStatuses(feed.map((p) => p.linked_event_id).filter((id): id is string => !!id), me)
       : new Map<string, MyRsvpStatus>();
     setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setStatuses(rsvps);
-  }, [me, member, space]);
+  }, [me, member, space, identity]);
   useEffect(() => { load(); }, [load]);
 
   /** Am I actively attending (going or maybe)? */
@@ -225,16 +232,20 @@ export default function Events() {
 
   return (
     <div className="evt">
-      <ScopeBack />
+      <ScopeBack sectionLabel="Events" />
       {/* Scoped: a slim header in place of the personal tabs — back to the
-          entity, "{Name}'s Events". */}
+          entity, "{Name}'s Events" (or "Events for Veterans"). */}
       {scoped ? (
         <header className="mkt__head">
-          <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
-            <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
-          </button>
+          {(member || space) && (
+            <button className="cmp__back mkt__memberback" onClick={() => navigate(member ? `/members/${member}` : `/spaces/${space}`)}>
+              <Icon name="arrow-left" size={14} /> {scopeName || 'Back'}
+            </button>
+          )}
           <h1 className="mkt__title">
-            {scopeName}&rsquo;s <span className="display-italic">Events</span>
+            {identity
+              ? <><span className="display-italic">Events</span> for {scopeName || '…'}</>
+              : <>{scopeName}&rsquo;s <span className="display-italic">Events</span></>}
           </h1>
         </header>
       ) : view === 'mine' ? (
@@ -336,6 +347,7 @@ export default function Events() {
             {visible.length === 0 && (scoped ? (
               <ScopeEmpty
                 icon="rsvp" section="Events" who={scopeName || 'them'}
+                prep={identity ? 'for' : 'from'}
                 to="/events" label="Visit Lichen Events"
               />
             ) : (
@@ -347,6 +359,7 @@ export default function Events() {
                 count={visible.length}
                 section="Events"
                 who={scopeName || 'they'}
+                phrase={identity ? `for ${scopeName || 'this identity'}` : undefined}
                 to="/events"
                 label="Browse Lichen Events"
               />

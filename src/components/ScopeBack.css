@@ -13,3 +13,8 @@
 }
 .scope-back:hover { border-color: var(--peach); color: var(--peach-deep); }
 .scope-back svg { color: var(--peach-deep); }
+
+/* Identity scope shows two clear steps: back, and clear (2026-08-21) */
+.scope-back-row { display: flex; gap: 8px; flex-wrap: wrap; align-self: flex-start; }
+.scope-back--clear { color: var(--ink-muted); }
+.scope-back--clear:hover { color: var(--rust); border-color: var(--rust); }
