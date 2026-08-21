@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MaUqY8JGz9TOvuloLj2fQDeUH2aFihiVppFa2jfWmQ72faTnRhm2vwhcIaM9pRn
+\restrict mTOfnGfDANwgtT6BiHhH20bFpG1AWchPf9hczdBLrvIfUWMKd2uhsfXrrqX0WMh
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -220,6 +220,8 @@ declare
   v_slug text;
   v_n int;
   v_first_slug text;
+  v_identity_slug text;
+  v_provider_slugs text[] := '{}';
 begin
   select is_admin into v_is_admin from public.profiles where id = v_caller;
   if not coalesce(v_is_admin, false) then
@@ -256,6 +258,7 @@ begin
     if v_first_slug is null then v_first_slug := v_slug; end if;
 
     if v_domain = 'identity' then
+      v_identity_slug := v_slug;
       -- "I am this" lands in the proposer's public identity tags.
       update public.profiles
         set identity_tags = case
@@ -264,12 +267,20 @@ begin
         end
         where id = s.proposer_id;
     else
+      v_provider_slugs := v_provider_slugs || v_slug;
       -- "I offer this" lands in their provider categories.
       insert into public.profile_categories (profile_id, category_id)
       values (s.proposer_id, v_slug)
       on conflict do nothing;
     end if;
   end loop;
+
+  -- Landed in both worlds at once → the worlds are kindred; remember it.
+  if v_identity_slug is not null and coalesce(array_length(v_provider_slugs, 1), 0) > 0 then
+    insert into public.category_identity_links (category_id, identity_id)
+    select unnest(v_provider_slugs), v_identity_slug
+    on conflict do nothing;
+  end if;
 
   update public.category_suggestions
     set status = 'approved', category_id = v_first_slug, decided_at = now(), decided_by = v_caller
@@ -877,6 +888,27 @@ $$;
 
 
 ALTER FUNCTION public.chat_unread_counts() OWNER TO postgres;
+
+--
+-- Name: check_category_identity_link(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.check_category_identity_link() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if (select domain from public.categories where id = new.category_id) = 'identity' then
+    raise exception 'category_id must be a provider category, not an identity';
+  end if;
+  if (select domain from public.categories where id = new.identity_id) <> 'identity' then
+    raise exception 'identity_id must be an identity category';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.check_category_identity_link() OWNER TO postgres;
 
 --
 -- Name: check_invite(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5259,6 +5291,19 @@ CREATE TABLE public.category_aliases (
 ALTER TABLE public.category_aliases OWNER TO postgres;
 
 --
+-- Name: category_identity_links; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.category_identity_links (
+    category_id text NOT NULL,
+    identity_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.category_identity_links OWNER TO postgres;
+
+--
 -- Name: category_suggestions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -6668,6 +6713,14 @@ ALTER TABLE ONLY public.category_aliases
 
 
 --
+-- Name: category_identity_links category_identity_links_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.category_identity_links
+    ADD CONSTRAINT category_identity_links_pkey PRIMARY KEY (category_id, identity_id);
+
+
+--
 -- Name: category_suggestions category_suggestions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7707,6 +7760,13 @@ CREATE TRIGGER care_posts_touch BEFORE UPDATE ON public.care_posts FOR EACH ROW 
 
 
 --
+-- Name: category_identity_links enforce_category_identity_link; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER enforce_category_identity_link BEFORE INSERT OR UPDATE ON public.category_identity_links FOR EACH ROW EXECUTE FUNCTION public.check_category_identity_link();
+
+
+--
 -- Name: collection_items enforce_weaveable; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -8183,6 +8243,22 @@ ALTER TABLE ONLY public.category_aliases
 
 ALTER TABLE ONLY public.category_aliases
     ADD CONSTRAINT category_aliases_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: category_identity_links category_identity_links_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.category_identity_links
+    ADD CONSTRAINT category_identity_links_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: category_identity_links category_identity_links_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.category_identity_links
+    ADD CONSTRAINT category_identity_links_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.categories(id) ON DELETE CASCADE;
 
 
 --
@@ -9549,6 +9625,12 @@ CREATE POLICY "categories: readable" ON public.categories FOR SELECT TO anon USI
 ALTER TABLE public.category_aliases ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: category_identity_links; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.category_identity_links ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: category_suggestions; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -10111,6 +10193,24 @@ CREATE POLICY ledger_read ON public.ledger_entries FOR SELECT TO authenticated U
   WHERE ((m.space_id = ledger_entries.to_id) AND (m.profile_id = auth.uid()))))) OR (EXISTS ( SELECT 1
    FROM public.profiles p
   WHERE ((p.id = auth.uid()) AND p.is_admin)))));
+
+
+--
+-- Name: category_identity_links links readable; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "links readable" ON public.category_identity_links FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: category_identity_links links: admins write; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "links: admins write" ON public.category_identity_links TO authenticated USING (COALESCE(( SELECT profiles.is_admin
+   FROM public.profiles
+  WHERE (profiles.id = auth.uid())), false)) WITH CHECK (COALESCE(( SELECT profiles.is_admin
+   FROM public.profiles
+  WHERE (profiles.id = auth.uid())), false));
 
 
 --
@@ -11031,6 +11131,15 @@ GRANT ALL ON FUNCTION public.care_member_display(p_ids uuid[]) TO service_role;
 GRANT ALL ON FUNCTION public.chat_unread_counts() TO anon;
 GRANT ALL ON FUNCTION public.chat_unread_counts() TO authenticated;
 GRANT ALL ON FUNCTION public.chat_unread_counts() TO service_role;
+
+
+--
+-- Name: FUNCTION check_category_identity_link(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.check_category_identity_link() TO anon;
+GRANT ALL ON FUNCTION public.check_category_identity_link() TO authenticated;
+GRANT ALL ON FUNCTION public.check_category_identity_link() TO service_role;
 
 
 --
@@ -12377,6 +12486,15 @@ GRANT ALL ON TABLE public.category_aliases TO service_role;
 
 
 --
+-- Name: TABLE category_identity_links; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.category_identity_links TO anon;
+GRANT ALL ON TABLE public.category_identity_links TO authenticated;
+GRANT ALL ON TABLE public.category_identity_links TO service_role;
+
+
+--
 -- Name: TABLE category_suggestions; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13296,7 +13414,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MaUqY8JGz9TOvuloLj2fQDeUH2aFihiVppFa2jfWmQ72faTnRhm2vwhcIaM9pRn
+\unrestrict mTOfnGfDANwgtT6BiHhH20bFpG1AWchPf9hczdBLrvIfUWMKd2uhsfXrrqX0WMh
 
 
 

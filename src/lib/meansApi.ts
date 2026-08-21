@@ -116,6 +116,37 @@ export async function getIdentityTags(profileId: string): Promise<string[]> {
   return Array.isArray(tags) ? tags : [];
 }
 
+/** THE OVERLAP, OFFERED NEVER INFERRED (founder 2026-08-20: "providing
+ *  pastries might mean that you identify as a baker" — but "some beekeepers
+ *  just want to do their job"). Curated category→identity links surface a
+ *  one-time question at the moment of overlap; the caller filters by
+ *  member_prompts (topic `identity-offer-<identityId>`) so nobody is asked
+ *  twice, and nothing ever adds itself. */
+export interface IdentityOffer { identityId: string; identityName: string; becauseOf: string[] }
+
+export async function loadIdentityOffers(profileId: string): Promise<IdentityOffer[]> {
+  const { data: pc } = await supabase
+    .from('profile_categories').select('category_id').eq('profile_id', profileId);
+  const catIds = ((pc as { category_id: string }[] | null) ?? []).map((r) => r.category_id);
+  if (!catIds.length) return [];
+  const { data: links } = await supabase
+    .from('category_identity_links')
+    .select('category_id, cat:categories!category_identity_links_category_id_fkey(name), identity:categories!category_identity_links_identity_id_fkey(id, name)')
+    .in('category_id', catIds);
+  if (!links) return [];
+  const carried = new Set((await getIdentityTags(profileId)).map((t) => t.trim().toLowerCase()));
+  const byIdentity = new Map<string, IdentityOffer>();
+  for (const raw of links as unknown[]) {
+    const row = raw as { cat: { name: string } | null; identity: { id: string; name: string } | null };
+    if (!row.identity || carried.has(row.identity.name.trim().toLowerCase())) continue;
+    const cur = byIdentity.get(row.identity.id)
+      ?? { identityId: row.identity.id, identityName: row.identity.name, becauseOf: [] };
+    if (row.cat?.name && !cur.becauseOf.includes(row.cat.name)) cur.becauseOf.push(row.cat.name);
+    byIdentity.set(row.identity.id, cur);
+  }
+  return [...byIdentity.values()];
+}
+
 export async function saveIdentityTags(tags: string[]): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;

@@ -297,3 +297,19 @@
 
 /* Legacy identity tags — free text from before the vocabulary existed */
 .prof__legacy-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* The identity offer — the overlap honored, never inferred (2026-08-20) */
+.prof__idoffer {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: var(--s-3);
+  padding: 12px 14px; border: 1px solid var(--peach); border-radius: var(--r-md);
+  background: var(--peach-tint);
+}
+.prof__idoffer > svg { flex-shrink: 0; margin-top: 2px; color: var(--peach-deep); }
+.prof__idoffer-text { flex: 1 1 220px; font-size: var(--t-sm); color: var(--ink-soft); line-height: 1.5; }
+.prof__idoffer-text strong { color: var(--ink); }
+.prof__idoffer-acts { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.prof__idoffer-no {
+  background: none; border: 0; padding: 0; font-size: var(--t-xs); color: var(--ink-faint);
+  cursor: pointer; font-family: inherit; text-decoration: underline;
+}
+.prof__idoffer-no:hover { color: var(--ink); }

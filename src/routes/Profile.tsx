@@ -6,7 +6,8 @@ import {
   listMyBeings, createBeing, ENTITY_KINDS, DISTRIBUTED_KINDS,
   type Being, type EntityKind, type EntityAspect,
 } from '../lib/stewardshipApi';
-import { getIdentityTags, saveIdentityTags } from '../lib/meansApi';
+import { getIdentityTags, saveIdentityTags, loadIdentityOffers, type IdentityOffer } from '../lib/meansApi';
+import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -133,6 +134,10 @@ export default function Profile() {
   // vocabulary and match nothing stay as legacy chips — never dropped.
   const [identityIds, setIdentityIds] = useState<string[]>([]);
   const [identityLegacy, setIdentityLegacy] = useState<string[]>([]);
+  // The overlap, offered never inferred (founder 2026-08-20): "providing
+  // pastries might mean that you identify as a baker" — linked identities
+  // you don't carry surface ONE question each, tracked in member_prompts.
+  const [identityOffers, setIdentityOffers] = useState<IdentityOffer[]>([]);
   const [notifPref, setNotifPref] = useState<NotifPref>('in_app');
   const [pushState, setPushState] = useState<PushState>('off');
   const [pushBusy, setPushBusy] = useState(false);
@@ -638,6 +643,36 @@ export default function Profile() {
     }
   }
 
+  const refreshIdentityOffers = useCallback(async () => {
+    if (!user) return;
+    await loadPrompts(user.id);
+    const offers = await loadIdentityOffers(user.id);
+    setIdentityOffers(offers.filter((o) => !promptSeen('identity-offer-' + o.identityId)));
+  }, [user]);
+  useEffect(() => { void refreshIdentityOffers(); }, [refreshIdentityOffers]);
+
+  /** One tap says yes — the tag saves right away (an offer answered
+   *  shouldn't wait on a Save button it can't see). */
+  async function acceptIdentityOffer(o: IdentityOffer) {
+    if (!user) return;
+    const idName = new Map(categories.filter((c) => c.domain === 'identity').map((c) => [c.id, c.name]));
+    const names = [
+      ...identityIds.map((cid) => idName.get(cid)).filter((n): n is string => !!n),
+      ...identityLegacy,
+    ];
+    if (!names.some((n) => n.trim().toLowerCase() === o.identityName.trim().toLowerCase())) {
+      await saveIdentityTags([...names, o.identityName]);
+      setIdentityIds((cur) => (cur.includes(o.identityId) ? cur : [...cur, o.identityId]));
+    }
+    await markPrompt(user.id, 'identity-offer-' + o.identityId);
+    setIdentityOffers((cur) => cur.filter((x) => x.identityId !== o.identityId));
+  }
+  async function declineIdentityOffer(o: IdentityOffer) {
+    if (!user) return;
+    await markPrompt(user.id, 'identity-offer-' + o.identityId);
+    setIdentityOffers((cur) => cur.filter((x) => x.identityId !== o.identityId));
+  }
+
   // Persist category changes immediately (added -> upsert, removed -> delete)
   async function setCatsForDomain(domain: 'good' | 'service' | 'place', ids: string[]) {
     if (!user) return;
@@ -653,6 +688,9 @@ export default function Profile() {
       const { error: e } = await supabase.from('profile_categories')
         .upsert(rows, { onConflict: 'profile_id,category_id', ignoreDuplicates: true });
       if (e) setError(e.message);
+      // The moment of overlap: a just-added category may carry a kindred
+      // identity worth offering (never adding) — refresh the question list.
+      void refreshIdentityOffers();
     }
     if (removed.length) {
       const { error: e } = await supabase.from('profile_categories')
@@ -1280,6 +1318,28 @@ export default function Profile() {
             />
           </div>
         )}
+
+        {/* The overlap, honored (founder 2026-08-20): what you provide may
+            also be who you are — but only you say so. Each linked identity
+            asks ONCE (member_prompts); declining is silent and final. */}
+        {identityOffers.map((o) => (
+          <div className="prof__idoffer" key={o.identityId}>
+            <Icon name="fingerprint" size={15} />
+            <span className="prof__idoffer-text">
+              Providing {o.becauseOf.join(' & ').toLowerCase() || 'this'} — do you
+              also identify as a <strong>{o.identityName}</strong>? It would show
+              on your profile and place you in the {o.identityName} gathering.
+            </span>
+            <span className="prof__idoffer-acts">
+              <button className="btn btn-primary prof__idoffer-yes" onClick={() => void acceptIdentityOffer(o)}>
+                I&rsquo;m a {o.identityName}
+              </button>
+              <button className="prof__idoffer-no" onClick={() => void declineIdentityOffer(o)}>
+                Not for me
+              </button>
+            </span>
+          </div>
+        ))}
       </CollapsibleSection>
 
       <CollapsibleSection id="currentcy" title="Current-cy" open={openSections.has('currentcy')} onToggle={() => toggleSection('currentcy')}>
