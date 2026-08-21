@@ -345,10 +345,10 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               number of people and nobody runs it). Absent in admin view. */}
           {!adminView && (
             <div className="side-menu__section">
-              {/* Identities sit IN LINE with the other section titles, a
-                  hairline above them as the visual split (founder 2026-08-21)
-                  — same icon grid as everything else, different nature. */}
-              <div className="side-menu__divider" aria-hidden />
+              {/* Identities sit WITH the space kinds — they're all filters
+                  on the network, unlike the utilities below (founder
+                  2026-08-21); the hairline now sits UNDER this section as
+                  the filters/utilities split. */}
               <button
                 className="side-menu__header"
                 onClick={() => { setIdnExpanded((e) => !e); go('/identities'); }}
@@ -373,6 +373,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               )}
             </div>
           )}
+
+          {/* Filters above, utilities below (founder 2026-08-21): the kinds
+              and Identities are ways of seeing the network; everything under
+              this line is a tool. */}
+          <div className="side-menu__divider" aria-hidden />
 
           {/* The tools and platform doors come AFTER the places you belong to
               (founder 2026-08-08): what you read and where you belong lead;
