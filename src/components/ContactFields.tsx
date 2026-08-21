@@ -54,6 +54,9 @@ export default function ContactFields({ value, onChange, lead, suggestions }: {
             />
             {!(value[f.key] ?? '').trim() && (suggestions?.[f.key]?.length ?? 0) > 0 && (
               <span className="contactf__suggs">
+                {/* An explicit Add bubble does the adding (founder
+                    2026-08-21: the bare chip didn't say it was a button) —
+                    the chip shows WHAT Lichen holds, the bubble is the act. */}
                 {suggestions![f.key]!.slice(0, 3).map((s) => (
                   <button
                     key={s.value} type="button" className="contactf__sugg"
@@ -61,6 +64,7 @@ export default function ContactFields({ value, onChange, lead, suggestions }: {
                     title={s.value}
                   >
                     <em>From Lichen</em> {s.label}
+                    <span className="contactf__sugg-add">+ Add</span>
                   </button>
                 ))}
               </span>

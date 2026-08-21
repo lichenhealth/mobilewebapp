@@ -84,12 +84,23 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   return (
     <div className="ptabs">
       <p className="ptabs__lead">
-        Feed always leads. Each tab below stays hidden until you give it
-        something to show.
+        Every page opens on Home — visitors land there. Each tab below is
+        optional, and stays hidden until you give it something to show.
       </p>
 
+      {/* HOME IS THE ALWAYS-ON DEFAULT (founder 2026-08-21): it was already
+          structural — every public page leads with it — but the builder
+          never said so, which made About read as the page's anchor. About
+          is an optional tab like the others. */}
+      <div className="ptabs__row ptabs__row--home">
+        <div className="ptabs__head">
+          <span className="ptabs__icon"><Icon name="home" size={15} /></span>
+          <span className="ptabs__name">Home<em className="ptabs__auto">always on — where visitors land</em></span>
+        </div>
+      </div>
+
       {tabs.length === 0 && (
-        <p className="ptabs__empty">No tabs yet. Your page is just your feed.</p>
+        <p className="ptabs__empty">No other tabs yet — your page is Home, plus your feed.</p>
       )}
 
       <div className="ptabs__list" ref={listRef}>

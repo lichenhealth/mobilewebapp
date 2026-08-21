@@ -27,6 +27,11 @@ export default function Onboarding() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  // Ask for whichever contact the SIGNUP didn't give us (founder 2026-08-21):
+  // an email signup adds a phone; a phone signup adds an email. Neither is
+  // public — what gets shared is chosen later in this same flow.
+  const [contactEmail, setContactEmail] = useState('');
+  const hasAuthPhone = !!user?.phone && !user?.email;
   // Age (founder 2026-08-05). One question for everyone; a minor gives a birth
   // date so the platform ages them up on its own instead of freezing a number.
   const [adult, setAdult] = useState<boolean | null>(null);
@@ -99,13 +104,18 @@ export default function Onboarding() {
         return 'Ask a parent or guardian to set this up for you — they can invite you from their own Lichen account.';
       }
     }
-    return firstName.trim() && lastName.trim() && phone.trim()
+    const contactOk = hasAuthPhone ? contactEmail.trim() : phone.trim();
+    return firstName.trim() && lastName.trim() && contactOk
       ? ''
-      : 'Please add your first name, last name, and phone number.';
+      : `Please add your first name, last name, and ${hasAuthPhone ? 'email address' : 'phone number'}.`;
   }
   function basicsPatch() {
     return {
-      first_name: firstName.trim(), last_name: lastName.trim(), phone: phone.trim(),
+      first_name: firstName.trim(), last_name: lastName.trim(),
+      // A phone signup already gave us the phone — keep it; what we asked
+      // for instead was the email, saved to the profile's contact column.
+      phone: hasAuthPhone ? (user?.phone ?? null) : phone.trim(),
+      ...(hasAuthPhone && contactEmail.trim() ? { email: contactEmail.trim() } : {}),
       // A birth date always wins — the trigger recomputes is_adult from it.
       birth_date: birthDate || null,
       is_adult: adult ?? undefined,
@@ -227,17 +237,30 @@ export default function Onboarding() {
               placeholder="Last name"
               autoComplete="family-name"
             />
-            <input
-              className="onb__input"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone number"
-              autoComplete="tel"
-            />
+            {hasAuthPhone ? (
+              <input
+                className="onb__input"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="Email address"
+                autoComplete="email"
+              />
+            ) : (
+              <input
+                className="onb__input"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Phone number"
+                autoComplete="tel"
+              />
+            )}
           </div>
           <p className="onb__lead" style={{ marginBottom: 0 }}>
-            Your care team uses your phone to reach you — and to call you if you’re ever on call for someone.
+            Not for public display, but for practical use cases on the
+            platform. You&rsquo;ll be able to specify what contact info you
+            want shared later in this process.
           </p>
 
           {/* Age. Everyone answers; only a minor gives a date, so we can age

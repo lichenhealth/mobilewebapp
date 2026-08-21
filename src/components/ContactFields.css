@@ -31,3 +31,11 @@
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--peach-deep);
 }
 .contactf__sugg:hover { background: var(--peach-tint); }
+
+/* The act made visible (2026-08-21): the chip shows the data, + Add does it */
+.contactf__sugg-add {
+  padding: 2px 8px; border-radius: var(--r-full);
+  background: var(--peach); color: #fff;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap;
+}
+.contactf__sugg:hover .contactf__sugg-add { background: var(--peach-deep); }

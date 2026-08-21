@@ -9,7 +9,14 @@ import './BuildModeSplit.css';
  *
  *  `back` rides along so the Snapshot screen can offer the way home in the
  *  founder's words: "back to manual mode". */
-export default function BuildModeSplit({ back }: { back: string }) {
+export default function BuildModeSplit({ back, onBeforeGo }: {
+  back: string;
+  /** Persist any unsaved manual work before crossing over (founder
+   *  2026-08-21: "import and remember anything you've entered in the manual
+   *  build") — the two modes are one document, so what you typed must be IN
+   *  the document when Claude opens it. */
+  onBeforeGo?: () => Promise<void> | void;
+}) {
   const navigate = useNavigate();
   // The app's ONE segmented-toggle idiom (view-toggle — the same control as
   // ADMIN | LICHEN VIEW | PUBLIC VIEW right above it; founder 2026-08-20:
@@ -25,7 +32,10 @@ export default function BuildModeSplit({ back }: { back: string }) {
         <button
           className="view-toggle__side"
           type="button"
-          onClick={() => navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`)}
+          onClick={() => {
+            void Promise.resolve(onBeforeGo?.()).then(() =>
+              navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`));
+          }}
         >
           <Icon name="brain" size={12} /> Build with Claude
         </button>
@@ -37,21 +47,25 @@ export default function BuildModeSplit({ back }: { back: string }) {
 
 /** The nudge that lives under a single field — same door, arriving with
  *  that field's job in mind. */
-export function FillWithClaude({ back, label = 'Fill this out with Claude', ask }: {
+export function FillWithClaude({ back, label = 'Fill this out with Claude', ask, onBeforeGo }: {
   back: string; label?: string;
   /** The errand this door is for, prefilled into the composer unsent — so the
    *  ask arrives ready to send, or to add to first. */
   ask?: string;
+  /** Persist unsaved manual work before crossing over — see BuildModeSplit. */
+  onBeforeGo?: () => Promise<void> | void;
 }) {
   const navigate = useNavigate();
   return (
     <button
       className="bmode__inline"
       type="button"
-      onClick={() => navigate(
-        `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`
-        + (ask ? `&ask=${encodeURIComponent(ask)}` : ''),
-      )}
+      onClick={() => {
+        void Promise.resolve(onBeforeGo?.()).then(() => navigate(
+          `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`
+          + (ask ? `&ask=${encodeURIComponent(ask)}` : ''),
+        ));
+      }}
     >
       <Icon name="brain" size={12} /> {label}
     </button>

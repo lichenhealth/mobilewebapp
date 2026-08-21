@@ -487,6 +487,18 @@ export default function Profile() {
       setWebMsg('Saved.');
     }
   }
+  /** Crossing to build-with-Claude carries your manual work (founder
+   *  2026-08-21: "import and remember anything you've entered in the manual
+   *  build"). Persists ONLY the page content — never public_page or handle,
+   *  so the hand-off can't publish a page that Save hasn't (the untouched-
+   *  page checkbox arrives pre-checked; an implicit save must not act it). */
+  async function savePageDraft() {
+    if (!user) return;
+    await supabase.from('profiles')
+      .update({ page: Object.keys(pageMeta).length ? pageMeta : null })
+      .eq('id', user.id);
+  }
+
   async function updateFindable(next: boolean) {
     if (!user) return;
     setFindable(next);
@@ -870,7 +882,7 @@ export default function Profile() {
           {/* The fork (founder 2026-08-11): fill it in yourself, or hand it
               to Claude. Manual stands as the default — the form is right
               below — so the AI option teaches itself without blocking. */}
-          <BuildModeSplit back="/profile#public-page" />
+          <BuildModeSplit back="/profile#public-page" onBeforeGo={savePageDraft} />
 
 
           <label className="prof__consent">
@@ -942,27 +954,20 @@ export default function Profile() {
             <textarea className="prof__textarea prof__story" value={pageMeta.story ?? ''}
               onChange={(e) => setPage({ story: e.target.value })}
               placeholder="Write it the way you'd tell a neighbor. A few short paragraphs is plenty." />
-            {/* Both doors land in the PROFILE thread now, not the brief —
-                that's the room where Claude can actually change the page
-                (docs/ASSISTANT_ACTIONS.md), and the errand rides along
-                unsent so it can be edited before it goes. */}
+            {/* ONE door (founder 2026-08-21, striking the second "Draft it
+                with Claude" line — streamline): it lands in the PROFILE
+                thread, where Claude can actually change the page
+                (docs/ASSISTANT_ACTIONS.md), the errand rides along unsent,
+                and anything typed here first is SAVED into the page on the
+                way over — the two modes are one document. */}
             <FillWithClaude
               back="/profile#public-page"
               label="Fill out my story with Claude"
-              ask={'Help me write the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer.'}
+              onBeforeGo={savePageDraft}
+              ask={(pageMeta.story ?? '').trim()
+                ? 'Help me finish the story on my public page — I’ve started a draft there; build on it, keeping my voice. You can also draw on my headline, bio, and what I offer.'
+                : 'Help me write the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer.'}
             />
-            <p className="prof__hint">
-              Rather talk it through?{' '}
-              <button
-                className="prof__inline-link"
-                onClick={() => navigate('/assistant/feed?thread=profile&back=' + encodeURIComponent('/profile#public-page') + '&ask=' + encodeURIComponent(
-                  'Help me draft the story for my public page. Use what you already know about me on Lichen — my headline, bio, and what I offer. Before you send this, feel free to add anything else: a website to read, a length ("140 characters"), a tone.',
-                ))}
-              >
-                Draft it with Claude
-              </button>{' '}
-              — the ask arrives ready to send, or add to it first.
-            </p>
           </div>
           <div className="prof__field">
             <label className="prof__label">How do you want people to get in touch</label>

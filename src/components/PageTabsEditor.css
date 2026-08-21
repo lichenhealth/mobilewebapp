@@ -76,3 +76,7 @@
    it's the one image that tab wears. */
 .ptabs__shot--wide { display: block; max-width: 320px; margin-bottom: var(--s-2); }
 .ptabs__shot--wide img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+
+/* Home — the always-on landing tab, shown but never removable (2026-08-21) */
+.ptabs__row--home { opacity: 0.85; margin-bottom: 6px; }
+.ptabs__row--home .ptabs__head { cursor: default; }
