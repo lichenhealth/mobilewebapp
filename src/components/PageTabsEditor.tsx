@@ -21,7 +21,11 @@ import './PageTabsEditor.css';
 const SECTIONED = ['about', 'services', 'goods', 'facilities'];
 type SectionMeta = Record<string, { lead?: string; image?: string } | undefined>;
 
-export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections }: {
+export default function PageTabsEditor({
+  tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
+  homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
+  entityName,
+}: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
   /** page.photos — what the Gallery tab shows. */
@@ -33,6 +37,16 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
    *  (founder 2026-08-11: reaching the Services photo). */
   sections?: SectionMeta;
   onSections?: (next: SectionMeta) => void;
+  /** Home tab styling. */
+  homeSummary?: string;
+  onHomeSummary?: (text: string) => void;
+  coverStyle?: string;
+  onCoverStyle?: (style: string) => void;
+  cover?: string;
+  onCover?: (url: string | undefined) => void;
+  coverPos?: string;
+  onCoverPos?: (pos: string) => void;
+  entityName?: string;
 }) {
   const patchSection = (id: string, patch: { lead?: string; image?: string }) => {
     if (!onSections) return;
@@ -59,6 +73,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
     addCtaRef.current?.scrollIntoView({ block: 'center' });
   }, [adding]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [homeOpen, setHomeOpen] = useState(false);
   const spare = availableTemplates(tabs);
 
   // Grab-and-pull reordering (founder 2026-08-11, replacing the ↑/↓
@@ -109,11 +124,70 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
           structural — every public page leads with it — but the builder
           never said so, which made About read as the page's anchor. About
           is an optional tab like the others. */}
-      <div className="ptabs__row ptabs__row--home">
+      <div className={'ptabs__row ptabs__row--home' + (homeOpen ? ' is-open' : '')}>
         <div className="ptabs__head">
           <span className="ptabs__icon"><Icon name="home" size={15} /></span>
           <span className="ptabs__name">Home<em className="ptabs__auto">always on — where visitors land</em></span>
+          {onHomeSummary && (
+            <span className="ptabs__moves">
+              <button className="ptabs__mv" onClick={() => setHomeOpen(!homeOpen)}
+                aria-label="Style the Home tab">
+                {homeOpen ? 'Done' : 'Style'}
+              </button>
+            </span>
+          )}
         </div>
+
+        {homeOpen && onHomeSummary && (
+          <div className="ptabs__edit">
+            <label className="prof__label">Welcome message — what greets a visitor</label>
+            <textarea
+              className="prof__textarea"
+              value={homeSummary ?? ''}
+              onChange={(e) => onHomeSummary(e.target.value)}
+              placeholder="A short welcome for the front page — your whole story still lives on About."
+            />
+            <p className="ptabs__note">
+              Leave it empty and Home opens with the first two paragraphs of your story.
+            </p>
+
+            <label className="prof__label" style={{ marginTop: '1.5rem' }}>Look</label>
+            <div className="cmp__chips">
+              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
+                <button key={v}
+                  className={'cmp__chip' + ((coverStyle ?? 'plain') === v ? ' is-on' : '')}
+                  onClick={() => onCoverStyle?.(v)}>{label}</button>
+              ))}
+            </div>
+            {coverStyle === 'photo' && uploaderId && onCover && (
+              <div>
+                {cover && (
+                  <span className="ptabs__shot ptabs__shot--wide">
+                    <img src={cover} alt="" />
+                    <button onClick={() => onCover(undefined)}
+                      aria-label="Remove this photo">×</button>
+                  </span>
+                )}
+                <label className="btn ptabs__upload">
+                  {upBusy ? 'Adding…' : cover ? 'Replace photo' : 'Add a photo'}
+                  <input type="file" accept="image/*" hidden disabled={upBusy}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      setUpBusy(true);
+                      try {
+                        const url = await uploadPageImage(uploaderId, file);
+                        onCover(url);
+                      }
+                      catch (err) { console.error(err); }
+                      setUpBusy(false);
+                    }} />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {tabs.length === 0 && (
