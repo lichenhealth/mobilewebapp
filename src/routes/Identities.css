@@ -1,0 +1,39 @@
+/* Identities — the gathering that isn't a community (founder 2026-08-20).
+   Rides Directory's grammar (.dir__*) so it reads almost identically —
+   the words on the page are what tell you which one you're in. */
+
+.idn__back {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  font-size: var(--t-xs); color: var(--ink-soft); background: none; border: 0;
+  padding: 0; margin-bottom: var(--s-2); cursor: pointer; font-family: inherit;
+}
+.idn__back:hover { color: var(--peach-deep); }
+
+.idn__row {
+  display: flex; align-items: center; gap: var(--s-2); width: 100%;
+  padding: 12px 14px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm);
+  font-family: inherit; font-size: var(--t-sm); color: var(--ink);
+  cursor: pointer; text-align: left; margin-bottom: var(--s-2);
+}
+.idn__row:hover { border-color: var(--peach); }
+.idn__row-name { flex: 1; font-weight: 500; }
+.idn__row-carried { font-size: var(--t-xs); color: var(--peach-deep); }
+.idn__row svg { color: var(--ink-faint); flex-shrink: 0; }
+
+.idn__carry { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3); flex-wrap: wrap; }
+.idn__carry-state { font-size: var(--t-sm); color: var(--peach-deep); font-weight: 500; }
+.idn__carry-out {
+  font-size: var(--t-xs); color: var(--ink-faint); background: none; border: 0;
+  padding: 0; cursor: pointer; font-family: inherit; text-decoration: underline;
+}
+.idn__carry-out:hover { color: var(--ink); }
+
+.idn__section-note {
+  font-size: var(--t-xs); color: var(--ink-faint); margin: calc(-1 * var(--s-1)) 0 var(--s-2);
+}
+
+/* The fingerprint mark (founder 2026-08-21) */
+.idn__eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+.idn__eyebrow svg { color: var(--peach-deep); }
+.idn__row > svg:first-child { color: var(--ink-soft); flex-shrink: 0; }

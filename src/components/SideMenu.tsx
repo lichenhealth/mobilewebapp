@@ -8,6 +8,7 @@ import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
 import { useAdminView } from '../lib/adminView';
 import { supabase } from '../lib/supabase';
+import { getIdentityTags } from '../lib/meansApi';
 import './SideMenu.css';
 
 interface SideMenuProps {
@@ -97,6 +98,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
   const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
+  // Identities you carry (founder 2026-08-20): a nav section of their own —
+  // structurally different from communities (nobody runs an identity), but
+  // reached the same way. Sub-items are YOUR identities; the header opens
+  // the whole directory. Hidden in admin view — there is nothing to steward.
+  const [idnExpanded, setIdnExpanded] = useState(false);
+  const [myIdentities, setMyIdentities] = useState<{ id: string; name: string }[]>([]);
   // Platform-level knock queue (founder 2026-08-02): a "Request an
   // invitation" toast disappearing shouldn't feel like the knock vanished —
   // join_requests is the permanent record (Invite.tsx "At the door"); this
@@ -115,6 +122,23 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         listMyMemberSpaces(user.id), listMyAdminDeskCounts(user.id),
       ]);
       if (live) { setMySpaces(rows); setDesk(d); }
+    })();
+    return () => { live = false; };
+  }, [open, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void (async () => {
+      const [tags, { data: cats }] = await Promise.all([
+        getIdentityTags(user.id),
+        supabase.from('categories').select('id, name').eq('domain', 'identity'),
+      ]);
+      if (!live) return;
+      const mine = new Set(tags.map((t) => t.trim().toLowerCase()));
+      setMyIdentities(((cats as { id: string; name: string }[] | null) ?? [])
+        .filter((c) => mine.has(c.name.trim().toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name)));
     })();
     return () => { live = false; };
   }, [open, user]);
@@ -311,6 +335,37 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               </div>
             );
           })}
+
+          {/* Identities ride below the spaces you belong to — same reach,
+              different nature (founder 2026-08-20: an identity holds any
+              number of people and nobody runs it). Absent in admin view. */}
+          {!adminView && (
+            <div className="side-menu__section">
+              <button
+                className="side-menu__header"
+                onClick={() => { setIdnExpanded((e) => !e); go('/identities'); }}
+                aria-expanded={idnExpanded}
+              >
+                <span className="side-menu__header-label side-menu__header-label--idn">
+                  <Icon name="fingerprint" size={15} /> Identities
+                </span>
+                {myIdentities.length > 0 && (
+                  <span className={'side-menu__chevron' + (idnExpanded ? ' is-open' : '')} aria-hidden="true" />
+                )}
+              </button>
+              {idnExpanded && myIdentities.length > 0 && (
+                <ul className="side-menu__sub-list">
+                  {myIdentities.map((c) => (
+                    <li key={c.id}>
+                      <button className="side-menu__sub-item" onClick={() => go(`/identities/${c.id}`)}>
+                        {c.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* The tools and platform doors come AFTER the places you belong to
               (founder 2026-08-08): what you read and where you belong lead;

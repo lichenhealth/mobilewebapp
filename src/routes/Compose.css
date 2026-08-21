@@ -285,3 +285,15 @@
   border-radius: var(--r-md); font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;
 }
 .cmp__collection-banner svg { flex-shrink: 0; align-self: center; }
+
+/* Gift to an identity (founder 2026-08-20) — vocabulary chips under the
+   free-text gift line; text-chip grammar, a check when on */
+.cmp__gift-terms { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.cmp__gift-idents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cmp__gift-idents-lead { font-size: var(--t-2xs); color: var(--ink-faint); margin-right: 2px; }
+.cmp__gift-ident {
+  font-size: var(--t-2xs); padding: 3px 9px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: transparent; color: var(--ink-soft);
+  font-weight: 300; cursor: pointer; font-family: inherit;
+}
+.cmp__gift-ident.is-on { border-color: var(--peach); color: var(--peach-deep); font-weight: 400; }

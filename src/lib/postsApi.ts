@@ -222,6 +222,21 @@ export async function loadPost(id: string): Promise<FeedPost | null> {
   return (data as unknown as FeedPost | null) ?? null;
 }
 
+/** Offerings gifted to an identity (founder 2026-08-20: "I want to Gift this
+ *  table to someone who identifies as a firefighter…"). Public gift-mode
+ *  posts whose details.giftToIdentities names this identity — shown on the
+ *  identity's gathering page. */
+export async function loadGiftedToIdentity(name: string): Promise<FeedPost[]> {
+  const { data, error } = await supabase
+    .from('posts').select(FEED_SELECT)
+    .contains('details', { giftToIdentities: [name] })
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(24);
+  if (error) { console.warn('loadGiftedToIdentity', error.message); return []; }
+  return (data as unknown as FeedPost[] | null) ?? [];
+}
+
 /** Host updates: later posts linked to the same calendar event. */
 export async function loadEventUpdates(eventId: string, excludePostId: string): Promise<FeedPost[]> {
   const { data, error } = await supabase

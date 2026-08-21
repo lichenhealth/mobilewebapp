@@ -13,6 +13,7 @@ import Concierge, { FinancialProfilePage } from './routes/Concierge';
 import Caregiver from './routes/Caregiver';
 import CarePostComposer from './routes/CarePostComposer';
 import Directory from './routes/Directory';
+import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import Donate from './routes/Donate';
@@ -254,6 +255,8 @@ export default function App() {
           <Route path="/concierge/:tab" element={<Concierge />} />
           <Route path="/caregiver"      element={<Caregiver />} />
           <Route path="/directory"      element={<Directory />} />
+          <Route path="/identities"     element={<IdentitiesDirectory />} />
+          <Route path="/identities/:id" element={<IdentityPage />} />
           <Route path="/chat"      element={<Chat />} />
           <Route path="/chat/:id"  element={<ChatThread />} />
           <Route path="/calendar"  element={<Calendar />} />

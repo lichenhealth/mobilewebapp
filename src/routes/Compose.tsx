@@ -80,6 +80,18 @@ export default function Compose() {
   const [modes, setModes] = useState<Set<OfferMode>>(
     () => new Set([params.get('entrust') === '1' ? 'lichen' : 'free'] as OfferMode[]));
   const [giftTo, setGiftTo] = useState('');
+  // Gift to an IDENTITY (founder 2026-08-20: "I want to Gift this table to
+  // someone who identifies as a firefighter, first responder, teacher or
+  // nurse"). Names from the identity vocabulary, stored structurally in
+  // details.giftToIdentities so the identity's gathering page can find it;
+  // the free-text giftTo stays for phrasing the vocabulary can't hold.
+  const [giftIdents, setGiftIdents] = useState<string[]>([]);
+  const [identCats, setIdentCats] = useState<{ id: string; name: string }[] | null>(null);
+  useEffect(() => {
+    if (!modes.has('free') || identCats !== null) return;
+    void supabase.from('categories').select('id, name').eq('domain', 'identity').order('name')
+      .then(({ data }) => setIdentCats((data as { id: string; name: string }[] | null) ?? []));
+  }, [modes, identCats]);
   // Lend/rent/borrow/ISO each keep their own terms line (they used to fight
   // over one shared field). details.modeNotes carries the map.
   const [modeNotes, setModeNotes] = useState<Record<string, string>>({});
@@ -282,6 +294,7 @@ export default function Compose() {
         }
       }
       if (typeof d.giftTo === 'string') setGiftTo(d.giftTo);
+      if (Array.isArray(d.giftToIdentities)) setGiftIdents((d.giftToIdentities as unknown[]).filter((x): x is string => typeof x === 'string'));
       if (d.modeNotes && typeof d.modeNotes === 'object') setModeNotes(d.modeNotes as Record<string, string>);
       if (Array.isArray(d.condition)) setCondition(new Set(d.condition as string[]));
       if (typeof d.availFrom === 'string') setAvailFrom(d.availFrom);
@@ -577,6 +590,7 @@ export default function Compose() {
           details.modes = [...new Set(chosen.map(canon))];
           details.mode = canon(chosen[0]);
           if ((modes.has('free') || modes.has('lichen')) && giftTo.trim()) details.giftTo = giftTo.trim();
+          if ((modes.has('free') || modes.has('lichen')) && giftIdents.length) details.giftToIdentities = giftIdents;
           if (condition.size) details.condition = [...condition];
           if (availFrom) details.availFrom = availFrom;
           if (availTo) details.availTo = availTo;
@@ -1043,7 +1057,10 @@ export default function Compose() {
             const order: OfferMode[] = ['lichen', 'free', 'trade', 'lend', 'rent', 'borrow', 'iso', 'paid'];
             const sentence = (m: OfferMode): string => {
               if (m === 'lichen') return 'routing entrusted to the Lichen Economy Algorithm';
-              if (m === 'free') return giftTo.trim() ? `to ${giftTo.trim()}` : 'freely, to anyone';
+              if (m === 'free') {
+                const parts = [giftIdents.length ? `to ${giftIdents.join(', ')}` : '', giftTo.trim() ? (giftIdents.length ? `— ${giftTo.trim()}` : `to ${giftTo.trim()}`) : ''].filter(Boolean);
+                return parts.length ? parts.join(' ') : 'freely, to anyone';
+              }
               if (m === 'trade') return tradeFor.trim() ? `for ${tradeFor.trim()}` : 'open to offers';
               if (m === 'paid') {
                 if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
@@ -1080,8 +1097,29 @@ export default function Compose() {
                     ) : (
                       <>
                         {m === 'free' && (
-                          <input className="cmp__term-input" value={giftTo} onKeyDown={onKey(m)}
-                            onChange={(e) => setGiftTo(e.target.value)} placeholder={PLACEHOLDER[m]} />
+                          <span className="cmp__gift-terms">
+                            <input className="cmp__term-input" value={giftTo} onKeyDown={onKey(m)}
+                              onChange={(e) => setGiftTo(e.target.value)} placeholder={PLACEHOLDER[m]} />
+                            {/* Gift to an IDENTITY (founder 2026-08-20): the
+                                vocabulary makes the gift findable from that
+                                identity's own gathering page. */}
+                            {identCats !== null && identCats.length > 0 && (
+                              <span className="cmp__gift-idents">
+                                <span className="cmp__gift-idents-lead">or to an identity:</span>
+                                {identCats.map((c) => {
+                                  const on = giftIdents.includes(c.name);
+                                  return (
+                                    <button key={c.id} type="button"
+                                      className={'cmp__gift-ident' + (on ? ' is-on' : '')}
+                                      onClick={() => setGiftIdents((cur) =>
+                                        on ? cur.filter((n) => n !== c.name) : [...cur, c.name])}>
+                                      {on ? '✓ ' : ''}{c.name}
+                                    </button>
+                                  );
+                                })}
+                              </span>
+                            )}
+                          </span>
                         )}
                         {m === 'trade' && (
                           <input className="cmp__term-input" value={tradeFor} onKeyDown={onKey(m)}

@@ -33,6 +33,7 @@ export type IconName =
   | 'concierge'
   | 'dollar'
   | 'fork-spoon'
+  | 'fingerprint'
   | 'globe'
   | 'graduation-cap'
   | 'health'
@@ -188,6 +189,18 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '314 218 18 17',
     strokeWidth: 1.0,
     content: <><path d="M327.8 225.923C329.567 225.923 331 224.373 331 222.462C331 220.55 329.567 219 327.8 219C326.033 219 324.6 220.55 324.6 222.462C324.6 224.373 326.033 225.923 327.8 225.923Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M327.8 225.923V234" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M318.333 219V234" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M321.666 219V221.885C321.666 222.263 321.58 222.639 321.413 222.989C321.245 223.338 321 223.656 320.69 223.924C320.381 224.192 320.013 224.405 319.609 224.55C319.204 224.695 318.771 224.769 318.333 224.769C317.449 224.769 316.601 224.465 315.976 223.924C315.351 223.383 315 222.65 315 221.885V219" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // Identities' mark (founder 2026-08-21: "let's use a Fingerprint icon for
+  // Identities!") — hand-drawn ridge arcs, no fill so it survives filled chips.
+  'fingerprint': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.5,
+    content: <>
+      <path d="M5 12a7 7 0 0 1 14 0c0 2.5-.35 4.9-1.05 7.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.2 12a3.8 3.8 0 0 1 7.6 0c0 2.9-.45 5.7-1.3 8.3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 12v2.8c0 2.1-.3 4.2-.9 6.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.6 15.5c.35 1.9.95 3.7 1.75 5.4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </>,
   },
   'globe': {
     viewBox: '315 836 26 26',

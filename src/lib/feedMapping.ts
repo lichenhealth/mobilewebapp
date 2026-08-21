@@ -108,7 +108,13 @@ export function postToCard(
     ? (p.details.modes as unknown[]).filter((m): m is string => typeof m === 'string')
     : rawMode ? [rawMode] : [];
   const isWork = postAreas(p).includes('work');
-  const giftTo = typeof p.details?.giftTo === 'string' ? (p.details.giftTo as string) : undefined;
+  const giftIdents = Array.isArray(p.details?.giftToIdentities)
+    ? (p.details.giftToIdentities as unknown[]).filter((x): x is string => typeof x === 'string')
+    : [];
+  const giftFree = typeof p.details?.giftTo === 'string' ? (p.details.giftTo as string) : undefined;
+  // Identities lead ("Gift to Firefighters, Nurses"); free text carries what
+  // the vocabulary can't.
+  const giftTo = [giftIdents.join(', '), giftFree].filter(Boolean).join(' · ') || undefined;
   const labels = [...new Set(rawModes.map((m) => {
     const base = isWork ? WORK_MODE_LABEL[m] : MODE_LABEL[m];
     return m === 'gift' && giftTo ? `${base} to ${giftTo}` : base;
