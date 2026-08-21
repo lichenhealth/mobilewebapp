@@ -222,18 +222,18 @@ export async function loadPost(id: string): Promise<FeedPost | null> {
   return (data as unknown as FeedPost | null) ?? null;
 }
 
-/** Offerings gifted to an identity (founder 2026-08-20: "I want to Gift this
- *  table to someone who identifies as a firefighter…"). Public gift-mode
- *  posts whose details.giftToIdentities names this identity — shown on the
- *  identity's gathering page. */
-export async function loadGiftedToIdentity(name: string): Promise<FeedPost[]> {
+/** Everything FOR an identity (founder 2026-08-20/21: a table gifted to
+ *  firefighters, a course for veterans and first responders). Public posts
+ *  whose details.forIdentities names this identity — the identity's own page
+ *  groups them by area, and an area only appears when something is in it. */
+export async function loadForIdentity(name: string): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('posts').select(FEED_SELECT)
-    .contains('details', { giftToIdentities: [name] })
+    .contains('details', { forIdentities: [name] })
     .eq('is_public', true)
     .order('created_at', { ascending: false })
-    .limit(24);
-  if (error) { console.warn('loadGiftedToIdentity', error.message); return []; }
+    .limit(60);
+  if (error) { console.warn('loadForIdentity', error.message); return []; }
   return (data as unknown as FeedPost[] | null) ?? [];
 }
 

@@ -108,17 +108,20 @@ export function postToCard(
     ? (p.details.modes as unknown[]).filter((m): m is string => typeof m === 'string')
     : rawMode ? [rawMode] : [];
   const isWork = postAreas(p).includes('work');
-  const giftIdents = Array.isArray(p.details?.giftToIdentities)
-    ? (p.details.giftToIdentities as unknown[]).filter((x): x is string => typeof x === 'string')
+  const rawIdents = p.details?.forIdentities ?? p.details?.giftToIdentities;   // pre-rename posts
+  const forIdents = Array.isArray(rawIdents)
+    ? (rawIdents as unknown[]).filter((x): x is string => typeof x === 'string')
     : [];
   const giftFree = typeof p.details?.giftTo === 'string' ? (p.details.giftTo as string) : undefined;
   // Identities lead ("Gift to Firefighters, Nurses"); free text carries what
   // the vocabulary can't.
-  const giftTo = [giftIdents.join(', '), giftFree].filter(Boolean).join(' · ') || undefined;
+  const giftTo = [forIdents.join(', '), giftFree].filter(Boolean).join(' · ') || undefined;
   const labels = [...new Set(rawModes.map((m) => {
     const base = isWork ? WORK_MODE_LABEL[m] : MODE_LABEL[m];
     return m === 'gift' && giftTo ? `${base} to ${giftTo}` : base;
   }).filter(Boolean))];
+  // A non-gift offering still says who it's for ("For Veterans, Teachers").
+  if (forIdents.length && !rawModes.includes('gift')) labels.push(`For ${forIdents.join(', ')}`);
   const mode = labels.length ? labels.join(' · ') : undefined;
   const rawPrice = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
   const price = rawModes.includes('sliding') && rawPrice

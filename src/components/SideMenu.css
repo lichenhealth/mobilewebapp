@@ -265,6 +265,5 @@
   gap: 8px;
 }
 
-/* Identities header wears its fingerprint (founder 2026-08-21) */
-.side-menu__header-label--idn { display: inline-flex; align-items: center; gap: 7px; }
-.side-menu__header-label--idn svg { color: var(--ink-soft); flex-shrink: 0; }
+/* Section headers wear their kind's mark (founder 2026-08-21) */
+.side-menu__header > svg { color: var(--ink); flex-shrink: 0; }

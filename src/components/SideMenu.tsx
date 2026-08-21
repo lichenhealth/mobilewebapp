@@ -25,6 +25,9 @@ interface NavSection {
   key: string;
   title: string;
   href: string;
+  /** The kind's mark — the same icon its directory, pins and tabs wear
+   *  (founder 2026-08-21: "add in all the icons for consistency"). */
+  icon: IconName;
   items: SubItem[];
   defaultExpanded: boolean;
 }
@@ -67,14 +70,14 @@ const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/me
  *  fetched when the menu opens. My-celium left this list (founder 2026-08-08)
  *  — it's a FEED, so it belongs beside Lichen at the top, not among the
  *  places you belong to. */
-const SPACE_SECTIONS: { key: string; title: string; href: string; kind: MappableSpace['kind'] }[] = [
-  { key: 'communities', title: 'Communities', href: '/communities', kind: 'community' },
-  { key: 'groups', title: 'Groups', href: '/groups', kind: 'group' },
-  { key: 'organizations', title: 'Organizations', href: '/organizations', kind: 'organization' },
-  { key: 'places', title: 'Places', href: '/places', kind: 'place' },
+const SPACE_SECTIONS: { key: string; title: string; href: string; kind: MappableSpace['kind']; icon: IconName }[] = [
+  { key: 'communities', title: 'Communities', href: '/communities', kind: 'community', icon: 'user-multiple' },
+  { key: 'groups', title: 'Groups', href: '/groups', kind: 'group', icon: 'groups' },
+  { key: 'organizations', title: 'Organizations', href: '/organizations', kind: 'organization', icon: 'globe' },
+  { key: 'places', title: 'Places', href: '/places', kind: 'place', icon: 'location' },
 ];
 const SECTIONS: NavSection[] = SPACE_SECTIONS.map((s) =>
-  ({ key: s.key, title: s.title, href: s.href, items: [], defaultExpanded: false }));
+  ({ key: s.key, title: s.title, href: s.href, icon: s.icon, items: [], defaultExpanded: false }));
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
@@ -288,6 +291,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   onClick={() => toggleAndGo(s)}
                   aria-expanded={expanded[s.key]}
                 >
+                  <Icon name={s.icon} size={20} />
                   <span className="side-menu__header-label">{s.title}</span>
                   {/* A shut list must not hide what waits at its desks
                       (2026-08-20, when admin view stopped auto-opening):
@@ -341,14 +345,17 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               number of people and nobody runs it). Absent in admin view. */}
           {!adminView && (
             <div className="side-menu__section">
+              {/* Identities sit IN LINE with the other section titles, a
+                  hairline above them as the visual split (founder 2026-08-21)
+                  — same icon grid as everything else, different nature. */}
+              <div className="side-menu__divider" aria-hidden />
               <button
                 className="side-menu__header"
                 onClick={() => { setIdnExpanded((e) => !e); go('/identities'); }}
                 aria-expanded={idnExpanded}
               >
-                <span className="side-menu__header-label side-menu__header-label--idn">
-                  <Icon name="fingerprint" size={15} /> Identities
-                </span>
+                <Icon name="fingerprint" size={20} />
+                <span className="side-menu__header-label">Identities</span>
                 {myIdentities.length > 0 && (
                   <span className={'side-menu__chevron' + (idnExpanded ? ' is-open' : '')} aria-hidden="true" />
                 )}

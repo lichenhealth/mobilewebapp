@@ -11,10 +11,28 @@ import {
   loadMyWeb, loadMyRecommendations, setInWeb, setVouch, setRecommend, recommendKey,
 } from '../lib/myceliumApi';
 import { getIdentityTags, saveIdentityTags } from '../lib/meansApi';
-import { loadGiftedToIdentity } from '../lib/postsApi';
+import { loadForIdentity, postAreas } from '../lib/postsApi';
 import type { FeedPost } from '../lib/postsApi';
 import { postOpenPath } from '../lib/feedMapping';
+import type { IconName } from '../components/Icon';
 import './Identities.css';
+
+/** The rooms an identity's page can grow — in the platform's own order,
+ *  each with the mark that section wears everywhere else. A room appears
+ *  ONLY when someone has aimed content at this identity (founder 2026-08-21:
+ *  "something doesn't show up in identity unless someone adds content within
+ *  it") — the door-appears-because-something-is-behind-it rule. */
+const IDENTITY_AREAS: { key: string; label: string; icon: IconName }[] = [
+  { key: 'courses', label: 'Courses', icon: 'graduation-cap' },
+  { key: 'marketplace', label: 'Marketplace', icon: 'store' },
+  { key: 'events', label: 'Events', icon: 'rsvp' },
+  { key: 'work', label: 'Work', icon: 'briefcase' },
+  { key: 'library', label: 'Library', icon: 'book' },
+  { key: 'art', label: 'Art', icon: 'palette' },
+  { key: 'food', label: 'Food', icon: 'fork-spoon' },
+  { key: 'travel', label: 'Travel', icon: 'plane' },
+  { key: 'places', label: 'Places', icon: 'location' },
+];
 
 /* IDENTITIES ARE NOT COMMUNITIES (founder 2026-08-20): "Communities should
  * be authentic — all members actually engaging with each other... while
@@ -140,7 +158,7 @@ export default function IdentityPage() {
   const [cat, setCat] = useState<IdentityCat | null>(null);
   const [members, setMembers] = useState<MemberHit[]>([]);
   const [spaces, setSpaces] = useState<SpaceHit[]>([]);
-  const [gifted, setGifted] = useState<FeedPost[]>([]);
+  const [forPosts, setForPosts] = useState<FeedPost[]>([]);
   const [myTags, setMyTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -173,12 +191,12 @@ export default function IdentityPage() {
         .contains('identity_tags', [catRow.name])
         .eq('findable', true)
         .order('name'),
-      loadGiftedToIdentity(catRow.name),
+      loadForIdentity(catRow.name),
       me ? getIdentityTags(me) : Promise.resolve([]),
     ]);
     setMembers((profs.data as MemberHit[] | null) ?? []);
     setSpaces((sps.data as SpaceHit[] | null) ?? []);
-    setGifted(gifts);
+    setForPosts(gifts);
     setMyTags(tags);
   };
 
@@ -198,6 +216,19 @@ export default function IdentityPage() {
   }, [id, me]);
 
   const carried = !!cat && myTags.some((t) => t.trim().toLowerCase() === cat.name.trim().toLowerCase());
+
+  // Targeted content, grouped into the platform's rooms — each post lands in
+  // its first matching area (plain offerings read as Marketplace).
+  const byArea = useMemo(() => {
+    const map = new Map<string, FeedPost[]>();
+    for (const p of forPosts) {
+      const areas = postAreas(p) as string[];
+      const key = IDENTITY_AREAS.find((a) => areas.includes(a.key))?.key ?? 'marketplace';
+      map.set(key, [...(map.get(key) ?? []), p]);
+    }
+    return map;
+  }, [forPosts]);
+  const liveAreas = IDENTITY_AREAS.filter((a) => (byArea.get(a.key)?.length ?? 0) > 0);
 
   /** Joining IS declaring (the elegance of the no-admin shape): one gesture,
    *  same storage as the profile's Identity field. */
@@ -254,6 +285,17 @@ export default function IdentityPage() {
             </button>
           )}
         </div>
+        {/* The doors row — only rooms with something behind them. */}
+        {liveAreas.length > 0 && (
+          <div className="idn__doors">
+            {liveAreas.map((a) => (
+              <button key={a.key} type="button" className="idn__door" title={`${a.label} for ${cat.name}s`}
+                onClick={() => document.getElementById(`idnsec-${a.key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+                <Icon name={a.icon} size={18} />
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="dir__list">
@@ -325,17 +367,19 @@ export default function IdentityPage() {
           </>
         )}
 
-        {gifted.length > 0 && (
-          <>
-            <h2 className="dir__section">Gifted to {cat.name}s</h2>
-            <p className="idn__section-note">
-              Offerings members gifted to anyone carrying this identity.
-            </p>
-            {gifted.map((p) => (
+        {/* THE ROOMS, presence-gated (founder 2026-08-21): a course aimed at
+            veterans puts Courses on the Veteran page; a targeted listing
+            puts Marketplace there. No content, no room. */}
+        {liveAreas.map((a) => (
+          <div key={a.key} id={`idnsec-${a.key}`}>
+            <h2 className="dir__section idn__area-head">
+              <Icon name={a.icon} size={15} /> {a.label} for {cat.name}s
+            </h2>
+            {byArea.get(a.key)!.map((p) => (
               <ListingRow key={p.id} post={p} onOpen={() => navigate(postOpenPath(p))} />
             ))}
-          </>
-        )}
+          </div>
+        ))}
       </div>
     </div>
   );

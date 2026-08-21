@@ -37,3 +37,15 @@
 .idn__eyebrow { display: inline-flex; align-items: center; gap: 6px; }
 .idn__eyebrow svg { color: var(--peach-deep); }
 .idn__row > svg:first-child { color: var(--ink-soft); flex-shrink: 0; }
+
+/* The rooms an identity grows — doors only when something is behind them */
+.idn__doors { display: flex; gap: 10px; margin-top: var(--s-3); flex-wrap: wrap; }
+.idn__door {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  color: var(--ink); cursor: pointer;
+}
+.idn__door:hover { border-color: var(--peach); color: var(--peach-deep); }
+.idn__area-head { display: flex; align-items: center; gap: 8px; }
+.idn__area-head svg { color: var(--ink-soft); }
