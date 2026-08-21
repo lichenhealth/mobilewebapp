@@ -116,3 +116,19 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 .invite__compose { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; margin-top: var(--s-2); }
 .invite__compose-acts { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .invite__knock-door { color: var(--ink-faint); font-size: 12px; }
+
+/* Knock rows stack: who on top full-width, answers below (2026-08-21 —
+   the center-aligned wrap was shattering long names into a skinny column) */
+.invite__row--knock { flex-direction: column; align-items: stretch; gap: 8px; }
+.invite__row--knock .invite__row-who { flex: none; }
+.invite__knock-name { overflow-wrap: anywhere; }
+.invite__knock-door { display: block; font-size: 12px; color: var(--ink-muted); }
+.invite__row--knock .invite__knock-acts { flex-wrap: wrap; }
+.invite__spamflag {
+  margin-left: 8px; font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: var(--r-full);
+  background: #F5DDD1; color: var(--rust); white-space: nowrap;
+}
+.invite__dismiss--spam { color: var(--rust); }
+.invite__dismiss--spam:hover { color: var(--rust); }

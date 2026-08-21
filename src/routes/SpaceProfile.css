@@ -317,3 +317,6 @@
 .sprof__knock-email { color: var(--ink-soft); font-weight: 400; }
 .sprof__memberacts { display: inline-flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .sprof__rolebtn--remove:hover { border-color: #c0564f; color: #c0564f; }
+
+/* Spam is the rust-colored answer at the door (2026-08-21) */
+.sprof__knock-spam { color: var(--rust); border-color: var(--rust); }

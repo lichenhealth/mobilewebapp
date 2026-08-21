@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mTOfnGfDANwgtT6BiHhH20bFpG1AWchPf9hczdBLrvIfUWMKd2uhsfXrrqX0WMh
+\restrict HX64pQedkWTSBRwJtLYXSqDgSqPDQq0cG99HVKmoPYFRs5SuTG8QFUnr2xPydbN
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -5831,7 +5831,7 @@ CREATE TABLE public.join_requests (
     status text DEFAULT 'new'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     space_id uuid,
-    CONSTRAINT join_requests_status_check CHECK ((status = ANY (ARRAY['new'::text, 'invited'::text, 'declined'::text])))
+    CONSTRAINT join_requests_status_check CHECK ((status = ANY (ARRAY['new'::text, 'invited'::text, 'declined'::text, 'spam'::text])))
 );
 
 
@@ -13414,7 +13414,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mTOfnGfDANwgtT6BiHhH20bFpG1AWchPf9hczdBLrvIfUWMKd2uhsfXrrqX0WMh
+\unrestrict HX64pQedkWTSBRwJtLYXSqDgSqPDQq0cG99HVKmoPYFRs5SuTG8QFUnr2xPydbN
 
 
 

@@ -17,6 +17,26 @@ import './Invite.css';
 type GiftTier = 'community' | 'concierge';
 
 // The chip and the email say the same thing: 1 month, 2 months… 1 year, 2 years.
+/** A quiet advisory flag, not a verdict (founder 2026-08-21: "so you can
+ *  learn how to identify spam"). Two cheap tells that catch bot noise —
+ *  words with no vowels at all ("Ngvjpj") and rAnDoM-cAsE tokens — while a
+ *  human name never trips them. The desk still decides; rows marked spam
+ *  stay in join_requests as the labeled set a smarter detector learns from. */
+function looksSpammy(name: string, story: string | null): boolean {
+  const words = `${name} ${story ?? ''}`.split(/\s+/).filter((w) => w.length >= 5);
+  for (const w of words) {
+    const letters = w.replace(/[^a-zA-Z]/g, '');
+    if (letters.length >= 5 && !/[aeiouyAEIOUY]/.test(letters)) return true;
+    let flips = 0;
+    for (let i = 1; i < letters.length; i++) {
+      const a = letters[i - 1], b = letters[i];
+      if ((a === a.toLowerCase()) !== (b === b.toLowerCase())) flips++;
+    }
+    if (flips >= 5) return true;
+  }
+  return false;
+}
+
 const spanText = (m: number | null) =>
   m === null ? 'no end date'
     : m % 12 === 0 ? (m === 12 ? '1 year' : `${m / 12} years`)
@@ -73,7 +93,7 @@ export default function Invite() {
   // Handling a knock moves it off the "waiting" tally and the side-menu
   // badge (founder 2026-08-02) — the row stays visible here either way, so
   // nothing is ever truly lost, just no longer flagged as needing you.
-  async function resolveKnock(id: string, status: 'invited' | 'declined') {
+  async function resolveKnock(id: string, status: 'invited' | 'declined' | 'spam') {
     const prior = knocks;
     setKnocks((cur) => cur.map((k) => (k.id === id ? { ...k, status } : k)));
     const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
@@ -407,14 +427,22 @@ export default function Invite() {
               <p className="invite__muted">Nobody knocking right now.</p>
             ) : (
               <ul className="invite__list">
+                {/* Who they are on one full-width line, the answers on their
+                    own line below — the old center-aligned wrap squeezed long
+                    names into a broken column (founder 2026-08-21 screenshot).
+                    No status pill here: everyone in this list is 'new'. */}
                 {waitingKnocks.map((k) => (
                   <li className="invite__row invite__row--knock" key={k.id}>
                     <span className="invite__row-who">
-                      <strong>{k.name}</strong> · {k.email}
-                      {k.space && <span className="invite__knock-door"> · knocked at {k.space.name} — its stewards can answer too</span>}
+                      <span className="invite__knock-name">
+                        <strong>{k.name}</strong> · {k.email}
+                        {looksSpammy(k.name, k.story) && (
+                          <span className="invite__spamflag" title="Automated guess from the name/story shape — you decide">looks like spam</span>
+                        )}
+                      </span>
+                      {k.space && <span className="invite__knock-door">knocked at {k.space.name} — its stewards can answer too</span>}
                       {k.story && <em className="invite__story">{k.story}</em>}
                     </span>
-                    <span className={'invite__pill' + (k.status === 'invited' ? ' is-in' : k.status === 'declined' ? ' is-declined' : '')}>{k.status}</span>
                     {k.status === 'new' && composeFor !== k.id && (
                       <span className="invite__knock-acts">
                         {/* The standard invitation is the default — a personal
@@ -429,6 +457,13 @@ export default function Invite() {
                         </button>
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
+                        </button>
+                        {/* Spam is a CATEGORY (founder 2026-08-21): the row
+                            steps out like a decline, the address is quietly
+                            barred from knocking again, and the labeled row
+                            stays as training data. */}
+                        <button className="invite__dismiss invite__dismiss--spam" onClick={() => void resolveKnock(k.id, 'spam')}>
+                          Spam
                         </button>
                       </span>
                     )}

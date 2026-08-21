@@ -1599,6 +1599,17 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                       .catch((e: Error) => setKnockErr(e.message))
                       .finally(() => setKnockBusy(null));
                   }}>Not a fit</button>
+                {/* Spam is a category, not just a dismissal (founder
+                    2026-08-21): the address is quietly barred from knocking
+                    again, and the labeled row becomes training data. */}
+                <button className="btn sprof__invite-btn sprof__knock-spam" disabled={knockBusy === k.id}
+                  onClick={() => {
+                    setKnockBusy(k.id);
+                    decideSpaceKnock(k.id, 'spam')
+                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
+                      .catch((e: Error) => setKnockErr(e.message))
+                      .finally(() => setKnockBusy(null));
+                  }}>Spam</button>
               </div>
             </div>
           ))}

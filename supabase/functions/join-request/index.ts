@@ -51,6 +51,13 @@ Deno.serve(async (req) => {
     if (sp && sp.public_page && sp.status === 'live') space = { id: sp.id, name: sp.name, kind: sp.kind };
   }
 
+  // An address the desk marked SPAM never re-enters the queue — and never
+  // learns it was marked (founder 2026-08-21). Same shape as the honeypot:
+  // a quiet ok, no row, no bells.
+  const { data: burned } = await db.from('join_requests')
+    .select('id').eq('email', email).eq('status', 'spam').limit(1).maybeSingle();
+  if (burned) return json({ ok: true });
+
   // One open knock per email — repeats just re-affirm, quietly. (A knock at a
   // different door by the same person updates which door it was.)
   const { data: existing } = await db.from('join_requests')
