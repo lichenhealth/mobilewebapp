@@ -38,7 +38,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/mycelium',    label: 'My-celium',   custom: true          },
   { prefix: '/communities', label: 'Communities', icon: 'user-multiple' },
   { prefix: '/community',   label: 'Communities', icon: 'user-multiple' },
-  { prefix: '/groups',      label: 'Groups',      icon: 'user-multiple' },
+  { prefix: '/groups',      label: 'Groups',      icon: 'groups'        },
   { prefix: '/organizations', label: 'Organizations', icon: 'globe'     },
   { prefix: '/concierge',   label: 'Concierge',   icon: 'concierge'     },
   { prefix: '/chat',        label: 'Chat',        icon: 'chat'          },
@@ -224,7 +224,11 @@ export default function TopBar({
               aria-label={scopeMark ? `${scopeMark.name} — ${section.label}` : section.label}
               title={scopeMark ? `${scopeMark.name} — ${section.label}` : section.label}
             >
-              <Icon name={section.icon!} size={34} />
+              {/* The glyph FILLS its ring like a profile photo fills its
+                  circle (founder 2026-08-21: "we don't need a circle inside
+                  the circle") — non-scaling-stroke keeps the hairline at
+                  1.2px no matter the scale. */}
+              <Icon name={section.icon!} size={50} />
               {scopeBadge}
             </div>
           )
