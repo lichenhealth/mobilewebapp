@@ -80,3 +80,17 @@
 /* Home — the always-on landing tab, shown but never removable (2026-08-21) */
 .ptabs__row--home { opacity: 0.85; margin-bottom: 6px; }
 .ptabs__row--home .ptabs__head { cursor: default; }
+
+/* The chooser's fold-up header (2026-08-21) */
+.ptabs__picker-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 2px 8px;
+}
+.ptabs__picker-title { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
+.ptabs__up {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--r-full);
+  border: 1px solid var(--peach); background: transparent; color: var(--peach-deep);
+  cursor: pointer;
+}
+.ptabs__up:hover { background: var(--peach-tint); }

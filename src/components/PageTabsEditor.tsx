@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import {
@@ -41,6 +41,23 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   };
   const [upBusy, setUpBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const addCtaRef = useRef<HTMLButtonElement>(null);
+  const scrollToCta = useRef(false);
+  const closePicker = () => {
+    scrollToCta.current = true;
+    setAdding(false);
+  };
+  // The chooser is tall — folding it from anywhere should land you back at
+  // the CTA, not wherever the collapse left the viewport. The scroll waits
+  // for the commit that puts the CTA back in the DOM (a rAF fires too soon).
+  useEffect(() => {
+    if (adding || !scrollToCta.current) return;
+    scrollToCta.current = false;
+    // Instant, not smooth: collapsing the tall chooser clamps the scroller's
+    // max-scroll at the same moment, and Chrome cancels a smooth scroll that
+    // starts during the clamp — verified live, the smooth version never landed.
+    addCtaRef.current?.scrollIntoView({ block: 'center' });
+  }, [adding]);
   const [openId, setOpenId] = useState<string | null>(null);
   const spare = availableTemplates(tabs);
 
@@ -241,13 +258,22 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
       </div>
 
       {!adding && (
-        <button className="btn ptabs__add" onClick={() => setAdding(true)}>
+        <button type="button" className="btn ptabs__add" ref={addCtaRef} onClick={() => setAdding(true)}>
           <Icon name="plus" size={14} /> Add a tab
         </button>
       )}
 
       {adding && (
         <div className="ptabs__picker">
+          {/* The way back is UP, at the top (founder 2026-08-21: "Never
+              mind" at the foot of a long list closed things confusingly) —
+              the chevron folds the chooser and lands you back on the CTA. */}
+          <div className="ptabs__picker-head">
+            <span className="ptabs__picker-title">Add a tab</span>
+            <button type="button" className="ptabs__up" onClick={closePicker} aria-label="Close the tab chooser">
+              <Icon name="arrow-up" size={14} />
+            </button>
+          </div>
           {/* A tab of your own (founder 2026-08-20): name it, write it — the
               same Write editor every template tab gets, and the public page
               renders it like any other. Claude can make these too. */}
@@ -278,7 +304,6 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
               </span>
             </button>
           ))}
-          <button className="btn ptabs__cancel" onClick={() => setAdding(false)}>Never mind</button>
         </div>
       )}
 
