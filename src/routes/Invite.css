@@ -132,3 +132,6 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 }
 .invite__dismiss--spam { color: var(--rust); }
 .invite__dismiss--spam:hover { color: var(--rust); }
+
+/* The knock the bell was about, lit on arrival (2026-08-21) */
+.invite__row--knock.is-called { border-color: var(--peach); background: var(--peach-tint); }

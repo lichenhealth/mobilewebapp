@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 /** The invitation's standard paragraph — kept in step with send-invite's
@@ -56,6 +56,9 @@ export default function Invite() {
   const [knocks, setKnocks] = useState<KnockRow[]>([]);
   const loadLedger = useCallback(async () => {
     if (!user) return;
+    // Re-arm the drop-at-the-door scroll: it must wait for THIS load (the
+    // admin-scoped one adds rows above the section and moves it).
+    setLedgerLoaded(false);
     // Admins see the whole picture — every invitation, and who sent it.
     // Members see their own (RLS decides; the query is the same shape).
     let q = supabase.from('invite_tokens')
@@ -82,8 +85,32 @@ export default function Invite() {
         .select('id, name, email, story, status, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
       setKnocks((k as KnockRow[] | null) ?? []);
     }
+    setLedgerLoaded(true);
   }, [user, isAdmin]);
   useEffect(() => { void loadLedger(); }, [loadLedger]);
+
+  // A knock's bell drops you AT the door, not at the top of the ledger
+  // (founder 2026-08-21). The link carries ?email= (and #door); once the
+  // list is real we scroll to the section and light the knock in question.
+  const [ledgerLoaded, setLedgerLoaded] = useState(false);
+  const [params] = useSearchParams();
+  const { hash } = useLocation();
+  const calledEmail = (params.get('email') ?? '').toLowerCase();
+  const droppedAtDoor = useRef(false);
+  useEffect(() => {
+    if (droppedAtDoor.current || !ledgerLoaded || !isAdmin) return;
+    if (!calledEmail && hash !== '#door') return;
+    // After paint AND a beat for the freshly-loaded rows to take their
+    // height — a smooth scroll aimed at a still-moving target lands short.
+    // ⚠ The one-shot flag is set when the scroll FIRES, not when it's armed:
+    // an armed-then-cleaned-up effect (StrictMode's double pass, a dep blip)
+    // would otherwise burn the shot without ever scrolling.
+    const t = setTimeout(() => {
+      droppedAtDoor.current = true;
+      document.getElementById('door')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [ledgerLoaded, isAdmin, calledEmail, hash]);
 
   // One truth per row (founder 2026-08-11): invited → opened (they reached
   // the signup page through their link) → joined. The old page derived
@@ -419,7 +446,7 @@ export default function Invite() {
             {/* "At the door" means people still waiting. Handled ones moved
                 below — a 0-waiting heading above four rows is what let three
                 unsent invitations hide in plain sight (founder 2026-08-06). */}
-            <h2 className="invite__h2">
+            <h2 className="invite__h2" id="door">
               At the door
               {waitingKnocks.length > 0 && <span className="invite__tally">{waitingKnocks.length} waiting</span>}
             </h2>
@@ -432,7 +459,7 @@ export default function Invite() {
                     names into a broken column (founder 2026-08-21 screenshot).
                     No status pill here: everyone in this list is 'new'. */}
                 {waitingKnocks.map((k) => (
-                  <li className="invite__row invite__row--knock" key={k.id}>
+                  <li className={'invite__row invite__row--knock' + (calledEmail && k.email.toLowerCase() === calledEmail ? ' is-called' : '')} key={k.id}>
                     <span className="invite__row-who">
                       <span className="invite__knock-name">
                         <strong>{k.name}</strong> · {k.email}

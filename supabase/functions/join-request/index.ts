@@ -80,7 +80,8 @@ Deno.serve(async (req) => {
   const bells = new Map<string, { link: string; title: string }>();
   for (const a of admins ?? []) {
     bells.set(a.id, {
-      link: '/invite?email=' + encodeURIComponent(email),
+      // ?email lights the knock row, #door scrolls to the section (2026-08-21).
+      link: '/invite?email=' + encodeURIComponent(email) + '#door',
       title: space ? `${name} asked to join ${space.name}` : `${name} asked to join Lichen`,
     });
   }
