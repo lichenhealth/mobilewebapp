@@ -10,10 +10,10 @@ import { listMyBeings } from '../lib/stewardshipApi';
 // Client-side state; persisted per-user in localStorage. No schema involved.
 
 export type SpaceKind = 'organization' | 'community' | 'group' | 'place';
-export interface ActingSpace { id: string; name: string; kind: SpaceKind }
+export interface ActingSpace { id: string; name: string; kind: SpaceKind; avatarUrl?: string | null }
 /** A being you steward — a horse, a cactus, a river (founder 2026-08-05).
  *  It has a profile but no login, so you speak and act for it. */
-export interface ActingBeing { id: string; name: string; kind: string }
+export interface ActingBeing { id: string; name: string; kind: string; avatarUrl?: string | null }
 export type Actor =
   | { type: 'self' }
   | ({ type: 'space' } & ActingSpace)
@@ -66,18 +66,22 @@ export function ActingProvider({ children }: { children: ReactNode }) {
     (async () => {
       const { data } = await supabase
         .from('space_members')
-        .select('role, spaces(id, name, kind)')
+        .select('role, spaces(id, name, kind, avatar_url)')
         .eq('profile_id', user.id)
         .in('role', ['admin', 'super_admin']);
       if (!live) return;
-      const opts = ((data as unknown as { spaces: ActingSpace | null }[] | null) ?? [])
-        .map((r) => r.spaces).filter((s): s is ActingSpace => !!s);
+      // The entity's real face rides along so the acting chip can wear it —
+      // a monogram alone made "whose hat am I wearing" too easy to misread
+      // (founder 2026-08-22).
+      const opts = ((data as unknown as { spaces: { id: string; name: string; kind: SpaceKind; avatar_url: string | null } | null }[] | null) ?? [])
+        .map((r) => r.spaces).filter((s): s is NonNullable<typeof s> => !!s)
+        .map((s): ActingSpace => ({ id: s.id, name: s.name, kind: s.kind, avatarUrl: s.avatar_url }));
       setOptions(opts);
       // Beings I steward join the switcher (empty pre-migration).
       const mine = await listMyBeings(user.id);
       if (!live) return;
       const bs: ActingBeing[] = mine.map((b) => ({
-        id: b.id, name: b.full_name ?? 'A being', kind: b.kind,
+        id: b.id, name: b.full_name ?? 'A being', kind: b.kind, avatarUrl: b.avatar_url ?? null,
       }));
       setBeings(bs);
       // Restore a persisted choice — only if it's still ours to act as.
