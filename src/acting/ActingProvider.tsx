@@ -28,11 +28,16 @@ interface ActingCtx {
   beings: ActingBeing[];           // beings I steward
   self: SelfIdentity;              // my own display identity (for the chip)
   refreshSelf: () => void;         // call after changing name/avatar
+  /** False until the persisted hat has been restored (or ruled out). The
+   *  boot briefly assumed "self" while the saved choice loaded, so the chip
+   *  and /profile's acting-as redirect flashed the wrong identity (founder
+   *  2026-08-22) — surfaces that BRANCH on the actor should wait for this. */
+  ready: boolean;
 }
 
 const Ctx = createContext<ActingCtx>({
   actor: { type: 'self' }, setActor: () => {}, options: [], beings: [],
-  self: { name: '', avatarUrl: null }, refreshSelf: () => {},
+  self: { name: '', avatarUrl: null }, refreshSelf: () => {}, ready: true,
 });
 export const useActing = () => useContext(Ctx);
 
@@ -43,6 +48,7 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ActingSpace[]>([]);
   const [beings, setBeings] = useState<ActingBeing[]>([]);
   const [actor, setActorState] = useState<Actor>({ type: 'self' });
+  const [ready, setReady] = useState(false);
   const [self, setSelf] = useState<SelfIdentity>({ name: '', avatarUrl: null });
   const [selfBump, setSelfBump] = useState(0);
   const refreshSelf = () => setSelfBump((n) => n + 1);
@@ -61,7 +67,11 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   }, [user, selfBump]);
 
   useEffect(() => {
-    if (!user) { setOptions([]); setBeings([]); setActorState({ type: 'self' }); return; }
+    if (!user) { setOptions([]); setBeings([]); setActorState({ type: 'self' }); setReady(true); return; }
+    // A saved hat means the boot's default "self" may be wrong — hold ready
+    // until the restore below has run. No saved hat = self is already true.
+    try { setReady(!localStorage.getItem(storageKey(user.id))); }
+    catch { setReady(true); }
     let live = true;
     (async () => {
       const { data } = await supabase
@@ -95,6 +105,7 @@ export function ActingProvider({ children }: { children: ReactNode }) {
             : { type: 'self' });
         }
       } catch { /* storage unavailable — stay self */ }
+      setReady(true);
     })();
     return () => { live = false; };
   }, [user]);
@@ -109,6 +120,6 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const value = useMemo(() => ({ actor, setActor, options, beings, self, refreshSelf }), [actor, options, beings, self]);
+  const value = useMemo(() => ({ actor, setActor, options, beings, self, refreshSelf, ready }), [actor, options, beings, self, ready]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

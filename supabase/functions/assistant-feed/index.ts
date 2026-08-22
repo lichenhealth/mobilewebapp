@@ -236,6 +236,75 @@ const CALENDAR_TOOLS = [
   },
 ];
 
+// SPACE PAGE TOOLS (rung 2, founder 2026-08-22) — the space-side twins of the
+// profile tools, armed only in a space's build thread (`space:<id>`), only
+// for a steward of that space, only while the space's own assistant switch is
+// on, and only behind the member's hand-that-writes flag. The space id comes
+// from the THREAD, never from the model — no tool takes a target.
+const SPACE_EDIT_TOOLS = [
+  {
+    name: 'set_space_tagline',
+    description: `Replace the space's public-page tagline — the one line under its name. Max ${TAGLINE_MAX} characters. Empty string clears it. Returns the previous value so you can tell them what it used to say.`,
+    input_schema: {
+      type: 'object',
+      properties: { tagline: { type: 'string', description: 'The new tagline. Empty string clears it.' } },
+      required: ['tagline'],
+    },
+  },
+  {
+    name: 'set_space_home_summary',
+    description: 'Replace the welcome paragraph(s) on the Home tab of the space\'s public page. When empty, Home opens with the first two paragraphs of its story — often what they want. Empty string clears it and goes back to that.',
+    input_schema: {
+      type: 'object',
+      properties: { summary: { type: 'string', description: 'The Home welcome, paragraphs separated by a blank line. Empty string clears it.' } },
+      required: ['summary'],
+    },
+  },
+  {
+    name: 'set_space_story',
+    description: 'Replace the space\'s whole story — the long-form About text on its page. Full replace, not append: read what you are replacing back to them. The previous value comes back in the result.',
+    input_schema: {
+      type: 'object',
+      properties: { story: { type: 'string', description: 'The new story, short paragraphs separated by blank lines. Empty string clears it — only on an explicit ask.' } },
+      required: ['story'],
+    },
+  },
+  {
+    name: 'set_space_description',
+    description: 'Replace the space\'s short description — the few words under its name inside Lichen (what it is, who it\'s for). Distinct from the tagline (its public page) and the story (long-form). Empty string clears it.',
+    input_schema: {
+      type: 'object',
+      properties: { description: { type: 'string', description: 'A sentence or two. Empty string clears it.' } },
+      required: ['description'],
+    },
+  },
+  {
+    name: 'set_space_contact_field',
+    description: `Set one of the space's public contact fields. Field must be one of: ${CONTACT_FIELDS.join(', ')}. Empty value clears it.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        field: { type: 'string', enum: CONTACT_FIELDS },
+        value: { type: 'string', description: 'The new value, or an empty string to clear it.' },
+      },
+      required: ['field', 'value'],
+    },
+  },
+  {
+    name: 'set_space_page_tab',
+    description: 'Create or rewrite a TAB on the space\'s public page — any tab they can name, not just the standard set. Matches an existing tab by title (case-insensitive); otherwise creates a custom tab. Passing an empty body AND empty lead REMOVES a written tab (built-in tabs fill themselves and cannot be written or removed here). Everything you write appears in the manual editor too — it is the same page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The tab name as shown to visitors.' },
+        lead: { type: 'string', description: 'One first line. Optional.' },
+        body: { type: 'string', description: 'The tab text, blank lines between paragraphs. Empty (with empty lead) removes the tab.' },
+      },
+      required: ['title', 'body'],
+    },
+  },
+];
+
 /** What a tool call did, in one plain line — the fallback report if the model
  *  writes and then says nothing (a write with no report is a bug). */
 type ToolOutcome = { ok: boolean; change?: string; [k: string]: unknown };
@@ -259,10 +328,22 @@ Deno.serve(async (req) => {
   const trigger = Array.isArray(posts) ? posts[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-post' });
 
+  // A SPACE'S BUILD THREAD (founder 2026-08-22): thread `space:<uuid>` — the
+  // member's own private rows, ABOUT a space. The space id comes from the
+  // thread name, never from the model, so the tools below still take no
+  // target (the profile-tools rule, held).
+  const spaceThreadMatch = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+    .exec(trigger.thread ?? '');
+  const spaceId = spaceThreadMatch ? spaceThreadMatch[1] : null;
+
   // PER-IDENTITY AI CONSENT (founder 2026-08-17). The member wrote into this
   // thread deliberately, so silence would be the failure mode: answer ONCE
   // with the honest state and where to change it, never again until they do.
-  if (await assistantConsentOff(profile_id, [{ type: 'section', id: trigger.thread ?? 'general' }])) {
+  // A space thread checks the member's per-SPACE de-selection instead of a
+  // section row.
+  if (await assistantConsentOff(profile_id, spaceId
+    ? [{ type: 'space', id: spaceId }]
+    : [{ type: 'section', id: trigger.thread ?? 'general' }])) {
     const note = 'You’ve switched the assistant off for this part of your Lichen life, so I won’t work here. The brain on that section’s page is where you can change that, anytime.';
     const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${trigger.thread ?? 'general'}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
     if (Array.isArray(last) && last[0]?.body === note) return json({ ok: true, skipped: 'consent-off' });
@@ -350,10 +431,71 @@ Deno.serve(async (req) => {
     }
   }
 
+  // THE SPACE ON THE TABLE (founder 2026-08-22): a space build thread reads
+  // the SPACE's page as its working context and the sender's standing in it.
+  // The reply then talks about the right subject — the 2026-08-22 bug was
+  // this thread's absence: building Countryman Stables landed in the
+  // member's personal thread, working from the member's own page.
+  let spaceFrame = '';
+  let spaceName = '';
+  let spaceIsAdmin = false;
+  let spaceAiOn = true;
+  if (spaceId) {
+    const sps = await (await sb(`spaces?id=eq.${spaceId}&select=name,kind,description,page,contact,assistant_enabled,status`)).json();
+    const sp = Array.isArray(sps) ? sps[0] : null;
+    const gone = !sp || sp.status === 'offline';
+    if (gone) {
+      // Offline is invisibly-gone by doctrine — same shape as the consent
+      // note: say it once, then stay quiet.
+      const note = 'That space isn’t reachable anymore — it may have been taken offline or deleted — so I can’t work on its page here.';
+      const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${encodeURIComponent(thread)}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
+      if (!(Array.isArray(last) && last[0]?.body === note)) {
+        await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+          profile_id, author: 'claude', thread, body: note,
+        }) });
+      }
+      return json({ ok: true, skipped: 'space-gone' });
+    }
+    spaceName = sp.name as string;
+    spaceAiOn = sp.assistant_enabled !== false;
+    if (!spaceAiOn) {
+      // The space's own switch wins for its whole fabric (founder 2026-08-17)
+      // — the honest once-only note, then silence until it changes.
+      const note = `${spaceName} has its assistant switched off, so I don’t read or write anything for it. Its stewards can change that in its Admin → Privacy.`;
+      const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${encodeURIComponent(thread)}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
+      if (!(Array.isArray(last) && last[0]?.body === note)) {
+        await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+          profile_id, author: 'claude', thread, body: note,
+        }) });
+      }
+      return json({ ok: true, skipped: 'space-ai-off' });
+    }
+    const mem = await (await sb(`space_members?space_id=eq.${spaceId}&profile_id=eq.${profile_id}&select=role&limit=1`)).json();
+    const role = Array.isArray(mem) ? mem[0]?.role : null;
+    spaceIsAdmin = role === 'admin' || role === 'super_admin';
+    const page = (sp.page ?? {}) as Record<string, unknown>;
+    const contact = (sp.contact ?? {}) as Record<string, string>;
+    const story = String(page.story ?? '').trim();
+    const tabs = (Array.isArray(page.tabs) ? page.tabs : []) as { id: string; label?: string }[];
+    const filled = CONTACT_FIELDS.filter((f) => contact[f]?.trim());
+    spaceFrame = `\n\nTHE SPACE ON THE TABLE — this thread is about ${spaceName} (${sp.kind}), NOT about the member's own page:`
+      + `\n- Description: ${String(sp.description ?? '').trim() || '(none yet)'}`
+      + `\n- Tagline: ${String(page.tagline ?? '').trim() || '(none yet)'}`
+      + `\n- Story: ${story ? `${story.split(/\s+/).length} words` : '(nothing written)'}`
+      + `\n- Home welcome: ${String(page.homeSummary ?? '').trim() ? 'written' : '(none — Home opens with the story’s first two paragraphs)'}`
+      + `\n- Tabs on its page: ${tabs.length ? tabs.map((t) => t.label ?? t.id).join(', ') : '(none yet)'}`
+      + `\n- Public contact filled: ${filled.length ? filled.join(', ') : '(none)'}`
+      + (spaceIsAdmin
+        ? `\nThe member STEWARDS this space, so help them build and run its public presence.`
+        : `\nThe member is NOT a steward of this space — its page belongs to its admins. Help them take part in it instead, and say who to ask for page changes.`);
+  }
+
   // Staying in the right thread is part of the job: if what they've asked
   // plainly belongs somewhere else, say so and point, rather than doing the
   // work in the wrong place (founder 2026-08-11).
-  const threadRule = thread === 'general'
+  const threadRule = spaceId
+    ? `\n\nYou are in this member's build thread for the space named above. Keep the work about THAT space's page and presence; their OWN page has its own Profile thread — point there for personal-page asks, one short sentence.`
+    : thread === 'general'
     ? '\n\nYou are in their GENERAL thread — anything goes here, and you may draw on their other threads when it helps.'
     : `\n\nYou are in their ${thread.toUpperCase()} thread, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which thread it belongs in so it stays findable — one short sentence, never a lecture.`;
 
@@ -368,6 +510,7 @@ Deno.serve(async (req) => {
   // quietly rewriting their page from the wrong room.
   let canEdit = false;
   let canCalendar = false;
+  let canSpaceEdit = false;
   {
     const me = await (await sb(`profiles?id=eq.${profile_id}&select=assistant_can_edit`)).json();
     const flag = !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
@@ -375,6 +518,11 @@ Deno.serve(async (req) => {
     // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
     // hand-that-writes flag arms CALENDAR tools in the calendar thread.
     canCalendar = thread === 'calendar' && flag;
+    // Rung 2 (founder 2026-08-22): the same flag arms SPACE page tools in a
+    // space's build thread — but only for a steward of the space, and only
+    // while the space's own assistant switch is on (checked above; an off
+    // switch never reaches here). Three consents, all required.
+    canSpaceEdit = !!spaceId && flag && spaceIsAdmin && spaceAiOn;
   }
 
   // The real taxonomy travels with the request, so a category can only ever be
@@ -391,6 +539,15 @@ Deno.serve(async (req) => {
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
       + '\n- PHOTO MOVES: When they ask to move a photo between sections (About/Services/Goods/Facilities), or to make one the Home cover, use the photo tools. They can say things like "move the jumping photo from About to Services" or "make the farm photo the Home cover" and you handle it directly via tools.'
       + (lines.length ? `\n\nThe only category ids that exist:\n${lines.join('\n')}` : '');
+  }
+
+  let spaceEditRule = '';
+  if (canSpaceEdit) {
+    spaceEditRule = `\n\nYOU CAN ACTUALLY CHANGE ${spaceName.toUpperCase()}'S PAGE. The member stewards it, its assistant switch is on, and they have turned on "Let Claude edit my page directly" — so your space tools write straight to ITS public page (never to the member's own page). How to hold that:`
+      + '\n- Make the change when they ask for one. Do not hand back a draft to paste — that is what the tools are for.'
+      + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
+      + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
+      + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.';
   }
 
   let calendarRule = '';
@@ -420,9 +577,121 @@ Deno.serve(async (req) => {
     return (Array.isArray(found) ? found : []) as { id: string; name: string; domain: string }[];
   };
 
+  // The space-side twins of readPage/patchMe — scoped to the THREAD's space,
+  // never a model-supplied id.
+  const readSpacePage = async () => {
+    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=page,contact,description`)).json();
+    const r = Array.isArray(cur) ? cur[0] : null;
+    return {
+      page: (r?.page ?? {}) as Record<string, unknown>,
+      contact: (r?.contact ?? {}) as Record<string, string>,
+      description: (r?.description ?? null) as string | null,
+    };
+  };
+  const patchSpace = (body: Record<string, unknown>) =>
+    sb(`spaces?id=eq.${spaceId}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body),
+    });
+
   // Every write is scoped to profile_id from the trigger — no tool takes a
   // target, so the model has no way to name someone else.
   async function runTool(name: string, input: Record<string, string & string[]>): Promise<ToolOutcome> {
+    // ── Space page tools (rung 2, founder 2026-08-22). Belt and braces: the
+    // tools only arm when canSpaceEdit, but each executor re-checks anyway.
+    if (name.startsWith('set_space_')) {
+      if (!spaceId || !canSpaceEdit) return { ok: false, error: 'Space tools are not armed here.' };
+
+      if (name === 'set_space_tagline' || name === 'set_space_home_summary' || name === 'set_space_story') {
+        const key = name === 'set_space_tagline' ? 'tagline' : name === 'set_space_home_summary' ? 'homeSummary' : 'story';
+        const next = String(input[name === 'set_space_tagline' ? 'tagline' : name === 'set_space_home_summary' ? 'summary' : 'story'] ?? '').trim();
+        if (key === 'tagline' && next.length > TAGLINE_MAX) {
+          return { ok: false, error: `A tagline is at most ${TAGLINE_MAX} characters; that one is ${next.length}. Shorten it and try again.` };
+        }
+        const { page } = await readSpacePage();
+        const previous = (page[key] as string | undefined) ?? null;
+        const label = key === 'tagline' ? 'tagline' : key === 'homeSummary' ? 'home welcome' : 'story';
+        if (!next) {
+          if (previous === null || previous === undefined) {
+            return { ok: false, error: `${spaceName}'s ${label} is already empty — nothing to clear.` };
+          }
+          delete page[key];
+          await patchSpace({ page });
+          return { ok: true, previous, change: `cleared ${spaceName}'s ${label}` };
+        }
+        page[key] = next;
+        if (key === 'story' && !((page.tabs as unknown[] | undefined)?.length)) {
+          page.tabs = [{ id: 'about' }, { id: 'services' }];
+        }
+        await patchSpace({ page });
+        return {
+          ok: true, previous,
+          change: previous ? `rewrote ${spaceName}'s ${label}` : `wrote ${spaceName}'s ${label} (it was empty)`,
+          note: previous ? 'Tell them what it said before, so they can ask for it back.' : undefined,
+        };
+      }
+
+      if (name === 'set_space_description') {
+        const next = String(input.description ?? '').trim();
+        const { description: previous } = await readSpacePage();
+        if (!next && !previous) return { ok: false, error: `${spaceName}'s description is already empty — nothing to clear.` };
+        await patchSpace({ description: next || null });
+        return {
+          ok: true, previous,
+          change: next
+            ? (previous ? `rewrote ${spaceName}'s description` : `wrote ${spaceName}'s description (it was empty)`)
+            : `cleared ${spaceName}'s description`,
+        };
+      }
+
+      if (name === 'set_space_contact_field') {
+        const field = String(input.field ?? '');
+        if (!CONTACT_FIELDS.includes(field)) {
+          return { ok: false, error: `"${field}" is not a public contact field. Choose one of: ${CONTACT_FIELDS.join(', ')}.` };
+        }
+        const value = String(input.value ?? '').trim();
+        const { contact } = await readSpacePage();
+        const previous = contact[field] ?? null;
+        if (value) contact[field] = value; else delete contact[field];
+        await patchSpace({ contact: Object.keys(contact).length ? contact : null });
+        return {
+          ok: true, previous,
+          change: value ? `set ${spaceName}'s public ${field} to ${value}` : `cleared ${spaceName}'s public ${field}`,
+        };
+      }
+
+      if (name === 'set_space_page_tab') {
+        const title = String(input.title ?? '').trim().slice(0, 60);
+        if (!title) return { ok: false, error: 'A tab needs a name.' };
+        const lead = String(input.lead ?? '').trim();
+        const bodyText = String(input.body ?? '').trim();
+        const BUILT_IN = ['about', 'services', 'goods', 'contact', 'gallery'];
+        const { page } = await readSpacePage();
+        const tabs = (Array.isArray(page.tabs) ? page.tabs : []) as { id: string; label?: string; lead?: string; body?: string }[];
+        const norm = (x: string) => x.toLowerCase().trim();
+        const hit = tabs.find((t) => norm(t.label ?? '') === norm(title) || norm(t.id) === norm(title));
+        if (hit && BUILT_IN.includes(hit.id)) {
+          return { ok: false, error: `"${title}" is a built-in tab — it fills itself and cannot be written or removed here.` };
+        }
+        if (!bodyText && !lead) {
+          if (!hit) return { ok: false, error: `No tab named "${title}" to remove.` };
+          page.tabs = tabs.filter((t) => t !== hit);
+          await patchSpace({ page });
+          return { ok: true, previous: hit.body ?? null, change: `removed the "${hit.label ?? hit.id}" tab from ${spaceName}'s page` };
+        }
+        if (hit) {
+          const previous = { lead: hit.lead ?? null, body: hit.body ?? null };
+          hit.label = title; hit.lead = lead || undefined; hit.body = bodyText || undefined;
+          await patchSpace({ page });
+          return { ok: true, previous, change: `rewrote the "${title}" tab on ${spaceName}'s page`, note: 'Tell them what it said before if it held anything.' };
+        }
+        const id = 'custom-' + Math.random().toString(36).slice(2, 8);
+        page.tabs = [...tabs, { id, label: title, lead: lead || undefined, body: bodyText || undefined }];
+        await patchSpace({ page });
+        return { ok: true, previous: null, change: `created the "${title}" tab on ${spaceName}'s page` };
+      }
+
+      return { ok: false, error: `No such space tool: ${name}` };
+    }
     if (name === 'set_tagline' || name === 'set_home_summary' || name === 'set_story') {
       const key = name === 'set_tagline' ? 'tagline' : name === 'set_home_summary' ? 'homeSummary' : 'story';
       const next = String(input[name === 'set_tagline' ? 'tagline' : name === 'set_home_summary' ? 'summary' : 'story'] ?? '').trim();
@@ -742,14 +1011,14 @@ Deno.serve(async (req) => {
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar) ? 1600 : 1000,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${threadRule}${editRule}${calendarRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
+        max_tokens: (canEdit || canCalendar || canSpaceEdit) ? 1600 : 1000,
+        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round
         // tool_choice 'none' forces the report instead of another edit.
-        ...((canEdit || canCalendar)
-          ? { tools: canEdit ? EDIT_TOOLS : CALENDAR_TOOLS, ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
+        ...((canEdit || canCalendar || canSpaceEdit)
+          ? { tools: canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : CALENDAR_TOOLS, ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
           : {}),
       }),
     });

@@ -799,6 +799,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // The brain closes the acting-doors group, just before the hairline
       // (founder 2026-08-05) — quiet when this section's consent is off.
       assistantSection={ctx.guest ? undefined : ASSISTANT_SECTION[space.kind]}
+      // The brain briefs THIS space, not the whole section (founder
+      // 2026-08-22: "Your organizations" from Countryman Stables' own page).
+      assistantSpace={ctx.guest ? undefined : space.id}
       assistantOff={space.assistant_enabled === false}
       // …and the space's own rooms open the group after it.
       afterGap={ctx.guest ? []
@@ -958,7 +961,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // the website layer (?preview=1 renders the open-web template).
   const adminBar = isAdmin ? (
     <div className="view-toggle-row">
-      <span className="view-toggle" role="group" aria-label="View">
+      {/* Whose views these are — this control is pixel-identical to the one
+          on /profile, and without the subject named, a space's backstage
+          reads as "my profile" (founder 2026-08-22, the Lichen View mixup). */}
+      <span className="view-toggle-row__subject">{possessive(space.name)} views</span>
+      <span className="view-toggle" role="group" aria-label={`Views of ${space.name}`}>
         <button
           className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}
           onClick={() => { beThisSpace(); setSearchParams({ manage: '1' }); }}
@@ -1141,7 +1148,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {adminTools && (
         <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
-          <BuildModeSplit back={`/spaces/${id}?manage=1#about`} />
+          <BuildModeSplit back={`/spaces/${id}?manage=1#about`} space={{ id: space.id, name: space.name }} />
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -1157,7 +1164,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onChange={(e) => setDescription(e.target.value)}
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
-            <FillWithClaude back={`/spaces/${id}?manage=1#about`} label="Fill out with Claude" />
+            <FillWithClaude
+              back={`/spaces/${id}?manage=1#about`}
+              label="Fill out with Claude"
+              space={{ id: space.id, name: space.name }}
+              ask={`Help me write ${possessive(space.name)} description — what it is, who it's for.`}
+            />
           </div>
           {space.kind === 'community' && (
             <div className="prof__field">

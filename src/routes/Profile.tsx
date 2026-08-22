@@ -102,7 +102,7 @@ function formatWeeklyHours(ws: { weekday: number; start_min: number; end_min: nu
 
 export default function Profile() {
   const { user, loading, isAdmin } = useAuth();
-  const { actor, refreshSelf } = useActing();
+  const { actor, refreshSelf, ready: actingReady } = useActing();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -582,8 +582,12 @@ export default function Profile() {
   // links like /profile#privacy and /profile#care-for are always about the
   // person, not whatever they're acting as.
   useEffect(() => {
+    // Wait for the persisted hat to restore (founder 2026-08-22): deciding
+    // on the boot's default "self" painted the personal page for a beat,
+    // then swapped it for the space's backstage under the reader.
+    if (!actingReady) return;
     if (!hash && actor.type === 'space') navigate(`/spaces/${actor.id}?manage=1`, { replace: true });
-  }, [actor, hash, navigate]);
+  }, [actingReady, actor, hash, navigate]);
 
   async function saveProfile() {
     if (!user) return;
@@ -740,7 +744,9 @@ export default function Profile() {
     catch (e) { setError(e instanceof Error ? e.message : 'Could not open chat'); }
   }
 
-  if (loading || (user && loadingData)) {
+  // actingReady: don't paint the personal page while a saved hat is still
+  // restoring — the acting-as redirect above may be about to fire.
+  if (loading || (user && loadingData) || !actingReady) {
     return <div className="prof"><p className="prof__muted">Loading...</p></div>;
   }
   if (!user) return null;
@@ -779,7 +785,11 @@ export default function Profile() {
       </div>
 
       <div className="view-toggle-row view-toggle-row--center">
-        <span className="view-toggle" role="group" aria-label="View">
+        {/* The subject label pairs with the one on a space's backstage
+            (founder 2026-08-22) — the same control, told apart by whose
+            views it switches. */}
+        <span className="view-toggle-row__subject">Your views</span>
+        <span className="view-toggle" role="group" aria-label="Views of you">
           <button className="view-toggle__side view-toggle__side--admin is-on">
             Admin
           </button>

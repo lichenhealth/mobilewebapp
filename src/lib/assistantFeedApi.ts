@@ -123,6 +123,73 @@ export async function loadProfileContext(me: string): Promise<ProfileContext | n
   };
 }
 
+// A SPACE'S BUILD THREAD (founder 2026-08-22, cashing in the note above):
+// `space:<uuid>` in the same free-text thread column. Still the MEMBER's own
+// rows by RLS — each admin holds their own private thread about the space;
+// the shared, entity-owned thread is the per-entity AI Partner fabric, later.
+export const spaceThreadId = (spaceId: string) => `space:${spaceId}`;
+export function spaceIdOfThread(thread: string): string | null {
+  const m = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(thread);
+  return m ? m[1] : null;
+}
+
+/** What Claude works from in a space's build thread — the space-side twin of
+ *  ProfileContext, read from the same rows the space tools write to. */
+export interface SpaceContext {
+  name: string;
+  kind: string;
+  tagline: string | null;
+  storyWords: number;
+  homeSummary: boolean;
+  hasDescription: boolean;
+  contactFilled: string[];
+  contactEmpty: string[];
+  /** The space's own assistant switch (backstage → Privacy). */
+  aiEnabled: boolean;
+  /** Steward of this space — participation-only help otherwise. */
+  isAdmin: boolean;
+  /** The member's hand-that-writes flag AND the space's switch, together. */
+  canEdit: boolean;
+}
+
+export async function loadSpaceContext(me: string, spaceId: string): Promise<SpaceContext | null> {
+  const [spRes, memRes, meRes] = await Promise.all([
+    supabase.from('spaces')
+      .select('name, kind, description, page, contact, assistant_enabled')
+      .eq('id', spaceId).maybeSingle(),
+    supabase.from('space_members')
+      .select('role').eq('space_id', spaceId).eq('profile_id', me).maybeSingle(),
+    supabase.from('profiles').select('assistant_can_edit').eq('id', me).maybeSingle(),
+  ]);
+  const sp = spRes.data as {
+    name: string; kind: string; description: string | null;
+    page: { tagline?: string; story?: string; homeSummary?: string } | null;
+    contact: Record<string, string> | null;
+    assistant_enabled: boolean | null;
+  } | null;
+  if (!sp) return null;
+  const role = (memRes.data as { role?: string } | null)?.role;
+  const isAdmin = role === 'admin' || role === 'super_admin';
+  const page = sp.page ?? {};
+  const contact = sp.contact ?? {};
+  const story = (page.story ?? '').trim();
+  const aiEnabled = sp.assistant_enabled !== false;
+  return {
+    name: sp.name,
+    kind: sp.kind,
+    tagline: page.tagline?.trim() || null,
+    storyWords: story ? story.split(/\s+/).length : 0,
+    homeSummary: !!page.homeSummary?.trim(),
+    hasDescription: !!sp.description?.trim(),
+    contactFilled: CONTACT_FIELDS.filter((f) => contact[f]?.trim()),
+    contactEmpty: CONTACT_FIELDS.filter((f) => !contact[f]?.trim()),
+    aiEnabled,
+    isAdmin,
+    canEdit: aiEnabled && isAdmin
+      && !!(meRes.data as { assistant_can_edit?: boolean } | null)?.assistant_can_edit,
+  };
+}
+
 /** Whether the member has actually used their Claude feed — a real post,
  *  not just having seen the row. */
 export async function hasClaudeFeedActivity(me: string): Promise<boolean> {
