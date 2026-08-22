@@ -961,10 +961,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // the website layer (?preview=1 renders the open-web template).
   const adminBar = isAdmin ? (
     <div className="view-toggle-row">
-      {/* Whose views these are — this control is pixel-identical to the one
-          on /profile, and without the subject named, a space's backstage
-          reads as "my profile" (founder 2026-08-22, the Lichen View mixup). */}
-      <span className="view-toggle-row__subject">{possessive(space.name)} views</span>
+      {/* No visible subject label (founder 2026-08-22, same day it shipped:
+          it squeezed the toggle off the column) — the acting chip's real
+          logo and the hat-following platform carry whose views these are;
+          the aria-label still names it for screen readers. */}
       <span className="view-toggle" role="group" aria-label={`Views of ${space.name}`}>
         <button
           className={'view-toggle__side view-toggle__side--admin' + (backstage ? ' is-on' : '')}

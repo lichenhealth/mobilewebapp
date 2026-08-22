@@ -785,10 +785,6 @@ export default function Profile() {
       </div>
 
       <div className="view-toggle-row view-toggle-row--center">
-        {/* The subject label pairs with the one on a space's backstage
-            (founder 2026-08-22) — the same control, told apart by whose
-            views it switches. */}
-        <span className="view-toggle-row__subject">Your views</span>
         <span className="view-toggle" role="group" aria-label="Views of you">
           <button className="view-toggle__side view-toggle__side--admin is-on">
             Admin

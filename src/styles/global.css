@@ -358,13 +358,6 @@ input, textarea, select { font: inherit; color: inherit; }
   font-size: 11px; font-weight: 700; line-height: 1;
 }
 .view-toggle-row { display: flex; align-items: center; gap: 10px; margin: var(--s-2) 0 var(--s-3); }
-/* WHO these views belong to (founder 2026-08-22): the identical three-way
-   control means "me" on /profile and "this space" on a backstage — the
-   subject label is what tells them apart at a glance. */
-.view-toggle-row__subject {
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--ink-muted); white-space: nowrap;
-}
 /* Inside an admin view, decisions are blue — approvals, saves, role grants. */
 .is-adminview .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
 .is-adminview .btn-primary:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
