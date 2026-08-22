@@ -1248,14 +1248,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             />
             <p className="prof__hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
           </div>
-          <div className="prof__field">
-            <label className="prof__label">Contact &amp; hours</label>
-            <ContactFields
-              value={contact}
-              onChange={setContact}
-              lead="These appear on the public page — how someone reaches you without joining Lichen."
-            />
-          </div>
+          {/* Contact & hours moved INTO the Contact tab's Style panel in the
+              tabs list (founder 2026-08-22: "contact and hours is supposed
+              to be a tab that you select, not a default part of the page
+              builder"). */}
           <label className="sprof__duty">
             <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
             <span>
@@ -1334,6 +1330,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             onCoverPos={(coverPos) => setPageEdit((pm) => ({ ...pm, coverPos }))}
             spaceId={space.id}
             entityName={name}
+            contact={contact}
+            onContact={setContact}
             homeExtra={
               <HomeSummaryButton
                 story={pageEdit.story ?? description ?? ''}

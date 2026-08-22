@@ -57,11 +57,28 @@ const CONTACT_FIELDS = ['website', 'email', 'phone', 'booking', 'hours', 'addres
 
 const TAGLINE_MAX = 90;
 
+// A photo PASTED INTO THIS VERY MESSAGE may be placed on the page (founder
+// 2026-08-22). The executor resolves photo_number against the trigger row's
+// own attachments — the model can never place an arbitrary URL.
+const PLACE_PHOTO_TOOL = {
+  name: 'place_uploaded_photo',
+  description: 'Put one of the photos the member pasted into THIS message onto the page. photo_number is 1-based, in the order sent. section names the tab (about, services, goods, contact, facilities) or "home_cover" to make it the Home cover. Only photos from this message can be placed — never a URL.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      photo_number: { type: 'number', description: '1 = the first photo in this message.' },
+      section: { type: 'string', enum: ['about', 'services', 'goods', 'contact', 'facilities', 'home_cover'] },
+    },
+    required: ['photo_number', 'section'],
+  },
+};
+
 // The WHOLE list of operations (docs/ASSISTANT_ACTIONS.md). Public-page fields
 // only: nothing here can reach location, care, financial position, another
 // member, or a space — those are consequential in a way that wants a confirm
 // step, not a chat message.
 const EDIT_TOOLS = [
+  PLACE_PHOTO_TOOL,
   {
     name: 'set_tagline',
     description: `Replace the member's public-page tagline — the one line under their name. Max ${TAGLINE_MAX} characters. Pass an empty string to clear it, which is how you put it back when it started out empty. Returns the previous value so you can tell them what it used to say.`,
@@ -159,12 +176,12 @@ const EDIT_TOOLS = [
   },
   {
     name: 'set_section_photo_position',
-    description: 'Adjust where a photo is cropped/positioned in a section. The position controls which part of the image shows. Useful when a photo needs to be adjusted to show the right part — e.g., "top" to show the top of the image (good for faces), "center" for the middle, "bottom" for the bottom.',
+    description: 'Adjust which part of a tab\'s photo shows in its frame. position: "top", "center", "bottom", or a number 0–100 (percent from the top — 0 shows the very top, 100 the very bottom; "push it down so the face shows" usually means a SMALLER number). Nudge, then ask them to look.',
     input_schema: {
       type: 'object',
       properties: {
-        section: { type: 'string', enum: ['about', 'services', 'goods', 'facilities'], description: 'The section containing the photo.' },
-        position: { type: 'string', enum: ['top', 'center', 'bottom'], description: 'Where to crop the image.' },
+        section: { type: 'string', enum: ['about', 'services', 'goods', 'contact', 'facilities'], description: 'The tab carrying the photo.' },
+        position: { type: 'string', description: '"top" | "center" | "bottom" | "0"–"100"' },
       },
       required: ['section', 'position'],
     },
@@ -242,6 +259,7 @@ const CALENDAR_TOOLS = [
 // on, and only behind the member's hand-that-writes flag. The space id comes
 // from the THREAD, never from the model — no tool takes a target.
 const SPACE_EDIT_TOOLS = [
+  PLACE_PHOTO_TOOL,
   {
     name: 'set_space_tagline',
     description: `Replace the space's public-page tagline — the one line under its name. Max ${TAGLINE_MAX} characters. Empty string clears it. Returns the previous value so you can tell them what it used to say.`,
@@ -291,6 +309,39 @@ const SPACE_EDIT_TOOLS = [
     },
   },
   {
+    name: 'move_space_section_photo',
+    description: 'Move a photo from one tab of the space\'s page to another. Tabs: about, services, goods, contact, facilities. Pass empty string for to_section to remove the photo from its current tab.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from_section: { type: 'string', enum: ['about', 'services', 'goods', 'contact', 'facilities'] },
+        to_section: { type: 'string', description: 'Destination tab, or empty string to remove.' },
+      },
+      required: ['from_section', 'to_section'],
+    },
+  },
+  {
+    name: 'move_space_photo_to_home_cover',
+    description: 'Move a photo from a tab of the space\'s page to become its Home cover — the image that greets every visitor.',
+    input_schema: {
+      type: 'object',
+      properties: { from_section: { type: 'string', enum: ['about', 'services', 'goods', 'contact', 'facilities'] } },
+      required: ['from_section'],
+    },
+  },
+  {
+    name: 'set_space_section_photo_position',
+    description: 'Adjust which part of a tab\'s photo shows in its frame. position: "top", "center", "bottom", or a number 0–100 (percent from the top — 0 shows the very top, 100 the very bottom). "Push it down so the face shows" usually means a SMALLER number.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', enum: ['about', 'services', 'goods', 'contact', 'facilities'] },
+        position: { type: 'string', description: '"top" | "center" | "bottom" | "0"–"100"' },
+      },
+      required: ['section', 'position'],
+    },
+  },
+  {
     name: 'set_space_page_tab',
     description: 'Create or rewrite a TAB on the space\'s public page — any tab they can name, not just the standard set. Matches an existing tab by title (case-insensitive); otherwise creates a custom tab. Passing an empty body AND empty lead REMOVES a written tab (built-in tabs fill themselves and cannot be written or removed here). Everything you write appears in the manual editor too — it is the same page.',
     input_schema: {
@@ -324,9 +375,15 @@ Deno.serve(async (req) => {
   const ident = Array.isArray(idents) ? idents[0] : null;
   if (!ident) return json({ ok: true, skipped: 'no-identity' });
 
-  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread`)).json();
+  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread,attachments`)).json();
   const trigger = Array.isArray(posts) ? posts[0] : null;
-  if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-post' });
+  // Pasted photos (founder 2026-08-22) — a photo with no words is still a
+  // real message ("what do you think of this one?" is often implied).
+  const triggerImages: string[] = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .filter((a: { type?: string; url?: string }) => a?.type === 'photo' && typeof a.url === 'string')
+    .map((a: { url: string }) => a.url)
+    .slice(0, 6);
+  if (!trigger?.body?.trim() && triggerImages.length === 0) return json({ ok: true, skipped: 'empty-post' });
 
   // A SPACE'S BUILD THREAD (founder 2026-08-22): thread `space:<uuid>` — the
   // member's own private rows, ABOUT a space. The space id comes from the
@@ -379,8 +436,9 @@ Deno.serve(async (req) => {
   // into a care conversation. General is the exception: it's the thread for
   // whatever isn't one subject, so it gets a short glance at the others.
   const thread = trigger.thread ?? 'general';
-  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}&select=id,author,body,source_post_id&order=created_at.desc&limit=20`)).json();
-  const rows = (Array.isArray(feed) ? feed : []).reverse().filter((p: { body?: string }) => p.body?.trim());
+  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}&select=id,author,body,source_post_id,attachments&order=created_at.desc&limit=20`)).json();
+  const rows = (Array.isArray(feed) ? feed : []).reverse()
+    .filter((p: { body?: string; attachments?: unknown[] }) => p.body?.trim() || (Array.isArray(p.attachments) && p.attachments.length));
 
   let elsewhere = '';
   if (thread === 'general') {
@@ -537,7 +595,7 @@ Deno.serve(async (req) => {
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
-      + '\n- PHOTO MOVES: When they ask to move a photo between sections (About/Services/Goods/Facilities), or to make one the Home cover, use the photo tools. They can say things like "move the jumping photo from About to Services" or "make the farm photo the Home cover" and you handle it directly via tools.'
+      + '\n- PHOTO MOVES: When they ask to move a photo between tabs (About/Services/Goods/Contact/Facilities), make one the Home cover, or shift which part of a photo shows ("push it down so the face shows" — the position tool takes 0–100 from the top), use the photo tools directly. A photo pasted into their message goes onto the page with place_uploaded_photo.'
       + (lines.length ? `\n\nThe only category ids that exist:\n${lines.join('\n')}` : '');
   }
 
@@ -547,8 +605,15 @@ Deno.serve(async (req) => {
       + '\n- Make the change when they ask for one. Do not hand back a draft to paste — that is what the tools are for.'
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
-      + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.';
+      + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.'
+      + '\n- PHOTO MOVES work here too: move a photo between the page\'s tabs, make one the Home cover, or shift which part shows (the position tool takes top/center/bottom or 0–100 from the top). A photo pasted into their message goes onto the page with place_uploaded_photo.';
   }
+
+  // Pasted photos (founder 2026-08-22): the model can SEE them — say so,
+  // and hold the no-pretending line when tools aren't armed.
+  const imageRule = triggerImages.length
+    ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.`
+    : '';
 
   let calendarRule = '';
   if (canCalendar) {
@@ -596,9 +661,39 @@ Deno.serve(async (req) => {
   // Every write is scoped to profile_id from the trigger — no tool takes a
   // target, so the model has no way to name someone else.
   async function runTool(name: string, input: Record<string, string & string[]>): Promise<ToolOutcome> {
+    // ── A photo pasted into THIS message, placed on the page (founder
+    // 2026-08-22). photo_number resolves against the trigger's own
+    // attachments — never a model-supplied URL. Writes to whichever page
+    // this thread's tools are armed for.
+    if (name === 'place_uploaded_photo') {
+      const target = canSpaceEdit ? 'space' : canEdit ? 'me' : null;
+      if (!target) return { ok: false, error: 'Page tools are not armed here.' };
+      const idx = Number(input.photo_number) - 1;
+      const url = triggerImages[idx];
+      if (!url) {
+        return { ok: false, error: triggerImages.length
+          ? `No pasted photo number ${input.photo_number} — this message has ${triggerImages.length}.`
+          : 'This message has no pasted photos to place.' };
+      }
+      const sectionId = String(input.section ?? '');
+      if (!['about', 'services', 'goods', 'contact', 'facilities', 'home_cover'].includes(sectionId)) {
+        return { ok: false, error: 'section must be about, services, goods, contact, facilities, or home_cover.' };
+      }
+      const { page } = target === 'space' ? await readSpacePage() : await readPage();
+      if (sectionId === 'home_cover') {
+        page.cover = url; page.coverStyle = 'photo'; page.coverPos = 50;
+      } else {
+        const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string } | undefined>;
+        sections[sectionId] = { ...sections[sectionId], image: url };
+        page.sections = sections;
+      }
+      await (target === 'space' ? patchSpace({ page }) : patchMe({ page }));
+      return { ok: true, change: `placed the pasted photo ${sectionId === 'home_cover' ? 'as the Home cover' : `on the ${sectionId} tab`}` };
+    }
+
     // ── Space page tools (rung 2, founder 2026-08-22). Belt and braces: the
     // tools only arm when canSpaceEdit, but each executor re-checks anyway.
-    if (name.startsWith('set_space_')) {
+    if (name.startsWith('set_space_') || name.startsWith('move_space_')) {
       if (!spaceId || !canSpaceEdit) return { ok: false, error: 'Space tools are not armed here.' };
 
       if (name === 'set_space_tagline' || name === 'set_space_home_summary' || name === 'set_space_story') {
@@ -657,6 +752,49 @@ Deno.serve(async (req) => {
           ok: true, previous,
           change: value ? `set ${spaceName}'s public ${field} to ${value}` : `cleared ${spaceName}'s public ${field}`,
         };
+      }
+
+      if (name === 'move_space_section_photo' || name === 'move_space_photo_to_home_cover') {
+        const fromSection = String(input.from_section ?? '');
+        const toSection = name === 'move_space_photo_to_home_cover' ? null : String(input.to_section ?? '');
+        const { page } = await readSpacePage();
+        const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string } | undefined>;
+        const fromData = sections[fromSection];
+        if (!fromData?.image) return { ok: false, error: `No photo on the ${fromSection} tab to move.` };
+        const photo = fromData.image;
+        const imagePos = fromData.imagePos;
+        delete sections[fromSection]?.image;
+        if (sections[fromSection]) { delete sections[fromSection]!.imagePos; delete sections[fromSection]!.imageSize; }
+        if (toSection === null) {
+          page.cover = photo; page.coverStyle = 'photo'; page.coverPos = 50;
+        } else if (toSection) {
+          sections[toSection] = { ...sections[toSection], image: photo, imagePos };
+        }
+        page.sections = sections;
+        await patchSpace({ page });
+        return {
+          ok: true,
+          change: toSection === null
+            ? `moved the photo from ${fromSection} to be ${spaceName}'s Home cover`
+            : toSection
+              ? `moved the photo from ${fromSection} to ${toSection} on ${spaceName}'s page`
+              : `removed the photo from ${fromSection} on ${spaceName}'s page`,
+        };
+      }
+
+      if (name === 'set_space_section_photo_position') {
+        const sectionId = String(input.section ?? '');
+        const raw = String(input.position ?? '').trim();
+        const pct = raw === 'top' ? 0 : raw === 'center' ? 50 : raw === 'bottom' ? 100 : Number(raw);
+        if (!(pct >= 0 && pct <= 100)) return { ok: false, error: 'position must be top, center, bottom, or a number 0–100.' };
+        const { page } = await readSpacePage();
+        const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+        if (!sections[sectionId]?.image) return { ok: false, error: `No photo on the ${sectionId} tab to adjust.` };
+        const previous = sections[sectionId]!.imagePos ?? 'center';
+        sections[sectionId]!.imagePos = `50% ${Math.round(pct)}%`;
+        page.sections = sections;
+        await patchSpace({ page });
+        return { ok: true, previous, change: `set the ${sectionId} photo to show from ${Math.round(pct)}% down (0 = top)` };
       }
 
       if (name === 'set_space_page_tab') {
@@ -866,9 +1004,13 @@ Deno.serve(async (req) => {
 
     if (name === 'set_section_photo_position') {
       const section = String(input.section ?? '');
-      const position = String(input.position ?? '');
-      if (!['top', 'center', 'bottom'].includes(position)) {
-        return { ok: false, error: 'Position must be top, center, or bottom.' };
+      const raw = String(input.position ?? '').trim();
+      // Words or a 0–100 percent from the top (founder 2026-08-22: "push
+      // the photo down so we can see Rick's face" needs finer grain).
+      const pct = raw === 'top' ? 0 : raw === 'center' ? 50 : raw === 'bottom' ? 100 : Number(raw);
+      const position = (pct >= 0 && pct <= 100) ? `50% ${Math.round(pct)}%` : null;
+      if (!position) {
+        return { ok: false, error: 'Position must be top, center, bottom, or a number 0–100 (percent from the top).' };
       }
       const { page } = await readPage();
       const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
@@ -880,7 +1022,7 @@ Deno.serve(async (req) => {
       await patchMe({ page });
       return {
         ok: true,
-        change: `adjusted the ${section} photo to show from the ${position}`,
+        change: `set the ${section} photo to show from ${Math.round(pct)}% down (0 = top)`,
       };
     }
 
@@ -985,10 +1127,24 @@ Deno.serve(async (req) => {
     return { ok: false, error: `No such tool: ${name}` };
   }
 
-  const messages: Record<string, unknown>[] = rows.map((p: { id: string; author: string; body: string; source_post_id: string | null }) =>
-    p.author === 'claude'
-      ? { role: 'assistant', content: p.body }
-      : { role: 'user', content: p.id === feed_post_id ? `${p.body}${sharedPostContext}` : p.body });
+  // Pasted photos ride the TRIGGER message as real vision blocks (URL
+  // source — the bucket is public); older messages' photos ride as a plain
+  // marker so history stays cheap.
+  const messages: Record<string, unknown>[] = rows.map((p: { id: string; author: string; body: string; source_post_id: string | null; attachments?: { type?: string; url?: string }[] }) => {
+    if (p.author === 'claude') return { role: 'assistant', content: p.body };
+    const hasShots = Array.isArray(p.attachments) && p.attachments.length > 0;
+    if (p.id === feed_post_id && triggerImages.length) {
+      return {
+        role: 'user',
+        content: [
+          ...triggerImages.map((url) => ({ type: 'image', source: { type: 'url', url } })),
+          { type: 'text', text: `${p.body?.trim() || '(They sent the photo without words.)'}${sharedPostContext}` },
+        ],
+      };
+    }
+    const marker = hasShots ? '[they attached a photo] ' : '';
+    return { role: 'user', content: p.id === feed_post_id ? `${marker}${p.body}${sharedPostContext}` : `${marker}${p.body}` };
+  });
 
   // Tool rounds run INSIDE one exchange: a multi-turn edit costs one entry in
   // the daily cap, the same as a conversation, and the usage is summed.
@@ -1012,7 +1168,7 @@ Deno.serve(async (req) => {
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
         max_tokens: (canEdit || canCalendar || canSpaceEdit) ? 1600 : 1000,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round

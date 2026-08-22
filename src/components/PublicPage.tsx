@@ -17,6 +17,8 @@ const posToObjectPos = (pos?: string | number): string => {
   if (pos === 'top') return '50% 0%';
   if (pos === 'bottom') return '50% 100%';
   if (typeof pos === 'number') return `50% ${pos}%`;
+  // The drag editor stores real percents ("50% 37%") — pass them through.
+  if (typeof pos === 'string' && pos.includes('%')) return pos;
   return '50% 50%'; // center or default
 };
 
@@ -71,7 +73,10 @@ export interface PageMeta {
   /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
-  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string; imagePos?: string }>>;
+  /** EVERY tab may carry its own lead + photo (founder 2026-08-22: "all
+   *  tabs should") — keyed by tab id, built-in or custom. imageSize 'full'
+   *  opts that photo out of the standard cropped frame. */
+  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -402,16 +407,21 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
+  // Which image the hero wears on this tab: the tab's OWN photo when it has
+  // one (any tab — founder 2026-08-22), else the page cover on Home/About
+  // (Home never had a hero slot before, a relic of About-as-landing).
+  const activeSec = !doors && tabbed ? page.sections?.[tab] : undefined;
   const coverSrc = doors
     ? activeDoor?.image
-    : (!tabbed || tab === 'about')
+    : !tabbed
       ? page.cover
-      : page.sections?.[tab as 'services' | 'facilities' | 'goods']?.image;
+      : activeSec?.image ?? ((tab === 'home' || tab === 'about' || tab === 'feed') ? page.cover : undefined);
+  const usingPageCover = !doors && coverSrc === page.cover && !activeSec?.image;
   const coverPos = doors
     ? undefined
-    : (!tabbed || tab === 'about')
-      ? page.coverPos
-      : (page.sections?.[tab as 'services' | 'facilities' | 'goods']?.imagePos || page.coverPos);
+    : usingPageCover ? page.coverPos : (activeSec?.imagePos || page.coverPos);
+  // "Expand to full size" — this photo opted out of the standard frame.
+  const coverFull = !doors && !usingPageCover && activeSec?.imageSize === 'full';
 
   return (
     <div
@@ -490,8 +500,9 @@ export default function PublicPage(props: PublicPageProps) {
         {navInHero && navNode}
         {coverSrc && (
           <img
-            className="ppage__cover" src={coverSrc} alt=""
-            style={{ objectPosition: posToObjectPos(coverPos) }}
+            className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
+            src={coverSrc} alt=""
+            style={coverFull ? undefined : { objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
         )}

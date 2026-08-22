@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import CoverPicker from './CoverPicker';
+import ContactFields, { type ContactInfo } from './ContactFields';
 import { uploadPageImage } from '../lib/avatarApi';
 import {
   TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
@@ -18,14 +19,130 @@ import './PageTabsEditor.css';
  *
  *  A tab stays off the live page until it has something to show, so adding one
  *  can never leave a visitor in an empty room. */
-/** Built-in tabs whose lead line + photo the owner sets (page.sections). */
-const SECTIONED = ['about', 'services', 'goods', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+/** Built-in tabs whose lead line + photo the owner sets (page.sections).
+ *  EVERY tab carries a photo now (founder 2026-08-22: "Contact doesn't have
+ *  a style button, it should have one as well. All tabs should") — built-ins
+ *  through Style, write-tabs through Write; the photo lives in sections[id]
+ *  either way. */
+const SECTIONED = ['about', 'services', 'goods', 'contact', 'facilities'];
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string } | undefined>;
+
+/** imagePos → a 0–100 vertical percent, legacy words included. */
+function posPct(pos?: string): number {
+  if (!pos || pos === 'center') return 50;
+  if (pos === 'top') return 0;
+  if (pos === 'bottom') return 100;
+  const m = /50%\s+([\d.]+)%/.exec(pos);
+  return m ? Math.max(0, Math.min(100, Number(m[1]))) : 50;
+}
+
+/** One photo on one tab (founder 2026-08-22 redesign): drag INSIDE the
+ *  photo to choose what the standard frame shows; "Expand to full size"
+ *  opts this photo out of cropping on the live page; Delete and Change sit
+ *  together as plain links, no bubbles. */
+function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
+  sec: { image?: string; imagePos?: string; imageSize?: string } | undefined;
+  patch: (p: { image?: string; imagePos?: string; imageSize?: string }) => void;
+  uploaderId?: string;
+  upBusy: boolean;
+  setUpBusy: (b: boolean) => void;
+}) {
+  const drag = useRef<{ startY: number; startPct: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const full = sec?.imageSize === 'full';
+  const pct = posPct(sec?.imagePos);
+
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag.current || !boxRef.current) return;
+    const h = boxRef.current.getBoundingClientRect().height || 1;
+    // Pulling the photo down reveals what's above it — position % falls.
+    const delta = ((e.clientY - drag.current.startY) / h) * 100;
+    const next = Math.max(0, Math.min(100, drag.current.startPct - delta));
+    patch({ imagePos: `50% ${Math.round(next)}%` });
+  };
+
+  return (
+    <div className="ptabs__photo-section">
+      <p className="ptabs__section-label">Photo</p>
+      {sec?.image && (
+        <>
+          <div
+            ref={boxRef}
+            className={'ptabs__photo-drag' + (full ? ' is-full' : '')}
+            onPointerDown={(e) => {
+              if (full) return;
+              e.preventDefault();
+              try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+              drag.current = { startY: e.clientY, startPct: posPct(sec?.imagePos) };
+            }}
+            onPointerMove={onMove}
+            onPointerUp={() => { drag.current = null; }}
+            onPointerCancel={() => { drag.current = null; }}
+          >
+            <img
+              src={sec.image} alt="" draggable={false}
+              style={full ? undefined : { objectPosition: `50% ${pct}%` }}
+            />
+          </div>
+          <p className="ptabs__note">
+            {full
+              ? 'Showing the whole photo, uncropped.'
+              : 'Drag the photo up or down to choose what the frame shows.'}
+          </p>
+          <div className="ptabs__photo-links">
+            <button
+              type="button" className="ptabs__linkbtn"
+              onClick={() => patch({ imageSize: full ? undefined : 'full' })}
+            >
+              {full ? '⤡ Back to standard size' : '⤢ Expand to full size'}
+            </button>
+            {uploaderId && (
+              <label className="ptabs__linkbtn">
+                {upBusy ? 'Adding…' : '↻ Change photo'}
+                <input type="file" accept="image/*" hidden disabled={upBusy}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setUpBusy(true);
+                    try { patch({ image: await uploadPageImage(uploaderId, file) }); }
+                    catch (err) { console.error(err); }
+                    setUpBusy(false);
+                  }} />
+              </label>
+            )}
+            <button
+              type="button" className="ptabs__linkbtn ptabs__linkbtn--rm"
+              onClick={() => patch({ image: undefined, imagePos: undefined, imageSize: undefined })}
+            >
+              × Delete
+            </button>
+          </div>
+        </>
+      )}
+      {!sec?.image && uploaderId && (
+        <label className="ptabs__linkbtn">
+          {upBusy ? 'Adding…' : '+ Add a photo'}
+          <input type="file" accept="image/*" hidden disabled={upBusy}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              setUpBusy(true);
+              try { patch({ image: await uploadPageImage(uploaderId, file) }); }
+              catch (err) { console.error(err); }
+              setUpBusy(false);
+            }} />
+        </label>
+      )}
+    </div>
+  );
+}
 
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
-  entityName, authorId, spaceId, homeExtra,
+  entityName, authorId, spaceId, homeExtra, contact, onContact,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -55,6 +172,10 @@ export default function PageTabsEditor({
   /** Extra controls under the welcome textarea (e.g. a space's
    *  "Write it for me" helper) — the caller's, rendered in place. */
   homeExtra?: React.ReactNode;
+  /** The public contact block — edited INSIDE the Contact tab's Style
+   *  panel (founder 2026-08-22), not as a loose builder field. */
+  contact?: ContactInfo;
+  onContact?: (next: ContactInfo) => void;
 }) {
   const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
     if (!onSections) return;
@@ -90,7 +211,6 @@ export default function PageTabsEditor({
   // the stream alive while React re-keys the rows; rows live-shuffle as
   // the pointer crosses their midpoints, so the drop needs no ghost.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const startDrag = (i: number) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -266,84 +386,35 @@ export default function PageTabsEditor({
             )}
 
             {/* A built-in tab's own lead + photo — its body still fills
-                itself from your profile. */}
+                itself from your profile. The lead is a textarea so a real
+                sentence never gets clipped mid-thought (founder 2026-08-22:
+                "don't cut off the text here"). */}
             {open && tpl?.builtIn && onSections && SECTIONED.includes(t.id) && (
               <div className="ptabs__edit">
-                <input
-                  className="prof__input"
+                <textarea
+                  className="prof__input ptabs__lead-input"
+                  rows={2}
                   value={sections?.[t.id]?.lead ?? ''}
                   placeholder="A first line — the point of this page"
                   onChange={(e) => patchSection(t.id, { lead: e.target.value || undefined })}
                 />
-
-                {/* Photo Management */}
-                <div className="ptabs__photo-section">
-                  <p className="ptabs__section-label">Photo</p>
-
-                  {sections?.[t.id]?.image && (
-                    <div>
-                      <div className="ptabs__photo-preview">
-                        <span className="ptabs__shot ptabs__shot--wide" style={{
-                          overflow: 'hidden',
-                          backgroundPosition: sections?.[t.id]?.imagePos || 'center',
-                          height: expandedSection === t.id ? '500px' : '300px',
-                        }}>
-                          <img src={sections[t.id]!.image} alt="" style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            objectPosition: sections?.[t.id]?.imagePos || 'center',
-                          }} />
-                        </span>
-                      </div>
-
-                      <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <button
-                          className="cmp__chip"
-                          onClick={() => setExpandedSection(expandedSection === t.id ? null : t.id)}
-                        >
-                          {expandedSection === t.id ? '↙ Collapse' : '↗ Expand'}
-                        </button>
-                        <button
-                          className="cmp__chip"
-                          onClick={() => patchSection(t.id, { image: undefined })}
-                        >
-                          Delete
-                        </button>
-                      </div>
-
-                      <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                        {(['top', 'center', 'bottom'] as const).map((pos) => (
-                          <button
-                            key={pos}
-                            className={'cmp__chip' + ((sections?.[t.id]?.imagePos ?? 'center') === pos ? ' is-on' : '')}
-                            onClick={() => patchSection(t.id, { imagePos: pos })}
-                            style={{ fontSize: '0.875rem' }}
-                          >
-                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {uploaderId && (
-                    <label className="btn ptabs__upload" style={{ marginTop: sections?.[t.id]?.image ? '0.5rem' : 0 }}>
-                      {upBusy ? 'Adding…' : sections?.[t.id]?.image ? '↻ Change photo' : '+ Add a photo'}
-                      <input type="file" accept="image/*" hidden disabled={upBusy}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = '';
-                          if (!file) return;
-                          setUpBusy(true);
-                          try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
-                          catch (err) { console.error(err); }
-                          setUpBusy(false);
-                        }} />
-                    </label>
-                  )}
-                </div>
-
+                {/* Contact's own fields live IN its tab (founder 2026-08-22:
+                    "contact and hours is supposed to be a tab that you
+                    select, not a default part of the page builder"). */}
+                {t.id === 'contact' && contact && onContact && (
+                  <ContactFields
+                    value={contact}
+                    onChange={onContact}
+                    lead="These appear on the public page — how someone reaches you without joining Lichen."
+                  />
+                )}
+                <SectionPhoto
+                  sec={sections?.[t.id]}
+                  patch={(p) => patchSection(t.id, p)}
+                  uploaderId={uploaderId}
+                  upBusy={upBusy}
+                  setUpBusy={setUpBusy}
+                />
                 <p className="ptabs__note">
                   This tab writes itself from your profile — the line and photo above are yours to set.
                 </p>
@@ -388,12 +459,23 @@ export default function PageTabsEditor({
                 <input className="prof__input" value={t.label ?? tpl?.label ?? ''}
                   placeholder="Tab name"
                   onChange={(e) => patch(t.id, { label: e.target.value || undefined })} />
-                <input className="prof__input" value={t.lead ?? ''}
+                <textarea className="prof__input ptabs__lead-input" rows={2} value={t.lead ?? ''}
                   placeholder="A first line — the point of this page"
                   onChange={(e) => patch(t.id, { lead: e.target.value || undefined })} />
                 <textarea className="prof__input ptabs__body" rows={5} value={t.body ?? ''}
                   placeholder="The rest. Leave a blank line between paragraphs."
                   onChange={(e) => patch(t.id, { body: e.target.value || undefined })} />
+                {/* Every tab carries a photo (founder 2026-08-22: "all tabs
+                    should") — written tabs included. */}
+                {onSections && (
+                  <SectionPhoto
+                    sec={sections?.[t.id]}
+                    patch={(p) => patchSection(t.id, p)}
+                    uploaderId={uploaderId}
+                    upBusy={upBusy}
+                    setUpBusy={setUpBusy}
+                  />
+                )}
               </div>
             )}
           </div>
