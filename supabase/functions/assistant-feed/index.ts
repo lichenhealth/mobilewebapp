@@ -1178,7 +1178,12 @@ Deno.serve(async (req) => {
           : {}),
       }),
     });
-    if (!res.ok) return json({ error: 'Anthropic call failed', detail: (await res.text()).slice(0, 300) }, 502);
+    if (!res.ok) {
+      // pg_net never reads this response — the log line is the only witness.
+      const detail = (await res.text()).slice(0, 300);
+      console.error('anthropic-failed', res.status, detail);
+      return json({ error: 'Anthropic call failed', detail }, 502);
+    }
     data = await res.json();
     inputTokens += data?.usage?.input_tokens ?? 0;
     outputTokens += data?.usage?.output_tokens ?? 0;
@@ -1208,7 +1213,29 @@ Deno.serve(async (req) => {
   let reply = (data?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
   // No silent edits: if it wrote and then said nothing, say it for them.
   if (!reply && changes.length) reply = `Done — I ${changes.join(', and ')}. Have a look, and tell me what to change.`;
-  if (!reply) return json({ ok: true, skipped: 'empty-reply' });
+  if (!reply) {
+    // The member wrote deliberately, so silence is the failure mode (the
+    // 2026-08-22 4:13pm message vanished exactly here, with nothing in the
+    // logs to say why) — name what came back, bill the tokens that were
+    // spent, and leave an honest note instead of nothing.
+    console.error('empty-reply', JSON.stringify({
+      feed_post_id, thread,
+      stop_reason: (data as { stop_reason?: string })?.stop_reason ?? null,
+      content_types: (data?.content ?? []).map((c) => c.type),
+      rounds: round, input_tokens: inputTokens, output_tokens: outputTokens,
+    }));
+    await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      profile_id, author: 'claude', thread,
+      body: 'I hit a snag putting an answer together and lost it — that’s on my side, not yours. Say it once more and I’ll take another run at it.',
+    }) });
+    if (inputTokens || outputTokens) {
+      await sb('assistant_queries', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        profile_id, context: 'feed', model: MODEL,
+        input_tokens: inputTokens || null, output_tokens: outputTokens || null,
+      }) });
+    }
+    return json({ ok: true, skipped: 'empty-reply' });
+  }
 
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread,
