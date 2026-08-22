@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
+\restrict 01B9nuNM3w1KnxogLCzvno7awWlPSKLkgnfJQds3mkFjoiCXA5oDpwRyrZJLziN
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -6124,7 +6124,7 @@ CREATE TABLE public.profiles (
     is_adult boolean,
     age_declared_at timestamp with time zone,
     findable boolean DEFAULT true NOT NULL,
-    assistant_can_edit boolean DEFAULT false NOT NULL,
+    assistant_can_edit boolean DEFAULT true NOT NULL,
     weaveable_default boolean DEFAULT true NOT NULL,
     jurisdiction text,
     pronouns text,
@@ -13416,7 +13416,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
+\unrestrict 01B9nuNM3w1KnxogLCzvno7awWlPSKLkgnfJQds3mkFjoiCXA5oDpwRyrZJLziN
 
 
 
