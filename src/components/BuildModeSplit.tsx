@@ -1,6 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
+import { spaceThreadId } from '../lib/assistantFeedApi';
 import './BuildModeSplit.css';
+
+/** Where a build door lands. A member's builder → the profile thread's build
+ *  page; a SPACE's builder → that space's own build thread (founder
+ *  2026-08-22: the shared door hardcoded the member destination, so building
+ *  Countryman Stables dropped its admin into their personal thread). */
+export interface BuildSpace { id: string; name: string }
+function buildDoorPath(back: string, space?: BuildSpace, ask?: string): string {
+  const askPart = ask ? `&ask=${encodeURIComponent(ask)}` : '';
+  return space
+    ? `/assistant/feed?thread=${spaceThreadId(space.id)}&back=${encodeURIComponent(back)}${askPart}`
+    : `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}${askPart}`;
+}
 
 /** The fork at the top of any builder (founder 2026-08-11): fill it in
  *  yourself on the left, or hand it to Claude on the right. Manual is the
@@ -9,13 +22,16 @@ import './BuildModeSplit.css';
  *
  *  `back` rides along so the Snapshot screen can offer the way home in the
  *  founder's words: "back to manual mode". */
-export default function BuildModeSplit({ back, onBeforeGo }: {
+export default function BuildModeSplit({ back, onBeforeGo, space }: {
   back: string;
   /** Persist any unsaved manual work before crossing over (founder
    *  2026-08-21: "import and remember anything you've entered in the manual
    *  build") — the two modes are one document, so what you typed must be IN
    *  the document when Claude opens it. */
   onBeforeGo?: () => Promise<void> | void;
+  /** Present on a SPACE's builder — the door then opens the space's own
+   *  build thread instead of the member's profile thread. */
+  space?: BuildSpace;
 }) {
   const navigate = useNavigate();
   // The app's ONE segmented-toggle idiom (view-toggle — the same control as
@@ -34,26 +50,32 @@ export default function BuildModeSplit({ back, onBeforeGo }: {
           type="button"
           onClick={() => {
             void Promise.resolve(onBeforeGo?.()).then(() =>
-              navigate(`/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`));
+              navigate(buildDoorPath(back, space)));
           }}
         >
           <Icon name="brain" size={12} /> Build with Claude
         </button>
       </span>
-      <span className="bmode-row__hint">Fill in the fields yourself, or tell Claude about you.</span>
+      <span className="bmode-row__hint">
+        {space
+          ? `Fill in the fields yourself, or tell Claude about ${space.name}.`
+          : 'Fill in the fields yourself, or tell Claude about you.'}
+      </span>
     </div>
   );
 }
 
 /** The nudge that lives under a single field — same door, arriving with
  *  that field's job in mind. */
-export function FillWithClaude({ back, label = 'Fill this out with Claude', ask, onBeforeGo }: {
+export function FillWithClaude({ back, label = 'Fill this out with Claude', ask, onBeforeGo, space }: {
   back: string; label?: string;
   /** The errand this door is for, prefilled into the composer unsent — so the
    *  ask arrives ready to send, or to add to first. */
   ask?: string;
   /** Persist unsaved manual work before crossing over — see BuildModeSplit. */
   onBeforeGo?: () => Promise<void> | void;
+  /** Present on a SPACE's builder — the errand goes to its build thread. */
+  space?: BuildSpace;
 }) {
   const navigate = useNavigate();
   return (
@@ -61,10 +83,7 @@ export function FillWithClaude({ back, label = 'Fill this out with Claude', ask,
       className="bmode__inline"
       type="button"
       onClick={() => {
-        void Promise.resolve(onBeforeGo?.()).then(() => navigate(
-          `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}`
-          + (ask ? `&ask=${encodeURIComponent(ask)}` : ''),
-        ));
+        void Promise.resolve(onBeforeGo?.()).then(() => navigate(buildDoorPath(back, space, ask)));
       }}
     >
       <Icon name="brain" size={12} /> {label}

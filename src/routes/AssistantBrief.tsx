@@ -76,6 +76,10 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   // on someone you're meeting with from your assistant"). Reached from the
   // brain on another member's profile, with ?member=<id>.
   course: { title: 'This course', frame: 'You are briefing the member on ONE course they are walking or teaching. The snapshot holds the course itself (what it is, who leads it, its modules and the lessons in order), where THIS member stands in it (what they have completed, what is next), and its cohort life if there is any. If they teach it, speak to the shape of the material and what is thin or missing; if they are learning it, pick up where they left off — name the next lesson and what it covers, in a sentence. Never invent a lesson that is not in the outline.' },
+  // ONE SPACE, not a section (founder 2026-08-22: the brain on Countryman
+  // Stables' page said "Your organizations", which briefed everything except
+  // the place the member was standing in). Reached with ?space=<id>.
+  space: { title: 'This space', frame: 'You are briefing the member on ONE space — an organization, community, group or place. The snapshot holds what it is in its own words, where THIS member stands with it (member or steward, their own web and recommendation signals — never anyone else\'s), its recent activity, and — when they steward it — what is waiting at its desks and the state of its public page. Lead with what is alive and what needs them; for a steward, name one concrete act of tending worth doing. Never invent activity, never score the space, and never describe another member\'s standing.' },
   member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Use the pronouns given in the snapshot and never infer them from a name. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
 };
 
@@ -110,6 +114,9 @@ export default function AssistantBrief() {
   const section = params.get('section') ?? 'home';
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
+  // ?space=<id> — the briefing on one space (founder 2026-08-22): the brain
+  // on a space's page briefs THAT space, not the whole section.
+  const spaceParam = params.get('space');
   // ?back= — the way home to whatever sent you here (a builder's "Back to
   // manual mode"); ?intent=build — you came from a Build-with-Claude door,
   // so the page leads with the build card (founder 2026-08-17: the same
@@ -125,6 +132,7 @@ export default function AssistantBrief() {
   const SPACE_SECTIONS = ['communities', 'groups', 'organizations', 'places'];
   const spacesAll = allScope && SPACE_SECTIONS.includes(section);
   const briefKey = memberId ? `member:${memberId}`
+    : spaceParam ? `space:${spaceParam}`
     : collectionId ? `course:${collectionId}`
     : spacesAll ? `${section}:all` : section;
   const { user } = useAuth();
@@ -139,6 +147,7 @@ export default function AssistantBrief() {
   const [refreshTick, setRefreshTick] = useState(0);
 
   const meta = memberId ? FRAMES.member
+    : spaceParam ? FRAMES.space
     : collectionId ? FRAMES.course
     : spacesAll ? { title: `All ${section}`, frame: `You are looking at EVERY ${section.replace(/s$/, '')} on Lichen, not just the member's own. Two jobs: say what has newly appeared or grown, and flag the few that look like a genuine fit for THIS member — name why, from what you were given (their web, what they already belong to, what they offer). Never pad the list to look useful: two real suggestions beat eight. Never imply they should join anything.` }
     : (FRAMES[section] ?? FRAMES.home);
@@ -146,16 +155,24 @@ export default function AssistantBrief() {
   // on a cache hit.
   const [briefWho, setBriefWho] = useState<string | null>(null);
   useEffect(() => {
-    if (!memberId) { setBriefWho(null); return; }
+    if (!memberId && !spaceParam) { setBriefWho(null); return; }
     let live = true;
-    void supabase.from('profiles').select('full_name').eq('id', memberId).maybeSingle()
-      .then(({ data }) => { if (live) setBriefWho((data as { full_name: string | null } | null)?.full_name ?? null); });
+    if (memberId) {
+      void supabase.from('profiles').select('full_name').eq('id', memberId).maybeSingle()
+        .then(({ data }) => { if (live) setBriefWho((data as { full_name: string | null } | null)?.full_name ?? null); });
+    } else if (spaceParam) {
+      void supabase.from('spaces').select('name').eq('id', spaceParam).maybeSingle()
+        .then(({ data }) => { if (live) setBriefWho((data as { name: string | null } | null)?.name ?? null); });
+    }
     return () => { live = false; };
-  }, [memberId]);
+  }, [memberId, spaceParam]);
 
   const { snapshot, fingerprint } = useMemo(() => {
     if (memberId) {
       return { snapshot: {}, fingerprint: `member:${memberId}:${new Date().toISOString().slice(0, 10)}` };
+    }
+    if (spaceParam) {
+      return { snapshot: {}, fingerprint: `space:${spaceParam}:${new Date().toISOString().slice(0, 10)}` };
     }
     if (collectionId) {
       return { snapshot: {}, fingerprint: `course:${collectionId}:${new Date().toISOString().slice(0, 10)}` };
@@ -187,7 +204,7 @@ export default function AssistantBrief() {
     // the cached text was written — refetch instead of showing old news.
     return { snapshot: { unseen_notifications: relevant }, fingerprint: scoped.slice(0, 25).map((r) => r.id).join(',') };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, section, memberId, collectionId, spacesAll]);
+  }, [rows, section, memberId, spaceParam, collectionId, spacesAll]);
 
   function refresh() {
     cache.delete(briefKey);
@@ -204,7 +221,7 @@ export default function AssistantBrief() {
       let desk: Record<string, number> | undefined;
       let deskNames: Record<string, string> | undefined;
       try {
-        if (memberId || collectionId || spacesAll) throw new Error('scoped brief — no desks');
+        if (memberId || collectionId || spacesAll || spaceParam) throw new Error('scoped brief — no desks');
         const d = await listMyAdminDeskCounts(me);
         if (Object.keys(d.counts).length) {
           const spaces = await listMyMemberSpaces(me);
@@ -290,6 +307,64 @@ export default function AssistantBrief() {
               } else {
                 extras.your_conversation = rows2.reverse().map((m) => `${m.sender_id === me ? 'me' : name}: ${(m.body ?? '').slice(0, 200)}`);
               }
+            }
+          }
+        }
+        if (spaceParam) {
+          // ── The space briefing (founder 2026-08-22) ─────────────────────
+          // One space, as the VIEWER may see it — every read RLS-scoped:
+          // the space's own words, where I stand with it, its recent posts
+          // (per-post AI consent respected), and — for a steward — what is
+          // waiting at its desks.
+          const [{ data: sp }, { data: myRow }, mine, recs, { data: spPosts }] = await Promise.all([
+            supabase.from('spaces')
+              .select('name, kind, description, page, contact, findable, public_page')
+              .eq('id', spaceParam).maybeSingle(),
+            supabase.from('space_members').select('role')
+              .eq('space_id', spaceParam).eq('profile_id', me).maybeSingle(),
+            loadMyWeb(),
+            loadMyRecommendations(),
+            supabase.from('posts')
+              .select('id, title, body, service_areas, created_at, details')
+              .or(`author_space_id.eq.${spaceParam},space_id.eq.${spaceParam}`)
+              .order('created_at', { ascending: false }).limit(8),
+          ]);
+          const s = sp as { name: string; kind: string; description: string | null;
+            page: { tagline?: string; story?: string; tabs?: { id: string; label?: string }[] } | null;
+            contact: Record<string, string> | null; findable: boolean | null; public_page: boolean | null } | null;
+          if (s) {
+            const role = (myRow as { role?: string } | null)?.role ?? null;
+            const isSteward = role === 'admin' || role === 'super_admin';
+            const page = s.page ?? {};
+            extras.the_space = {
+              name: s.name, kind: s.kind,
+              description: (s.description ?? '').slice(0, 400) || undefined,
+              tagline: page.tagline || undefined,
+              page_tabs: page.tabs?.length ? page.tabs.map((t) => t.label ?? t.id) : undefined,
+              public_page_live: s.public_page === true,
+              findable: s.findable !== false,
+            };
+            found.push({ label: s.name, to: `/spaces/${spaceParam}` });
+            extras.where_you_stand = {
+              your_role: role ?? 'not a member',
+              in_your_web: mine.web.has(`space:${spaceParam}`),
+              you_recommend_it: [...recs].some((k) => k.includes(spaceParam)),
+            };
+            const posts = ((spPosts as { id: string; title: string | null; body: string; service_areas: string[] | null; created_at: string; details: { aiExcluded?: boolean } | null }[] | null) ?? [])
+              .filter((p) => !p.details?.aiExcluded);
+            if (posts.length) {
+              extras.its_recent_posts = posts.slice(0, 6).map((p) => ({
+                title: p.title || p.body.slice(0, 60), areas: p.service_areas ?? [], on: p.created_at.slice(0, 10),
+              }));
+              posts.slice(0, 6).forEach((p) => { if (p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
+            }
+            if (isSteward) {
+              // The desks, for this one space — best-effort, duty truth
+              // rides the shared counter.
+              try {
+                const d = await listMyAdminDeskCounts(me);
+                if (d.counts[spaceParam]) extras.waiting_at_its_desks = d.counts[spaceParam];
+              } catch { /* lighter */ }
             }
           }
         }
@@ -604,10 +679,14 @@ export default function AssistantBrief() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, section, doorOn, fingerprint, refreshTick]);
 
+  // A space briefing's conversation belongs in that space's own thread
+  // (founder 2026-08-22), not the section's.
+  const feedThread = spaceParam ? `space:${spaceParam}` : threadForSection(section);
+
   function talkToClaude() {
-    // Land in the room this section belongs to (founder 2026-08-11), so the
+    // Land in the room this work belongs to (founder 2026-08-11), so the
     // work logs where it lives instead of in one flat feed.
-    navigate(`/assistant/feed?thread=${threadForSection(section)}`);
+    navigate(`/assistant/feed?thread=${feedThread}`);
   }
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
@@ -618,8 +697,8 @@ export default function AssistantBrief() {
    *  the reply. */
   async function sendToClaude(text: string) {
     if (!me) return;
-    await postToAssistantFeed(text, undefined, threadForSection(section));
-    navigate(`/assistant/feed?thread=${threadForSection(section)}`);
+    await postToAssistantFeed(text, undefined, feedThread);
+    navigate(`/assistant/feed?thread=${feedThread}`);
   }
 
   // The build door on the profile brief (founder 2026-08-17: Build with
@@ -672,6 +751,8 @@ export default function AssistantBrief() {
         <p className="abrief__sub">
           {memberId
             ? `${briefWho ?? 'This member'}: your relationship to date, gathered before you meet.`
+            : spaceParam
+            ? `${briefWho ?? 'This space'}: what's alive here and what needs you, gathered and filtered.`
             : `${meta.title}: what needs your attention, gathered and filtered for you.`}
         </p>
       </div>

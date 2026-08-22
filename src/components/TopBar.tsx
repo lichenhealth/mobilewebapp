@@ -110,7 +110,7 @@ export default function TopBar({
   ) : null;
 
   const { unreadForScope } = useNotifications();
-  const { actor, setActor, options, beings, self } = useActing();
+  const { actor, setActor, options, beings, self, ready: actingReady } = useActing();
   const { user, reconnecting } = useAuth();
   const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
@@ -257,6 +257,10 @@ export default function TopBar({
                "side nav disappeared" was a lost session presenting as a "?"
                circle). Say the one thing that fixes everything. */
             <span className="top-bar__signin">Sign in</span>
+          ) : !actingReady ? (
+            /* A saved hat is still restoring — a blank circle beats flashing
+               the wrong face for a beat (founder 2026-08-22). */
+            <span className="top-bar__acting-avatar" aria-hidden="true" />
           ) : actor.type !== 'self' ? (
             /* The hat you're wearing shows its REAL face (founder 2026-08-22:
                a bare monogram made acting-as too easy to misread) — Avatar

@@ -44,7 +44,7 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, signals, emptyEscape }: {
+export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantSpace, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, signals, emptyEscape }: {
   profileId?: string;
   spaceId?: string;
   me: string;
@@ -61,6 +61,10 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
    *  relationship to date, like your assistant prepping you for a meeting
    *  (founder 2026-08-14). Carries their id into /assistant. */
   assistantMember?: string;
+  /** On a SPACE's page the brain briefs you about THAT space (founder
+   *  2026-08-22 — "Your organizations" from a space's own page briefed
+   *  everything except where you were standing). Carries its id. */
+  assistantSpace?: string;
   /** This profile or space has opted out of the assistant (founder
    *  2026-08-05). The door still opens — a member always reaches their own
    *  assistant — it just reads as switched off for everyone who visits. */
@@ -222,7 +226,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
           {assistantSection && (
             <button
               className={'cfeed__area cfeed__area--ai' + (aiOn ? '' : ' is-ai-off')}
-              onClick={() => navigate(`/assistant?section=${assistantSection}${assistantMember ? `&member=${assistantMember}` : ''}`)}
+              onClick={() => navigate(`/assistant?section=${assistantSection}${assistantMember ? `&member=${assistantMember}` : ''}${assistantSpace ? `&space=${assistantSpace}` : ''}`)}
               title={aiOn
                 ? 'Your assistant — a briefing for this part of your Lichen life'
                 : assistantOff
