@@ -71,6 +71,43 @@ export default function AssistantFeed() {
     return () => { live = false; };
   }, [me, spaceId, pageNonce]);
 
+  // "Let me change it directly" flips the hand-that-writes switch IN PLACE
+  // (founder 2026-08-22: the old link navigated to /profile#privacy — while
+  // wearing a space's hat that landed on the PERSON's admin page, pure
+  // identity whiplash). One flag covers their own page and pages they
+  // steward; a one-line confirm keeps it deliberate.
+  const [armConfirm, setArmConfirm] = useState(false);
+  const [arming, setArming] = useState(false);
+  async function armEditing() {
+    if (!me) return;
+    setArming(true);
+    try {
+      await supabase.from('profiles').update({ assistant_can_edit: true }).eq('id', me);
+      setArmConfirm(false);
+      setPageNonce((n) => n + 1);   // both context cards reload on this
+    } finally { setArming(false); }
+  }
+  const armOffer = armConfirm ? (
+    <p className="afeed__ctx-off">
+      I&rsquo;ll make changes myself and name every one — your page, and pages you
+      steward. You can switch this off anytime in Privacy.{' '}
+      <button className="afeed__ctx-link" disabled={arming} onClick={() => void armEditing()}>
+        {arming ? 'Switching on…' : 'Yes, let Claude edit'}
+      </button>{' '}
+      <button className="afeed__ctx-link" onClick={() => setArmConfirm(false)}>
+        Not now
+      </button>
+    </p>
+  ) : (
+    <p className="afeed__ctx-off">
+      Ask and I&rsquo;ll write you a draft to paste in.{' '}
+      <button className="afeed__ctx-link" onClick={() => setArmConfirm(true)}>
+        Let me change it directly
+      </button>{' '}
+      and I&rsquo;ll make the change myself, and tell you exactly what I did.
+    </p>
+  );
+
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourcePosts, setSourcePosts] = useState<Map<string, FeedPost>>(new Map());
@@ -297,15 +334,7 @@ export default function AssistantFeed() {
                         : <em className="afeed__ctx-none">all empty</em>}
                     </li>
                   </ul>
-                  {!ctx.canEdit && (
-                    <p className="afeed__ctx-off">
-                      Ask and I&rsquo;ll write you a draft to paste in.{' '}
-                      <button className="afeed__ctx-link" onClick={() => navigate('/profile#privacy')}>
-                        Let me change it directly
-                      </button>{' '}
-                      and I&rsquo;ll make the change myself, and tell you exactly what I did.
-                    </p>
-                  )}
+                  {!ctx.canEdit && armOffer}
                 </div>
               )}
               <SnapshotPanel back={back} openInitially={params.get('build') === '1'} onDone={() => { void load(); setPageNonce((n) => n + 1); }} />
@@ -394,15 +423,7 @@ export default function AssistantFeed() {
                   You&rsquo;re not a steward of {sctx.name} — I can help you take
                   part in it, but its page belongs to its admins.
                 </p>
-              ) : !sctx.canEdit && (
-                <p className="afeed__ctx-off">
-                  Ask and I&rsquo;ll write you a draft to paste in.{' '}
-                  <button className="afeed__ctx-link" onClick={() => navigate('/profile#privacy')}>
-                    Let me change it directly
-                  </button>{' '}
-                  and I&rsquo;ll make the change myself, and tell you exactly what I did.
-                </p>
-              )}
+              ) : !sctx.canEdit && armOffer}
             </div>
           )}
         </>
@@ -425,15 +446,37 @@ export default function AssistantFeed() {
           const shared = p.source_post_id ? sourcePosts.get(p.source_post_id) : null;
           return (
             <div className={'afeed__entry' + (p.author === 'claude' ? ' afeed__entry--claude' : '')} key={p.id}>
-              <Avatar
-                id={p.author === 'claude' ? CLAUDE_PROFILE_ID : me}
-                name={p.author === 'claude' ? 'Claude' : 'You'}
-                url={p.author === 'claude' ? avatars.claude : avatars.me}
-                size={30}
-              />
+              {/* In a space's build thread, your entries wear the SPACE's
+                  logo with your face as the small peach-ringed dot — the
+                  steward-face idiom space chats already use (founder
+                  2026-08-22: "the countryman logo and my face as a smaller
+                  dot"). The space never speaks itself; you speak for it. */}
+              {p.author !== 'claude' && spaceId ? (
+                <Avatar
+                  id={spaceId}
+                  name={sctx?.name ?? 'This space'}
+                  url={sctx?.avatarUrl}
+                  size={30}
+                  stewardFace={{ id: me, name: 'You', url: avatars.me }}
+                />
+              ) : (
+                <Avatar
+                  id={p.author === 'claude' ? CLAUDE_PROFILE_ID : me}
+                  name={p.author === 'claude' ? 'Claude' : 'You'}
+                  url={p.author === 'claude' ? avatars.claude : avatars.me}
+                  size={30}
+                />
+              )}
               <div className="afeed__entry-body">
                 <div className="afeed__entry-meta">
-                  <span className="afeed__entry-name">{p.author === 'claude' ? 'Claude' : 'You'}</span>
+                  {/* In a space's build thread the STEWARD speaks — the space
+                      never talks to Claude itself (the chat rule: humans
+                      answer for a space). Saying so is what keeps the CS hat
+                      + your face from reading as a bug (founder 2026-08-22). */}
+                  <span className="afeed__entry-name">
+                    {p.author === 'claude' ? 'Claude'
+                      : spaceId ? `You · steward of ${sctx?.name ?? 'this space'}` : 'You'}
+                  </span>
                   <span className="afeed__entry-time">{timeAgo(p.created_at)}</span>
                 </div>
                 {shared && (
