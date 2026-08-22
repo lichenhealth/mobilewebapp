@@ -25,10 +25,14 @@ import './PageTabsEditor.css';
  *  through Style, write-tabs through Write; the photo lives in sections[id]
  *  either way. */
 const SECTIONED = ['about', 'services', 'goods', 'contact', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string } | undefined>;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string } | undefined>;
 
-/** imagePos → a 0–100 vertical percent, legacy words included. */
-function posPct(pos?: string): number {
+/** imagePos → a 0–100 vertical percent. Three generations of stored shape
+ *  render alike: legacy words, the local session's bare numbers, and the
+ *  drag editor's '50% N%' strings (two builds converged on this the same
+ *  day — honor them all). */
+function posPct(pos?: string | number): number {
+  if (typeof pos === 'number') return Math.max(0, Math.min(100, pos));
   if (!pos || pos === 'center') return 50;
   if (pos === 'top') return 0;
   if (pos === 'bottom') return 100;
@@ -41,8 +45,8 @@ function posPct(pos?: string): number {
  *  opts this photo out of cropping on the live page; Delete and Change sit
  *  together as plain links, no bubbles. */
 function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
-  sec: { image?: string; imagePos?: string; imageSize?: string } | undefined;
-  patch: (p: { image?: string; imagePos?: string; imageSize?: string }) => void;
+  sec: { image?: string; imagePos?: string | number; imageSize?: string } | undefined;
+  patch: (p: { image?: string; imagePos?: string | number; imageSize?: string }) => void;
   uploaderId?: string;
   upBusy: boolean;
   setUpBusy: (b: boolean) => void;
@@ -177,7 +181,7 @@ export default function PageTabsEditor({
   contact?: ContactInfo;
   onContact?: (next: ContactInfo) => void;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });

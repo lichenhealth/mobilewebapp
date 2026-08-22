@@ -74,9 +74,12 @@ export interface PageMeta {
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
   /** EVERY tab may carry its own lead + photo (founder 2026-08-22: "all
-   *  tabs should") — keyed by tab id, built-in or custom. imageSize 'full'
-   *  opts that photo out of the standard cropped frame. */
-  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string; imageSize?: string }>>;
+   *  tabs should") — keyed by tab id, built-in or custom. `imagePos` is the
+   *  vertical crop for THIS image — words, a bare 0–100 number, or the drag
+   *  editor's '50% N%' — because the page-wide coverPos is tuned for the
+   *  cover (founder 2026-08-21: Katie's face, cut off on Services).
+   *  imageSize 'full' opts that photo out of the standard frame entirely. */
+  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -104,8 +107,11 @@ export interface PageMeta {
   photos?: string[];
   /** Images woven INTO the story (founder 2026-07-29): each renders after
    *  its 1-based paragraph number, so the picture sits beside the words
-   *  that tell it. A template feature for every public page. */
-  storyImages?: { after: number; src: string }[];
+   *  that tell it. A template feature for every public page. `pos` = the
+   *  vertical crop (0 top – 100 bottom) when the frame crops; `full` shows
+   *  the whole photo at its natural shape, no crop (founder 2026-08-21:
+   *  "expand this pic down so you can see Katie"). */
+  storyImages?: { after: number; src: string; pos?: number; full?: boolean }[];
   showPosts?: boolean;
   /** The tabs this page's owner chose from the template library
    *  (founder 2026-08-05). When present, these drive the row. */
@@ -407,21 +413,24 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
-  // Which image the hero wears on this tab: the tab's OWN photo when it has
-  // one (any tab — founder 2026-08-22), else the page cover on Home/About
-  // (Home never had a hero slot before, a relic of About-as-landing).
+  // Which image the hero wears on this tab (two builds converged here the
+  // same day — merged): HOME and Feed wear the page cover (founder
+  // 2026-08-21: "Home have the picture of Mary jumping as the cover" — it
+  // used to have none, a relic of About-as-landing); every OTHER tab wears
+  // its own section image, About falling back to the cover so older pages
+  // keep their look. Each image crops for ITSELF: the section's own
+  // imagePos wins over the page-wide coverPos (founder 2026-08-21: Katie's
+  // face); imageSize 'full' opts the photo out of the frame entirely
+  // (founder 2026-08-22).
   const activeSec = !doors && tabbed ? page.sections?.[tab] : undefined;
   const coverSrc = doors
     ? activeDoor?.image
-    : !tabbed
+    : (!tabbed || tab === 'home' || tab === 'feed')
       ? page.cover
-      : activeSec?.image ?? ((tab === 'home' || tab === 'about' || tab === 'feed') ? page.cover : undefined);
-  const usingPageCover = !doors && coverSrc === page.cover && !activeSec?.image;
-  const coverPos = doors
-    ? undefined
-    : usingPageCover ? page.coverPos : (activeSec?.imagePos || page.coverPos);
-  // "Expand to full size" — this photo opted out of the standard frame.
-  const coverFull = !doors && !usingPageCover && activeSec?.imageSize === 'full';
+      : activeSec?.image ?? (tab === 'about' ? page.cover : undefined);
+  const usingSectionImage = !doors && !!activeSec?.image && coverSrc === activeSec.image;
+  const coverPos = (usingSectionImage ? activeSec?.imagePos : undefined) ?? page.coverPos;
+  const coverFull = usingSectionImage && activeSec?.imageSize === 'full';
 
   return (
     <div
@@ -576,7 +585,10 @@ export default function PublicPage(props: PublicPageProps) {
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
-                  <img className="ppage__story-img" src={si.src} alt="" loading="lazy"
+                  <img
+                    className={'ppage__story-img' + (si.full ? ' ppage__story-img--full' : '')}
+                    src={si.src} alt="" loading="lazy"
+                    style={si.full ? undefined : { objectPosition: `50% ${si.pos ?? 0}%` }}
                     key={si.src} onClick={() => setLightbox(si.src)} />
                 ))}
               </div>

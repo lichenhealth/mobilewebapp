@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HX64pQedkWTSBRwJtLYXSqDgSqPDQq0cG99HVKmoPYFRs5SuTG8QFUnr2xPydbN
+\restrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -12880,6 +12880,7 @@ GRANT SELECT(avatar_url) ON TABLE public.profiles TO anon;
 --
 
 GRANT SELECT(location) ON TABLE public.profiles TO authenticated;
+GRANT SELECT(location) ON TABLE public.profiles TO anon;
 
 
 --
@@ -12901,6 +12902,7 @@ GRANT SELECT(updated_at) ON TABLE public.profiles TO authenticated;
 --
 
 GRANT SELECT(onboarded) ON TABLE public.profiles TO authenticated;
+GRANT SELECT(onboarded) ON TABLE public.profiles TO anon;
 
 
 --
@@ -13414,8 +13416,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HX64pQedkWTSBRwJtLYXSqDgSqPDQq0cG99HVKmoPYFRs5SuTG8QFUnr2xPydbN
-
+\unrestrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
 
 
 
