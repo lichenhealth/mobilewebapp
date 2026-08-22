@@ -20,7 +20,10 @@ import './PageTabsEditor.css';
  *  can never leave a visitor in an empty room. */
 /** Built-in tabs whose lead line + photo the owner sets (page.sections). */
 const SECTIONED = ['about', 'services', 'goods', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number } | undefined>;
+/** imagePos may be a keyword ('top') or a 0–100 vertical crop number. */
+const posCss = (pos?: string | number): string =>
+  typeof pos === 'number' ? `50% ${pos}%` : (pos || 'center');
 
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
@@ -56,7 +59,7 @@ export default function PageTabsEditor({
    *  "Write it for me" helper) — the caller's, rendered in place. */
   homeExtra?: React.ReactNode;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });
@@ -285,14 +288,14 @@ export default function PageTabsEditor({
                       <div className="ptabs__photo-preview">
                         <span className="ptabs__shot ptabs__shot--wide" style={{
                           overflow: 'hidden',
-                          backgroundPosition: sections?.[t.id]?.imagePos || 'center',
+                          backgroundPosition: posCss(sections?.[t.id]?.imagePos),
                           height: expandedSection === t.id ? '500px' : '300px',
                         }}>
                           <img src={sections[t.id]!.image} alt="" style={{
                             width: '100%',
                             height: '100%',
                             objectFit: 'cover',
-                            objectPosition: sections?.[t.id]?.imagePos || 'center',
+                            objectPosition: posCss(sections?.[t.id]?.imagePos),
                           }} />
                         </span>
                       </div>

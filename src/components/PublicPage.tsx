@@ -71,7 +71,11 @@ export interface PageMeta {
   /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
-  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string; imagePos?: string }>>;
+  /** Per-section imagery. `imagePos` is the vertical crop for THIS image —
+   *  'top'/'bottom' or 0 (top) – 100 (bottom) — because the page-wide
+   *  coverPos is tuned for the cover and cropped other tabs' photos wrong
+   *  (founder 2026-08-21: Katie's face, cut off on Services). */
+  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string; imagePos?: string | number }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -99,8 +103,11 @@ export interface PageMeta {
   photos?: string[];
   /** Images woven INTO the story (founder 2026-07-29): each renders after
    *  its 1-based paragraph number, so the picture sits beside the words
-   *  that tell it. A template feature for every public page. */
-  storyImages?: { after: number; src: string }[];
+   *  that tell it. A template feature for every public page. `pos` = the
+   *  vertical crop (0 top – 100 bottom) when the frame crops; `full` shows
+   *  the whole photo at its natural shape, no crop (founder 2026-08-21:
+   *  "expand this pic down so you can see Katie"). */
+  storyImages?: { after: number; src: string; pos?: number; full?: boolean }[];
   showPosts?: boolean;
   /** The tabs this page's owner chose from the template library
    *  (founder 2026-08-05). When present, these drive the row. */
@@ -402,16 +409,23 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
+  // HOME wears the page cover (founder 2026-08-21: "Home have the picture of
+  // Mary jumping as the cover") — it used to have none, and About wore the
+  // cover; About now wears its own section image, falling back to the cover
+  // so older pages keep their look.
+  const sectionImage = page.sections?.[tab as 'about' | 'services' | 'goods' | 'facilities']?.image;
   const coverSrc = doors
     ? activeDoor?.image
-    : (!tabbed || tab === 'about')
+    : (!tabbed || tab === 'home' || tab === 'feed')
       ? page.cover
-      : page.sections?.[tab as 'services' | 'facilities' | 'goods']?.image;
-  const coverPos = doors
-    ? undefined
-    : (!tabbed || tab === 'about')
-      ? page.coverPos
-      : (page.sections?.[tab as 'services' | 'facilities' | 'goods']?.imagePos || page.coverPos);
+      : tab === 'about'
+        ? (sectionImage ?? page.cover)
+        : sectionImage;
+  // Each image crops for ITSELF: a section image's own imagePos wins over the
+  // page-wide coverPos, which is tuned for the cover photo.
+  const coverPos = (!doors && sectionImage && coverSrc === sectionImage
+    ? page.sections?.[tab as 'about' | 'services' | 'goods' | 'facilities']?.imagePos
+    : undefined) ?? page.coverPos;
 
   return (
     <div
@@ -565,7 +579,10 @@ export default function PublicPage(props: PublicPageProps) {
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
-                  <img className="ppage__story-img" src={si.src} alt="" loading="lazy"
+                  <img
+                    className={'ppage__story-img' + (si.full ? ' ppage__story-img--full' : '')}
+                    src={si.src} alt="" loading="lazy"
+                    style={si.full ? undefined : { objectPosition: `50% ${si.pos ?? 0}%` }}
                     key={si.src} onClick={() => setLightbox(si.src)} />
                 ))}
               </div>
