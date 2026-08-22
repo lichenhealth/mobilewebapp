@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
+import CoverPicker from './CoverPicker';
 import { uploadPageImage } from '../lib/avatarApi';
 import {
   TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
@@ -24,7 +25,7 @@ type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: st
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
-  entityName,
+  entityName, authorId, spaceId, homeExtra,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -47,6 +48,13 @@ export default function PageTabsEditor({
   coverPos?: number;
   onCoverPos?: (pos: number) => void;
   entityName?: string;
+  /** Whose post photos the cover picker may harvest — a member's… */
+  authorId?: string;
+  /** …or a space's wall. */
+  spaceId?: string;
+  /** Extra controls under the welcome textarea (e.g. a space's
+   *  "Write it for me" helper) — the caller's, rendered in place. */
+  homeExtra?: React.ReactNode;
 }) {
   const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
     if (!onSections) return;
@@ -174,6 +182,7 @@ export default function PageTabsEditor({
               onChange={(e) => onHomeSummary(e.target.value)}
               placeholder="A short welcome for the front page — your whole story still lives on About."
             />
+            {homeExtra}
             <p className="ptabs__note">
               Leave it empty and Home opens with the first two paragraphs of your story.
             </p>
@@ -186,58 +195,19 @@ export default function PageTabsEditor({
                   onClick={() => onCoverStyle?.(v)}>{label}</button>
               ))}
             </div>
+            {/* The one real cover editor — the slider and the pick-from-
+                Lichen grid, not a hand-rolled twin (it briefly had one). */}
             {coverStyle === 'photo' && uploaderId && onCover && (
-              <div>
-                {cover && (
-                  <div>
-                    <span className="ptabs__shot ptabs__shot--wide" style={{
-                      overflow: 'hidden',
-                      backgroundPosition: coverPos || 'center',
-                    }}>
-                      <img src={cover} alt="" style={{
-                        width: '100%',
-                        height: '300px',
-                        objectFit: 'cover',
-                        objectPosition: coverPos || 'center',
-                      }} />
-                      <button onClick={() => onCover(undefined)}
-                        aria-label="Remove this photo">×</button>
-                    </span>
-                    <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                      {(['top', 'center', 'bottom'] as const).map((pos) => {
-                        const numPos = pos === 'top' ? 0 : pos === 'bottom' ? 100 : 50;
-                        const currentNum = typeof coverPos === 'number' ? coverPos : (coverPos === 'top' ? 0 : coverPos === 'bottom' ? 100 : 50);
-                        return (
-                          <button
-                            key={pos}
-                            className={'cmp__chip' + (currentNum === numPos ? ' is-on' : '')}
-                            onClick={() => onCoverPos?.(numPos)}
-                            style={{ fontSize: '0.875rem' }}
-                          >
-                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <label className="btn ptabs__upload">
-                  {upBusy ? 'Adding…' : cover ? 'Replace photo' : 'Add a photo'}
-                  <input type="file" accept="image/*" hidden disabled={upBusy}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (!file) return;
-                      setUpBusy(true);
-                      try {
-                        const url = await uploadPageImage(uploaderId, file);
-                        onCover(url);
-                      }
-                      catch (err) { console.error(err); }
-                      setUpBusy(false);
-                    }} />
-                </label>
-              </div>
+              <CoverPicker
+                value={cover}
+                onChange={onCover}
+                pos={coverPos}
+                onPos={onCoverPos}
+                uploaderId={uploaderId}
+                authorId={authorId}
+                spaceId={spaceId}
+                extraPhotos={photos}
+              />
             )}
           </div>
         )}
