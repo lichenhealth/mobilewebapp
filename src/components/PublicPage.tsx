@@ -13,9 +13,10 @@ import './PublicPage.css';
 // can read them all — and members never face a blank canvas, because most of
 // it fills itself from what they already keep on Lichen.
 
-const posToObjectPos = (pos?: string): string => {
+const posToObjectPos = (pos?: string | number): string => {
   if (pos === 'top') return '50% 0%';
   if (pos === 'bottom') return '50% 100%';
+  if (typeof pos === 'number') return `50% ${pos}%`;
   return '50% 50%'; // center or default
 };
 
@@ -51,10 +52,10 @@ export interface PageMeta {
    *  paragraphs when empty, so Home is never blank. */
   homeSummary?: string;
   cover?: string;
-  /** Vertical crop position for the cover: 'top' | 'center' | 'bottom',
-   *  default centered — "so I can move it up to see my dog's face" (founder
+  /** Vertical crop position for the cover, 0 (top) – 100 (bottom), default
+   *  centered — "so I can move it up to see my dog's face" (founder
    *  2026-08-11). */
-  coverPos?: string;
+  coverPos?: number;
   coverStyle?: 'photo' | 'tint' | 'plain';
   accent?: string;
   /** Legacy single CTA — kept for old rows; new saves write `actions`. */
@@ -410,7 +411,7 @@ export default function PublicPage(props: PublicPageProps) {
     ? undefined
     : (!tabbed || tab === 'about')
       ? page.coverPos
-      : page.sections?.[tab as 'services' | 'facilities' | 'goods']?.imagePos;
+      : (page.sections?.[tab as 'services' | 'facilities' | 'goods']?.imagePos || page.coverPos);
 
   return (
     <div
