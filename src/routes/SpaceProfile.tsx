@@ -1315,7 +1315,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 value={pageEdit.cover}
                 onChange={(cover) => setPageEdit((pm) => ({ ...pm, cover }))}
                 pos={pageEdit.coverPos}
-                onPos={(coverPos) => setPageEdit((pm) => ({ ...pm, coverPos }))}
+                onPos={(coverPos: number) => setPageEdit((pm) => ({ ...pm, coverPos }))}
                 uploaderId={me}
                 spaceId={space.id}
                 extraPhotos={pageEdit.photos ?? []}

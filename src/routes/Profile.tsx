@@ -1015,11 +1015,11 @@ export default function Profile() {
             homeSummary={pageMeta.homeSummary}
             onHomeSummary={(text) => setPage({ homeSummary: text })}
             coverStyle={pageMeta.coverStyle}
-            onCoverStyle={(style) => setPage({ coverStyle: style })}
+            onCoverStyle={(style: 'photo' | 'plain' | 'tint') => setPage({ coverStyle: style })}
             cover={pageMeta.cover}
             onCover={(url) => setPage({ cover: url })}
             coverPos={pageMeta.coverPos}
-            onCoverPos={(pos) => setPage({ coverPos: pos })}
+            onCoverPos={(pos: number) => setPage({ coverPos: pos })}
             entityName={fullName}
           />
 
