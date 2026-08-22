@@ -145,6 +145,7 @@ export function spaceIdOfThread(thread: string): string | null {
 export interface SpaceContext {
   name: string;
   kind: string;
+  avatarUrl: string | null;
   tagline: string | null;
   storyWords: number;
   homeSummary: boolean;
@@ -162,14 +163,14 @@ export interface SpaceContext {
 export async function loadSpaceContext(me: string, spaceId: string): Promise<SpaceContext | null> {
   const [spRes, memRes, meRes] = await Promise.all([
     supabase.from('spaces')
-      .select('name, kind, description, page, contact, assistant_enabled')
+      .select('name, kind, avatar_url, description, page, contact, assistant_enabled')
       .eq('id', spaceId).maybeSingle(),
     supabase.from('space_members')
       .select('role').eq('space_id', spaceId).eq('profile_id', me).maybeSingle(),
     supabase.from('profiles').select('assistant_can_edit').eq('id', me).maybeSingle(),
   ]);
   const sp = spRes.data as {
-    name: string; kind: string; description: string | null;
+    name: string; kind: string; avatar_url: string | null; description: string | null;
     page: { tagline?: string; story?: string; homeSummary?: string } | null;
     contact: Record<string, string> | null;
     assistant_enabled: boolean | null;
@@ -184,6 +185,7 @@ export async function loadSpaceContext(me: string, spaceId: string): Promise<Spa
   return {
     name: sp.name,
     kind: sp.kind,
+    avatarUrl: sp.avatar_url,
     tagline: page.tagline?.trim() || null,
     storyWords: story ? story.split(/\s+/).length : 0,
     homeSummary: !!page.homeSummary?.trim(),
