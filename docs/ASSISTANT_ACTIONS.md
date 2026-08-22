@@ -1,8 +1,11 @@
 # Assistant actions — letting Claude edit a member's own page
 
 **Status:** BUILT 2026-08-13 — all four steps of the build order below. Live behind `profiles.assistant_can_edit`,
-default off, switched on in Profile → Privacy → "What the assistant may change",
-and armed only in the Profile thread. One correction from testing: an empty
+default **ON since 2026-08-22** (founder: page editing on for all assistants on
+every page — member and space alike; the original default-off rows were
+backfilled, and Profile → Privacy → "What the assistant may change" is the
+opt-OUT), and armed only in the Profile thread (or a space's build thread,
+for its stewards). One correction from testing: an empty
 value CLEARS a field rather than erroring — without that, "put it back" could
 never undo a write onto something that started empty, which is most first
 edits. Founder 2026-08-11: "it should load a chat
@@ -55,8 +58,8 @@ way that wants a confirm step, not a chat message.
 - **Own profile only.** The service-role client already knows who triggered
   the row; the model never supplies a target.
 - **A member switch.** "Let Claude edit my page directly" in Profile →
-  Privacy, default OFF for now. With it off, the assistant proposes in prose
-  and the member applies by hand — exactly today's behavior.
+  Privacy — default ON since 2026-08-22 (opt-out). With it off, the
+  assistant proposes in prose and the member applies by hand.
 - **Every write is announced.** No silent edits: the reply must name what
   changed. A write with no report is a bug.
 - **Reversible by conversation.** The report carries the previous value so
