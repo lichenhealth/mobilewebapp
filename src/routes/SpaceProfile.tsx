@@ -48,7 +48,6 @@ import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/Pub
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
-import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
@@ -1147,27 +1146,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          {/* What Home shows (founder 2026-08-11): a real summary, not the
-              story's first inches. Empty falls back to the opening two
-              paragraphs so Home is never blank. */}
-          <div className="prof__field">
-            <label className="prof__label">Home summary — what greets a visitor</label>
-            <textarea
-              className="prof__textarea"
-              value={pageEdit.homeSummary ?? ''}
-              onChange={(e) => setPageEdit((pm) => ({ ...pm, homeSummary: e.target.value }))}
-              placeholder="A short welcome for the front page — the whole story still lives on About."
-            />
-            <HomeSummaryButton
-              story={pageEdit.story ?? description ?? ''}
-              entityName={name}
-              onWritten={(t) => setPageEdit((pm) => ({ ...pm, homeSummary: t }))}
-            />
-            <p className="prof__hint">
-              Leave it empty and Home opens with the first two paragraphs of your story.
-            </p>
-          </div>
-
+          {/* Home's welcome + cover moved into the Home row's Style panel in
+              the tabs list below (founder 2026-08-22: "the cover photo is
+              still outside the home editor") — everything Home lives there. */}
           <div className="prof__field">
             <label className="prof__label">Description</label>
             <textarea
@@ -1301,28 +1282,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
-          <div className="prof__field">
-            <label className="prof__label">Look</label>
-            <div className="cmp__chips">
-              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
-                <button key={v}
-                  className={'cmp__chip' + ((pageEdit.coverStyle ?? 'plain') === v ? ' is-on' : '')}
-                  onClick={() => setPageEdit((pm) => ({ ...pm, coverStyle: v }))}>{label}</button>
-              ))}
-            </div>
-            {pageEdit.coverStyle === 'photo' && me && (
-              <CoverPicker
-                value={pageEdit.cover}
-                onChange={(cover) => setPageEdit((pm) => ({ ...pm, cover }))}
-                pos={pageEdit.coverPos}
-                onPos={(coverPos: number) => setPageEdit((pm) => ({ ...pm, coverPos }))}
-                uploaderId={me}
-                spaceId={space.id}
-                extraPhotos={pageEdit.photos ?? []}
-              />
-            )}
-          </div>
-
           {/* The feed is a Lichen thing; the open web only sees it if this
               space says so (founder 2026-08-11). */}
           <label className="prof__consent">
@@ -1353,6 +1312,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             uploaderId={me}
             sections={pageEdit.sections}
             onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
+            homeSummary={pageEdit.homeSummary}
+            onHomeSummary={(text) => setPageEdit((pm) => ({ ...pm, homeSummary: text }))}
+            coverStyle={pageEdit.coverStyle}
+            onCoverStyle={(coverStyle) => setPageEdit((pm) => ({ ...pm, coverStyle }))}
+            cover={pageEdit.cover}
+            onCover={(cover) => setPageEdit((pm) => ({ ...pm, cover }))}
+            coverPos={pageEdit.coverPos}
+            onCoverPos={(coverPos) => setPageEdit((pm) => ({ ...pm, coverPos }))}
+            spaceId={space.id}
+            entityName={name}
+            homeExtra={
+              <HomeSummaryButton
+                story={pageEdit.story ?? description ?? ''}
+                entityName={name}
+                onWritten={(t) => setPageEdit((pm) => ({ ...pm, homeSummary: t }))}
+              />
+            }
           />
 
           {/* A community can decide it works without the assistant — the AI

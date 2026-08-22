@@ -35,7 +35,6 @@ import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
-import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
@@ -961,27 +960,8 @@ export default function Profile() {
               onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
-          <div className="prof__field">
-            <label className="prof__label">Look</label>
-            <div className="cmp__chips">
-              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
-                <button key={v}
-                  className={'cmp__chip' + ((pageMeta.coverStyle ?? 'plain') === v ? ' is-on' : '')}
-                  onClick={() => setPage({ coverStyle: v })}>{label}</button>
-              ))}
-            </div>
-            {pageMeta.coverStyle === 'photo' && user && (
-              <CoverPicker
-                value={pageMeta.cover}
-                onChange={(cover) => setPage({ cover })}
-                pos={pageMeta.coverPos}
-                onPos={(coverPos) => setPage({ coverPos })}
-                uploaderId={user.id}
-                authorId={user.id}
-                extraPhotos={pageMeta.photos ?? []}
-              />
-            )}
-          </div>
+          {/* Home's look + cover live in the Home row's Style panel in the
+              tabs list below (founder 2026-08-22) — one editor, not two. */}
 
           {/* The feed is a Lichen thing; the open web only sees it if you
               say so (founder 2026-08-11) — and even then About greets a
@@ -1021,6 +1001,7 @@ export default function Profile() {
             coverPos={pageMeta.coverPos}
             onCoverPos={(pos: number) => setPage({ coverPos: pos })}
             entityName={fullName}
+            authorId={user?.id}
           />
 
           <div className="prof__save-row">
