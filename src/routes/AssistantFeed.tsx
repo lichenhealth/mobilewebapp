@@ -169,6 +169,26 @@ export default function AssistantFeed() {
     return needle ? posts.filter((p) => p.body.toLowerCase().includes(needle)) : posts;
   }, [q, posts]);
 
+  // THE THINKING WHEEL (founder 2026-08-22: "is he still thinking or is
+  // there a bug?"). Derived, not tracked: if the thread's newest entry is
+  // the member's and young, Claude is composing — show the pulse. If it's
+  // the member's and stale, the reply was LOST (the trigger fires once, no
+  // retry) — say so honestly instead of spinning forever. Derivation means
+  // reloads and arriving from a brief's composer show the right state too.
+  const THINKING_MS = 90_000;          // replies land well inside this
+  const STALE_NOTE_MS = 60 * 60_000;   // older than an hour is just history
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const lastPost = posts[posts.length - 1];
+  const lastIsMine = !!lastPost && lastPost.author === 'member';
+  const lastAge = lastIsMine ? nowTick - new Date(lastPost.created_at).getTime() : Infinity;
+  const thinking = lastIsMine && lastAge < THINKING_MS;
+  const replyLost = lastIsMine && lastAge >= THINKING_MS && lastAge < STALE_NOTE_MS;
+  useEffect(() => {
+    if (!lastIsMine || lastAge >= STALE_NOTE_MS) return;
+    const t = setInterval(() => setNowTick(Date.now()), 3000);
+    return () => clearInterval(t);
+  }, [lastIsMine, lastAge >= STALE_NOTE_MS, posts.length]);
+
   async function send(text: string, images?: string[]) {
     // The realtime subscription above picks up both this insert and
     // Claude's reply — no need to refetch.
@@ -498,6 +518,25 @@ export default function AssistantFeed() {
             </div>
           );
         })}
+        {thinking && (
+          <div className="afeed__entry afeed__entry--claude" aria-live="polite">
+            <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={30} />
+            <div className="afeed__entry-body">
+              <div className="afeed__entry-meta">
+                <span className="afeed__entry-name">Claude</span>
+              </div>
+              <p className="afeed__thinking" aria-label="Claude is thinking">
+                <span /><span /><span />
+              </p>
+            </div>
+          </div>
+        )}
+        {replyLost && (
+          <p className="afeed__lost">
+            No reply arrived — something hiccuped on my end, and I won&rsquo;t
+            answer this one late. Say it again and I&rsquo;ll take another run.
+          </p>
+        )}
       </div>
 
       {/* A door can arrive with its errand via ?ask= (the same prefill

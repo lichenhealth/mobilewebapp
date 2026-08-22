@@ -48,6 +48,28 @@
 .afeed__entry-text {
   font-size: 14px; line-height: 1.55; color: var(--ink); white-space: pre-wrap;
 }
+/* The thinking wheel (founder 2026-08-22): three silicon-blue dots
+   breathing while Claude composes; honest text when a reply is lost. */
+.afeed__thinking { display: inline-flex; gap: 5px; margin: 4px 0 0; }
+.afeed__thinking span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--blue); opacity: 0.35;
+  animation: afeed-think 1.2s ease-in-out infinite;
+}
+.afeed__thinking span:nth-child(2) { animation-delay: 0.2s; }
+.afeed__thinking span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes afeed-think {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .afeed__thinking span { animation: none; opacity: 0.7; }
+}
+.afeed__lost {
+  font-size: 13px; color: var(--ink-muted); font-style: italic;
+  margin: 4px 0 0 40px;
+}
+
 /* Pasted photos in an entry (founder 2026-08-22) — modest thumbs, tap to
    see full size. */
 .afeed__entry-shots { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; }
