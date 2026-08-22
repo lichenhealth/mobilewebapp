@@ -40,12 +40,12 @@ export default function PageTabsEditor({
   /** Home tab styling. */
   homeSummary?: string;
   onHomeSummary?: (text: string) => void;
-  coverStyle?: string;
-  onCoverStyle?: (style: string) => void;
+  coverStyle?: 'photo' | 'plain' | 'tint';
+  onCoverStyle?: (style: 'photo' | 'plain' | 'tint') => void;
   cover?: string;
   onCover?: (url: string | undefined) => void;
-  coverPos?: string;
-  onCoverPos?: (pos: string) => void;
+  coverPos?: number;
+  onCoverPos?: (pos: number) => void;
   entityName?: string;
 }) {
   const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
@@ -177,16 +177,20 @@ export default function PageTabsEditor({
                         aria-label="Remove this photo">×</button>
                     </span>
                     <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                      {(['top', 'center', 'bottom'] as const).map((pos) => (
-                        <button
-                          key={pos}
-                          className={'cmp__chip' + ((coverPos ?? 'center') === pos ? ' is-on' : '')}
-                          onClick={() => onCoverPos?.(pos)}
-                          style={{ fontSize: '0.875rem' }}
-                        >
-                          {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
-                        </button>
-                      ))}
+                      {(['top', 'center', 'bottom'] as const).map((pos) => {
+                        const numPos = pos === 'top' ? 0 : pos === 'bottom' ? 100 : 50;
+                        const currentNum = typeof coverPos === 'number' ? coverPos : (coverPos === 'top' ? 0 : coverPos === 'bottom' ? 100 : 50);
+                        return (
+                          <button
+                            key={pos}
+                            className={'cmp__chip' + (currentNum === numPos ? ' is-on' : '')}
+                            onClick={() => onCoverPos?.(numPos)}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
