@@ -228,8 +228,6 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
            manages, Lichen View is the internal experience, Public View is
            the website layer (?preview=1 renders the open-web template). */
         <div className="view-toggle-row">
-          {/* Subject label pairs with a space backstage's (founder 2026-08-22). */}
-          <span className="view-toggle-row__subject">Your views</span>
           <span className="view-toggle" role="group" aria-label="Views of you">
             <button
               className="view-toggle__side view-toggle__side--admin"
