@@ -1,14 +1,8 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
+import { speechRecognition } from '../lib/dictation';
 import './AssistantComposer.css';
-
-interface SpeechRecognitionLike {
-  lang: string; interimResults: boolean;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onend: (() => void) | null; onerror: (() => void) | null;
-  start: () => void;
-}
 
 /** The text box every surface that talks to Claude sends through — the
  *  brief's inline reply and the feed's compose box alike. Dictation where
@@ -39,9 +33,10 @@ export default function AssistantComposer({
   const [images, setImages] = useState<string[]>([]);
   const [upBusy, setUpBusy] = useState(false);
 
-  const SR = (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike; SpeechRecognition?: new () => SpeechRecognitionLike })
-    .webkitSpeechRecognition
-    ?? (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition;
+  // Usable-here check, not merely present (src/lib/dictation.ts): on iOS
+  // this is null — starting recognition in an installed web app hangs the
+  // page, and the iPhone keyboard's own mic covers dictation anyway.
+  const SR = speechRecognition();
   function dictate() {
     if (!SR || listening) return;
     const rec = new SR();
@@ -54,7 +49,9 @@ export default function AssistantComposer({
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
     setListening(true);
-    rec.start();
+    // A refused start (mic permission, engine state) must never strand the
+    // button lit — reset instead of freezing the affordance.
+    try { rec.start(); } catch { setListening(false); }
   }
 
   async function addFiles(files: File[]) {
