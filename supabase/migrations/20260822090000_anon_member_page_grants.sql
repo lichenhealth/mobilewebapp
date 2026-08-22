@@ -1,0 +1,15 @@
+-- A member's PUBLISHED page showed signed-out visitors only a sign-in wall
+-- (found 2026-08-22, live on production). Two column-grant gaps, one fix:
+--
+-- 1. loadMemberProfile selects `location`, which anon's column-scoped SELECT
+--    grant on profiles doesn't include — one ungranted column fails the WHOLE
+--    query (42501), so the page thought the member didn't exist.
+-- 2. profile_categories' anon policy quals `EXISTS (... p.public_page AND
+--    p.onboarded)` — a policy subquery on ANOTHER table runs with the
+--    caller's privileges, and anon lacked `onboarded`, so the offerings
+--    read died inside the policy itself.
+--
+-- Row exposure is unchanged: the anon row policy on profiles stays
+-- `public_page AND onboarded`, so these columns are only ever readable on
+-- pages their owners published.
+grant select (location, onboarded) on public.profiles to anon;
