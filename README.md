@@ -128,3 +128,4 @@ In priority order:
 ## Notes on what I made up
 
 The wireframes are mid-fidelity; copy and microcopy are mine. Everything I invented is replaceable in `src/data/*` and the route files — the structural decisions (palette, type, components, navigation) all trace back to the wireframe.
+# Build fix
