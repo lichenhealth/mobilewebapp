@@ -19,7 +19,7 @@ import './PageTabsEditor.css';
  *  can never leave a visitor in an empty room. */
 /** Built-in tabs whose lead line + photo the owner sets (page.sections). */
 const SECTIONED = ['about', 'services', 'goods', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string } | undefined>;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
 
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
@@ -48,7 +48,7 @@ export default function PageTabsEditor({
   onCoverPos?: (pos: string) => void;
   entityName?: string;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });
@@ -162,11 +162,33 @@ export default function PageTabsEditor({
             {coverStyle === 'photo' && uploaderId && onCover && (
               <div>
                 {cover && (
-                  <span className="ptabs__shot ptabs__shot--wide">
-                    <img src={cover} alt="" />
-                    <button onClick={() => onCover(undefined)}
-                      aria-label="Remove this photo">×</button>
-                  </span>
+                  <div>
+                    <span className="ptabs__shot ptabs__shot--wide" style={{
+                      overflow: 'hidden',
+                      backgroundPosition: coverPos || 'center',
+                    }}>
+                      <img src={cover} alt="" style={{
+                        width: '100%',
+                        height: '300px',
+                        objectFit: 'cover',
+                        objectPosition: coverPos || 'center',
+                      }} />
+                      <button onClick={() => onCover(undefined)}
+                        aria-label="Remove this photo">×</button>
+                    </span>
+                    <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      {(['top', 'center', 'bottom'] as const).map((pos) => (
+                        <button
+                          key={pos}
+                          className={'cmp__chip' + ((coverPos ?? 'center') === pos ? ' is-on' : '')}
+                          onClick={() => onCoverPos?.(pos)}
+                          style={{ fontSize: '0.875rem' }}
+                        >
+                          {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 <label className="btn ptabs__upload">
                   {upBusy ? 'Adding…' : cover ? 'Replace photo' : 'Add a photo'}
@@ -253,11 +275,33 @@ export default function PageTabsEditor({
                   onChange={(e) => patchSection(t.id, { lead: e.target.value || undefined })}
                 />
                 {sections?.[t.id]?.image && (
-                  <span className="ptabs__shot ptabs__shot--wide">
-                    <img src={sections[t.id]!.image} alt="" />
-                    <button onClick={() => patchSection(t.id, { image: undefined })}
-                      aria-label="Remove this photo">×</button>
-                  </span>
+                  <div>
+                    <span className="ptabs__shot ptabs__shot--wide" style={{
+                      overflow: 'hidden',
+                      backgroundPosition: sections?.[t.id]?.imagePos || 'center',
+                    }}>
+                      <img src={sections[t.id]!.image} alt="" style={{
+                        width: '100%',
+                        height: '300px',
+                        objectFit: 'cover',
+                        objectPosition: sections?.[t.id]?.imagePos || 'center',
+                      }} />
+                      <button onClick={() => patchSection(t.id, { image: undefined })}
+                        aria-label="Remove this photo">×</button>
+                    </span>
+                    <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      {(['top', 'center', 'bottom'] as const).map((pos) => (
+                        <button
+                          key={pos}
+                          className={'cmp__chip' + ((sections?.[t.id]?.imagePos ?? 'center') === pos ? ' is-on' : '')}
+                          onClick={() => patchSection(t.id, { imagePos: pos })}
+                          style={{ fontSize: '0.875rem' }}
+                        >
+                          {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {uploaderId && (
                   <label className="btn ptabs__upload">
