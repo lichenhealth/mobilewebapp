@@ -258,9 +258,10 @@ export default function TopBar({
                circle). Say the one thing that fixes everything. */
             <span className="top-bar__signin">Sign in</span>
           ) : actor.type !== 'self' ? (
-            <span className="top-bar__acting-avatar" style={{ background: colorFor(actor.id) }}>
-              {monogramFor(actor.name)}
-            </span>
+            /* The hat you're wearing shows its REAL face (founder 2026-08-22:
+               a bare monogram made acting-as too easy to misread) — Avatar
+               falls back to the monogram when the entity has no photo. */
+            <Avatar id={actor.id} name={actor.name} url={actor.avatarUrl} size={36} />
           ) : (
             <Avatar id={selfId} name={self.name} url={self.avatarUrl} size={36} />
           )}
@@ -285,9 +286,7 @@ export default function TopBar({
                   onClick={() => pickIdentity(o)}
                   role="menuitem"
                 >
-                  <span className="top-bar__switch-avatar" style={{ background: colorFor(o.id) }}>
-                    {monogramFor(o.name)}
-                  </span>
+                  <Avatar id={o.id} name={o.name} url={o.avatarUrl} size={30} />
                   <span className="top-bar__switch-name">{o.name}</span>
                   <span className="top-bar__switch-kind">{o.kind}</span>
                 </button>
@@ -299,9 +298,7 @@ export default function TopBar({
                   onClick={() => pickIdentity(b)}
                   role="menuitem"
                 >
-                  <span className="top-bar__switch-avatar" style={{ background: colorFor(b.id) }}>
-                    {monogramFor(b.name)}
-                  </span>
+                  <Avatar id={b.id} name={b.name} url={b.avatarUrl} size={30} />
                   <span className="top-bar__switch-name">{b.name}</span>
                   <span className="top-bar__switch-kind">{b.kind}</span>
                 </button>
