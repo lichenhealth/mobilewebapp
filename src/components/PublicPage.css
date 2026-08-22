@@ -63,6 +63,13 @@
    2026-08-05). 'tint' survives as a stored value on older pages; it simply
    renders plain now. */
 .ppage__name { margin: 6px 0 0; font-family: var(--font-display, inherit); font-size: 30px; line-height: 1.15; }
+/* The kind line — same voice as .sprof__kind on the template-less space
+   view, so "Organization" reads identically wherever a space's name shows. */
+.ppage__kind {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--peach-deep); margin: 2px 0 0;
+  display: inline-flex; align-items: center; gap: 6px; justify-content: center;
+}
 .ppage__tagline { margin: 0; font-size: 15.5px; color: var(--ink-soft); max-width: 46ch; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }
 .ppage__where { display: inline-flex; align-items: center; gap: 5px; margin: 2px 0 0; font-size: 13px; color: var(--ink-muted); }
 .ppage__cta {
