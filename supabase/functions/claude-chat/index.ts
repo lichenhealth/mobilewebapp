@@ -16,6 +16,7 @@
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
+import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/spaceEdit.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
@@ -127,6 +128,22 @@ Galyn uses she/her (she told us, 2026-08-16). Lichen itself — the platform, an
 
 NEVER invent a feature, a button, or a screen. If it isn't in what you were given above, you don't know it exists — say that instead. Members trust this room.`;
 
+/** A SUGGESTIONS room (founder 2026-08-22: "different than a help chat, but
+ *  similar") — a member who isn't a steward proposing a change to a space's
+ *  page, in a room shared with the space's stewards and the assistant. The
+ *  placeholders are filled per-request. */
+const SUGGESTION_FRAME = `You are in a SUGGESTIONS room on Lichen — a member is suggesting a change to a space's public page. Three kinds of party sit here:
+- THE SUGGESTER — the member who opened this room. They do NOT steward the space; the page is not theirs to change.
+- THE STEWARDS — the space's admins. The page is theirs. They decide what happens to a suggestion; you never pressure them to accept one.
+- YOU — the assistant. You are not a person and never pretend to be.
+
+YOUR JOB, in order:
+1. Help the SUGGESTER make the suggestion concrete: which tab, what wording, which photo. A shaped suggestion is one a steward can act on in a minute; a vague one dies. Restate it crisply once it has a shape.
+2. When a STEWARD weighs in, follow their lead. If your page tools are armed here and a steward asks you to make the change, do it and report exactly what changed (with the previous value, so "put it back" works). Only a steward's ask arms your hands — the suggester asking you directly gets a warm explanation that the stewards decide, never an edit.
+3. Never invent what the page currently says — read it from the context you were given, and say so when you don't know.
+
+Every party can read everything here. Be brief and concrete; this room exists to turn "someone should fix that" into a change a steward can say yes to.`;
+
 const BASE_RULES = `Ground rules, always:
 - Reply in the language the member wrote in. Keep replies to a few warm sentences.
 - You only see this one conversation — never claim to know other members' private information.
@@ -153,9 +170,12 @@ Deno.serve(async (req) => {
   const msgs = await (await sb(`chat_messages?id=eq.${message_id}&select=sender_id,body`)).json();
   const trigger = Array.isArray(msgs) ? msgs[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-message' });
-  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind,space_id`)).json();
+  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind,space_id,party_space_id,direct_key`)).json();
   const kind = Array.isArray(chats) ? chats[0]?.kind : null;
   const chatSpaceId: string | null = Array.isArray(chats) ? chats[0]?.space_id ?? null : null;
+  const partySpaceId: string | null = Array.isArray(chats) ? chats[0]?.party_space_id ?? null : null;
+  const directKey: string | null = Array.isArray(chats) ? chats[0]?.direct_key ?? null : null;
+  const isSuggestion = kind === 'suggestion';
 
   // A SPACE'S OWN AI CHOICE, enforced where it matters (founder 2026-08-17:
   // "one group may want to be in the Ai fabric of lichen while another
@@ -168,14 +188,56 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: 'space-ai-off' });
     }
   }
+  // A suggestion room is ABOUT its party space — that space's own AI switch
+  // governs here too, and its page is the room's working context.
+  let suggSpaceName = '';
+  let suggContext = '';
+  let senderIsSteward = false;
+  let canSpaceEdit = false;
+  if (isSuggestion && partySpaceId) {
+    const sps = await (await sb(`spaces?id=eq.${partySpaceId}&select=name,kind,description,page,assistant_enabled,status`)).json();
+    const sp = Array.isArray(sps) ? sps[0] : null;
+    if (!sp || sp.status === 'offline') return json({ ok: true, skipped: 'space-gone' });
+    if (sp.assistant_enabled === false) return json({ ok: true, skipped: 'space-ai-off' });
+    suggSpaceName = sp.name as string;
+    const mem = await (await sb(`space_members?space_id=eq.${partySpaceId}&profile_id=eq.${trigger.sender_id}&select=role&limit=1`)).json();
+    const role = Array.isArray(mem) ? mem[0]?.role : null;
+    senderIsSteward = role === 'admin' || role === 'super_admin';
+    if (senderIsSteward) {
+      const prof = await (await sb(`profiles?id=eq.${trigger.sender_id}&select=assistant_can_edit`)).json();
+      canSpaceEdit = Array.isArray(prof) && prof[0]?.assistant_can_edit === true;
+    }
+    const page = (sp.page ?? {}) as Record<string, unknown>;
+    const tabs = (Array.isArray(page.tabs) ? page.tabs : []) as { id: string; label?: string }[];
+    const suggesterId = directKey?.startsWith('suggest:') ? directKey.split(':')[2] ?? null : null;
+    const sug = suggesterId ? await (await sb(`profiles?id=eq.${suggesterId}&select=full_name`)).json() : null;
+    const suggesterName = Array.isArray(sug) ? (sug[0]?.full_name || 'A member') : 'A member';
+    suggContext = `\n\nTHE SPACE ON THE TABLE — this room holds suggestions for ${suggSpaceName} (${sp.kind}):`
+      + `\n- Suggester: ${suggesterName}. Stewards: everyone else human in this room.`
+      + `\n- Description: ${String(sp.description ?? '').trim() || '(none yet)'}`
+      + `\n- Tagline: ${String(page.tagline ?? '').trim() || '(none yet)'}`
+      + `\n- Story: ${String(page.story ?? '').trim() ? `${String(page.story).split(/\s+/).length} words` : '(nothing written)'}`
+      + `\n- Tabs on its page: ${tabs.length ? tabs.map((t) => t.label ?? t.id).join(', ') : '(none yet)'}`
+      + (canSpaceEdit
+        ? `\nYour page tools ARE armed for the steward who just wrote — a steward's ask is enough.`
+        : `\nYour page tools are NOT armed for the sender of this message — shape and summarize, never claim to have edited.`);
+  }
 
   // Group manners: outside direct chats, speak only when spoken to — EXCEPT
   // in a help room, which exists to be answered in. Nobody should have to
   // learn a magic word to get support (founder 2026-08-16).
   const isHelp = kind === 'help';
-  if (kind !== 'direct' && !isHelp) {
+  if (kind !== 'direct' && !isHelp && !isSuggestion) {
     const mention = (ident.label as string).split(/[^A-Za-z]/)[0].toLowerCase();  // "claude"
     if (!trigger.body.toLowerCase().includes(mention)) return json({ ok: true, skipped: 'not-addressed' });
+  }
+  // Suggestion-room manners (the help-room shape): the suggester's messages
+  // are always answered — the room exists to shape their suggestion. A
+  // steward's message is usually THE answer, not a prompt for one — Claude
+  // stays quiet unless the steward addresses it by name ("Claude, apply it").
+  if (isSuggestion && senderIsSteward) {
+    const mention = (ident.label as string).split(/[^A-Za-z]/)[0].toLowerCase();
+    if (!trigger.body.toLowerCase().includes(mention)) return json({ ok: true, skipped: 'steward-spoke' });
   }
   // Never answer the human steward's own messages — when Galyn replies in a
   // help room, that's the answer, not a prompt for one. Held at function
@@ -200,6 +262,7 @@ Deno.serve(async (req) => {
   if (await assistantConsentOff(trigger.sender_id, [
     { type: 'section', id: isHelp ? 'help' : 'chat' },
     ...(chatSpaceId ? [{ type: 'space' as const, id: chatSpaceId }] : []),
+    ...(partySpaceId ? [{ type: 'space' as const, id: partySpaceId }] : []),
   ])) {
     return json({ ok: true, skipped: 'consent-off' });
   }
@@ -278,8 +341,15 @@ Deno.serve(async (req) => {
   // last round forces tool_choice 'none' so it always ends in an answer
   // rather than another lookup.
   const MAX_LOOKUP_ROUNDS = 2;
+  // An edit exchange in a suggestion room may take a few tool rounds, like
+  // the build thread's; lookups stay at two.
+  const maxRounds = canSpaceEdit ? 4 : MAX_LOOKUP_ROUNDS;
+  const chatTools = isHelp
+    ? LOOKUP_TOOLS
+    : (isSuggestion && canSpaceEdit) ? SPACE_PAGE_TOOLS : null;
   let data: Record<string, unknown> | undefined;
   let inTok = 0, outTok = 0, round = 0;
+  const changes: string[] = [];
   const convo = [...messages];
 
   while (true) {
@@ -294,8 +364,9 @@ Deno.serve(async (req) => {
         model: MODEL,
         // 400 cut a help reply mid-sentence ("As for \"getting them into the
         // con") — the same trap wow-window hit at 300. A support answer that
-        // stops halfway is worse than a short one.
-        max_tokens: 900,
+        // stops halfway is worse than a short one; an edit exchange needs
+        // more headroom still (the assistant-feed lesson).
+        max_tokens: canSpaceEdit ? 1600 : 900,
         // Two blocks on purpose: persona, frame, rules and the doctrine are
         // stable and worth caching (the doctrine is ~27k tokens). The roster
         // changes every message as presence and read cursors move, so it goes
@@ -305,14 +376,19 @@ Deno.serve(async (req) => {
             type: 'text',
             text: isHelp
               ? `${ident.persona}\n\n${HELP_FRAME}\n\n${BASE_RULES}\n\n${LICHEN_DOCTRINE}`
-              : `${ident.persona}\n\n${BASE_RULES}`,
+              : isSuggestion
+                ? `${ident.persona}\n\n${SUGGESTION_FRAME}\n\n${BASE_RULES}\n\n${LICHEN_DOCTRINE}`
+                : `${ident.persona}\n\n${BASE_RULES}`,
             cache_control: { type: 'ephemeral' },
           },
+          // The space context changes as the page changes — its own uncached
+          // block, the roster pattern.
+          ...(suggContext ? [{ type: 'text', text: suggContext }] : []),
           ...(rosterNote ? [{ type: 'text', text: rosterNote }] : []),
         ],
         messages: convo,
-        ...(isHelp
-          ? { tools: LOOKUP_TOOLS, ...(round >= MAX_LOOKUP_ROUNDS ? { tool_choice: { type: 'none' } } : {}) }
+        ...(chatTools
+          ? { tools: chatTools, ...(round >= maxRounds ? { tool_choice: { type: 'none' } } : {}) }
           : {}),
       }),
     });
@@ -321,24 +397,54 @@ Deno.serve(async (req) => {
     inTok += (data as { usage?: { input_tokens?: number } })?.usage?.input_tokens ?? 0;
     outTok += (data as { usage?: { output_tokens?: number } })?.usage?.output_tokens ?? 0;
 
-    const calls = ((data as { content?: { type: string; id?: string; name?: string }[] })?.content ?? [])
+    const calls = ((data as { content?: { type: string; id?: string; name?: string; input?: Record<string, string & string[]> }[] })?.content ?? [])
       .filter((c) => c.type === 'tool_use');
     if (!calls.length) break;
 
     convo.push({ role: 'assistant', content: (data as { content: unknown }).content });
     const results = [];
     for (const c of calls) {
-      // ⚠ `trigger.sender_id`, never anything the model supplied.
-      const out = await runLookup(c.name ?? '', trigger.sender_id, sb);
+      // ⚠ Targets are server-side facts only: lookups run against
+      // `trigger.sender_id`, page tools against the chat's party_space_id —
+      // never anything the model supplied. Belt and braces: canSpaceEdit is
+      // re-checked even though the tools only arm when it holds.
+      const out = isSpacePageTool(c.name ?? '')
+        ? (canSpaceEdit && partySpaceId
+            ? await runSpacePageTool(sb, partySpaceId, suggSpaceName, c.name ?? '', c.input ?? {} as Record<string, string & string[]>)
+            : { ok: false, error: 'Page tools are not armed for this sender.' })
+        : await runLookup(c.name ?? '', trigger.sender_id, sb);
+      if ((out as { ok?: boolean; change?: string }).ok && (out as { change?: string }).change) {
+        changes.push((out as { change: string }).change);
+      }
       results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(out) });
     }
     convo.push({ role: 'user', content: results });
     round++;
   }
 
-  const reply = ((data as { content?: { type: string; text?: string }[] })?.content ?? [])
+  let reply = ((data as { content?: { type: string; text?: string }[] })?.content ?? [])
     .filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
-  if (!reply) return json({ ok: true, skipped: 'empty-reply' });
+  // No silent edits: if it wrote and then said nothing, say it for them.
+  if (!reply && changes.length) reply = `Done — I ${changes.join(', and ')}. Have a look, and tell me what to change.`;
+  if (!reply) {
+    // Silence is the failure mode (the assistant-feed 4:13pm lesson) — but
+    // in group rooms an unprompted apology would be noise, so the honest
+    // note goes only where a reply was owed: direct, help, and suggestion
+    // rooms. Always log it.
+    console.error('empty-reply', JSON.stringify({
+      chat_id, kind,
+      stop_reason: (data as { stop_reason?: string })?.stop_reason ?? null,
+      content_types: ((data as { content?: { type: string }[] })?.content ?? []).map((c) => c.type),
+      rounds: round, input_tokens: inTok, output_tokens: outTok,
+    }));
+    if (kind === 'direct' || isHelp || isSuggestion) {
+      await sb('chat_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        chat_id, sender_id: assistant_id,
+        body: 'I hit a snag putting an answer together and lost it — that’s on my side, not yours. Say it once more and I’ll take another run at it.',
+      }) });
+    }
+    return json({ ok: true, skipped: 'empty-reply' });
+  }
 
   await sb('chat_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     chat_id, sender_id: assistant_id, body: reply,

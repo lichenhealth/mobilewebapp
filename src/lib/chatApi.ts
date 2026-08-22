@@ -19,7 +19,7 @@ export function helpPartyOrder<T extends { profile_id: string }>(members: T[], h
   return [...members].sort((a, b) => rank(a.profile_id) - rank(b.profile_id));
 }
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm' | 'suggestion';
 
 export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
@@ -59,7 +59,9 @@ export interface ChatVM {
   helpMemberId?: string | null;
 }
 export function visitorIdOfKey(key: string | null | undefined): string | null {
-  if (!key || !key.startsWith('space:')) return null;
+  // 'space:<sid>:<visitor>[:<responder>]' (a Message chat) and
+  // 'suggest:<sid>:<visitor>' (a suggestions room) share the shape.
+  if (!key || !(key.startsWith('space:') || key.startsWith('suggest:'))) return null;
   return key.split(':')[2] ?? null;
 }
 export function helpMemberOfKey(key: string | null | undefined): string | null {
@@ -78,6 +80,7 @@ export const KIND_LABEL: Record<ChatKind, string> = {
   direct: 'Direct',
   help: 'Help',
   space_dm: 'Message',
+  suggestion: 'Suggestion',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
@@ -157,7 +160,7 @@ export function chatTitle(
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
   }
-  if (kind === 'space_dm' && party) {
+  if ((kind === 'space_dm' || kind === 'suggestion') && party) {
     // The visitor sees the SPACE; the space's admins see the visitor.
     if (party.visitorId === me) return party.name;
     const v = members.find((m) => m.profile_id === party.visitorId);
@@ -261,6 +264,16 @@ export async function markChatRead(chatId: string): Promise<void> {
  *  the general thread — every current admin may reply. */
 export async function ensureSpaceChat(spaceId: string, responderId?: string | null): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_space_chat', { p_space: spaceId, p_responder: responderId ?? null });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Find-or-create my SUGGESTIONS room for a space (founder 2026-08-22:
+ *  "different than a help chat, but similar") — me, the space's stewards,
+ *  and Claude, holding my suggestions for its page. Admins are refused by
+ *  the RPC (they edit directly). */
+export async function ensureSuggestionChat(spaceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_suggestion_chat', { p_space: spaceId });
   if (error) throw new Error(error.message);
   return data as string;
 }

@@ -34,7 +34,7 @@ import {
   requestResourceBooking, listPendingResourceBookings, decideResourceBooking,
   resourceSpanContact, type ResourceRow, type ResourceBusySpan, type ResourceBookingRow,
 } from '../lib/resourcesApi';
-import { ensureDirectChat, ensureSpaceChat } from '../lib/chatApi';
+import { ensureDirectChat, ensureSpaceChat, ensureSuggestionChat } from '../lib/chatApi';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
 import { todayISO } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
@@ -805,14 +805,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       assistantOff={space.assistant_enabled === false}
       // …and the space's own rooms open the group after it.
       afterGap={ctx.guest ? []
-        : chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }]
-        // Not a member: a MESSAGE door to the space itself (founder 2026-08-17:
-        // a space can be a chat party) — the general thread, any admin replies.
-        : me && !isAdmin ? [{ icon: 'chat' as const, label: 'Message', onClick: () => {
-            void ensureSpaceChat(space.id).then((cid) => navigate(`/chat/${cid}`))
-              .catch((e: Error) => alert(e.message));
-          } }]
-        : []}
+        : [
+          ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }]
+            // Not a member: a MESSAGE door to the space itself (founder 2026-08-17:
+            // a space can be a chat party) — the general thread, any admin replies.
+            : me && !isAdmin ? [{ icon: 'chat' as const, label: 'Message', onClick: () => {
+                void ensureSpaceChat(space.id).then((cid) => navigate(`/chat/${cid}`))
+                  .catch((e: Error) => alert(e.message));
+              } }]
+            : []),
+          // SUGGEST (founder 2026-08-22): any signed-in non-steward can open
+          // their suggestions room for this page — them, the stewards, and
+          // Claude, "different than a help chat, but similar".
+          ...(me && !isAdmin ? [{ icon: 'sparkle' as const, label: 'Suggest', onClick: () => {
+              void ensureSuggestionChat(space.id).then((cid) => navigate(`/chat/${cid}`))
+                .catch((e: Error) => alert(e.message));
+            } }] : []),
+        ]}
       trailing={ctx.guest ? [] : [
         // The founder's Marketplace-icon analogy: a Groups door appears only
         // when this space actually has groups nested under it.

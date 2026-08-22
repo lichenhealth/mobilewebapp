@@ -258,7 +258,7 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
   // A conversation WITH a space (founder 2026-08-17): the visitor's row wears
   // the space's logo; an admin's row wears the visitor's face and says which
   // space it's about. Sender prefixes stay on — WHO answered matters here.
-  const party = chat.kind === 'space_dm' ? chat.party : undefined;
+  const party = (chat.kind === 'space_dm' || chat.kind === 'suggestion') ? chat.party : undefined;
   const iAmVisitor = !!party && party.visitorId === me;
   const senderName = last
     ? chat.members.find((m) => m.profile_id === last.sender_id)?.name.split(' ')[0]
@@ -314,7 +314,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
 
   // A conversation WITH a space: the visitor sees the space's logo wearing the
   // answering admin's face; the admin sees the visitor.
-  if (chat.kind === 'space_dm' && chat.party) {
+  if ((chat.kind === 'space_dm' || chat.kind === 'suggestion') && chat.party) {
     const party = chat.party;
     if (party.visitorId === me) {
       const answerers = chat.members.filter((m) => m.profile_id !== party.visitorId);

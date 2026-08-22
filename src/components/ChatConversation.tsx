@@ -332,7 +332,7 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
   }
   // A conversation WITH a space: the visitor's link goes to the space, the
   // space's admins' link goes to the visitor.
-  if (chat.kind === 'space_dm' && chat.party) {
+  if ((chat.kind === 'space_dm' || chat.kind === 'suggestion') && chat.party) {
     return chat.party.visitorId === me ? `/spaces/${chat.party.id}` : (chat.party.visitorId ? `/members/${chat.party.visitorId}` : null);
   }
   return null;
@@ -342,22 +342,28 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
  *  line under the name. The visitor sees the space's logo wearing the face
  *  of the admin who answers; an admin sees the visitor. */
 function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { avatar: React.ReactNode; sub: string } | null {
-  if (chat.kind !== 'space_dm' || !chat.party) return null;
+  if ((chat.kind !== 'space_dm' && chat.kind !== 'suggestion') || !chat.party) return null;
   const party = chat.party;
+  const isSuggestion = chat.kind === 'suggestion';
   const iAmVisitor = party.visitorId === me;
-  const answerers = members.filter((m) => m.profile_id !== party.visitorId);
+  // Claude sits in suggestion rooms — it isn't "the answering steward".
+  const answerers = members.filter((m) => m.profile_id !== party.visitorId && m.profile_id !== CLAUDE_PROFILE_ID);
   if (iAmVisitor) {
     const one = answerers.length === 1 ? answerers[0] : null;
     return {
       avatar: <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={38}
         stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />,
-      sub: one ? `${one.name} answers for ${party.name}` : `${party.name}'s stewards answer here`,
+      sub: isSuggestion
+        ? `Your suggestions for ${party.name} — its stewards and Claude are here`
+        : one ? `${one.name} answers for ${party.name}` : `${party.name}'s stewards answer here`,
     };
   }
   const visitor = members.find((m) => m.profile_id === party.visitorId);
   return {
     avatar: <Avatar id={visitor?.profile_id ?? 'v'} name={visitor?.name ?? 'Member'} url={visitor?.avatarUrl} size={38} />,
-    sub: `Writing to ${party.name} — you answer for it`,
+    sub: isSuggestion
+      ? `Suggests a change to ${party.name}'s page — you steward it`
+      : `Writing to ${party.name} — you answer for it`,
   };
 }
 
