@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { myPresence, setAlwaysPresent } from '../lib/presenceApi';
+import { listMyAdminDeskCounts } from '../lib/spacesApi';
 import PresencePrompt from './PresencePrompt';
 import { clearPromptCache } from '../lib/promptsApi';
 import Avatar from './Avatar';
@@ -115,6 +116,18 @@ export default function TopBar({
   const selfId = user?.id ?? 'me';
   const scope = scopeForPath(pathname);
   const notificationCount = unreadForScope(scope);
+
+  // The acting space's desk count for the hat-following bell (below) —
+  // the same actionable-only counter its backstage badge uses.
+  const [deskCount, setDeskCount] = useState(0);
+  useEffect(() => {
+    if (actor.type !== 'space' || !user) { setDeskCount(0); return; }
+    let live = true;
+    void listMyAdminDeskCounts(user.id)
+      .then((d) => { if (live && actor.type === 'space') setDeskCount(d.counts[actor.id] ?? 0); })
+      .catch(() => { /* lighter bell */ });
+    return () => { live = false; };
+  }, [actor, user]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   // The candle — a persistent "I'm present, open to connecting" toggle you can
@@ -326,18 +339,39 @@ export default function TopBar({
             <span aria-hidden="true">🕯️</span>
           </button>
         )}
-        <button
-          className="top-bar__icon top-bar__bell"
-          onClick={() => setPanelOpen((o) => !o)}
-          aria-label={`Notifications (${notificationCount})`}
-        >
-          <Icon name="bell" size={18} />
-          {notificationCount > 0 && (
-            <span className="top-bar__badge">
-              {notificationCount > 99 ? '99+' : notificationCount}
-            </span>
-          )}
-        </button>
+        {/* THE BELL FOLLOWS THE HAT (founder 2026-08-22, the FB-mode
+            decision): acting as a space, the bell is ITS desk — knocks at
+            the door, shelf shares, proposals — counted in stewardship blue
+            and opening the backstage where those queues live. Your own bell
+            waits behind a hat-switch. */}
+        {actor.type === 'space' ? (
+          <button
+            className="top-bar__icon top-bar__bell"
+            onClick={() => navigate(`/spaces/${actor.id}?manage=1`)}
+            aria-label={`${actor.name}'s desk (${deskCount} waiting)`}
+            title={`${actor.name}'s desk`}
+          >
+            <Icon name="bell" size={18} />
+            {deskCount > 0 && (
+              <span className="top-bar__badge top-bar__badge--desk">
+                {deskCount > 99 ? '99+' : deskCount}
+              </span>
+            )}
+          </button>
+        ) : (
+          <button
+            className="top-bar__icon top-bar__bell"
+            onClick={() => setPanelOpen((o) => !o)}
+            aria-label={`Notifications (${notificationCount})`}
+          >
+            <Icon name="bell" size={18} />
+            {notificationCount > 0 && (
+              <span className="top-bar__badge">
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* The bubble can change the light too — keep the button in step. */}
