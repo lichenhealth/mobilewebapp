@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from './Icon';
+import { speechRecognition } from '../lib/dictation';
 import {
   requestSnapshot, applySnapshot,
   type SnapshotProposal, type SnapshotListing,
@@ -52,11 +53,10 @@ export default function SnapshotPanel({ back, onDone, openInitially = false }: {
   const [applied, setApplied] = useState(false);
 
   const [listening, setListening] = useState(false);
-  const SR = (window as unknown as { webkitSpeechRecognition?: new () => {
-    lang: string; interimResults: boolean;
-    onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-    onend: (() => void) | null; onerror: (() => void) | null; start: () => void;
-  } }).webkitSpeechRecognition;
+  // Usable-here check (src/lib/dictation.ts): null on iOS, where starting
+  // recognition in an installed web app hangs the page — the iPhone
+  // keyboard's own mic covers dictation there.
+  const SR = speechRecognition();
   function dictate() {
     if (!SR || listening) return;
     const rec = new SR();
@@ -69,7 +69,8 @@ export default function SnapshotPanel({ back, onDone, openInitially = false }: {
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
     setListening(true);
-    rec.start();
+    // A refused start must never strand the button lit.
+    try { rec.start(); } catch { setListening(false); }
   }
 
   async function run() {
