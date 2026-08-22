@@ -17,6 +17,8 @@ const posToObjectPos = (pos?: string | number): string => {
   if (pos === 'top') return '50% 0%';
   if (pos === 'bottom') return '50% 100%';
   if (typeof pos === 'number') return `50% ${pos}%`;
+  // The drag editor stores real percents ("50% 37%") — pass them through.
+  if (typeof pos === 'string' && pos.includes('%')) return pos;
   return '50% 50%'; // center or default
 };
 
@@ -71,11 +73,13 @@ export interface PageMeta {
   /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
-  /** Per-section imagery. `imagePos` is the vertical crop for THIS image —
-   *  'top'/'bottom' or 0 (top) – 100 (bottom) — because the page-wide
-   *  coverPos is tuned for the cover and cropped other tabs' photos wrong
-   *  (founder 2026-08-21: Katie's face, cut off on Services). */
-  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string; imagePos?: string | number }>>;
+  /** EVERY tab may carry its own lead + photo (founder 2026-08-22: "all
+   *  tabs should") — keyed by tab id, built-in or custom. `imagePos` is the
+   *  vertical crop for THIS image — words, a bare 0–100 number, or the drag
+   *  editor's '50% N%' — because the page-wide coverPos is tuned for the
+   *  cover (founder 2026-08-21: Katie's face, cut off on Services).
+   *  imageSize 'full' opts that photo out of the standard frame entirely. */
+  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -409,23 +413,24 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
-  // HOME wears the page cover (founder 2026-08-21: "Home have the picture of
-  // Mary jumping as the cover") — it used to have none, and About wore the
-  // cover; About now wears its own section image, falling back to the cover
-  // so older pages keep their look.
-  const sectionImage = page.sections?.[tab as 'about' | 'services' | 'goods' | 'facilities']?.image;
+  // Which image the hero wears on this tab (two builds converged here the
+  // same day — merged): HOME and Feed wear the page cover (founder
+  // 2026-08-21: "Home have the picture of Mary jumping as the cover" — it
+  // used to have none, a relic of About-as-landing); every OTHER tab wears
+  // its own section image, About falling back to the cover so older pages
+  // keep their look. Each image crops for ITSELF: the section's own
+  // imagePos wins over the page-wide coverPos (founder 2026-08-21: Katie's
+  // face); imageSize 'full' opts the photo out of the frame entirely
+  // (founder 2026-08-22).
+  const activeSec = !doors && tabbed ? page.sections?.[tab] : undefined;
   const coverSrc = doors
     ? activeDoor?.image
     : (!tabbed || tab === 'home' || tab === 'feed')
       ? page.cover
-      : tab === 'about'
-        ? (sectionImage ?? page.cover)
-        : sectionImage;
-  // Each image crops for ITSELF: a section image's own imagePos wins over the
-  // page-wide coverPos, which is tuned for the cover photo.
-  const coverPos = (!doors && sectionImage && coverSrc === sectionImage
-    ? page.sections?.[tab as 'about' | 'services' | 'goods' | 'facilities']?.imagePos
-    : undefined) ?? page.coverPos;
+      : activeSec?.image ?? (tab === 'about' ? page.cover : undefined);
+  const usingSectionImage = !doors && !!activeSec?.image && coverSrc === activeSec.image;
+  const coverPos = (usingSectionImage ? activeSec?.imagePos : undefined) ?? page.coverPos;
+  const coverFull = usingSectionImage && activeSec?.imageSize === 'full';
 
   return (
     <div
@@ -504,8 +509,9 @@ export default function PublicPage(props: PublicPageProps) {
         {navInHero && navNode}
         {coverSrc && (
           <img
-            className="ppage__cover" src={coverSrc} alt=""
-            style={{ objectPosition: posToObjectPos(coverPos) }}
+            className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
+            src={coverSrc} alt=""
+            style={coverFull ? undefined : { objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
         )}

@@ -132,10 +132,10 @@ export default function AssistantFeed() {
     return needle ? posts.filter((p) => p.body.toLowerCase().includes(needle)) : posts;
   }, [q, posts]);
 
-  async function send(text: string) {
+  async function send(text: string, images?: string[]) {
     // The realtime subscription above picks up both this insert and
     // Claude's reply — no need to refetch.
-    await postToAssistantFeed(text, undefined, thread);
+    await postToAssistantFeed(text, undefined, thread, images);
   }
 
   return (
@@ -441,7 +441,16 @@ export default function AssistantFeed() {
                     {shared.title || shared.body.slice(0, 60)}
                   </button>
                 )}
-                <p className="afeed__entry-text">{p.body}</p>
+                {/* Pasted photos ride the entry (founder 2026-08-22). */}
+                {(p.attachments?.length ?? 0) > 0 && (
+                  <div className="afeed__entry-shots">
+                    {p.attachments!.filter((a) => a.type === 'photo').map((a) => (
+                      <img key={a.url} src={a.url} alt="" loading="lazy"
+                        onClick={() => window.open(a.url, '_blank')} />
+                    ))}
+                  </div>
+                )}
+                {p.body && <p className="afeed__entry-text">{p.body}</p>}
               </div>
             </div>
           );
@@ -458,6 +467,7 @@ export default function AssistantFeed() {
         onSend={send}
         initialText={params.get('ask') ?? undefined}
         placeholder="Say something…"
+        uploaderId={me || undefined}
       />
     </div>
   );

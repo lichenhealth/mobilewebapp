@@ -133,15 +133,38 @@
   border-color: var(--peach); color: var(--peach-deep);
 }
 
-/* Enhanced Photo Section with expand/collapse */
+/* Photo on every tab (founder 2026-08-22 redesign): drag inside the frame
+   to reposition; expand opts the photo out of cropping entirely. */
 .ptabs__photo-section { display: flex; flex-direction: column; gap: var(--s-2); }
 .ptabs__section-label {
   font-size: var(--t-xs); font-weight: 600; color: var(--ink-soft);
   text-transform: uppercase; letter-spacing: 0.05em;
   margin: 0;
 }
-.ptabs__photo-preview {
+.ptabs__photo-drag {
   border-radius: var(--r-sm); overflow: hidden;
   border: 1px solid var(--bone-edge);
-  transition: height 0.2s ease-in-out;
+  cursor: grab; touch-action: none; user-select: none;
+  max-width: 560px;
 }
+.ptabs__photo-drag:active { cursor: grabbing; }
+.ptabs__photo-drag img {
+  display: block; width: 100%; height: 300px; object-fit: cover;
+  pointer-events: none;
+}
+/* Full size = the photo as it is, no frame, no drag. */
+.ptabs__photo-drag.is-full { cursor: default; }
+.ptabs__photo-drag.is-full img { height: auto; object-fit: unset; }
+/* The tab's actions read as quiet links, together — no bubbles
+   (founder 2026-08-22). */
+.ptabs__photo-links { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center; }
+.ptabs__linkbtn {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font-size: var(--t-sm); font-weight: 500; color: var(--ink-soft);
+  align-self: flex-start;
+}
+.ptabs__linkbtn:hover { color: var(--peach-deep); }
+.ptabs__linkbtn--rm:hover { color: var(--red, #b4483c); }
+/* The lead is a sentence, not a slug — let it wrap (founder 2026-08-22:
+   "don't cut off the text here"). */
+.ptabs__lead-input { resize: vertical; min-height: 0; }

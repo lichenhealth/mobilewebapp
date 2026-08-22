@@ -48,6 +48,13 @@
 .afeed__entry-text {
   font-size: 14px; line-height: 1.55; color: var(--ink); white-space: pre-wrap;
 }
+/* Pasted photos in an entry (founder 2026-08-22) — modest thumbs, tap to
+   see full size. */
+.afeed__entry-shots { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; }
+.afeed__entry-shots img {
+  width: 120px; height: 120px; object-fit: cover; border-radius: 10px;
+  border: 1px solid var(--bone-edge); cursor: zoom-in; display: block;
+}
 .afeed__ref {
   display: block; margin-bottom: 6px; padding: 8px 12px;
   background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);

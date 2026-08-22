@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+/** A photo pasted into the feed — the same shape chat attachments wear. */
+export interface FeedAttachment { type: 'photo'; url: string }
+
 export interface FeedPostRow {
   id: string;
   author: 'member' | 'claude';
@@ -7,6 +10,7 @@ export interface FeedPostRow {
   source_post_id: string | null;
   thread: string;
   created_at: string;
+  attachments: FeedAttachment[] | null;
 }
 
 // THREADS (founder 2026-08-11) — "since we're weaving a tapestry": the
@@ -43,7 +47,7 @@ export function threadForSection(section?: string | null): string {
 export async function loadAssistantFeed(profileId: string, thread?: string): Promise<FeedPostRow[]> {
   let q = supabase
     .from('assistant_feed_posts')
-    .select('id, author, body, source_post_id, thread, created_at')
+    .select('id, author, body, source_post_id, thread, created_at, attachments')
     .eq('profile_id', profileId);
   if (thread) q = q.eq('thread', thread);
   const { data, error } = await q.order('created_at', { ascending: true });
@@ -64,15 +68,18 @@ export async function loadThreadCounts(profileId: string): Promise<Record<string
 }
 
 /** Post into a thread of your own feed — the assistant_on_feed_post trigger
- *  answers in the same thread. */
+ *  answers in the same thread. `images` are already-uploaded URLs (pasted
+ *  photos, founder 2026-08-22); they ride the existing attachments column
+ *  in chat's {type:'photo', url} shape. */
 export async function postToAssistantFeed(
-  body: string, sourcePostId?: string, thread = 'general',
+  body: string, sourcePostId?: string, thread = 'general', images?: string[],
 ): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const { error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,
     source_post_id: sourcePostId ?? null, thread,
+    attachments: images?.length ? images.map((url) => ({ type: 'photo', url })) : null,
   });
   if (error) throw error;
 }

@@ -1012,6 +1012,8 @@ export default function Profile() {
             onCoverPos={(pos: number) => setPage({ coverPos: pos })}
             entityName={fullName}
             authorId={user?.id}
+            contact={contact}
+            onContact={(next: ContactInfo) => setContact(next)}
           />
 
           <div className="prof__save-row">

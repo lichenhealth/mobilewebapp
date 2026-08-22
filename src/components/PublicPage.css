@@ -29,11 +29,18 @@
   /* Soft corners, same vocabulary as every card on the platform. */
   border-radius: var(--r-lg, 16px);
 }
+/* "Expand to full size" (founder 2026-08-22): the owner opted this photo
+   out of the standard frame — show the whole thing, whatever its shape. */
+.ppage__cover--full {
+  aspect-ratio: auto; height: auto; max-height: none; object-fit: unset;
+}
 /* The mark sits well below the corner doors, with air above and beneath. */
 .ppage__hero { padding: calc(var(--safe-top, 0px) + 104px) var(--s-5) 0; }
 .ppage__hero-body--top > :first-child { margin-bottom: 14px; }
 @media (min-width: 900px) {
   .ppage__cover { aspect-ratio: 16 / 9; }
+  /* Full-size stays full-size at every width. */
+  .ppage__cover--full { aspect-ratio: auto; }
   /* The whole page is one centered column on wide screens — the hero cover
      matches the content measure exactly (founder 2026-07-29). */
   .ppage { max-width: 860px; margin-inline: auto; }
