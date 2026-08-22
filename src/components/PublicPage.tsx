@@ -460,12 +460,21 @@ export default function PublicPage(props: PublicPageProps) {
             size={props.signedIn ? 96 : 128} />
           <h1 className="ppage__name">{name}</h1>
           {props.pronouns && <p className="ppage__pronouns">{props.pronouns}</p>}
-          {(page.tagline || kindLabel) && (
+          {/* A space always names its kind — "Organization ·globe·" — the way
+              the template-less space view does. The tagline used to occupy
+              this slot exclusively, so any org WITH a tagline lost its kind
+              line entirely (founder 2026-08-22: groups said "Group", orgs
+              said nothing). kindIcon is only passed for spaces; a member's
+              kindLabel is their headline and keeps riding the tagline slot. */}
+          {props.kindIcon && kindLabel && (
+            <p className="ppage__kind">
+              {kindLabel}
+              <Icon name={props.kindIcon} size={15} />
+            </p>
+          )}
+          {(page.tagline || (!props.kindIcon && kindLabel)) && (
             <p className="ppage__tagline">
               {page.tagline || kindLabel}
-              {!page.tagline && props.kindIcon && (
-                <Icon name={props.kindIcon} size={16} />
-              )}
             </p>
           )}
           {location && <p className="ppage__where"><Icon name="location" size={13} /> {location}</p>}
