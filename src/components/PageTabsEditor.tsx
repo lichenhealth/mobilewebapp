@@ -82,6 +82,7 @@ export default function PageTabsEditor({
   // the stream alive while React re-keys the rows; rows live-shuffle as
   // the pointer crosses their midpoints, so the drop needs no ghost.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const startDrag = (i: number) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -119,6 +120,32 @@ export default function PageTabsEditor({
         Every page opens on Home — visitors land there. Each tab below is
         optional, and stays hidden until you give it something to show.
       </p>
+
+      {/* Photo Gallery Browser — all uploaded photos in one place */}
+      {photos.length > 0 && (
+        <div className="ptabs__gallery-browser">
+          <p className="ptabs__gallery-title">Your photos</p>
+          <div className="ptabs__gallery-grid">
+            {photos.map((src) => (
+              <div key={src} className="ptabs__gallery-item">
+                <img src={src} alt="" />
+                <div className="ptabs__gallery-actions">
+                  {SECTIONED.map((sectionId) => (
+                    <button
+                      key={sectionId}
+                      className="ptabs__gallery-use"
+                      onClick={() => patchSection(sectionId, { image: src })}
+                      title={`Use in ${tabById(sectionId)?.label || sectionId}`}
+                    >
+                      Use in {tabById(sectionId)?.label || sectionId}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* HOME IS THE ALWAYS-ON DEFAULT (founder 2026-08-21): it was already
           structural — every public page leads with it — but the builder
@@ -278,50 +305,75 @@ export default function PageTabsEditor({
                   placeholder="A first line — the point of this page"
                   onChange={(e) => patchSection(t.id, { lead: e.target.value || undefined })}
                 />
-                {sections?.[t.id]?.image && (
-                  <div>
-                    <span className="ptabs__shot ptabs__shot--wide" style={{
-                      overflow: 'hidden',
-                      backgroundPosition: sections?.[t.id]?.imagePos || 'center',
-                    }}>
-                      <img src={sections[t.id]!.image} alt="" style={{
-                        width: '100%',
-                        height: '300px',
-                        objectFit: 'cover',
-                        objectPosition: sections?.[t.id]?.imagePos || 'center',
-                      }} />
-                      <button onClick={() => patchSection(t.id, { image: undefined })}
-                        aria-label="Remove this photo">×</button>
-                    </span>
-                    <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                      {(['top', 'center', 'bottom'] as const).map((pos) => (
+
+                {/* Photo Management */}
+                <div className="ptabs__photo-section">
+                  <p className="ptabs__section-label">Photo</p>
+
+                  {sections?.[t.id]?.image && (
+                    <div>
+                      <div className="ptabs__photo-preview">
+                        <span className="ptabs__shot ptabs__shot--wide" style={{
+                          overflow: 'hidden',
+                          backgroundPosition: sections?.[t.id]?.imagePos || 'center',
+                          height: expandedSection === t.id ? '500px' : '300px',
+                        }}>
+                          <img src={sections[t.id]!.image} alt="" style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: sections?.[t.id]?.imagePos || 'center',
+                          }} />
+                        </span>
+                      </div>
+
+                      <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
-                          key={pos}
-                          className={'cmp__chip' + ((sections?.[t.id]?.imagePos ?? 'center') === pos ? ' is-on' : '')}
-                          onClick={() => patchSection(t.id, { imagePos: pos })}
-                          style={{ fontSize: '0.875rem' }}
+                          className="cmp__chip"
+                          onClick={() => setExpandedSection(expandedSection === t.id ? null : t.id)}
                         >
-                          {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                          {expandedSection === t.id ? '↙ Collapse' : '↗ Expand'}
                         </button>
-                      ))}
+                        <button
+                          className="cmp__chip"
+                          onClick={() => patchSection(t.id, { image: undefined })}
+                        >
+                          Delete
+                        </button>
+                      </div>
+
+                      <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                        {(['top', 'center', 'bottom'] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            className={'cmp__chip' + ((sections?.[t.id]?.imagePos ?? 'center') === pos ? ' is-on' : '')}
+                            onClick={() => patchSection(t.id, { imagePos: pos })}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {uploaderId && (
-                  <label className="btn ptabs__upload">
-                    {upBusy ? 'Adding…' : sections?.[t.id]?.image ? 'Replace photo' : 'Add a photo'}
-                    <input type="file" accept="image/*" hidden disabled={upBusy}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        if (!file) return;
-                        setUpBusy(true);
-                        try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
-                        catch (err) { console.error(err); }
-                        setUpBusy(false);
-                      }} />
-                  </label>
-                )}
+                  )}
+
+                  {uploaderId && (
+                    <label className="btn ptabs__upload" style={{ marginTop: sections?.[t.id]?.image ? '0.5rem' : 0 }}>
+                      {upBusy ? 'Adding…' : sections?.[t.id]?.image ? '↻ Change photo' : '+ Add a photo'}
+                      <input type="file" accept="image/*" hidden disabled={upBusy}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          setUpBusy(true);
+                          try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
+                          catch (err) { console.error(err); }
+                          setUpBusy(false);
+                        }} />
+                    </label>
+                  )}
+                </div>
+
                 <p className="ptabs__note">
                   This tab writes itself from your profile — the line and photo above are yours to set.
                 </p>
