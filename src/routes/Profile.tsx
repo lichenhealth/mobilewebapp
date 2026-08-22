@@ -27,7 +27,7 @@ import { currentPushState, enablePush, disablePush, type PushState } from '../li
 import './Profile.css';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { offerCareFor } from '../lib/careTeamApi';
-import ContactFields, { type ContactInfo, type ContactSuggestion } from '../components/ContactFields';
+import { type ContactInfo, type ContactSuggestion } from '../components/ContactFields';
 import { listMyBookingTypes } from '../lib/bookingApi';
 import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } from '../lib/spacesApi';
 import { APP_ORIGIN } from '../lib/customDomain';
@@ -37,7 +37,6 @@ import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import CoverPicker from '../components/CoverPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
-import HomeSummaryButton from '../components/HomeSummaryButton';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -931,23 +930,6 @@ export default function Profile() {
               onChange={(e) => setPage({ tagline: e.target.value })}
               placeholder="Equine-assisted healing in the Colorado foothills" />
           </div>
-          <div className="prof__field">
-            <label className="prof__label">Home summary — what greets a visitor</label>
-            <textarea
-              className="prof__textarea"
-              value={pageMeta.homeSummary ?? ''}
-              onChange={(e) => setPage({ homeSummary: e.target.value })}
-              placeholder="A short welcome for the front page — your whole story still lives on About."
-            />
-            <HomeSummaryButton
-              story={pageMeta.story ?? bio ?? ''}
-              entityName={fullName}
-              onWritten={(t) => setPage({ homeSummary: t })}
-            />
-            <p className="prof__hint">
-              Leave it empty and Home opens with the first two paragraphs of your story.
-            </p>
-          </div>
 
           <div className="prof__field">
             <label className="prof__label">Your story</label>
@@ -1030,14 +1012,15 @@ export default function Profile() {
             uploaderId={user?.id}
             sections={pageMeta.sections}
             onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
-          />
-
-          <p className="prof__privacy-sub">Contact &amp; hours</p>
-          <ContactFields
-            value={contact}
-            onChange={setContact}
-            lead="How someone reaches you without joining Lichen. Leave a field empty to keep it off the page."
-            suggestions={contactSuggs}
+            homeSummary={pageMeta.homeSummary}
+            onHomeSummary={(text) => setPage({ homeSummary: text })}
+            coverStyle={pageMeta.coverStyle}
+            onCoverStyle={(style: 'photo' | 'plain' | 'tint') => setPage({ coverStyle: style })}
+            cover={pageMeta.cover}
+            onCover={(url) => setPage({ cover: url })}
+            coverPos={pageMeta.coverPos}
+            onCoverPos={(pos: number) => setPage({ coverPos: pos })}
+            entityName={fullName}
           />
 
           <div className="prof__save-row">

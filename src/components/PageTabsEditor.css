@@ -94,3 +94,54 @@
   cursor: pointer;
 }
 .ptabs__up:hover { background: var(--peach-tint); }
+
+/* Photo Gallery Browser — all uploaded photos in one place (Phase 1) */
+.ptabs__gallery-browser {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+.ptabs__gallery-title {
+  font-size: var(--t-sm); font-weight: 600; color: var(--ink);
+  margin: 0 0 var(--s-2);
+}
+.ptabs__gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--s-2);
+}
+.ptabs__gallery-item {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-sm);
+  background: var(--bone); overflow: hidden;
+}
+.ptabs__gallery-item img {
+  width: 100%; aspect-ratio: 1; object-fit: cover;
+  display: block;
+}
+.ptabs__gallery-actions {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px; font-size: 0.75rem;
+}
+.ptabs__gallery-use {
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: 3px; padding: 4px 6px; cursor: pointer;
+  font-size: 0.7rem; color: var(--ink-soft); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ptabs__gallery-use:hover {
+  border-color: var(--peach); color: var(--peach-deep);
+}
+
+/* Enhanced Photo Section with expand/collapse */
+.ptabs__photo-section { display: flex; flex-direction: column; gap: var(--s-2); }
+.ptabs__section-label {
+  font-size: var(--t-xs); font-weight: 600; color: var(--ink-soft);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin: 0;
+}
+.ptabs__photo-preview {
+  border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid var(--bone-edge);
+  transition: height 0.2s ease-in-out;
+}

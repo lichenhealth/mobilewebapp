@@ -134,6 +134,41 @@ const EDIT_TOOLS = [
       required: ['title', 'body'],
     },
   },
+  {
+    name: 'move_section_photo',
+    description: 'Move a photo from one built-in section to another. Built-in sections are: about, services, goods, facilities. Example: move a photo from About to Services, or from Services to Goods. This is useful when a photo is better suited to a different section. Pass empty string for to_section to remove the photo from its current section.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from_section: { type: 'string', enum: ['about', 'services', 'goods', 'facilities'], description: 'The section to move the photo FROM.' },
+        to_section: { type: 'string', enum: ['about', 'services', 'goods', 'facilities', ''], description: 'The section to move the photo TO, or empty string to remove it.' },
+      },
+      required: ['from_section', 'to_section'],
+    },
+  },
+  {
+    name: 'move_photo_to_home_cover',
+    description: 'Move a photo from a built-in section (about/services/goods/facilities) to become the Home tab cover image. The photo will become the Home section\'s image, centered at the top of the page. This is useful when you want one specific photo as the main visual for visitors landing on the page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from_section: { type: 'string', enum: ['about', 'services', 'goods', 'facilities'], description: 'The section to move the photo FROM.' },
+      },
+      required: ['from_section'],
+    },
+  },
+  {
+    name: 'set_section_photo_position',
+    description: 'Adjust where a photo is cropped/positioned in a section. The position controls which part of the image shows. Useful when a photo needs to be adjusted to show the right part — e.g., "top" to show the top of the image (good for faces), "center" for the middle, "bottom" for the bottom.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', enum: ['about', 'services', 'goods', 'facilities'], description: 'The section containing the photo.' },
+        position: { type: 'string', enum: ['top', 'center', 'bottom'], description: 'Where to crop the image.' },
+      },
+      required: ['section', 'position'],
+    },
+  },
 ];
 
 // CALENDAR TOOLS (founder 2026-08-19, rung 1 of "Claude codes with members"):
@@ -354,6 +389,7 @@ Deno.serve(async (req) => {
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
+      + '\n- PHOTO MOVES: When they ask to move a photo between sections (About/Services/Goods/Facilities), or to make one the Home cover, use the photo tools. They can say things like "move the jumping photo from About to Services" or "make the farm photo the Home cover" and you handle it directly via tools.'
       + (lines.length ? `\n\nThe only category ids that exist:\n${lines.join('\n')}` : '');
   }
 
@@ -506,6 +542,77 @@ Deno.serve(async (req) => {
       page.tabs = [...tabs, { id, label: title, lead: lead || undefined, body: bodyText || undefined }];
       await patchMe({ page });
       return { ok: true, previous: null, change: `created the "${title}" tab and put it on their page` };
+    }
+
+    // ── Photo tools (Phase 2: natural language photo manipulation)
+    if (name === 'move_section_photo') {
+      const fromSection = String(input.from_section ?? '');
+      const toSection = String(input.to_section ?? '');
+      const { page } = await readPage();
+      const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+      const fromData = sections[fromSection];
+      if (!fromData?.image) {
+        return { ok: false, error: `No photo in ${fromSection} to move.` };
+      }
+      const photo = fromData.image;
+      const imagePos = fromData.imagePos ?? 'center';
+      // Remove from source
+      delete sections[fromSection];
+      // Add to destination (or nowhere if empty string)
+      if (toSection) {
+        sections[toSection] = { ...sections[toSection], image: photo, imagePos };
+      }
+      page.sections = sections;
+      await patchMe({ page });
+      return {
+        ok: true,
+        change: toSection
+          ? `moved the photo from ${fromSection} to ${toSection}`
+          : `removed the photo from ${fromSection}`,
+      };
+    }
+
+    if (name === 'move_photo_to_home_cover') {
+      const fromSection = String(input.from_section ?? '');
+      const { page } = await readPage();
+      const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+      const fromData = sections[fromSection];
+      if (!fromData?.image) {
+        return { ok: false, error: `No photo in ${fromSection} to move to Home cover.` };
+      }
+      const photo = fromData.image;
+      // Remove from section
+      delete sections[fromSection];
+      // Set as Home cover — Home cover is stored in page.cover
+      page.cover = photo;
+      page.coverStyle = 'photo'; // Set Home to photo cover mode
+      page.coverPos = 'center'; // Default position
+      page.sections = sections;
+      await patchMe({ page });
+      return {
+        ok: true,
+        change: `moved the photo from ${fromSection} to become Home's cover image — it now greets every visitor`,
+      };
+    }
+
+    if (name === 'set_section_photo_position') {
+      const section = String(input.section ?? '');
+      const position = String(input.position ?? '');
+      if (!['top', 'center', 'bottom'].includes(position)) {
+        return { ok: false, error: 'Position must be top, center, or bottom.' };
+      }
+      const { page } = await readPage();
+      const sections = (page.sections ?? {}) as Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
+      if (!sections[section]?.image) {
+        return { ok: false, error: `No photo in ${section} to adjust.` };
+      }
+      sections[section]!.imagePos = position;
+      page.sections = sections;
+      await patchMe({ page });
+      return {
+        ok: true,
+        change: `adjusted the ${section} photo to show from the ${position}`,
+      };
     }
 
     // ── Calendar tools (rung 1, founder 2026-08-19) — sender-scoped, no targets.

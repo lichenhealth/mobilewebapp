@@ -13,6 +13,13 @@ import './PublicPage.css';
 // can read them all — and members never face a blank canvas, because most of
 // it fills itself from what they already keep on Lichen.
 
+const posToObjectPos = (pos?: string | number): string => {
+  if (pos === 'top') return '50% 0%';
+  if (pos === 'bottom') return '50% 100%';
+  if (typeof pos === 'number') return `50% ${pos}%`;
+  return '50% 50%'; // center or default
+};
+
 export type ContactActionKind = 'call' | 'book' | 'email' | 'visit';
 
 /** Handed to a render-function `feed` on every tab (see the prop's doc).
@@ -64,7 +71,7 @@ export interface PageMeta {
   /** Per-door flavor (founder 2026-07-29): an optional summary sentence and
    *  an image between it and the body — uniform on every public page.
    *  Contact stays utilitarian on purpose. */
-  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string }>>;
+  sections?: Partial<Record<'about' | 'services' | 'goods' | 'facilities', { lead?: string; image?: string; imagePos?: string }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -399,7 +406,12 @@ export default function PublicPage(props: PublicPageProps) {
     ? activeDoor?.image
     : (!tabbed || tab === 'about')
       ? page.cover
-      : page.sections?.[tab as 'services' | 'facilities']?.image;
+      : page.sections?.[tab as 'services' | 'facilities' | 'goods']?.image;
+  const coverPos = doors
+    ? undefined
+    : (!tabbed || tab === 'about')
+      ? page.coverPos
+      : (page.sections?.[tab as 'services' | 'facilities' | 'goods']?.imagePos || page.coverPos);
 
   return (
     <div
@@ -470,7 +482,7 @@ export default function PublicPage(props: PublicPageProps) {
         {coverSrc && (
           <img
             className="ppage__cover" src={coverSrc} alt=""
-            style={{ objectPosition: `50% ${page.coverPos ?? 50}%` }}
+            style={{ objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
         )}

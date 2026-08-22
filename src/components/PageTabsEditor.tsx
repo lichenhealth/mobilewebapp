@@ -19,9 +19,13 @@ import './PageTabsEditor.css';
  *  can never leave a visitor in an empty room. */
 /** Built-in tabs whose lead line + photo the owner sets (page.sections). */
 const SECTIONED = ['about', 'services', 'goods', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string } | undefined>;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string } | undefined>;
 
-export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections }: {
+export default function PageTabsEditor({
+  tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
+  homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
+  entityName,
+}: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
   /** page.photos — what the Gallery tab shows. */
@@ -33,8 +37,18 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
    *  (founder 2026-08-11: reaching the Services photo). */
   sections?: SectionMeta;
   onSections?: (next: SectionMeta) => void;
+  /** Home tab styling. */
+  homeSummary?: string;
+  onHomeSummary?: (text: string) => void;
+  coverStyle?: 'photo' | 'plain' | 'tint';
+  onCoverStyle?: (style: 'photo' | 'plain' | 'tint') => void;
+  cover?: string;
+  onCover?: (url: string | undefined) => void;
+  coverPos?: number;
+  onCoverPos?: (pos: number) => void;
+  entityName?: string;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });
@@ -59,6 +73,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
     addCtaRef.current?.scrollIntoView({ block: 'center' });
   }, [adding]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [homeOpen, setHomeOpen] = useState(false);
   const spare = availableTemplates(tabs);
 
   // Grab-and-pull reordering (founder 2026-08-11, replacing the ↑/↓
@@ -67,6 +82,7 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
   // the stream alive while React re-keys the rows; rows live-shuffle as
   // the pointer crosses their midpoints, so the drop needs no ghost.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const startDrag = (i: number) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -105,15 +121,126 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
         optional, and stays hidden until you give it something to show.
       </p>
 
+      {/* Photo Gallery Browser — all uploaded photos in one place */}
+      {photos.length > 0 && (
+        <div className="ptabs__gallery-browser">
+          <p className="ptabs__gallery-title">Your photos</p>
+          <div className="ptabs__gallery-grid">
+            {photos.map((src) => (
+              <div key={src} className="ptabs__gallery-item">
+                <img src={src} alt="" />
+                <div className="ptabs__gallery-actions">
+                  {SECTIONED.map((sectionId) => (
+                    <button
+                      key={sectionId}
+                      className="ptabs__gallery-use"
+                      onClick={() => patchSection(sectionId, { image: src })}
+                      title={`Use in ${tabById(sectionId)?.label || sectionId}`}
+                    >
+                      Use in {tabById(sectionId)?.label || sectionId}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* HOME IS THE ALWAYS-ON DEFAULT (founder 2026-08-21): it was already
           structural — every public page leads with it — but the builder
           never said so, which made About read as the page's anchor. About
           is an optional tab like the others. */}
-      <div className="ptabs__row ptabs__row--home">
+      <div className={'ptabs__row ptabs__row--home' + (homeOpen ? ' is-open' : '')}>
         <div className="ptabs__head">
           <span className="ptabs__icon"><Icon name="home" size={15} /></span>
           <span className="ptabs__name">Home<em className="ptabs__auto">always on — where visitors land</em></span>
+          {onHomeSummary && (
+            <span className="ptabs__moves">
+              <button className="ptabs__mv" onClick={() => setHomeOpen(!homeOpen)}
+                aria-label="Style the Home tab">
+                {homeOpen ? 'Done' : 'Style'}
+              </button>
+            </span>
+          )}
         </div>
+
+        {homeOpen && onHomeSummary && (
+          <div className="ptabs__edit">
+            <label className="prof__label">Welcome message — what greets a visitor</label>
+            <textarea
+              className="prof__textarea"
+              value={homeSummary ?? ''}
+              onChange={(e) => onHomeSummary(e.target.value)}
+              placeholder="A short welcome for the front page — your whole story still lives on About."
+            />
+            <p className="ptabs__note">
+              Leave it empty and Home opens with the first two paragraphs of your story.
+            </p>
+
+            <label className="prof__label" style={{ marginTop: '1.5rem' }}>Look</label>
+            <div className="cmp__chips">
+              {([['plain', 'Plain'], ['photo', 'Photo cover']] as const).map(([v, label]) => (
+                <button key={v}
+                  className={'cmp__chip' + ((coverStyle ?? 'plain') === v ? ' is-on' : '')}
+                  onClick={() => onCoverStyle?.(v)}>{label}</button>
+              ))}
+            </div>
+            {coverStyle === 'photo' && uploaderId && onCover && (
+              <div>
+                {cover && (
+                  <div>
+                    <span className="ptabs__shot ptabs__shot--wide" style={{
+                      overflow: 'hidden',
+                      backgroundPosition: coverPos || 'center',
+                    }}>
+                      <img src={cover} alt="" style={{
+                        width: '100%',
+                        height: '300px',
+                        objectFit: 'cover',
+                        objectPosition: coverPos || 'center',
+                      }} />
+                      <button onClick={() => onCover(undefined)}
+                        aria-label="Remove this photo">×</button>
+                    </span>
+                    <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      {(['top', 'center', 'bottom'] as const).map((pos) => {
+                        const numPos = pos === 'top' ? 0 : pos === 'bottom' ? 100 : 50;
+                        const currentNum = typeof coverPos === 'number' ? coverPos : (coverPos === 'top' ? 0 : coverPos === 'bottom' ? 100 : 50);
+                        return (
+                          <button
+                            key={pos}
+                            className={'cmp__chip' + (currentNum === numPos ? ' is-on' : '')}
+                            onClick={() => onCoverPos?.(numPos)}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <label className="btn ptabs__upload">
+                  {upBusy ? 'Adding…' : cover ? 'Replace photo' : 'Add a photo'}
+                  <input type="file" accept="image/*" hidden disabled={upBusy}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      setUpBusy(true);
+                      try {
+                        const url = await uploadPageImage(uploaderId, file);
+                        onCover(url);
+                      }
+                      catch (err) { console.error(err); }
+                      setUpBusy(false);
+                    }} />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {tabs.length === 0 && (
@@ -178,28 +305,75 @@ export default function PageTabsEditor({ tabs, onChange, photos = [], onPhotos, 
                   placeholder="A first line — the point of this page"
                   onChange={(e) => patchSection(t.id, { lead: e.target.value || undefined })}
                 />
-                {sections?.[t.id]?.image && (
-                  <span className="ptabs__shot ptabs__shot--wide">
-                    <img src={sections[t.id]!.image} alt="" />
-                    <button onClick={() => patchSection(t.id, { image: undefined })}
-                      aria-label="Remove this photo">×</button>
-                  </span>
-                )}
-                {uploaderId && (
-                  <label className="btn ptabs__upload">
-                    {upBusy ? 'Adding…' : sections?.[t.id]?.image ? 'Replace photo' : 'Add a photo'}
-                    <input type="file" accept="image/*" hidden disabled={upBusy}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        if (!file) return;
-                        setUpBusy(true);
-                        try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
-                        catch (err) { console.error(err); }
-                        setUpBusy(false);
-                      }} />
-                  </label>
-                )}
+
+                {/* Photo Management */}
+                <div className="ptabs__photo-section">
+                  <p className="ptabs__section-label">Photo</p>
+
+                  {sections?.[t.id]?.image && (
+                    <div>
+                      <div className="ptabs__photo-preview">
+                        <span className="ptabs__shot ptabs__shot--wide" style={{
+                          overflow: 'hidden',
+                          backgroundPosition: sections?.[t.id]?.imagePos || 'center',
+                          height: expandedSection === t.id ? '500px' : '300px',
+                        }}>
+                          <img src={sections[t.id]!.image} alt="" style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: sections?.[t.id]?.imagePos || 'center',
+                          }} />
+                        </span>
+                      </div>
+
+                      <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          className="cmp__chip"
+                          onClick={() => setExpandedSection(expandedSection === t.id ? null : t.id)}
+                        >
+                          {expandedSection === t.id ? '↙ Collapse' : '↗ Expand'}
+                        </button>
+                        <button
+                          className="cmp__chip"
+                          onClick={() => patchSection(t.id, { image: undefined })}
+                        >
+                          Delete
+                        </button>
+                      </div>
+
+                      <div className="ptabs__pos-controls" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                        {(['top', 'center', 'bottom'] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            className={'cmp__chip' + ((sections?.[t.id]?.imagePos ?? 'center') === pos ? ' is-on' : '')}
+                            onClick={() => patchSection(t.id, { imagePos: pos })}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            {pos === 'top' ? '↑ Top' : pos === 'center' ? '• Center' : '↓ Bottom'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {uploaderId && (
+                    <label className="btn ptabs__upload" style={{ marginTop: sections?.[t.id]?.image ? '0.5rem' : 0 }}>
+                      {upBusy ? 'Adding…' : sections?.[t.id]?.image ? '↻ Change photo' : '+ Add a photo'}
+                      <input type="file" accept="image/*" hidden disabled={upBusy}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          setUpBusy(true);
+                          try { patchSection(t.id, { image: await uploadPageImage(uploaderId, file) }); }
+                          catch (err) { console.error(err); }
+                          setUpBusy(false);
+                        }} />
+                    </label>
+                  )}
+                </div>
+
                 <p className="ptabs__note">
                   This tab writes itself from your profile — the line and photo above are yours to set.
                 </p>
