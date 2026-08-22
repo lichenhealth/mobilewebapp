@@ -147,6 +147,9 @@
   justify-content: center;
   border: 2px solid var(--bone);
 }
+/* Acting as a space, the bell counts ITS desk — stewardship is blue
+   (color doctrine: peach = life, blue = tending the structure). */
+.top-bar__badge--desk { background: var(--blue); color: #fff; }
 
 /* "Acting as" chip: visible whenever you're not yourself, so you never post
    as the org by accident. Peach ring = switched identity. */

@@ -8,7 +8,7 @@ import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { Icon } from '../components/Icon';
 import InstallPrompt from '../components/InstallPrompt';
-import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
+import { loadFeed, loadAuthorFeed, deletePost, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -113,7 +113,7 @@ export default function Home() {
   const navigate = useNavigate();
   const adminView = useAdminView();
   const { promptSaved, openPicker } = useCollect();
-  const { actor } = useActing();
+  const { actor, ready: actingReady } = useActing();
 
   // One rule for every feed's chat door (founder 2026-08-17): a post in a
   // space's voice opens the conversation WITH that space, answered by the
@@ -143,17 +143,28 @@ export default function Home() {
   const [present, setPresent] = useState<number | null>(null);
   const [available, setAvailable] = useState(0);
 
+  // THE FEED FOLLOWS THE HAT (founder 2026-08-22, the FB-mode decision —
+  // reversing 2026-08-10's personal-feed-while-acting call): wearing a
+  // space's hat, Home is the SPACE's stream — what its page shows — and
+  // your own river waits a hat-switch away. Waits for the persisted hat to
+  // restore (the actor-branch rule) so it never paints the wrong feed.
   useEffect(() => {
+    if (!actingReady) return;
+    let live = true;
     (async () => {
-      const feed = await loadFeed(50, { river: true });
+      const feed = actor.type === 'space'
+        ? await loadAuthorFeed({ spaceId: actor.id })
+        : await loadFeed(50, { river: true });
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), loadMySaved(),
       ]);
       const ov = await loadEndorsements(feed, myc);
+      if (!live) return;
       // Set posts last so cards mount once, with engagement state already in hand.
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
-  }, []);
+    return () => { live = false; };
+  }, [actingReady, actor]);
 
   // Presence follows whoever you're acting as — its own effect so switching
   // hats re-counts without refetching the whole feed (which stays personal,
