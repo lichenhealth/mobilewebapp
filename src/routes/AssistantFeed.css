@@ -39,7 +39,25 @@
 .afeed__list { display: flex; flex-direction: column; gap: var(--s-4); flex: 1; padding-bottom: var(--s-4); }
 .afeed__muted { color: var(--ink-muted); font-size: 13px; text-align: center; padding: var(--s-6) 0; }
 
-.afeed__entry { display: flex; gap: var(--s-3); align-items: flex-start; }
+/* Two sides of the conversation (founder 2026-08-24): Claude's entries sit
+   LEFT, the member's sit RIGHT — the messenger grammar, so a glance tells
+   who said what. The member's rows reverse (avatar outermost), hug their
+   content, and wear a soft peach-tint bubble; Claude keeps the open page
+   look on the left. */
+.afeed__entry { display: flex; gap: var(--s-3); align-items: flex-start; max-width: 88%; }
+.afeed__entry--claude { align-self: flex-start; }
+.afeed__entry:not(.afeed__entry--claude) {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.afeed__entry:not(.afeed__entry--claude) .afeed__entry-body { flex: 0 1 auto; }
+.afeed__entry:not(.afeed__entry--claude) .afeed__entry-meta { justify-content: flex-end; }
+.afeed__entry:not(.afeed__entry--claude) .afeed__entry-text {
+  background: var(--peach-tint);
+  border-radius: 14px 4px 14px 14px;
+  padding: 8px 12px;
+}
+.afeed__entry:not(.afeed__entry--claude) .afeed__entry-shots { justify-content: flex-end; }
 .afeed__entry-body { flex: 1; min-width: 0; }
 .afeed__entry-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .afeed__entry-name { font-size: 12px; font-weight: 600; color: var(--ink); }
