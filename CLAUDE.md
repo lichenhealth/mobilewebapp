@@ -20,6 +20,12 @@ worker-env psql: select via, summary, details from dev_reports where status='new
 Mark rows `seen` when picked up, `fixed`/`not_a_bug` when resolved — the
 assistants promise members "the builder Claude reads the queue at the start of
 every build session," and this protocol is what makes that promise true.
+**Marking a row `fixed` IS the announcement**: the `on_dev_report_fixed`
+trigger posts Claude's "it's fixed, thank you" back into the room the report
+was filed from (chat message or feed entry — the member is belled the
+ordinary way), so never mark `fixed` until the fix is actually live.
+`not_a_bug` stays silent by design — explain in the room by hand if the
+reporter deserves an answer.
 
 ## Stack & deploy
 - React 18 + Vite + TypeScript. Build: `tsc -b && vite build` (it type-checks — always run before considering a change done, and fix all errors; the project builds clean).

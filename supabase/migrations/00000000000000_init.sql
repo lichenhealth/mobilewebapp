@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pWB7WX3ZnD4P80TDtQMOvZxZ0QXakN7uUEW2Et1QWzAgaRjThqek6vooL2wpLcw
+\restrict Zy1Gg2AlfMb3whRle6XaIgK45SBJQrHzzrfskC7ILNNi3Mvc10l7qgWDJf11bHH
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3628,6 +3628,42 @@ end; $$;
 
 
 ALTER FUNCTION public.on_care_request_notify() OWNER TO postgres;
+
+--
+-- Name: on_dev_report_fixed(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.on_dev_report_fixed() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_claude uuid := '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+  v_chat uuid;
+  v_body text;
+begin
+  if new.status <> 'fixed' or old.status = 'fixed' then return new; end if;
+  v_body := 'Good news — the issue reported here ("' || new.summary || '") has been fixed by the builders. Thank you for flagging it; reports like this are how the platform gets better. 🌱';
+  if new.via like 'chat:%' then
+    begin
+      v_chat := nullif(split_part(new.via, ':', 3), '')::uuid;
+    exception when others then
+      v_chat := null;
+    end;
+    if v_chat is not null
+       and exists (select 1 from public.chat_members m where m.chat_id = v_chat and m.profile_id = v_claude) then
+      insert into public.chat_messages (chat_id, sender_id, body) values (v_chat, v_claude, v_body);
+    end if;
+  elsif new.via like 'feed:%' then
+    insert into public.assistant_feed_posts (profile_id, author, thread, body)
+    values (new.reporter_id, 'claude', substring(new.via from 6), v_body);
+  end if;
+  return new;
+end
+$$;
+
+
+ALTER FUNCTION public.on_dev_report_fixed() OWNER TO postgres;
 
 --
 -- Name: on_event_invite_notify(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -7936,6 +7972,13 @@ CREATE TRIGGER on_collection_suggestion_created AFTER INSERT ON public.collectio
 
 
 --
+-- Name: dev_reports on_dev_report_fixed_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_dev_report_fixed_trg AFTER UPDATE ON public.dev_reports FOR EACH ROW EXECUTE FUNCTION public.on_dev_report_fixed();
+
+
+--
 -- Name: event_attendees on_event_invite_notify_trg; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -12069,6 +12112,15 @@ GRANT ALL ON FUNCTION public.on_care_request_notify() TO service_role;
 
 
 --
+-- Name: FUNCTION on_dev_report_fixed(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO anon;
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO authenticated;
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO service_role;
+
+
+--
 -- Name: FUNCTION on_event_invite_notify(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13537,7 +13589,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pWB7WX3ZnD4P80TDtQMOvZxZ0QXakN7uUEW2Et1QWzAgaRjThqek6vooL2wpLcw
+\unrestrict Zy1Gg2AlfMb3whRle6XaIgK45SBJQrHzzrfskC7ILNNi3Mvc10l7qgWDJf11bHH
 
 
 
