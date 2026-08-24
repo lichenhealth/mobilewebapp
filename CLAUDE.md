@@ -26,6 +26,23 @@ was filed from (chat message or feed entry — the member is belled the
 ordinary way), so never mark `fixed` until the fix is actually live.
 `not_a_bug` stays silent by design — explain in the room by hand if the
 reporter deserves an answer.
+**THE NIGHT SHIFT** (founder 2026-08-24: "a real cloud session that goes in
+and fixes things"): cloud routine `trig_01AyUHhjBEAVzQZofDmNf8CB` ("Lichen
+night shift — bug fixes", claude.ai/code/routines) runs daily at 3am Denver
+in Anthropic's cloud: reads the queue via REST, fixes ≤2 reports/night —
+client/edge code only, small verified diffs, NO migrations/RLS/auth/payments,
+build must pass — pushes to main, and marks rows `{status:'fixed',
+autonomous:true}`, which makes the announcement speak the founder's safety
+framing: "I'm running these fixes on my own; if something looks funny…we can
+bring Galyn into the conversation." What it can't fix safely it leaves `new`
+with a `[night-shift triage]` note appended for the supervised session.
+Needs `SUPABASE_SERVICE_ROLE_KEY` (+ optional `SUPABASE_ACCESS_TOKEN` for
+edge deploys) as env vars on the cloud environment — founder-pasted, never
+through chat; without them it no-ops with a one-line summary. The safety
+valve on the member side: claude-chat's **`bring_in_galyn`** tool (chat rooms
+only, 6/day cap) — when a member says a fix didn't take, Claude pings Galyn's
+phone (an `assistant_escalation` notification → push, link to the room) and
+says so plainly.
 
 ## Stack & deploy
 - React 18 + Vite + TypeScript. Build: `tsc -b && vite build` (it type-checks — always run before considering a change done, and fix all errors; the project builds clean).

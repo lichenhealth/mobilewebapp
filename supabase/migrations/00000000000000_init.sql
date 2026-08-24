@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Zy1Gg2AlfMb3whRle6XaIgK45SBJQrHzzrfskC7ILNNi3Mvc10l7qgWDJf11bHH
+\restrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3643,7 +3643,11 @@ declare
   v_body text;
 begin
   if new.status <> 'fixed' or old.status = 'fixed' then return new; end if;
-  v_body := 'Good news — the issue reported here ("' || new.summary || '") has been fixed by the builders. Thank you for flagging it; reports like this are how the platform gets better. 🌱';
+  if new.autonomous then
+    v_body := 'Good news — the issue reported here ("' || new.summary || '") should be fixed now. I''m running these fixes on my own; if something looks funny or isn''t working, say so here and we can bring Galyn into the conversation. 🌱';
+  else
+    v_body := 'Good news — the issue reported here ("' || new.summary || '") has been fixed by the builders. Thank you for flagging it; reports like this are how the platform gets better. 🌱';
+  end if;
   if new.via like 'chat:%' then
     begin
       v_chat := nullif(split_part(new.via, ':', 3), '')::uuid;
@@ -5585,6 +5589,7 @@ CREATE TABLE public.dev_reports (
     status text DEFAULT 'new'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     seen_at timestamp with time zone,
+    autonomous boolean DEFAULT false NOT NULL,
     CONSTRAINT dev_reports_status_check CHECK ((status = ANY (ARRAY['new'::text, 'seen'::text, 'fixed'::text, 'not_a_bug'::text])))
 );
 
@@ -13589,7 +13594,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Zy1Gg2AlfMb3whRle6XaIgK45SBJQrHzzrfskC7ILNNi3Mvc10l7qgWDJf11bHH
+\unrestrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
 
 
 
