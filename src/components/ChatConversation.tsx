@@ -23,7 +23,7 @@ interface Pending { type: MediaType; path: string; localUrl: string; }
  *  attachments / reactions / replies. Fills its parent (give the parent a bounded
  *  height). Used by the full-screen thread route and the Concierge care tab. */
 export default function ChatConversation({
-  chatId, me, onBack, showIntro = true, onInfo,
+  chatId, me, onBack, showIntro = true, onInfo, onRead,
 }: {
   chatId: string;
   me: string;
@@ -31,6 +31,10 @@ export default function ChatConversation({
   showIntro?: boolean;
   /** Gives the header's info circle a job (e.g. Concierge → Care Team tab). Hidden when absent. */
   onInfo?: () => void;
+  /** Fired every time this pane marks the chat read — the split-view inbox
+   *  zeroes its unread pill from this (founder 2026-08-24: the "2" that
+   *  wouldn't go away while sitting inside the very chat it counted). */
+  onRead?: (chatId: string) => void;
 }) {
   const [chat, setChat] = useState<ChatInfo | null>(null);
   const [members, setMembers] = useState<Record<string, MemberInfo>>({});
@@ -117,6 +121,7 @@ export default function ChatConversation({
       // Being here IS reading: bump the read cursor + clear this chat's
       // bell notifications (the TopBar updates itself via realtime).
       void markChatRead(chatId);
+      onRead?.(chatId);
     })();
     return () => { active = false; };
   }, [chatId]);
@@ -133,6 +138,7 @@ export default function ChatConversation({
           const row = payload.new as MessageRow;
           setMessages((cur) => (cur.some((m) => m.id === row.id) ? cur : [...cur, row]));
           void markChatRead(chatId);   // still looking — stay caught up
+          onRead?.(chatId);
         },
       )
       .subscribe();

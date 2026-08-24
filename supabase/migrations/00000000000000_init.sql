@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nFE9x4LPyhFrps7dcMZlRPFWW8E7grWQa9Wp9dvm4gWqV2VMZT3Hne8BEAbyhas
+\restrict pWB7WX3ZnD4P80TDtQMOvZxZ0QXakN7uUEW2Et1QWzAgaRjThqek6vooL2wpLcw
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -5537,6 +5537,25 @@ CREATE TABLE public.course_notes (
 ALTER TABLE public.course_notes OWNER TO postgres;
 
 --
+-- Name: dev_reports; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dev_reports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    reporter_id uuid NOT NULL,
+    via text NOT NULL,
+    summary text NOT NULL,
+    details text,
+    status text DEFAULT 'new'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    seen_at timestamp with time zone,
+    CONSTRAINT dev_reports_status_check CHECK ((status = ANY (ARRAY['new'::text, 'seen'::text, 'fixed'::text, 'not_a_bug'::text])))
+);
+
+
+ALTER TABLE public.dev_reports OWNER TO postgres;
+
+--
 -- Name: donations; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -6850,6 +6869,14 @@ ALTER TABLE ONLY public.collections
 
 ALTER TABLE ONLY public.course_notes
     ADD CONSTRAINT course_notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dev_reports dev_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dev_reports
+    ADD CONSTRAINT dev_reports_pkey PRIMARY KEY (id);
 
 
 --
@@ -8538,6 +8565,14 @@ ALTER TABLE ONLY public.course_notes
 
 
 --
+-- Name: dev_reports dev_reports_reporter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dev_reports
+    ADD CONSTRAINT dev_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: donations donations_donor_profile_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -9864,6 +9899,30 @@ CREATE POLICY "csugg: suggest to visible collections" ON public.collection_sugge
 --
 
 CREATE POLICY "csugg: withdraw own pending" ON public.collection_suggestions FOR DELETE TO authenticated USING (((suggested_by = auth.uid()) AND (status = 'pending'::text)));
+
+
+--
+-- Name: dev_reports; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.dev_reports ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: dev_reports dev_reports: admins read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "dev_reports: admins read" ON public.dev_reports FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin))));
+
+
+--
+-- Name: dev_reports dev_reports: admins update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "dev_reports: admins update" ON public.dev_reports FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin))));
 
 
 --
@@ -12647,6 +12706,15 @@ GRANT ALL ON TABLE public.course_notes TO service_role;
 
 
 --
+-- Name: TABLE dev_reports; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.dev_reports TO anon;
+GRANT ALL ON TABLE public.dev_reports TO authenticated;
+GRANT ALL ON TABLE public.dev_reports TO service_role;
+
+
+--
 -- Name: TABLE donations; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -13469,7 +13537,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nFE9x4LPyhFrps7dcMZlRPFWW8E7grWQa9Wp9dvm4gWqV2VMZT3Hne8BEAbyhas
+\unrestrict pWB7WX3ZnD4P80TDtQMOvZxZ0QXakN7uUEW2Et1QWzAgaRjThqek6vooL2wpLcw
 
 
 

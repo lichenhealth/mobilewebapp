@@ -244,7 +244,15 @@ export default function Chat() {
           from openChat's desktop branch). */}
       {selectedId && (
         <div className="chat__thread-pane">
-          <ChatConversation chatId={selectedId} me={me} onBack={closeThread} />
+          <ChatConversation
+            chatId={selectedId} me={me} onBack={closeThread}
+            // The pane read it — the list's pill must agree, immediately
+            // (founder 2026-08-24: a "2" that survived sitting in the chat).
+            onRead={(id) => setUnread((prev) => {
+              if (!prev.get(id)) return prev;
+              const next = new Map(prev); next.set(id, 0); return next;
+            })}
+          />
         </div>
       )}
     </div>
