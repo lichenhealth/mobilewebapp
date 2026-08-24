@@ -110,7 +110,7 @@ export default function TopBar({
     </span>
   ) : null;
 
-  const { unreadForScope } = useNotifications();
+  const { unreadForScope, totalUnread } = useNotifications();
   const { actor, setActor, options, beings, self, ready: actingReady } = useActing();
   const { user, reconnecting } = useAuth();
   const selfId = user?.id ?? 'me';
@@ -187,9 +187,17 @@ export default function TopBar({
         <button
           className="top-bar__icon"
           onClick={onMenu}
-          aria-label="Open menu"
+          aria-label={totalUnread > 0 ? `Open menu (${totalUnread} unread)` : 'Open menu'}
         >
           <Icon name="menu" size={20} />
+          {/* The audit-at-a-glance dot (founder 2026-08-24): landing anywhere,
+              the hamburger says whether the menu holds news — the counts
+              follow the hat, like every badge. */}
+          {totalUnread > 0 && (
+            <span className="top-bar__badge">
+              {totalUnread > 99 ? '99+' : totalUnread}
+            </span>
+          )}
         </button>
         {/* Back-to-Home beside the hamburger on section screens (founder
             2026-07-25): same circle, same size — one tap returns to Home. */}

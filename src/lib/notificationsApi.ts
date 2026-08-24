@@ -47,7 +47,10 @@ export async function markScopeReadRemote(me: string, scope: Scope): Promise<voi
   const now = new Date().toISOString();
   let q = supabase.from('notifications').update({ read_at: now })
     .eq('recipient_id', me).is('read_at', null);
-  if (scope.kind === 'section') q = q.eq('section', scope.section).is('space_id', null);
+  // A section holds ALL its rows, space-stamped or not (2026-08-24: chat
+  // bells for a space's rooms carry the space so badges can follow the hat,
+  // but a "via the space" message is still yours — /chat must clear it).
+  if (scope.kind === 'section') q = q.eq('section', scope.section);
   else if (scope.kind === 'space') q = q.eq('space_id', scope.spaceId);
   await q;
 }
@@ -56,7 +59,7 @@ export async function markScopeReadRemote(me: string, scope: Scope): Promise<voi
 export function rowsForScope(rows: NotificationRow[], scope: Scope): NotificationRow[] {
   if (scope.kind === 'global') return rows;
   if (scope.kind === 'space') return rows.filter((r) => r.space_id === scope.spaceId);
-  return rows.filter((r) => !r.space_id && r.section === scope.section);
+  return rows.filter((r) => r.section === scope.section);
 }
 export function isUnreadInScope(r: NotificationRow, scope: Scope): boolean {
   return !r.read_at && rowsForScope([r], scope).length > 0;

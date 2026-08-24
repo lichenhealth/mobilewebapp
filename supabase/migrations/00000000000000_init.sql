@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict etFZxl6c2gPHVh6ZGVkIPpr0G8nfL9gYMrEth15UfVGCuN83PG5bBdfKinA8Uf8
+\restrict nFE9x4LPyhFrps7dcMZlRPFWW8E7grWQa9Wp9dvm4gWqV2VMZT3Hne8BEAbyhas
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3693,16 +3693,16 @@ CREATE FUNCTION public.on_message_notify() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_kind text; v_name text; v_space text;
+declare v_kind text; v_name text; v_space text; v_party uuid;
 begin
-  select c.kind, s.name into v_kind, v_space
+  select c.kind, s.name, c.party_space_id into v_kind, v_space, v_party
     from public.chats c left join public.spaces s on s.id = c.party_space_id
    where c.id = new.chat_id;
   if v_kind not in ('direct', 'care_team', 'help', 'space_dm', 'suggestion') then return new; end if;
   select coalesce(nullif(full_name, ''), email, 'A member')
     into v_name from public.profiles where id = new.sender_id;
-  insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
-  select m.profile_id, 'chat', 'dm_message',
+  insert into public.notifications (recipient_id, section, space_id, type, title, body, link, actor_id)
+  select m.profile_id, 'chat', v_party, 'dm_message',
          case when v_kind in ('space_dm', 'suggestion') and v_space is not null
               then v_name || ' · ' || v_space
               else v_name end,
@@ -13469,7 +13469,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict etFZxl6c2gPHVh6ZGVkIPpr0G8nfL9gYMrEth15UfVGCuN83PG5bBdfKinA8Uf8
+\unrestrict nFE9x4LPyhFrps7dcMZlRPFWW8E7grWQa9Wp9dvm4gWqV2VMZT3Hne8BEAbyhas
 
 
 
