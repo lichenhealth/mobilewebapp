@@ -240,9 +240,12 @@ export default function EventComposer() {
 
   // Prefill from a slot click/drag or find-a-time link (?date&start&end&space&inv).
   // Synchronous on mount — must never wait on (or be skipped by) network calls.
-  const { actor } = useActing();
+  const { actor, ready: actingReady } = useActing();
   useEffect(() => {
     if (eventId) return;
+    // ⚠ Wait for the hat: defaulting the calendar before the persisted actor
+    // restores would pick the person's calendar under a space steward.
+    if (!actingReady) return;
     const qSpace = params.get('space'), qDate = params.get('date'), qStart = params.get('start'), qEnd = params.get('end'), qInv = params.get('inv');
     // A to-do typed in the To-Do view carries its words here when you ask
     // for a time or people (founder 2026-08-14: the quick-add box gave no
@@ -272,7 +275,7 @@ export default function EventComposer() {
         return [...cur, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, full_name: null }))];
       });
     }
-  }, [eventId, params, actor]);
+  }, [eventId, params, actor, actingReady]);
 
   // Edit mode: prefill from the existing event.
   useEffect(() => {

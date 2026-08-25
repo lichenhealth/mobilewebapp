@@ -47,7 +47,11 @@ export default function Chat() {
   // its identity"). The list REPLACES your personal one: the space's own
   // member room plus every conversation where the space is the party —
   // all the ways people have engaged it. Your own life is one toggle away.
-  const { actor } = useActing();
+  // ⚠ Wait for `ready` (the acting-as rule): until the persisted hat has
+  // restored, the actor reads as the boot default "self" — scoping the
+  // inbox on it would show a space's steward their personal inbox for a
+  // beat (or worse, if the restore is retrying) and swap it underneath.
+  const { actor, ready: actingReady } = useActing();
   const asSpace = actor.type === 'space' ? actor.id : undefined;
   const spaceName = actor.type === 'space' ? actor.name : '';
 
@@ -134,9 +138,9 @@ export default function Chat() {
       </div>
 
       <div className="chat__list">
-        {loading && <div className="chat__empty"><p>Loading your chats…</p></div>}
+        {(loading || !actingReady) && <div className="chat__empty"><p>Loading your chats…</p></div>}
 
-        {!loading && asSpace && scoped.length === 0 && (
+        {!loading && actingReady && asSpace && scoped.length === 0 && (
           <div className="chat__empty">
             <Icon name="message" size={20} />
             <p>Nobody has written to {spaceName} yet</p>
@@ -146,7 +150,7 @@ export default function Chat() {
             </p>
           </div>
         )}
-        {!loading && !asSpace && chats.length === 0 && (
+        {!loading && actingReady && !asSpace && chats.length === 0 && (
           <div className="chat__empty">
             <Icon name="message" size={20} />
             <p>No chats yet</p>
@@ -157,7 +161,7 @@ export default function Chat() {
           </div>
         )}
 
-        {!loading && chats.length > 0 && hits.length === 0 && msgHits.length === 0 && (
+        {!loading && actingReady && chats.length > 0 && hits.length === 0 && msgHits.length === 0 && (
           <div className="chat__empty">
             <Icon name="search" size={20} />
             <p>No matches for &ldquo;{query}&rdquo;</p>
@@ -188,7 +192,7 @@ export default function Chat() {
           </div>
         )}
 
-        {hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
+        {actingReady && hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
           <ConversationRow
             key={c.id}
             chat={c}
@@ -203,7 +207,7 @@ export default function Chat() {
         {/* THE DESK, apart from your life (founder 2026-08-19): a steward's
             help rooms sit under their own header, each named for the person
             being helped. Only stewards ever have rows here. */}
-        {hits.some((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) && (
+        {actingReady && hits.some((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) && (
           <>
             <p className="chat__desk-head">Help desk — you answer for Lichen Help</p>
             {hits.filter((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me).map((c) => (
@@ -305,6 +309,13 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // any group rather than showing one face (founder 2026-08-16).
   const dmLike = chat.kind === 'direct';
   const single = chat.members.find((m) => m.profile_id !== me) ?? chat.members[0];
+
+  // A SPACE'S OWN ROOM WEARS THE SPACE'S LOGO (founder 2026-08-25): the
+  // member-face stack minus yourself is empty in a young room, which drew a
+  // blank circle — and even full, the room's identity is the space.
+  if (chat.spaceId && ['organization', 'community', 'group', 'place'].includes(chat.kind) && chat.roomSpaceAvatar) {
+    return <Avatar id={chat.spaceId} name={chat.roomSpaceName ?? chat.title} url={chat.roomSpaceAvatar} size={48} className="conv-row__avatar--party" />;
+  }
 
   // THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): a help room's row
   // wears Lichen Health's avatar — its identity — from every side. The humans

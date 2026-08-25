@@ -69,6 +69,7 @@ export default function Mycelium() {
   // so acting as one no longer bounces to its profile page — this reads that
   // space's web instead of the wrong person's.
   const asSpace = actor.type === 'space' ? actor.id : undefined;
+  const { ready: actingReady } = useActing();
 
   // One rule for every feed's chat door (founder 2026-08-17): a post in a
   // space's voice opens the conversation WITH that space, answered by the
@@ -98,6 +99,9 @@ export default function Mycelium() {
   const [overlays, setOverlays] = useState<Record<string, MyceliumSignals>>({});
 
   useEffect(() => {
+    // ⚠ Wait for the hat (the acting-as rule): loading before the persisted
+    // actor restores would read the PERSON's web for a beat and swap it.
+    if (!actingReady) return;
     (async () => {
       const feed = await loadFeed(50, { river: true });
       const [{ web, vouched }, recs, saves] = await Promise.all([
@@ -106,7 +110,7 @@ export default function Mycelium() {
       const ov = await loadEndorsements(feed, vouched);
       setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
-  }, [asSpace]);
+  }, [asSpace, actingReady]);
 
   // The feed: real posts from entities in your mycelium.
   const items = useMemo<Item[]>(() => {
