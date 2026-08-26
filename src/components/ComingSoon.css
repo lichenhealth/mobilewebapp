@@ -1,0 +1,24 @@
+.soon {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--s-3); padding: 18vh var(--s-5) var(--s-8);
+}
+.soon__mark {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  color: var(--peach-deep);
+}
+.soon__title { margin: 2px 0 0; font-size: 30px; line-height: 1.1; }
+.soon__badge {
+  margin: 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+  color: var(--peach-deep); border: 1px solid var(--peach-light);
+  border-radius: 999px; padding: 4px 12px; background: var(--peach-tint);
+}
+.soon__line { margin: 2px 0 0; font-size: 14.5px; color: var(--ink-soft); max-width: 42ch; }
+
+.soon__admin-note {
+  margin: 0 0 var(--s-3); padding: 8px 12px; border-radius: 10px;
+  font-size: 12.5px; color: var(--blue-deep, var(--blue));
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent);
+}
