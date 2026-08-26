@@ -255,7 +255,11 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
           </span>
         </div>
       )}
-      {idTags.length > 0 && (
+      {/* Identity chips are Lichen-View furniture (founder 2026-08-26): the
+          vocabulary exists because the platform uses it, so the open web
+          doesn't wear the bubbles — and preview must show what guests
+          actually see. The public summary lives in the headline/story. */}
+      {!previewing && idTags.length > 0 && (
         <p className="mprof__idtags">
           {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
         </p>

@@ -5,6 +5,7 @@ import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
 import { tabById, tabHasContent, type PageTab } from '../lib/pageTabs';
+import { subjectPronoun } from '../lib/names';
 import KnockForm from './KnockForm';
 import './PublicPage.css';
 
@@ -256,6 +257,10 @@ export default function PublicPage(props: PublicPageProps) {
   // tab: tab content (About) greets the open web first.
   const asGuest = !props.signedIn || !!props.preview;
   const showFeed = !!props.feed && (!asGuest || page.showPosts === true);
+  // The owner's own subject pronoun for tease-link copy — she/he/ze when the
+  // member set pronouns, they otherwise (and always they for a space, which
+  // passes no pronouns). Never inferred from a name.
+  const subj = subjectPronoun(props.pronouns);
   // The render-function form carries its own Feed door inside the stream's
   // icon row (founder 2026-08-11: the newsfeed circle belongs with the other
   // circles, not beside the About/Services text tabs) — so the nav skips it.
@@ -627,7 +632,7 @@ export default function PublicPage(props: PublicPageProps) {
             ))}
           </ul>
           {teasing('services') && svcRows.length > 5 && (
-            <More to="services">See everything they offer</More>
+            <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
           )}
         </section>
       )}
@@ -665,7 +670,7 @@ export default function PublicPage(props: PublicPageProps) {
             })}
           </ul>
           {teasing('services') && offerings.length > 5 && (
-            <More to="services">See everything they offer</More>
+            <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
           )}
         </section>
       )}
