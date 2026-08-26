@@ -8,6 +8,7 @@ import FeedCard from '../components/FeedCard';
 import OfferingChips from '../components/OfferingChips';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
+import ComingSoon from '../components/ComingSoon';
 import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { deletePost, loadAuthorFeed, loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
@@ -47,7 +48,7 @@ export default function CollectionPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { promptSaved, openPicker } = useCollect();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const me = user?.id ?? '';
 
   const [meta, setMeta] = useState<CollectionRow | null>(null);
@@ -348,6 +349,14 @@ export default function CollectionPage() {
 
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
+  // Courses are OFFLINE while they're made better (founder 2026-08-25) —
+  // the /courses room shows Coming Soon, and a course reached by any other
+  // door (a feed door-post, a cohort's Course door, Drive) says the same.
+  // Plain collections and Drive folders are untouched. Delete with the
+  // route gate in App.tsx when Courses reopen.
+  if (meta.kind === 'course' && !isAdmin) {
+    return <ComingSoon icon="graduation-cap" title="Courses." line="Trainings, workshops and apprenticeships are being tended before they open. Check back soon." />;
+  }
 
   // What the header says about the three promises — named plainly, so a
   // student reads exactly which door is shut rather than one blanket word.
