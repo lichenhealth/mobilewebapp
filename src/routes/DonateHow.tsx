@@ -262,7 +262,8 @@ export default function DonateHow() {
           <p>
             <strong>The entrusted offering.</strong> A member lists a
             handcrafted bench and chooses <em>Lichen*</em> — no recipient, no
-            price, no decisions. The algorithm reads the network: an open ask
+            price, no decisions. A human steward, aided by the matching
+            algorithm, reads the network: an open ask
             whose words and style match, a well-resourced member who admires
             the maker&rsquo;s work, a family short on groceries this month.
             Sometimes it proposes the simple route — bench to the ask. And

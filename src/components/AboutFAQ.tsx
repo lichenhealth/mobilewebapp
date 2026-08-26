@@ -17,11 +17,11 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Is my data private?',
-    a: 'Yes. You control whether your data is woven into the shared commons, and whether Lichen’s AI assists you — both are opt-in, never required. Sensitive details like your home location, phone number and financial picture stay hidden by default and are only ever shared at the level you choose.',
+    a: 'Yes. You control whether your data is woven into the shared commons, and whether Lichen’s AI assists you — always your choice, switchable any time, per section of the app and per community or group. Sensitive details like your home location, phone number and financial picture stay hidden by default and are only ever shared at the level you choose.',
   },
   {
     q: 'Do I have to use the AI assistant?',
-    a: 'No. The assistant is a partner you can turn on or off per section of the app — home, chat, calendar, wherever. Nothing is read or acted on without your say.',
+    a: 'No. The assistant starts on — collaboration is the premise of the platform — but it is yours to switch off per section of the app, and per community or group. Nothing is read outside the scopes you allow, and nothing is acted on without your say.',
   },
   {
     q: 'How is Lichen different from other social networks?',
