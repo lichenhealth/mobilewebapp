@@ -116,8 +116,8 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
           style={toastPos ? { left: toastPos.x, top: toastPos.y - 14 } : undefined}
           role="status"
         >
-          <Icon name="bookmark" size={13} />
-          <span>Saved to your shelf</span>
+          <Icon name="drive" size={13} />
+          <span>Saved to your Drive</span>
           <button onClick={() => openPicker(toastFor)}>Add to collection…</button>
           <button className="collect__toast-x" onClick={() => setToastFor(null)} aria-label="Dismiss">
             <Icon name="close" size={11} />

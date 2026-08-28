@@ -205,7 +205,7 @@ export default function PostPage() {
                 void setSaved('post', p.id, next).then(() => { if (next) promptSaved(p.id); }).catch(console.error);
               }}
             >
-              <Icon name="bookmark" size={16} />
+              <Icon name="drive" size={16} />
             </button>
           </div>
         )}
