@@ -84,11 +84,14 @@ export interface PageMeta {
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
-   *  they've vetted them; 'none' = no doors at all, not even the corner
-   *  Sign in (founder 2026-08-28: a page can be published as somebody's
-   *  website before its owner has been walked through the platform — until
-   *  then it shouldn't be recruiting for it). Members reach the app at
-   *  lichen.health, so nobody is locked out by this. */
+   *  they've vetted them; 'none' = no corner Sign in and no invitation card
+   *  (founder 2026-08-28: a page can be published as somebody's website
+   *  before its owner has been walked through the platform). ⚠ 'none' is
+   *  NOT "no mention of Lichen" — the credit-and-invite floor line renders
+   *  at every level (founder, same day, choosing reach over silence). If
+   *  that ever changes, the page-builder copy promising what each level
+   *  does must change WITH it. Members reach the app at lichen.health, so
+   *  nobody is locked out. */
   join?: 'full' | 'quiet' | 'none';
   /** Custom doors (founder 2026-07-29, the front door): fully data-driven
    *  pages replacing the built-in About/Services/Facilities/Contact set.
@@ -858,10 +861,17 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead.
           Skipped entirely for a signed-in viewer — their real join/trust
           controls already rendered above, in `children`. */}
-      {props.signedIn || page.join === 'none' ? null : page.join === 'quiet' ? (
+      {props.signedIn ? null : page.join === 'quiet' || page.join === 'none' ? (
+        /* THE FLOOR (founder 2026-08-28): every public page carries the
+           credit and the invitation, at whatever volume the owner chose.
+           Turning the doors off turns them down to this line — it does not
+           turn them off. The louder levels below already say both things in
+           their own card, so this renders only when that card doesn't, and
+           never to a signed-in member (they're already in). */
         <p className="ppage__join-quiet">
-          This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
-          {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>
+          Powered by <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
+          {' '}· Want to join our community?{' '}
+          <button className="ppage__join-quiet-link" onClick={() => go('/signup')}>Request an invite</button>
         </p>
       ) : props.knockSpace ? (
         /* A space's page is a GATEWAY (founder 2026-08-17): the ask is to

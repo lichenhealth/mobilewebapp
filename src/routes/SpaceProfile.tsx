@@ -1290,7 +1290,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 ['quiet', 'Keep it quiet',
                  'One small line at the foot of the page. Members can still sign in from it.'],
                 ['none', 'Just my website',
-                 "No mention of Lichen and no sign-in — the page reads as this place's own site and nothing else. You can turn it back up whenever you're ready."],
+                 "No sign-in and no invitation card — the page reads as this place's own site. One small \u201cPowered by Lichen\u201d line stays at the very bottom. You can turn it back up whenever you're ready."],
               ] as const).map(([value, title, note]) => (
                 <label className="prof__consent" key={value}>
                   <input
