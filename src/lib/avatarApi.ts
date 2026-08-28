@@ -44,3 +44,24 @@ export async function uploadPageImage(uid: string, file: File): Promise<string> 
   if (error) throw error;
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
+
+/** Where a freshly uploaded photo should sit in its frame, as a CSS
+ *  object-position percentage (0 = show the top, 100 = the bottom).
+ *  `null` means "we don't know" — the caller leaves the photo centred, which
+ *  is exactly what happened before this existed.
+ *
+ *  Founder 2026-08-28, after Rick Countryman's head was cropped off the
+ *  barn's About page: nothing looked at an uploaded image, so a standing
+ *  person lost their head to a centred crop every time. Fire-and-forget —
+ *  never await this before showing the photo, and never let it throw into an
+ *  upload. The owner's drag overwrites whatever it returns. */
+export async function imageFocusPct(url: string): Promise<number | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('image-focus', { body: { image: url } });
+    if (error) return null;
+    const pct = (data as { pct?: unknown } | null)?.pct;
+    return typeof pct === 'number' && pct >= 0 && pct <= 100 ? Math.round(pct) : null;
+  } catch {
+    return null;
+  }
+}

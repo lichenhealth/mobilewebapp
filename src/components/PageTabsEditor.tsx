@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import CoverPicker from './CoverPicker';
 import ContactFields, { type ContactInfo } from './ContactFields';
-import { uploadPageImage } from '../lib/avatarApi';
+import { uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import {
   TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
 } from '../lib/pageTabs';
@@ -109,7 +109,20 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
                     e.target.value = '';
                     if (!file) return;
                     setUpBusy(true);
-                    try { patch({ image: await uploadPageImage(uploaderId, file) }); }
+                    try {
+                      const url = await uploadPageImage(uploaderId, file);
+                      // Show the photo immediately, centred, exactly as before.
+                      patch({ image: url, imagePos: undefined });
+                      setUpBusy(false);
+                      // Then ask where to look and nudge the frame if we learn
+                      // something (founder 2026-08-28). Deliberately AFTER the
+                      // photo is on screen and after the busy flag clears: a
+                      // slow or failed model call must never hold up an upload,
+                      // and a centred photo is the honest fallback.
+                      const pct = await imageFocusPct(url);
+                      if (pct !== null) patch({ image: url, imagePos: `50% ${pct}%` });
+                      return;
+                    }
                     catch (err) { console.error(err); }
                     setUpBusy(false);
                   }} />
