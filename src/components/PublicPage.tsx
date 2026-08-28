@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
+import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
@@ -60,7 +61,15 @@ export interface PageMeta {
    *  2026-08-11). */
   coverPos?: number;
   coverStyle?: 'photo' | 'tint' | 'plain';
+  /** The page's own accent, as a hex string. Falls back to Lichen's peach.
+   *  FORCED READABLE against `surface` when the owner sets one — see
+   *  readableAccent() (founder 2026-08-28). */
   accent?: string;
+  /** Which ground the page sits on: 'warm' (Lichen's paper, the default),
+   *  'white', or 'dark'. Three choices on purpose — a free background field
+   *  is how a non-technical owner ends up with an unreadable site. The ink
+   *  colour travels with the ground so text flips on the dark one. */
+  surface?: 'warm' | 'white' | 'dark';
   /** Legacy single CTA — kept for old rows; new saves write `actions`. */
   action?: { kind: 'call' | 'book' | 'email' | 'visit' | 'none'; label?: string; href?: string };
   /** "How do you want people to get in touch" (founder 2026-08-11) —
@@ -209,13 +218,32 @@ export default function PublicPage(props: PublicPageProps) {
     return () => { m.remove(); };
   }, [props.page.noindex]);
 
+  // The GROUND is on <body>, not on this component — a page shorter than the
+  // viewport would otherwise sit as a white card on Lichen's bone, which
+  // reads as a bug. Restored on unmount so leaving a dark page doesn't leave
+  // the app dark (founder 2026-08-28).
+  useEffect(() => {
+    if (!props.page.surface || props.signedIn) return;
+    const prev = document.body.style.background;
+    document.body.style.background = SURFACES[props.page.surface].ground;
+    return () => { document.body.style.background = prev; };
+  }, [props.page.surface, props.signedIn]);
+
   const go = (path: string) => {
     const u = appUrl(path);
     if (u.startsWith('http')) window.location.href = u; else navigate(u);
   };
   const { name, kindLabel, avatarUrl, description, location, contact, page } = props;
   const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
-  const accent = page.accent || 'var(--peach)';
+  // The owner's colours, kept honest. An accent only gets the readability
+  // pass when they actually chose one — Lichen's default peach is left
+  // exactly as it is rather than silently restyling every existing page
+  // (founder 2026-08-28).
+  const surfaceKey: PageSurface = page.surface ?? 'warm';
+  const surface = SURFACES[surfaceKey];
+  const accent = page.accent
+    ? (readableAccent(page.accent, surfaceKey) ?? 'var(--peach)')
+    : 'var(--peach)';
   const story = (page.story || description || '').trim();
   // Is there anything on Home worth sending someone to? A tagline, a story
   // or an offering counts; the name and kind alone are the empty room.
@@ -518,7 +546,13 @@ export default function PublicPage(props: PublicPageProps) {
   return (
     <div
       className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')}
-      style={{ ['--ppage-accent' as string]: accent }}
+      style={{
+        ['--ppage-accent' as string]: accent,
+        ['--ppage-ground' as string]: surface.ground,
+        ['--ppage-ink' as string]: surface.ink,
+        ['--ppage-ink-muted' as string]: surface.muted,
+        ['--ppage-edge' as string]: surface.edge,
+      }}
     >
       {props.preview && (
         <p className="ppage__preview">Preview — this is what the open web sees.</p>

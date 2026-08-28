@@ -65,3 +65,18 @@ export async function imageFocusPct(url: string): Promise<number | null> {
     return null;
   }
 }
+
+/** The colour a business's logo says it is, as a hex string, or `null` when
+ *  the logo is only black and white — or when anything at all goes wrong.
+ *  A suggestion, never an authority: the caller still forces it readable
+ *  against the chosen ground (founder 2026-08-28). */
+export async function brandAccentFromLogo(url: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('brand-colors', { body: { image: url } });
+    if (error) return null;
+    const accent = (data as { accent?: unknown } | null)?.accent;
+    return typeof accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : null;
+  } catch {
+    return null;
+  }
+}

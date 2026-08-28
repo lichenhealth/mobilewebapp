@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import { domainsForHandle } from '../lib/customDomain';
+import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
+import { brandAccentFromLogo } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -258,6 +260,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [hueBusy, setHueBusy] = useState(false);
+  const [hueNote, setHueNote] = useState('');
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
   // 2026-07-27: queues and edit tools on the public page are distracting).
@@ -1342,6 +1346,79 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <input className="prof__input" value={pageEdit.tagline ?? ''}
               onChange={(e) => setPageEdit((pm) => ({ ...pm, tagline: e.target.value }))}
               placeholder="A grange for the whole valley" />
+          </div>
+
+          {/* THIS PAGE'S COLOURS (founder 2026-08-28: "can they choose a
+              white background and to pull their dark red in instead of our
+              peach?"). Background is three grounds, not a colour picker — a
+              free background field is how someone ends up with an unreadable
+              site. The accent is theirs and comes off their own logo, but is
+              forced readable on whichever ground they picked, so nobody can
+              quietly wreck their own page. */}
+          <div className="prof__field">
+            <label className="prof__label">Background</label>
+            {(Object.keys(SURFACES) as PageSurface[]).map((key) => (
+              <label className="prof__consent" key={key}>
+                <input
+                  type="radio"
+                  name="page-surface"
+                  checked={(pageEdit.surface ?? 'warm') === key}
+                  onChange={() => setPageEdit((pm) => ({
+                    ...pm, surface: key === 'warm' ? undefined : key,
+                  }))}
+                />
+                <span>
+                  <strong>{SURFACES[key].label}</strong>
+                  <em>{SURFACES[key].note}</em>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="prof__field">
+            <label className="prof__label">Accent colour</label>
+            <div className="prof__handle">
+              <span
+                aria-hidden
+                style={{
+                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                  border: '1px solid var(--bone-edge)',
+                  background: pageEdit.accent
+                    ? (readableAccent(pageEdit.accent, pageEdit.surface ?? 'warm') ?? 'var(--peach)')
+                    : 'var(--peach)',
+                }}
+              />
+              <button
+                type="button" className="btn" disabled={hueBusy || !space?.avatar_url}
+                onClick={async () => {
+                  if (!space?.avatar_url) return;
+                  setHueBusy(true); setHueNote('');
+                  const found = await brandAccentFromLogo(space.avatar_url);
+                  setHueBusy(false);
+                  if (!found) { setHueNote("Couldn't find a colour in the logo — it may be black and white."); return; }
+                  const safe = readableAccent(found, pageEdit.surface ?? 'warm');
+                  setPageEdit((pm) => ({ ...pm, accent: safe ?? found }));
+                  setHueNote(safe && safe.toLowerCase() !== found.toLowerCase()
+                    ? `Took ${found} from your logo and deepened it so it stays readable on this background.`
+                    : `Took ${found} from your logo.`);
+                }}
+              >
+                {hueBusy ? 'Reading your logo…' : '✦ Pull the colour from my logo'}
+              </button>
+              {pageEdit.accent && (
+                <button
+                  type="button" className="btn"
+                  onClick={() => { setPageEdit((pm) => ({ ...pm, accent: undefined })); setHueNote(''); }}
+                >
+                  Back to Lichen's peach
+                </button>
+              )}
+            </div>
+            <p className="prof__hint">
+              {hueNote || (space?.avatar_url
+                ? 'Used for links, buttons and section labels. Anything too pale to read on your background is deepened until it is.'
+                : 'Add a logo above and this can take its colour from it.')}
+            </p>
           </div>
           <div className="prof__field">
             <label className="prof__label">How do you want people to get in touch</label>
