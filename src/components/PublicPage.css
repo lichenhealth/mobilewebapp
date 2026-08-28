@@ -321,3 +321,18 @@
 /* A story image shown WHOLE — natural shape, no crop (founder 2026-08-21:
    "expand this pic down so you can see Katie below him") */
 .ppage__story-img--full { max-height: none; object-fit: contain; }
+
+/* Alternating summary split cards (founder 2026-08-26): copy beside the
+   tab's photo, sides alternating down Home. Two columns only at >=1024px —
+   the app-shell column stays phone-width until then, so below that the card
+   stacks copy first, photo after. */
+.ppage__split-copy { display: flex; flex-direction: column; gap: var(--s-3); align-items: flex-start; }
+.ppage__split-img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border-radius: var(--r-lg); cursor: zoom-in;
+}
+@media (min-width: 1024px) {
+  .ppage__sec--split { display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--s-7); align-items: center; }
+  .ppage__sec--split.is-flip .ppage__split-copy { order: 2; }
+  .ppage__sec--split.is-flip .ppage__split-img { order: 1; }
+}

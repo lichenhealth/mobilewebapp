@@ -168,3 +168,7 @@
 /* The lead is a sentence, not a slug — let it wrap (founder 2026-08-22:
    "don't cut off the text here"). */
 .ptabs__lead-input { resize: vertical; min-height: 0; }
+
+/* The auto-added Facilities row (content creates the tab, 2026-08-26). */
+.ptabs__auto { display: block; font-style: normal; font-size: var(--t-2xs); color: var(--ink-faint); margin-top: 2px; }
+.ptabs__restore { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; font-size: inherit; }

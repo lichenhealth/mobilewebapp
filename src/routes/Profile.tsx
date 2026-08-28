@@ -998,6 +998,7 @@ export default function Profile() {
             uploaderId={user?.id}
             sections={pageMeta.sections}
             onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
+            hasFacilities={!!pageMeta.facilities?.trim()}
             homeSummary={pageMeta.homeSummary}
             onHomeSummary={(text) => setPage({ homeSummary: text })}
             coverStyle={pageMeta.coverStyle}

@@ -25,7 +25,7 @@ import './PageTabsEditor.css';
  *  through Style, write-tabs through Write; the photo lives in sections[id]
  *  either way. */
 const SECTIONED = ['about', 'services', 'goods', 'contact', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string } | undefined>;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string; tabOff?: boolean } | undefined>;
 
 /** imagePos → a 0–100 vertical percent. Three generations of stored shape
  *  render alike: legacy words, the local session's bare numbers, and the
@@ -146,7 +146,7 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
-  entityName, authorId, spaceId, homeExtra, contact, onContact,
+  entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -173,6 +173,10 @@ export default function PageTabsEditor({
   authorId?: string;
   /** …or a space's wall. */
   spaceId?: string;
+  /** The page holds facilities text, so a Facilities tab appears by
+   *  itself (founder 2026-08-26: content creates the tab; the builder can
+   *  X it away). */
+  hasFacilities?: boolean;
   /** Extra controls under the welcome textarea (e.g. a space's
    *  "Write it for me" helper) — the caller's, rendered in place. */
   homeExtra?: React.ReactNode;
@@ -181,7 +185,7 @@ export default function PageTabsEditor({
   contact?: ContactInfo;
   onContact?: (next: ContactInfo) => void;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number; tabOff?: boolean }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });
@@ -485,6 +489,32 @@ export default function PageTabsEditor({
           </div>
         );
       })}
+      {/* CONTENT CREATES THE TAB (founder 2026-08-26): a page holding
+          facilities text grows a Facilities tab on its own — this row names
+          that, and the × declines it (sections.facilities.tabOff). */}
+      {hasFacilities && !tabs.some((t) => t.id === 'facilities') && !sections?.facilities?.tabOff && (
+        <div className="ptabs__tab">
+          <div className="ptabs__row">
+            <span className="ptabs__name">
+              <Icon name="location" size={15} /> Facilities
+              <em className="ptabs__auto">added by itself — your page has facilities content</em>
+            </span>
+            <span className="ptabs__moves">
+              <button className="ptabs__mv ptabs__mv--rm"
+                onClick={() => patchSection('facilities', { tabOff: true })}
+                aria-label="Hide the Facilities tab">×</button>
+            </span>
+          </div>
+        </div>
+      )}
+      {hasFacilities && !tabs.some((t) => t.id === 'facilities') && sections?.facilities?.tabOff && (
+        <p className="ptabs__note">
+          The Facilities tab is hidden — its content shows on Home only.{' '}
+          <button type="button" className="ptabs__restore" onClick={() => patchSection('facilities', { tabOff: false })}>
+            Bring the tab back
+          </button>
+        </p>
+      )}
       </div>
 
       {!adding && (

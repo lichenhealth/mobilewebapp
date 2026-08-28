@@ -80,7 +80,7 @@ export interface PageMeta {
    *  editor's '50% N%' — because the page-wide coverPos is tuned for the
    *  cover (founder 2026-08-21: Katie's face, cut off on Services).
    *  imageSize 'full' opts that photo out of the standard frame entirely. */
-  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string }>>;
+  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string; tabOff?: boolean }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
@@ -126,6 +126,8 @@ export interface PublicPageProps {
   /** Optional, stated by the member. Sits under the name — a fact about how
    *  to refer to someone, not a claim about them. */
   pronouns?: string | null;
+  /** The page speaks as "we" (spaces) instead of she/he/they (members). */
+  firstPerson?: boolean;
   /** The kind's mark, shown beside its word — spaces only (founder
    *  2026-08-05: the kind belongs under the name, not in the top bar). */
   kindIcon?: IconName;
@@ -260,7 +262,7 @@ export default function PublicPage(props: PublicPageProps) {
   // The owner's own subject pronoun for tease-link copy — she/he/ze when the
   // member set pronouns, they otherwise (and always they for a space, which
   // passes no pronouns). Never inferred from a name.
-  const subj = subjectPronoun(props.pronouns);
+  const subj = props.firstPerson ? { word: 'we', plural: true } : subjectPronoun(props.pronouns);
   // The render-function form carries its own Feed door inside the stream's
   // icon row (founder 2026-08-11: the newsfeed circle belongs with the other
   // circles, not beside the About/Services text tabs) — so the nav skips it.
@@ -288,6 +290,17 @@ export default function PublicPage(props: PublicPageProps) {
     const tpl = tabById(t.id);
     return tpl?.builtIn ? builtInHasContent(t.id) : tabHasContent(t, tpl);
   });
+  // CONTENT CREATES THE TAB (founder 2026-08-26: "a smart reading of the
+  // situation"): a page holding facilities text grows a Facilities tab even
+  // when the builder never picked one — X-able in the builder, which stores
+  // the decline at sections.facilities.tabOff. Slotted before Contact, where
+  // websites keep it.
+  if (liveChosen.length > 0 && !!page.facilities?.trim()
+      && !liveChosen.some((t) => t.id === 'facilities')
+      && !page.sections?.facilities?.tabOff) {
+    const at = liveChosen.findIndex((t) => t.id === 'contact');
+    liveChosen.splice(at >= 0 ? at : liveChosen.length, 0, { id: 'facilities' });
+  }
 
   const sectionItems = liveChosen.length
     ? liveChosen.map((t) => ({ id: t.id, label: t.label ?? tabById(t.id)?.label ?? t.id }))
@@ -400,6 +413,9 @@ export default function PublicPage(props: PublicPageProps) {
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // Sections a Home reader opened in place (summarized sections with no tab
+  // of their own — the door expands instead of routing).
+  const [openSecs, setOpenSecs] = useState<Set<string>>(new Set());
 
   // A visitor from the open web isn't an app user — no Lichen top bar, no
   // bottom tabs (founder 2026-07-29). Signed-in members keep their normal
@@ -424,8 +440,55 @@ export default function PublicPage(props: PublicPageProps) {
   // panel lead, or homeSummary for the story — Home now shows the summary
   // and the door instead of the dump. No summary written = the old excerpt,
   // so nothing goes blank.
+  const hasTab = (id: string) => navItems.some((n) => n.id === id);
+  const secLead = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    page.sections?.[id]?.lead?.trim();
   const summarized = (id: 'about' | 'services' | 'goods' | 'facilities') =>
-    teasing(id) && !!page.sections?.[id]?.lead?.trim();
+    tab === 'home' && !!secLead(id) && !openSecs.has(id);
+  // The summary's door: routes to the tab when one exists; a section with
+  // nowhere to route expands in place instead (the no-dead-end rule, kept).
+  const SecDoor = ({ id, children }: { id: string; children: React.ReactNode }) => hasTab(id)
+    ? <More to={id}>{children}</More>
+    : (
+      <button
+        className="ppage__more" type="button"
+        onClick={() => setOpenSecs((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id); else next.add(id);
+          return next;
+        })}
+      >
+        {openSecs.has(id) ? 'Show less' : children} <span aria-hidden>&rarr;</span>
+      </button>
+    );
+  // ALTERNATING SPLIT CARDS (founder 2026-08-26, from her sketch): a
+  // summarized section whose tab carries a photo renders copy beside the
+  // photo, sides alternating down the page — copy left first, then right,
+  // then left. Only at >=1024px (the app-shell column stays phone-width
+  // until then — a media query can't see the column, so below that the
+  // card stacks copy-then-photo).
+  const splitOrder = (['about', 'services', 'goods', 'facilities'] as const)
+    .filter((id) => summarized(id) && !!page.sections?.[id]?.image);
+  const splitting = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    splitOrder.includes(id) && !(id === 'about' && page.homeSummary?.trim());
+  const SumSplit = ({ id, label, door }: { id: 'about' | 'services' | 'goods' | 'facilities'; label?: string; door: React.ReactNode }) => {
+    const sec = page.sections![id]!;
+    const pos = typeof sec.imagePos === 'number' ? `50% ${sec.imagePos}%` : (sec.imagePos ?? '50% 50%');
+    return (
+      <section className={'ppage__sec ppage__sec--split' + (splitOrder.indexOf(id) % 2 === 1 ? ' is-flip' : '')}>
+        <div className="ppage__split-copy">
+          {label && <h2 className="ppage__h2">{label}</h2>}
+          <p className="ppage__lead">{secLead(id)}</p>
+          <SecDoor id={id}>{door}</SecDoor>
+        </div>
+        <img
+          className="ppage__split-img" src={sec.image} alt="" loading="lazy"
+          style={{ objectPosition: pos }}
+          onClick={() => setLightbox(sec.image!)}
+        />
+      </section>
+    );
+  };
   // Which image the hero wears on this tab (two builds converged here the
   // same day — merged): HOME and Feed wear the page cover (founder
   // 2026-08-21: "Home have the picture of Mary jumping as the cover" — it
@@ -586,17 +649,22 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 2 · Story */}
-      {story && show('about') && (
+      {story && show('about') && splitting('about') && (
+        <SumSplit id="about" door="Read the whole story" />
+      )}
+      {story && show('about') && !splitting('about') && (
         <section className="ppage__sec">
           {flavor('about')}
           <div className="ppage__story">
-            {(teasing('about')
-              ? (page.homeSummary?.trim()
+            {(tab !== 'home' || openSecs.has('about')
+              ? story.split(/\n{2,}/)
+              : page.homeSummary?.trim()
                 ? page.homeSummary.split(/\n{2,}/)
                 : summarized('about')
                   ? []
-                  : story.split(/\n{2,}/).slice(0, 2))
-              : story.split(/\n{2,}/)).map((para, i) => (
+                  : teasing('about')
+                    ? story.split(/\n{2,}/).slice(0, 2)
+                    : story.split(/\n{2,}/)).map((para, i) => (
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
@@ -608,8 +676,8 @@ export default function PublicPage(props: PublicPageProps) {
                 ))}
               </div>
             ))}
-            {teasing('about') && (page.homeSummary?.trim() || summarized('about') || story.split(/\n{2,}/).length > 2) && (
-              <More to="about">Read the whole story</More>
+            {tab === 'home' && (page.homeSummary?.trim() || secLead('about') || (hasTab('about') && story.split(/\n{2,}/).length > 2)) && (
+              <SecDoor id="about">Read the whole story</SecDoor>
             )}
           </div>
         </section>
@@ -629,7 +697,10 @@ export default function PublicPage(props: PublicPageProps) {
              Services and Goods are separate tabs (founder 2026-08-06), and
              each row carries its OWN recommend: you recommend the work, not
              the person. */}
-      {svcRows.length > 0 && show('services') && (
+      {svcRows.length > 0 && show('services') && splitting('services') && (
+        <SumSplit id="services" label="Services" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
+      )}
+      {svcRows.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
@@ -643,13 +714,16 @@ export default function PublicPage(props: PublicPageProps) {
               ))}
             </ul>
           )}
-          {teasing('services') && (summarized('services') || svcRows.length > 5) && (
-            <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
+          {tab === 'home' && (secLead('services') || (hasTab('services') && svcRows.length > 5)) && (
+            <SecDoor id="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</SecDoor>
           )}
         </section>
       )}
 
-      {goodRows.length > 0 && show('goods') && (
+      {goodRows.length > 0 && show('goods') && splitting('goods') && (
+        <SumSplit id="goods" label="Goods" door="See all the goods" />
+      )}
+      {goodRows.length > 0 && show('goods') && !splitting('goods') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
@@ -663,13 +737,16 @@ export default function PublicPage(props: PublicPageProps) {
               ))}
             </ul>
           )}
-          {summarized('goods') && <More to="goods">See all the goods</More>}
+          {tab === 'home' && secLead('goods') && <SecDoor id="goods">See all the goods</SecDoor>}
         </section>
       )}
 
       {/* A page that gave us plain strings (a space's hand-written offerings)
           keeps the old single list. */}
-      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && (
+      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && splitting('services') && (
+        <SumSplit id="services" label="What we offer" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
+      )}
+      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
@@ -686,23 +763,28 @@ export default function PublicPage(props: PublicPageProps) {
             })}
           </ul>
           )}
-          {teasing('services') && (summarized('services') || offerings.length > 5) && (
-            <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
+          {tab === 'home' && (secLead('services') || (hasTab('services') && offerings.length > 5)) && (
+            <SecDoor id="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</SecDoor>
           )}
         </section>
       )}
 
       {/* 3b · Facilities — the grounds themselves */}
-      {page.facilities && show('facilities') && (
+      {page.facilities && show('facilities') && splitting('facilities') && (
+        <SumSplit id="facilities" label="The facilities" door="See the grounds" />
+      )}
+      {page.facilities && show('facilities') && !splitting('facilities') && (
         <section className="ppage__sec">
           <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
           <div className="ppage__story">
-            {(teasing('facilities')
-              ? (summarized('facilities') ? [] : page.facilities.split(/\n{2,}/).slice(0, 1))
-              : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
-            {teasing('facilities') && (summarized('facilities') || page.facilities.split(/\n{2,}/).length > 1) && (
-              <More to="facilities">See the grounds</More>
+            {(summarized('facilities')
+              ? []
+              : teasing('facilities')
+                ? page.facilities.split(/\n{2,}/).slice(0, 1)
+                : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
+            {tab === 'home' && (secLead('facilities') || (hasTab('facilities') && page.facilities.split(/\n{2,}/).length > 1)) && (
+              <SecDoor id="facilities">See the grounds</SecDoor>
             )}
           </div>
         </section>

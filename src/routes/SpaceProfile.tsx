@@ -1003,6 +1003,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       <PublicPage
         id={space.id}
         name={space.name}
+        firstPerson
         kindLabel={kindLabel}
         kindIcon={KIND_ICON[space.kind]}
         avatarUrl={space.avatar_url}
@@ -1329,6 +1330,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             uploaderId={me}
             sections={pageEdit.sections}
             onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
+            hasFacilities={!!pageEdit.facilities?.trim()}
             homeSummary={pageEdit.homeSummary}
             onHomeSummary={(text) => setPageEdit((pm) => ({ ...pm, homeSummary: text }))}
             coverStyle={pageEdit.coverStyle}
