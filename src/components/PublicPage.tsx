@@ -103,7 +103,7 @@ export interface PageMeta {
    *  categories instead. */
   offerings?: string[];
   /** The people behind it — a barn, a practice, a farm is its people. */
-  team?: { name: string; role?: string; note?: string }[];
+  team?: { name: string; role?: string; note?: string; photo?: string }[];
   /** A few more images, shown as a quiet strip under the story. */
   photos?: string[];
   /** Images woven INTO the story (founder 2026-07-29): each renders after
@@ -561,13 +561,13 @@ export default function PublicPage(props: PublicPageProps) {
               line entirely (founder 2026-08-22: groups said "Group", orgs
               said nothing). kindIcon is only passed for spaces; a member's
               kindLabel is their headline and keeps riding the tagline slot. */}
-          {props.kindIcon && kindLabel && (
+          {props.kindIcon && kindLabel && !asGuest && (
             <p className="ppage__kind">
               {kindLabel}
               <Icon name={props.kindIcon} size={15} />
             </p>
           )}
-          {(page.tagline || (!props.kindIcon && kindLabel)) && (
+          {(page.tagline || (!props.kindIcon && kindLabel)) && !(asGuest && tab === 'home' && page.tagline && coverSrc) && (
             <p className="ppage__tagline">
               {page.tagline || kindLabel}
             </p>
@@ -590,6 +590,9 @@ export default function PublicPage(props: PublicPageProps) {
             style={coverFull ? undefined : { objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
+        )}
+        {asGuest && tab === 'home' && page.tagline && coverSrc && (
+          <p className="ppage__tagline-under">{page.tagline}</p>
         )}
       </header>
 
@@ -819,6 +822,10 @@ export default function PublicPage(props: PublicPageProps) {
           <div className="ppage__team">
             {page.team!.map((t) => (
               <div className="ppage__person" key={t.name}>
+                {t.photo && (
+                  <img className="ppage__person-photo" src={t.photo} alt="" loading="lazy"
+                    onClick={() => setLightbox(t.photo!)} />
+                )}
                 <p className="ppage__person-name">{t.name}</p>
                 {t.role && <p className="ppage__person-role">{t.role}</p>}
                 {t.note && <p className="ppage__person-note">{t.note}</p>}
