@@ -98,16 +98,6 @@
       "destination": "/api/page"
     },
     {
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "(www\\.)?countrymanstables\\.(com|org)"
-        }
-      ],
-      "destination": "/api/page"
-    },
-    {
       "source": "/:handle((?!(?:about|admin|api|art|assets|assistant|b|blog|book|bookings|business|calendar|care-model|caregiver|chat|collections|communities|community|compose|concierge|conscious-economy|courses|directory|donate|drive|events|food|giving|groups|help|home|identities|invite|library|login|maps|market|members|membership|mission|mycelium|onboarding|opportunity|organizations|organize|ourstory|pilot|places|platform|privacy|profile|reset-password|resources|safety|saved|search|signup|snapshot|social-networks|spaces|terms|travel|vision|work)$)[A-Za-z0-9][A-Za-z0-9_-]*)",
       "destination": "/api/page"
     },

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
+import { domainsForHandle } from '../lib/customDomain';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -1317,6 +1318,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
               <code>/spaces/{id.slice(0, 8)}…</code> instead.
             </p>
+            {/* WHERE THIS PAGE ACTUALLY LIVES (founder 2026-08-28). The
+                Address field only ever showed the lichen.health handle, so a
+                space whose site answers on its own domain — Countryman
+                Stables — had no way to see that from the builder. Custom
+                domains come from HOST_SPACES; wiring a NEW one is still a
+                code + Vercel change, not something this screen can do yet. */}
+            {handle.trim() && (
+              <p className="prof__hint">
+                Live at{' '}
+                {[`lichen.health/${handle.trim()}`, ...domainsForHandle(handle)].map((addr, i) => (
+                  <span key={addr}>
+                    {i > 0 ? ' · ' : null}
+                    <a href={`https://${addr}`} target="_blank" rel="noreferrer">{addr}</a>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
           <p className="prof__privacy-sub">This page</p>
           <div className="prof__field">

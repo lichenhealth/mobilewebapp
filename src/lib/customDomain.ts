@@ -23,6 +23,20 @@ export function hostSpaceHandle(): string | null {
   return spaceHandleForHost(window.location.hostname);
 }
 
+/** Every domain wired to this handle — the addresses this page is actually
+ *  served at. The page builder shows them so an owner can SEE where their
+ *  site lives instead of taking our word for it (founder 2026-08-28): the
+ *  Address field only ever showed the lichen.health handle, which read as
+ *  the only address even for a space whose site answers on its own domain.
+ *  `www.` variants are folded away — one line per domain, not two. */
+export function domainsForHandle(handle: string): string[] {
+  const h = handle.trim().toLowerCase();
+  if (!h) return [];
+  return Object.keys(HOST_SPACES)
+    .filter((host) => HOST_SPACES[host] === h && !host.startsWith('www.'))
+    .sort();
+}
+
 /** Lichen's canonical origin (the 2026-07-29 consolidation: the app lives on
  *  lichen.health; lichen.healthcare 301s here and keeps only the send-email
  *  MX). Everything that writes an absolute app link uses this. */
