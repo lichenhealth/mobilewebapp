@@ -80,15 +80,22 @@ export default async function handler(req: Request): Promise<Response> {
     row = (await fetchRow('spaces', 'handle', h)) ?? (await fetchRow('profiles', 'handle', h));
   }
 
+  // An address that resolves to nothing still renders "Nothing lives at that
+  // address" — a soft 404. Handing it a canonical URL invites Google to index
+  // it, so unmatched addresses are noindexed instead (founder 2026-08-28).
+  if (!row) noindex = true;
+
   if (row) {
     const r = row as Record<string, string | null | undefined> & { page?: { noindex?: boolean } };
     const name = r.name ?? r.full_name;
     if (name) {
       const where = r.location ? ` · ${r.location}` : '';
       if (customHandle) {
-        // The barn's own domain is the barn's own site: no "· Lichen" suffix
-        // and no kind label — the title is the business, then where it is.
-        title = `${name}${r.location ? ` — ${r.location}` : ''}`;
+        // The barn's own domain is the barn's own site: the title is just
+        // the business. No "· Lichen" suffix, no kind label, and no location
+        // either — `location` holds a full street address, which reads as
+        // noise in a tab and in search results.
+        title = name;
       } else {
         const kindWord = r.kind
           ? r.kind.charAt(0).toUpperCase() + r.kind.slice(1)
@@ -118,8 +125,16 @@ export default async function handler(req: Request): Promise<Response> {
   ].join('\n    ');
 
   // Replace the shell's own <title>, then inject ours.
+  // Strip what we're about to replace. The shell carries its own description
+  // and og tags; injecting ours on top left every patched page with TWO
+  // <meta name="description">, and a crawler picks whichever it likes
+  // (founder 2026-08-28).
   const html = shell
     .replace(/<title>[\s\S]*?<\/title>/i, '')
+    .replace(/[ \t]*<meta\s+name="description"[^>]*>\n?/gi, '')
+    .replace(/[ \t]*<meta\s+property="og:[^"]*"[^>]*>\n?/gi, '')
+    .replace(/[ \t]*<meta\s+name="twitter:[^"]*"[^>]*>\n?/gi, '')
+    .replace(/[ \t]*<link\s+rel="canonical"[^>]*>\n?/gi, '')
     .replace('</head>', `    ${tags}\n  </head>`);
 
   return new Response(html, {
