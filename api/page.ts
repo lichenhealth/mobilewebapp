@@ -41,8 +41,22 @@ async function fetchRow(kind: 'spaces' | 'profiles', by: 'id' | 'handle', value:
 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const shell = await fetch(`${SITE}/index.html`).then((r) => r.text()).catch(() => '');
-  if (!shell) return new Response('', { status: 302, headers: { Location: url.pathname } });
+
+  // FETCH THE SHELL FROM THIS DEPLOYMENT, NOT FROM PRODUCTION (founder
+  // 2026-08-28). The shell names a hash-versioned bundle — index-<hash>.js —
+  // so production's shell on a preview deployment points at a bundle that
+  // deployment doesn't have: the script 404s and the page renders BLANK.
+  // Invisible before now because only /spaces/:id and /members/:id reached
+  // this function and nobody opened one on a preview; it also meant a brand
+  // new production deployment could serve the previous build's shell for the
+  // seconds before the alias moved.
+  let shell = await fetch(`${url.origin}/index.html`).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+  if (!shell && url.origin !== SITE) {
+    shell = await fetch(`${SITE}/index.html`).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+  }
+  // Was a 302 back to the same path — which this function serves, so a failed
+  // shell fetch redirected to itself forever. Fail honestly instead.
+  if (!shell) return new Response('Temporarily unavailable', { status: 503, headers: { 'Retry-After': '30' } });
 
   // WHOSE SITE IS THIS (founder 2026-08-28): on a custom domain every path
   // serves that space's website, so the HOST names the page, not the path —
