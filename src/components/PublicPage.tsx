@@ -418,6 +418,14 @@ export default function PublicPage(props: PublicPageProps) {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
+  // SMART SUMMARIES (founder 2026-08-26): Home used to tease a tab by
+  // excerpting it (2 story paragraphs, 5 offering rows), which read as the
+  // tab minus its ending. When the tab has a written summary — its Style
+  // panel lead, or homeSummary for the story — Home now shows the summary
+  // and the door instead of the dump. No summary written = the old excerpt,
+  // so nothing goes blank.
+  const summarized = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    teasing(id) && !!page.sections?.[id]?.lead?.trim();
   // Which image the hero wears on this tab (two builds converged here the
   // same day — merged): HOME and Feed wear the page cover (founder
   // 2026-08-21: "Home have the picture of Mary jumping as the cover" — it
@@ -585,7 +593,9 @@ export default function PublicPage(props: PublicPageProps) {
             {(teasing('about')
               ? (page.homeSummary?.trim()
                 ? page.homeSummary.split(/\n{2,}/)
-                : story.split(/\n{2,}/).slice(0, 2))
+                : summarized('about')
+                  ? []
+                  : story.split(/\n{2,}/).slice(0, 2))
               : story.split(/\n{2,}/)).map((para, i) => (
               <div key={i}>
                 <p>{para}</p>
@@ -598,7 +608,7 @@ export default function PublicPage(props: PublicPageProps) {
                 ))}
               </div>
             ))}
-            {teasing('about') && (page.homeSummary?.trim() || story.split(/\n{2,}/).length > 2) && (
+            {teasing('about') && (page.homeSummary?.trim() || summarized('about') || story.split(/\n{2,}/).length > 2) && (
               <More to="about">Read the whole story</More>
             )}
           </div>
@@ -623,15 +633,17 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
-          <ul className="ppage__offers">
-            {(teasing('services') ? svcRows.slice(0, 5) : svcRows).map((o) => (
-              <li className="ppage__offer" key={o.id}>
-                <span className="ppage__offer-name">{o.name}</span>
-                {props.renderOfferingAction?.(o)}
-              </li>
-            ))}
-          </ul>
-          {teasing('services') && svcRows.length > 5 && (
+          {!summarized('services') && (
+            <ul className="ppage__offers">
+              {(teasing('services') ? svcRows.slice(0, 5) : svcRows).map((o) => (
+                <li className="ppage__offer" key={o.id}>
+                  <span className="ppage__offer-name">{o.name}</span>
+                  {props.renderOfferingAction?.(o)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {teasing('services') && (summarized('services') || svcRows.length > 5) && (
             <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
           )}
         </section>
@@ -641,14 +653,17 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
-          <ul className="ppage__offers">
-            {(teasing('goods') ? goodRows.slice(0, 5) : goodRows).map((o) => (
-              <li className="ppage__offer" key={o.id}>
-                <span className="ppage__offer-name">{o.name}</span>
-                {props.renderOfferingAction?.(o)}
-              </li>
-            ))}
-          </ul>
+          {!summarized('goods') && (
+            <ul className="ppage__offers">
+              {(teasing('goods') ? goodRows.slice(0, 5) : goodRows).map((o) => (
+                <li className="ppage__offer" key={o.id}>
+                  <span className="ppage__offer-name">{o.name}</span>
+                  {props.renderOfferingAction?.(o)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {summarized('goods') && <More to="goods">See all the goods</More>}
         </section>
       )}
 
@@ -658,6 +673,7 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec">
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
+          {!summarized('services') && (
           <ul className="ppage__offers">
             {(teasing('services') ? offerings.slice(0, 5) : offerings).map((o) => {
               const [head, ...rest] = o.split(' · ');
@@ -669,7 +685,8 @@ export default function PublicPage(props: PublicPageProps) {
               );
             })}
           </ul>
-          {teasing('services') && offerings.length > 5 && (
+          )}
+          {teasing('services') && (summarized('services') || offerings.length > 5) && (
             <More to="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</More>
           )}
         </section>
@@ -682,9 +699,9 @@ export default function PublicPage(props: PublicPageProps) {
           {flavor('facilities')}
           <div className="ppage__story">
             {(teasing('facilities')
-              ? page.facilities.split(/\n{2,}/).slice(0, 1)
+              ? (summarized('facilities') ? [] : page.facilities.split(/\n{2,}/).slice(0, 1))
               : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
-            {teasing('facilities') && page.facilities.split(/\n{2,}/).length > 1 && (
+            {teasing('facilities') && (summarized('facilities') || page.facilities.split(/\n{2,}/).length > 1) && (
               <More to="facilities">See the grounds</More>
             )}
           </div>
