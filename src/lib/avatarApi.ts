@@ -66,16 +66,21 @@ export async function imageFocusPct(url: string): Promise<number | null> {
   }
 }
 
-/** The colour a business's logo says it is, as a hex string, or `null` when
- *  the logo is only black and white — or when anything at all goes wrong.
- *  A suggestion, never an authority: the caller still forces it readable
- *  against the chosen ground (founder 2026-08-28). */
-export async function brandAccentFromLogo(url: string): Promise<string | null> {
+/** The colour scheme a business's logo implies — its colour, and which of
+ *  the three grounds it belongs on. `null` when nothing useful came back.
+ *  A PROPOSAL, never applied directly: the caller shows it to the owner to
+ *  accept or refuse, and forces the accent readable first (founder
+ *  2026-08-28, "let them preview it to decide if they like it"). */
+export async function brandSchemeFromLogo(
+  url: string,
+): Promise<{ accent: string | null; ground: 'warm' | 'white' | 'dark' } | null> {
   try {
     const { data, error } = await supabase.functions.invoke('brand-colors', { body: { image: url } });
     if (error) return null;
-    const accent = (data as { accent?: unknown } | null)?.accent;
-    return typeof accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : null;
+    const d = data as { accent?: unknown; ground?: unknown } | null;
+    const accent = typeof d?.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(d.accent) ? d.accent : null;
+    const ground = d?.ground === 'white' || d?.ground === 'dark' ? d.ground : 'warm';
+    return accent === null && ground === 'warm' ? null : { accent, ground };
   } catch {
     return null;
   }

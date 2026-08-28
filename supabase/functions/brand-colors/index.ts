@@ -5,13 +5,15 @@
 // wordmark; the page was wearing Lichen's peach. The colours a business
 // already owns are sitting in the file they uploaded — so read them.
 //
-// Returns ONE accent hex and nothing else. Not a palette: the page has
-// exactly one accent slot, and a function that returned five colours would
-// invite a UI that asks an owner to assign them. The ground is chosen from
-// three presets on the client, never from here.
+// Returns an accent hex and which of three named grounds the logo sits best
+// on — a scheme, not a palette. Still no more than that: the page has one
+// accent slot and three possible grounds, so anything richer would invite a
+// UI asking an owner to assign colours to things.
 //
-// The client re-checks contrast against the chosen ground and will darken
-// what comes back — this function is a suggestion, not an authority.
+// The whole answer is a PROPOSAL the owner previews and accepts or refuses
+// (founder 2026-08-28: "let them preview it to decide if they like it"), and
+// the client re-checks contrast and will deepen the accent — this function
+// is a suggestion, never an authority.
 //
 // Auth: verify_jwt (members only). Images must live in OUR storage — the
 // function refuses to fetch arbitrary URLs (same guard as style-tags and
@@ -31,12 +33,16 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 const PROMPT =
-  'This is a business\'s logo. Pick the one colour that most reads as THEIR colour — ' +
-  'the hue someone would name if asked what colour this business is.\n' +
-  'Prefer a saturated brand colour over black, white or grey; those are almost always ' +
-  'the ink and the paper, not the brand. If the logo is genuinely only black and white, ' +
-  'reply NONE.\n' +
-  'Reply with a single hex colour like #A32B2B and nothing else — no words, no explanation.';
+  'This is a business\'s logo. Answer two things about it.\n\n' +
+  'ACCENT: the one colour that most reads as THEIR colour — the hue someone would name ' +
+  'if asked what colour this business is. Prefer a saturated brand colour over black, ' +
+  'white or grey; those are almost always the ink and the paper, not the brand. If the ' +
+  'logo is genuinely only black and white, use NONE.\n\n' +
+  'GROUND: which background this logo belongs on — "white" if it is drawn for white paper, ' +
+  '"warm" if it would suit a soft off-white paper tone, "dark" only if the logo is clearly ' +
+  'built for a dark background (light or reversed-out artwork).\n\n' +
+  'Reply with exactly this and nothing else: a hex colour or NONE, a space, then one of ' +
+  'white / warm / dark. For example: #A32B2B white';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -73,11 +79,14 @@ Deno.serve(async (req) => {
     const d = await r.json();
     if (!r.ok) throw new Error(d?.error?.message ?? `Anthropic ${r.status}`);
     const text: string = d?.content?.[0]?.text ?? '';
-    const m = text.match(/#[0-9a-fA-F]{6}\b/);
-    if (!m) return json({});   // NONE, or anything that isn't a colour
-    return json({ accent: m[0].toLowerCase() });
+    const hex = text.match(/#[0-9a-fA-F]{6}\b/);
+    const groundWord = text.match(/\b(white|warm|dark)\b/i);
+    const ground = groundWord ? groundWord[1].toLowerCase() : 'warm';
+    // A ground is still worth returning when the logo has no colour of its
+    // own — a black-and-white wordmark on white paper is a scheme too.
+    return json({ accent: hex ? hex[0].toLowerCase() : null, ground });
   } catch (err) {
     console.error('brand-colors error:', err);
-    return json({});   // honest degrade — the page keeps whatever accent it has
+    return json({});   // honest degrade — the page keeps the colours it has
   }
 });
