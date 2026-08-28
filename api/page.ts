@@ -50,13 +50,32 @@ export default async function handler(req: Request): Promise<Response> {
   // this function and nobody opened one on a preview; it also meant a brand
   // new production deployment could serve the previous build's shell for the
   // seconds before the alias moved.
-  let shell = await fetch(`${url.origin}/index.html`).then((r) => (r.ok ? r.text() : '')).catch(() => '');
-  if (!shell && url.origin !== SITE) {
-    shell = await fetch(`${SITE}/index.html`).then((r) => (r.ok ? r.text() : '')).catch(() => '');
-  }
+  //
+  // The self-fetch forwards the visitor's cookies, and what comes back is
+  // CHECKED for the app's mount point. A protected preview deployment answers
+  // an unauthenticated sub-request with Vercel's login page — 200 OK, valid
+  // HTML — and without this guard the function happily patched the barn's
+  // title onto Vercel's login screen. Anything that can intercept a request
+  // (a WAF challenge, an outage page) fails the same way, so validate rather
+  // than trust the status code.
+  const cookie = req.headers.get('cookie') ?? '';
+  const looksLikeShell = (h: string) => h.includes('id="root"') && /<script[^>]+type="module"/.test(h);
+  const getShell = async (from: string) =>
+    fetch(`${from}/index.html`, { headers: cookie ? { cookie } : {} })
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((h) => (looksLikeShell(h) ? h : ''))
+      .catch(() => '');
+
+  let shell = await getShell(url.origin);
+  if (!shell && url.origin !== SITE) shell = await getShell(SITE);
   // Was a 302 back to the same path — which this function serves, so a failed
   // shell fetch redirected to itself forever. Fail honestly instead.
-  if (!shell) return new Response('Temporarily unavailable', { status: 503, headers: { 'Retry-After': '30' } });
+  if (!shell) {
+    return new Response('Temporarily unavailable', {
+      status: 503,
+      headers: { 'Retry-After': '30', 'Cache-Control': 'no-store' },
+    });
+  }
 
   // WHOSE SITE IS THIS (founder 2026-08-28): on a custom domain every path
   // serves that space's website, so the HOST names the page, not the path —
