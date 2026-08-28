@@ -20,6 +20,7 @@ package-lock.json
 
 # Local Claude Code preview config (machine-specific paths)
 .claude/launch.json
+.claude/settings.local.json
 worker/.env
 worker/test-session.json
 
