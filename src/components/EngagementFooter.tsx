@@ -178,7 +178,10 @@ export default function EngagementFooter({
             disabled={!can.save}
             title={can.save ? undefined : 'Not available for this content'}
           >
-            <Icon name="bookmark" size={13} />
+            {/* Save wears the DRIVE glyph (founder 2026-08-28): the gesture
+                saves TO Drive, so it shows where things land — the bookmark
+                stays the glyph for folders and notes, different acts. */}
+            <Icon name="drive" size={13} />
             <span>Save</span>
           </button>
           <button
