@@ -257,7 +257,9 @@
 /* Crops anchor to the top of the frame — that's where heads live (founder:
    nobody's head gets chopped off, ever). */
 .ppage__strip-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: 50% 0%; display: block; }
-.ppage__team { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+/* Three abreast in the desktop column (its ~720px measure fits 3×200 + gaps),
+   stepping to 2 mid-width and a single vertical stack on phones. */
+.ppage__team { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
 .ppage__person-name { margin: 0; font-size: 16px; font-weight: 600; color: var(--ink); }
 .ppage__person-role {
   margin: 1px 0 4px; font-family: var(--font-mono); font-size: 10px;
