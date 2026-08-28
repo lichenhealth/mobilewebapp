@@ -84,8 +84,12 @@ export interface PageMeta {
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
-   *  they've vetted them. */
-  join?: 'full' | 'quiet';
+   *  they've vetted them; 'none' = no doors at all, not even the corner
+   *  Sign in (founder 2026-08-28: a page can be published as somebody's
+   *  website before its owner has been walked through the platform — until
+   *  then it shouldn't be recruiting for it). Members reach the app at
+   *  lichen.health, so nobody is locked out by this. */
+  join?: 'full' | 'quiet' | 'none';
   /** Custom doors (founder 2026-07-29, the front door): fully data-driven
    *  pages replacing the built-in About/Services/Facilities/Contact set.
    *  A door with `href` is a link out (to /about, a collection, /donate);
@@ -521,13 +525,13 @@ export default function PublicPage(props: PublicPageProps) {
           2026-07-29): Sign in for members everywhere; the invitation only
           where the page owner wants it (join !== quiet). Skipped for a
           signed-in viewer — they're already in. */}
-      {!props.preview && !props.signedIn && (
+      {!props.preview && !props.signedIn && page.join !== 'none' && (
         <div className="ppage__corner">
-          {page.join !== 'quiet' && (
+          {page.join === 'full' || page.join === undefined ? (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
               Request an invitation
             </button>
-          )}
+          ) : null}
           <button className="ppage__corner-signin" type="button" onClick={() => go('/login')}>
             Sign in
           </button>
@@ -854,7 +858,7 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead.
           Skipped entirely for a signed-in viewer — their real join/trust
           controls already rendered above, in `children`. */}
-      {props.signedIn ? null : page.join === 'quiet' ? (
+      {props.signedIn || page.join === 'none' ? null : page.join === 'quiet' ? (
         <p className="ppage__join-quiet">
           This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
           {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>

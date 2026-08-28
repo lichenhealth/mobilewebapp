@@ -1271,6 +1271,41 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </span>
           </label>
 
+          {/* HOW LOUDLY THE PAGE RECRUITS (founder 2026-08-28). A page can go
+              live as somebody's actual website before its owner has been
+              walked through Lichen — Countryman Stables went up on its own
+              domain that way. Until that conversation happens the page
+              shouldn't be selling the platform to the barn's customers. The
+              `join` levels existed since 2026-07-29 but had no control; an
+              owner had to be edited into the database. Now they choose.
+              Nobody is locked out by 'none': the app lives at lichen.health
+              and members sign in there. */}
+          {publicPage && (
+            <div className="prof__field">
+              <label className="prof__label">How much should this page mention Lichen?</label>
+              {([
+                ['full', 'Invite people in',
+                 'Visitors get an invitation to request an account, and members can sign in from the page.'],
+                ['quiet', 'Keep it quiet',
+                 'One small line at the foot of the page. Members can still sign in from it.'],
+                ['none', 'Just my website',
+                 "No mention of Lichen and no sign-in — the page reads as this place's own site and nothing else. You can turn it back up whenever you're ready."],
+              ] as const).map(([value, title, note]) => (
+                <label className="prof__consent" key={value}>
+                  <input
+                    type="radio"
+                    name="page-join"
+                    checked={(pageEdit.join ?? 'full') === value}
+                    onChange={() => setPageEdit((pm) => ({
+                      ...pm, join: value === 'full' ? undefined : value,
+                    }))}
+                  />
+                  <span><strong>{title}</strong><em>{note}</em></span>
+                </label>
+              ))}
+            </div>
+          )}
+
           <div className="prof__field">
             <label className="prof__label">Address</label>
             <div className="prof__handle">
