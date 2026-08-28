@@ -146,7 +146,7 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
-  entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities,
+  entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -177,6 +177,11 @@ export default function PageTabsEditor({
    *  itself (founder 2026-08-26: content creates the tab; the builder can
    *  X it away). */
   hasFacilities?: boolean;
+  /** page.team — the people on the page, shown in the About section.
+   *  Passing onTeam turns on the People editor (founder 2026-08-26:
+   *  restoring the barn's faces surfaced that team had no UI at all). */
+  team?: { name: string; role?: string; note?: string; photo?: string }[];
+  onTeam?: (next: { name: string; role?: string; note?: string; photo?: string }[]) => void;
   /** Extra controls under the welcome textarea (e.g. a space's
    *  "Write it for me" helper) — the caller's, rendered in place. */
   homeExtra?: React.ReactNode;
@@ -567,6 +572,73 @@ export default function PageTabsEditor({
         </div>
       )}
 
+      {/* ── The people on the page (page.team) — rendered in the About
+             section with an optional photo above each name. First UI for
+             this data (founder 2026-08-26); previously only Snapshot and
+             hand edits ever wrote it. ── */}
+      {onTeam && (
+        <div className="ptabs__people">
+          <p className="ptabs__people-title">People on the page</p>
+          {(team ?? []).map((person, i) => (
+            <div className="ptabs__person" key={i}>
+              <label className="ptabs__person-photo">
+                {person.photo
+                  ? <img src={person.photo} alt="" />
+                  : <span className="ptabs__person-photo-empty"><Icon name="image" size={16} /></span>}
+                <input
+                  type="file" accept="image/*" hidden
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !uploaderId) return;
+                    setUpBusy(true);
+                    try {
+                      const url = await uploadPageImage(uploaderId, file);
+                      onTeam((team ?? []).map((t, j) => j === i ? { ...t, photo: url } : t));
+                    } catch (err) { console.error('team photo', err); }
+                    finally { setUpBusy(false); }
+                  }}
+                />
+              </label>
+              <div className="ptabs__person-fields">
+                <input
+                  type="text" placeholder="Name" value={person.name}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, name: e.target.value } : t))}
+                />
+                <input
+                  type="text" placeholder="Role — e.g. Founder & instructor" value={person.role ?? ''}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, role: e.target.value || undefined } : t))}
+                />
+                <textarea
+                  rows={2} placeholder="A line about them" value={person.note ?? ''}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, note: e.target.value || undefined } : t))}
+                />
+                <span className="ptabs__person-acts">
+                  {person.photo && (
+                    <button type="button" onClick={() => onTeam((team ?? []).map((t, j) => j === i ? { ...t, photo: undefined } : t))}>
+                      Remove photo
+                    </button>
+                  )}
+                  {i > 0 && (
+                    <button type="button" aria-label="Move up"
+                      onClick={() => { const next = [...(team ?? [])]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; onTeam(next); }}>
+                      ↑
+                    </button>
+                  )}
+                  <button type="button" className="ptabs__person-rm"
+                    onClick={() => onTeam((team ?? []).filter((_, j) => j !== i))}>
+                    Remove
+                  </button>
+                </span>
+              </div>
+            </div>
+          ))}
+          {upBusy && <p className="ptabs__note">Uploading…</p>}
+          <button type="button" className="btn ptabs__add"
+            onClick={() => onTeam([...(team ?? []), { name: '' }])}>
+            <Icon name="plus" size={14} /> Add a person
+          </button>
+        </div>
+      )}
 
     </div>
   );

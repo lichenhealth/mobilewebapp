@@ -1331,6 +1331,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             sections={pageEdit.sections}
             onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
             hasFacilities={!!pageEdit.facilities?.trim()}
+            team={pageEdit.team ?? []}
+            onTeam={(team) => setPageEdit((pm) => ({ ...pm, team }))}
             homeSummary={pageEdit.homeSummary}
             onHomeSummary={(text) => setPageEdit((pm) => ({ ...pm, homeSummary: text }))}
             coverStyle={pageEdit.coverStyle}
