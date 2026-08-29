@@ -330,3 +330,17 @@
 }
 .sprof__hue-lead { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
 .sprof__hue-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Each look carries its own Preview, so the decision and the way to check it
+   are the same object (founder 2026-08-28). */
+.sprof__look { align-items: center; }
+.sprof__look > span { flex: 1; }
+.sprof__look-see {
+  flex-shrink: 0; align-self: center;
+  border: 1px solid var(--bone-edge); border-radius: 999px;
+  background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 12.5px; padding: 5px 12px; cursor: pointer;
+}
+.sprof__look-see:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
+.sprof__look-see:disabled { opacity: 0.4; cursor: default; }
+.sprof__look .sprof__hue-dot { width: 12px; height: 12px; margin-left: 8px; display: inline-block; vertical-align: middle; }

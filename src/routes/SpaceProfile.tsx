@@ -975,7 +975,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const previewing = searchParams.get('preview') === '1';
   // forcePublic: on a custom domain (countrymanstables.com) EVERYONE gets
   // the website — even signed-in members; the app lives on Lichen's domain.
-  const showTemplate = !me || previewing || forcePublic || (!backstage && !tab);
+  // A COLOUR TRIAL IS A PUBLIC VIEW (founder 2026-08-28: "it should default
+  // to public view... and I see the side nav, even though the preview is
+  // public"). Opening ?brand/?ground while signed in rendered the in-app
+  // chrome — nav, no corner doors — which is precisely not the thing being
+  // judged. The trial forces the guest rendering.
+  const trialView = searchParams.has('brand') || searchParams.has('ground');
+  const showTemplate = !me || previewing || forcePublic || trialView || (!backstage && !tab);
   // The way into backstage has to exist on the page an admin actually lands
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
   // not sure where to edit the page"). It lived only in the non-template
@@ -1057,7 +1063,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         contact={contact}
         page={pageMeta}
         preview={previewing}
-        signedIn={!!me}
+        signedIn={!!me && !trialView}
         // A space's page is a gateway into Lichen (founder 2026-08-17): a
         // signed-out visitor knocks right here, and the knock names us.
         knockSpace={{ id: space.id, name: space.name, kindLabel }}
@@ -1398,67 +1404,31 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               placeholder="A grange for the whole valley" />
           </div>
 
-          {/* THIS PAGE'S COLOURS (founder 2026-08-28: "can they choose a
-              white background and to pull their dark red in instead of our
-              peach?"). Background is three grounds, not a colour picker — a
-              free background field is how someone ends up with an unreadable
-              site. The accent is theirs and comes off their own logo, but is
-              forced readable on whichever ground they picked, so nobody can
-              quietly wreck their own page. */}
-          <div className="prof__field">
-            <label className="prof__label">Background</label>
-            {(Object.keys(SURFACES) as PageSurface[]).map((key) => (
-              <label className="prof__consent" key={key}>
-                <input
-                  type="radio"
-                  name="page-surface"
-                  checked={(pageEdit.surface ?? 'warm') === key}
-                  onChange={() => setPageEdit((pm) => ({
-                    ...pm, surface: key === 'warm' ? undefined : key,
-                  }))}
-                />
-                <span>
-                  <strong>{SURFACES[key].label}</strong>
-                  <em>{SURFACES[key].note}</em>
-                </span>
-              </label>
-            ))}
-          </div>
+          {/* HOW THIS PAGE LOOKS (founder 2026-08-28, after using it: "put the
+              preview in the boxes next to what you select. Create a box for
+              build with my branding"). Four peers, each previewable in place,
+              rather than a background list plus a separate colour control
+              plus a separate row of preview links — three places to look for
+              one decision.
 
-          {/* SEE EVERY OPTION, FULL SIZE (founder 2026-08-28: "can we have
-              preview screens for all options?"). Each opens the REAL page in
-              a new tab. The accent passed is the one currently in this form,
-              not the saved one — so previewing a background shows the colour
-              you just picked, unsaved. Nothing is written by looking. */}
+              The first three are Lichen's own colours on different paper. The
+              fourth is theirs: the accent off their logo, on the ground that
+              logo suits. Choosing it reads the logo; previewing it reads the
+              logo too, and neither writes anything until Save. */}
           <div className="prof__field">
-            <label className="prof__label">See the whole page</label>
-            <div className="sprof__hue-acts">
-              {([
-                ['lichen', 'warm',  "Lichen\u2019s look"],
-                [null,     'white', 'White'],
-                [null,     'dark',  'Dark'],
-              ] as const).map(([forceBrand, ground, label]) => (
-                <button
-                  key={label} type="button" className="btn" disabled={!handle.trim()}
-                  onClick={() => {
-                    const q = new URLSearchParams();
-                    q.set('brand', forceBrand ?? (pageEdit.accent || 'lichen'));
-                    q.set('ground', ground);
-                    window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
-                  }}
-                >
-                  ↗ {label}
-                </button>
-              ))}
-              <button
-                type="button" className="btn"
-                disabled={hueBusy || !space?.avatar_url || !handle.trim()}
-                onClick={async () => {
-                  if (!space?.avatar_url) return;
-                  // Reuse a scheme we already read; otherwise fetch, then open
-                  // straight into the tab — one click, not two.
+            <label className="prof__label">How this page looks</label>
+            {(['warm', 'white', 'dark', 'branding'] as const).map((key) => {
+              const isBranding = key === 'branding';
+              const chosen = pageEdit.accent
+                ? isBranding
+                : !isBranding && (pageEdit.surface ?? 'warm') === key;
+              const openTrial = async () => {
+                let brand = 'lichen';
+                let ground: PageSurface = isBranding ? 'warm' : key;
+                if (isBranding) {
                   let prop = hueProposal;
                   if (!prop) {
+                    if (!space?.avatar_url) { setHueNote('Add a logo above first.'); return; }
                     setHueBusy(true); setHueNote('');
                     const found = await brandSchemeFromLogo(space.avatar_url);
                     setHueBusy(false);
@@ -1467,127 +1437,84 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                     prop = { accent: safe, raw: found.accent, ground: found.ground };
                     setHueProposal(prop);
                   }
-                  const q = new URLSearchParams();
-                  q.set('brand', prop.accent ?? 'lichen');
-                  q.set('ground', prop.ground);
-                  window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
-                }}
-              >
-                {hueBusy ? 'Reading your logo…' : '↗ ✦ My branding'}
-              </button>
-            </div>
-            <p className="prof__hint">
-              {handle.trim()
-                ? 'Opens in a new tab. Looking changes nothing \u2014 come back here to choose.'
-                : 'Give this page an address above and you can preview it.'}
-            </p>
-          </div>
-
-          {/* TRY IT ON THE WHOLE PAGE (founder 2026-08-28: "the preview is
-              too small — open a new tab where they can see the entire thing
-              rendered with their branding"). Reading the logo changes
-              nothing; it offers a link that opens the real page with the
-              colours applied for that view only, via ?brand/?ground. The
-              owner looks, closes the tab, and decides here. */}
-          <div className="prof__field">
-            <label className="prof__label">Accent colour</label>
-            <div className="sprof__hue-row">
-              <span
-                aria-hidden
-                className="sprof__hue-dot"
-                style={{
-                  background: pageEdit.accent
-                    ? (readableAccent(pageEdit.accent, pageEdit.surface ?? 'warm') ?? 'var(--peach)')
-                    : 'var(--peach)',
-                }}
-              />
-              <button
-                type="button" className="btn" disabled={hueBusy || !space?.avatar_url}
-                onClick={async () => {
-                  if (!space?.avatar_url) return;
-                  setHueBusy(true); setHueNote(''); setHueProposal(null);
-                  const found = await brandSchemeFromLogo(space.avatar_url);
-                  setHueBusy(false);
-                  if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
-                  const ground: PageSurface = found.ground;
-                  const safe = found.accent ? readableAccent(found.accent, ground) : null;
-                  setHueProposal({ accent: safe, raw: found.accent, ground });
-                }}
-              >
-                {hueBusy ? 'Reading your logo…' : '✦ Use my branding'}
-              </button>
-              {(pageEdit.accent || pageEdit.surface) && !hueProposal && (
-                <button
-                  type="button" className="btn"
-                  onClick={() => {
-                    setPageEdit((pm) => ({ ...pm, accent: undefined, surface: undefined }));
-                    setHueNote('');
-                  }}
-                >
-                  Back to Lichen&rsquo;s colours
-                </button>
-              )}
-            </div>
-
-            {hueProposal && (
-              <div className="sprof__hue-try">
-                <p className="sprof__hue-lead">
-                  {hueProposal.accent
-                    ? <>Your logo reads as <strong>{hueProposal.raw}</strong> on a{' '}
-                        {SURFACES[hueProposal.ground].label.toLowerCase()} background.</>
-                    : <>Your logo is black and white, so this just proposes a{' '}
-                        {SURFACES[hueProposal.ground].label.toLowerCase()} background.</>}
-                  {' '}Nothing has changed yet.
-                </p>
-                <div className="sprof__hue-acts">
-                  <button
-                    type="button" className="btn"
-                    disabled={!handle.trim()}
-                    onClick={() => {
-                      const q = new URLSearchParams();
-                      if (hueProposal.accent) q.set('brand', hueProposal.accent);
-                      q.set('ground', hueProposal.ground);
-                      window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
-                    }}
-                  >
-                    ↗ Preview the whole page
-                  </button>
-                  <button
-                    type="button" className="btn btn-primary"
-                    onClick={() => {
+                  brand = prop.accent ?? 'lichen';
+                  ground = prop.ground;
+                }
+                window.open(`/${handle.trim()}?brand=${encodeURIComponent(brand)}&ground=${ground}`,
+                  '_blank', 'noopener');
+              };
+              return (
+                <label className="prof__consent sprof__look" key={key}>
+                  <input
+                    type="radio"
+                    name="page-look"
+                    checked={chosen}
+                    onChange={async () => {
+                      if (!isBranding) {
+                        // Lichen's colours, just on different paper.
+                        setPageEdit((pm) => ({
+                          ...pm, accent: undefined, surface: key === 'warm' ? undefined : key,
+                        }));
+                        setHueNote('');
+                        return;
+                      }
+                      if (!space?.avatar_url) { setHueNote('Add a logo above first.'); return; }
+                      setHueBusy(true); setHueNote('');
+                      const found = await brandSchemeFromLogo(space.avatar_url);
+                      setHueBusy(false);
+                      if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
+                      const safe = found.accent ? readableAccent(found.accent, found.ground) : null;
+                      setHueProposal({ accent: safe, raw: found.accent, ground: found.ground });
                       setPageEdit((pm) => ({
                         ...pm,
-                        accent: hueProposal.accent ?? undefined,
-                        surface: hueProposal.ground === 'warm' ? undefined : hueProposal.ground,
+                        accent: safe ?? undefined,
+                        surface: found.ground === 'warm' ? undefined : found.ground,
                       }));
                       setHueNote(
-                        hueProposal.accent && hueProposal.raw
-                          && hueProposal.accent.toLowerCase() !== hueProposal.raw.toLowerCase()
-                          ? `Using ${hueProposal.raw} from your logo, deepened so it stays readable.`
-                          : 'Using your logo\u2019s colours. Remember to Save.',
+                        safe && found.accent && safe.toLowerCase() !== found.accent.toLowerCase()
+                          ? `Took ${found.accent} from your logo and deepened it so it stays readable. Remember to Save.`
+                          : safe
+                            ? `Took ${safe} from your logo. Remember to Save.`
+                            : 'Your logo is black and white, so this just sets the background. Remember to Save.',
                       );
-                      setHueProposal(null);
                     }}
+                  />
+                  <span>
+                    <strong>
+                      {isBranding ? (
+                        <>
+                          ✦ My branding
+                          {pageEdit.accent && (
+                            <span className="sprof__hue-dot" style={{ background: pageEdit.accent }} />
+                          )}
+                        </>
+                      ) : SURFACES[key].label}
+                    </strong>
+                    <em>
+                      {isBranding
+                        ? (hueBusy
+                            ? 'Reading your logo…'
+                            : space?.avatar_url
+                              ? 'Takes the colour from your logo and puts it on the background that suits it.'
+                              : 'Add a logo above and this can take its colours from it.')
+                        : SURFACES[key].note}
+                    </em>
+                  </span>
+                  <button
+                    type="button" className="sprof__look-see"
+                    disabled={!handle.trim() || hueBusy || (isBranding && !space?.avatar_url)}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void openTrial(); }}
                   >
-                    Use these colours
+                    ↗ Preview
                   </button>
-                  <button type="button" className="btn" onClick={() => setHueProposal(null)}>
-                    No thanks
-                  </button>
-                </div>
-                {!handle.trim() && (
-                  <p className="prof__hint">Give this page an address above and you can preview it.</p>
-                )}
-              </div>
-            )}
-
-            {!hueProposal && (
-              <p className="prof__hint">
-                {hueNote || (space?.avatar_url
-                  ? 'Used for links, buttons and section labels. Anything too pale to read on your background is deepened until it is.'
-                  : 'Add a logo above and this can take its colours from it.')}
-              </p>
-            )}
+                </label>
+              );
+            })}
+            <p className="prof__hint">
+              {hueNote || (handle.trim()
+                ? 'Preview opens the real page in a new tab, exactly as the open web sees it. Looking changes nothing.'
+                : 'Give this page an address above and you can preview these.')}
+            </p>
           </div>
 
           <div className="prof__field">
