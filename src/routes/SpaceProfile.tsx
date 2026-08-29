@@ -50,6 +50,7 @@ import ContactFields, { ContactList, type ContactInfo } from '../components/Cont
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import { readDraft, writeDraft, clearDraft, sameDraft, type PageDraft } from '../lib/pageDrafts';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import HomeSummaryButton from '../components/HomeSummaryButton';
@@ -263,6 +264,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const sharedNow = useRef<SpaceShared>({ page: {}, description: '', contact: {} });
   sharedNow.current = { page: pageEdit, description, contact };
   const [pageAhead, setPageAhead] = useState<SpaceShared | null>(null);
+  // Unpublished work. `draftPending` is what the Publish row reports; it is
+  // true exactly when the builder holds something the open web hasn't seen.
+  const [draftPending, setDraftPending] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -337,10 +342,24 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContentDownloadDefault(s.content_download_default !== false);
       const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
       setPageEdit(loadedPage);
-      sharedBase.current = JSON.stringify({
-        page: loadedPage, description: s.description ?? '', contact: sx.contact ?? {},
-      });
+      const live: SpaceShared = {
+        page: loadedPage, description: s.description ?? '', contact: (sx.contact ?? {}) as ContactInfo,
+      };
+      sharedBase.current = JSON.stringify(live);
       setPageAhead(null);
+      // UNPUBLISHED WORK OUTLIVES THE TAB (founder 2026-08-29). If a draft is
+      // waiting, the builder opens on the DRAFT, not on the live page — that
+      // is the whole promise. The live page underneath is untouched.
+      const kept = await readDraft('space', id);
+      if (kept && !sameDraft(kept.draft as PageDraft, live as PageDraft)) {
+        setPageEdit(kept.draft.page ?? {});
+        setDescription(kept.draft.description ?? '');
+        setContact((kept.draft.contact ?? {}) as ContactInfo);
+        setDraftPending(true);
+      } else {
+        setDraftPending(false);
+        if (kept) void clearDraft('space', id);   // a draft identical to live is noise
+      }
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
       if (s.kind === 'community') {
         // Identity vocabulary — names stored on the row map onto picker ids;
@@ -663,8 +682,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (!fresh) return;
     const freshJson = JSON.stringify(fresh);
     if (freshJson === sharedBase.current) { setPageAhead(null); return; }
-    if (JSON.stringify(sharedNow.current) === sharedBase.current) {
-      // Nothing typed here yet — the newer page simply IS this form now.
+    if (!draftPending && JSON.stringify(sharedNow.current) === sharedBase.current) {
+      // Nothing unpublished here — the newer page simply IS this form now.
       sharedBase.current = freshJson;
       setPageEdit(fresh.page);
       setDescription(fresh.description);
@@ -675,7 +694,33 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // middle of writing; show the choice instead.
       setPageAhead(fresh);
     }
-  }, [readShared]);
+  }, [readShared, draftPending]);
+
+  // AUTOSAVE THE DRAFT (founder 2026-08-29: Squarespace's shape — you never
+  // press save, you press publish). Debounced, because this fires on every
+  // keystroke; the draft is a whole-document upsert, not a patch, so writing
+  // one per character would be both wasteful and racy. A form that matches
+  // the live page has nothing pending, so the row is deleted rather than
+  // kept as an empty promise of unpublished work.
+  useEffect(() => {
+    if (!backstage || loading || !sharedBase.current) return;
+    const now = JSON.stringify(sharedNow.current);
+    const t = setTimeout(() => {
+      if (now === sharedBase.current) {
+        if (draftPending) { void clearDraft('space', id); setDraftPending(false); setDraftMsg(''); }
+        return;
+      }
+      void writeDraft(
+        'space', id, sharedNow.current as PageDraft,
+        JSON.parse(sharedBase.current) as PageDraft, me ?? undefined,
+      ).then((ok) => {
+        setDraftPending(true);
+        setDraftMsg(ok ? 'Draft saved' : 'Couldn\u2019t save your draft — check your connection');
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+    // sharedNow is a ref; these are the values that actually change it.
+  }, [backstage, loading, id, me, pageEdit, description, contact, draftPending]);
 
   // Catch up when the builder opens, and again whenever this tab comes back
   // to the front — going to the chat, asking Claude for a change and coming
@@ -696,7 +741,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
     try {
-      let note = 'Saved';
+      let note = 'Published';
       const patch: Parameters<typeof updateSpaceProfile>[1] = {
         name: name.trim() || space.name,
         description: description.trim() || null,
@@ -768,6 +813,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       }
       await updateSpaceProfile(space.id, patch);
       sharedBase.current = JSON.stringify({ page: pageEdit, description, contact });
+      // Published — there is nothing unpublished left to keep.
+      await clearDraft('space', id);
+      setDraftPending(false);
+      setDraftMsg('');
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
       await load();
@@ -1901,11 +1950,36 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 assistant elsewhere.</em>
             </span>
           </label>
+          {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
+              kept — it went into the draft as you typed. This button is
+              about the open web: it decides when strangers see it. The row
+              always says which of the two states the page is in, because
+              "is this live?" is the only question that matters here. */}
           <div className="prof__save-row">
             <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
             </button>
+            {draftPending && (
+              <button
+                className="btn" type="button" disabled={saving}
+                onClick={async () => {
+                  await clearDraft('space', id);
+                  setDraftPending(false);
+                  setDraftMsg('');
+                  await load();
+                }}
+              >
+                Discard draft
+              </button>
+            )}
             {msg && <span className="prof__msg">{msg}</span>}
+            {!msg && (
+              <span className="prof__msg sprof__draft-state">
+                {draftPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
+                  : 'Everything here is live.'}
+              </span>
+            )}
           </div>
         </CollapsibleSection>
       )}
