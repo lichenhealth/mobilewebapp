@@ -585,8 +585,8 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {trying && !props.preview && (
         <p className="ppage__preview">
-          Trying your branding — nothing is saved, and nobody else sees this.
-          Close this tab and choose back on your page settings.
+          Preview — nothing is saved, and nobody else sees this.
+          Close this tab to go back.
         </p>
       )}
 
