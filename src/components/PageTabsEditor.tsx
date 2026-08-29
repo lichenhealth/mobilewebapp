@@ -410,7 +410,7 @@ export default function PageTabsEditor({
                 {(!tpl?.builtIn || (onSections && SECTIONED.includes(t.id))) && (
                   <button className="ptabs__mv" onClick={() => setOpenId(open ? null : t.id)}
                     aria-label="Edit this tab">
-                    {open ? 'Done' : tpl?.builtIn ? 'Style' : 'Write'}
+                    {open ? 'Done' : tpl?.builtIn && t.id !== 'facilities' ? 'Style' : 'Write'}
                   </button>
                 )}
                 <button className="ptabs__mv ptabs__mv--rm"
@@ -599,7 +599,9 @@ export default function PageTabsEditor({
               onClick={() => {
                 onChange([...tabs, { id: tpl.id, lead: tpl.starter || undefined }]);
                 setAdding(false);
-                if (!tpl.builtIn) setOpenId(tpl.id);
+                // Facilities is builtIn but still has words to write
+                // (there's no profile field behind it), so it opens too.
+                if (!tpl.builtIn || tpl.id === 'facilities') setOpenId(tpl.id);
               }}>
               <span className="ptabs__icon"><Icon name={tpl.icon} size={15} /></span>
               <span className="ptabs__pick-body">
