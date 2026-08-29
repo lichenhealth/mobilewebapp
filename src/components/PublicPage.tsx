@@ -254,11 +254,22 @@ export default function PublicPage(props: PublicPageProps) {
   // the app dark (founder 2026-08-28).
   useEffect(() => {
     if (props.signedIn) return;
-    if (!props.page.surface && !trying) return;
     const prev = document.body.style.background;
     document.body.style.background = surface.ground;
-    return () => { document.body.style.background = prev; };
-  }, [props.page.surface, props.signedIn, trying, surface.ground]);
+    // A WEBSITE IS NOT AN APP SCREEN (founder 2026-08-28: "can we get rid of
+    // the beige sides? I want the entire preview to feel like a different
+    // website... it looks messy"). `.app-shell` is a centred column with a
+    // max-width, a bone ground and a framing shadow — right for the app,
+    // wrong for somebody's site, which was sitting in a beige surround that
+    // no choice of background could remove. The class lets the shell stand
+    // down for the whole of a public rendering; the page's own inner columns
+    // still hold the text to a readable measure.
+    document.body.classList.add('is-website');
+    return () => {
+      document.body.style.background = prev;
+      document.body.classList.remove('is-website');
+    };
+  }, [props.signedIn, surface.ground]);
 
   const go = (path: string) => {
     const u = appUrl(path);
