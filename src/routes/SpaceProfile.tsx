@@ -986,7 +986,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
   // not sure where to edit the page"). It lived only in the non-template
   // shell, which a signed-in admin never reaches.
-  const presenceLine = isMember && present !== null ? (
+  // PRESENCE IS A MEMBER SIGNAL, NOT A WEBSITE ONE (founder 2026-08-28: "the
+  // presence line shouldn't be on the public view"). "One in Countryman
+  // Stables is present" means nothing to a customer looking for lesson
+  // prices, and it quietly reports member activity to the open web. It was
+  // gated on isMember only — which is false for an actual visitor, so the
+  // leak showed up in the owner's own preview and on a custom domain, where
+  // a member IS the audience for their own website. Any rendering that
+  // stands for the open web now hides it: a custom domain, a colour trial,
+  // and the PUBLIC VIEW toggle.
+  const presenceLine = isMember && present !== null && !forcePublic && !trialView && !previewing ? (
     <div className="sprof__presence">
       <button className="sprof__presence-line" onClick={() => openTab('members')}>
         {present === 0
