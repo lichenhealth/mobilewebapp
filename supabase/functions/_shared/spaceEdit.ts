@@ -129,6 +129,124 @@ export const SPACE_PAGE_TOOLS = [
       required: ['title', 'body'],
     },
   },
+  // THE REST OF THE PAGE (founder 2026-08-28: "anything you ask claude to
+  // change, including text, should be editable by Claude"). An audit found
+  // the manual builder could reach every field a public page renders while
+  // the assistant could reach nine of them. These close the gap. Each is a
+  // full replacement of ONE field, so each says so, and get_space_page is
+  // how the model learns what it is replacing.
+  {
+    name: 'set_space_offerings',
+    description:
+      "Replace the space's offerings list — the \"what we offer\" lines with their terms "
+      + '("Private lessons" / "45 min · $60", "Leasing" / "inquire about available horses"). '
+      + 'FULL REPLACE of the whole list: call get_space_page and send every line back, including '
+      + 'the ones you are not changing. Send an empty array only to clear the list entirely.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        offerings: {
+          type: 'array',
+          description: 'Every line, in order.',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'What it is — "Private lessons".' },
+              terms: { type: 'string', description: 'Price, length or a note — "45 min · $60". Optional.' },
+            },
+            required: ['name'],
+          },
+        },
+      },
+      required: ['offerings'],
+    },
+  },
+  {
+    name: 'set_space_facilities',
+    description:
+      "Replace the facilities text on the space's page — what the place physically has. "
+      + 'Full replace; read it first. Empty string clears it.',
+    input_schema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: 'Short paragraphs separated by blank lines.' } },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'set_space_practical',
+    description:
+      'Replace the practical notes shown under Contact & hours — what to bring, parking, and '
+      + 'accessibility. Send all three every time: any you omit are cleared. Empty string clears one.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        bring: { type: 'string', description: 'What to bring.' },
+        parking: { type: 'string', description: 'Parking.' },
+        access: { type: 'string', description: 'Accessibility.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'set_space_page_colours',
+    description:
+      "Set the page's accent colour and background. The accent is a hex like #8b4545 — a business's "
+      + 'own colour, usually from its logo. The ground is "white", "warm" (Lichen\'s paper) or a VERY '
+      + 'light hex tint. Never a dark background. You do not have to check contrast: the page forces '
+      + 'a too-pale accent darker when it renders. Omit a field to leave it as it is; pass "default" '
+      + "to either to go back to Lichen's own colours.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        accent: { type: 'string', description: 'Hex like #8b4545, or "default".' },
+        ground: { type: 'string', description: '"white", "warm", a light hex, or "default".' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'set_space_join_level',
+    description:
+      'How loudly the public page invites visitors into Lichen. "full" shows the invitation card, '
+      + '"quiet" shows a small footer line and a sign-in, "none" shows neither — the page reads as '
+      + "the business's own website. A \"Powered by Lichen · Request an invite\" line stays at every "
+      + 'level, so "none" is not silence.',
+    input_schema: {
+      type: 'object',
+      properties: { level: { type: 'string', enum: ['full', 'quiet', 'none'] } },
+      required: ['level'],
+    },
+  },
+  {
+    name: 'set_space_page_visibility',
+    description:
+      'Two switches on the public page: hide_from_search asks search engines to leave it alone '
+      + '(the page still works for anyone with the link), and show_feed decides whether the space\'s '
+      + 'posts appear to the open web. Omit either to leave it alone.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        hide_from_search: { type: 'boolean' },
+        show_feed: { type: 'boolean' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'set_space_cover_style',
+    description:
+      "How the page's home cover is treated: \"photo\" shows the cover image, \"tint\" washes it in "
+      + 'the accent, "plain" drops it. Optionally set position, 0–100, for how the cover is framed '
+      + 'vertically when it crops (0 keeps the top of the photo, 100 the bottom).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        style: { type: 'string', enum: ['photo', 'tint', 'plain'] },
+        position: { type: 'number', description: '0–100. Optional.' },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** True when `name` is one of the SPACE_PAGE_TOOLS. */
@@ -294,6 +412,151 @@ export async function runSpacePageTool(
     page.tabs = [...tabs, { id, label: title, lead: lead || undefined, body: bodyText || undefined }];
     await patchSpace({ page });
     return { ok: true, previous: null, change: `created the "${title}" tab on ${spaceName}'s page` };
+  }
+
+  if (name === 'set_space_offerings') {
+    const rows = Array.isArray(input.offerings) ? input.offerings : [];
+    const lines = rows
+      .map((r) => {
+        const o = r as { name?: unknown; terms?: unknown };
+        const n = String(o?.name ?? '').trim();
+        const t = String(o?.terms ?? '').trim();
+        return n ? (t ? `${n} · ${t}` : n) : '';
+      })
+      .filter(Boolean);
+    const { page } = await readSpacePage();
+    const previous = (page.offerings as string[] | undefined) ?? null;
+    if (!lines.length) {
+      if (!previous?.length) return { ok: false, error: `${spaceName} has no offerings listed — nothing to clear.` };
+      delete page.offerings;
+      await patchSpace({ page });
+      return { ok: true, previous, change: `cleared ${spaceName}'s offerings list` };
+    }
+    page.offerings = lines;
+    await patchSpace({ page });
+    return { ok: true, previous, change: `rewrote ${spaceName}'s offerings (${lines.length} line${lines.length === 1 ? '' : 's'})` };
+  }
+
+  if (name === 'set_space_facilities') {
+    const next = String(input.text ?? '').trim();
+    const { page } = await readSpacePage();
+    const previous = (page.facilities as string | undefined) ?? null;
+    if (!next) {
+      if (!previous) return { ok: false, error: `${spaceName}'s facilities text is already empty.` };
+      delete page.facilities;
+      await patchSpace({ page });
+      return { ok: true, previous, change: `cleared ${spaceName}'s facilities text` };
+    }
+    page.facilities = next;
+    await patchSpace({ page });
+    return { ok: true, previous, change: `rewrote ${spaceName}'s facilities text` };
+  }
+
+  if (name === 'set_space_practical') {
+    const { page } = await readSpacePage();
+    const previous = (page.practical as Record<string, string> | undefined) ?? null;
+    const next: Record<string, string> = {};
+    for (const k of ['bring', 'parking', 'access']) {
+      const v = String((input as Record<string, unknown>)[k] ?? '').trim();
+      if (v) next[k] = v;
+    }
+    if (!Object.keys(next).length) {
+      if (!previous) return { ok: false, error: `${spaceName} has no practical notes — nothing to clear.` };
+      delete page.practical;
+      await patchSpace({ page });
+      return { ok: true, previous, change: `cleared ${spaceName}'s practical notes` };
+    }
+    page.practical = next;
+    await patchSpace({ page });
+    return { ok: true, previous, change: `set ${spaceName}'s practical notes (${Object.keys(next).join(', ')})` };
+  }
+
+  if (name === 'set_space_page_colours') {
+    const { page } = await readSpacePage();
+    const previous = { accent: page.accent ?? null, ground: page.surface ?? null };
+    const accent = input.accent === undefined ? undefined : String(input.accent).trim().toLowerCase();
+    const ground = input.ground === undefined ? undefined : String(input.ground).trim().toLowerCase();
+    if (accent !== undefined) {
+      if (accent === 'default') delete page.accent;
+      else if (/^#[0-9a-f]{6}$/.test(accent)) page.accent = accent;
+      else return { ok: false, error: `"${accent}" is not a hex colour like #8b4545, and not "default".` };
+    }
+    if (ground !== undefined) {
+      if (ground === 'default' || ground === 'warm') delete page.surface;
+      else if (ground === 'white') page.surface = 'white';
+      else if (/^#[0-9a-f]{6}$/.test(ground)) {
+        // A ground has to carry text. The page derives its ink from whatever
+        // it is given, but a dark one is not on offer (founder 2026-08-28).
+        const [r, g, b] = [1, 3, 5].map((i) => parseInt(ground.slice(i, i + 2), 16));
+        if (0.2126 * r + 0.7152 * g + 0.0722 * b < 200) {
+          return { ok: false, error: `${ground} is too dark for a page background. Use white, warm, or a much lighter tint.` };
+        }
+        page.surface = ground;
+      } else return { ok: false, error: `"${ground}" is not "white", "warm", "default" or a light hex.` };
+    }
+    if (accent === undefined && ground === undefined) {
+      return { ok: false, error: 'Nothing to change — pass an accent, a ground, or both.' };
+    }
+    await patchSpace({ page });
+    return {
+      ok: true, previous,
+      change: `set ${spaceName}'s page colours`,
+      note: 'The page darkens a too-pale accent when it renders, so what they see may be a deeper shade of what you set.',
+    };
+  }
+
+  if (name === 'set_space_join_level') {
+    const level = String(input.level ?? '').trim();
+    if (!['full', 'quiet', 'none'].includes(level)) {
+      return { ok: false, error: 'Level must be "full", "quiet" or "none".' };
+    }
+    const { page } = await readSpacePage();
+    const previous = (page.join as string | undefined) ?? 'full';
+    if (level === 'full') delete page.join; else page.join = level;
+    await patchSpace({ page });
+    return { ok: true, previous, change: `set ${spaceName}'s page to invite visitors "${level}"` };
+  }
+
+  if (name === 'set_space_page_visibility') {
+    const { page } = await readSpacePage();
+    const previous = { hide_from_search: !!page.noindex, show_feed: page.showPosts === true };
+    let touched = false;
+    if (typeof input.hide_from_search === 'boolean') {
+      if (input.hide_from_search) page.noindex = true; else delete page.noindex;
+      touched = true;
+    }
+    if (typeof input.show_feed === 'boolean') {
+      if (input.show_feed) page.showPosts = true; else delete page.showPosts;
+      touched = true;
+    }
+    if (!touched) return { ok: false, error: 'Nothing to change — pass hide_from_search, show_feed, or both.' };
+    await patchSpace({ page });
+    return { ok: true, previous, change: `changed what ${spaceName}'s page shows the open web` };
+  }
+
+  if (name === 'set_space_cover_style') {
+    const { page } = await readSpacePage();
+    const previous = { style: page.coverStyle ?? 'plain', position: page.coverPos ?? null };
+    let touched = false;
+    if (input.style !== undefined) {
+      const st = String(input.style).trim();
+      if (!['photo', 'tint', 'plain'].includes(st)) {
+        return { ok: false, error: 'Style must be "photo", "tint" or "plain".' };
+      }
+      page.coverStyle = st;
+      touched = true;
+    }
+    if (input.position !== undefined) {
+      const pos = Number(input.position);
+      if (!Number.isFinite(pos) || pos < 0 || pos > 100) {
+        return { ok: false, error: 'Position must be a number from 0 to 100.' };
+      }
+      page.coverPos = Math.round(pos);
+      touched = true;
+    }
+    if (!touched) return { ok: false, error: 'Nothing to change — pass a style, a position, or both.' };
+    await patchSpace({ page });
+    return { ok: true, previous, change: `changed ${spaceName}'s cover` };
   }
 
   return { ok: false, error: `No such space tool: ${name}` };
