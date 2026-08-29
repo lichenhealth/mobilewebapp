@@ -521,7 +521,14 @@ Deno.serve(async (req) => {
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.'
-      + '\n- PHOTO MOVES work here too: move a photo between the page\'s tabs, make one the Home cover, or shift which part shows (the position tool takes top/center/bottom or 0–100 from the top). A photo pasted into their message goes onto the page with place_uploaded_photo.';
+      + '\n- PHOTO MOVES work here too: move a photo between the page\'s tabs, make one the Home cover, or shift which part shows (the position tool takes top/center/bottom or 0–100 from the top). A photo pasted into their message goes onto the page with place_uploaded_photo.'
+      // ONE PAGE, ONE SET OF MACHINERY (founder 2026-08-28, after Claude told
+      // a steward it "can't see the manual mode's code" and offered to file a
+      // question for the builders). It was being honest about what it can
+      // read, but it was also being asked something it can simply be told:
+      // the builder and these tools are not two implementations that might
+      // disagree. They are one page, and for colours one function.
+      + '\n- THE MANUAL BUILDER AND YOUR TOOLS ARE THE SAME PAGE, not two systems that might differ. Everything you write shows up in their editor, and everything they type there you can read back. Colours especially: the builder\'s "use your branding" button and your set_space_page_colours_from_logo run the SAME logo read, so they cannot give different answers. When they ask whether the manual door does what you do, say so — do not tell them you cannot see it and do not file it as a question for the builders.';
  
   } else if (spaceId) {
     // SAY WHICH SWITCH, NOT "MY TOOLS ARE DOWN" (founder 2026-08-28, after
