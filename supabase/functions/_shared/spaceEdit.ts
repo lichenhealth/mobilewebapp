@@ -18,6 +18,24 @@ export type SbFn = (path: string, init?: RequestInit) => Promise<Response>;
 
 export const SPACE_PAGE_TOOLS = [
   {
+    // READ BEFORE WRITE (founder 2026-08-28, after the assistant answered
+    // "I don't have a way to read what's currently on the page — I can only
+    // write to it" and asked her to paste her own page back to it). Every
+    // set_* tool below is a FULL REPLACEMENT, so a write-only toolset makes
+    // "change this phrase to that" impossible to do safely: the model either
+    // guesses the surrounding text or overwrites it. The function could
+    // always read (readSpacePage); nothing exposed it to the model.
+    name: 'get_space_page',
+    description:
+      "Read what is CURRENTLY on this space's public page — its tagline, home welcome, story, "
+      + 'tabs and their text, offerings, facilities, practical notes, team, colours, and contact '
+      + 'details. CALL THIS FIRST whenever you are changing existing wording. Every set_ tool is a '
+      + 'full replacement, so to reword one line you must read the whole value, change that line, '
+      + 'and write the whole thing back. Never ask the person to paste their own page to you — read '
+      + 'it. Takes no arguments.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'set_space_tagline',
     description: `Replace the space's public-page tagline — the one line under its name. Max ${SPACE_TAGLINE_MAX} characters. Empty string clears it. Returns the previous value so you can tell them what it used to say.`,
     input_schema: {
@@ -37,7 +55,7 @@ export const SPACE_PAGE_TOOLS = [
   },
   {
     name: 'set_space_story',
-    description: 'Replace the space\'s whole story — the long-form About text on its page. Full replace, not append: read what you are replacing back to them. The previous value comes back in the result.',
+    description: 'Replace the space\'s whole story — the long-form About text on its page. FULL REPLACE, not append: call get_space_page first and write back the entire story with your change in it, or you will delete the rest of it. The previous value also comes back in the result.',
     input_schema: {
       type: 'object',
       properties: { story: { type: 'string', description: 'The new story, short paragraphs separated by blank lines. Empty string clears it — only on an explicit ask.' } },
@@ -138,6 +156,13 @@ export async function runSpacePageTool(
     sb(`spaces?id=eq.${spaceId}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body),
     });
+
+  if (name === 'get_space_page') {
+    const { page, contact, description } = await readSpacePage();
+    // No `change` key: a read is not an edit, and the calling surfaces use
+    // `change` to tell the steward what was done to their page.
+    return { ok: true, name: spaceName, description, contact, page };
+  }
 
   if (name === 'set_space_tagline' || name === 'set_space_home_summary' || name === 'set_space_story') {
     const key = name === 'set_space_tagline' ? 'tagline' : name === 'set_space_home_summary' ? 'homeSummary' : 'story';
