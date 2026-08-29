@@ -45,6 +45,10 @@ export default function SignUp() {
   }, [inviteToken]);
 
   // The knock: who are you, and why Lichen?
+  const knockFrom = (() => {
+    const v = params.get('from') ?? '';
+    return /^[0-9a-f-]{36}$/.test(v) ? v : '';
+  })();
   const [kName, setKName] = useState('');
   const [kEmail, setKEmail] = useState('');
   const [kStory, setKStory] = useState('');
@@ -59,7 +63,11 @@ export default function SignUp() {
     }
     setKBusy(true);
     const { error } = await supabase.functions.invoke('join-request', {
-      body: { name: kName.trim(), email: kEmail.trim(), story: kStory.trim() },
+      // ?from=<space id> — set by the floor line on a space's public page, so
+      // the introduction reaches its stewards with the page it came from
+      // attached. join-request re-checks the id against a live public space
+      // and quietly falls back to a plain knock if it doesn't hold up.
+      body: { name: kName.trim(), email: kEmail.trim(), story: kStory.trim(), ...(knockFrom ? { space_id: knockFrom } : {}) },
     });
     setKBusy(false);
     if (error) { setKError('Something went wrong — try again in a moment.'); return; }

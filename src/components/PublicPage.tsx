@@ -967,7 +967,19 @@ export default function PublicPage(props: PublicPageProps) {
         <p className="ppage__join-quiet">
           Powered by <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
           {' '}· Want to join our community?{' '}
-          <button className="ppage__join-quiet-link" onClick={() => go('/signup')}>Request an invite</button>
+          {/* THE KNOCK CARRIES THE PAGE IT CAME FROM (founder 2026-08-29).
+              The loud join card knocks at the SPACE's door — its stewards
+              see it, and the note says where it came from. Turning the page
+              down to 'quiet' or 'none' used to drop that: the floor line
+              went to the generic /signup, so an introduction from Countryman
+              Stables arrived looking like a walk-in off the street. Volume
+              was never supposed to change who is knocking. */}
+          <button
+            className="ppage__join-quiet-link"
+            onClick={() => go(props.knockSpace ? `/signup?from=${props.knockSpace.id}` : '/signup')}
+          >
+            Request an invite
+          </button>
         </p>
       ) : props.knockSpace ? (
         /* A space's page is a GATEWAY (founder 2026-08-17): the ask is to
