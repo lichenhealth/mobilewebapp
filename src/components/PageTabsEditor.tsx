@@ -544,11 +544,54 @@ export default function PageTabsEditor({
               <em className="ptabs__auto">added by itself — your page has facilities content</em>
             </span>
             <span className="ptabs__moves">
+              {/* A tab that arrived by itself still has to be WRITABLE
+                  (founder 2026-08-28: "everything on the public page should
+                  show up in the manual editor and be edit-able"). Countryman
+                  Stables' Facilities tab is this row — auto-added, never
+                  saved into page.tabs — so without this door its words had
+                  no field anywhere in the builder. */}
+              {onFacilities && (
+                <button className="ptabs__mv"
+                  onClick={() => setOpenId(openId === 'facilities' ? null : 'facilities')}
+                  aria-label="Edit the Facilities tab">
+                  {openId === 'facilities' ? 'Done' : 'Write'}
+                </button>
+              )}
               <button className="ptabs__mv ptabs__mv--rm"
                 onClick={() => patchSection('facilities', { tabOff: true })}
                 aria-label="Hide the Facilities tab">×</button>
             </span>
           </div>
+          {openId === 'facilities' && onFacilities && (
+            <div className="ptabs__edit">
+              <textarea
+                className="prof__input ptabs__lead-input"
+                rows={2}
+                value={sections?.facilities?.lead ?? ''}
+                placeholder="A first line — the point of this page"
+                onChange={(e) => patchSection('facilities', { lead: e.target.value || undefined })}
+              />
+              <textarea
+                className="prof__input ptabs__body"
+                rows={5}
+                value={facilities ?? ''}
+                placeholder="The rooms, the land, the equipment. Leave a blank line between paragraphs."
+                onChange={(e) => onFacilities(e.target.value)}
+              />
+              {onSections && (
+                <SectionPhoto
+                  sec={sections?.facilities}
+                  patch={(p) => patchSection('facilities', p)}
+                  uploaderId={uploaderId}
+                  upBusy={upBusy}
+                  setUpBusy={setUpBusy}
+                />
+              )}
+              <p className="ptabs__note">
+                Emptying this removes the Facilities tab — the page grows it from these words.
+              </p>
+            </div>
+          )}
         </div>
       )}
       {hasFacilities && !tabs.some((t) => t.id === 'facilities') && sections?.facilities?.tabOff && (
