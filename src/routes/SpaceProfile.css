@@ -320,3 +320,16 @@
 
 /* Spam is the rust-colored answer at the door (2026-08-21) */
 .sprof__knock-spam { color: var(--rust); border-color: var(--rust); }
+
+/* THE PAGE MOVED UNDER YOU (founder 2026-08-29). Claude and the builder edit
+   the same page, so the builder can be holding an older version than the
+   server. This is not an error — it is a choice, so it reads as a note with a
+   door, not as a red failure. */
+.sprof__ahead {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 0 16px; padding: 12px 14px;
+  border: 1px solid var(--bone-edge); border-radius: 10px;
+  background: var(--peach-tint);
+}
+.sprof__ahead-say { flex: 1 1 100%; margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
+.sprof__ahead-cost { font-size: 12px; color: var(--ink-muted); }

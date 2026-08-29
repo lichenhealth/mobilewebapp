@@ -238,6 +238,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     return () => window.clearInterval(tick);
   }, [sectionHash]);
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
+  // THE BUILDER AND THE CHAT EDIT THE SAME PAGE (founder 2026-08-29: "we just
+  // need to make sure that the manual mode will be changed the next time you
+  // login to it from what claude did in the chat").
+  //
+  // This form seeds itself from spaces.page ONCE, and Save writes the whole
+  // JSON blob back. So a change Claude made in the build thread — colours,
+  // a tab, the facilities text — was invisible here until a full reload, and
+  // pressing Save on a stale form wrote silently over it. Last-write-wins on
+  // a shared document, with no way to see you'd lost anything.
+  //
+  // pageBase is the version this form was seeded from. Anything newer on the
+  // server is either adopted (you haven't typed) or offered (you have) —
+  // never discarded, in either direction.
+  const pageBase = useRef<string>('{}');
+  const pageEditRef = useRef<PageMeta>({});
+  pageEditRef.current = pageEdit;
+  const [pageAhead, setPageAhead] = useState<PageMeta | null>(null);
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -310,7 +327,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setAssistantReadable(s.assistant_readable !== false);
       setContentAiDefault(s.content_ai_default !== false);
       setContentDownloadDefault(s.content_download_default !== false);
-      setPageEdit(((sx as { page?: PageMeta }).page ?? {}) as PageMeta);
+      const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
+      setPageEdit(loadedPage);
+      pageBase.current = JSON.stringify(loadedPage);
+      setPageAhead(null);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
       if (s.kind === 'community') {
         // Identity vocabulary — names stored on the row map onto picker ids;
@@ -615,6 +635,49 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     return () => { live = false; clearTimeout(t); };
   }, [handle, id]);
 
+  /** The page as the server holds it right now — not as this form remembers
+   *  it. Cheap: one column, one row. */
+  const readStoredPage = useCallback(async (): Promise<PageMeta | null> => {
+    const { data, error } = await supabase.from('spaces').select('page').eq('id', id).maybeSingle();
+    if (error) return null;
+    return (((data as { page?: PageMeta | null } | null)?.page) ?? {}) as PageMeta;
+  }, [id]);
+
+  /** Catch the form up with whatever Claude (or another steward, or this
+   *  page in another window) has written since it opened. Reads pageEdit
+   *  through a ref so typing never re-fires this. */
+  const syncPage = useCallback(async () => {
+    const fresh = await readStoredPage();
+    if (!fresh) return;
+    const freshJson = JSON.stringify(fresh);
+    if (freshJson === pageBase.current) { setPageAhead(null); return; }
+    if (JSON.stringify(pageEditRef.current) === pageBase.current) {
+      // Nothing typed here yet — the newer page simply IS this form now.
+      pageBase.current = freshJson;
+      setPageEdit(fresh);
+      setPageAhead(null);
+    } else {
+      // Unsaved edits on screen. Never overwrite what someone is in the
+      // middle of writing; show the choice instead.
+      setPageAhead(fresh);
+    }
+  }, [readStoredPage]);
+
+  // Catch up when the builder opens, and again whenever this tab comes back
+  // to the front — going to the chat, asking Claude for a change and coming
+  // back is the exact path this is for.
+  useEffect(() => {
+    if (!backstage) return;
+    void syncPage();
+    const wake = () => { if (document.visibilityState === 'visible') void syncPage(); };
+    window.addEventListener('focus', wake);
+    document.addEventListener('visibilitychange', wake);
+    return () => {
+      window.removeEventListener('focus', wake);
+      document.removeEventListener('visibilitychange', wake);
+    };
+  }, [backstage, syncPage]);
+
   async function save() {
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
@@ -627,6 +690,20 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
       };
+      // LAST WRITE MUST NOT WIN BLINDLY (founder 2026-08-29). The update
+      // below replaces the whole `page` blob, so if Claude wrote to it while
+      // this form sat open, saving would erase that work with no trace. Read
+      // it one more time and stop rather than clobber.
+      if (Object.keys(pageEdit).length) {
+        const stored = await readStoredPage();
+        if (stored && JSON.stringify(stored) !== pageBase.current) {
+          setPageAhead(stored);
+          throw new Error(
+            'This page changed while the builder was open — Claude edited it in the chat. '
+            + 'Nothing was saved. Load the current page at the top of the builder, then make your change again.',
+          );
+        }
+      }
       // Public-page facts ride the same Save (harmless if the columns are new).
       const { error: spaceErr } = await supabase.from('spaces')
         .update({
@@ -676,6 +753,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         }
       }
       await updateSpaceProfile(space.id, patch);
+      pageBase.current = JSON.stringify(pageEdit);
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
       await load();
@@ -1223,6 +1301,28 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       {adminTools && (
         <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
           <BuildModeSplit back={`/spaces/${id}?manage=1#about`} space={{ id: space.id, name: space.name }} />
+          {/* Only ever shown when there are unsaved edits here AND a newer
+              page on the server — with nothing typed, the form just catches
+              up quietly and this never appears. */}
+          {pageAhead && (
+            <div className="sprof__ahead">
+              <p className="sprof__ahead-say">
+                This page changed in the chat while the builder was open — Claude has written
+                something newer than what&rsquo;s on screen here. Saving now would write over it.
+              </p>
+              <button
+                type="button" className="btn"
+                onClick={() => {
+                  pageBase.current = JSON.stringify(pageAhead);
+                  setPageEdit(pageAhead);
+                  setPageAhead(null);
+                }}
+              >
+                Load the current page
+              </button>
+              <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
+            </div>
+          )}
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
