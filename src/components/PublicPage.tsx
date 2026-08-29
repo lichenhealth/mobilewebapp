@@ -214,8 +214,16 @@ export default function PublicPage(props: PublicPageProps) {
   const tryBrand = tryParams.get('brand');
   const tryGround = tryParams.get('ground');
   const trying = !!(tryBrand || tryGround);
-  const surfaceKey: PageSurface =
-    (tryGround === 'warm' || tryGround === 'white' || tryGround === 'dark')
+  // INSIDE THE PLATFORM, LICHEN'S COLOURS (founder 2026-08-28: "within the
+  // platform, I think we should keep it lichen color, right?"). A member's
+  // chosen scheme is for their WEBSITE — the face they show the open web. In
+  // app, every space rendering in someone's own colours would make Lichen
+  // look like a different product on every screen, and a member moving
+  // between spaces would lose the thread of where they are.
+  const inApp = !!props.signedIn;
+  const surfaceKey: PageSurface = inApp
+    ? 'warm'
+    : (tryGround === 'warm' || tryGround === 'white' || tryGround === 'dark')
       ? tryGround
       : (props.page.surface ?? 'warm');
   const surface = SURFACES[surfaceKey];
@@ -223,7 +231,7 @@ export default function PublicPage(props: PublicPageProps) {
   // builder offer Lichen's own look as one previewable option alongside the
   // rest, which a missing parameter can't do (it would fall back to whatever
   // accent is already saved).
-  const wantAccent = tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent);
+  const wantAccent = inApp ? null : (tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent));
   const accent = wantAccent
     ? (readableAccent(wantAccent, surfaceKey) ?? 'var(--peach)')
     : 'var(--peach)';
