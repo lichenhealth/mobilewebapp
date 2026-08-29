@@ -484,6 +484,16 @@ export default function PublicPage(props: PublicPageProps) {
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
   const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
 
+  // ONE HEADING PER SECTION (founder 2026-08-28: "it says facilities twice").
+  // The small-caps eyebrow earns its place on Home, where several sections
+  // stack and each needs naming. On a section's OWN door the big title above
+  // it already says the word, so the eyebrow is just the same word again in
+  // a smaller font. Hidden only when that door is what titled the page —
+  // never when the eyebrow is the only heading there is.
+  const doorTitled = activeChosen?.id ?? null;
+  const eyebrow = (id: string, label: React.ReactNode) =>
+    doorTitled === id ? null : <h2 className="ppage__h2">{label}</h2>;
+
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
   // Sections a Home reader opened in place (summarized sections with no tab
@@ -791,7 +801,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {svcRows.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">Services</h2>
+          {eyebrow('services', 'Services')}
           {flavor('services')}
           {!summarized('services') && (
             <ul className="ppage__offers">
@@ -814,7 +824,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {goodRows.length > 0 && show('goods') && !splitting('goods') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">Goods</h2>
+          {eyebrow('goods', 'Goods')}
           {flavor('goods')}
           {!summarized('goods') && (
             <ul className="ppage__offers">
@@ -837,7 +847,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">What we offer</h2>
+          {eyebrow('services', 'What we offer')}
           {flavor('services')}
           {!summarized('services') && (
           <ul className="ppage__offers">
@@ -864,7 +874,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {page.facilities && show('facilities') && !splitting('facilities') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">The facilities</h2>
+          {eyebrow('facilities', 'The facilities')}
           {flavor('facilities')}
           <div className="ppage__story">
             {(summarized('facilities')
@@ -882,7 +892,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 4 · Practical */}
       {hasContact && show('contact') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">Contact &amp; hours</h2>
+          {eyebrow('contact', <>Contact &amp; hours</>)}
           <ContactList contact={contact} />
           {bizLocations.length > 0 && (
             <div className="contactl">
@@ -904,7 +914,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 4b · The people — part of the story, so they live on About */}
       {(page.team?.length ?? 0) > 0 && show('about') && (
         <section className="ppage__sec">
-          <h2 className="ppage__h2">The people</h2>
+          {eyebrow('about', 'The people')}
           <div className="ppage__team">
             {page.team!.map((t) => (
               <div className="ppage__person" key={t.name}>
