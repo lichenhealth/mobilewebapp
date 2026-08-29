@@ -361,3 +361,21 @@
   font: inherit; font-size: 13px; padding: 7px 14px; cursor: pointer;
 }
 .prof__addline:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* Practical notes + photos in the story — the two fields an audit found
+   rendering publicly with no control (founder 2026-08-28). */
+.sprof__prac-label {
+  flex: 0 0 118px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+.sprof__storyimg {
+  display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px;
+  padding: 10px; border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+}
+.sprof__storyimg img {
+  width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex-shrink: 0;
+}
+.sprof__storyimg-ctl { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.sprof__storyimg-ctl label { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.sprof__storyimg-ctl input[type="number"] { width: 58px; }
+.sprof__storyimg-ctl input[type="range"] { flex: 1; min-width: 90px; }

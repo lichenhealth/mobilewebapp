@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import { domainsForHandle } from '../lib/customDomain';
 import { SURFACES, resolveSurface, readableAccent, type PageSurface } from '../lib/pageColors';
-import { brandSchemeFromLogo } from '../lib/avatarApi';
+import { brandSchemeFromLogo, uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -262,6 +262,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [avatarBusy, setAvatarBusy] = useState(false);
   const savedHandle = useRef('');
   const [handleFree, setHandleFree] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle');
+  const [storyImgBusy, setStoryImgBusy] = useState(false);
   const [hueBusy, setHueBusy] = useState(false);
   const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: string } | null>(null);
   const [hueNote, setHueNote] = useState('');
@@ -1592,6 +1593,127 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               something like &ldquo;inquire about available horses&rdquo;. Leave the right
               side empty for a plain line.
             </p>
+          </div>
+
+          {/* PRACTICAL NOTES (founder 2026-08-28: "everything on the public
+              page should show up in the manual editor and be editable").
+              These three render under Contact & hours and had no control —
+              one of two fields an audit of PageMeta found stranded. */}
+          <div className="prof__field">
+            <label className="prof__label">Practical notes</label>
+            {([
+              ['bring',   'What to bring',  'Boots and a helmet — we have loaners.'],
+              ['parking', 'Parking',        'Gravel lot by the barn, room for trailers.'],
+              ['access',  'Accessibility',  'Level gravel paths; the arena is step-free.'],
+            ] as const).map(([key, label, ph]) => (
+              <div className="sprof__offer-row" key={key}>
+                <span className="sprof__prac-label">{label}</span>
+                <input
+                  className="prof__input" placeholder={ph}
+                  value={pageEdit.practical?.[key] ?? ''}
+                  onChange={(e) => setPageEdit((pm) => {
+                    const next = { ...(pm.practical ?? {}), [key]: e.target.value };
+                    const empty = !next.bring && !next.parking && !next.access;
+                    return { ...pm, practical: empty ? undefined : next };
+                  })}
+                />
+              </div>
+            ))}
+            <p className="prof__hint">Shown under Contact &amp; hours. Leave any of them empty to hide it.</p>
+          </div>
+
+          {/* PHOTOS INSIDE THE STORY (the other stranded field). They render
+              between story paragraphs, so the control is "after which
+              paragraph" — the same question the data asks. */}
+          <div className="prof__field">
+            <label className="prof__label">Photos in the story</label>
+            {(() => {
+              const paras = (pageEdit.story ?? description ?? '').split(/\n{2,}/).filter(Boolean).length;
+              const imgs = pageEdit.storyImages ?? [];
+              const patch = (i: number, p: Partial<{ after: number; pos: number; full: boolean }>) =>
+                setPageEdit((pm) => {
+                  const next = [...(pm.storyImages ?? [])];
+                  next[i] = { ...next[i], ...p };
+                  return { ...pm, storyImages: next };
+                });
+              return (
+                <>
+                  {imgs.map((si, i) => (
+                    <div className="sprof__storyimg" key={`${si.src}-${i}`}>
+                      <img src={si.src} alt="" />
+                      <div className="sprof__storyimg-ctl">
+                        <label>
+                          After paragraph{' '}
+                          <input
+                            type="number" min={1} max={Math.max(1, paras)} value={si.after}
+                            onChange={(e) => patch(i, { after: Math.max(1, Number(e.target.value) || 1) })}
+                          />
+                          {paras > 0 && <span className="prof__hint"> of {paras}</span>}
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox" checked={!!si.full}
+                            onChange={(e) => patch(i, { full: e.target.checked || undefined })}
+                          />{' '}
+                          Show the whole photo
+                        </label>
+                        {!si.full && (
+                          <label>
+                            Framing
+                            <input
+                              type="range" min={0} max={100} value={si.pos ?? 50}
+                              onChange={(e) => patch(i, { pos: Number(e.target.value) })}
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button" className="sprof__offer-rm"
+                          aria-label="Remove this photo"
+                          onClick={() => setPageEdit((pm) => ({
+                            ...pm, storyImages: (pm.storyImages ?? []).filter((_, j) => j !== i),
+                          }))}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <label className="prof__addline">
+                    {storyImgBusy ? 'Adding…' : '+ Add a photo to the story'}
+                    <input
+                      type="file" accept="image/*" hidden disabled={storyImgBusy}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file || !me) return;
+                        setStoryImgBusy(true);
+                        try {
+                          const src = await uploadPageImage(me, file);
+                          setPageEdit((pm) => ({
+                            ...pm,
+                            storyImages: [...(pm.storyImages ?? []), { after: Math.max(1, paras), src }],
+                          }));
+                          const pct = await imageFocusPct(src);
+                          if (pct !== null) {
+                            setPageEdit((pm) => {
+                              const next = [...(pm.storyImages ?? [])];
+                              if (next.length) next[next.length - 1] = { ...next[next.length - 1], pos: pct };
+                              return { ...pm, storyImages: next };
+                            });
+                          }
+                        } catch (err) { console.error(err); }
+                        setStoryImgBusy(false);
+                      }}
+                    />
+                  </label>
+                  <p className="prof__hint">
+                    {paras > 0
+                      ? `Your story has ${paras} paragraph${paras === 1 ? '' : 's'}. A photo sits after the one you choose.`
+                      : 'Write your story first, then photos can sit between its paragraphs.'}
+                  </p>
+                </>
+              );
+            })()}
           </div>
 
           {/* The feed is a Lichen thing; the open web only sees it if this
