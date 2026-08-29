@@ -12,6 +12,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { loadMyPhone } from '../lib/conciergeApi';
+import { readDraft, writeDraft, clearDraft, sameDraft, normalize, type PageDraft } from '../lib/pageDrafts';
 import {
   loadCareLinks, inviteCare as careInvite, approveCare as careApprove,
   removeCare as careRemove, cancelCareInvite as careCancelInvite,
@@ -443,6 +444,16 @@ export default function Profile() {
   const [publicPage, setPublicPage] = useState(false);
   const [webMsg, setWebMsg] = useState('');
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
+  // DRAFT AND PUBLISH, the member's page (founder 2026-08-29). Same contract
+  // as a space's: what you type is kept the moment you type it, and the open
+  // web only moves when you publish. A member's draft holds page + contact;
+  // the address and the "serve this to the open web" switch are not page
+  // content and go live with the publish itself.
+  const liveBase = useRef<string>('');
+  const nowRef = useRef<PageDraft>({ page: {}, contact: {} });
+  nowRef.current = { page: pageMeta, contact };
+  const [draftPending, setDraftPending] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
   const setPage = (patch: Partial<PageMeta>) => setPageMeta((m) => ({ ...m, ...patch }));
   // Your vanity address (founder 2026-08-03) — lichen.health/<handle>
   // resolves the same as a space's, via SpaceByHandle's fallback lookup.
@@ -462,10 +473,42 @@ export default function Profile() {
           const untouched = !r.public_page && !r.handle && (!r.page || Object.keys(r.page).length === 0);
           setContact(r.contact ?? {}); setPublicPage(untouched ? true : !!r.public_page); setPageMeta(r.page ?? {});
           setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
+          const live: PageDraft = { page: r.page ?? {}, contact: r.contact ?? {} };
+          liveBase.current = normalize(live);
+          void readDraft('profile', user.id).then((kept) => {
+            if (kept && !sameDraft(kept.draft, live)) {
+              setPageMeta(kept.draft.page ?? {});
+              setContact((kept.draft.contact ?? {}) as ContactInfo);
+              setDraftPending(true);
+            } else if (kept) {
+              void clearDraft('profile', user.id);
+            }
+          });
         }
       });
   }, [user]);
   const setHandle = (v: string) => setHandleState(v.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  // Debounced, for the same reason as the space builder: the draft is a
+  // whole-document upsert, so one write per keystroke would be wasteful and
+  // racy. A form that matches what's live has nothing pending — the row goes
+  // rather than sitting there claiming unpublished work.
+  useEffect(() => {
+    if (!user || !liveBase.current) return;
+    const now = normalize(nowRef.current);
+    const t = setTimeout(() => {
+      if (now === liveBase.current) {
+        if (draftPending) { void clearDraft('profile', user.id); setDraftPending(false); setDraftMsg(''); }
+        return;
+      }
+      void writeDraft('profile', user.id, nowRef.current, JSON.parse(liveBase.current) as PageDraft, user.id)
+        .then((ok) => {
+          setDraftPending(true);
+          setDraftMsg(ok ? 'Draft saved' : 'Couldn\u2019t save your draft — check your connection');
+        });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [user, pageMeta, contact, draftPending]);
+
   async function saveWebPage() {
     if (!user) return;
     setWebMsg('');
@@ -482,7 +525,11 @@ export default function Profile() {
       setWebMsg(e.code === '23505' ? 'That address is taken — try another.' : e.message);
     } else {
       setSavedHandle(h);
-      setWebMsg('Saved.');
+      liveBase.current = normalize({ page: pageMeta, contact });
+      await clearDraft('profile', user.id);
+      setDraftPending(false);
+      setDraftMsg('');
+      setWebMsg('Published.');
     }
   }
   /** Crossing to build-with-Claude carries your manual work (founder
@@ -1020,7 +1067,24 @@ export default function Profile() {
           />
 
           <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={() => void saveWebPage()}>Save</button>
+            <button className="btn btn-primary" onClick={() => void saveWebPage()}>
+              {draftPending ? 'Publish changes' : 'Publish'}
+            </button>
+            {draftPending && user && (
+              <button
+                className="btn" type="button"
+                onClick={async () => {
+                  await clearDraft('profile', user.id);
+                  const live = JSON.parse(liveBase.current) as PageDraft;
+                  setPageMeta(live.page ?? {});
+                  setContact((live.contact ?? {}) as ContactInfo);
+                  setDraftPending(false);
+                  setDraftMsg('');
+                }}
+              >
+                Discard draft
+              </button>
+            )}
             <button className="btn" onClick={() => window.open(
               savedHandle ? `/${savedHandle}?preview=1` : `/members/${user?.id}?preview=1`, '_blank')}>
               Preview
@@ -1038,6 +1102,13 @@ export default function Profile() {
               </button>
             )}
             {webMsg && <span className="prof__msg">{webMsg}</span>}
+            {!webMsg && (
+              <span className="prof__msg prof__draft-state">
+                {draftPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — your live page still shows what you published last.`
+                  : 'Everything here is live.'}
+              </span>
+            )}
           </div>
 
       </CollapsibleSection>

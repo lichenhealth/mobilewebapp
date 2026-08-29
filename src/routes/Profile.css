@@ -379,3 +379,6 @@
 .sprof__storyimg-ctl label { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .sprof__storyimg-ctl input[type="number"] { width: 58px; }
 .sprof__storyimg-ctl input[type="range"] { flex: 1; min-width: 90px; }
+
+/* Is this live? The publish row answers it whether or not anything is pending. */
+.prof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }

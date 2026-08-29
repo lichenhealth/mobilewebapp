@@ -335,4 +335,4 @@
 .sprof__ahead-cost { font-size: 12px; color: var(--ink-muted); }
 
 /* The one thing the publish row must always answer: is this live? */
-.sprof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
+.prof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }

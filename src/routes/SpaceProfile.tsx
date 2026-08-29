@@ -1974,7 +1974,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
             {msg && <span className="prof__msg">{msg}</span>}
             {!msg && (
-              <span className="prof__msg sprof__draft-state">
+              <span className="prof__msg prof__draft-state">
                 {draftPending
                   ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
                   : 'Everything here is live.'}
