@@ -260,6 +260,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const savedHandle = useRef('');
+  const [handleFree, setHandleFree] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle');
   const [hueBusy, setHueBusy] = useState(false);
   const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: PageSurface } | null>(null);
   const [hueNote, setHueNote] = useState('');
@@ -292,6 +294,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (s) {
       setName(s.name);
       setHandle(s.handle ?? '');
+      savedHandle.current = (s.handle ?? '').toLowerCase();
       setParentPick(s.parent);
       setDescription(s.description ?? '');
       setLocText(s.location ?? '');
@@ -587,6 +590,32 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setAvatarBusy(false);
   }
 
+  // IS THIS ADDRESS TAKEN (founder 2026-08-28: "is the page smart enough to
+  // know if a url is taken and to say 'this is taken'?"). It was not. Worse:
+  // the handle write is part of a single .update() whose result was never
+  // checked, so a collision silently discarded the WHOLE save — colours,
+  // contact, everything in that call — while the form said it had saved.
+  //
+  // Checks BOTH tables. The DB has a unique index per table, but a space and
+  // a person can each hold the same handle, and SpaceByHandle resolves spaces
+  // first — so the person's page would just quietly stop being reachable.
+  useEffect(() => {
+    const h = handle.trim().toLowerCase();
+    if (!h || h === savedHandle.current || !/^[a-z0-9-]+$/.test(h)) { setHandleFree('idle'); return; }
+    setHandleFree('checking');
+    let live = true;
+    const t = setTimeout(async () => {
+      const [sp, pr] = await Promise.all([
+        supabase.from('spaces').select('id').eq('handle', h).maybeSingle(),
+        supabase.from('profiles').select('id').eq('handle', h).maybeSingle(),
+      ]);
+      if (!live) return;
+      const bySpace = sp.data ? (sp.data as { id: string }).id !== id : false;
+      setHandleFree(bySpace || !!pr.data ? 'taken' : 'free');
+    }, 400);
+    return () => { live = false; clearTimeout(t); };
+  }, [handle, id]);
+
   async function save() {
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
@@ -600,7 +629,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         lng: locGeo?.lng ?? null,
       };
       // Public-page facts ride the same Save (harmless if the columns are new).
-      await supabase.from('spaces')
+      const { error: spaceErr } = await supabase.from('spaces')
         .update({
           handle: handle.trim() || null,
           contact: Object.keys(contact).length ? contact : null,
@@ -626,6 +655,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           } : {}),
         })
         .eq('id', id);
+      // A unique-violation here used to be swallowed whole (founder
+      // 2026-08-28). Everything in this update travels together, so a taken
+      // address loses the colours and the contact details with it.
+      if (spaceErr) {
+        throw new Error(
+          spaceErr.code === '23505'
+            ? `lichen.health/${handle.trim()} is already taken — pick another address. Nothing was saved.`
+            : (spaceErr.message || 'Could not save. Please try again.'),
+        );
+      }
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
         if (!parentPick) {
           patch.parent_space_id = null;   // going standalone is always the group's right
@@ -1320,8 +1359,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 placeholder={kindLabel.toLowerCase().replace(/\s+/g, '-')} />
             </div>
             <p className="prof__hint">
-              Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
-              <code>/spaces/{id.slice(0, 8)}…</code> instead.
+              {handleFree === 'taken'
+                ? <strong style={{ color: 'var(--red, #B3261E)' }}>
+                    That address is taken — try another.
+                  </strong>
+                : handleFree === 'free'
+                  ? <strong style={{ color: 'var(--green-deep, #2E6B4F)' }}>
+                      lichen.health/{handle.trim()} is free.
+                    </strong>
+                  : handleFree === 'checking'
+                    ? 'Checking…'
+                    : <>Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
+                        <code>/spaces/{id.slice(0, 8)}…</code> instead.</>}
             </p>
             {/* WHERE THIS PAGE ACTUALLY LIVES (founder 2026-08-28). The
                 Address field only ever showed the lichen.health handle, so a
@@ -1376,19 +1425,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             ))}
           </div>
 
-          {/* A PROPOSAL YOU LOOK AT FIRST (founder 2026-08-28: "let them
-              preview it to decide if they like it"). Reading the logo does
-              not change the page — it puts a scheme on screen, on the ground
-              it suggests, showing the elements the accent actually drives.
-              Nothing is committed until the owner says so. */}
+          {/* TRY IT ON THE WHOLE PAGE (founder 2026-08-28: "the preview is
+              too small — open a new tab where they can see the entire thing
+              rendered with their branding"). Reading the logo changes
+              nothing; it offers a link that opens the real page with the
+              colours applied for that view only, via ?brand/?ground. The
+              owner looks, closes the tab, and decides here. */}
           <div className="prof__field">
             <label className="prof__label">Accent colour</label>
-            <div className="prof__handle">
+            <div className="sprof__hue-row">
               <span
                 aria-hidden
+                className="sprof__hue-dot"
                 style={{
-                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                  border: '1px solid var(--bone-edge)',
                   background: pageEdit.accent
                     ? (readableAccent(pageEdit.accent, pageEdit.surface ?? 'warm') ?? 'var(--peach)')
                     : 'var(--peach)',
@@ -1423,38 +1472,28 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </div>
 
             {hueProposal && (
-              <div
-                style={{
-                  marginTop: 12, borderRadius: 12, overflow: 'hidden',
-                  border: '1px solid var(--bone-edge)',
-                }}
-              >
-                {/* The preview is the real thing in miniature: the ground it
-                    proposes, the name in that ground's ink, a section label
-                    and a button in the accent — the three places the accent
-                    actually shows up on a page. */}
-                <div style={{
-                  background: SURFACES[hueProposal.ground].ground,
-                  color: SURFACES[hueProposal.ground].ink,
-                  padding: '18px 16px', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 19, marginBottom: 6 }}>{space?.name}</div>
-                  <div style={{
-                    fontSize: 10, letterSpacing: '0.05em', textTransform: 'uppercase',
-                    color: hueProposal.accent ?? SURFACES[hueProposal.ground].muted,
-                    marginBottom: 12,
-                  }}>
-                    What we offer
-                  </div>
-                  <span style={{
-                    display: 'inline-block', padding: '7px 16px', borderRadius: 999,
-                    fontSize: 13,
-                    background: hueProposal.accent ?? 'var(--peach)', color: '#fff',
-                  }}>
-                    Get in touch
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 8, padding: 10, background: 'var(--bone-warm)' }}>
+              <div className="sprof__hue-try">
+                <p className="sprof__hue-lead">
+                  {hueProposal.accent
+                    ? <>Your logo reads as <strong>{hueProposal.raw}</strong> on a{' '}
+                        {SURFACES[hueProposal.ground].label.toLowerCase()} background.</>
+                    : <>Your logo is black and white, so this just proposes a{' '}
+                        {SURFACES[hueProposal.ground].label.toLowerCase()} background.</>}
+                  {' '}Nothing has changed yet.
+                </p>
+                <div className="sprof__hue-acts">
+                  <button
+                    type="button" className="btn"
+                    disabled={!handle.trim()}
+                    onClick={() => {
+                      const q = new URLSearchParams();
+                      if (hueProposal.accent) q.set('brand', hueProposal.accent);
+                      q.set('ground', hueProposal.ground);
+                      window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
+                    }}
+                  >
+                    ↗ Preview the whole page
+                  </button>
                   <button
                     type="button" className="btn btn-primary"
                     onClick={() => {
@@ -1467,7 +1506,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                         hueProposal.accent && hueProposal.raw
                           && hueProposal.accent.toLowerCase() !== hueProposal.raw.toLowerCase()
                           ? `Using ${hueProposal.raw} from your logo, deepened so it stays readable.`
-                          : 'Using your logo\u2019s colours.',
+                          : 'Using your logo\u2019s colours. Remember to Save.',
                       );
                       setHueProposal(null);
                     }}
@@ -1478,18 +1517,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                     No thanks
                   </button>
                 </div>
+                {!handle.trim() && (
+                  <p className="prof__hint">Give this page an address above and you can preview it.</p>
+                )}
               </div>
             )}
 
-            <p className="prof__hint">
-              {hueProposal
-                ? (hueProposal.accent
-                    ? `Your logo reads as ${hueProposal.raw} on a ${SURFACES[hueProposal.ground].label.toLowerCase()} background. Nothing changes until you choose.`
-                    : `Your logo is black and white, so this just proposes a ${SURFACES[hueProposal.ground].label.toLowerCase()} background.`)
-                : hueNote || (space?.avatar_url
-                    ? 'Used for links, buttons and section labels. Anything too pale to read on your background is deepened until it is.'
-                    : 'Add a logo above and this can take its colours from it.')}
-            </p>
+            {!hueProposal && (
+              <p className="prof__hint">
+                {hueNote || (space?.avatar_url
+                  ? 'Used for links, buttons and section labels. Anything too pale to read on your background is deepened until it is.'
+                  : 'Add a logo above and this can take its colours from it.')}
+              </p>
+            )}
           </div>
 
           <div className="prof__field">

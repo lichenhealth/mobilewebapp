@@ -313,3 +313,20 @@
   cursor: pointer; font-family: inherit; text-decoration: underline;
 }
 .prof__idoffer-no:hover { color: var(--ink); }
+
+/* The logo-colour proposal (founder 2026-08-28). The swatch used to sit
+   inside .prof__handle, which is styled like a text input — so the whole row
+   read as a field and people clicked the words instead of the button. It is
+   a row of controls, so it looks like one. */
+.sprof__hue-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sprof__hue-dot {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--bone-edge);
+}
+.sprof__hue-try {
+  margin-top: 10px; padding: 12px 14px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: var(--bone-warm);
+}
+.sprof__hue-lead { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.sprof__hue-acts { display: flex; gap: 8px; flex-wrap: wrap; }
