@@ -219,7 +219,11 @@ export default function PublicPage(props: PublicPageProps) {
       ? tryGround
       : (props.page.surface ?? 'warm');
   const surface = SURFACES[surfaceKey];
-  const wantAccent = tryBrand ?? props.page.accent;
+  // ?brand=lichen is the sentinel for "no accent of your own" — it lets the
+  // builder offer Lichen's own look as one previewable option alongside the
+  // rest, which a missing parameter can't do (it would fall back to whatever
+  // accent is already saved).
+  const wantAccent = tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent);
   const accent = wantAccent
     ? (readableAccent(wantAccent, surfaceKey) ?? 'var(--peach)')
     : 'var(--peach)';

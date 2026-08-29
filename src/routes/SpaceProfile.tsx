@@ -1425,6 +1425,64 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             ))}
           </div>
 
+          {/* SEE EVERY OPTION, FULL SIZE (founder 2026-08-28: "can we have
+              preview screens for all options?"). Each opens the REAL page in
+              a new tab. The accent passed is the one currently in this form,
+              not the saved one — so previewing a background shows the colour
+              you just picked, unsaved. Nothing is written by looking. */}
+          <div className="prof__field">
+            <label className="prof__label">See the whole page</label>
+            <div className="sprof__hue-acts">
+              {([
+                ['lichen', 'warm',  "Lichen\u2019s look"],
+                [null,     'white', 'White'],
+                [null,     'dark',  'Dark'],
+              ] as const).map(([forceBrand, ground, label]) => (
+                <button
+                  key={label} type="button" className="btn" disabled={!handle.trim()}
+                  onClick={() => {
+                    const q = new URLSearchParams();
+                    q.set('brand', forceBrand ?? (pageEdit.accent || 'lichen'));
+                    q.set('ground', ground);
+                    window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
+                  }}
+                >
+                  ↗ {label}
+                </button>
+              ))}
+              <button
+                type="button" className="btn"
+                disabled={hueBusy || !space?.avatar_url || !handle.trim()}
+                onClick={async () => {
+                  if (!space?.avatar_url) return;
+                  // Reuse a scheme we already read; otherwise fetch, then open
+                  // straight into the tab — one click, not two.
+                  let prop = hueProposal;
+                  if (!prop) {
+                    setHueBusy(true); setHueNote('');
+                    const found = await brandSchemeFromLogo(space.avatar_url);
+                    setHueBusy(false);
+                    if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
+                    const safe = found.accent ? readableAccent(found.accent, found.ground) : null;
+                    prop = { accent: safe, raw: found.accent, ground: found.ground };
+                    setHueProposal(prop);
+                  }
+                  const q = new URLSearchParams();
+                  q.set('brand', prop.accent ?? 'lichen');
+                  q.set('ground', prop.ground);
+                  window.open(`/${handle.trim()}?${q.toString()}`, '_blank', 'noopener');
+                }}
+              >
+                {hueBusy ? 'Reading your logo…' : '↗ ✦ My branding'}
+              </button>
+            </div>
+            <p className="prof__hint">
+              {handle.trim()
+                ? 'Opens in a new tab. Looking changes nothing \u2014 come back here to choose.'
+                : 'Give this page an address above and you can preview it.'}
+            </p>
+          </div>
+
           {/* TRY IT ON THE WHOLE PAGE (founder 2026-08-28: "the preview is
               too small — open a new tab where they can see the entire thing
               rendered with their branding"). Reading the logo changes
