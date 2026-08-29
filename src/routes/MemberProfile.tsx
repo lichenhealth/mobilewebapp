@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { setTopIdentity } from '../lib/topIdentity';
+import { useTopIdentityFor } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -142,11 +142,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   }, [id]);
 
   // De-branding (founder 2026-07-30): this member's face takes the top bar.
-  useEffect(() => {
-    if (!member) return;
-    setTopIdentity({ id: member.id, name: member.full_name || 'A Lichen member', avatarUrl: member.avatar_url, kind: 'person' });
-    return () => setTopIdentity(null);
-  }, [member]);
+  useTopIdentityFor(member ? { id: member.id, name: member.full_name || 'A Lichen member', avatarUrl: member.avatar_url, kind: 'person' } : null);
 
   useEffect(() => {
     if (!me) return;

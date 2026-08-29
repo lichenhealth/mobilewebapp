@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
+import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
@@ -70,6 +71,16 @@ export default function AssistantFeed() {
     void loadSpaceContext(me, spaceId).then((c) => { if (live) setSctx(c); });
     return () => { live = false; };
   }, [me, spaceId, pageNonce]);
+
+  // WHOSE SCREEN IS THIS (founder 2026-08-28: "it shows me in the top right,
+  // versus countryman stables, but in the chat it shows me as steward").
+  // A space's build thread is one of ITS screens — every write here lands on
+  // its page — so it wears the space's mark. The right-hand chip is a
+  // different question and stays: it says who you are ACTING as, and the
+  // honest answer is yourself, stewarding.
+  useTopIdentityFor(spaceId && sctx
+    ? { id: spaceId, name: sctx.name, avatarUrl: sctx.avatarUrl, kind: 'space' }
+    : null);
 
   // "Let me change it directly" flips the hand-that-writes switch IN PLACE
   // (founder 2026-08-22: the old link navigated to /profile#privacy — while

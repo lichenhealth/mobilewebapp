@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
-import { setTopIdentity } from '../lib/topIdentity';
+import { useTopIdentityFor } from '../lib/topIdentity';
 import { domainsForHandle } from '../lib/customDomain';
 import { SURFACES, resolveSurface, readableAccent, type PageSurface } from '../lib/pageColors';
 import { brandSchemeFromLogo, uploadPageImage, imageFocusPct } from '../lib/avatarApi';
@@ -332,11 +332,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   useEffect(() => { load(); }, [load]);
 
   // De-branding (founder 2026-07-30): this profile's mark takes the top bar.
-  useEffect(() => {
-    if (!space) return;
-    setTopIdentity({ id: space.id, name: space.name, avatarUrl: space.avatar_url, kind: 'space' });
-    return () => setTopIdentity(null);
-  }, [space]);
+  useTopIdentityFor(space ? { id: space.id, name: space.name, avatarUrl: space.avatar_url, kind: 'space' } : null);
 
   async function toggleWeb() {
     if (!me) return;
