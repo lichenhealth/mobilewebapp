@@ -60,11 +60,27 @@
 .afeed__entry:not(.afeed__entry--claude) .afeed__entry-shots { justify-content: flex-end; }
 .afeed__entry-body { flex: 1; min-width: 0; }
 .afeed__entry-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
-.afeed__entry-name { font-size: 12px; font-weight: 600; color: var(--ink); }
-.afeed__entry--claude .afeed__entry-name { color: var(--blue-deep, var(--blue)); }
+/* SAME LANGUAGE AS A CHAT ROOM (founder 2026-08-28: "let's have the claude
+   chat have the white background, and the speaker the peach, just like in
+   chat"). The build thread had its own dialect — member messages in a peach
+   bubble, Claude's replies as bare text on the page — so the two surfaces
+   read as different products. ChatThread.css is the reference: speaker names
+   in peach (.msg-run__sender), a white bubble with a hairline (.bubble). */
+.afeed__entry-name { font-size: 12px; font-weight: 600; color: var(--peach); }
+.afeed__entry--claude .afeed__entry-name { color: var(--peach); }
 .afeed__entry-time { font-size: 11px; color: var(--ink-faint); }
 .afeed__entry-text {
   font-size: 14px; line-height: 1.55; color: var(--ink); white-space: pre-wrap;
+}
+/* Claude's replies now sit in the same white bubble a chat room uses, with
+   the same tail-less corner. The member's peach bubble above is unchanged —
+   it already matched .bubble--me. */
+.afeed__entry--claude .afeed__entry-text {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: 16px;
+  border-bottom-left-radius: 6px;
+  padding: 8px 12px;
 }
 /* The thinking wheel (founder 2026-08-22): three silicon-blue dots
    breathing while Claude composes; honest text when a reply is lost. */
