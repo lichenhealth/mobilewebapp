@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
 import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
@@ -205,6 +205,28 @@ export interface PublicPageProps {
 
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
+  // TRYING COLOURS ON THE REAL PAGE (founder 2026-08-28: "the preview is too
+  // small — open a new tab where they can see the entire thing"). ?brand= and
+  // ?ground= override the saved colours for THIS VIEW ONLY. Nothing is
+  // written, nobody else is affected, and the banner says so — it is the
+  // whole page as it would look, which a thumbnail can never be.
+  const tryParams = new URLSearchParams(useLocation().search);
+  const tryBrand = tryParams.get('brand');
+  const tryGround = tryParams.get('ground');
+  const trying = !!(tryBrand || tryGround);
+  const surfaceKey: PageSurface =
+    (tryGround === 'warm' || tryGround === 'white' || tryGround === 'dark')
+      ? tryGround
+      : (props.page.surface ?? 'warm');
+  const surface = SURFACES[surfaceKey];
+  // ?brand=lichen is the sentinel for "no accent of your own" — it lets the
+  // builder offer Lichen's own look as one previewable option alongside the
+  // rest, which a missing parameter can't do (it would fall back to whatever
+  // accent is already saved).
+  const wantAccent = tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent);
+  const accent = wantAccent
+    ? (readableAccent(wantAccent, surfaceKey) ?? 'var(--peach)')
+    : 'var(--peach)';
   // Lichen doors cross back to Lichen's own origin when this page is served
   // from a member's custom domain.
   // Ask crawlers to leave a noindex page alone. Client-side meta is honored
@@ -223,11 +245,12 @@ export default function PublicPage(props: PublicPageProps) {
   // reads as a bug. Restored on unmount so leaving a dark page doesn't leave
   // the app dark (founder 2026-08-28).
   useEffect(() => {
-    if (!props.page.surface || props.signedIn) return;
+    if (props.signedIn) return;
+    if (!props.page.surface && !trying) return;
     const prev = document.body.style.background;
-    document.body.style.background = SURFACES[props.page.surface].ground;
+    document.body.style.background = surface.ground;
     return () => { document.body.style.background = prev; };
-  }, [props.page.surface, props.signedIn]);
+  }, [props.page.surface, props.signedIn, trying, surface.ground]);
 
   const go = (path: string) => {
     const u = appUrl(path);
@@ -239,11 +262,6 @@ export default function PublicPage(props: PublicPageProps) {
   // pass when they actually chose one — Lichen's default peach is left
   // exactly as it is rather than silently restyling every existing page
   // (founder 2026-08-28).
-  const surfaceKey: PageSurface = page.surface ?? 'warm';
-  const surface = SURFACES[surfaceKey];
-  const accent = page.accent
-    ? (readableAccent(page.accent, surfaceKey) ?? 'var(--peach)')
-    : 'var(--peach)';
   const story = (page.story || description || '').trim();
   // Is there anything on Home worth sending someone to? A tagline, a story
   // or an offering counts; the name and kind alone are the empty room.
@@ -556,6 +574,12 @@ export default function PublicPage(props: PublicPageProps) {
     >
       {props.preview && (
         <p className="ppage__preview">Preview — this is what the open web sees.</p>
+      )}
+      {trying && !props.preview && (
+        <p className="ppage__preview">
+          Trying your branding — nothing is saved, and nobody else sees this.
+          Close this tab and choose back on your page settings.
+        </p>
       )}
 
       {/* Platform doors, upper right — elegant and quiet (founder
