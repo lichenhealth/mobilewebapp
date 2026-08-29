@@ -7,6 +7,8 @@
 // the thread name (assistant-feed) or the chat row's party_space_id
 // (claude-chat) — server-side facts the model cannot supply.
 
+import { readBrandScheme } from './brandColors.ts';
+
 export const SPACE_CONTACT_FIELDS = ['website', 'email', 'phone', 'booking', 'hours', 'address', 'instagram', 'facebook'];
 export const SPACE_TAGLINE_MAX = 90;
 
@@ -203,6 +205,20 @@ export const SPACE_PAGE_TOOLS = [
       },
       required: [],
     },
+  },
+  {
+    // The assistant could SET colours but never SEE the logo, so a steward
+    // asking to "switch to Countryman Stables branding" got asked for a hex
+    // code — while the page builder's own button had been reading that logo
+    // all along (founder 2026-08-28).
+    name: 'set_space_page_colours_from_logo',
+    description:
+      "Read the space's own logo and set the page's colours from it — the accent it reads as, on "
+      + 'the background that suits it. Use this whenever someone asks for "our branding", "our '
+      + 'colours" or "the colours from our logo" — do NOT ask them for a hex code, and do not ask '
+      + 'them to describe the colour. Only ask if the space has no logo, or if they want something '
+      + 'other than what the logo says. Reports what it picked and what was there before.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'set_space_join_level',
@@ -512,6 +528,32 @@ export async function runSpacePageTool(
       ok: true, previous,
       change: `set ${spaceName}'s page colours`,
       note: 'The page darkens a too-pale accent when it renders, so what they see may be a deeper shade of what you set.',
+    };
+  }
+
+  if (name === 'set_space_page_colours_from_logo') {
+    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=avatar_url,page`)).json();
+    const row = Array.isArray(cur) ? cur[0] : null;
+    const logo = (row?.avatar_url ?? '') as string;
+    if (!logo) {
+      return { ok: false, error: `${spaceName} has no logo yet, so there is nothing to read a colour from. They can add one on the page, or tell you a colour.` };
+    }
+    const KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
+    const scheme = await readBrandScheme(logo, KEY);
+    if (!scheme || (!scheme.accent && scheme.ground === 'white')) {
+      return { ok: false, error: `Couldn't read a colour from ${spaceName}'s logo — it may be black and white. Ask them what colour they want.` };
+    }
+    const page = (row?.page ?? {}) as Record<string, unknown>;
+    const previous = { accent: page.accent ?? null, ground: page.surface ?? null };
+    if (scheme.accent) page.accent = scheme.accent; else delete page.accent;
+    if (scheme.ground === 'warm') delete page.surface; else page.surface = scheme.ground;
+    await patchSpace({ page });
+    return {
+      ok: true, previous,
+      accent: scheme.accent, ground: scheme.ground,
+      change: `set ${spaceName}'s page to its own colours from its logo`
+        + (scheme.accent ? ` — ${scheme.accent} on ${scheme.ground}` : ` — a ${scheme.ground} background`),
+      note: 'The page deepens a too-pale accent when it renders, so what they see may be a shade darker than the hex you name.',
     };
   }
 
