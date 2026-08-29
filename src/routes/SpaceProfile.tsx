@@ -1863,6 +1863,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
             hasFacilities={!!pageEdit.facilities?.trim()}
             facilities={pageEdit.facilities}
+            story={pageEdit.story}
+            onStory={(story) => setPageEdit((pm) => ({ ...pm, story }))}
             onFacilities={(facilities) => setPageEdit((pm) => ({ ...pm, facilities }))}
             team={pageEdit.team ?? []}
             onTeam={(team) => setPageEdit((pm) => ({ ...pm, team }))}

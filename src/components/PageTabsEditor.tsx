@@ -163,7 +163,7 @@ export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
   entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
-  facilities, onFacilities,
+  facilities, onFacilities, story, onStory,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -202,6 +202,14 @@ export default function PageTabsEditor({
    *  into and grew a second copy of itself. */
   facilities?: string;
   onFacilities?: (text: string) => void;
+  /** page.story — the long About text. Claude's set_space_story writes it,
+   *  and it had no field here (founder 2026-08-29: "the copy claude pushed
+   *  is in the proper fields in manual… right?"). Worse than absent: once
+   *  page.story existed, the builder's Description box — the obvious place
+   *  to edit the About text — silently stopped affecting the public page,
+   *  because story wins over description there. */
+  story?: string;
+  onStory?: (text: string) => void;
   /** page.team — the people on the page, shown in the About section.
    *  Passing onTeam turns on the People editor (founder 2026-08-26:
    *  restoring the barn's faces surfaced that team had no UI at all). */
@@ -446,6 +454,23 @@ export default function PageTabsEditor({
                     lead="These appear on the public page — how someone reaches you without joining Lichen."
                   />
                 )}
+                {/* About's long text. Empty here = the public page falls
+                    back to the Description, which is how most pages start. */}
+                {t.id === 'about' && onStory && (
+                  <>
+                    <textarea
+                      className="prof__input ptabs__body"
+                      rows={6}
+                      value={story ?? ''}
+                      placeholder="The long story. Leave a blank line between paragraphs."
+                      onChange={(e) => onStory(e.target.value)}
+                    />
+                    <p className="ptabs__note">
+                      Leave this empty and About shows your Description instead. Write anything here
+                      and it takes over — the Description goes back to being the short line inside Lichen.
+                    </p>
+                  </>
+                )}
                 {/* Facilities is the one built-in whose body has nowhere
                     else to come from — there's no profile field behind it —
                     so it's written right here. */}
@@ -468,7 +493,9 @@ export default function PageTabsEditor({
                 <p className="ptabs__note">
                   {t.id === 'facilities'
                     ? 'This is the whole Facilities page — the line, the photo and the words above are yours.'
-                    : 'This tab writes itself from your profile — the line and photo above are yours to set.'}
+                    : t.id === 'about'
+                      ? 'The people on this page are edited below; the line, photo and story above are yours.'
+                      : 'This tab writes itself from your profile — the line and photo above are yours to set.'}
                 </p>
               </div>
             )}

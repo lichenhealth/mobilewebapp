@@ -1000,6 +1000,8 @@ export default function Profile() {
             onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
             hasFacilities={!!pageMeta.facilities?.trim()}
             facilities={pageMeta.facilities}
+            story={pageMeta.story}
+            onStory={(story) => setPage({ story })}
             onFacilities={(facilities) => setPage({ facilities })}
             team={pageMeta.team ?? []}
             onTeam={(team) => setPage({ team })}
