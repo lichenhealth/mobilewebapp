@@ -249,9 +249,19 @@ export const SPACE_PAGE_TOOLS = [
   },
 ];
 
-/** True when `name` is one of the SPACE_PAGE_TOOLS. */
+/** True when `name` is one of the SPACE_PAGE_TOOLS.
+ *
+ *  ⚠ MATCHED AGAINST THE ACTUAL LIST, not a name prefix (founder 2026-08-28).
+ *  This tested `set_space_` || `move_space_`, so the day `get_space_page` was
+ *  added the model could SEE the tool, call it, and have the router refuse to
+ *  recognise it — which surfaced to a steward as "the function call just
+ *  failed" and "my tools aren't responding", and looked for all the world
+ *  like an outage. A prefix rule silently excludes every future verb; the set
+ *  cannot drift from the tools it is derived from. */
+const SPACE_PAGE_TOOL_NAMES: ReadonlySet<string> = new Set(SPACE_PAGE_TOOLS.map((t) => t.name));
+
 export function isSpacePageTool(name: string): boolean {
-  return name.startsWith('set_space_') || name.startsWith('move_space_');
+  return SPACE_PAGE_TOOL_NAMES.has(name);
 }
 
 /** Execute one space page tool against the given space. Callers must have
