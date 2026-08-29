@@ -1019,7 +1019,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // The same three-way every profile wears now (founder 2026-08-11):
   // Admin manages, Lichen View is the internal experience, Public View is
   // the website layer (?preview=1 renders the open-web template).
-  const adminBar = isAdmin ? (
+  // A TRIAL SHOWS THE PAGE AND NOTHING ELSE (founder 2026-08-28: "to make it
+  // a clear preview, let's remove the nav here. You close the tab and you
+  // close the preview, that simple"). The three-way toggle is a way OUT of
+  // the view you are in — and this view's exit is the tab's close button. An
+  // owner judging their colours shouldn't have Lichen's furniture in shot.
+  const adminBar = isAdmin && !trialView ? (
     <div className="view-toggle-row">
       {/* No visible subject label (founder 2026-08-22, same day it shipped:
           it squeezed the toggle off the column) — the acting chip's real
