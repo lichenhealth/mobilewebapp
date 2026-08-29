@@ -482,9 +482,11 @@ Deno.serve(async (req) => {
   let canEdit = false;
   let canCalendar = false;
   let canSpaceEdit = false;
+  let handThatWrites = false;
   {
     const me = await (await sb(`profiles?id=eq.${profile_id}&select=assistant_can_edit`)).json();
     const flag = !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
+    handThatWrites = flag;
     canEdit = thread === 'profile' && flag;
     // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
     // hand-that-writes flag arms CALENDAR tools in the calendar thread.
@@ -520,6 +522,25 @@ Deno.serve(async (req) => {
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.'
       + '\n- PHOTO MOVES work here too: move a photo between the page\'s tabs, make one the Home cover, or shift which part shows (the position tool takes top/center/bottom or 0–100 from the top). A photo pasted into their message goes onto the page with place_uploaded_photo.';
+ 
+  } else if (spaceId) {
+    // SAY WHICH SWITCH, NOT "MY TOOLS ARE DOWN" (founder 2026-08-28, after
+    // Claude told a steward "once my tools are working again" and filed a dev
+    // report for a one-line copy change). Nothing is broken when the tools
+    // are unarmed — a consent is off, and the member can turn it on in about
+    // ten seconds. Naming a switch is help; implying an outage sends them
+    // away to wait for a fix that is never coming.
+    const missing = [
+      !spaceIsAdmin ? 'they are not a steward of this space — only its stewards can let you write to its page' : '',
+      !spaceAiOn ? `${spaceName}'s own assistant switch is off (its page settings, "Let Claude help with this page")` : '',
+      !handThatWrites ? 'their own "Let Claude edit my page directly" switch is off (Profile → Privacy)' : '',
+    ].filter(Boolean);
+    spaceEditRule = `\n\nYOUR PAGE TOOLS ARE NOT ARMED FOR ${spaceName.toUpperCase()} IN THIS THREAD, and the reason is a SWITCH, not a fault. `
+      + `What is missing: ${missing.join('; ')}. `
+      + 'When they ask you to change the page: say plainly that you cannot write to it yet, name the switch and where it is, and offer to make the change the moment it is on. '
+      + 'NEVER say your tools are "down", "not working", or "working again later" — nothing is broken and no one is coming to fix it. '
+      + 'NEVER file a dev report for a change they asked YOU to make; a report is for something broken, and an unset consent is not broken. '
+      + 'You may still draft the exact wording for them to paste, and say where in the builder it goes.';
   }
 
   // Pasted photos (founder 2026-08-22): the model can SEE them — say so,
