@@ -1542,6 +1542,58 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
+          {/* WHAT YOU OFFER (founder 2026-08-28, wanting to change "school
+              horses & barn horses" to "inquire about available horses" and
+              finding nowhere to do it). `page.offerings` has rendered on
+              public pages since July with no way to edit it — the same
+              data-without-a-control gap as `join` and `accent` had this
+              morning. Stored as one string per line, "Name · terms", which
+              PublicPage splits on the middle dot; the two fields here keep
+              an owner from ever having to know that. */}
+          <div className="prof__field">
+            <label className="prof__label">What you offer</label>
+            {(pageEdit.offerings ?? []).map((line, i) => {
+              const [name, ...rest] = line.split(' · ');
+              const terms = rest.join(' · ');
+              const write = (n: string, t: string) => setPageEdit((pm) => {
+                const next = [...(pm.offerings ?? [])];
+                next[i] = t.trim() ? `${n} · ${t}` : n;
+                return { ...pm, offerings: next };
+              });
+              return (
+                <div className="sprof__offer-row" key={i}>
+                  <input
+                    className="prof__input" value={name} placeholder="Private lessons"
+                    onChange={(e) => write(e.target.value, terms)}
+                  />
+                  <input
+                    className="prof__input" value={terms} placeholder="45 min · $60"
+                    onChange={(e) => write(name, e.target.value)}
+                  />
+                  <button
+                    type="button" className="sprof__offer-rm" aria-label={`Remove ${name || 'this line'}`}
+                    onClick={() => setPageEdit((pm) => ({
+                      ...pm, offerings: (pm.offerings ?? []).filter((_, j) => j !== i),
+                    }))}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button" className="prof__addline"
+              onClick={() => setPageEdit((pm) => ({ ...pm, offerings: [...(pm.offerings ?? []), ''] }))}
+            >
+              + Add a line
+            </button>
+            <p className="prof__hint">
+              What it is on the left, the terms on the right — price, length, or
+              something like &ldquo;inquire about available horses&rdquo;. Leave the right
+              side empty for a plain line.
+            </p>
+          </div>
+
           {/* The feed is a Lichen thing; the open web only sees it if this
               space says so (founder 2026-08-11). */}
           <label className="prof__consent">

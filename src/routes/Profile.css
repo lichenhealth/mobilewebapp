@@ -344,3 +344,20 @@
 .sprof__look-see:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
 .sprof__look-see:disabled { opacity: 0.4; cursor: default; }
 .sprof__look .sprof__hue-dot { width: 12px; height: 12px; margin-left: 8px; display: inline-block; vertical-align: middle; }
+
+/* What you offer — name and terms side by side, so nobody has to know the
+   stored line is "Name · terms" (founder 2026-08-28). */
+.sprof__offer-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sprof__offer-row .prof__input { flex: 1; min-width: 0; }
+.sprof__offer-rm {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--bone-edge); background: transparent;
+  color: var(--ink-muted); font-size: 17px; line-height: 1; cursor: pointer;
+}
+.sprof__offer-rm:hover { color: var(--ink); border-color: var(--ink-faint); }
+.prof__addline {
+  border: 1px dashed var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 13px; padding: 7px 14px; cursor: pointer;
+}
+.prof__addline:hover { color: var(--ink); border-color: var(--ink-faint); }
