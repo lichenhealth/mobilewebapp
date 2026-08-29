@@ -9,10 +9,23 @@
      existed, so an untouched page is byte-identical (founder 2026-08-28). */
   --ppage-ground: var(--bone);
   --ppage-ink: var(--ink);
+  --ppage-ink-soft: var(--ink-soft);
   --ppage-ink-muted: var(--ink-muted);
   --ppage-edge: var(--bone-edge);
   background: var(--ppage-ground);
   color: var(--ppage-ink);
+  /* REDEFINE LICHEN'S INK FAMILY FOR THIS PAGE (founder 2026-08-28). The
+     whole global family assumes light paper — the nav links are --ink-soft
+     (#2A3338), which on a chosen dark ground is near-black on near-black and
+     simply vanished. Rebinding the tokens here means every descendant that
+     reaches for --ink, --ink-soft, --ink-muted or --bone-edge gets the
+     PAGE's version, whatever ground it wears, without hunting rule by rule. */
+  --ink: var(--ppage-ink);
+  --ink-soft: var(--ppage-ink-soft);
+  --ink-muted: var(--ppage-ink-muted);
+  --ink-faint: var(--ppage-ink-muted);
+  --bone-edge: var(--ppage-edge);
+  --bone-edge-soft: var(--ppage-edge);
   min-height: 100dvh;
   padding-bottom: 72px; position: relative;
 }

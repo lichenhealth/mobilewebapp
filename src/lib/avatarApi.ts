@@ -73,14 +73,19 @@ export async function imageFocusPct(url: string): Promise<number | null> {
  *  2026-08-28, "let them preview it to decide if they like it"). */
 export async function brandSchemeFromLogo(
   url: string,
-): Promise<{ accent: string | null; ground: 'warm' | 'white' | 'dark' } | null> {
+): Promise<{ accent: string | null; ground: string } | null> {
   try {
     const { data, error } = await supabase.functions.invoke('brand-colors', { body: { image: url } });
     if (error) return null;
     const d = data as { accent?: unknown; ground?: unknown } | null;
     const accent = typeof d?.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(d.accent) ? d.accent : null;
-    const ground = d?.ground === 'white' || d?.ground === 'dark' ? d.ground : 'warm';
-    return accent === null && ground === 'warm' ? null : { accent, ground };
+    // A ground is a named look OR a hex the logo suggested — a tint that
+    // suits it can beat plain white (founder 2026-08-28).
+    const raw = typeof d?.ground === 'string' ? d.ground.trim().toLowerCase() : '';
+    const ground = raw === 'white' || raw === 'warm' ? raw
+      : /^#[0-9a-f]{6}$/.test(raw) ? raw
+      : 'white';
+    return accent === null && ground === 'white' ? null : { accent, ground };
   } catch {
     return null;
   }

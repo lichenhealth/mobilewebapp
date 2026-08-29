@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import { domainsForHandle } from '../lib/customDomain';
-import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
+import { SURFACES, resolveSurface, readableAccent, type PageSurface } from '../lib/pageColors';
 import { brandSchemeFromLogo } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
@@ -263,7 +263,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const savedHandle = useRef('');
   const [handleFree, setHandleFree] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle');
   const [hueBusy, setHueBusy] = useState(false);
-  const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: PageSurface } | null>(null);
+  const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: string } | null>(null);
   const [hueNote, setHueNote] = useState('');
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
@@ -1422,14 +1422,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               logo too, and neither writes anything until Save. */}
           <div className="prof__field">
             <label className="prof__label">How this page looks</label>
-            {(['warm', 'white', 'dark', 'branding'] as const).map((key) => {
+            {(['white', 'warm', 'branding'] as const).map((key) => {
               const isBranding = key === 'branding';
               const chosen = pageEdit.accent
                 ? isBranding
                 : !isBranding && (pageEdit.surface ?? 'warm') === key;
               const openTrial = async () => {
                 let brand = 'lichen';
-                let ground: PageSurface = isBranding ? 'warm' : key;
+                let ground: string = isBranding ? 'warm' : key;
                 if (isBranding) {
                   let prop = hueProposal;
                   if (!prop) {
@@ -1442,6 +1442,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                     prop = { accent: safe, raw: found.accent, ground: found.ground };
                     setHueProposal(prop);
                   }
+                  if (!prop) return;
                   brand = prop.accent ?? 'lichen';
                   ground = prop.ground;
                 }
@@ -1502,7 +1503,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                             : space?.avatar_url
                               ? 'Takes the colour from your logo and puts it on the background that suits it.'
                               : 'Add a logo above and this can take its colours from it.')
-                        : SURFACES[key].note}
+                        : SURFACES[key as PageSurface].note}
                     </em>
                   </span>
                   <button

@@ -38,11 +38,15 @@ const PROMPT =
   'if asked what colour this business is. Prefer a saturated brand colour over black, ' +
   'white or grey; those are almost always the ink and the paper, not the brand. If the ' +
   'logo is genuinely only black and white, use NONE.\n\n' +
-  'GROUND: which background this logo belongs on — "white" if it is drawn for white paper, ' +
-  '"warm" if it would suit a soft off-white paper tone, "dark" only if the logo is clearly ' +
-  'built for a dark background (light or reversed-out artwork).\n\n' +
-  'Reply with exactly this and nothing else: a hex colour or NONE, a space, then one of ' +
-  'white / warm / dark. For example: #A32B2B white';
+  'GROUND: the page background this logo belongs on. Answer "white" unless a soft tint ' +
+  'would genuinely suit it better — a barely-there wash of the brand hue, or a warm ' +
+  'paper tone for something traditional. If you choose a tint, give it as a hex and keep ' +
+  'it VERY light: near-white, the sort of colour that reads as paper rather than as a ' +
+  'colour. Never a dark or saturated background — the page carries long text and a logo ' +
+  'that may be drawn in dark ink.\n\n' +
+  'Reply with exactly this and nothing else: a hex colour or NONE, a space, then "white" ' +
+  'or a hex. For example: #A32B2B #FBF7F4\n' +
+  'Another example: #1D6F52 white';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -79,12 +83,22 @@ Deno.serve(async (req) => {
     const d = await r.json();
     if (!r.ok) throw new Error(d?.error?.message ?? `Anthropic ${r.status}`);
     const text: string = d?.content?.[0]?.text ?? '';
-    const hex = text.match(/#[0-9a-fA-F]{6}\b/);
-    const groundWord = text.match(/\b(white|warm|dark)\b/i);
-    const ground = groundWord ? groundWord[1].toLowerCase() : 'warm';
+    // Accent first, ground second — a reply may carry two hexes.
+    const hexes = text.match(/#[0-9a-fA-F]{6}\b/g) ?? [];
+    const accentHex: string | null = hexes[0] ?? null;
+    const groundHex: string | null = hexes[1] ?? null;
+    const groundWord = text.match(/\b(white|warm)\b/i);
+    let ground = groundHex ?? (groundWord ? groundWord[1].toLowerCase() : 'white');
+    // Refuse a ground too dark to carry text, whatever was asked for — the
+    // client derives ink from it, but a dark page is not on offer.
+    const g = /^#[0-9a-f]{6}$/i.test(ground) ? ground : null;
+    if (g) {
+      const [r, gg, b] = [1, 3, 5].map((i) => parseInt(g.slice(i, i + 2), 16));
+      if (0.2126 * r + 0.7152 * gg + 0.0722 * b < 200) ground = 'white';
+    }
     // A ground is still worth returning when the logo has no colour of its
     // own — a black-and-white wordmark on white paper is a scheme too.
-    return json({ accent: hex ? hex[0].toLowerCase() : null, ground });
+    return json({ accent: accentHex ? accentHex.toLowerCase() : null, ground });
   } catch (err) {
     console.error('brand-colors error:', err);
     return json({});   // honest degrade — the page keeps the colours it has

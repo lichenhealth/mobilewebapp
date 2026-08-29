@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
-import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
+import { resolveSurface, readableAccent } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
@@ -65,11 +65,14 @@ export interface PageMeta {
    *  FORCED READABLE against `surface` when the owner sets one — see
    *  readableAccent() (founder 2026-08-28). */
   accent?: string;
-  /** Which ground the page sits on: 'warm' (Lichen's paper, the default),
-   *  'white', or 'dark'. Three choices on purpose — a free background field
-   *  is how a non-technical owner ends up with an unreadable site. The ink
-   *  colour travels with the ground so text flips on the dark one. */
-  surface?: 'warm' | 'white' | 'dark';
+  /** The ground this page sits on: 'white', 'warm' (Lichen's paper, the
+   *  default), or a hex a business's logo suggested — a tint that suits it
+   *  can beat plain white (founder 2026-08-28). Never a free colour field:
+   *  the two named looks are picked from a list and the third is proposed
+   *  from the logo, then previewed before it is accepted. Whatever the
+   *  ground, its text colours are DERIVED from it (resolveSurface), so a
+   *  page can't inherit near-black type onto a colour it chose. */
+  surface?: string;
   /** Legacy single CTA — kept for old rows; new saves write `actions`. */
   action?: { kind: 'call' | 'book' | 'email' | 'visit' | 'none'; label?: string; href?: string };
   /** "How do you want people to get in touch" (founder 2026-08-11) —
@@ -221,19 +224,17 @@ export default function PublicPage(props: PublicPageProps) {
   // look like a different product on every screen, and a member moving
   // between spaces would lose the thread of where they are.
   const inApp = !!props.signedIn;
-  const surfaceKey: PageSurface = inApp
-    ? 'warm'
-    : (tryGround === 'warm' || tryGround === 'white' || tryGround === 'dark')
-      ? tryGround
-      : (props.page.surface ?? 'warm');
-  const surface = SURFACES[surfaceKey];
+  // A ground may be a named look or a hex a logo suggested, so it is resolved
+  // rather than looked up — and it brings its own text colours with it.
+  const surfaceValue = inApp ? 'warm' : (tryGround ?? props.page.surface ?? 'warm');
+  const surface = resolveSurface(surfaceValue);
   // ?brand=lichen is the sentinel for "no accent of your own" — it lets the
   // builder offer Lichen's own look as one previewable option alongside the
   // rest, which a missing parameter can't do (it would fall back to whatever
   // accent is already saved).
   const wantAccent = inApp ? null : (tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent));
   const accent = wantAccent
-    ? (readableAccent(wantAccent, surfaceKey) ?? 'var(--peach)')
+    ? (readableAccent(wantAccent, surfaceValue) ?? 'var(--peach)')
     : 'var(--peach)';
   // Lichen doors cross back to Lichen's own origin when this page is served
   // from a member's custom domain.
@@ -587,6 +588,7 @@ export default function PublicPage(props: PublicPageProps) {
         ['--ppage-accent' as string]: accent,
         ['--ppage-ground' as string]: surface.ground,
         ['--ppage-ink' as string]: surface.ink,
+        ['--ppage-ink-soft' as string]: surface.soft,
         ['--ppage-ink-muted' as string]: surface.muted,
         ['--ppage-edge' as string]: surface.edge,
       }}

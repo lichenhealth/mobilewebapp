@@ -1,27 +1,34 @@
-// A PAGE'S OWN COLOURS (founder 2026-08-28: "can they choose a white
-// background and to pull their dark red in instead of our peach?").
+// A PAGE'S OWN COLOURS (founder 2026-08-28).
 //
-// Two deliberate limits. The BACKGROUND is a choice from three grounds, not a
-// colour picker — a free background field is how a non-technical owner ends
-// up with an unreadable site and no idea why. The ACCENT is free, because it
-// is theirs and it comes off their logo, but it is FORCED to be readable on
-// whichever ground they chose. An owner cannot wreck their own page here.
+// Three named looks — White, Lichen's warm paper, or the business's own —
+// and the third can bring its own GROUND, not only its own accent ("can we
+// make 'your branding' smart enough that you can decide to have the webpage
+// be another color, versus white, if it looks good?").
+//
+// DARK WAS REMOVED the same day, and the reason is worth keeping. It looked
+// broken because the page's text colours came from Lichen's global --ink
+// family (#2A3338 nav links on a near-black ground — invisible), while only
+// a couple of elements followed the page's own ink. That is fixed below by
+// deriving the whole ink family from the ground, so a dark ground would now
+// work. It is still gone, because the founder judged a black site wrong for
+// the businesses on here — and because a logo drawn in dark ink on
+// transparency, like Countryman's, vanishes on one no matter how correct
+// the text colours are.
+//
+// So: an accent is FORCED readable on its ground, and a ground carries text
+// colours derived from it rather than inherited. An owner cannot land on an
+// unreadable page from either direction.
 
-export type PageSurface = 'warm' | 'white' | 'dark';
+export type PageSurface = 'warm' | 'white';
 
-/** The three grounds. `ink` travels with the ground because text has to flip
- *  on a dark one — offering a background without its text colour is how you
- *  ship black-on-black. */
-export const SURFACES: Record<PageSurface, { ground: string; ink: string; muted: string; edge: string; label: string; note: string }> = {
-  warm:  { ground: '#F0EEE9', ink: '#12181C', muted: '#5B6B73', edge: '#D9D9D9',
-           label: 'Warm',  note: "Lichen's own paper tone — the default." },
-  white: { ground: '#FFFFFF', ink: '#12181C', muted: '#5B6B73', edge: '#E4E4E4',
-           label: 'White',  note: 'Clean and neutral. Good behind a logo with its own colours.' },
-  dark:  { ground: '#12181C', ink: '#F2F4F5', muted: '#A3B0B7', edge: '#2A3238',
-           label: 'Dark',   note: 'Light text on a near-black ground.' },
+/** The two named grounds. Anything else is a hex a logo suggested. */
+export const SURFACES: Record<PageSurface, { ground: string; label: string; note: string }> = {
+  white: { ground: '#FFFFFF', label: 'White',
+           note: 'Clean and neutral. Good behind a logo with its own colours.' },
+  warm:  { ground: '#F0EEE9', label: "Lichen's look",
+           note: "Lichen's own paper tone — the default." },
 };
 
-/** #rgb or #rrggbb → [r,g,b] 0–255, or null if it isn't a colour. */
 export function parseHex(hex: string): [number, number, number] | null {
   const s = hex.trim().replace(/^#/, '');
   const full = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
@@ -32,7 +39,6 @@ export function parseHex(hex: string): [number, number, number] | null {
 const toHex = (rgb: [number, number, number]) =>
   '#' + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
-/** WCAG relative luminance. */
 function luminance([r, g, b]: [number, number, number]): number {
   const lin = [r, g, b].map((v) => {
     const c = v / 255;
@@ -41,7 +47,6 @@ function luminance([r, g, b]: [number, number, number]): number {
   return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
 }
 
-/** WCAG contrast ratio, 1 (identical) to 21 (black on white). */
 export function contrast(a: string, b: string): number {
   const ca = parseHex(a); const cb = parseHex(b);
   if (!ca || !cb) return 1;
@@ -49,30 +54,51 @@ export function contrast(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** The floor. 4.5:1 is WCAG AA for body text, and the accent is used for
- *  link text and small labels, not just decoration — so body text is the
- *  right bar, not the large-text 3:1 concession. */
+/** WCAG AA for body text. The accent is used for link text and small labels,
+ *  not just decoration, so body text is the right bar. */
 export const MIN_CONTRAST = 4.5;
 
-/** An accent the owner will actually be able to read on their chosen ground.
- *  Their hue is kept; only lightness moves, and only as far as it has to.
- *  A colour that already passes is returned untouched — this is a floor, not
- *  a house style. Returns null for input that isn't a colour at all. */
-export function readableAccent(accent: string, surface: PageSurface): string | null {
+const mix = (a: [number, number, number], b: [number, number, number], t: number) =>
+  toHex([0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t) as [number, number, number]);
+
+export type ResolvedSurface = { ground: string; ink: string; muted: string; soft: string; edge: string };
+
+/** Everything a ground needs, DERIVED from the ground rather than inherited.
+ *  Lichen's global --ink family assumes light paper; a page that chose its
+ *  own colour has to carry its own text colours or it inherits near-black on
+ *  whatever it picked (founder 2026-08-28 — this is exactly what made the
+ *  dark option look broken). Accepts a preset name or any hex. */
+export function resolveSurface(value?: string | null): ResolvedSurface {
+  const named = value === 'white' || value === 'warm' ? SURFACES[value].ground : null;
+  const ground = named ?? (value && parseHex(value) ? toHex(parseHex(value)!) : SURFACES.warm.ground);
+  const rgb = parseHex(ground)!;
+  // Pick whichever of near-black / near-white reads better ON this ground,
+  // then step the softer tones back toward the ground rather than toward
+  // grey, so they stay in the page's own key.
+  const dark: [number, number, number] = [18, 24, 28];
+  const light: [number, number, number] = [242, 244, 245];
+  const ink = contrast(toHex(dark), ground) >= contrast(toHex(light), ground) ? dark : light;
+  return {
+    ground,
+    ink: toHex(ink),
+    soft: mix(ink, rgb, 0.18),
+    muted: mix(ink, rgb, 0.42),
+    edge: mix(ink, rgb, 0.82),
+  };
+}
+
+/** An accent the owner will be able to read on their ground. Their hue is
+ *  kept; only lightness moves, and only as far as it must. */
+export function readableAccent(accent: string, surfaceValue?: string | null): string | null {
   const rgb = parseHex(accent);
   if (!rgb) return null;
-  const { ground } = SURFACES[surface];
+  const { ground, ink } = resolveSurface(surfaceValue);
   if (contrast(accent, ground) >= MIN_CONTRAST) return toHex(rgb);
-  // Walk toward black on a light ground, toward white on a dark one, in small
-  // steps, and stop the moment it clears. 60 steps is enough to reach either
-  // end from any starting colour.
-  const towardWhite = surface === 'dark';
+  const groundIsDark = luminance(parseHex(ground)!) < 0.5;
   let cur: [number, number, number] = [...rgb] as [number, number, number];
   for (let i = 0; i < 60; i++) {
-    cur = cur.map((v) => (towardWhite ? v + (255 - v) * 0.06 : v * 0.94)) as [number, number, number];
+    cur = cur.map((v) => (groundIsDark ? v + (255 - v) * 0.06 : v * 0.94)) as [number, number, number];
     if (contrast(toHex(cur), ground) >= MIN_CONTRAST) return toHex(cur);
   }
-  // Nothing in this hue works; fall back to the ground's own ink rather than
-  // returning something unreadable.
-  return SURFACES[surface].ink;
+  return ink;
 }
