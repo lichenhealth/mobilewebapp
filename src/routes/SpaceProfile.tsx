@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { Icon, type IconName } from '../components/Icon';
 import { setTopIdentity } from '../lib/topIdentity';
 import { domainsForHandle } from '../lib/customDomain';
+import { SURFACES, readableAccent, type PageSurface } from '../lib/pageColors';
+import { brandSchemeFromLogo } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -258,6 +260,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [hueBusy, setHueBusy] = useState(false);
+  const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: PageSurface } | null>(null);
+  const [hueNote, setHueNote] = useState('');
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
   // 2026-07-27: queues and edit tools on the public page are distracting).
@@ -1343,6 +1348,150 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onChange={(e) => setPageEdit((pm) => ({ ...pm, tagline: e.target.value }))}
               placeholder="A grange for the whole valley" />
           </div>
+
+          {/* THIS PAGE'S COLOURS (founder 2026-08-28: "can they choose a
+              white background and to pull their dark red in instead of our
+              peach?"). Background is three grounds, not a colour picker — a
+              free background field is how someone ends up with an unreadable
+              site. The accent is theirs and comes off their own logo, but is
+              forced readable on whichever ground they picked, so nobody can
+              quietly wreck their own page. */}
+          <div className="prof__field">
+            <label className="prof__label">Background</label>
+            {(Object.keys(SURFACES) as PageSurface[]).map((key) => (
+              <label className="prof__consent" key={key}>
+                <input
+                  type="radio"
+                  name="page-surface"
+                  checked={(pageEdit.surface ?? 'warm') === key}
+                  onChange={() => setPageEdit((pm) => ({
+                    ...pm, surface: key === 'warm' ? undefined : key,
+                  }))}
+                />
+                <span>
+                  <strong>{SURFACES[key].label}</strong>
+                  <em>{SURFACES[key].note}</em>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {/* A PROPOSAL YOU LOOK AT FIRST (founder 2026-08-28: "let them
+              preview it to decide if they like it"). Reading the logo does
+              not change the page — it puts a scheme on screen, on the ground
+              it suggests, showing the elements the accent actually drives.
+              Nothing is committed until the owner says so. */}
+          <div className="prof__field">
+            <label className="prof__label">Accent colour</label>
+            <div className="prof__handle">
+              <span
+                aria-hidden
+                style={{
+                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                  border: '1px solid var(--bone-edge)',
+                  background: pageEdit.accent
+                    ? (readableAccent(pageEdit.accent, pageEdit.surface ?? 'warm') ?? 'var(--peach)')
+                    : 'var(--peach)',
+                }}
+              />
+              <button
+                type="button" className="btn" disabled={hueBusy || !space?.avatar_url}
+                onClick={async () => {
+                  if (!space?.avatar_url) return;
+                  setHueBusy(true); setHueNote(''); setHueProposal(null);
+                  const found = await brandSchemeFromLogo(space.avatar_url);
+                  setHueBusy(false);
+                  if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
+                  const ground: PageSurface = found.ground;
+                  const safe = found.accent ? readableAccent(found.accent, ground) : null;
+                  setHueProposal({ accent: safe, raw: found.accent, ground });
+                }}
+              >
+                {hueBusy ? 'Reading your logo…' : '✦ Use my branding'}
+              </button>
+              {(pageEdit.accent || pageEdit.surface) && !hueProposal && (
+                <button
+                  type="button" className="btn"
+                  onClick={() => {
+                    setPageEdit((pm) => ({ ...pm, accent: undefined, surface: undefined }));
+                    setHueNote('');
+                  }}
+                >
+                  Back to Lichen&rsquo;s colours
+                </button>
+              )}
+            </div>
+
+            {hueProposal && (
+              <div
+                style={{
+                  marginTop: 12, borderRadius: 12, overflow: 'hidden',
+                  border: '1px solid var(--bone-edge)',
+                }}
+              >
+                {/* The preview is the real thing in miniature: the ground it
+                    proposes, the name in that ground's ink, a section label
+                    and a button in the accent — the three places the accent
+                    actually shows up on a page. */}
+                <div style={{
+                  background: SURFACES[hueProposal.ground].ground,
+                  color: SURFACES[hueProposal.ground].ink,
+                  padding: '18px 16px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 19, marginBottom: 6 }}>{space?.name}</div>
+                  <div style={{
+                    fontSize: 10, letterSpacing: '0.05em', textTransform: 'uppercase',
+                    color: hueProposal.accent ?? SURFACES[hueProposal.ground].muted,
+                    marginBottom: 12,
+                  }}>
+                    What we offer
+                  </div>
+                  <span style={{
+                    display: 'inline-block', padding: '7px 16px', borderRadius: 999,
+                    fontSize: 13,
+                    background: hueProposal.accent ?? 'var(--peach)', color: '#fff',
+                  }}>
+                    Get in touch
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, padding: 10, background: 'var(--bone-warm)' }}>
+                  <button
+                    type="button" className="btn btn-primary"
+                    onClick={() => {
+                      setPageEdit((pm) => ({
+                        ...pm,
+                        accent: hueProposal.accent ?? undefined,
+                        surface: hueProposal.ground === 'warm' ? undefined : hueProposal.ground,
+                      }));
+                      setHueNote(
+                        hueProposal.accent && hueProposal.raw
+                          && hueProposal.accent.toLowerCase() !== hueProposal.raw.toLowerCase()
+                          ? `Using ${hueProposal.raw} from your logo, deepened so it stays readable.`
+                          : 'Using your logo\u2019s colours.',
+                      );
+                      setHueProposal(null);
+                    }}
+                  >
+                    Use these colours
+                  </button>
+                  <button type="button" className="btn" onClick={() => setHueProposal(null)}>
+                    No thanks
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <p className="prof__hint">
+              {hueProposal
+                ? (hueProposal.accent
+                    ? `Your logo reads as ${hueProposal.raw} on a ${SURFACES[hueProposal.ground].label.toLowerCase()} background. Nothing changes until you choose.`
+                    : `Your logo is black and white, so this just proposes a ${SURFACES[hueProposal.ground].label.toLowerCase()} background.`)
+                : hueNote || (space?.avatar_url
+                    ? 'Used for links, buttons and section labels. Anything too pale to read on your background is deepened until it is.'
+                    : 'Add a logo above and this can take its colours from it.')}
+            </p>
+          </div>
+
           <div className="prof__field">
             <label className="prof__label">How do you want people to get in touch</label>
             <ContactActionsPicker
