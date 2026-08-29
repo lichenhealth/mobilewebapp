@@ -251,10 +251,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // pageBase is the version this form was seeded from. Anything newer on the
   // server is either adopted (you haven't typed) or offered (you have) —
   // never discarded, in either direction.
-  const pageBase = useRef<string>('{}');
-  const pageEditRef = useRef<PageMeta>({});
-  pageEditRef.current = pageEdit;
-  const [pageAhead, setPageAhead] = useState<PageMeta | null>(null);
+  //
+  // ⚠ THE GUARD COVERS EVERY COLUMN CLAUDE CAN WRITE, not just `page`.
+  // The first version of this watched the page blob alone — but the space
+  // tools also write `description` (the story) and `contact`, and this form
+  // saves both, so the story could still be overwritten in silence while
+  // the colours were protected. A half-guarded save is worse than none: it
+  // reads as safe.
+  type SpaceShared = { page: PageMeta; description: string; contact: ContactInfo };
+  const sharedBase = useRef<string>('');
+  const sharedNow = useRef<SpaceShared>({ page: {}, description: '', contact: {} });
+  sharedNow.current = { page: pageEdit, description, contact };
+  const [pageAhead, setPageAhead] = useState<SpaceShared | null>(null);
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -329,7 +337,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContentDownloadDefault(s.content_download_default !== false);
       const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
       setPageEdit(loadedPage);
-      pageBase.current = JSON.stringify(loadedPage);
+      sharedBase.current = JSON.stringify({
+        page: loadedPage, description: s.description ?? '', contact: sx.contact ?? {},
+      });
       setPageAhead(null);
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
       if (s.kind === 'community') {
@@ -637,31 +647,35 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
   /** The page as the server holds it right now — not as this form remembers
    *  it. Cheap: one column, one row. */
-  const readStoredPage = useCallback(async (): Promise<PageMeta | null> => {
-    const { data, error } = await supabase.from('spaces').select('page').eq('id', id).maybeSingle();
-    if (error) return null;
-    return (((data as { page?: PageMeta | null } | null)?.page) ?? {}) as PageMeta;
+  const readShared = useCallback(async (): Promise<SpaceShared | null> => {
+    const { data, error } = await supabase.from('spaces')
+      .select('page, description, contact').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    const row = data as { page?: PageMeta | null; description?: string | null; contact?: ContactInfo | null };
+    return { page: (row.page ?? {}) as PageMeta, description: row.description ?? '', contact: row.contact ?? {} };
   }, [id]);
 
   /** Catch the form up with whatever Claude (or another steward, or this
    *  page in another window) has written since it opened. Reads pageEdit
    *  through a ref so typing never re-fires this. */
   const syncPage = useCallback(async () => {
-    const fresh = await readStoredPage();
+    const fresh = await readShared();
     if (!fresh) return;
     const freshJson = JSON.stringify(fresh);
-    if (freshJson === pageBase.current) { setPageAhead(null); return; }
-    if (JSON.stringify(pageEditRef.current) === pageBase.current) {
+    if (freshJson === sharedBase.current) { setPageAhead(null); return; }
+    if (JSON.stringify(sharedNow.current) === sharedBase.current) {
       // Nothing typed here yet — the newer page simply IS this form now.
-      pageBase.current = freshJson;
-      setPageEdit(fresh);
+      sharedBase.current = freshJson;
+      setPageEdit(fresh.page);
+      setDescription(fresh.description);
+      setContact(fresh.contact);
       setPageAhead(null);
     } else {
       // Unsaved edits on screen. Never overwrite what someone is in the
       // middle of writing; show the choice instead.
       setPageAhead(fresh);
     }
-  }, [readStoredPage]);
+  }, [readShared]);
 
   // Catch up when the builder opens, and again whenever this tab comes back
   // to the front — going to the chat, asking Claude for a change and coming
@@ -694,12 +708,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // below replaces the whole `page` blob, so if Claude wrote to it while
       // this form sat open, saving would erase that work with no trace. Read
       // it one more time and stop rather than clobber.
-      if (Object.keys(pageEdit).length) {
-        const stored = await readStoredPage();
-        if (stored && JSON.stringify(stored) !== pageBase.current) {
+      {
+        const stored = await readShared();
+        if (stored && sharedBase.current && JSON.stringify(stored) !== sharedBase.current) {
           setPageAhead(stored);
           throw new Error(
-            'This page changed while the builder was open — Claude edited it in the chat. '
+            'This page changed while the builder was open — Claude, or another steward, edited it. '
             + 'Nothing was saved. Load the current page at the top of the builder, then make your change again.',
           );
         }
@@ -753,7 +767,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         }
       }
       await updateSpaceProfile(space.id, patch);
-      pageBase.current = JSON.stringify(pageEdit);
+      sharedBase.current = JSON.stringify({ page: pageEdit, description, contact });
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
       await load();
@@ -1307,14 +1321,17 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           {pageAhead && (
             <div className="sprof__ahead">
               <p className="sprof__ahead-say">
-                This page changed in the chat while the builder was open — Claude has written
-                something newer than what&rsquo;s on screen here. Saving now would write over it.
+                This page changed while the builder was open — Claude, or another steward, has
+                written something newer than what&rsquo;s on screen here. Saving now would write
+                over it.
               </p>
               <button
                 type="button" className="btn"
                 onClick={() => {
-                  pageBase.current = JSON.stringify(pageAhead);
-                  setPageEdit(pageAhead);
+                  sharedBase.current = JSON.stringify(pageAhead);
+                  setPageEdit(pageAhead.page);
+                  setDescription(pageAhead.description);
+                  setContact(pageAhead.contact);
                   setPageAhead(null);
                 }}
               >
