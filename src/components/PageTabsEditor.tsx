@@ -4,7 +4,7 @@ import CoverPicker from './CoverPicker';
 import ContactFields, { type ContactInfo } from './ContactFields';
 import { uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import {
-  TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
+  TAB_TEMPLATES, availableTemplates, tabById, SECTION_IDS, type PageTab,
 } from '../lib/pageTabs';
 import './PageTabsEditor.css';
 
@@ -24,7 +24,10 @@ import './PageTabsEditor.css';
  *  a style button, it should have one as well. All tabs should") — built-ins
  *  through Style, write-tabs through Write; the photo lives in sections[id]
  *  either way. */
-const SECTIONED = ['about', 'services', 'goods', 'contact', 'facilities'];
+//  ONE LIST, NOT TWO (founder 2026-08-28): this used to be its own copy of
+//  the section ids, which is how Facilities came to be a section here and a
+//  writable template tab in the library at the same time.
+const SECTIONED: readonly string[] = SECTION_IDS;
 type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string; tabOff?: boolean } | undefined>;
 
 /** imagePos → a 0–100 vertical percent. Three generations of stored shape
@@ -160,6 +163,7 @@ export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
   entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
+  facilities, onFacilities,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -190,6 +194,14 @@ export default function PageTabsEditor({
    *  itself (founder 2026-08-26: content creates the tab; the builder can
    *  X it away). */
   hasFacilities?: boolean;
+  /** page.facilities — the grounds themselves. Written HERE, in the
+   *  Facilities tab's own panel (founder 2026-08-28: "everything on the
+   *  public page should show up in the manual editor and be edit-able").
+   *  It had no field at all: the text could only arrive from Claude or an
+   *  import, which is part of why the tab looked like something you write
+   *  into and grew a second copy of itself. */
+  facilities?: string;
+  onFacilities?: (text: string) => void;
   /** page.team — the people on the page, shown in the About section.
    *  Passing onTeam turns on the People editor (founder 2026-08-26:
    *  restoring the barn's faces surfaced that team had no UI at all). */
@@ -434,6 +446,18 @@ export default function PageTabsEditor({
                     lead="These appear on the public page — how someone reaches you without joining Lichen."
                   />
                 )}
+                {/* Facilities is the one built-in whose body has nowhere
+                    else to come from — there's no profile field behind it —
+                    so it's written right here. */}
+                {t.id === 'facilities' && onFacilities && (
+                  <textarea
+                    className="prof__input ptabs__body"
+                    rows={5}
+                    value={facilities ?? ''}
+                    placeholder="The rooms, the land, the equipment. Leave a blank line between paragraphs."
+                    onChange={(e) => onFacilities(e.target.value)}
+                  />
+                )}
                 <SectionPhoto
                   sec={sections?.[t.id]}
                   patch={(p) => patchSection(t.id, p)}
@@ -442,7 +466,9 @@ export default function PageTabsEditor({
                   setUpBusy={setUpBusy}
                 />
                 <p className="ptabs__note">
-                  This tab writes itself from your profile — the line and photo above are yours to set.
+                  {t.id === 'facilities'
+                    ? 'This is the whole Facilities page — the line, the photo and the words above are yours.'
+                    : 'This tab writes itself from your profile — the line and photo above are yours to set.'}
                 </p>
               </div>
             )}

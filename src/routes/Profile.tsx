@@ -999,6 +999,8 @@ export default function Profile() {
             sections={pageMeta.sections}
             onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
             hasFacilities={!!pageMeta.facilities?.trim()}
+            facilities={pageMeta.facilities}
+            onFacilities={(facilities) => setPage({ facilities })}
             team={pageMeta.team ?? []}
             onTeam={(team) => setPage({ team })}
             homeSummary={pageMeta.homeSummary}

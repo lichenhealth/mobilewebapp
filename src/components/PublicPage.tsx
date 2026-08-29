@@ -5,7 +5,7 @@ import { resolveSurface, readableAccent } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
-import { tabById, tabHasContent, type PageTab } from '../lib/pageTabs';
+import { tabById, tabHasContent, isSectionTab, type PageTab } from '../lib/pageTabs';
 import { subjectPronoun } from '../lib/names';
 import KnockForm from './KnockForm';
 import './PublicPage.css';
@@ -350,13 +350,21 @@ export default function PublicPage(props: PublicPageProps) {
   // has something to show — adding one is an invitation to write, not an
   // empty room for a visitor to walk into.
   const chosen: PageTab[] = page.tabs?.length ? page.tabs : [];
+  // FACILITIES USED TO BE WRITABLE (founder 2026-08-28). While it sat in the
+  // library as a template tab, a builder could type the grounds into the
+  // TAB's body instead of into page.facilities. It's a built-in section now,
+  // so that older text would have gone dark — read it as the facilities copy
+  // when the page itself holds none. Nothing is lost, and nothing renders
+  // twice: this is the same string either way.
+  const oldFacTab = chosen.find((t) => t.id === 'facilities');
+  const facilities = page.facilities?.trim() || oldFacTab?.body?.trim() || '';
   const svcRows = (props.offeringRows ?? []).filter((o) => o.domain === 'service');
   const goodRows = (props.offeringRows ?? []).filter((o) => o.domain === 'good');
   const builtInHasContent = (id: string) =>
     id === 'about' ? !!story
       : id === 'goods' ? goodRows.length > 0
       : id === 'services' ? (svcRows.length > 0 || offerings.length > 0)
-      : id === 'facilities' ? !!page.facilities
+      : id === 'facilities' ? !!facilities
       : id === 'contact' ? hasContact
       : false;
   const liveChosen = chosen.filter((t) => {
@@ -368,7 +376,7 @@ export default function PublicPage(props: PublicPageProps) {
   // when the builder never picked one — X-able in the builder, which stores
   // the decline at sections.facilities.tabOff. Slotted before Contact, where
   // websites keep it.
-  if (liveChosen.length > 0 && !!page.facilities?.trim()
+  if (liveChosen.length > 0 && !!facilities
       && !liveChosen.some((t) => t.id === 'facilities')
       && !page.sections?.facilities?.tabOff) {
     const at = liveChosen.findIndex((t) => t.id === 'contact');
@@ -382,7 +390,7 @@ export default function PublicPage(props: PublicPageProps) {
       : [
         story ? { id: 'about', label: 'About' } : null,
         offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
-        page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
+        facilities ? { id: 'facilities', label: 'Facilities' } : null,
         hasContact ? { id: 'contact', label: 'Contact' } : null,
       ].filter((n): n is { id: string; label: string } => !!n);
   // EVERY public page has a Home to land on (founder 2026-08-11: "you
@@ -482,17 +490,16 @@ export default function PublicPage(props: PublicPageProps) {
     </nav>
   ) : null;
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
-  const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
-
-  // ONE HEADING PER SECTION (founder 2026-08-28: "it says facilities twice").
-  // The small-caps eyebrow earns its place on Home, where several sections
-  // stack and each needs naming. On a section's OWN door the big title above
-  // it already says the word, so the eyebrow is just the same word again in
-  // a smaller font. Hidden only when that door is what titled the page —
-  // never when the eyebrow is the only heading there is.
-  const doorTitled = activeChosen?.id ?? null;
-  const eyebrow = (id: string, label: React.ReactNode) =>
-    doorTitled === id ? null : <h2 className="ppage__h2">{label}</h2>;
+  // ONE RENDERER PER SECTION (founder 2026-08-28: "it says facilities
+  // twice", four times over). The five ids in SECTION_IDS are drawn by the
+  // hand-written blocks below, from data Lichen already holds. This line is
+  // what stops a chosen tab from ALSO drawing one of them with its own title
+  // and body — the actual cause of the duplicate, which earlier fixes only
+  // hid by suppressing one of the two headings. isSectionTab, not the
+  // builtIn flag, so a library edit can never reopen it.
+  const activeChosen = liveChosen.find(
+    (t) => t.id === tab && !tabById(t.id)?.builtIn && !isSectionTab(t.id),
+  ) ?? null;
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -801,7 +808,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {svcRows.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
-          {eyebrow('services', 'Services')}
+          <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
           {!summarized('services') && (
             <ul className="ppage__offers">
@@ -824,7 +831,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {goodRows.length > 0 && show('goods') && !splitting('goods') && (
         <section className="ppage__sec">
-          {eyebrow('goods', 'Goods')}
+          <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
           {!summarized('goods') && (
             <ul className="ppage__offers">
@@ -847,7 +854,7 @@ export default function PublicPage(props: PublicPageProps) {
       )}
       {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec">
-          {eyebrow('services', 'What we offer')}
+          <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
           {!summarized('services') && (
           <ul className="ppage__offers">
@@ -869,20 +876,20 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 3b · Facilities — the grounds themselves */}
-      {page.facilities && show('facilities') && splitting('facilities') && (
+      {facilities && show('facilities') && splitting('facilities') && (
         <SumSplit id="facilities" label="The facilities" door="See the grounds" />
       )}
-      {page.facilities && show('facilities') && !splitting('facilities') && (
+      {facilities && show('facilities') && !splitting('facilities') && (
         <section className="ppage__sec">
-          {eyebrow('facilities', 'The facilities')}
+          <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
           <div className="ppage__story">
             {(summarized('facilities')
               ? []
               : teasing('facilities')
-                ? page.facilities.split(/\n{2,}/).slice(0, 1)
-                : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
-            {tab === 'home' && (secLead('facilities') || (hasTab('facilities') && page.facilities.split(/\n{2,}/).length > 1)) && (
+                ? facilities.split(/\n{2,}/).slice(0, 1)
+                : facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
+            {tab === 'home' && (secLead('facilities') || (hasTab('facilities') && facilities.split(/\n{2,}/).length > 1)) && (
               <SecDoor id="facilities">See the grounds</SecDoor>
             )}
           </div>
@@ -892,7 +899,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 4 · Practical */}
       {hasContact && show('contact') && (
         <section className="ppage__sec">
-          {eyebrow('contact', <>Contact &amp; hours</>)}
+          <h2 className="ppage__h2">Contact &amp; hours</h2>
           <ContactList contact={contact} />
           {bizLocations.length > 0 && (
             <div className="contactl">
@@ -914,7 +921,7 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 4b · The people — part of the story, so they live on About */}
       {(page.team?.length ?? 0) > 0 && show('about') && (
         <section className="ppage__sec">
-          {eyebrow('about', 'The people')}
+          <h2 className="ppage__h2">The people</h2>
           <div className="ppage__team">
             {page.team!.map((t) => (
               <div className="ppage__person" key={t.name}>
