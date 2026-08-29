@@ -91,7 +91,7 @@
    view, so "Organization" reads identically wherever a space's name shows. */
 .ppage__kind {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--peach-deep); margin: 2px 0 0;
+  text-transform: uppercase; color: var(--ppage-accent, var(--peach-deep)); margin: 2px 0 0;
   display: inline-flex; align-items: center; gap: 6px; justify-content: center;
 }
 .ppage__tagline { margin: 0; font-size: 15.5px; color: var(--ink-soft); max-width: 46ch; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }

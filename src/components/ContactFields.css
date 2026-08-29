@@ -14,7 +14,12 @@
   flex: 0 0 92px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-faint); padding-top: 3px;
 }
-.contactl__row a { color: var(--peach-deep); text-decoration: none; }
+/* A business's phone and email are ITS links, so they wear its accent
+   (founder 2026-08-28: "the orange persists for the contact, not the red").
+   This file is shared with the in-app contact editor, where --ppage-accent
+   isn't defined — the fallback keeps that exactly as it was. Bonus: the old
+   peach-deep sat at about 2.3:1 on white, which was never readable. */
+.contactl__row a { color: var(--ppage-accent, var(--peach-deep)); text-decoration: none; }
 .contactl__row a:hover { text-decoration: underline; }
 
 /* "Pull from Lichen" offers under an empty field — one tap fills it in;
