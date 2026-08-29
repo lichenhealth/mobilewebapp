@@ -21,6 +21,7 @@ export type IconName =
   | 'chat-about'
   | 'plane'
   | 'briefcase'
+  | 'building'
   | 'calendar'
   | 'chat'
   | 'check'
@@ -129,6 +130,16 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '264 838 29 26',
     strokeWidth: 1.81,
     content: <><path d="M286.786 863.071L278.5 855.643L270.214 863.071V840.786C270.214 840.293 270.433 839.821 270.821 839.472C271.21 839.124 271.736 838.928 272.286 838.928H284.714C285.264 838.928 285.791 839.124 286.179 839.472C286.567 839.821 286.786 840.293 286.786 840.786V863.071Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // ORGANIZATION (founder 2026-08-28: an organization wore the MAPS globe,
+  // which said "the whole world" about a barn on one island). briefcase and
+  // store were the obvious reaches and are already section marks — Work and
+  // Marketplace — so either would make every organization read as one of
+  // those. The set had no building, so here is one.
+  'building': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M3 21h18" strokeLinecap="round"/><path d="M5 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 21v-9h4a1 1 0 0 1 1 1v8" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 8h3M8 12h3M8 16h3" strokeLinecap="round"/></>,
   },
   'briefcase': {
     viewBox: '180.52 217.5 17 17',

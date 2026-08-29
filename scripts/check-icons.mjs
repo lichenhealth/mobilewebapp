@@ -35,17 +35,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'src/components/Icon.tsx'), 'utf8');
 
 const icons = [];
-for (const [, name, body] of src.matchAll(/\n  '([a-z0-9-]+)':\s*\{(.*?)\n  \},/gs)) {
+// ⚠ Each block runs to the NEXT icon key, not to the first "\n  },". Some
+// glyphs contain a nested close, which ends a lazy match early and desyncs
+// every name from its body after it — measurements then belong to a
+// neighbour, which is a very convincing way to "fix" the wrong icon.
+const keys = [...src.matchAll(/\n  '([a-z0-9-]+)':\s*\{/g)].map((m) => ({ at: m.index, name: m[1] }));
+keys.forEach((k, i) => {
+  const body = src.slice(k.at, i + 1 < keys.length ? keys[i + 1].at : src.length);
   const vb = body.match(/viewBox:\s*'([^']+)'/);
-  if (!vb) continue;
+  if (!vb) return;
   icons.push({
-    name,
+    name: k.name,
     viewBox: vb[1],
     d: [...body.matchAll(/d="([^"]+)"/g)].map((m) => m[1]),
     circle: [...body.matchAll(/<circle([^/>]+)\/?>/g)].map((m) => m[1]),
     rect: [...body.matchAll(/<rect([^/>]+)\/?>/g)].map((m) => m[1]),
   });
-}
+});
 
 const html = `<html><body>${icons.map((ic, i) => {
   const inner = ic.d.map((d) => `<path d="${d.replace(/"/g, '&quot;')}"/>`).join('')

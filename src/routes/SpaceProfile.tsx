@@ -63,7 +63,9 @@ const KIND_LABEL: Record<SpaceKind, string> = {
 // (founder 2026-08-05: the section mark belongs to where you ARE, not to what
 // kind of room you're standing in).
 const KIND_ICON: Record<SpaceKind, IconName> = {
-  organization: 'globe', community: 'user-multiple', group: 'groups', place: 'location',
+  // An organization is not the globe (founder 2026-08-28) — that mark belongs
+  // to Maps, and it said "the whole world" about a barn on one island.
+  organization: 'building', community: 'user-multiple', group: 'groups', place: 'location',
 };
 // Which assistant frame a space page briefs from — its own kind.
 const ASSISTANT_SECTION: Record<SpaceKind, string> = {
