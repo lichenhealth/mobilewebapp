@@ -537,6 +537,22 @@ export default function AssistantFeed() {
             answer this one late. Say it again and I&rsquo;ll take another run.
           </p>
         )}
+
+        {/* THE PERMISSION LIVES WHERE THE ASKING HAPPENS (founder 2026-08-28:
+            "if you want claude to build it, you're signaling you want claude
+            to have edit access"). This offer already existed — buried in the
+            context card above the conversation — so a member who asked Claude
+            to change their page was told no while the yes sat off-screen.
+            Asking IS the signal; the consent belongs next to it.
+
+            The two-step confirm is kept exactly as it was, and the model
+            still cannot grant itself anything: it can say it lacks the
+            switch, and the person taps. A model that could arm its own write
+            access would make the consent worthless. */}
+        {!loading && visible.length > 0
+          && (spaceId ? (sctx && !sctx.canEdit) : (ctx && !ctx.canEdit)) && (
+          <div className="afeed__arm">{armOffer}</div>
+        )}
       </div>
 
       {/* A door can arrive with its errand via ?ask= (the same prefill

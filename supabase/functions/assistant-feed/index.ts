@@ -537,7 +537,9 @@ Deno.serve(async (req) => {
     ].filter(Boolean);
     spaceEditRule = `\n\nYOUR PAGE TOOLS ARE NOT ARMED FOR ${spaceName.toUpperCase()} IN THIS THREAD, and the reason is a SWITCH, not a fault. `
       + `What is missing: ${missing.join('; ')}. `
-      + 'When they ask you to change the page: say plainly that you cannot write to it yet, name the switch and where it is, and offer to make the change the moment it is on. '
+      + 'When they ask you to change the page: say plainly that you cannot write to it yet, and point at the offer sitting at the BOTTOM OF THIS CONVERSATION — '
+      + '"Let me change it directly", right under these messages, two taps. Do not send them to Profile settings when the switch is right there. '
+      + 'Then offer to make the change the moment it is on. '
       + 'NEVER say your tools are "down", "not working", or "working again later" — nothing is broken and no one is coming to fix it. '
       + 'NEVER file a dev report for a change they asked YOU to make; a report is for something broken, and an unset consent is not broken. '
       + 'You may still draft the exact wording for them to paste, and say where in the builder it goes.';

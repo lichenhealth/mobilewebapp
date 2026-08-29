@@ -224,3 +224,14 @@
    width"). A flex child stretches by default — align-self is what makes it hug
    left; compound selector so import order can't lose the tie. */
 .cmp__back.afeed__back { align-self: flex-start; margin-bottom: var(--s-4); }
+
+/* The edit-permission offer, in the conversation rather than the context card
+   above it (founder 2026-08-28) — asking Claude to change the page IS the
+   signal, so the switch belongs beside the asking. */
+.afeed__arm {
+  margin: var(--s-2) 0 var(--s-1);
+  padding: 12px 14px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: var(--bone-warm);
+}
+.afeed__arm .afeed__ctx-off { margin: 0; }
