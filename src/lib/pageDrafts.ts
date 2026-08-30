@@ -87,3 +87,58 @@ export function normalize(d: PageDraft): string {
 }
 
 export const sameDraft = (a: PageDraft, b: PageDraft): boolean => normalize(a) === normalize(b);
+
+/** ── Version history ──────────────────────────────────────────────────────
+ *  Every write to a live page snapshots what it replaced — recorded by a
+ *  database trigger, not by the code that writes, so no future write site
+ *  can forget. `source` tells you whether a person or the assistant made the
+ *  change that this snapshot preceded. */
+export interface PageVersion {
+  id: string;
+  snapshot: PageDraft;
+  source: 'builder' | 'assistant';
+  createdAt: string;
+}
+
+export async function listVersions(
+  type: DraftSubject, id: string, limit = 20,
+): Promise<PageVersion[]> {
+  const { data, error } = await supabase.from('page_versions')
+    .select('id, snapshot, source, created_at')
+    .eq('subject_type', type).eq('subject_id', id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return (data as { id: string; snapshot: PageDraft; source: 'builder' | 'assistant'; created_at: string }[])
+    .map((r) => ({ id: r.id, snapshot: r.snapshot, source: r.source, createdAt: r.created_at }));
+}
+
+export async function restoreVersion(versionId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('restore_page_version', { p_version: versionId });
+  return !error && data === true;
+}
+
+/** What changed between two states, in words a person would use. The history
+ *  stores states, not diffs — a diff computed on the way out can never drift
+ *  from what is actually stored. */
+export function describeChange(before: PageDraft, after: PageDraft): string {
+  const moved: string[] = [];
+  const b = before.page ?? {}; const a = after.page ?? {};
+  const named: [keyof PageMeta, string][] = [
+    ['tagline', 'the tagline'], ['story', 'the story'], ['homeSummary', 'the home welcome'],
+    ['facilities', 'the facilities'], ['accent', 'the colours'], ['surface', 'the background'],
+    ['join', 'the Lichen invitation'], ['coverStyle', 'the cover style'], ['cover', 'the cover photo'],
+  ];
+  for (const [key, label] of named) {
+    if (JSON.stringify(b[key]) !== JSON.stringify(a[key])) moved.push(label);
+  }
+  if (JSON.stringify(b.tabs) !== JSON.stringify(a.tabs)) moved.push('the tabs');
+  if (JSON.stringify(b.offerings) !== JSON.stringify(a.offerings)) moved.push('the offerings');
+  if (JSON.stringify(b.team) !== JSON.stringify(a.team)) moved.push('the people');
+  if (JSON.stringify(b.sections) !== JSON.stringify(a.sections)) moved.push('a section’s photo or line');
+  if ((before.description ?? '') !== (after.description ?? '')) moved.push('the description');
+  if (JSON.stringify(before.contact ?? {}) !== JSON.stringify(after.contact ?? {})) moved.push('the contact details');
+  if (!moved.length) return 'a small change';
+  if (moved.length === 1) return moved[0];
+  return `${moved.slice(0, -1).join(', ')} and ${moved[moved.length - 1]}`;
+}

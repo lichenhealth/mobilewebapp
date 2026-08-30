@@ -50,7 +50,10 @@ import ContactFields, { ContactList, type ContactInfo } from '../components/Cont
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
-import { readDraft, writeDraft, clearDraft, sameDraft, type PageDraft } from '../lib/pageDrafts';
+import {
+  readDraft, writeDraft, clearDraft, sameDraft, listVersions, restoreVersion, describeChange,
+  type PageDraft, type PageVersion,
+} from '../lib/pageDrafts';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import HomeSummaryButton from '../components/HomeSummaryButton';
@@ -268,6 +271,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // true exactly when the builder holds something the open web hasn't seen.
   const [draftPending, setDraftPending] = useState(false);
   const [draftMsg, setDraftMsg] = useState('');
+  // The page's last thirty turns, newest first (recorded by a trigger — see
+  // the migration). Loaded only when someone opens the history, because most
+  // visits to the builder never ask.
+  const [versions, setVersions] = useState<PageVersion[] | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [restoring, setRestoring] = useState('');
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -1979,6 +1988,66 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
                   : 'Everything here is live.'}
               </span>
+            )}
+          </div>
+          {/* WHAT THE PAGE USED TO SAY (founder 2026-08-29). Claude writes
+              straight to live, so the page can move without anyone pressing
+              anything — this is where you find out what it said before, and
+              put it back. A trigger records every write, from here, from the
+              chat, or from anywhere else. */}
+          <div className="sprof__history">
+            <button
+              type="button" className="ptabs__mv"
+              onClick={async () => {
+                const next = !historyOpen;
+                setHistoryOpen(next);
+                if (next && versions === null) setVersions(await listVersions('space', id));
+              }}
+            >
+              {historyOpen ? 'Hide history' : 'What changed before'}
+            </button>
+            {historyOpen && versions !== null && versions.length === 0 && (
+              <p className="ptabs__note">
+                Nothing yet — this page hasn&rsquo;t changed since history started keeping.
+              </p>
+            )}
+            {historyOpen && versions !== null && versions.length > 0 && (
+              <ul className="sprof__versions">
+                {versions.map((v, i) => {
+                  // Each row snapshots the page BEFORE its change; the state
+                  // that followed is the next-newer snapshot, or what is live
+                  // now for the most recent one.
+                  const after = i === 0
+                    ? { page: pageEdit, description, contact }
+                    : versions[i - 1].snapshot;
+                  return (
+                    <li className="sprof__version" key={v.id}>
+                      <span className="sprof__version-what">
+                        {v.source === 'assistant' ? 'Claude changed ' : 'You changed '}
+                        {describeChange(v.snapshot, after as PageDraft)}
+                        <em>{new Date(v.createdAt).toLocaleString()}</em>
+                      </span>
+                      <button
+                        type="button" className="ptabs__mv" disabled={!!restoring}
+                        onClick={async () => {
+                          setRestoring(v.id);
+                          const ok = await restoreVersion(v.id);
+                          setRestoring('');
+                          if (!ok) { setError('Could not put that version back.'); return; }
+                          await clearDraft('space', id);
+                          setDraftPending(false);
+                          setVersions(await listVersions('space', id));
+                          await load();
+                          setMsg('Put back');
+                          setTimeout(() => setMsg(''), 2500);
+                        }}
+                      >
+                        {restoring === v.id ? 'Putting back…' : 'Put this back'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </CollapsibleSection>

@@ -221,6 +221,35 @@ export const SPACE_PAGE_TOOLS = [
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    // "YOU CAN ASK CLAUDE TO REVERT" IS NOW TRUE (founder 2026-08-29). It
+    // used to be true only inside the conversation that made the change —
+    // the previous value rode home in the tool result and was stored
+    // nowhere. A database trigger records every write to a page now, from
+    // here or from the builder, and these two tools read and undo it.
+    name: 'list_space_page_versions',
+    description:
+      "The page's recent history, newest first — each entry is what the page said BEFORE that "
+      + 'change, who made it (you or a person in the builder), and when. Use it whenever someone '
+      + 'asks what changed, what it used to say, or wants something put back — including changes '
+      + 'from days ago and from other conversations, which you cannot otherwise know about. '
+      + 'Read this BEFORE saying you do not know what a page used to say.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'restore_space_page_version',
+    description:
+      'Put the page back to one of the versions from list_space_page_versions, by its id. This '
+      + 'replaces the WHOLE page with that snapshot — tabs, colours, story, contact, everything — '
+      + 'so it undoes every change made after it, not just the one they mentioned. Say exactly '
+      + 'that before you use it, and prefer editing the one field back by hand when they only '
+      + 'want one thing changed. Restoring is itself recorded, so it can be undone in turn.',
+    input_schema: {
+      type: 'object',
+      properties: { version_id: { type: 'string', description: 'The id from list_space_page_versions.' } },
+      required: ['version_id'],
+    },
+  },
+  {
     name: 'set_space_join_level',
     description:
       'How loudly the public page invites visitors into Lichen. "full" shows the invitation card, '
@@ -306,6 +335,68 @@ export async function runSpacePageTool(
     // No `change` key: a read is not an edit, and the calling surfaces use
     // `change` to tell the steward what was done to their page.
     return { ok: true, name: spaceName, description, contact, page };
+  }
+
+  // ── History ─────────────────────────────────────────────────────────────
+  if (name === 'list_space_page_versions') {
+    const rows = await (await sb(
+      `page_versions?subject_type=eq.space&subject_id=eq.${spaceId}`
+      + '&select=id,snapshot,source,created_at&order=created_at.desc&limit=20',
+    )).json();
+    const list = (Array.isArray(rows) ? rows : []) as {
+      id: string; snapshot: Record<string, unknown>; source: string; created_at: string;
+    }[];
+    if (!list.length) {
+      return { ok: true, change: `${spaceName}'s page has no recorded history yet`, versions: [] };
+    }
+    // Each row is the page BEFORE its change. Handing the model the whole
+    // snapshot of twenty versions would swamp the turn, so each entry carries
+    // the fields a person actually asks about by name.
+    const brief = list.map((r) => {
+      const page = (r.snapshot?.page ?? {}) as Record<string, unknown>;
+      return {
+        version_id: r.id,
+        when: r.created_at,
+        changed_by: r.source === 'assistant' ? 'the assistant' : 'someone in the builder',
+        page_was: {
+          tagline: page.tagline ?? null,
+          story: typeof page.story === 'string' ? (page.story as string).slice(0, 400) : null,
+          facilities: typeof page.facilities === 'string' ? (page.facilities as string).slice(0, 400) : null,
+          home_summary: page.homeSummary ?? null,
+          accent: page.accent ?? null,
+          surface: page.surface ?? null,
+          join: page.join ?? null,
+          tab_names: Array.isArray(page.tabs)
+            ? (page.tabs as { id?: string; label?: string }[]).map((t) => t.label ?? t.id) : null,
+          description: r.snapshot?.description ?? null,
+        },
+      };
+    });
+    return { ok: true, change: `read ${brief.length} recorded versions of ${spaceName}'s page`, versions: brief };
+  }
+
+  if (name === 'restore_space_page_version') {
+    const vid = String(input.version_id ?? '').trim();
+    if (!/^[0-9a-f-]{36}$/.test(vid)) {
+      return { ok: false, error: 'That is not a version id — call list_space_page_versions first.' };
+    }
+    const check = await (await sb(
+      `page_versions?id=eq.${vid}&subject_type=eq.space&subject_id=eq.${spaceId}&select=id,created_at`,
+    )).json();
+    if (!Array.isArray(check) || !check.length) {
+      // Belt and braces: the RPC checks permission too, but a version id from
+      // ANOTHER space would otherwise reach it and fail as a raw error.
+      return { ok: false, error: 'That version does not belong to this page.' };
+    }
+    const res = await sb('rpc/restore_page_version', {
+      method: 'POST', body: JSON.stringify({ p_version: vid }),
+    });
+    if (!res.ok) return { ok: false, error: 'Could not put that version back.' };
+    return {
+      ok: true,
+      change: `put ${spaceName}'s page back to how it was before the change of `
+        + `${(check[0] as { created_at: string }).created_at} — the WHOLE page, so anything done since is undone too`,
+    };
   }
 
   if (name === 'set_space_tagline' || name === 'set_space_home_summary' || name === 'set_space_story') {

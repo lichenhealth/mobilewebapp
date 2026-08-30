@@ -336,3 +336,13 @@
 
 /* The one thing the publish row must always answer: is this live? */
 .prof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
+
+/* The page's own history — what it said before, and the way back. */
+.sprof__history { margin: 10px 0 0; }
+.sprof__versions { list-style: none; margin: 8px 0 0; padding: 0; }
+.sprof__version {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-top: 1px solid var(--bone-edge-soft);
+}
+.sprof__version-what { font-size: 13px; color: var(--ink); line-height: 1.4; }
+.sprof__version-what em { display: block; font-style: normal; font-size: 11px; color: var(--ink-faint); }
