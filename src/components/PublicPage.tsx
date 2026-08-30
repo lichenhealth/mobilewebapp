@@ -565,7 +565,7 @@ export default function PublicPage(props: PublicPageProps) {
     const sec = page.sections![id]!;
     const pos = typeof sec.imagePos === 'number' ? `50% ${sec.imagePos}%` : (sec.imagePos ?? '50% 50%');
     return (
-      <section className={'ppage__sec ppage__sec--split' + (splitOrder.indexOf(id) % 2 === 1 ? ' is-flip' : '')}>
+      <section className={'ppage__sec ppage__sec--split' + (splitOrder.indexOf(id) % 2 === 1 ? ' is-flip' : '')} data-edit-region={id}>
         <div className="ppage__split-copy">
           {label && <h2 className="ppage__h2">{label}</h2>}
           <p className="ppage__lead">{secLead(id)}</p>
@@ -653,7 +653,7 @@ export default function PublicPage(props: PublicPageProps) {
           (logo, name, tagline, address), then the nav doors, then the cover
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
-        <div className="ppage__hero-body ppage__hero-body--top">
+        <div className="ppage__hero-body ppage__hero-body--top" data-edit-region="identity">
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
             size={props.signedIn ? 96 : 128} />
           <h1 className="ppage__name">{name}</h1>
@@ -689,6 +689,7 @@ export default function PublicPage(props: PublicPageProps) {
         {coverSrc && (
           <img
             className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
+            data-edit-region="cover"
             src={coverSrc} alt=""
             style={coverFull ? undefined : { objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
@@ -759,7 +760,7 @@ export default function PublicPage(props: PublicPageProps) {
         <SumSplit id="about" door="Read the whole story" />
       )}
       {story && show('about') && !splitting('about') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="about">
           {flavor('about')}
           <div className="ppage__story">
             {(tab !== 'home' || openSecs.has('about')
@@ -807,7 +808,7 @@ export default function PublicPage(props: PublicPageProps) {
         <SumSplit id="services" label="Services" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
       )}
       {svcRows.length > 0 && show('services') && !splitting('services') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="services">
           <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
           {!summarized('services') && (
@@ -830,7 +831,7 @@ export default function PublicPage(props: PublicPageProps) {
         <SumSplit id="goods" label="Goods" door="See all the goods" />
       )}
       {goodRows.length > 0 && show('goods') && !splitting('goods') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="goods">
           <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
           {!summarized('goods') && (
@@ -853,7 +854,7 @@ export default function PublicPage(props: PublicPageProps) {
         <SumSplit id="services" label="What we offer" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
       )}
       {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="offerings">
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
           {!summarized('services') && (
@@ -880,7 +881,7 @@ export default function PublicPage(props: PublicPageProps) {
         <SumSplit id="facilities" label="The facilities" door="See the grounds" />
       )}
       {facilities && show('facilities') && !splitting('facilities') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="facilities">
           <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
           <div className="ppage__story">
@@ -898,7 +899,7 @@ export default function PublicPage(props: PublicPageProps) {
 
       {/* 4 · Practical */}
       {hasContact && show('contact') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="contact">
           <h2 className="ppage__h2">Contact &amp; hours</h2>
           <ContactList contact={contact} />
           {bizLocations.length > 0 && (
@@ -920,7 +921,7 @@ export default function PublicPage(props: PublicPageProps) {
 
       {/* 4b · The people — part of the story, so they live on About */}
       {(page.team?.length ?? 0) > 0 && show('about') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="team">
           <h2 className="ppage__h2">The people</h2>
           <div className="ppage__team">
             {page.team!.map((t) => (
@@ -964,7 +965,7 @@ export default function PublicPage(props: PublicPageProps) {
            turn them off. The louder levels below already say both things in
            their own card, so this renders only when that card doesn't, and
            never to a signed-in member (they're already in). */
-        <p className="ppage__join-quiet">
+        <p className="ppage__join-quiet" data-edit-region="join">
           Powered by <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
           {' '}· Want to join our community?{' '}
           {/* THE KNOCK CARRIES THE PAGE IT CAME FROM (founder 2026-08-29).
@@ -987,7 +988,7 @@ export default function PublicPage(props: PublicPageProps) {
            person will be a member of the whole platform, not a user of one
            group's software, so they get told what they'd be joining. The
            knock carries the space; its stewards can send the invitation. */
-        <section className="ppage__join">
+        <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">Request to join <strong>{name}</strong></p>
           <p className="ppage__join-sub">
             {name} lives on <strong>Lichen</strong> — a member-run network for care, work,
@@ -1007,7 +1008,7 @@ export default function PublicPage(props: PublicPageProps) {
           </p>
         </section>
       ) : (
-        <section className="ppage__join">
+        <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
           <p className="ppage__join-sub">
             A member-run network for care, work, offerings and a fairer economy — where trust is

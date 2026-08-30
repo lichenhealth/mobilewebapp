@@ -163,7 +163,7 @@ export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
   entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
-  facilities, onFacilities, story, onStory,
+  facilities, onFacilities, story, onStory, openSignal,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -210,6 +210,10 @@ export default function PageTabsEditor({
    *  because story wins over description there. */
   story?: string;
   onStory?: (text: string) => void;
+  /** Open a tab's panel from OUTSIDE — the builder's stage routes a click on
+   *  the live page here (founder 2026-08-29: click the page, land in its
+   *  editor). n changes on every click so the same tab can be re-opened. */
+  openSignal?: { id: string; n: number } | null;
   /** page.team — the people on the page, shown in the About section.
    *  Passing onTeam turns on the People editor (founder 2026-08-26:
    *  restoring the barn's faces surfaced that team had no UI at all). */
@@ -230,6 +234,10 @@ export default function PageTabsEditor({
   };
   const [upBusy, setUpBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (openSignal) setOpenId(openSignal.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal?.n]);
   const addCtaRef = useRef<HTMLButtonElement>(null);
   const scrollToCta = useRef(false);
   const closePicker = () => {

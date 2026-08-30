@@ -262,10 +262,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // saves both, so the story could still be overwritten in silence while
   // the colours were protected. A half-guarded save is worse than none: it
   // reads as safe.
-  type SpaceShared = { page: PageMeta; description: string; contact: ContactInfo };
+  // `description` left this set on 2026-08-29 when the builders split: it is
+  // edited in the LICHEN builder now, saved live like the name — only what
+  // the public builder drafts and publishes belongs here.
+  type SpaceShared = { page: PageMeta; contact: ContactInfo };
   const sharedBase = useRef<string>('');
-  const sharedNow = useRef<SpaceShared>({ page: {}, description: '', contact: {} });
-  sharedNow.current = { page: pageEdit, description, contact };
+  const sharedNow = useRef<SpaceShared>({ page: {}, contact: {} });
+  sharedNow.current = { page: pageEdit, contact };
   const [pageAhead, setPageAhead] = useState<SpaceShared | null>(null);
   // Unpublished work. `draftPending` is what the Publish row reports; it is
   // true exactly when the builder holds something the open web hasn't seen.
@@ -277,6 +280,35 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [restoring, setRestoring] = useState('');
+  // CLICK THE PAGE, LAND IN ITS EDITOR (founder 2026-08-29: "laid out as the
+  // actual profile is laid out, except you can click on things and edit them
+  // here"). The stage renders the REAL PublicPage from the draft state, so
+  // it moves as you type; data-edit-region attributes on its sections say
+  // what was clicked, and this routes the click — into the right tab panel
+  // (via openSignal) or to the loose field it belongs to. Tab-nav clicks
+  // pass through untouched: switching tabs is part of looking at the page.
+  const [tabSignal, setTabSignal] = useState<{ id: string; n: number } | null>(null);
+  const stageEdit = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('.ppage__nav-link')) return;
+    e.preventDefault(); e.stopPropagation();
+    const region = t.closest('[data-edit-region]')?.getAttribute('data-edit-region');
+    if (!region) return;
+    const toTab: Record<string, string> = {
+      cover: 'home', about: 'about', team: 'about',
+      facilities: 'facilities', contact: 'contact', services: 'services', goods: 'goods',
+    };
+    const toAnchor: Record<string, string> = { identity: 'b-tagline', offerings: 'b-offerings', join: 'b-join' };
+    if (toTab[region]) {
+      setTabSignal({ id: toTab[region], n: Date.now() });
+      document.getElementById('b-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (toAnchor[region]) {
+      const el = document.getElementById(toAnchor[region]);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.classList.add('is-flash');
+      setTimeout(() => el?.classList.remove('is-flash'), 1600);
+    }
+  };
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -351,9 +383,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContentDownloadDefault(s.content_download_default !== false);
       const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
       setPageEdit(loadedPage);
-      const live: SpaceShared = {
-        page: loadedPage, description: s.description ?? '', contact: (sx.contact ?? {}) as ContactInfo,
-      };
+      const live: SpaceShared = { page: loadedPage, contact: (sx.contact ?? {}) as ContactInfo };
       sharedBase.current = JSON.stringify(live);
       setPageAhead(null);
       // UNPUBLISHED WORK OUTLIVES THE TAB (founder 2026-08-29). If a draft is
@@ -362,7 +392,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       const kept = await readDraft('space', id);
       if (kept && !sameDraft(kept.draft as PageDraft, live as PageDraft)) {
         setPageEdit(kept.draft.page ?? {});
-        setDescription(kept.draft.description ?? '');
         setContact((kept.draft.contact ?? {}) as ContactInfo);
         setDraftPending(true);
       } else {
@@ -503,6 +532,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }, [tab, id]);
   const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
   const adminTools = backstage;
+  // THE TWO BUILDERS (founder 2026-08-29: "two buttons… then have the rest
+  // be drop downs… a real website builder"). ?build=public opens the page
+  // laid out as the page itself, editable; ?build=lichen opens the in-app
+  // identity. Either one takes over the whole backstage — the doors and the
+  // drop-downs step aside until "Back to profile".
+  const buildView = adminTools ? searchParams.get('build') : null;
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
   // to admins holding the 'members' duty; full admins hold everything.
   const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && backstage;
@@ -677,10 +712,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
    *  it. Cheap: one column, one row. */
   const readShared = useCallback(async (): Promise<SpaceShared | null> => {
     const { data, error } = await supabase.from('spaces')
-      .select('page, description, contact').eq('id', id).maybeSingle();
+      .select('page, contact').eq('id', id).maybeSingle();
     if (error || !data) return null;
-    const row = data as { page?: PageMeta | null; description?: string | null; contact?: ContactInfo | null };
-    return { page: (row.page ?? {}) as PageMeta, description: row.description ?? '', contact: row.contact ?? {} };
+    const row = data as { page?: PageMeta | null; contact?: ContactInfo | null };
+    return { page: (row.page ?? {}) as PageMeta, contact: row.contact ?? {} };
   }, [id]);
 
   /** Catch the form up with whatever Claude (or another steward, or this
@@ -695,7 +730,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       // Nothing unpublished here — the newer page simply IS this form now.
       sharedBase.current = freshJson;
       setPageEdit(fresh.page);
-      setDescription(fresh.description);
       setContact(fresh.contact);
       setPageAhead(null);
     } else {
@@ -729,7 +763,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     }, 1200);
     return () => clearTimeout(t);
     // sharedNow is a ref; these are the values that actually change it.
-  }, [backstage, loading, id, me, pageEdit, description, contact, draftPending]);
+  }, [backstage, loading, id, me, pageEdit, contact, draftPending]);
 
   // Catch up when the builder opens, and again whenever this tab comes back
   // to the front — going to the chat, asking Claude for a change and coming
@@ -746,11 +780,18 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     };
   }, [backstage, syncPage]);
 
-  async function save() {
+  // THE THREE SAVERS (founder 2026-08-29, when the one builder became two).
+  // save() publishes the PAGE — draft guard, page/contact/handle, nothing
+  // else. saveLichen() is the in-app identity — name, description, location,
+  // community identity, group nesting — live on Save, no draft, because none
+  // of it is website copy someone stages. saveSettings() is Privacy's.
+  // One Save that wrote everything is how a taken handle once threw away the
+  // colours and the contact details with it — the split is the fix's shape.
+  async function saveLichen() {
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
     try {
-      let note = 'Published';
+      let note = 'Saved';
       const patch: Parameters<typeof updateSpaceProfile>[1] = {
         name: name.trim() || space.name,
         description: description.trim() || null,
@@ -758,6 +799,59 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
       };
+      if (space.kind === 'community') {
+        const names = new Map(idCats.map((c) => [c.id, c.name]));
+        const all = [
+          ...identityIds.map((cid) => names.get(cid)).filter((n): n is string => !!n),
+          ...identityLegacy,
+        ];
+        const { error: idErr } = await supabase.from('spaces')
+          .update({ identity_tags: all.length ? all : null }).eq('id', id);
+        if (idErr) throw new Error(idErr.message || 'Could not save the identity tags.');
+      }
+      if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
+        if (!parentPick) {
+          patch.parent_space_id = null;   // going standalone is always the group's right
+        } else if (await amIAdminOf(parentPick.id, me)) {
+          patch.parent_space_id = parentPick.id;
+        } else {
+          // Consensual nesting: their admins decide.
+          await proposeNesting(space.id, parentPick.id, me);
+          note = `Proposed — waiting for ${parentPick.name}'s admins`;
+        }
+      }
+      await updateSpaceProfile(space.id, patch);
+      setMsg(note);
+      setTimeout(() => setMsg(''), 2000);
+      await load();
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not save. Please try again.');
+    }
+    setSaving(false);
+  }
+
+  async function saveSettings() {
+    if (!space) return;
+    setSaving(true); setMsg(''); setError('');
+    const { error: err } = await supabase.from('spaces')
+      .update({
+        assistant_enabled: aiEnabled,
+        findable,
+        assistant_readable: assistantReadable,
+        content_ai_default: contentAiDefault,
+        content_download_default: contentDownloadDefault,
+      })
+      .eq('id', id);
+    if (err) setError(err.message || 'Could not save. Please try again.');
+    else { setMsg('Saved'); setTimeout(() => setMsg(''), 2000); }
+    setSaving(false);
+  }
+
+  async function save() {
+    if (!space) return;
+    setSaving(true); setMsg(''); setError('');
+    try {
+      const note = 'Published';
       // LAST WRITE MUST NOT WIN BLINDLY (founder 2026-08-29). The update
       // below replaces the whole `page` blob, so if Claude wrote to it while
       // this form sat open, saving would erase that work with no trace. Read
@@ -778,25 +872,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           handle: handle.trim() || null,
           contact: Object.keys(contact).length ? contact : null,
           public_page: publicPage,
-          assistant_enabled: aiEnabled,
-          findable,
-          assistant_readable: assistantReadable,
-          content_ai_default: contentAiDefault,
-          content_download_default: contentDownloadDefault,
           // Only ever WRITE a page, never null one out: this form didn't touch
           // `page` before today, and a mis-seeded save would wipe a built page
           // (Countryman Stables lives in this column).
           ...(Object.keys(pageEdit).length ? { page: pageEdit } : {}),
-          ...(space.kind === 'community' ? {
-            identity_tags: (() => {
-              const names = new Map(idCats.map((c) => [c.id, c.name]));
-              const all = [
-                ...identityIds.map((cid) => names.get(cid)).filter((n): n is string => !!n),
-                ...identityLegacy,
-              ];
-              return all.length ? all : null;
-            })(),
-          } : {}),
         })
         .eq('id', id);
       // A unique-violation here used to be swallowed whole (founder
@@ -809,19 +888,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             : (spaceErr.message || 'Could not save. Please try again.'),
         );
       }
-      if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
-        if (!parentPick) {
-          patch.parent_space_id = null;   // going standalone is always the group's right
-        } else if (await amIAdminOf(parentPick.id, me)) {
-          patch.parent_space_id = parentPick.id;
-        } else {
-          // Consensual nesting: their admins decide.
-          await proposeNesting(space.id, parentPick.id, me);
-          note = `Proposed — waiting for ${parentPick.name}'s admins`;
-        }
-      }
-      await updateSpaceProfile(space.id, patch);
-      sharedBase.current = JSON.stringify({ page: pageEdit, description, contact });
+      sharedBase.current = JSON.stringify({ page: pageEdit, contact });
       // Published — there is nothing unpublished left to keep.
       await clearDraft('space', id);
       setDraftPending(false);
@@ -1053,7 +1120,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       emptyEscape={ctx.openHome
         ? { label: 'Visit the homepage to engage', onGo: ctx.openHome }
         : ctx.homeBare && isAdmin
-          ? { label: `Build ${possessive(space.name)} homepage`, onGo: () => navigate(`/spaces/${id}?manage=1#about`) }
+          ? { label: `Build ${possessive(space.name)} homepage`, onGo: () => navigate(`/spaces/${id}?manage=1&build=public`) }
           : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
@@ -1285,7 +1352,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }
 
   return (
-    <div className={'prof is-space' + (backstage ? ' is-adminview' : '')}>
+    <div className={'prof is-space' + (backstage ? ' is-adminview' : '') + (buildView ? ' sprof--building' : '')}>
       {adminBar}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
@@ -1370,34 +1437,36 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {noticeBanners}
 
-      {adminTools && (
-        <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
-          <BuildModeSplit back={`/spaces/${id}?manage=1#about`} space={{ id: space.id, name: space.name }} />
-          {/* Only ever shown when there are unsaved edits here AND a newer
-              page on the server — with nothing typed, the form just catches
-              up quietly and this never appears. */}
-          {pageAhead && (
-            <div className="sprof__ahead">
-              <p className="sprof__ahead-say">
-                This page changed while the builder was open — Claude, or another steward, has
-                written something newer than what&rsquo;s on screen here. Saving now would write
-                over it.
-              </p>
-              <button
-                type="button" className="btn"
-                onClick={() => {
-                  sharedBase.current = JSON.stringify(pageAhead);
-                  setPageEdit(pageAhead.page);
-                  setDescription(pageAhead.description);
-                  setContact(pageAhead.contact);
-                  setPageAhead(null);
-                }}
-              >
-                Load the current page
-              </button>
-              <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
+      {adminTools && (<>
+        {!buildView && (
+          <div className="sprof__doors">
+            {/* TWO DOORS, NOT A DROP-DOWN (founder 2026-08-29): the builders
+                open as full screens; everything else on the backstage stays
+                a drop-down below. */}
+            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
+              <strong>Public Profile Builder</strong>
+              <em>The website the open web sees — laid out as the page itself. Click anything to edit it.</em>
+            </button>
+            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'lichen' })}>
+              <strong>Lichen Profile Builder</strong>
+              <em>Name, description, location — how this {kindLabel.toLowerCase()} shows up inside Lichen.</em>
+            </button>
+          </div>
+        )}
+
+        {buildView === 'lichen' && (
+          <div className="sprof__buildview">
+            <div className="sprof__buildbar">
+              <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
+              <strong className="sprof__buildtitle">Lichen Profile Builder</strong>
             </div>
-          )}
+            <div className="sprof__buildpane sprof__buildpane--lone">
+              <div className="prof__field">
+                <label className="prof__label">Photo</label>
+                <button className="btn" onClick={() => avatarInputRef.current?.click()} disabled={avatarBusy}>
+                  {avatarBusy ? 'Uploading…' : space.avatar_url ? 'Change the photo' : 'Add a photo'}
+                </button>
+              </div>
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -1414,7 +1483,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
             <FillWithClaude
-              back={`/spaces/${id}?manage=1#about`}
+              back={`/spaces/${id}?manage=1&build=lichen`}
               label="Fill out with Claude"
               space={{ id: space.id, name: space.name }}
               ask={`Help me write ${possessive(space.name)} description — what it is, who it's for.`}
@@ -1497,6 +1566,175 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             />
             <p className="prof__hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
           </div>
+          {/* A community can decide it works without the assistant — the AI
+              door then reads slashed for everyone who visits (founder
+              2026-08-05: "AI is off at the admin level for the group"). */}
+          <label className="sprof__duty">
+            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
+            <span>
+              Work with the assistant here
+              <em>Off means this {kindLabel.toLowerCase()} carries a slashed AI mark, and nothing
+                here is gathered for anyone&rsquo;s briefing. Members always reach their own
+                assistant elsewhere.</em>
+            </span>
+          </label>
+              <div className="prof__save-row">
+                <button className="btn btn-primary" onClick={saveLichen} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                {msg && <span className="prof__msg">{msg}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {buildView === 'public' && (
+          <div className="sprof__buildview">
+            <div className="sprof__buildbar">
+              <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
+              <strong className="sprof__buildtitle">Public Profile Builder</strong>
+            </div>
+            <div className="sprof__buildsplit">
+              {/* THE PAGE IS THE BUILDER (founder 2026-08-29: "like
+                  Squarespace or Wix… but more elegant"). The stage is the
+                  REAL PublicPage rendered from the DRAFT — it moves as you
+                  type, and clicking a section routes you to its editor in
+                  the pane. Tab nav still switches tabs; everything else on
+                  the stage is a door into editing, not a live control. */}
+              <div className="sprof__stage" onClickCapture={stageEdit}>
+                <PublicPage
+                  id={space.id}
+                  name={name || space.name}
+                  firstPerson
+                  kindLabel={kindLabel}
+                  kindIcon={KIND_ICON[space.kind]}
+                  avatarUrl={space.avatar_url}
+                  description={description}
+                  location={locText}
+                  contact={contact}
+                  page={pageEdit}
+                  preview
+                  signedIn={false}
+                  knockSpace={{ id: space.id, name: name || space.name, kindLabel }}
+                />
+              </div>
+              <div className="sprof__buildpane">
+          {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
+              kept — it went into the draft as you typed. This button is
+              about the open web: it decides when strangers see it. The row
+              always says which of the two states the page is in, because
+              "is this live?" is the only question that matters here. */}
+          <div className="prof__save-row">
+            <button className="btn btn-primary" onClick={save} disabled={saving}>
+              {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
+            </button>
+            {draftPending && (
+              <button
+                className="btn" type="button" disabled={saving}
+                onClick={async () => {
+                  await clearDraft('space', id);
+                  setDraftPending(false);
+                  setDraftMsg('');
+                  await load();
+                }}
+              >
+                Discard draft
+              </button>
+            )}
+            {msg && <span className="prof__msg">{msg}</span>}
+            {!msg && (
+              <span className="prof__msg prof__draft-state">
+                {draftPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
+                  : 'Everything here is live.'}
+              </span>
+            )}
+          </div>
+          {/* WHAT THE PAGE USED TO SAY (founder 2026-08-29). Claude writes
+              straight to live, so the page can move without anyone pressing
+              anything — this is where you find out what it said before, and
+              put it back. A trigger records every write, from here, from the
+              chat, or from anywhere else. */}
+          <div className="sprof__history">
+            <button
+              type="button" className="ptabs__mv"
+              onClick={async () => {
+                const next = !historyOpen;
+                setHistoryOpen(next);
+                if (next && versions === null) setVersions(await listVersions('space', id));
+              }}
+            >
+              {historyOpen ? 'Hide history' : 'What changed before'}
+            </button>
+            {historyOpen && versions !== null && versions.length === 0 && (
+              <p className="ptabs__note">
+                Nothing yet — this page hasn&rsquo;t changed since history started keeping.
+              </p>
+            )}
+            {historyOpen && versions !== null && versions.length > 0 && (
+              <ul className="sprof__versions">
+                {versions.map((v, i) => {
+                  // Each row snapshots the page BEFORE its change; the state
+                  // that followed is the next-newer snapshot, or what is live
+                  // now for the most recent one.
+                  const after = i === 0
+                    ? { page: pageEdit, description, contact }
+                    : versions[i - 1].snapshot;
+                  return (
+                    <li className="sprof__version" key={v.id}>
+                      <span className="sprof__version-what">
+                        {v.source === 'assistant' ? 'Claude changed ' : 'You changed '}
+                        {describeChange(v.snapshot, after as PageDraft)}
+                        <em>{new Date(v.createdAt).toLocaleString()}</em>
+                      </span>
+                      <button
+                        type="button" className="ptabs__mv" disabled={!!restoring}
+                        onClick={async () => {
+                          setRestoring(v.id);
+                          const ok = await restoreVersion(v.id);
+                          setRestoring('');
+                          if (!ok) { setError('Could not put that version back.'); return; }
+                          await clearDraft('space', id);
+                          setDraftPending(false);
+                          setVersions(await listVersions('space', id));
+                          await load();
+                          setMsg('Put back');
+                          setTimeout(() => setMsg(''), 2500);
+                        }}
+                      >
+                        {restoring === v.id ? 'Putting back…' : 'Put this back'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <BuildModeSplit back={`/spaces/${id}?manage=1&build=public`} space={{ id: space.id, name: space.name }} />
+          {/* Only ever shown when there are unsaved edits here AND a newer
+              page on the server — with nothing typed, the form just catches
+              up quietly and this never appears. */}
+          {pageAhead && (
+            <div className="sprof__ahead">
+              <p className="sprof__ahead-say">
+                This page changed while the builder was open — Claude, or another steward, has
+                written something newer than what&rsquo;s on screen here. Saving now would write
+                over it.
+              </p>
+              <button
+                type="button" className="btn"
+                onClick={() => {
+                  sharedBase.current = JSON.stringify(pageAhead);
+                  setPageEdit(pageAhead.page);
+                  setContact(pageAhead.contact);
+                  setPageAhead(null);
+                }}
+              >
+                Load the current page
+              </button>
+              <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
+            </div>
+          )}
           {/* Contact & hours moved INTO the Contact tab's Style panel in the
               tabs list (founder 2026-08-22: "contact and hours is supposed
               to be a tab that you select, not a default part of the page
@@ -1520,7 +1758,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               Nobody is locked out by 'none': the app lives at lichen.health
               and members sign in there. */}
           {publicPage && (
-            <div className="prof__field">
+            <div className="prof__field" id="b-join">
               <label className="prof__label">How much should this page mention Lichen?</label>
               {([
                 ['full', 'Invite people in',
@@ -1585,7 +1823,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
           </div>
           <p className="prof__privacy-sub">This page</p>
-          <div className="prof__field">
+          <div className="prof__field" id="b-tagline">
             <label className="prof__label">One line — what this {kindLabel.toLowerCase()} does, for whom</label>
             <input className="prof__input" value={pageEdit.tagline ?? ''}
               onChange={(e) => setPageEdit((pm) => ({ ...pm, tagline: e.target.value }))}
@@ -1724,7 +1962,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               morning. Stored as one string per line, "Name · terms", which
               PublicPage splits on the middle dot; the two fields here keep
               an owner from ever having to know that. */}
-          <div className="prof__field">
+          <div className="prof__field" id="b-offerings">
             <label className="prof__label">What you offer</label>
             {(pageEdit.offerings ?? []).map((line, i) => {
               const [name, ...rest] = line.split(' · ');
@@ -1910,8 +2148,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
           {/* Spaces build their page's tabs from the same library people do
               (founder 2026-08-06) — this form never wrote `page` until now. */}
-          <p className="prof__privacy-sub">This page&rsquo;s tabs</p>
+          <p className="prof__privacy-sub" id="b-tabs">This page&rsquo;s tabs</p>
           <PageTabsEditor
+            openSignal={tabSignal}
             tabs={pageEdit.tabs ?? []}
             onChange={(tabs) => setPageEdit((pm) => ({ ...pm, tabs }))}
             photos={pageEdit.photos ?? []}
@@ -1947,111 +2186,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             }
           />
 
-          {/* A community can decide it works without the assistant — the AI
-              door then reads slashed for everyone who visits (founder
-              2026-08-05: "AI is off at the admin level for the group"). */}
-          <label className="sprof__duty">
-            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
-            <span>
-              Work with the assistant here
-              <em>Off means this {kindLabel.toLowerCase()} carries a slashed AI mark, and nothing
-                here is gathered for anyone&rsquo;s briefing. Members always reach their own
-                assistant elsewhere.</em>
-            </span>
-          </label>
-          {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
-              kept — it went into the draft as you typed. This button is
-              about the open web: it decides when strangers see it. The row
-              always says which of the two states the page is in, because
-              "is this live?" is the only question that matters here. */}
-          <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
-            </button>
-            {draftPending && (
-              <button
-                className="btn" type="button" disabled={saving}
-                onClick={async () => {
-                  await clearDraft('space', id);
-                  setDraftPending(false);
-                  setDraftMsg('');
-                  await load();
-                }}
-              >
-                Discard draft
-              </button>
-            )}
-            {msg && <span className="prof__msg">{msg}</span>}
-            {!msg && (
-              <span className="prof__msg prof__draft-state">
-                {draftPending
-                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
-                  : 'Everything here is live.'}
-              </span>
-            )}
+              </div>
+            </div>
           </div>
-          {/* WHAT THE PAGE USED TO SAY (founder 2026-08-29). Claude writes
-              straight to live, so the page can move without anyone pressing
-              anything — this is where you find out what it said before, and
-              put it back. A trigger records every write, from here, from the
-              chat, or from anywhere else. */}
-          <div className="sprof__history">
-            <button
-              type="button" className="ptabs__mv"
-              onClick={async () => {
-                const next = !historyOpen;
-                setHistoryOpen(next);
-                if (next && versions === null) setVersions(await listVersions('space', id));
-              }}
-            >
-              {historyOpen ? 'Hide history' : 'What changed before'}
-            </button>
-            {historyOpen && versions !== null && versions.length === 0 && (
-              <p className="ptabs__note">
-                Nothing yet — this page hasn&rsquo;t changed since history started keeping.
-              </p>
-            )}
-            {historyOpen && versions !== null && versions.length > 0 && (
-              <ul className="sprof__versions">
-                {versions.map((v, i) => {
-                  // Each row snapshots the page BEFORE its change; the state
-                  // that followed is the next-newer snapshot, or what is live
-                  // now for the most recent one.
-                  const after = i === 0
-                    ? { page: pageEdit, description, contact }
-                    : versions[i - 1].snapshot;
-                  return (
-                    <li className="sprof__version" key={v.id}>
-                      <span className="sprof__version-what">
-                        {v.source === 'assistant' ? 'Claude changed ' : 'You changed '}
-                        {describeChange(v.snapshot, after as PageDraft)}
-                        <em>{new Date(v.createdAt).toLocaleString()}</em>
-                      </span>
-                      <button
-                        type="button" className="ptabs__mv" disabled={!!restoring}
-                        onClick={async () => {
-                          setRestoring(v.id);
-                          const ok = await restoreVersion(v.id);
-                          setRestoring('');
-                          if (!ok) { setError('Could not put that version back.'); return; }
-                          await clearDraft('space', id);
-                          setDraftPending(false);
-                          setVersions(await listVersions('space', id));
-                          await load();
-                          setMsg('Put back');
-                          setTimeout(() => setMsg(''), 2500);
-                        }}
-                      >
-                        {restoring === v.id ? 'Putting back…' : 'Put this back'}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </CollapsibleSection>
-      )}
+        )}
+      </>)}
 
       {adminTools && (
         <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
@@ -2098,7 +2237,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           </label>
 
           <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
+            <button className="btn btn-primary" onClick={saveSettings} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </button>
             {msg && <span className="prof__msg">{msg}</span>}
