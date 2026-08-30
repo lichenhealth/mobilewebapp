@@ -170,7 +170,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Curated-section shares awaiting stewards (courses/library)
   const [shares, setShares] = useState<SectionShareRow[]>([]);
   const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
-  // Bookable areas & things: the space's bookable resources + the steward
+  // Bookable Items & Spaces: the space's bookable resources + the steward
   // queue. Distinct from Goods (marketplace items that change hands) and
   // from Places (a venue's category) — these are LENT and come back.
   const [resources, setResources] = useState<ResourceRow[]>([]);
@@ -1061,7 +1061,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   );
   const roomsSection = !backstage && resources.length > 0 && (
     <section className="prof__section">
-      <h2 className="prof__h2">Bookable areas &amp; things</h2>
+      <h2 className="prof__h2">Bookable Items &amp; Spaces</h2>
       <div className="sprof__members">
         {resources.map((r) => (
           <div className="sprof__resource" key={r.id}>
@@ -2189,7 +2189,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {backstage && (
-        <CollapsibleSection id="rooms" title="Bookable areas & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
+        <CollapsibleSection id="rooms" title="Bookable Items & Spaces" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
             <p className="sprof__muted">Nothing listed yet — a stall, an arena, a tool, the dinner plates. Anything members can book.</p>
           )}
