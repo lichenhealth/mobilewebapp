@@ -56,6 +56,7 @@ import {
 } from '../lib/pageDrafts';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
+import GrabPen from '../components/GrabPen';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spacePresentCount, spacePresentList, type PresentMember } from '../lib/presenceApi';
@@ -1280,6 +1281,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
   if (showTemplate) {
     return (
+      <>
+      {/* The grab + pen rides an admin's own preview (founder 2026-08-31):
+          grab the screen, circle what you mean, and it lands in the space's
+          build thread — the Shottr loop, on-platform. Never on a trial or
+          embed (those stand for the naked site). */}
+      {previewing && isAdmin && !!me && !trialView && !embedView && (
+        <GrabPen thread={`space:${space.id}`} uploaderId={me} />
+      )}
       <PublicPage
         id={space.id}
         name={space.name}
@@ -1348,6 +1357,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           </>
         )}
       </PublicPage>
+      </>
     );
   }
 
