@@ -1197,6 +1197,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // chrome — nav, no corner doors — which is precisely not the thing being
   // judged. The trial forces the guest rendering.
   const trialView = searchParams.has('brand') || searchParams.has('ground');
+  // AN EMBED IS THE WEBSITE, NOT THE APP (founder 2026-08-31: the build
+  // thread's page pane wore the ADMIN | LICHEN VIEW | PUBLIC VIEW toggle —
+  // "the wrong link"; that framing belongs to the Lichen profile, the PUBLIC
+  // builder's pane shows the naked site the way the manual builder's stage
+  // does). Same treatment as a colour trial: no adminBar, guest rendering.
+  // MemberProfile has hidden its own toggle under ?embed=1 all along.
+  const embedView = searchParams.get('embed') === '1';
   const showTemplate = !me || previewing || forcePublic || trialView || (!backstage && !tab);
   // The way into backstage has to exist on the page an admin actually lands
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
@@ -1249,7 +1256,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // close the preview, that simple"). The three-way toggle is a way OUT of
   // the view you are in — and this view's exit is the tab's close button. An
   // owner judging their colours shouldn't have Lichen's furniture in shot.
-  const adminBar = isAdmin && !trialView ? (
+  const adminBar = isAdmin && !trialView && !embedView ? (
     <div className="view-toggle-row">
       {/* No visible subject label (founder 2026-08-22, same day it shipped:
           it squeezed the toggle off the column) — the acting chip's real
@@ -1293,7 +1300,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         contact={contact}
         page={pageMeta}
         preview={previewing}
-        signedIn={!!me && !trialView}
+        signedIn={!!me && !trialView && !embedView}
         // A space's page is a gateway into Lichen (founder 2026-08-17): a
         // signed-out visitor knocks right here, and the knock names us.
         knockSpace={{ id: space.id, name: space.name, kindLabel }}
