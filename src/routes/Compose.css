@@ -7,9 +7,15 @@
 }
 .cmp__muted { color: var(--ink-muted); font-size: var(--t-sm); text-align: center; padding: var(--s-7) 0; }
 
-/* Way back without posting (same language as SmartSearch's back chip) */
+/* Way back without posting (same language as SmartSearch's back chip).
+   A BACK CHIP IS ONLY AS WIDE AS ITS WORDS (founder 2026-08-31, platform
+   rule): width: fit-content + the two self props cover every parent —
+   align-self for flex columns, justify-self for grids, where align-self
+   stops governing the inline axis (how the assistant feed's paged GRID
+   stretched this to a bar despite the old flex fix). */
 .cmp__back {
   display: inline-flex; align-items: center; gap: 7px;
+  width: fit-content; align-self: flex-start; justify-self: start;
   margin-bottom: var(--s-3); padding: 6px 12px;
   border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);

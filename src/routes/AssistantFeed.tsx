@@ -48,6 +48,14 @@ export default function AssistantFeed() {
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
+  // BUILDER MODE (founder 2026-08-31, third pass: even with the page beside
+  // the chat, the six personal thread icons and the generic Claude header
+  // made this read as "the Lichen profile build"). Arriving through a page
+  // builder's Build-with-Claude door (`page=1`), this screen IS the Public
+  // Profile Builder in its Claude mode: it says so in the header, and the
+  // personal thread rail steps out — Back to manual mode is the one exit,
+  // the same way the manual builder is a full screen with one way back.
+  const builderMode = !!spaceId && params.get('page') === '1';
 
   // THE PROFILE THREAD FOLLOWS THE HAT (founder 2026-08-31, the same bug's
   // third face: acting as Countryman Stables, the profile thread showed
@@ -262,9 +270,11 @@ export default function AssistantFeed() {
       <header className="afeed__head">
         <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={44} />
         <div className="afeed__head-text">
-          <h1 className="afeed__title">Claude</h1>
+          <h1 className="afeed__title">{builderMode ? 'Public Profile Builder' : 'Claude'}</h1>
           <p className="afeed__sub">
-            {spaceId
+            {builderMode
+              ? `Build with Claude — ${possessive(sctx?.name ?? 'this space')} website changes beside the conversation.`
+              : spaceId
               ? `${possessive(sctx?.name ?? 'This space')} build thread — its page, its story, kept with the ${sctx?.kind ?? 'space'}.`
               : thread === 'general'
               ? 'Everything you’ve shared and asked — the whole weave, drawing on every thread.'
@@ -304,6 +314,7 @@ export default function AssistantFeed() {
           open" — with its message tally at the upper right, TopBar-badge
           style. A section with nothing in it yet reads GRAY until it's set
           up; General is always lit, it's the front door. */}
+      {!builderMode && (
       <div className="afeed__threads h-scroll">
         {ASSISTANT_THREADS.map((t) => {
           const off = setup ? !setup[t.id] : false;
@@ -334,6 +345,7 @@ export default function AssistantFeed() {
           </button>
         )}
       </div>
+      )}
 
       {/* Building your presence happens HERE, in the profile thread, rather
           than off in a screen of its own (founder 2026-08-11). */}

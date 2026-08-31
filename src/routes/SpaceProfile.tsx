@@ -1468,6 +1468,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               <strong className="sprof__buildtitle">Lichen Profile Builder</strong>
             </div>
             <div className="sprof__buildpane sprof__buildpane--lone">
+              {/* Both builders carry the two modes (founder 2026-08-31: "It
+                  should have both"). pagePane={false}: this door is about the
+                  in-Lichen profile, so the thread opens plain — the website
+                  pane belongs to the Public builder's door. */}
+              <BuildModeSplit
+                back={`/spaces/${id}?manage=1&build=lichen`}
+                space={{ id: space.id, name: space.name }}
+                pagePane={false}
+              />
               <div className="prof__field">
                 <label className="prof__label">Photo</label>
                 <button className="btn" onClick={() => avatarInputRef.current?.click()} disabled={avatarBusy}>
