@@ -313,3 +313,72 @@
   cursor: pointer; font-family: inherit; text-decoration: underline;
 }
 .prof__idoffer-no:hover { color: var(--ink); }
+
+/* The logo-colour proposal (founder 2026-08-28). The swatch used to sit
+   inside .prof__handle, which is styled like a text input — so the whole row
+   read as a field and people clicked the words instead of the button. It is
+   a row of controls, so it looks like one. */
+.sprof__hue-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sprof__hue-dot {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--bone-edge);
+}
+.sprof__hue-try {
+  margin-top: 10px; padding: 12px 14px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: var(--bone-warm);
+}
+.sprof__hue-lead { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.sprof__hue-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Each look carries its own Preview, so the decision and the way to check it
+   are the same object (founder 2026-08-28). */
+.sprof__look { align-items: center; }
+.sprof__look > span { flex: 1; }
+.sprof__look-see {
+  flex-shrink: 0; align-self: center;
+  border: 1px solid var(--bone-edge); border-radius: 999px;
+  background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 12.5px; padding: 5px 12px; cursor: pointer;
+}
+.sprof__look-see:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
+.sprof__look-see:disabled { opacity: 0.4; cursor: default; }
+.sprof__look .sprof__hue-dot { width: 12px; height: 12px; margin-left: 8px; display: inline-block; vertical-align: middle; }
+
+/* What you offer — name and terms side by side, so nobody has to know the
+   stored line is "Name · terms" (founder 2026-08-28). */
+.sprof__offer-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sprof__offer-row .prof__input { flex: 1; min-width: 0; }
+.sprof__offer-rm {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--bone-edge); background: transparent;
+  color: var(--ink-muted); font-size: 17px; line-height: 1; cursor: pointer;
+}
+.sprof__offer-rm:hover { color: var(--ink); border-color: var(--ink-faint); }
+.prof__addline {
+  border: 1px dashed var(--bone-edge); border-radius: var(--r-md, 12px);
+  background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 13px; padding: 7px 14px; cursor: pointer;
+}
+.prof__addline:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* Practical notes + photos in the story — the two fields an audit found
+   rendering publicly with no control (founder 2026-08-28). */
+.sprof__prac-label {
+  flex: 0 0 118px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+.sprof__storyimg {
+  display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px;
+  padding: 10px; border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px);
+}
+.sprof__storyimg img {
+  width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex-shrink: 0;
+}
+.sprof__storyimg-ctl { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.sprof__storyimg-ctl label { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.sprof__storyimg-ctl input[type="number"] { width: 58px; }
+.sprof__storyimg-ctl input[type="range"] { flex: 1; min-width: 90px; }
+
+/* Is this live? The publish row answers it whether or not anything is pending. */
+.prof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }

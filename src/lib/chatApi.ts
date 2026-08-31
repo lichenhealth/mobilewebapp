@@ -19,7 +19,7 @@ export function helpPartyOrder<T extends { profile_id: string }>(members: T[], h
   return [...members].sort((a, b) => rank(a.profile_id) - rank(b.profile_id));
 }
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm' | 'suggestion';
 
 export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
@@ -54,12 +54,19 @@ export interface ChatVM {
   party?: PartySpace;
   /** The space whose OWN room this is (org/community/group/place chats). */
   spaceId?: string | null;
+  /** That space's logo + name — the room wears the SPACE's identity, not a
+   *  stack of member faces (founder 2026-08-25: a solo room drew a blank
+   *  circle, because member-faces-minus-you was empty). */
+  roomSpaceAvatar?: string | null;
+  roomSpaceName?: string | null;
   /** help rooms: the member being helped (off the 'help:<id>' key). For a
    *  steward, rooms where this isn't them are DESK work, not their life. */
   helpMemberId?: string | null;
 }
 export function visitorIdOfKey(key: string | null | undefined): string | null {
-  if (!key || !key.startsWith('space:')) return null;
+  // 'space:<sid>:<visitor>[:<responder>]' (a Message chat) and
+  // 'suggest:<sid>:<visitor>' (a suggestions room) share the shape.
+  if (!key || !(key.startsWith('space:') || key.startsWith('suggest:'))) return null;
   return key.split(':')[2] ?? null;
 }
 export function helpMemberOfKey(key: string | null | undefined): string | null {
@@ -78,6 +85,7 @@ export const KIND_LABEL: Record<ChatKind, string> = {
   direct: 'Direct',
   help: 'Help',
   space_dm: 'Message',
+  suggestion: 'Suggestion',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
@@ -157,7 +165,7 @@ export function chatTitle(
     const other = members.find((m) => m.profile_id !== me) ?? members[0];
     return other?.name ?? 'Direct message';
   }
-  if (kind === 'space_dm' && party) {
+  if ((kind === 'space_dm' || kind === 'suggestion') && party) {
     // The visitor sees the SPACE; the space's admins see the visitor.
     if (party.visitorId === me) return party.name;
     const v = members.find((m) => m.profile_id === party.visitorId);
@@ -192,7 +200,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
     supabase.from('chats')
-      .select('id, kind, title, created_at, direct_key, space_id, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)')
+      .select('id, kind, title, created_at, direct_key, space_id, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)')
       .not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
@@ -214,7 +222,8 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   }
 
   type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null; space_id: string | null;
-    party: { id: string; name: string; avatar_url: string | null } | null };
+    party: { id: string; name: string; avatar_url: string | null } | null;
+    room_space: { id: string; name: string; avatar_url: string | null } | null };
   const vms: ChatVM[] = ((cRes.data as unknown as ChatRaw[] | null) ?? []).map((c) => {
     const members = membersByChat.get(c.id) ?? [];
     const party: PartySpace | undefined = c.party
@@ -229,6 +238,11 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
       last: lastByChat.get(c.id),
       party,
       spaceId: c.space_id,
+      // The space's OWN room wears the space's logo (founder 2026-08-25: a
+      // solo room built its avatar from member-faces-minus-you = a blank
+      // circle; the room's identity is the space, not its member stack).
+      roomSpaceAvatar: c.room_space?.avatar_url ?? null,
+      roomSpaceName: c.room_space?.name ?? null,
       helpMemberId,
     };
   });
@@ -261,6 +275,16 @@ export async function markChatRead(chatId: string): Promise<void> {
  *  the general thread — every current admin may reply. */
 export async function ensureSpaceChat(spaceId: string, responderId?: string | null): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_space_chat', { p_space: spaceId, p_responder: responderId ?? null });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Find-or-create my SUGGESTIONS room for a space (founder 2026-08-22:
+ *  "different than a help chat, but similar") — me, the space's stewards,
+ *  and Claude, holding my suggestions for its page. Admins are refused by
+ *  the RPC (they edit directly). */
+export async function ensureSuggestionChat(spaceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_suggestion_chat', { p_space: spaceId });
   if (error) throw new Error(error.message);
   return data as string;
 }

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
+\restrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -2013,6 +2013,47 @@ $$;
 ALTER FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) OWNER TO postgres;
 
 --
+-- Name: ensure_suggestion_chat(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ensure_suggestion_chat(p_space uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_me     uuid := auth.uid();
+  v_claude uuid := '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+  v_key    text;
+  v_chat   uuid;
+begin
+  if v_me is null then raise exception 'Not signed in'; end if;
+  if not public.space_alive(p_space) then raise exception 'That space isn''t reachable right now.'; end if;
+  if public.is_space_admin(p_space, v_me) then
+    raise exception 'You steward this space — you can change its page directly.';
+  end if;
+  v_key := 'suggest:' || p_space::text || ':' || v_me::text;
+  select id into v_chat from public.chats where direct_key = v_key;
+  if v_chat is null then
+    insert into public.chats (kind, party_space_id, direct_key, title)
+    values ('suggestion', p_space, v_key, null)
+    on conflict (direct_key) where direct_key is not null do nothing
+    returning id into v_chat;
+    if v_chat is null then select id into v_chat from public.chats where direct_key = v_key; end if;
+  end if;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_me) on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id) values (v_chat, v_claude) on conflict do nothing;
+  insert into public.chat_members (chat_id, profile_id)
+  select v_chat, m.profile_id from public.space_members m
+   where m.space_id = p_space and m.role in ('admin', 'super_admin')
+  on conflict do nothing;
+  return v_chat;
+end
+$$;
+
+
+ALTER FUNCTION public.ensure_suggestion_chat(p_space uuid) OWNER TO postgres;
+
+--
 -- Name: external_calendar_level(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -3589,6 +3630,46 @@ end; $$;
 ALTER FUNCTION public.on_care_request_notify() OWNER TO postgres;
 
 --
+-- Name: on_dev_report_fixed(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.on_dev_report_fixed() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_claude uuid := '85c04e7a-5a47-4c0e-85a4-0b35ff67a682';
+  v_chat uuid;
+  v_body text;
+begin
+  if new.status <> 'fixed' or old.status = 'fixed' then return new; end if;
+  if new.autonomous then
+    v_body := 'Good news — the issue reported here ("' || new.summary || '") should be fixed now. I''m running these fixes on my own; if something looks funny or isn''t working, say so here and we can bring Galyn into the conversation. 🌱';
+  else
+    v_body := 'Good news — the issue reported here ("' || new.summary || '") has been fixed by the builders. Thank you for flagging it; reports like this are how the platform gets better. 🌱';
+  end if;
+  if new.via like 'chat:%' then
+    begin
+      v_chat := nullif(split_part(new.via, ':', 3), '')::uuid;
+    exception when others then
+      v_chat := null;
+    end;
+    if v_chat is not null
+       and exists (select 1 from public.chat_members m where m.chat_id = v_chat and m.profile_id = v_claude) then
+      insert into public.chat_messages (chat_id, sender_id, body) values (v_chat, v_claude, v_body);
+    end if;
+  elsif new.via like 'feed:%' then
+    insert into public.assistant_feed_posts (profile_id, author, thread, body)
+    values (new.reporter_id, 'claude', substring(new.via from 6), v_body);
+  end if;
+  return new;
+end
+$$;
+
+
+ALTER FUNCTION public.on_dev_report_fixed() OWNER TO postgres;
+
+--
 -- Name: on_event_invite_notify(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -3652,23 +3733,26 @@ CREATE FUNCTION public.on_message_notify() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_kind text; v_name text; v_space text;
+declare v_kind text; v_name text; v_space text; v_party uuid;
 begin
-  select c.kind, s.name into v_kind, v_space
+  select c.kind, s.name, c.party_space_id into v_kind, v_space, v_party
     from public.chats c left join public.spaces s on s.id = c.party_space_id
    where c.id = new.chat_id;
-  if v_kind not in ('direct', 'care_team', 'help', 'space_dm') then return new; end if;
+  if v_kind not in ('direct', 'care_team', 'help', 'space_dm', 'suggestion') then return new; end if;
   select coalesce(nullif(full_name, ''), email, 'A member')
     into v_name from public.profiles where id = new.sender_id;
-  insert into public.notifications (recipient_id, section, type, title, body, link, actor_id)
-  select m.profile_id, 'chat', 'dm_message',
-         case when v_kind = 'space_dm' and v_space is not null then v_name || ' · ' || v_space else v_name end,
+  insert into public.notifications (recipient_id, section, space_id, type, title, body, link, actor_id)
+  select m.profile_id, 'chat', v_party, 'dm_message',
+         case when v_kind in ('space_dm', 'suggestion') and v_space is not null
+              then v_name || ' · ' || v_space
+              else v_name end,
          left(coalesce(new.body, 'Sent an attachment'), 140),
          '/chat/' || new.chat_id, new.sender_id
   from public.chat_members m
   where m.chat_id = new.chat_id and m.profile_id <> new.sender_id;
   return new;
-end; $$;
+end
+$$;
 
 
 ALTER FUNCTION public.on_message_notify() OWNER TO postgres;
@@ -5387,7 +5471,7 @@ CREATE TABLE public.chats (
     direct_key text,
     event_id uuid,
     party_space_id uuid,
-    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text, 'event'::text, 'help'::text, 'space_dm'::text])))
+    CONSTRAINT chats_kind_check CHECK ((kind = ANY (ARRAY['organization'::text, 'community'::text, 'group'::text, 'place'::text, 'care_team'::text, 'direct'::text, 'event'::text, 'help'::text, 'space_dm'::text, 'suggestion'::text])))
 );
 
 
@@ -5491,6 +5575,26 @@ CREATE TABLE public.course_notes (
 
 
 ALTER TABLE public.course_notes OWNER TO postgres;
+
+--
+-- Name: dev_reports; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dev_reports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    reporter_id uuid NOT NULL,
+    via text NOT NULL,
+    summary text NOT NULL,
+    details text,
+    status text DEFAULT 'new'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    seen_at timestamp with time zone,
+    autonomous boolean DEFAULT false NOT NULL,
+    CONSTRAINT dev_reports_status_check CHECK ((status = ANY (ARRAY['new'::text, 'seen'::text, 'fixed'::text, 'not_a_bug'::text])))
+);
+
+
+ALTER TABLE public.dev_reports OWNER TO postgres;
 
 --
 -- Name: donations; Type: TABLE; Schema: public; Owner: postgres
@@ -6124,7 +6228,7 @@ CREATE TABLE public.profiles (
     is_adult boolean,
     age_declared_at timestamp with time zone,
     findable boolean DEFAULT true NOT NULL,
-    assistant_can_edit boolean DEFAULT false NOT NULL,
+    assistant_can_edit boolean DEFAULT true NOT NULL,
     weaveable_default boolean DEFAULT true NOT NULL,
     jurisdiction text,
     pronouns text,
@@ -6806,6 +6910,14 @@ ALTER TABLE ONLY public.collections
 
 ALTER TABLE ONLY public.course_notes
     ADD CONSTRAINT course_notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dev_reports dev_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dev_reports
+    ADD CONSTRAINT dev_reports_pkey PRIMARY KEY (id);
 
 
 --
@@ -7865,6 +7977,13 @@ CREATE TRIGGER on_collection_suggestion_created AFTER INSERT ON public.collectio
 
 
 --
+-- Name: dev_reports on_dev_report_fixed_trg; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_dev_report_fixed_trg AFTER UPDATE ON public.dev_reports FOR EACH ROW EXECUTE FUNCTION public.on_dev_report_fixed();
+
+
+--
 -- Name: event_attendees on_event_invite_notify_trg; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -8491,6 +8610,14 @@ ALTER TABLE ONLY public.course_notes
 
 ALTER TABLE ONLY public.course_notes
     ADD CONSTRAINT course_notes_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dev_reports dev_reports_reporter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dev_reports
+    ADD CONSTRAINT dev_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -9820,6 +9947,30 @@ CREATE POLICY "csugg: suggest to visible collections" ON public.collection_sugge
 --
 
 CREATE POLICY "csugg: withdraw own pending" ON public.collection_suggestions FOR DELETE TO authenticated USING (((suggested_by = auth.uid()) AND (status = 'pending'::text)));
+
+
+--
+-- Name: dev_reports; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.dev_reports ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: dev_reports dev_reports: admins read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "dev_reports: admins read" ON public.dev_reports FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin))));
+
+
+--
+-- Name: dev_reports dev_reports: admins update; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "dev_reports: admins update" ON public.dev_reports FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = auth.uid()) AND p.is_admin))));
 
 
 --
@@ -11424,6 +11575,15 @@ GRANT ALL ON FUNCTION public.ensure_space_chat(p_space uuid, p_responder uuid) T
 
 
 --
+-- Name: FUNCTION ensure_suggestion_chat(p_space uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.ensure_suggestion_chat(p_space uuid) TO anon;
+GRANT ALL ON FUNCTION public.ensure_suggestion_chat(p_space uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.ensure_suggestion_chat(p_space uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION external_calendar_level(p_cal uuid, p_owner uuid, p_viewer uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -11954,6 +12114,15 @@ GRANT ALL ON FUNCTION public.on_care_remove() TO service_role;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO anon;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO authenticated;
 GRANT ALL ON FUNCTION public.on_care_request_notify() TO service_role;
+
+
+--
+-- Name: FUNCTION on_dev_report_fixed(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO anon;
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO authenticated;
+GRANT ALL ON FUNCTION public.on_dev_report_fixed() TO service_role;
 
 
 --
@@ -12591,6 +12760,15 @@ GRANT ALL ON TABLE public.collections TO service_role;
 GRANT ALL ON TABLE public.course_notes TO anon;
 GRANT ALL ON TABLE public.course_notes TO authenticated;
 GRANT ALL ON TABLE public.course_notes TO service_role;
+
+
+--
+-- Name: TABLE dev_reports; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.dev_reports TO anon;
+GRANT ALL ON TABLE public.dev_reports TO authenticated;
+GRANT ALL ON TABLE public.dev_reports TO service_role;
 
 
 --
@@ -13416,7 +13594,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ETQUhBvl0XcmFQOE1sM5rsJDHT8rIoS3oTCWyisxdNujQCkQKkoTkPfNK6fKsyj
+\unrestrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
 
 
 

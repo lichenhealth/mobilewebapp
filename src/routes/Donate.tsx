@@ -166,7 +166,7 @@ export default function Donate() {
 
   async function copyCheck() {
     try {
-      await navigator.clipboard.writeText('Lichen Health\nGalyn Burke\n320 Rustlers Rd.\nBailey, CO 80421');
+      await navigator.clipboard.writeText('Lichen Health\nGalyn Burke\n2076 Nova Rd.\nPine, CO 80470');
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {}
@@ -184,7 +184,7 @@ export default function Donate() {
         <p className="donate__sub">
           Thank you for investing in a more balanced and healthy future.
         </p>
-        <p className="donate__caption">Welcome to the Community — every donor becomes part of Lichen&rsquo;s Donor Community inside the platform.</p>
+        <p className="donate__caption">Welcome to the Community — every donor is invited to join us on the platform, and receives the aggregate story of their impact.</p>
         <div className="donate__head-links">
           <button
             type="button" className="donate__how-link"
@@ -442,7 +442,7 @@ export default function Donate() {
             </div>
             <div className="donate__check-row">
               <span className="donate__check-label">Mail to</span>
-              <span className="donate__check-val">Galyn Burke<br />320 Rustlers Rd.<br />Bailey, CO 80421</span>
+              <span className="donate__check-val">Galyn Burke<br />2076 Nova Rd.<br />Pine, CO 80470</span>
             </div>
             <button type="button" className="donate__check-copy" onClick={copyCheck}>
               {copied ? 'Copied!' : 'Copy details'}

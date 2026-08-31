@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
+import { resolveSurface, readableAccent } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
 import { ContactList, type ContactInfo } from './ContactFields';
-import { tabById, tabHasContent, type PageTab } from '../lib/pageTabs';
+import { tabById, tabHasContent, isSectionTab, type PageTab } from '../lib/pageTabs';
+import { subjectPronoun } from '../lib/names';
 import KnockForm from './KnockForm';
 import './PublicPage.css';
 
@@ -59,7 +61,18 @@ export interface PageMeta {
    *  2026-08-11). */
   coverPos?: number;
   coverStyle?: 'photo' | 'tint' | 'plain';
+  /** The page's own accent, as a hex string. Falls back to Lichen's peach.
+   *  FORCED READABLE against `surface` when the owner sets one — see
+   *  readableAccent() (founder 2026-08-28). */
   accent?: string;
+  /** The ground this page sits on: 'white', 'warm' (Lichen's paper, the
+   *  default), or a hex a business's logo suggested — a tint that suits it
+   *  can beat plain white (founder 2026-08-28). Never a free colour field:
+   *  the two named looks are picked from a list and the third is proposed
+   *  from the logo, then previewed before it is accepted. Whatever the
+   *  ground, its text colours are DERIVED from it (resolveSurface), so a
+   *  page can't inherit near-black type onto a colour it chose. */
+  surface?: string;
   /** Legacy single CTA — kept for old rows; new saves write `actions`. */
   action?: { kind: 'call' | 'book' | 'email' | 'visit' | 'none'; label?: string; href?: string };
   /** "How do you want people to get in touch" (founder 2026-08-11) —
@@ -79,12 +92,19 @@ export interface PageMeta {
    *  editor's '50% N%' — because the page-wide coverPos is tuned for the
    *  cover (founder 2026-08-21: Katie's face, cut off on Services).
    *  imageSize 'full' opts that photo out of the standard frame entirely. */
-  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string }>>;
+  sections?: Partial<Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string; tabOff?: boolean }>>;
   /** How loudly the page invites visitors into Lichen (founder 2026-07-29):
    *  'full' (default) = the peach doorway card; 'quiet' = one muted footer
    *  line — for pages whose owner prefers to invite people themselves once
-   *  they've vetted them. */
-  join?: 'full' | 'quiet';
+   *  they've vetted them; 'none' = no corner Sign in and no invitation card
+   *  (founder 2026-08-28: a page can be published as somebody's website
+   *  before its owner has been walked through the platform). ⚠ 'none' is
+   *  NOT "no mention of Lichen" — the credit-and-invite floor line renders
+   *  at every level (founder, same day, choosing reach over silence). If
+   *  that ever changes, the page-builder copy promising what each level
+   *  does must change WITH it. Members reach the app at lichen.health, so
+   *  nobody is locked out. */
+  join?: 'full' | 'quiet' | 'none';
   /** Custom doors (founder 2026-07-29, the front door): fully data-driven
    *  pages replacing the built-in About/Services/Facilities/Contact set.
    *  A door with `href` is a link out (to /about, a collection, /donate);
@@ -102,7 +122,7 @@ export interface PageMeta {
    *  categories instead. */
   offerings?: string[];
   /** The people behind it — a barn, a practice, a farm is its people. */
-  team?: { name: string; role?: string; note?: string }[];
+  team?: { name: string; role?: string; note?: string; photo?: string }[];
   /** A few more images, shown as a quiet strip under the story. */
   photos?: string[];
   /** Images woven INTO the story (founder 2026-07-29): each renders after
@@ -125,6 +145,8 @@ export interface PublicPageProps {
   /** Optional, stated by the member. Sits under the name — a fact about how
    *  to refer to someone, not a claim about them. */
   pronouns?: string | null;
+  /** The page speaks as "we" (spaces) instead of she/he/they (members). */
+  firstPerson?: boolean;
   /** The kind's mark, shown beside its word — spaces only (founder
    *  2026-08-05: the kind belongs under the name, not in the top bar). */
   kindIcon?: IconName;
@@ -186,6 +208,34 @@ export interface PublicPageProps {
 
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
+  // TRYING COLOURS ON THE REAL PAGE (founder 2026-08-28: "the preview is too
+  // small — open a new tab where they can see the entire thing"). ?brand= and
+  // ?ground= override the saved colours for THIS VIEW ONLY. Nothing is
+  // written, nobody else is affected, and the banner says so — it is the
+  // whole page as it would look, which a thumbnail can never be.
+  const tryParams = new URLSearchParams(useLocation().search);
+  const tryBrand = tryParams.get('brand');
+  const tryGround = tryParams.get('ground');
+  const trying = !!(tryBrand || tryGround);
+  // INSIDE THE PLATFORM, LICHEN'S COLOURS (founder 2026-08-28: "within the
+  // platform, I think we should keep it lichen color, right?"). A member's
+  // chosen scheme is for their WEBSITE — the face they show the open web. In
+  // app, every space rendering in someone's own colours would make Lichen
+  // look like a different product on every screen, and a member moving
+  // between spaces would lose the thread of where they are.
+  const inApp = !!props.signedIn;
+  // A ground may be a named look or a hex a logo suggested, so it is resolved
+  // rather than looked up — and it brings its own text colours with it.
+  const surfaceValue = inApp ? 'warm' : (tryGround ?? props.page.surface ?? 'warm');
+  const surface = resolveSurface(surfaceValue);
+  // ?brand=lichen is the sentinel for "no accent of your own" — it lets the
+  // builder offer Lichen's own look as one previewable option alongside the
+  // rest, which a missing parameter can't do (it would fall back to whatever
+  // accent is already saved).
+  const wantAccent = inApp ? null : (tryBrand === 'lichen' ? null : (tryBrand ?? props.page.accent));
+  const accent = wantAccent
+    ? (readableAccent(wantAccent, surfaceValue) ?? 'var(--peach)')
+    : 'var(--peach)';
   // Lichen doors cross back to Lichen's own origin when this page is served
   // from a member's custom domain.
   // Ask crawlers to leave a noindex page alone. Client-side meta is honored
@@ -199,13 +249,39 @@ export default function PublicPage(props: PublicPageProps) {
     return () => { m.remove(); };
   }, [props.page.noindex]);
 
+  // The GROUND is on <body>, not on this component — a page shorter than the
+  // viewport would otherwise sit as a white card on Lichen's bone, which
+  // reads as a bug. Restored on unmount so leaving a dark page doesn't leave
+  // the app dark (founder 2026-08-28).
+  useEffect(() => {
+    if (props.signedIn) return;
+    const prev = document.body.style.background;
+    document.body.style.background = surface.ground;
+    // A WEBSITE IS NOT AN APP SCREEN (founder 2026-08-28: "can we get rid of
+    // the beige sides? I want the entire preview to feel like a different
+    // website... it looks messy"). `.app-shell` is a centred column with a
+    // max-width, a bone ground and a framing shadow — right for the app,
+    // wrong for somebody's site, which was sitting in a beige surround that
+    // no choice of background could remove. The class lets the shell stand
+    // down for the whole of a public rendering; the page's own inner columns
+    // still hold the text to a readable measure.
+    document.body.classList.add('is-website');
+    return () => {
+      document.body.style.background = prev;
+      document.body.classList.remove('is-website');
+    };
+  }, [props.signedIn, surface.ground]);
+
   const go = (path: string) => {
     const u = appUrl(path);
     if (u.startsWith('http')) window.location.href = u; else navigate(u);
   };
   const { name, kindLabel, avatarUrl, description, location, contact, page } = props;
   const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
-  const accent = page.accent || 'var(--peach)';
+  // The owner's colours, kept honest. An accent only gets the readability
+  // pass when they actually chose one — Lichen's default peach is left
+  // exactly as it is rather than silently restyling every existing page
+  // (founder 2026-08-28).
   const story = (page.story || description || '').trim();
   // Is there anything on Home worth sending someone to? A tagline, a story
   // or an offering counts; the name and kind alone are the empty room.
@@ -256,6 +332,10 @@ export default function PublicPage(props: PublicPageProps) {
   // tab: tab content (About) greets the open web first.
   const asGuest = !props.signedIn || !!props.preview;
   const showFeed = !!props.feed && (!asGuest || page.showPosts === true);
+  // The owner's own subject pronoun for tease-link copy — she/he/ze when the
+  // member set pronouns, they otherwise (and always they for a space, which
+  // passes no pronouns). Never inferred from a name.
+  const subj = props.firstPerson ? { word: 'we', plural: true } : subjectPronoun(props.pronouns);
   // The render-function form carries its own Feed door inside the stream's
   // icon row (founder 2026-08-11: the newsfeed circle belongs with the other
   // circles, not beside the About/Services text tabs) — so the nav skips it.
@@ -270,19 +350,38 @@ export default function PublicPage(props: PublicPageProps) {
   // has something to show — adding one is an invitation to write, not an
   // empty room for a visitor to walk into.
   const chosen: PageTab[] = page.tabs?.length ? page.tabs : [];
+  // FACILITIES USED TO BE WRITABLE (founder 2026-08-28). While it sat in the
+  // library as a template tab, a builder could type the grounds into the
+  // TAB's body instead of into page.facilities. It's a built-in section now,
+  // so that older text would have gone dark — read it as the facilities copy
+  // when the page itself holds none. Nothing is lost, and nothing renders
+  // twice: this is the same string either way.
+  const oldFacTab = chosen.find((t) => t.id === 'facilities');
+  const facilities = page.facilities?.trim() || oldFacTab?.body?.trim() || '';
   const svcRows = (props.offeringRows ?? []).filter((o) => o.domain === 'service');
   const goodRows = (props.offeringRows ?? []).filter((o) => o.domain === 'good');
   const builtInHasContent = (id: string) =>
     id === 'about' ? !!story
       : id === 'goods' ? goodRows.length > 0
       : id === 'services' ? (svcRows.length > 0 || offerings.length > 0)
-      : id === 'facilities' ? !!page.facilities
+      : id === 'facilities' ? !!facilities
       : id === 'contact' ? hasContact
       : false;
   const liveChosen = chosen.filter((t) => {
     const tpl = tabById(t.id);
     return tpl?.builtIn ? builtInHasContent(t.id) : tabHasContent(t, tpl);
   });
+  // CONTENT CREATES THE TAB (founder 2026-08-26: "a smart reading of the
+  // situation"): a page holding facilities text grows a Facilities tab even
+  // when the builder never picked one — X-able in the builder, which stores
+  // the decline at sections.facilities.tabOff. Slotted before Contact, where
+  // websites keep it.
+  if (liveChosen.length > 0 && !!facilities
+      && !liveChosen.some((t) => t.id === 'facilities')
+      && !page.sections?.facilities?.tabOff) {
+    const at = liveChosen.findIndex((t) => t.id === 'contact');
+    liveChosen.splice(at >= 0 ? at : liveChosen.length, 0, { id: 'facilities' });
+  }
 
   const sectionItems = liveChosen.length
     ? liveChosen.map((t) => ({ id: t.id, label: t.label ?? tabById(t.id)?.label ?? t.id }))
@@ -291,7 +390,7 @@ export default function PublicPage(props: PublicPageProps) {
       : [
         story ? { id: 'about', label: 'About' } : null,
         offerings.length > 0 ? { id: 'services', label: 'Services' } : null,
-        page.facilities ? { id: 'facilities', label: 'Facilities' } : null,
+        facilities ? { id: 'facilities', label: 'Facilities' } : null,
         hasContact ? { id: 'contact', label: 'Contact' } : null,
       ].filter((n): n is { id: string; label: string } => !!n);
   // EVERY public page has a Home to land on (founder 2026-08-11: "you
@@ -391,10 +490,22 @@ export default function PublicPage(props: PublicPageProps) {
     </nav>
   ) : null;
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
-  const activeChosen = liveChosen.find((t) => t.id === tab && !tabById(t.id)?.builtIn) ?? null;
+  // ONE RENDERER PER SECTION (founder 2026-08-28: "it says facilities
+  // twice", four times over). The five ids in SECTION_IDS are drawn by the
+  // hand-written blocks below, from data Lichen already holds. This line is
+  // what stops a chosen tab from ALSO drawing one of them with its own title
+  // and body — the actual cause of the duplicate, which earlier fixes only
+  // hid by suppressing one of the two headings. isSectionTab, not the
+  // builtIn flag, so a library edit can never reopen it.
+  const activeChosen = liveChosen.find(
+    (t) => t.id === tab && !tabById(t.id)?.builtIn && !isSectionTab(t.id),
+  ) ?? null;
 
   // Tap any image for a closer, uncropped look (founder 2026-07-29).
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // Sections a Home reader opened in place (summarized sections with no tab
+  // of their own — the door expands instead of routing).
+  const [openSecs, setOpenSecs] = useState<Set<string>>(new Set());
 
   // A visitor from the open web isn't an app user — no Lichen top bar, no
   // bottom tabs (founder 2026-07-29). Signed-in members keep their normal
@@ -412,6 +523,61 @@ export default function PublicPage(props: PublicPageProps) {
   const flavor = (id: 'about' | 'services' | 'goods' | 'facilities') => {
     const lead = page.sections?.[id]?.lead;
     return lead ? <p className="ppage__lead">{lead}</p> : null;
+  };
+  // SMART SUMMARIES (founder 2026-08-26): Home used to tease a tab by
+  // excerpting it (2 story paragraphs, 5 offering rows), which read as the
+  // tab minus its ending. When the tab has a written summary — its Style
+  // panel lead, or homeSummary for the story — Home now shows the summary
+  // and the door instead of the dump. No summary written = the old excerpt,
+  // so nothing goes blank.
+  const hasTab = (id: string) => navItems.some((n) => n.id === id);
+  const secLead = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    page.sections?.[id]?.lead?.trim();
+  const summarized = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    tab === 'home' && !!secLead(id) && !openSecs.has(id);
+  // The summary's door: routes to the tab when one exists; a section with
+  // nowhere to route expands in place instead (the no-dead-end rule, kept).
+  const SecDoor = ({ id, children }: { id: string; children: React.ReactNode }) => hasTab(id)
+    ? <More to={id}>{children}</More>
+    : (
+      <button
+        className="ppage__more" type="button"
+        onClick={() => setOpenSecs((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id); else next.add(id);
+          return next;
+        })}
+      >
+        {openSecs.has(id) ? 'Show less' : children} <span aria-hidden>&rarr;</span>
+      </button>
+    );
+  // ALTERNATING SPLIT CARDS (founder 2026-08-26, from her sketch): a
+  // summarized section whose tab carries a photo renders copy beside the
+  // photo, sides alternating down the page — copy left first, then right,
+  // then left. Only at >=1024px (the app-shell column stays phone-width
+  // until then — a media query can't see the column, so below that the
+  // card stacks copy-then-photo).
+  const splitOrder = (['about', 'services', 'goods', 'facilities'] as const)
+    .filter((id) => summarized(id) && !!page.sections?.[id]?.image);
+  const splitting = (id: 'about' | 'services' | 'goods' | 'facilities') =>
+    splitOrder.includes(id) && !(id === 'about' && page.homeSummary?.trim());
+  const SumSplit = ({ id, label, door }: { id: 'about' | 'services' | 'goods' | 'facilities'; label?: string; door: React.ReactNode }) => {
+    const sec = page.sections![id]!;
+    const pos = typeof sec.imagePos === 'number' ? `50% ${sec.imagePos}%` : (sec.imagePos ?? '50% 50%');
+    return (
+      <section className={'ppage__sec ppage__sec--split' + (splitOrder.indexOf(id) % 2 === 1 ? ' is-flip' : '')} data-edit-region={id}>
+        <div className="ppage__split-copy">
+          {label && <h2 className="ppage__h2">{label}</h2>}
+          <p className="ppage__lead">{secLead(id)}</p>
+          <SecDoor id={id}>{door}</SecDoor>
+        </div>
+        <img
+          className="ppage__split-img" src={sec.image} alt="" loading="lazy"
+          style={{ objectPosition: pos }}
+          onClick={() => setLightbox(sec.image!)}
+        />
+      </section>
+    );
   };
   // Which image the hero wears on this tab (two builds converged here the
   // same day — merged): HOME and Feed wear the page cover (founder
@@ -435,23 +601,36 @@ export default function PublicPage(props: PublicPageProps) {
   return (
     <div
       className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')}
-      style={{ ['--ppage-accent' as string]: accent }}
+      style={{
+        ['--ppage-accent' as string]: accent,
+        ['--ppage-ground' as string]: surface.ground,
+        ['--ppage-ink' as string]: surface.ink,
+        ['--ppage-ink-soft' as string]: surface.soft,
+        ['--ppage-ink-muted' as string]: surface.muted,
+        ['--ppage-edge' as string]: surface.edge,
+      }}
     >
       {props.preview && (
         <p className="ppage__preview">Preview — this is what the open web sees.</p>
+      )}
+      {trying && !props.preview && (
+        <p className="ppage__preview">
+          Preview — nothing is saved, and nobody else sees this.
+          Close this tab to go back.
+        </p>
       )}
 
       {/* Platform doors, upper right — elegant and quiet (founder
           2026-07-29): Sign in for members everywhere; the invitation only
           where the page owner wants it (join !== quiet). Skipped for a
           signed-in viewer — they're already in. */}
-      {!props.preview && !props.signedIn && (
+      {!props.preview && !props.signedIn && page.join !== 'none' && (
         <div className="ppage__corner">
-          {page.join !== 'quiet' && (
+          {page.join === 'full' || page.join === undefined ? (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
               Request an invitation
             </button>
-          )}
+          ) : null}
           <button className="ppage__corner-signin" type="button" onClick={() => go('/login')}>
             Sign in
           </button>
@@ -474,7 +653,7 @@ export default function PublicPage(props: PublicPageProps) {
           (logo, name, tagline, address), then the nav doors, then the cover
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
-        <div className="ppage__hero-body ppage__hero-body--top">
+        <div className="ppage__hero-body ppage__hero-body--top" data-edit-region="identity">
           <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
             size={props.signedIn ? 96 : 128} />
           <h1 className="ppage__name">{name}</h1>
@@ -485,13 +664,13 @@ export default function PublicPage(props: PublicPageProps) {
               line entirely (founder 2026-08-22: groups said "Group", orgs
               said nothing). kindIcon is only passed for spaces; a member's
               kindLabel is their headline and keeps riding the tagline slot. */}
-          {props.kindIcon && kindLabel && (
+          {props.kindIcon && kindLabel && !asGuest && (
             <p className="ppage__kind">
               {kindLabel}
               <Icon name={props.kindIcon} size={15} />
             </p>
           )}
-          {(page.tagline || (!props.kindIcon && kindLabel)) && (
+          {(page.tagline || (!props.kindIcon && kindLabel)) && !(asGuest && tab === 'home' && page.tagline && coverSrc) && (
             <p className="ppage__tagline">
               {page.tagline || kindLabel}
             </p>
@@ -510,10 +689,14 @@ export default function PublicPage(props: PublicPageProps) {
         {coverSrc && (
           <img
             className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
+            data-edit-region="cover"
             src={coverSrc} alt=""
             style={coverFull ? undefined : { objectPosition: posToObjectPos(coverPos) }}
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
+        )}
+        {asGuest && tab === 'home' && page.tagline && coverSrc && (
+          <p className="ppage__tagline-under">{page.tagline}</p>
         )}
       </header>
 
@@ -573,15 +756,22 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 2 · Story */}
-      {story && show('about') && (
-        <section className="ppage__sec">
+      {story && show('about') && splitting('about') && (
+        <SumSplit id="about" door="Read the whole story" />
+      )}
+      {story && show('about') && !splitting('about') && (
+        <section className="ppage__sec" data-edit-region="about">
           {flavor('about')}
           <div className="ppage__story">
-            {(teasing('about')
-              ? (page.homeSummary?.trim()
+            {(tab !== 'home' || openSecs.has('about')
+              ? story.split(/\n{2,}/)
+              : page.homeSummary?.trim()
                 ? page.homeSummary.split(/\n{2,}/)
-                : story.split(/\n{2,}/).slice(0, 2))
-              : story.split(/\n{2,}/)).map((para, i) => (
+                : summarized('about')
+                  ? []
+                  : teasing('about')
+                    ? story.split(/\n{2,}/).slice(0, 2)
+                    : story.split(/\n{2,}/)).map((para, i) => (
               <div key={i}>
                 <p>{para}</p>
                 {(page.storyImages ?? []).filter((si) => si.after === i + 1).map((si) => (
@@ -593,8 +783,8 @@ export default function PublicPage(props: PublicPageProps) {
                 ))}
               </div>
             ))}
-            {teasing('about') && (page.homeSummary?.trim() || story.split(/\n{2,}/).length > 2) && (
-              <More to="about">Read the whole story</More>
+            {tab === 'home' && (page.homeSummary?.trim() || secLead('about') || (hasTab('about') && story.split(/\n{2,}/).length > 2)) && (
+              <SecDoor id="about">Read the whole story</SecDoor>
             )}
           </div>
         </section>
@@ -614,45 +804,60 @@ export default function PublicPage(props: PublicPageProps) {
              Services and Goods are separate tabs (founder 2026-08-06), and
              each row carries its OWN recommend: you recommend the work, not
              the person. */}
-      {svcRows.length > 0 && show('services') && (
-        <section className="ppage__sec">
+      {svcRows.length > 0 && show('services') && splitting('services') && (
+        <SumSplit id="services" label="Services" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
+      )}
+      {svcRows.length > 0 && show('services') && !splitting('services') && (
+        <section className="ppage__sec" data-edit-region="services">
           <h2 className="ppage__h2">Services</h2>
           {flavor('services')}
-          <ul className="ppage__offers">
-            {(teasing('services') ? svcRows.slice(0, 5) : svcRows).map((o) => (
-              <li className="ppage__offer" key={o.id}>
-                <span className="ppage__offer-name">{o.name}</span>
-                {props.renderOfferingAction?.(o)}
-              </li>
-            ))}
-          </ul>
-          {teasing('services') && svcRows.length > 5 && (
-            <More to="services">See everything they offer</More>
+          {!summarized('services') && (
+            <ul className="ppage__offers">
+              {(teasing('services') ? svcRows.slice(0, 5) : svcRows).map((o) => (
+                <li className="ppage__offer" key={o.id}>
+                  <span className="ppage__offer-name">{o.name}</span>
+                  {props.renderOfferingAction?.(o)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {tab === 'home' && (secLead('services') || (hasTab('services') && svcRows.length > 5)) && (
+            <SecDoor id="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</SecDoor>
           )}
         </section>
       )}
 
-      {goodRows.length > 0 && show('goods') && (
-        <section className="ppage__sec">
+      {goodRows.length > 0 && show('goods') && splitting('goods') && (
+        <SumSplit id="goods" label="Goods" door="See all the goods" />
+      )}
+      {goodRows.length > 0 && show('goods') && !splitting('goods') && (
+        <section className="ppage__sec" data-edit-region="goods">
           <h2 className="ppage__h2">Goods</h2>
           {flavor('goods')}
-          <ul className="ppage__offers">
-            {(teasing('goods') ? goodRows.slice(0, 5) : goodRows).map((o) => (
-              <li className="ppage__offer" key={o.id}>
-                <span className="ppage__offer-name">{o.name}</span>
-                {props.renderOfferingAction?.(o)}
-              </li>
-            ))}
-          </ul>
+          {!summarized('goods') && (
+            <ul className="ppage__offers">
+              {(teasing('goods') ? goodRows.slice(0, 5) : goodRows).map((o) => (
+                <li className="ppage__offer" key={o.id}>
+                  <span className="ppage__offer-name">{o.name}</span>
+                  {props.renderOfferingAction?.(o)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {tab === 'home' && secLead('goods') && <SecDoor id="goods">See all the goods</SecDoor>}
         </section>
       )}
 
       {/* A page that gave us plain strings (a space's hand-written offerings)
           keeps the old single list. */}
-      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && (
-        <section className="ppage__sec">
+      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && splitting('services') && (
+        <SumSplit id="services" label="What we offer" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
+      )}
+      {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
+        <section className="ppage__sec" data-edit-region="offerings">
           <h2 className="ppage__h2">What we offer</h2>
           {flavor('services')}
+          {!summarized('services') && (
           <ul className="ppage__offers">
             {(teasing('services') ? offerings.slice(0, 5) : offerings).map((o) => {
               const [head, ...rest] = o.split(' · ');
@@ -664,23 +869,29 @@ export default function PublicPage(props: PublicPageProps) {
               );
             })}
           </ul>
-          {teasing('services') && offerings.length > 5 && (
-            <More to="services">See everything they offer</More>
+          )}
+          {tab === 'home' && (secLead('services') || (hasTab('services') && offerings.length > 5)) && (
+            <SecDoor id="services">See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</SecDoor>
           )}
         </section>
       )}
 
       {/* 3b · Facilities — the grounds themselves */}
-      {page.facilities && show('facilities') && (
-        <section className="ppage__sec">
+      {facilities && show('facilities') && splitting('facilities') && (
+        <SumSplit id="facilities" label="The facilities" door="See the grounds" />
+      )}
+      {facilities && show('facilities') && !splitting('facilities') && (
+        <section className="ppage__sec" data-edit-region="facilities">
           <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
           <div className="ppage__story">
-            {(teasing('facilities')
-              ? page.facilities.split(/\n{2,}/).slice(0, 1)
-              : page.facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
-            {teasing('facilities') && page.facilities.split(/\n{2,}/).length > 1 && (
-              <More to="facilities">See the grounds</More>
+            {(summarized('facilities')
+              ? []
+              : teasing('facilities')
+                ? facilities.split(/\n{2,}/).slice(0, 1)
+                : facilities.split(/\n{2,}/)).map((para, i) => <p key={i}>{para}</p>)}
+            {tab === 'home' && (secLead('facilities') || (hasTab('facilities') && facilities.split(/\n{2,}/).length > 1)) && (
+              <SecDoor id="facilities">See the grounds</SecDoor>
             )}
           </div>
         </section>
@@ -688,7 +899,7 @@ export default function PublicPage(props: PublicPageProps) {
 
       {/* 4 · Practical */}
       {hasContact && show('contact') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="contact">
           <h2 className="ppage__h2">Contact &amp; hours</h2>
           <ContactList contact={contact} />
           {bizLocations.length > 0 && (
@@ -710,11 +921,15 @@ export default function PublicPage(props: PublicPageProps) {
 
       {/* 4b · The people — part of the story, so they live on About */}
       {(page.team?.length ?? 0) > 0 && show('about') && (
-        <section className="ppage__sec">
+        <section className="ppage__sec" data-edit-region="team">
           <h2 className="ppage__h2">The people</h2>
           <div className="ppage__team">
             {page.team!.map((t) => (
               <div className="ppage__person" key={t.name}>
+                {t.photo && (
+                  <img className="ppage__person-photo" src={t.photo} alt="" loading="lazy"
+                    onClick={() => setLightbox(t.photo!)} />
+                )}
                 <p className="ppage__person-name">{t.name}</p>
                 {t.role && <p className="ppage__person-role">{t.role}</p>}
                 {t.note && <p className="ppage__person-note">{t.note}</p>}
@@ -743,10 +958,29 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead.
           Skipped entirely for a signed-in viewer — their real join/trust
           controls already rendered above, in `children`. */}
-      {props.signedIn ? null : page.join === 'quiet' ? (
-        <p className="ppage__join-quiet">
-          This page lives on <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
-          {' '}· members <button className="ppage__join-quiet-link" onClick={() => go('/login')}>sign in</button>
+      {props.signedIn ? null : page.join === 'quiet' || page.join === 'none' ? (
+        /* THE FLOOR (founder 2026-08-28): every public page carries the
+           credit and the invitation, at whatever volume the owner chose.
+           Turning the doors off turns them down to this line — it does not
+           turn them off. The louder levels below already say both things in
+           their own card, so this renders only when that card doesn't, and
+           never to a signed-in member (they're already in). */
+        <p className="ppage__join-quiet" data-edit-region="join">
+          Powered by <button className="ppage__join-quiet-link" onClick={() => go('/about')}>Lichen</button>
+          {' '}· Want to join our community?{' '}
+          {/* THE KNOCK CARRIES THE PAGE IT CAME FROM (founder 2026-08-29).
+              The loud join card knocks at the SPACE's door — its stewards
+              see it, and the note says where it came from. Turning the page
+              down to 'quiet' or 'none' used to drop that: the floor line
+              went to the generic /signup, so an introduction from Countryman
+              Stables arrived looking like a walk-in off the street. Volume
+              was never supposed to change who is knocking. */}
+          <button
+            className="ppage__join-quiet-link"
+            onClick={() => go(props.knockSpace ? `/signup?from=${props.knockSpace.id}` : '/signup')}
+          >
+            Request an invite
+          </button>
         </p>
       ) : props.knockSpace ? (
         /* A space's page is a GATEWAY (founder 2026-08-17): the ask is to
@@ -754,7 +988,7 @@ export default function PublicPage(props: PublicPageProps) {
            person will be a member of the whole platform, not a user of one
            group's software, so they get told what they'd be joining. The
            knock carries the space; its stewards can send the invitation. */
-        <section className="ppage__join">
+        <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">Request to join <strong>{name}</strong></p>
           <p className="ppage__join-sub">
             {name} lives on <strong>Lichen</strong> — a member-run network for care, work,
@@ -774,7 +1008,7 @@ export default function PublicPage(props: PublicPageProps) {
           </p>
         </section>
       ) : (
-        <section className="ppage__join">
+        <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
           <p className="ppage__join-sub">
             A member-run network for care, work, offerings and a fairer economy — where trust is

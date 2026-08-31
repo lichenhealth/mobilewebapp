@@ -2,7 +2,37 @@
    and an accent, nothing more — constrained templates beat builders. */
 /* Open space doctrine (founder 2026-07-29): generous air at the top, around
    the mark, in the margins, and at the foot — the page breathes. */
-.ppage { --ppage-accent: var(--peach); padding-bottom: 72px; position: relative; }
+.ppage {
+  --ppage-accent: var(--peach);
+  /* The ground and its ink arrive together from PageMeta.surface; the
+     defaults reproduce exactly what every page looked like before colours
+     existed, so an untouched page is byte-identical (founder 2026-08-28). */
+  --ppage-ground: var(--bone);
+  --ppage-ink: var(--ink);
+  --ppage-ink-soft: var(--ink-soft);
+  --ppage-ink-muted: var(--ink-muted);
+  --ppage-edge: var(--bone-edge);
+  background: var(--ppage-ground);
+  color: var(--ppage-ink);
+  /* REDEFINE LICHEN'S INK FAMILY FOR THIS PAGE (founder 2026-08-28). The
+     whole global family assumes light paper — the nav links are --ink-soft
+     (#2A3338), which on a chosen dark ground is near-black on near-black and
+     simply vanished. Rebinding the tokens here means every descendant that
+     reaches for --ink, --ink-soft, --ink-muted or --bone-edge gets the
+     PAGE's version, whatever ground it wears, without hunting rule by rule. */
+  --ink: var(--ppage-ink);
+  --ink-soft: var(--ppage-ink-soft);
+  --ink-muted: var(--ppage-ink-muted);
+  --ink-faint: var(--ppage-ink-muted);
+  --bone-edge: var(--ppage-edge);
+  --bone-edge-soft: var(--ppage-edge);
+  min-height: 100dvh;
+  padding-bottom: 72px; position: relative;
+}
+/* Text and rules inside the page follow the page's ink, not the app's, so a
+   dark ground doesn't leave near-black type on near-black paper. */
+.ppage h1, .ppage h2, .ppage h3, .ppage p, .ppage li { color: inherit; }
+.ppage hr, .ppage__rule { border-color: var(--ppage-edge); }
 /* In-app (signed-in) rendering keeps the normal top bar — .scroll-view's
    padding-top isn't zeroed here the way it is for guests, so pull up by the
    same amount .prof does to sit directly under the compact bar (founder
@@ -74,7 +104,7 @@
    view, so "Organization" reads identically wherever a space's name shows. */
 .ppage__kind {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--peach-deep); margin: 2px 0 0;
+  text-transform: uppercase; color: var(--ppage-accent, var(--peach-deep)); margin: 2px 0 0;
   display: inline-flex; align-items: center; gap: 6px; justify-content: center;
 }
 .ppage__tagline { margin: 0; font-size: 15.5px; color: var(--ink-soft); max-width: 46ch; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }
@@ -321,3 +351,36 @@
 /* A story image shown WHOLE — natural shape, no crop (founder 2026-08-21:
    "expand this pic down so you can see Katie below him") */
 .ppage__story-img--full { max-height: none; object-fit: contain; }
+
+/* Alternating summary split cards (founder 2026-08-26): copy beside the
+   tab's photo, sides alternating down Home. Two columns only at >=1024px —
+   the app-shell column stays phone-width until then, so below that the card
+   stacks copy first, photo after. */
+.ppage__split-copy { display: flex; flex-direction: column; gap: var(--s-3); align-items: flex-start; }
+.ppage__split-img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border-radius: var(--r-lg); cursor: zoom-in;
+}
+@media (min-width: 1024px) {
+  .ppage__sec--split { display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--s-7); align-items: center; }
+  .ppage__sec--split.is-flip .ppage__split-copy { order: 2; }
+  .ppage__sec--split.is-flip .ppage__split-img { order: 1; }
+}
+
+/* Public view: the tagline under the cover, in display type — the breath
+   between the photo and Home's first card (founder 2026-08-26; Lichen View
+   keeps the platform nav as that break, and its masthead tagline). */
+.ppage__tagline-under {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3.2vw, 34px);
+  font-weight: 400; line-height: 1.35; color: var(--ink);
+  text-align: center; max-width: 26ch;
+  margin: var(--s-6) auto var(--s-4);
+}
+
+/* A team member's photo (founder 2026-08-26 — restoring the faces from the
+   barn's old site). */
+.ppage__person-photo {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+  border-radius: var(--r-md); margin-bottom: 10px; cursor: zoom-in;
+}

@@ -47,7 +47,11 @@ export default function Chat() {
   // its identity"). The list REPLACES your personal one: the space's own
   // member room plus every conversation where the space is the party —
   // all the ways people have engaged it. Your own life is one toggle away.
-  const { actor } = useActing();
+  // ⚠ Wait for `ready` (the acting-as rule): until the persisted hat has
+  // restored, the actor reads as the boot default "self" — scoping the
+  // inbox on it would show a space's steward their personal inbox for a
+  // beat (or worse, if the restore is retrying) and swap it underneath.
+  const { actor, ready: actingReady } = useActing();
   const asSpace = actor.type === 'space' ? actor.id : undefined;
   const spaceName = actor.type === 'space' ? actor.name : '';
 
@@ -134,9 +138,9 @@ export default function Chat() {
       </div>
 
       <div className="chat__list">
-        {loading && <div className="chat__empty"><p>Loading your chats…</p></div>}
+        {(loading || !actingReady) && <div className="chat__empty"><p>Loading your chats…</p></div>}
 
-        {!loading && asSpace && scoped.length === 0 && (
+        {!loading && actingReady && asSpace && scoped.length === 0 && (
           <div className="chat__empty">
             <Icon name="message" size={20} />
             <p>Nobody has written to {spaceName} yet</p>
@@ -146,7 +150,7 @@ export default function Chat() {
             </p>
           </div>
         )}
-        {!loading && !asSpace && chats.length === 0 && (
+        {!loading && actingReady && !asSpace && chats.length === 0 && (
           <div className="chat__empty">
             <Icon name="message" size={20} />
             <p>No chats yet</p>
@@ -157,7 +161,7 @@ export default function Chat() {
           </div>
         )}
 
-        {!loading && chats.length > 0 && hits.length === 0 && msgHits.length === 0 && (
+        {!loading && actingReady && chats.length > 0 && hits.length === 0 && msgHits.length === 0 && (
           <div className="chat__empty">
             <Icon name="search" size={20} />
             <p>No matches for &ldquo;{query}&rdquo;</p>
@@ -188,7 +192,7 @@ export default function Chat() {
           </div>
         )}
 
-        {hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
+        {actingReady && hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
           <ConversationRow
             key={c.id}
             chat={c}
@@ -203,7 +207,7 @@ export default function Chat() {
         {/* THE DESK, apart from your life (founder 2026-08-19): a steward's
             help rooms sit under their own header, each named for the person
             being helped. Only stewards ever have rows here. */}
-        {hits.some((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) && (
+        {actingReady && hits.some((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) && (
           <>
             <p className="chat__desk-head">Help desk — you answer for Lichen Help</p>
             {hits.filter((c) => c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me).map((c) => (
@@ -244,7 +248,15 @@ export default function Chat() {
           from openChat's desktop branch). */}
       {selectedId && (
         <div className="chat__thread-pane">
-          <ChatConversation chatId={selectedId} me={me} onBack={closeThread} />
+          <ChatConversation
+            chatId={selectedId} me={me} onBack={closeThread}
+            // The pane read it — the list's pill must agree, immediately
+            // (founder 2026-08-24: a "2" that survived sitting in the chat).
+            onRead={(id) => setUnread((prev) => {
+              if (!prev.get(id)) return prev;
+              const next = new Map(prev); next.set(id, 0); return next;
+            })}
+          />
         </div>
       )}
     </div>
@@ -258,7 +270,7 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
   // A conversation WITH a space (founder 2026-08-17): the visitor's row wears
   // the space's logo; an admin's row wears the visitor's face and says which
   // space it's about. Sender prefixes stay on — WHO answered matters here.
-  const party = chat.kind === 'space_dm' ? chat.party : undefined;
+  const party = (chat.kind === 'space_dm' || chat.kind === 'suggestion') ? chat.party : undefined;
   const iAmVisitor = !!party && party.visitorId === me;
   const senderName = last
     ? chat.members.find((m) => m.profile_id === last.sender_id)?.name.split(' ')[0]
@@ -298,6 +310,13 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   const dmLike = chat.kind === 'direct';
   const single = chat.members.find((m) => m.profile_id !== me) ?? chat.members[0];
 
+  // A SPACE'S OWN ROOM WEARS THE SPACE'S LOGO (founder 2026-08-25): the
+  // member-face stack minus yourself is empty in a young room, which drew a
+  // blank circle — and even full, the room's identity is the space.
+  if (chat.spaceId && ['organization', 'community', 'group', 'place'].includes(chat.kind) && chat.roomSpaceAvatar) {
+    return <Avatar id={chat.spaceId} name={chat.roomSpaceName ?? chat.title} url={chat.roomSpaceAvatar} size={48} className="conv-row__avatar--party" />;
+  }
+
   // THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): a help room's row
   // wears Lichen Health's avatar — its identity — from every side. The humans
   // who answer show on their own messages inside, ringed peach.
@@ -314,7 +333,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
 
   // A conversation WITH a space: the visitor sees the space's logo wearing the
   // answering admin's face; the admin sees the visitor.
-  if (chat.kind === 'space_dm' && chat.party) {
+  if ((chat.kind === 'space_dm' || chat.kind === 'suggestion') && chat.party) {
     const party = chat.party;
     if (party.visitorId === me) {
       const answerers = chat.members.filter((m) => m.profile_id !== party.visitorId);

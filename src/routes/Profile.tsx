@@ -12,6 +12,7 @@ import { ensureDirectChat } from '../lib/chatApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { loadMyPhone } from '../lib/conciergeApi';
+import { readDraft, writeDraft, clearDraft, sameDraft, normalize, type PageDraft } from '../lib/pageDrafts';
 import {
   loadCareLinks, inviteCare as careInvite, approveCare as careApprove,
   removeCare as careRemove, cancelCareInvite as careCancelInvite,
@@ -36,7 +37,6 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
-import BuilderPreview from '../components/BuilderPreview';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -443,9 +443,17 @@ export default function Profile() {
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(false);
   const [webMsg, setWebMsg] = useState('');
-  // Reloads the builder-side preview frame; bumped on Save (BuilderPreview).
-  const [prevNonce, setPrevNonce] = useState(0);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
+  // DRAFT AND PUBLISH, the member's page (founder 2026-08-29). Same contract
+  // as a space's: what you type is kept the moment you type it, and the open
+  // web only moves when you publish. A member's draft holds page + contact;
+  // the address and the "serve this to the open web" switch are not page
+  // content and go live with the publish itself.
+  const liveBase = useRef<string>('');
+  const nowRef = useRef<PageDraft>({ page: {}, contact: {} });
+  nowRef.current = { page: pageMeta, contact };
+  const [draftPending, setDraftPending] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
   const setPage = (patch: Partial<PageMeta>) => setPageMeta((m) => ({ ...m, ...patch }));
   // Your vanity address (founder 2026-08-03) — lichen.health/<handle>
   // resolves the same as a space's, via SpaceByHandle's fallback lookup.
@@ -465,10 +473,42 @@ export default function Profile() {
           const untouched = !r.public_page && !r.handle && (!r.page || Object.keys(r.page).length === 0);
           setContact(r.contact ?? {}); setPublicPage(untouched ? true : !!r.public_page); setPageMeta(r.page ?? {});
           setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
+          const live: PageDraft = { page: r.page ?? {}, contact: r.contact ?? {} };
+          liveBase.current = normalize(live);
+          void readDraft('profile', user.id).then((kept) => {
+            if (kept && !sameDraft(kept.draft, live)) {
+              setPageMeta(kept.draft.page ?? {});
+              setContact((kept.draft.contact ?? {}) as ContactInfo);
+              setDraftPending(true);
+            } else if (kept) {
+              void clearDraft('profile', user.id);
+            }
+          });
         }
       });
   }, [user]);
   const setHandle = (v: string) => setHandleState(v.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  // Debounced, for the same reason as the space builder: the draft is a
+  // whole-document upsert, so one write per keystroke would be wasteful and
+  // racy. A form that matches what's live has nothing pending — the row goes
+  // rather than sitting there claiming unpublished work.
+  useEffect(() => {
+    if (!user || !liveBase.current) return;
+    const now = normalize(nowRef.current);
+    const t = setTimeout(() => {
+      if (now === liveBase.current) {
+        if (draftPending) { void clearDraft('profile', user.id); setDraftPending(false); setDraftMsg(''); }
+        return;
+      }
+      void writeDraft('profile', user.id, nowRef.current, JSON.parse(liveBase.current) as PageDraft, user.id)
+        .then((ok) => {
+          setDraftPending(true);
+          setDraftMsg(ok ? 'Draft saved' : 'Couldn\u2019t save your draft — check your connection');
+        });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [user, pageMeta, contact, draftPending]);
+
   async function saveWebPage() {
     if (!user) return;
     setWebMsg('');
@@ -485,9 +525,11 @@ export default function Profile() {
       setWebMsg(e.code === '23505' ? 'That address is taken — try another.' : e.message);
     } else {
       setSavedHandle(h);
-      setWebMsg('Saved.');
-      // The preview beside the builder shows saves — bring it current.
-      setPrevNonce((n) => n + 1);
+      liveBase.current = normalize({ page: pageMeta, contact });
+      await clearDraft('profile', user.id);
+      setDraftPending(false);
+      setDraftMsg('');
+      setWebMsg('Published.');
     }
   }
   /** Crossing to build-with-Claude carries your manual work (founder
@@ -763,7 +805,7 @@ export default function Profile() {
   const iCareFor = care.filter((c) => c.caregiver_id === meId); // people I care for
 
   return (
-    <div className={'prof is-adminview' + (openSections.has('public-page') ? ' is-building' : '')}>
+    <div className="prof is-adminview">
       <div className="prof__head">
         <button
           className="prof__avatar-btn"
@@ -882,11 +924,6 @@ export default function Profile() {
           (founder consolidation): your Lichen profile first, the open-web
           page as the add-on it is. */}
       <CollapsibleSection id="public-page" title="Add a public page" meta="like a website, visible to the open web" open={openSections.has('public-page')} onToggle={() => toggleSection('public-page')}>
-        {/* Builder left, page right (founder 2026-08-22) — the manual twin
-            of the assistant thread's split. Below 1024px the form stands
-            alone and the preview is a door. */}
-        <div className="build-split">
-        <div className="build-split__form">
           <p className="prof__care-lead">
             This is what someone finds when they search your name or follow a link — no Lichen
             account needed. Everything deeper (recommending you, booking, messaging, your
@@ -1008,6 +1045,13 @@ export default function Profile() {
             uploaderId={user?.id}
             sections={pageMeta.sections}
             onSections={(sections) => setPage({ sections: sections as PageMeta['sections'] })}
+            hasFacilities={!!pageMeta.facilities?.trim()}
+            facilities={pageMeta.facilities}
+            story={pageMeta.story}
+            onStory={(story) => setPage({ story })}
+            onFacilities={(facilities) => setPage({ facilities })}
+            team={pageMeta.team ?? []}
+            onTeam={(team) => setPage({ team })}
             homeSummary={pageMeta.homeSummary}
             onHomeSummary={(text) => setPage({ homeSummary: text })}
             coverStyle={pageMeta.coverStyle}
@@ -1023,7 +1067,24 @@ export default function Profile() {
           />
 
           <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={() => void saveWebPage()}>Save</button>
+            <button className="btn btn-primary" onClick={() => void saveWebPage()}>
+              {draftPending ? 'Publish changes' : 'Publish'}
+            </button>
+            {draftPending && user && (
+              <button
+                className="btn" type="button"
+                onClick={async () => {
+                  await clearDraft('profile', user.id);
+                  const live = JSON.parse(liveBase.current) as PageDraft;
+                  setPageMeta(live.page ?? {});
+                  setContact((live.contact ?? {}) as ContactInfo);
+                  setDraftPending(false);
+                  setDraftMsg('');
+                }}
+              >
+                Discard draft
+              </button>
+            )}
             <button className="btn" onClick={() => window.open(
               savedHandle ? `/${savedHandle}?preview=1` : `/members/${user?.id}?preview=1`, '_blank')}>
               Preview
@@ -1041,17 +1102,15 @@ export default function Profile() {
               </button>
             )}
             {webMsg && <span className="prof__msg">{webMsg}</span>}
+            {!webMsg && (
+              <span className="prof__msg prof__draft-state">
+                {draftPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — your live page still shows what you published last.`
+                  : 'Everything here is live.'}
+              </span>
+            )}
           </div>
-        </div>
-        {user && (
-          <BuilderPreview
-            frameSrc={`/members/${user.id}?preview=1&embed=1`}
-            tabHref={savedHandle ? `/${savedHandle}?preview=1` : `/members/${user.id}?preview=1`}
-            nonce={prevNonce}
-            onRefresh={() => setPrevNonce((n) => n + 1)}
-          />
-        )}
-        </div>
+
       </CollapsibleSection>
 
 

@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import CoverPicker from './CoverPicker';
 import ContactFields, { type ContactInfo } from './ContactFields';
-import { uploadPageImage } from '../lib/avatarApi';
+import { uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import {
-  TAB_TEMPLATES, availableTemplates, tabById, type PageTab,
+  TAB_TEMPLATES, availableTemplates, tabById, SECTION_IDS, type PageTab,
 } from '../lib/pageTabs';
 import './PageTabsEditor.css';
 
@@ -24,8 +24,11 @@ import './PageTabsEditor.css';
  *  a style button, it should have one as well. All tabs should") — built-ins
  *  through Style, write-tabs through Write; the photo lives in sections[id]
  *  either way. */
-const SECTIONED = ['about', 'services', 'goods', 'contact', 'facilities'];
-type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string } | undefined>;
+//  ONE LIST, NOT TWO (founder 2026-08-28): this used to be its own copy of
+//  the section ids, which is how Facilities came to be a section here and a
+//  writable template tab in the library at the same time.
+const SECTIONED: readonly string[] = SECTION_IDS;
+type SectionMeta = Record<string, { lead?: string; image?: string; imagePos?: string | number; imageSize?: string; tabOff?: boolean } | undefined>;
 
 /** imagePos → a 0–100 vertical percent. Three generations of stored shape
  *  render alike: legacy words, the local session's bare numbers, and the
@@ -109,7 +112,20 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
                     e.target.value = '';
                     if (!file) return;
                     setUpBusy(true);
-                    try { patch({ image: await uploadPageImage(uploaderId, file) }); }
+                    try {
+                      const url = await uploadPageImage(uploaderId, file);
+                      // Show the photo immediately, centred, exactly as before.
+                      patch({ image: url, imagePos: undefined });
+                      setUpBusy(false);
+                      // Then ask where to look and nudge the frame if we learn
+                      // something (founder 2026-08-28). Deliberately AFTER the
+                      // photo is on screen and after the busy flag clears: a
+                      // slow or failed model call must never hold up an upload,
+                      // and a centred photo is the honest fallback.
+                      const pct = await imageFocusPct(url);
+                      if (pct !== null) patch({ image: url, imagePos: `50% ${pct}%` });
+                      return;
+                    }
                     catch (err) { console.error(err); }
                     setUpBusy(false);
                   }} />
@@ -146,7 +162,8 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
   homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
-  entityName, authorId, spaceId, homeExtra, contact, onContact,
+  entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
+  facilities, onFacilities, story, onStory, openSignal,
 }: {
   tabs: PageTab[];
   onChange: (next: PageTab[]) => void;
@@ -173,6 +190,35 @@ export default function PageTabsEditor({
   authorId?: string;
   /** …or a space's wall. */
   spaceId?: string;
+  /** The page holds facilities text, so a Facilities tab appears by
+   *  itself (founder 2026-08-26: content creates the tab; the builder can
+   *  X it away). */
+  hasFacilities?: boolean;
+  /** page.facilities — the grounds themselves. Written HERE, in the
+   *  Facilities tab's own panel (founder 2026-08-28: "everything on the
+   *  public page should show up in the manual editor and be edit-able").
+   *  It had no field at all: the text could only arrive from Claude or an
+   *  import, which is part of why the tab looked like something you write
+   *  into and grew a second copy of itself. */
+  facilities?: string;
+  onFacilities?: (text: string) => void;
+  /** page.story — the long About text. Claude's set_space_story writes it,
+   *  and it had no field here (founder 2026-08-29: "the copy claude pushed
+   *  is in the proper fields in manual… right?"). Worse than absent: once
+   *  page.story existed, the builder's Description box — the obvious place
+   *  to edit the About text — silently stopped affecting the public page,
+   *  because story wins over description there. */
+  story?: string;
+  onStory?: (text: string) => void;
+  /** Open a tab's panel from OUTSIDE — the builder's stage routes a click on
+   *  the live page here (founder 2026-08-29: click the page, land in its
+   *  editor). n changes on every click so the same tab can be re-opened. */
+  openSignal?: { id: string; n: number } | null;
+  /** page.team — the people on the page, shown in the About section.
+   *  Passing onTeam turns on the People editor (founder 2026-08-26:
+   *  restoring the barn's faces surfaced that team had no UI at all). */
+  team?: { name: string; role?: string; note?: string; photo?: string }[];
+  onTeam?: (next: { name: string; role?: string; note?: string; photo?: string }[]) => void;
   /** Extra controls under the welcome textarea (e.g. a space's
    *  "Write it for me" helper) — the caller's, rendered in place. */
   homeExtra?: React.ReactNode;
@@ -181,13 +227,17 @@ export default function PageTabsEditor({
   contact?: ContactInfo;
   onContact?: (next: ContactInfo) => void;
 }) {
-  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number }) => {
+  const patchSection = (id: string, patch: { lead?: string; image?: string; imagePos?: string | number; tabOff?: boolean }) => {
     if (!onSections) return;
     const cur = sections ?? {};
     onSections({ ...cur, [id]: { ...cur[id], ...patch } });
   };
   const [upBusy, setUpBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (openSignal) setOpenId(openSignal.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal?.n]);
   const addCtaRef = useRef<HTMLButtonElement>(null);
   const scrollToCta = useRef(false);
   const closePicker = () => {
@@ -376,7 +426,7 @@ export default function PageTabsEditor({
                 {(!tpl?.builtIn || (onSections && SECTIONED.includes(t.id))) && (
                   <button className="ptabs__mv" onClick={() => setOpenId(open ? null : t.id)}
                     aria-label="Edit this tab">
-                    {open ? 'Done' : tpl?.builtIn ? 'Style' : 'Write'}
+                    {open ? 'Done' : tpl?.builtIn && t.id !== 'facilities' ? 'Style' : 'Write'}
                   </button>
                 )}
                 <button className="ptabs__mv ptabs__mv--rm"
@@ -412,6 +462,35 @@ export default function PageTabsEditor({
                     lead="These appear on the public page — how someone reaches you without joining Lichen."
                   />
                 )}
+                {/* About's long text. Empty here = the public page falls
+                    back to the Description, which is how most pages start. */}
+                {t.id === 'about' && onStory && (
+                  <>
+                    <textarea
+                      className="prof__input ptabs__body"
+                      rows={6}
+                      value={story ?? ''}
+                      placeholder="The long story. Leave a blank line between paragraphs."
+                      onChange={(e) => onStory(e.target.value)}
+                    />
+                    <p className="ptabs__note">
+                      Leave this empty and About shows your Description instead. Write anything here
+                      and it takes over — the Description goes back to being the short line inside Lichen.
+                    </p>
+                  </>
+                )}
+                {/* Facilities is the one built-in whose body has nowhere
+                    else to come from — there's no profile field behind it —
+                    so it's written right here. */}
+                {t.id === 'facilities' && onFacilities && (
+                  <textarea
+                    className="prof__input ptabs__body"
+                    rows={5}
+                    value={facilities ?? ''}
+                    placeholder="The rooms, the land, the equipment. Leave a blank line between paragraphs."
+                    onChange={(e) => onFacilities(e.target.value)}
+                  />
+                )}
                 <SectionPhoto
                   sec={sections?.[t.id]}
                   patch={(p) => patchSection(t.id, p)}
@@ -420,7 +499,11 @@ export default function PageTabsEditor({
                   setUpBusy={setUpBusy}
                 />
                 <p className="ptabs__note">
-                  This tab writes itself from your profile — the line and photo above are yours to set.
+                  {t.id === 'facilities'
+                    ? 'This is the whole Facilities page — the line, the photo and the words above are yours.'
+                    : t.id === 'about'
+                      ? 'The people on this page are edited below; the line, photo and story above are yours.'
+                      : 'This tab writes itself from your profile — the line and photo above are yours to set.'}
                 </p>
               </div>
             )}
@@ -485,6 +568,75 @@ export default function PageTabsEditor({
           </div>
         );
       })}
+      {/* CONTENT CREATES THE TAB (founder 2026-08-26): a page holding
+          facilities text grows a Facilities tab on its own — this row names
+          that, and the × declines it (sections.facilities.tabOff). */}
+      {hasFacilities && !tabs.some((t) => t.id === 'facilities') && !sections?.facilities?.tabOff && (
+        <div className="ptabs__tab">
+          <div className="ptabs__row">
+            <span className="ptabs__name">
+              <Icon name="location" size={15} /> Facilities
+              <em className="ptabs__auto">added by itself — your page has facilities content</em>
+            </span>
+            <span className="ptabs__moves">
+              {/* A tab that arrived by itself still has to be WRITABLE
+                  (founder 2026-08-28: "everything on the public page should
+                  show up in the manual editor and be edit-able"). Countryman
+                  Stables' Facilities tab is this row — auto-added, never
+                  saved into page.tabs — so without this door its words had
+                  no field anywhere in the builder. */}
+              {onFacilities && (
+                <button className="ptabs__mv"
+                  onClick={() => setOpenId(openId === 'facilities' ? null : 'facilities')}
+                  aria-label="Edit the Facilities tab">
+                  {openId === 'facilities' ? 'Done' : 'Write'}
+                </button>
+              )}
+              <button className="ptabs__mv ptabs__mv--rm"
+                onClick={() => patchSection('facilities', { tabOff: true })}
+                aria-label="Hide the Facilities tab">×</button>
+            </span>
+          </div>
+          {openId === 'facilities' && onFacilities && (
+            <div className="ptabs__edit">
+              <textarea
+                className="prof__input ptabs__lead-input"
+                rows={2}
+                value={sections?.facilities?.lead ?? ''}
+                placeholder="A first line — the point of this page"
+                onChange={(e) => patchSection('facilities', { lead: e.target.value || undefined })}
+              />
+              <textarea
+                className="prof__input ptabs__body"
+                rows={5}
+                value={facilities ?? ''}
+                placeholder="The rooms, the land, the equipment. Leave a blank line between paragraphs."
+                onChange={(e) => onFacilities(e.target.value)}
+              />
+              {onSections && (
+                <SectionPhoto
+                  sec={sections?.facilities}
+                  patch={(p) => patchSection('facilities', p)}
+                  uploaderId={uploaderId}
+                  upBusy={upBusy}
+                  setUpBusy={setUpBusy}
+                />
+              )}
+              <p className="ptabs__note">
+                Emptying this removes the Facilities tab — the page grows it from these words.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+      {hasFacilities && !tabs.some((t) => t.id === 'facilities') && sections?.facilities?.tabOff && (
+        <p className="ptabs__note">
+          The Facilities tab is hidden — its content shows on Home only.{' '}
+          <button type="button" className="ptabs__restore" onClick={() => patchSection('facilities', { tabOff: false })}>
+            Bring the tab back
+          </button>
+        </p>
+      )}
       </div>
 
       {!adding && (
@@ -525,7 +677,9 @@ export default function PageTabsEditor({
               onClick={() => {
                 onChange([...tabs, { id: tpl.id, lead: tpl.starter || undefined }]);
                 setAdding(false);
-                if (!tpl.builtIn) setOpenId(tpl.id);
+                // Facilities is builtIn but still has words to write
+                // (there's no profile field behind it), so it opens too.
+                if (!tpl.builtIn || tpl.id === 'facilities') setOpenId(tpl.id);
               }}>
               <span className="ptabs__icon"><Icon name={tpl.icon} size={15} /></span>
               <span className="ptabs__pick-body">
@@ -537,6 +691,73 @@ export default function PageTabsEditor({
         </div>
       )}
 
+      {/* ── The people on the page (page.team) — rendered in the About
+             section with an optional photo above each name. First UI for
+             this data (founder 2026-08-26); previously only Snapshot and
+             hand edits ever wrote it. ── */}
+      {onTeam && (
+        <div className="ptabs__people">
+          <p className="ptabs__people-title">People on the page</p>
+          {(team ?? []).map((person, i) => (
+            <div className="ptabs__person" key={i}>
+              <label className="ptabs__person-photo">
+                {person.photo
+                  ? <img src={person.photo} alt="" />
+                  : <span className="ptabs__person-photo-empty"><Icon name="image" size={16} /></span>}
+                <input
+                  type="file" accept="image/*" hidden
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !uploaderId) return;
+                    setUpBusy(true);
+                    try {
+                      const url = await uploadPageImage(uploaderId, file);
+                      onTeam((team ?? []).map((t, j) => j === i ? { ...t, photo: url } : t));
+                    } catch (err) { console.error('team photo', err); }
+                    finally { setUpBusy(false); }
+                  }}
+                />
+              </label>
+              <div className="ptabs__person-fields">
+                <input
+                  type="text" placeholder="Name" value={person.name}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, name: e.target.value } : t))}
+                />
+                <input
+                  type="text" placeholder="Role — e.g. Founder & instructor" value={person.role ?? ''}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, role: e.target.value || undefined } : t))}
+                />
+                <textarea
+                  rows={2} placeholder="A line about them" value={person.note ?? ''}
+                  onChange={(e) => onTeam((team ?? []).map((t, j) => j === i ? { ...t, note: e.target.value || undefined } : t))}
+                />
+                <span className="ptabs__person-acts">
+                  {person.photo && (
+                    <button type="button" onClick={() => onTeam((team ?? []).map((t, j) => j === i ? { ...t, photo: undefined } : t))}>
+                      Remove photo
+                    </button>
+                  )}
+                  {i > 0 && (
+                    <button type="button" aria-label="Move up"
+                      onClick={() => { const next = [...(team ?? [])]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; onTeam(next); }}>
+                      ↑
+                    </button>
+                  )}
+                  <button type="button" className="ptabs__person-rm"
+                    onClick={() => onTeam((team ?? []).filter((_, j) => j !== i))}>
+                    Remove
+                  </button>
+                </span>
+              </div>
+            </div>
+          ))}
+          {upBusy && <p className="ptabs__note">Uploading…</p>}
+          <button type="button" className="btn ptabs__add"
+            onClick={() => onTeam([...(team ?? []), { name: '' }])}>
+            <Icon name="plus" size={14} /> Add a person
+          </button>
+        </div>
+      )}
 
     </div>
   );

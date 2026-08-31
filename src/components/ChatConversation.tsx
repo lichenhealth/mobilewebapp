@@ -15,7 +15,9 @@ import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import '../routes/ChatThread.css';
 
-interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; helpMemberId?: string | null; }
+interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; helpMemberId?: string | null;
+  /** The space whose OWN room this is — the header wears its logo (founder 2026-08-25). */
+  roomSpace?: { id: string; name: string; avatarUrl: string | null } | null; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -23,7 +25,7 @@ interface Pending { type: MediaType; path: string; localUrl: string; }
  *  attachments / reactions / replies. Fills its parent (give the parent a bounded
  *  height). Used by the full-screen thread route and the Concierge care tab. */
 export default function ChatConversation({
-  chatId, me, onBack, showIntro = true, onInfo,
+  chatId, me, onBack, showIntro = true, onInfo, onRead,
 }: {
   chatId: string;
   me: string;
@@ -31,6 +33,10 @@ export default function ChatConversation({
   showIntro?: boolean;
   /** Gives the header's info circle a job (e.g. Concierge → Care Team tab). Hidden when absent. */
   onInfo?: () => void;
+  /** Fired every time this pane marks the chat read — the split-view inbox
+   *  zeroes its unread pill from this (founder 2026-08-24: the "2" that
+   *  wouldn't go away while sitting inside the very chat it counted). */
+  onRead?: (chatId: string) => void;
 }) {
   const [chat, setChat] = useState<ChatInfo | null>(null);
   const [members, setMembers] = useState<Record<string, MemberInfo>>({});
@@ -88,16 +94,18 @@ export default function ChatConversation({
     (async () => {
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
-        supabase.from('chats').select('id, kind, title, space_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
+        supabase.from('chats').select('id, kind, title, space_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
         supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
       if (!cRes.data) { setMissing(true); setLoading(false); return; }
       const c = cRes.data as unknown as { id: string; kind: ChatKind; title: string | null; space_id: string | null; direct_key: string | null;
-        party: { id: string; name: string; avatar_url: string | null } | null };
+        party: { id: string; name: string; avatar_url: string | null } | null;
+        room_space: { id: string; name: string; avatar_url: string | null } | null };
       setChat({
         id: c.id, kind: c.kind, title: c.title, space_id: c.space_id,
+        roomSpace: c.room_space ? { id: c.room_space.id, name: c.room_space.name, avatarUrl: c.room_space.avatar_url } : null,
         party: c.party ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) } : undefined,
         // A help room is keyed 'help:<member>' — the person being helped.
         helpMemberId: c.kind === 'help' && c.direct_key?.startsWith('help:') ? c.direct_key.slice(5) : null,
@@ -117,6 +125,7 @@ export default function ChatConversation({
       // Being here IS reading: bump the read cursor + clear this chat's
       // bell notifications (the TopBar updates itself via realtime).
       void markChatRead(chatId);
+      onRead?.(chatId);
     })();
     return () => { active = false; };
   }, [chatId]);
@@ -133,6 +142,7 @@ export default function ChatConversation({
           const row = payload.new as MessageRow;
           setMessages((cur) => (cur.some((m) => m.id === row.id) ? cur : [...cur, row]));
           void markChatRead(chatId);   // still looking — stay caught up
+          onRead?.(chatId);
         },
       )
       .subscribe();
@@ -332,7 +342,7 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
   }
   // A conversation WITH a space: the visitor's link goes to the space, the
   // space's admins' link goes to the visitor.
-  if (chat.kind === 'space_dm' && chat.party) {
+  if ((chat.kind === 'space_dm' || chat.kind === 'suggestion') && chat.party) {
     return chat.party.visitorId === me ? `/spaces/${chat.party.id}` : (chat.party.visitorId ? `/members/${chat.party.visitorId}` : null);
   }
   return null;
@@ -342,22 +352,28 @@ function profilePathFor(chat: ChatInfo, members: MemberInfo[], me: string): stri
  *  line under the name. The visitor sees the space's logo wearing the face
  *  of the admin who answers; an admin sees the visitor. */
 function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { avatar: React.ReactNode; sub: string } | null {
-  if (chat.kind !== 'space_dm' || !chat.party) return null;
+  if ((chat.kind !== 'space_dm' && chat.kind !== 'suggestion') || !chat.party) return null;
   const party = chat.party;
+  const isSuggestion = chat.kind === 'suggestion';
   const iAmVisitor = party.visitorId === me;
-  const answerers = members.filter((m) => m.profile_id !== party.visitorId);
+  // Claude sits in suggestion rooms — it isn't "the answering steward".
+  const answerers = members.filter((m) => m.profile_id !== party.visitorId && m.profile_id !== CLAUDE_PROFILE_ID);
   if (iAmVisitor) {
     const one = answerers.length === 1 ? answerers[0] : null;
     return {
       avatar: <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={38}
         stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />,
-      sub: one ? `${one.name} answers for ${party.name}` : `${party.name}'s stewards answer here`,
+      sub: isSuggestion
+        ? `Your suggestions for ${party.name} — its stewards and Claude are here`
+        : one ? `${one.name} answers for ${party.name}` : `${party.name}'s stewards answer here`,
     };
   }
   const visitor = members.find((m) => m.profile_id === party.visitorId);
   return {
     avatar: <Avatar id={visitor?.profile_id ?? 'v'} name={visitor?.name ?? 'Member'} url={visitor?.avatarUrl} size={38} />,
-    sub: `Writing to ${party.name} — you answer for it`,
+    sub: isSuggestion
+      ? `Suggests a change to ${party.name}'s page — you steward it`
+      : `Writing to ${party.name} — you answer for it`,
   };
 }
 
@@ -388,6 +404,13 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-avatar">
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
+          ) : chat.roomSpace?.avatarUrl && ['organization', 'community', 'group', 'place'].includes(chat.kind) ? (
+            /* A SPACE'S OWN ROOM WEARS THE SPACE'S LOGO (founder 2026-08-25):
+               the face-stack minus yourself is EMPTY in a solo room — a blank
+               circle — and even full, the room's identity is the space. */
+            <div className="thread__head-party">
+              <Avatar id={chat.roomSpace.id} name={chat.roomSpace.name} url={chat.roomSpace.avatarUrl} size={38} />
+            </div>
           ) : chat.kind === 'help' ? (
             /* All three parties, tiered lower→higher like the inbox stacks
                (founder 2026-08-19: the single brain read flat; the intro

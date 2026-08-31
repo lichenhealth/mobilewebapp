@@ -44,3 +44,49 @@ export async function uploadPageImage(uid: string, file: File): Promise<string> 
   if (error) throw error;
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
+
+/** Where a freshly uploaded photo should sit in its frame, as a CSS
+ *  object-position percentage (0 = show the top, 100 = the bottom).
+ *  `null` means "we don't know" — the caller leaves the photo centred, which
+ *  is exactly what happened before this existed.
+ *
+ *  Founder 2026-08-28, after Rick Countryman's head was cropped off the
+ *  barn's About page: nothing looked at an uploaded image, so a standing
+ *  person lost their head to a centred crop every time. Fire-and-forget —
+ *  never await this before showing the photo, and never let it throw into an
+ *  upload. The owner's drag overwrites whatever it returns. */
+export async function imageFocusPct(url: string): Promise<number | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('image-focus', { body: { image: url } });
+    if (error) return null;
+    const pct = (data as { pct?: unknown } | null)?.pct;
+    return typeof pct === 'number' && pct >= 0 && pct <= 100 ? Math.round(pct) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The colour scheme a business's logo implies — its colour, and which of
+ *  the three grounds it belongs on. `null` when nothing useful came back.
+ *  A PROPOSAL, never applied directly: the caller shows it to the owner to
+ *  accept or refuse, and forces the accent readable first (founder
+ *  2026-08-28, "let them preview it to decide if they like it"). */
+export async function brandSchemeFromLogo(
+  url: string,
+): Promise<{ accent: string | null; ground: string } | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('brand-colors', { body: { image: url } });
+    if (error) return null;
+    const d = data as { accent?: unknown; ground?: unknown } | null;
+    const accent = typeof d?.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(d.accent) ? d.accent : null;
+    // A ground is a named look OR a hex the logo suggested — a tint that
+    // suits it can beat plain white (founder 2026-08-28).
+    const raw = typeof d?.ground === 'string' ? d.ground.trim().toLowerCase() : '';
+    const ground = raw === 'white' || raw === 'warm' ? raw
+      : /^#[0-9a-f]{6}$/.test(raw) ? raw
+      : 'white';
+    return accent === null && ground === 'white' ? null : { accent, ground };
+  } catch {
+    return null;
+  }
+}

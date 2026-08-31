@@ -506,9 +506,9 @@ export default function AboutLichen() {
           <p>
             Lichen is a nonprofit with the vision, strategy and operations of a lean technology
             startup. Membership and donations keep the platform running — <strong>everything beyond
-            that flows back into the network to restore balance</strong>. Our algorithm identifies
-            those that the current system leaves behind: the people, plants, animals and places who
-            are
+            that flows back into the network to restore balance</strong>. Today our human stewards —
+            teaching the algorithm as they go — identify those that the current system leaves
+            behind: the people, plants, animals and places who are
           </p>
           <ol className="about__list">
             <li>Carrying wounds that need healing</li>
@@ -564,10 +564,10 @@ export default function AboutLichen() {
           </p>
 
           <p>
-            When you exchange manually, you close the gap that you can see. The algorithm reads the whole web
-            at once — who’s seeking, who’s offering, what something is truly worth and who has the
-            capacity to pay for it — and weaves the strands together so nothing, and no one, is
-            wasted. The more it learns, the faster the maps converge — closing the gap more
+            When you exchange manually, you close the gap that you can see. The algorithm is
+            learning to read the whole web at once — who’s seeking, who’s offering, what something
+            is truly worth and who has the capacity to pay for it — and weave the strands together
+            so nothing, and no one, is wasted. The more it learns, the faster the maps converge — closing the gap more
             efficiently than we ever could one exchange at a time. Carbon-based intelligence
             approves every step while the silicon-based mycelium earns our trust; a caring partner
             in your corner, never an oracle.

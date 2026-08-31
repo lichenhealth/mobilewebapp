@@ -80,6 +80,7 @@ import FrontDoor from './routes/FrontDoor';
 import { hostSpaceHandle } from './lib/customDomain';
 import ReminderAlerts from './components/ReminderAlerts';
 import { PullToRefresh } from './components/PullToRefresh';
+import ComingSoon, { AdminGateNote } from './components/ComingSoon';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
@@ -392,19 +393,33 @@ export default function App() {
           <Route path="/events/:postId" element={<EventPage />} />
           <Route path="/e/:token" element={<GuestEvent />} />
           <Route path="/about" element={<StaticAboutRedirect />} />
-          <Route path="/courses"  element={
-            <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
-              title="Lichen" italic="Courses."
-              sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
-              addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training."
-              mediaLenses structuredKind="course" browse />
+          {/* OFFLINE WHILE THEY'RE MADE BETTER (founder 2026-08-25: "don't
+              want to hold the platform up from going live"): Courses and
+              Library show Coming Soon to everyone but platform admins —
+              scoped arrivals (?space=/?identity=) ride these same routes, so
+              every door into either room lands on the same honest page.
+              To reopen a room: delete its gate here, nothing else. */}
+          <Route path="/courses"  element={!isAdmin
+            ? <ComingSoon icon="graduation-cap" title="Courses." line="Trainings, workshops and apprenticeships are being tended before they open — taught by people your web can vouch for. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
+                title="Lichen" italic="Courses."
+                sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
+                addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training."
+                mediaLenses structuredKind="course" browse />
+            </>
           } />
-          <Route path="/library"  element={
-            <AreaFeed area="library" icon="book" crumb="Library"
-              title="Lichen" italic="Library."
-              sub="Essays, field guides, and zines on land, food, and care."
-              addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
-              mediaLenses collections structuredKind="path" browse />
+          <Route path="/library"  element={!isAdmin
+            ? <ComingSoon icon="book" title="Library." line="Essays, field guides, and zines on land, food, and care — being gathered and tended before the doors open. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="library" icon="book" crumb="Library"
+                title="Lichen" italic="Library."
+                sub="Essays, field guides, and zines on land, food, and care."
+                addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
+                mediaLenses collections structuredKind="path" browse />
+            </>
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

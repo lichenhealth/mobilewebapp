@@ -74,25 +74,43 @@ export function ActingProvider({ children }: { children: ReactNode }) {
     catch { setReady(true); }
     let live = true;
     (async () => {
-      const { data } = await supabase
-        .from('space_members')
-        .select('role, spaces(id, name, kind, avatar_url)')
-        .eq('profile_id', user.id)
-        .in('role', ['admin', 'super_admin']);
-      if (!live) return;
+      // A TRANSIENT FAILURE MUST NEVER COST ANYONE THEIR HAT (founder
+      // 2026-08-25: acting as Countryman, opening its chat, the chip
+      // "slipped back to my profile"). This effect re-runs on auth
+      // refreshes; the old code treated a failed space_members read as "you
+      // admin nothing" and silently dropped a saved hat to self. Now an
+      // errored read RETRIES with backoff, and the restore-or-drop decision
+      // is only ever made on a read that actually succeeded.
+      let rows: { spaces: { id: string; name: string; kind: SpaceKind; avatar_url: string | null } | null }[] | null = null;
+      for (let attempt = 0; live && rows === null; attempt++) {
+        const { data, error } = await supabase
+          .from('space_members')
+          .select('role, spaces(id, name, kind, avatar_url)')
+          .eq('profile_id', user.id)
+          .in('role', ['admin', 'super_admin']);
+        if (!live) return;
+        if (!error) { rows = (data as unknown as typeof rows) ?? []; break; }
+        if (attempt >= 5) return; // hold ready=false — a blank chip is honest, a wrong hat is not
+        await new Promise((r) => setTimeout(r, Math.min(8000, 1000 * 2 ** attempt)));
+      }
+      if (!live || rows === null) return;
       // The entity's real face rides along so the acting chip can wear it —
       // a monogram alone made "whose hat am I wearing" too easy to misread
       // (founder 2026-08-22).
-      const opts = ((data as unknown as { spaces: { id: string; name: string; kind: SpaceKind; avatar_url: string | null } | null }[] | null) ?? [])
+      const opts = rows
         .map((r) => r.spaces).filter((s): s is NonNullable<typeof s> => !!s)
         .map((s): ActingSpace => ({ id: s.id, name: s.name, kind: s.kind, avatarUrl: s.avatar_url }));
       setOptions(opts);
-      // Beings I steward join the switcher (empty pre-migration).
-      const mine = await listMyBeings(user.id);
+      // Beings I steward join the switcher (empty pre-migration). A failed
+      // beings read must not kill the whole restore either.
+      let bs: ActingBeing[] = [];
+      try {
+        const mine = await listMyBeings(user.id);
+        bs = mine.map((b) => ({
+          id: b.id, name: b.full_name ?? 'A being', kind: b.kind, avatarUrl: b.avatar_url ?? null,
+        }));
+      } catch { /* beings unavailable — the switcher just omits them this boot */ }
       if (!live) return;
-      const bs: ActingBeing[] = mine.map((b) => ({
-        id: b.id, name: b.full_name ?? 'A being', kind: b.kind, avatarUrl: b.avatar_url ?? null,
-      }));
       setBeings(bs);
       // Restore a persisted choice — only if it's still ours to act as.
       try {
@@ -100,9 +118,14 @@ export function ActingProvider({ children }: { children: ReactNode }) {
         if (saved) {
           const space = opts.find((o) => o.id === saved);
           const being = bs.find((b) => b.id === saved);
-          setActorState(space ? { type: 'space', ...space }
-            : being ? { type: 'being', ...being }
-            : { type: 'self' });
+          if (space) setActorState({ type: 'space', ...space });
+          else if (being) setActorState({ type: 'being', ...being });
+          else {
+            // Genuinely no longer ours (read SUCCEEDED and it's absent) —
+            // drop honestly and stop re-litigating it every boot.
+            setActorState({ type: 'self' });
+            localStorage.removeItem(storageKey(user.id));
+          }
         }
       } catch { /* storage unavailable — stay self */ }
       setReady(true);

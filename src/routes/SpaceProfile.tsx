@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
-import { setTopIdentity } from '../lib/topIdentity';
+import { useTopIdentityFor } from '../lib/topIdentity';
+import { domainsForHandle } from '../lib/customDomain';
+import { SURFACES, resolveSurface, readableAccent, type PageSurface } from '../lib/pageColors';
+import { brandSchemeFromLogo, uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
@@ -34,7 +37,7 @@ import {
   requestResourceBooking, listPendingResourceBookings, decideResourceBooking,
   resourceSpanContact, type ResourceRow, type ResourceBusySpan, type ResourceBookingRow,
 } from '../lib/resourcesApi';
-import { ensureDirectChat, ensureSpaceChat } from '../lib/chatApi';
+import { ensureDirectChat, ensureSpaceChat, ensureSuggestionChat } from '../lib/chatApi';
 import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalendar';
 import { todayISO } from '../lib/conciergeApi';
 import { loadMyWeb, setInWeb, setVouch, loadMyRecommendations, setRecommend } from '../lib/myceliumApi';
@@ -47,9 +50,12 @@ import ContactFields, { ContactList, type ContactInfo } from '../components/Cont
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import {
+  readDraft, writeDraft, clearDraft, sameDraft, listVersions, restoreVersion, describeChange,
+  type PageDraft, type PageVersion,
+} from '../lib/pageDrafts';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
-import BuilderPreview from '../components/BuilderPreview';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spacePresentCount, spacePresentList, type PresentMember } from '../lib/presenceApi';
@@ -61,7 +67,9 @@ const KIND_LABEL: Record<SpaceKind, string> = {
 // (founder 2026-08-05: the section mark belongs to where you ARE, not to what
 // kind of room you're standing in).
 const KIND_ICON: Record<SpaceKind, IconName> = {
-  organization: 'globe', community: 'user-multiple', group: 'groups', place: 'location',
+  // An organization is not the globe (founder 2026-08-28) — that mark belongs
+  // to Maps, and it said "the whole world" about a barn on one island.
+  organization: 'building', community: 'user-multiple', group: 'groups', place: 'location',
 };
 // Which assistant frame a space page briefs from — its own kind.
 const ASSISTANT_SECTION: Record<SpaceKind, string> = {
@@ -162,7 +170,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Curated-section shares awaiting stewards (courses/library)
   const [shares, setShares] = useState<SectionShareRow[]>([]);
   const [sharePosts, setSharePosts] = useState<FeedPost[]>([]);
-  // Bookable areas & things: the space's bookable resources + the steward
+  // Bookable Items & Spaces: the space's bookable resources + the steward
   // queue. Distinct from Goods (marketplace items that change hands) and
   // from Places (a venue's category) — these are LENT and come back.
   const [resources, setResources] = useState<ResourceRow[]>([]);
@@ -234,6 +242,73 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     return () => window.clearInterval(tick);
   }, [sectionHash]);
   const [pageEdit, setPageEdit] = useState<PageMeta>({});
+  // THE BUILDER AND THE CHAT EDIT THE SAME PAGE (founder 2026-08-29: "we just
+  // need to make sure that the manual mode will be changed the next time you
+  // login to it from what claude did in the chat").
+  //
+  // This form seeds itself from spaces.page ONCE, and Save writes the whole
+  // JSON blob back. So a change Claude made in the build thread — colours,
+  // a tab, the facilities text — was invisible here until a full reload, and
+  // pressing Save on a stale form wrote silently over it. Last-write-wins on
+  // a shared document, with no way to see you'd lost anything.
+  //
+  // pageBase is the version this form was seeded from. Anything newer on the
+  // server is either adopted (you haven't typed) or offered (you have) —
+  // never discarded, in either direction.
+  //
+  // ⚠ THE GUARD COVERS EVERY COLUMN CLAUDE CAN WRITE, not just `page`.
+  // The first version of this watched the page blob alone — but the space
+  // tools also write `description` (the story) and `contact`, and this form
+  // saves both, so the story could still be overwritten in silence while
+  // the colours were protected. A half-guarded save is worse than none: it
+  // reads as safe.
+  // `description` left this set on 2026-08-29 when the builders split: it is
+  // edited in the LICHEN builder now, saved live like the name — only what
+  // the public builder drafts and publishes belongs here.
+  type SpaceShared = { page: PageMeta; contact: ContactInfo };
+  const sharedBase = useRef<string>('');
+  const sharedNow = useRef<SpaceShared>({ page: {}, contact: {} });
+  sharedNow.current = { page: pageEdit, contact };
+  const [pageAhead, setPageAhead] = useState<SpaceShared | null>(null);
+  // Unpublished work. `draftPending` is what the Publish row reports; it is
+  // true exactly when the builder holds something the open web hasn't seen.
+  const [draftPending, setDraftPending] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
+  // The page's last thirty turns, newest first (recorded by a trigger — see
+  // the migration). Loaded only when someone opens the history, because most
+  // visits to the builder never ask.
+  const [versions, setVersions] = useState<PageVersion[] | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [restoring, setRestoring] = useState('');
+  // CLICK THE PAGE, LAND IN ITS EDITOR (founder 2026-08-29: "laid out as the
+  // actual profile is laid out, except you can click on things and edit them
+  // here"). The stage renders the REAL PublicPage from the draft state, so
+  // it moves as you type; data-edit-region attributes on its sections say
+  // what was clicked, and this routes the click — into the right tab panel
+  // (via openSignal) or to the loose field it belongs to. Tab-nav clicks
+  // pass through untouched: switching tabs is part of looking at the page.
+  const [tabSignal, setTabSignal] = useState<{ id: string; n: number } | null>(null);
+  const stageEdit = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('.ppage__nav-link')) return;
+    e.preventDefault(); e.stopPropagation();
+    const region = t.closest('[data-edit-region]')?.getAttribute('data-edit-region');
+    if (!region) return;
+    const toTab: Record<string, string> = {
+      cover: 'home', about: 'about', team: 'about',
+      facilities: 'facilities', contact: 'contact', services: 'services', goods: 'goods',
+    };
+    const toAnchor: Record<string, string> = { identity: 'b-tagline', offerings: 'b-offerings', join: 'b-join' };
+    if (toTab[region]) {
+      setTabSignal({ id: toTab[region], n: Date.now() });
+      document.getElementById('b-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (toAnchor[region]) {
+      const el = document.getElementById(toAnchor[region]);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.classList.add('is-flash');
+      setTimeout(() => el?.classList.remove('is-flash'), 1600);
+    }
+  };
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -253,13 +328,17 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
-  // Reloads the builder-side preview frame; bumped on Save (BuilderPreview).
-  const [prevNonce, setPrevNonce] = useState(0);
   const [error, setError] = useState('');
   const [retireMode, setRetireMode] = useState<'offline' | 'delete' | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const savedHandle = useRef('');
+  const [handleFree, setHandleFree] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle');
+  const [storyImgBusy, setStoryImgBusy] = useState(false);
+  const [hueBusy, setHueBusy] = useState(false);
+  const [hueProposal, setHueProposal] = useState<{ accent: string | null; raw: string | null; ground: string } | null>(null);
+  const [hueNote, setHueNote] = useState('');
   // View-first: everyone (admins included) lands on the public presentation.
   // ALL admin machinery lives behind ?manage=1 — the "backstage" (founder
   // 2026-07-27: queues and edit tools on the public page are distracting).
@@ -289,6 +368,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     if (s) {
       setName(s.name);
       setHandle(s.handle ?? '');
+      savedHandle.current = (s.handle ?? '').toLowerCase();
       setParentPick(s.parent);
       setDescription(s.description ?? '');
       setLocText(s.location ?? '');
@@ -301,7 +381,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setAssistantReadable(s.assistant_readable !== false);
       setContentAiDefault(s.content_ai_default !== false);
       setContentDownloadDefault(s.content_download_default !== false);
-      setPageEdit(((sx as { page?: PageMeta }).page ?? {}) as PageMeta);
+      const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
+      setPageEdit(loadedPage);
+      const live: SpaceShared = { page: loadedPage, contact: (sx.contact ?? {}) as ContactInfo };
+      sharedBase.current = JSON.stringify(live);
+      setPageAhead(null);
+      // UNPUBLISHED WORK OUTLIVES THE TAB (founder 2026-08-29). If a draft is
+      // waiting, the builder opens on the DRAFT, not on the live page — that
+      // is the whole promise. The live page underneath is untouched.
+      const kept = await readDraft('space', id);
+      if (kept && !sameDraft(kept.draft as PageDraft, live as PageDraft)) {
+        setPageEdit(kept.draft.page ?? {});
+        setContact((kept.draft.contact ?? {}) as ContactInfo);
+        setDraftPending(true);
+      } else {
+        setDraftPending(false);
+        if (kept) void clearDraft('space', id);   // a draft identical to live is noise
+      }
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
       if (s.kind === 'community') {
         // Identity vocabulary — names stored on the row map onto picker ids;
@@ -325,11 +421,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   useEffect(() => { load(); }, [load]);
 
   // De-branding (founder 2026-07-30): this profile's mark takes the top bar.
-  useEffect(() => {
-    if (!space) return;
-    setTopIdentity({ id: space.id, name: space.name, avatarUrl: space.avatar_url, kind: 'space' });
-    return () => setTopIdentity(null);
-  }, [space]);
+  useTopIdentityFor(space ? { id: space.id, name: space.name, avatarUrl: space.avatar_url, kind: 'space' } : null);
 
   async function toggleWeb() {
     if (!me) return;
@@ -440,6 +532,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }, [tab, id]);
   const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
   const adminTools = backstage;
+  // THE TWO BUILDERS (founder 2026-08-29: "two buttons… then have the rest
+  // be drop downs… a real website builder"). ?build=public opens the page
+  // laid out as the page itself, editable; ?build=lichen opens the in-app
+  // identity. Either one takes over the whole backstage — the doors and the
+  // drop-downs step aside until "Back to profile".
+  const buildView = adminTools ? searchParams.get('build') : null;
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
   // to admins holding the 'members' duty; full admins hold everything.
   const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && backstage;
@@ -584,7 +682,112 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     setAvatarBusy(false);
   }
 
-  async function save() {
+  // IS THIS ADDRESS TAKEN (founder 2026-08-28: "is the page smart enough to
+  // know if a url is taken and to say 'this is taken'?"). It was not. Worse:
+  // the handle write is part of a single .update() whose result was never
+  // checked, so a collision silently discarded the WHOLE save — colours,
+  // contact, everything in that call — while the form said it had saved.
+  //
+  // Checks BOTH tables. The DB has a unique index per table, but a space and
+  // a person can each hold the same handle, and SpaceByHandle resolves spaces
+  // first — so the person's page would just quietly stop being reachable.
+  useEffect(() => {
+    const h = handle.trim().toLowerCase();
+    if (!h || h === savedHandle.current || !/^[a-z0-9-]+$/.test(h)) { setHandleFree('idle'); return; }
+    setHandleFree('checking');
+    let live = true;
+    const t = setTimeout(async () => {
+      const [sp, pr] = await Promise.all([
+        supabase.from('spaces').select('id').eq('handle', h).maybeSingle(),
+        supabase.from('profiles').select('id').eq('handle', h).maybeSingle(),
+      ]);
+      if (!live) return;
+      const bySpace = sp.data ? (sp.data as { id: string }).id !== id : false;
+      setHandleFree(bySpace || !!pr.data ? 'taken' : 'free');
+    }, 400);
+    return () => { live = false; clearTimeout(t); };
+  }, [handle, id]);
+
+  /** The page as the server holds it right now — not as this form remembers
+   *  it. Cheap: one column, one row. */
+  const readShared = useCallback(async (): Promise<SpaceShared | null> => {
+    const { data, error } = await supabase.from('spaces')
+      .select('page, contact').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    const row = data as { page?: PageMeta | null; contact?: ContactInfo | null };
+    return { page: (row.page ?? {}) as PageMeta, contact: row.contact ?? {} };
+  }, [id]);
+
+  /** Catch the form up with whatever Claude (or another steward, or this
+   *  page in another window) has written since it opened. Reads pageEdit
+   *  through a ref so typing never re-fires this. */
+  const syncPage = useCallback(async () => {
+    const fresh = await readShared();
+    if (!fresh) return;
+    const freshJson = JSON.stringify(fresh);
+    if (freshJson === sharedBase.current) { setPageAhead(null); return; }
+    if (!draftPending && JSON.stringify(sharedNow.current) === sharedBase.current) {
+      // Nothing unpublished here — the newer page simply IS this form now.
+      sharedBase.current = freshJson;
+      setPageEdit(fresh.page);
+      setContact(fresh.contact);
+      setPageAhead(null);
+    } else {
+      // Unsaved edits on screen. Never overwrite what someone is in the
+      // middle of writing; show the choice instead.
+      setPageAhead(fresh);
+    }
+  }, [readShared, draftPending]);
+
+  // AUTOSAVE THE DRAFT (founder 2026-08-29: Squarespace's shape — you never
+  // press save, you press publish). Debounced, because this fires on every
+  // keystroke; the draft is a whole-document upsert, not a patch, so writing
+  // one per character would be both wasteful and racy. A form that matches
+  // the live page has nothing pending, so the row is deleted rather than
+  // kept as an empty promise of unpublished work.
+  useEffect(() => {
+    if (!backstage || loading || !sharedBase.current) return;
+    const now = JSON.stringify(sharedNow.current);
+    const t = setTimeout(() => {
+      if (now === sharedBase.current) {
+        if (draftPending) { void clearDraft('space', id); setDraftPending(false); setDraftMsg(''); }
+        return;
+      }
+      void writeDraft(
+        'space', id, sharedNow.current as PageDraft,
+        JSON.parse(sharedBase.current) as PageDraft, me ?? undefined,
+      ).then((ok) => {
+        setDraftPending(true);
+        setDraftMsg(ok ? 'Draft saved' : 'Couldn\u2019t save your draft — check your connection');
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+    // sharedNow is a ref; these are the values that actually change it.
+  }, [backstage, loading, id, me, pageEdit, contact, draftPending]);
+
+  // Catch up when the builder opens, and again whenever this tab comes back
+  // to the front — going to the chat, asking Claude for a change and coming
+  // back is the exact path this is for.
+  useEffect(() => {
+    if (!backstage) return;
+    void syncPage();
+    const wake = () => { if (document.visibilityState === 'visible') void syncPage(); };
+    window.addEventListener('focus', wake);
+    document.addEventListener('visibilitychange', wake);
+    return () => {
+      window.removeEventListener('focus', wake);
+      document.removeEventListener('visibilitychange', wake);
+    };
+  }, [backstage, syncPage]);
+
+  // THE THREE SAVERS (founder 2026-08-29, when the one builder became two).
+  // save() publishes the PAGE — draft guard, page/contact/handle, nothing
+  // else. saveLichen() is the in-app identity — name, description, location,
+  // community identity, group nesting — live on Save, no draft, because none
+  // of it is website copy someone stages. saveSettings() is Privacy's.
+  // One Save that wrote everything is how a taken handle once threw away the
+  // colours and the contact details with it — the split is the fix's shape.
+  async function saveLichen() {
     if (!space) return;
     setSaving(true); setMsg(''); setError('');
     try {
@@ -596,33 +799,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         lat: locGeo?.lat ?? null,
         lng: locGeo?.lng ?? null,
       };
-      // Public-page facts ride the same Save (harmless if the columns are new).
-      await supabase.from('spaces')
-        .update({
-          handle: handle.trim() || null,
-          contact: Object.keys(contact).length ? contact : null,
-          public_page: publicPage,
-          assistant_enabled: aiEnabled,
-          findable,
-          assistant_readable: assistantReadable,
-          content_ai_default: contentAiDefault,
-          content_download_default: contentDownloadDefault,
-          // Only ever WRITE a page, never null one out: this form didn't touch
-          // `page` before today, and a mis-seeded save would wipe a built page
-          // (Countryman Stables lives in this column).
-          ...(Object.keys(pageEdit).length ? { page: pageEdit } : {}),
-          ...(space.kind === 'community' ? {
-            identity_tags: (() => {
-              const names = new Map(idCats.map((c) => [c.id, c.name]));
-              const all = [
-                ...identityIds.map((cid) => names.get(cid)).filter((n): n is string => !!n),
-                ...identityLegacy,
-              ];
-              return all.length ? all : null;
-            })(),
-          } : {}),
-        })
-        .eq('id', id);
+      if (space.kind === 'community') {
+        const names = new Map(idCats.map((c) => [c.id, c.name]));
+        const all = [
+          ...identityIds.map((cid) => names.get(cid)).filter((n): n is string => !!n),
+          ...identityLegacy,
+        ];
+        const { error: idErr } = await supabase.from('spaces')
+          .update({ identity_tags: all.length ? all : null }).eq('id', id);
+        if (idErr) throw new Error(idErr.message || 'Could not save the identity tags.');
+      }
       if (space.kind === 'group' && (parentPick?.id ?? null) !== (space.parent?.id ?? null)) {
         if (!parentPick) {
           patch.parent_space_id = null;   // going standalone is always the group's right
@@ -637,8 +823,78 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       await updateSpaceProfile(space.id, patch);
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
-      // The preview beside the builder shows saves — bring it current.
-      setPrevNonce((n) => n + 1);
+      await load();
+    } catch (e) {
+      setError((e as Error)?.message || 'Could not save. Please try again.');
+    }
+    setSaving(false);
+  }
+
+  async function saveSettings() {
+    if (!space) return;
+    setSaving(true); setMsg(''); setError('');
+    const { error: err } = await supabase.from('spaces')
+      .update({
+        assistant_enabled: aiEnabled,
+        findable,
+        assistant_readable: assistantReadable,
+        content_ai_default: contentAiDefault,
+        content_download_default: contentDownloadDefault,
+      })
+      .eq('id', id);
+    if (err) setError(err.message || 'Could not save. Please try again.');
+    else { setMsg('Saved'); setTimeout(() => setMsg(''), 2000); }
+    setSaving(false);
+  }
+
+  async function save() {
+    if (!space) return;
+    setSaving(true); setMsg(''); setError('');
+    try {
+      const note = 'Published';
+      // LAST WRITE MUST NOT WIN BLINDLY (founder 2026-08-29). The update
+      // below replaces the whole `page` blob, so if Claude wrote to it while
+      // this form sat open, saving would erase that work with no trace. Read
+      // it one more time and stop rather than clobber.
+      {
+        const stored = await readShared();
+        if (stored && sharedBase.current && JSON.stringify(stored) !== sharedBase.current) {
+          setPageAhead(stored);
+          throw new Error(
+            'This page changed while the builder was open — Claude, or another steward, edited it. '
+            + 'Nothing was saved. Load the current page at the top of the builder, then make your change again.',
+          );
+        }
+      }
+      // Public-page facts ride the same Save (harmless if the columns are new).
+      const { error: spaceErr } = await supabase.from('spaces')
+        .update({
+          handle: handle.trim() || null,
+          contact: Object.keys(contact).length ? contact : null,
+          public_page: publicPage,
+          // Only ever WRITE a page, never null one out: this form didn't touch
+          // `page` before today, and a mis-seeded save would wipe a built page
+          // (Countryman Stables lives in this column).
+          ...(Object.keys(pageEdit).length ? { page: pageEdit } : {}),
+        })
+        .eq('id', id);
+      // A unique-violation here used to be swallowed whole (founder
+      // 2026-08-28). Everything in this update travels together, so a taken
+      // address loses the colours and the contact details with it.
+      if (spaceErr) {
+        throw new Error(
+          spaceErr.code === '23505'
+            ? `lichen.health/${handle.trim()} is already taken — pick another address. Nothing was saved.`
+            : (spaceErr.message || 'Could not save. Please try again.'),
+        );
+      }
+      sharedBase.current = JSON.stringify({ page: pageEdit, contact });
+      // Published — there is nothing unpublished left to keep.
+      await clearDraft('space', id);
+      setDraftPending(false);
+      setDraftMsg('');
+      setMsg(note);
+      setTimeout(() => setMsg(''), 2000);
       await load();
     } catch (e) {
       setError((e as Error)?.message || 'Could not save. Please try again.');
@@ -810,14 +1066,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       assistantOff={space.assistant_enabled === false}
       // …and the space's own rooms open the group after it.
       afterGap={ctx.guest ? []
-        : chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }]
-        // Not a member: a MESSAGE door to the space itself (founder 2026-08-17:
-        // a space can be a chat party) — the general thread, any admin replies.
-        : me && !isAdmin ? [{ icon: 'chat' as const, label: 'Message', onClick: () => {
-            void ensureSpaceChat(space.id).then((cid) => navigate(`/chat/${cid}`))
-              .catch((e: Error) => alert(e.message));
-          } }]
-        : []}
+        : [
+          ...(chatId ? [{ icon: 'chat' as const, label: 'Chat', onClick: () => navigate(`/chat/${chatId}`) }]
+            // Not a member: a MESSAGE door to the space itself (founder 2026-08-17:
+            // a space can be a chat party) — the general thread, any admin replies.
+            : me && !isAdmin ? [{ icon: 'chat' as const, label: 'Message', onClick: () => {
+                void ensureSpaceChat(space.id).then((cid) => navigate(`/chat/${cid}`))
+                  .catch((e: Error) => alert(e.message));
+              } }]
+            : []),
+          // SUGGEST (founder 2026-08-22): any signed-in non-steward can open
+          // their suggestions room for this page — them, the stewards, and
+          // Claude, "different than a help chat, but similar".
+          ...(me && !isAdmin ? [{ icon: 'sparkle' as const, label: 'Suggest', onClick: () => {
+              void ensureSuggestionChat(space.id).then((cid) => navigate(`/chat/${cid}`))
+                .catch((e: Error) => alert(e.message));
+            } }] : []),
+        ]}
       trailing={ctx.guest ? [] : [
         // The founder's Marketplace-icon analogy: a Groups door appears only
         // when this space actually has groups nested under it.
@@ -855,7 +1120,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       emptyEscape={ctx.openHome
         ? { label: 'Visit the homepage to engage', onGo: ctx.openHome }
         : ctx.homeBare && isAdmin
-          ? { label: `Build ${possessive(space.name)} homepage`, onGo: () => navigate(`/spaces/${id}?manage=1#about`) }
+          ? { label: `Build ${possessive(space.name)} homepage`, onGo: () => navigate(`/spaces/${id}?manage=1&build=public`) }
           : undefined}
       listHidden={!ctx.showing}
       interactive={!ctx.guest}
@@ -863,7 +1128,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   );
   const roomsSection = !backstage && resources.length > 0 && (
     <section className="prof__section">
-      <h2 className="prof__h2">Bookable areas &amp; things</h2>
+      <h2 className="prof__h2">Bookable Items &amp; Spaces</h2>
       <div className="sprof__members">
         {resources.map((r) => (
           <div className="sprof__resource" key={r.id}>
@@ -926,12 +1191,27 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const previewing = searchParams.get('preview') === '1';
   // forcePublic: on a custom domain (countrymanstables.com) EVERYONE gets
   // the website — even signed-in members; the app lives on Lichen's domain.
-  const showTemplate = !me || previewing || forcePublic || (!backstage && !tab);
+  // A COLOUR TRIAL IS A PUBLIC VIEW (founder 2026-08-28: "it should default
+  // to public view... and I see the side nav, even though the preview is
+  // public"). Opening ?brand/?ground while signed in rendered the in-app
+  // chrome — nav, no corner doors — which is precisely not the thing being
+  // judged. The trial forces the guest rendering.
+  const trialView = searchParams.has('brand') || searchParams.has('ground');
+  const showTemplate = !me || previewing || forcePublic || trialView || (!backstage && !tab);
   // The way into backstage has to exist on the page an admin actually lands
   // on (founder 2026-08-06: "I don't see the admin versus public view, so I'm
   // not sure where to edit the page"). It lived only in the non-template
   // shell, which a signed-in admin never reaches.
-  const presenceLine = isMember && present !== null ? (
+  // PRESENCE IS A MEMBER SIGNAL, NOT A WEBSITE ONE (founder 2026-08-28: "the
+  // presence line shouldn't be on the public view"). "One in Countryman
+  // Stables is present" means nothing to a customer looking for lesson
+  // prices, and it quietly reports member activity to the open web. It was
+  // gated on isMember only — which is false for an actual visitor, so the
+  // leak showed up in the owner's own preview and on a custom domain, where
+  // a member IS the audience for their own website. Any rendering that
+  // stands for the open web now hides it: a custom domain, a colour trial,
+  // and the PUBLIC VIEW toggle.
+  const presenceLine = isMember && present !== null && !forcePublic && !trialView && !previewing ? (
     <div className="sprof__presence">
       <button className="sprof__presence-line" onClick={() => openTab('members')}>
         {present === 0
@@ -964,7 +1244,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // The same three-way every profile wears now (founder 2026-08-11):
   // Admin manages, Lichen View is the internal experience, Public View is
   // the website layer (?preview=1 renders the open-web template).
-  const adminBar = isAdmin ? (
+  // A TRIAL SHOWS THE PAGE AND NOTHING ELSE (founder 2026-08-28: "to make it
+  // a clear preview, let's remove the nav here. You close the tab and you
+  // close the preview, that simple"). The three-way toggle is a way OUT of
+  // the view you are in — and this view's exit is the tab's close button. An
+  // owner judging their colours shouldn't have Lichen's furniture in shot.
+  const adminBar = isAdmin && !trialView ? (
     <div className="view-toggle-row">
       {/* No visible subject label (founder 2026-08-22, same day it shipped:
           it squeezed the toggle off the column) — the acting chip's real
@@ -999,6 +1284,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       <PublicPage
         id={space.id}
         name={space.name}
+        firstPerson
         kindLabel={kindLabel}
         kindIcon={KIND_ICON[space.kind]}
         avatarUrl={space.avatar_url}
@@ -1007,7 +1293,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         contact={contact}
         page={pageMeta}
         preview={previewing}
-        signedIn={!!me}
+        signedIn={!!me && !trialView}
         // A space's page is a gateway into Lichen (founder 2026-08-17): a
         // signed-out visitor knocks right here, and the knock names us.
         knockSpace={{ id: space.id, name: space.name, kindLabel }}
@@ -1066,7 +1352,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }
 
   return (
-    <div className={'prof is-space' + (backstage ? ' is-adminview' : '') + (backstage && openSections.has('about') ? ' is-building' : '')}>
+    <div className={'prof is-space' + (backstage ? ' is-adminview' : '') + (buildView ? ' sprof--building' : '')}>
       {adminBar}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
@@ -1151,13 +1437,36 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {noticeBanners}
 
-      {adminTools && (
-        <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
-          {/* Builder left, page right (founder 2026-08-22) — same split the
-              member builder and the assistant thread wear. */}
-          <div className="build-split">
-          <div className="build-split__form">
-          <BuildModeSplit back={`/spaces/${id}?manage=1#about`} space={{ id: space.id, name: space.name }} />
+      {adminTools && (<>
+        {!buildView && (
+          <div className="sprof__doors">
+            {/* TWO DOORS, NOT A DROP-DOWN (founder 2026-08-29): the builders
+                open as full screens; everything else on the backstage stays
+                a drop-down below. */}
+            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
+              <strong>Public Profile Builder</strong>
+              <em>The website the open web sees — laid out as the page itself. Click anything to edit it.</em>
+            </button>
+            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'lichen' })}>
+              <strong>Lichen Profile Builder</strong>
+              <em>Name, description, location — how this {kindLabel.toLowerCase()} shows up inside Lichen.</em>
+            </button>
+          </div>
+        )}
+
+        {buildView === 'lichen' && (
+          <div className="sprof__buildview">
+            <div className="sprof__buildbar">
+              <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
+              <strong className="sprof__buildtitle">Lichen Profile Builder</strong>
+            </div>
+            <div className="sprof__buildpane sprof__buildpane--lone">
+              <div className="prof__field">
+                <label className="prof__label">Photo</label>
+                <button className="btn" onClick={() => avatarInputRef.current?.click()} disabled={avatarBusy}>
+                  {avatarBusy ? 'Uploading…' : space.avatar_url ? 'Change the photo' : 'Add a photo'}
+                </button>
+              </div>
           <div className="prof__field">
             <label className="prof__label">Name</label>
             <input className="prof__input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -1174,7 +1483,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
             <FillWithClaude
-              back={`/spaces/${id}?manage=1#about`}
+              back={`/spaces/${id}?manage=1&build=lichen`}
               label="Fill out with Claude"
               space={{ id: space.id, name: space.name }}
               ask={`Help me write ${possessive(space.name)} description — what it is, who it's for.`}
@@ -1257,6 +1566,175 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             />
             <p className="prof__hint">Pick a suggestion to put it on the map — free text saves, but won&rsquo;t pin.</p>
           </div>
+          {/* A community can decide it works without the assistant — the AI
+              door then reads slashed for everyone who visits (founder
+              2026-08-05: "AI is off at the admin level for the group"). */}
+          <label className="sprof__duty">
+            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
+            <span>
+              Work with the assistant here
+              <em>Off means this {kindLabel.toLowerCase()} carries a slashed AI mark, and nothing
+                here is gathered for anyone&rsquo;s briefing. Members always reach their own
+                assistant elsewhere.</em>
+            </span>
+          </label>
+              <div className="prof__save-row">
+                <button className="btn btn-primary" onClick={saveLichen} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                {msg && <span className="prof__msg">{msg}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {buildView === 'public' && (
+          <div className="sprof__buildview">
+            <div className="sprof__buildbar">
+              <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
+              <strong className="sprof__buildtitle">Public Profile Builder</strong>
+            </div>
+            <div className="sprof__buildsplit">
+              {/* THE PAGE IS THE BUILDER (founder 2026-08-29: "like
+                  Squarespace or Wix… but more elegant"). The stage is the
+                  REAL PublicPage rendered from the DRAFT — it moves as you
+                  type, and clicking a section routes you to its editor in
+                  the pane. Tab nav still switches tabs; everything else on
+                  the stage is a door into editing, not a live control. */}
+              <div className="sprof__stage" onClickCapture={stageEdit}>
+                <PublicPage
+                  id={space.id}
+                  name={name || space.name}
+                  firstPerson
+                  kindLabel={kindLabel}
+                  kindIcon={KIND_ICON[space.kind]}
+                  avatarUrl={space.avatar_url}
+                  description={description}
+                  location={locText}
+                  contact={contact}
+                  page={pageEdit}
+                  preview
+                  signedIn={false}
+                  knockSpace={{ id: space.id, name: name || space.name, kindLabel }}
+                />
+              </div>
+              <div className="sprof__buildpane">
+          {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
+              kept — it went into the draft as you typed. This button is
+              about the open web: it decides when strangers see it. The row
+              always says which of the two states the page is in, because
+              "is this live?" is the only question that matters here. */}
+          <div className="prof__save-row">
+            <button className="btn btn-primary" onClick={save} disabled={saving}>
+              {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
+            </button>
+            {draftPending && (
+              <button
+                className="btn" type="button" disabled={saving}
+                onClick={async () => {
+                  await clearDraft('space', id);
+                  setDraftPending(false);
+                  setDraftMsg('');
+                  await load();
+                }}
+              >
+                Discard draft
+              </button>
+            )}
+            {msg && <span className="prof__msg">{msg}</span>}
+            {!msg && (
+              <span className="prof__msg prof__draft-state">
+                {draftPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
+                  : 'Everything here is live.'}
+              </span>
+            )}
+          </div>
+          {/* WHAT THE PAGE USED TO SAY (founder 2026-08-29). Claude writes
+              straight to live, so the page can move without anyone pressing
+              anything — this is where you find out what it said before, and
+              put it back. A trigger records every write, from here, from the
+              chat, or from anywhere else. */}
+          <div className="sprof__history">
+            <button
+              type="button" className="ptabs__mv"
+              onClick={async () => {
+                const next = !historyOpen;
+                setHistoryOpen(next);
+                if (next && versions === null) setVersions(await listVersions('space', id));
+              }}
+            >
+              {historyOpen ? 'Hide history' : 'What changed before'}
+            </button>
+            {historyOpen && versions !== null && versions.length === 0 && (
+              <p className="ptabs__note">
+                Nothing yet — this page hasn&rsquo;t changed since history started keeping.
+              </p>
+            )}
+            {historyOpen && versions !== null && versions.length > 0 && (
+              <ul className="sprof__versions">
+                {versions.map((v, i) => {
+                  // Each row snapshots the page BEFORE its change; the state
+                  // that followed is the next-newer snapshot, or what is live
+                  // now for the most recent one.
+                  const after = i === 0
+                    ? { page: pageEdit, description, contact }
+                    : versions[i - 1].snapshot;
+                  return (
+                    <li className="sprof__version" key={v.id}>
+                      <span className="sprof__version-what">
+                        {v.source === 'assistant' ? 'Claude changed ' : 'You changed '}
+                        {describeChange(v.snapshot, after as PageDraft)}
+                        <em>{new Date(v.createdAt).toLocaleString()}</em>
+                      </span>
+                      <button
+                        type="button" className="ptabs__mv" disabled={!!restoring}
+                        onClick={async () => {
+                          setRestoring(v.id);
+                          const ok = await restoreVersion(v.id);
+                          setRestoring('');
+                          if (!ok) { setError('Could not put that version back.'); return; }
+                          await clearDraft('space', id);
+                          setDraftPending(false);
+                          setVersions(await listVersions('space', id));
+                          await load();
+                          setMsg('Put back');
+                          setTimeout(() => setMsg(''), 2500);
+                        }}
+                      >
+                        {restoring === v.id ? 'Putting back…' : 'Put this back'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <BuildModeSplit back={`/spaces/${id}?manage=1&build=public`} space={{ id: space.id, name: space.name }} />
+          {/* Only ever shown when there are unsaved edits here AND a newer
+              page on the server — with nothing typed, the form just catches
+              up quietly and this never appears. */}
+          {pageAhead && (
+            <div className="sprof__ahead">
+              <p className="sprof__ahead-say">
+                This page changed while the builder was open — Claude, or another steward, has
+                written something newer than what&rsquo;s on screen here. Saving now would write
+                over it.
+              </p>
+              <button
+                type="button" className="btn"
+                onClick={() => {
+                  sharedBase.current = JSON.stringify(pageAhead);
+                  setPageEdit(pageAhead.page);
+                  setContact(pageAhead.contact);
+                  setPageAhead(null);
+                }}
+              >
+                Load the current page
+              </button>
+              <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
+            </div>
+          )}
           {/* Contact & hours moved INTO the Contact tab's Style panel in the
               tabs list (founder 2026-08-22: "contact and hours is supposed
               to be a tab that you select, not a default part of the page
@@ -1270,6 +1748,41 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </span>
           </label>
 
+          {/* HOW LOUDLY THE PAGE RECRUITS (founder 2026-08-28). A page can go
+              live as somebody's actual website before its owner has been
+              walked through Lichen — Countryman Stables went up on its own
+              domain that way. Until that conversation happens the page
+              shouldn't be selling the platform to the barn's customers. The
+              `join` levels existed since 2026-07-29 but had no control; an
+              owner had to be edited into the database. Now they choose.
+              Nobody is locked out by 'none': the app lives at lichen.health
+              and members sign in there. */}
+          {publicPage && (
+            <div className="prof__field" id="b-join">
+              <label className="prof__label">How much should this page mention Lichen?</label>
+              {([
+                ['full', 'Invite people in',
+                 'Visitors get an invitation to request an account, and members can sign in from the page.'],
+                ['quiet', 'Keep it quiet',
+                 'One small line at the foot of the page. Members can still sign in from it.'],
+                ['none', 'Just my website',
+                 "No sign-in and no invitation card — the page reads as this place's own site. One small \u201cPowered by Lichen\u201d line stays at the very bottom. You can turn it back up whenever you're ready."],
+              ] as const).map(([value, title, note]) => (
+                <label className="prof__consent" key={value}>
+                  <input
+                    type="radio"
+                    name="page-join"
+                    checked={(pageEdit.join ?? 'full') === value}
+                    onChange={() => setPageEdit((pm) => ({
+                      ...pm, join: value === 'full' ? undefined : value,
+                    }))}
+                  />
+                  <span><strong>{title}</strong><em>{note}</em></span>
+                </label>
+              ))}
+            </div>
+          )}
+
           <div className="prof__field">
             <label className="prof__label">Address</label>
             <div className="prof__handle">
@@ -1278,17 +1791,159 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 placeholder={kindLabel.toLowerCase().replace(/\s+/g, '-')} />
             </div>
             <p className="prof__hint">
-              Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
-              <code>/spaces/{id.slice(0, 8)}…</code> instead.
+              {handleFree === 'taken'
+                ? <strong style={{ color: 'var(--red, #B3261E)' }}>
+                    That address is taken — try another.
+                  </strong>
+                : handleFree === 'free'
+                  ? <strong style={{ color: 'var(--green-deep, #2E6B4F)' }}>
+                      lichen.health/{handle.trim()} is free.
+                    </strong>
+                  : handleFree === 'checking'
+                    ? 'Checking…'
+                    : <>Letters, numbers and dashes only. Leave it blank and this page lives at{' '}
+                        <code>/spaces/{id.slice(0, 8)}…</code> instead.</>}
             </p>
+            {/* WHERE THIS PAGE ACTUALLY LIVES (founder 2026-08-28). The
+                Address field only ever showed the lichen.health handle, so a
+                space whose site answers on its own domain — Countryman
+                Stables — had no way to see that from the builder. Custom
+                domains come from HOST_SPACES; wiring a NEW one is still a
+                code + Vercel change, not something this screen can do yet. */}
+            {handle.trim() && (
+              <p className="prof__hint">
+                Live at{' '}
+                {[`lichen.health/${handle.trim()}`, ...domainsForHandle(handle)].map((addr, i) => (
+                  <span key={addr}>
+                    {i > 0 ? ' · ' : null}
+                    <a href={`https://${addr}`} target="_blank" rel="noreferrer">{addr}</a>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
           <p className="prof__privacy-sub">This page</p>
-          <div className="prof__field">
+          <div className="prof__field" id="b-tagline">
             <label className="prof__label">One line — what this {kindLabel.toLowerCase()} does, for whom</label>
             <input className="prof__input" value={pageEdit.tagline ?? ''}
               onChange={(e) => setPageEdit((pm) => ({ ...pm, tagline: e.target.value }))}
               placeholder="A grange for the whole valley" />
           </div>
+
+          {/* HOW THIS PAGE LOOKS (founder 2026-08-28, after using it: "put the
+              preview in the boxes next to what you select. Create a box for
+              build with my branding"). Four peers, each previewable in place,
+              rather than a background list plus a separate colour control
+              plus a separate row of preview links — three places to look for
+              one decision.
+
+              The first three are Lichen's own colours on different paper. The
+              fourth is theirs: the accent off their logo, on the ground that
+              logo suits. Choosing it reads the logo; previewing it reads the
+              logo too, and neither writes anything until Save. */}
+          <div className="prof__field">
+            <label className="prof__label">How this page looks</label>
+            {(['white', 'warm', 'branding'] as const).map((key) => {
+              const isBranding = key === 'branding';
+              const chosen = pageEdit.accent
+                ? isBranding
+                : !isBranding && (pageEdit.surface ?? 'warm') === key;
+              const openTrial = async () => {
+                let brand = 'lichen';
+                let ground: string = isBranding ? 'warm' : key;
+                if (isBranding) {
+                  let prop = hueProposal;
+                  if (!prop) {
+                    if (!space?.avatar_url) { setHueNote('Add a logo above first.'); return; }
+                    setHueBusy(true); setHueNote('');
+                    const found = await brandSchemeFromLogo(space.avatar_url);
+                    setHueBusy(false);
+                    if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
+                    const safe = found.accent ? readableAccent(found.accent, found.ground) : null;
+                    prop = { accent: safe, raw: found.accent, ground: found.ground };
+                    setHueProposal(prop);
+                  }
+                  if (!prop) return;
+                  brand = prop.accent ?? 'lichen';
+                  ground = prop.ground;
+                }
+                window.open(`/${handle.trim()}?brand=${encodeURIComponent(brand)}&ground=${ground}`,
+                  '_blank', 'noopener');
+              };
+              return (
+                <label className="prof__consent sprof__look" key={key}>
+                  <input
+                    type="radio"
+                    name="page-look"
+                    checked={chosen}
+                    onChange={async () => {
+                      if (!isBranding) {
+                        // Lichen's colours, just on different paper.
+                        setPageEdit((pm) => ({
+                          ...pm, accent: undefined, surface: key === 'warm' ? undefined : key,
+                        }));
+                        setHueNote('');
+                        return;
+                      }
+                      if (!space?.avatar_url) { setHueNote('Add a logo above first.'); return; }
+                      setHueBusy(true); setHueNote('');
+                      const found = await brandSchemeFromLogo(space.avatar_url);
+                      setHueBusy(false);
+                      if (!found) { setHueNote("Couldn't read a colour scheme from the logo."); return; }
+                      const safe = found.accent ? readableAccent(found.accent, found.ground) : null;
+                      setHueProposal({ accent: safe, raw: found.accent, ground: found.ground });
+                      setPageEdit((pm) => ({
+                        ...pm,
+                        accent: safe ?? undefined,
+                        surface: found.ground === 'warm' ? undefined : found.ground,
+                      }));
+                      setHueNote(
+                        safe && found.accent && safe.toLowerCase() !== found.accent.toLowerCase()
+                          ? `Took ${found.accent} from your logo and deepened it so it stays readable. Remember to Save.`
+                          : safe
+                            ? `Took ${safe} from your logo. Remember to Save.`
+                            : 'Your logo is black and white, so this just sets the background. Remember to Save.',
+                      );
+                    }}
+                  />
+                  <span>
+                    <strong>
+                      {isBranding ? (
+                        <>
+                          ✦ My branding
+                          {pageEdit.accent && (
+                            <span className="sprof__hue-dot" style={{ background: pageEdit.accent }} />
+                          )}
+                        </>
+                      ) : SURFACES[key].label}
+                    </strong>
+                    <em>
+                      {isBranding
+                        ? (hueBusy
+                            ? 'Reading your logo…'
+                            : space?.avatar_url
+                              ? 'Takes the colour from your logo and puts it on the background that suits it.'
+                              : 'Add a logo above and this can take its colours from it.')
+                        : SURFACES[key as PageSurface].note}
+                    </em>
+                  </span>
+                  <button
+                    type="button" className="sprof__look-see"
+                    disabled={!handle.trim() || hueBusy || (isBranding && !space?.avatar_url)}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void openTrial(); }}
+                  >
+                    ↗ Preview
+                  </button>
+                </label>
+              );
+            })}
+            <p className="prof__hint">
+              {hueNote || (handle.trim()
+                ? 'Preview opens the real page in a new tab, exactly as the open web sees it. Looking changes nothing.'
+                : 'Give this page an address above and you can preview these.')}
+            </p>
+          </div>
+
           <div className="prof__field">
             <label className="prof__label">How do you want people to get in touch</label>
             <ContactActionsPicker
@@ -1299,6 +1954,179 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               onContact={(patch) => setContact((c) => ({ ...c, ...patch }))}
             />
           </div>
+          {/* WHAT YOU OFFER (founder 2026-08-28, wanting to change "school
+              horses & barn horses" to "inquire about available horses" and
+              finding nowhere to do it). `page.offerings` has rendered on
+              public pages since July with no way to edit it — the same
+              data-without-a-control gap as `join` and `accent` had this
+              morning. Stored as one string per line, "Name · terms", which
+              PublicPage splits on the middle dot; the two fields here keep
+              an owner from ever having to know that. */}
+          <div className="prof__field" id="b-offerings">
+            <label className="prof__label">What you offer</label>
+            {(pageEdit.offerings ?? []).map((line, i) => {
+              const [name, ...rest] = line.split(' · ');
+              const terms = rest.join(' · ');
+              const write = (n: string, t: string) => setPageEdit((pm) => {
+                const next = [...(pm.offerings ?? [])];
+                next[i] = t.trim() ? `${n} · ${t}` : n;
+                return { ...pm, offerings: next };
+              });
+              return (
+                <div className="sprof__offer-row" key={i}>
+                  <input
+                    className="prof__input" value={name} placeholder="Private lessons"
+                    onChange={(e) => write(e.target.value, terms)}
+                  />
+                  <input
+                    className="prof__input" value={terms} placeholder="45 min · $60"
+                    onChange={(e) => write(name, e.target.value)}
+                  />
+                  <button
+                    type="button" className="sprof__offer-rm" aria-label={`Remove ${name || 'this line'}`}
+                    onClick={() => setPageEdit((pm) => ({
+                      ...pm, offerings: (pm.offerings ?? []).filter((_, j) => j !== i),
+                    }))}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button" className="prof__addline"
+              onClick={() => setPageEdit((pm) => ({ ...pm, offerings: [...(pm.offerings ?? []), ''] }))}
+            >
+              + Add a line
+            </button>
+            <p className="prof__hint">
+              What it is on the left, the terms on the right — price, length, or
+              something like &ldquo;inquire about available horses&rdquo;. Leave the right
+              side empty for a plain line.
+            </p>
+          </div>
+
+          {/* PRACTICAL NOTES (founder 2026-08-28: "everything on the public
+              page should show up in the manual editor and be editable").
+              These three render under Contact & hours and had no control —
+              one of two fields an audit of PageMeta found stranded. */}
+          <div className="prof__field">
+            <label className="prof__label">Practical notes</label>
+            {([
+              ['bring',   'What to bring',  'Boots and a helmet — we have loaners.'],
+              ['parking', 'Parking',        'Gravel lot by the barn, room for trailers.'],
+              ['access',  'Accessibility',  'Level gravel paths; the arena is step-free.'],
+            ] as const).map(([key, label, ph]) => (
+              <div className="sprof__offer-row" key={key}>
+                <span className="sprof__prac-label">{label}</span>
+                <input
+                  className="prof__input" placeholder={ph}
+                  value={pageEdit.practical?.[key] ?? ''}
+                  onChange={(e) => setPageEdit((pm) => {
+                    const next = { ...(pm.practical ?? {}), [key]: e.target.value };
+                    const empty = !next.bring && !next.parking && !next.access;
+                    return { ...pm, practical: empty ? undefined : next };
+                  })}
+                />
+              </div>
+            ))}
+            <p className="prof__hint">Shown under Contact &amp; hours. Leave any of them empty to hide it.</p>
+          </div>
+
+          {/* PHOTOS INSIDE THE STORY (the other stranded field). They render
+              between story paragraphs, so the control is "after which
+              paragraph" — the same question the data asks. */}
+          <div className="prof__field">
+            <label className="prof__label">Photos in the story</label>
+            {(() => {
+              const paras = (pageEdit.story ?? description ?? '').split(/\n{2,}/).filter(Boolean).length;
+              const imgs = pageEdit.storyImages ?? [];
+              const patch = (i: number, p: Partial<{ after: number; pos: number; full: boolean }>) =>
+                setPageEdit((pm) => {
+                  const next = [...(pm.storyImages ?? [])];
+                  next[i] = { ...next[i], ...p };
+                  return { ...pm, storyImages: next };
+                });
+              return (
+                <>
+                  {imgs.map((si, i) => (
+                    <div className="sprof__storyimg" key={`${si.src}-${i}`}>
+                      <img src={si.src} alt="" />
+                      <div className="sprof__storyimg-ctl">
+                        <label>
+                          After paragraph{' '}
+                          <input
+                            type="number" min={1} max={Math.max(1, paras)} value={si.after}
+                            onChange={(e) => patch(i, { after: Math.max(1, Number(e.target.value) || 1) })}
+                          />
+                          {paras > 0 && <span className="prof__hint"> of {paras}</span>}
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox" checked={!!si.full}
+                            onChange={(e) => patch(i, { full: e.target.checked || undefined })}
+                          />{' '}
+                          Show the whole photo
+                        </label>
+                        {!si.full && (
+                          <label>
+                            Framing
+                            <input
+                              type="range" min={0} max={100} value={si.pos ?? 50}
+                              onChange={(e) => patch(i, { pos: Number(e.target.value) })}
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button" className="sprof__offer-rm"
+                          aria-label="Remove this photo"
+                          onClick={() => setPageEdit((pm) => ({
+                            ...pm, storyImages: (pm.storyImages ?? []).filter((_, j) => j !== i),
+                          }))}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <label className="prof__addline">
+                    {storyImgBusy ? 'Adding…' : '+ Add a photo to the story'}
+                    <input
+                      type="file" accept="image/*" hidden disabled={storyImgBusy}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file || !me) return;
+                        setStoryImgBusy(true);
+                        try {
+                          const src = await uploadPageImage(me, file);
+                          setPageEdit((pm) => ({
+                            ...pm,
+                            storyImages: [...(pm.storyImages ?? []), { after: Math.max(1, paras), src }],
+                          }));
+                          const pct = await imageFocusPct(src);
+                          if (pct !== null) {
+                            setPageEdit((pm) => {
+                              const next = [...(pm.storyImages ?? [])];
+                              if (next.length) next[next.length - 1] = { ...next[next.length - 1], pos: pct };
+                              return { ...pm, storyImages: next };
+                            });
+                          }
+                        } catch (err) { console.error(err); }
+                        setStoryImgBusy(false);
+                      }}
+                    />
+                  </label>
+                  <p className="prof__hint">
+                    {paras > 0
+                      ? `Your story has ${paras} paragraph${paras === 1 ? '' : 's'}. A photo sits after the one you choose.`
+                      : 'Write your story first, then photos can sit between its paragraphs.'}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+
           {/* The feed is a Lichen thing; the open web only sees it if this
               space says so (founder 2026-08-11). */}
           <label className="prof__consent">
@@ -1320,8 +2148,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
           {/* Spaces build their page's tabs from the same library people do
               (founder 2026-08-06) — this form never wrote `page` until now. */}
-          <p className="prof__privacy-sub">This page&rsquo;s tabs</p>
+          <p className="prof__privacy-sub" id="b-tabs">This page&rsquo;s tabs</p>
           <PageTabsEditor
+            openSignal={tabSignal}
             tabs={pageEdit.tabs ?? []}
             onChange={(tabs) => setPageEdit((pm) => ({ ...pm, tabs }))}
             photos={pageEdit.photos ?? []}
@@ -1329,6 +2158,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             uploaderId={me}
             sections={pageEdit.sections}
             onSections={(sections) => setPageEdit((pm) => ({ ...pm, sections: sections as PageMeta['sections'] }))}
+            hasFacilities={!!pageEdit.facilities?.trim()}
+            facilities={pageEdit.facilities}
+            story={pageEdit.story}
+            onStory={(story) => setPageEdit((pm) => ({ ...pm, story }))}
+            onFacilities={(facilities) => setPageEdit((pm) => ({ ...pm, facilities }))}
+            team={pageEdit.team ?? []}
+            onTeam={(team) => setPageEdit((pm) => ({ ...pm, team }))}
             homeSummary={pageEdit.homeSummary}
             onHomeSummary={(text) => setPageEdit((pm) => ({ ...pm, homeSummary: text }))}
             coverStyle={pageEdit.coverStyle}
@@ -1350,34 +2186,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             }
           />
 
-          {/* A community can decide it works without the assistant — the AI
-              door then reads slashed for everyone who visits (founder
-              2026-08-05: "AI is off at the admin level for the group"). */}
-          <label className="sprof__duty">
-            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
-            <span>
-              Work with the assistant here
-              <em>Off means this {kindLabel.toLowerCase()} carries a slashed AI mark, and nothing
-                here is gathered for anyone&rsquo;s briefing. Members always reach their own
-                assistant elsewhere.</em>
-            </span>
-          </label>
-          <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            {msg && <span className="prof__msg">{msg}</span>}
+              </div>
+            </div>
           </div>
-          </div>
-          <BuilderPreview
-            frameSrc={`/spaces/${space.id}?preview=1&embed=1`}
-            tabHref={`/spaces/${space.id}?preview=1`}
-            nonce={prevNonce}
-            onRefresh={() => setPrevNonce((n) => n + 1)}
-          />
-          </div>
-        </CollapsibleSection>
-      )}
+        )}
+      </>)}
 
       {adminTools && (
         <CollapsibleSection id="privacy" title="Privacy" open={openSections.has('privacy')} onToggle={() => toggleSection('privacy')}>
@@ -1424,7 +2237,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           </label>
 
           <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
+            <button className="btn btn-primary" onClick={saveSettings} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </button>
             {msg && <span className="prof__msg">{msg}</span>}
@@ -1515,7 +2328,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {backstage && (
-        <CollapsibleSection id="rooms" title="Bookable areas & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
+        <CollapsibleSection id="rooms" title="Bookable Items & Spaces" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
             <p className="sprof__muted">Nothing listed yet — a stall, an arena, a tool, the dinner plates. Anything members can book.</p>
           )}

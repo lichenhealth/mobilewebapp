@@ -37,11 +37,19 @@ export const TAB_TEMPLATES: TabTemplate[] = [
     blurb: 'What you make or sell. Updates itself too.' },
   { id: 'contact', label: 'Contact', icon: 'phone', builtIn: true,
     blurb: 'Address, hours, phone, email, and what to bring.' },
+  // FACILITIES IS BUILT-IN (founder 2026-08-28: "the facilities bug is still
+  // live, how has this persisted after 4+ requests to fix it?"). It was
+  // listed below as a TEMPLATE tab — one you pick and then write into — while
+  // PublicPage has always rendered a facilities section of its own from
+  // page.facilities. So a page with a Facilities tab grew two of everything:
+  // the template tab's own title and body, and the built-in section right
+  // under it. Four fixes hid one heading or the other; none of them removed
+  // the second renderer. It belongs here, with the other tabs whose body
+  // comes from data Lichen already holds. SECTION_IDS below now enforces it.
+  { id: 'facilities', label: 'Facilities', icon: 'location', builtIn: true,
+    blurb: 'The rooms, the land, the equipment.' },
 
   // ── The ones most websites have ─────────────────────────────────────────
-  { id: 'facilities', label: 'Facilities', icon: 'location',
-    blurb: 'The rooms, the land, the equipment.',
-    starter: 'What’s here, and what visitors can use.' },
   { id: 'hours', label: 'Hours', icon: 'calendar',
     blurb: 'When you’re open.',
     starter: 'When we’re here.' },
@@ -82,6 +90,39 @@ export const TAB_TEMPLATES: TabTemplate[] = [
 
 export const tabById = (id: string): TabTemplate | undefined =>
   TAB_TEMPLATES.find((t) => t.id === id);
+
+/** THE SECTIONS PUBLICPAGE DRAWS ITSELF (founder 2026-08-28: "make sure
+ *  there isn't a leaky fix for this and repair it fully so it doesn't happen
+ *  again").
+ *
+ *  PublicPage has hand-written blocks for these five ids — the story, the
+ *  offerings, the goods, the facilities, the contact details. Each of them
+ *  draws its body from data Lichen already holds, so each MUST be `builtIn`
+ *  here: a section id that is also a writable template tab renders TWICE on
+ *  its own door, once with the tab's title and once with the section's.
+ *
+ *  Two things hold the line, because one clearly didn't:
+ *   · PublicPage refuses to render a chosen-tab block for any id in this
+ *     list, whatever the flag says — so a future drift can't duplicate.
+ *   · The assertion below, and `npm run check:sections`, fail loudly the
+ *     moment the two disagree. */
+export const SECTION_IDS = ['about', 'services', 'goods', 'facilities', 'contact'] as const;
+export type SectionId = (typeof SECTION_IDS)[number];
+export const isSectionTab = (id: string): boolean =>
+  (SECTION_IDS as readonly string[]).includes(id);
+
+for (const id of SECTION_IDS) {
+  const tpl = tabById(id);
+  if (!tpl) {
+    throw new Error(`pageTabs: PublicPage renders a "${id}" section, but the tab library has no "${id}" tab.`);
+  }
+  if (!tpl.builtIn) {
+    throw new Error(
+      `pageTabs: "${id}" is a section PublicPage renders itself, so it must be builtIn — `
+      + 'a writable template tab with the same id renders the section twice.',
+    );
+  }
+}
 
 /** A tab on someone's page: the template it came from, plus what they wrote. */
 export interface PageTab {

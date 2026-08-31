@@ -10,18 +10,18 @@ import './AboutFAQ.css';
 const HUBSPOT_PORTAL = '246356324';
 const HUBSPOT_FORM = '66b86cc2-3710-48bd-8c08-c94c1198dc0e';
 
-const FAQS: { q: string; a: string }[] = [
+const FAQS: { q: string; a: string; link?: { href: string; label: string } }[] = [
   {
     q: 'What does membership cost?',
     a: 'Every new member gets three months of full Concierge membership, free — no card required. When that ends, choose Community ($29/mo) or Community + Concierge ($99/mo), right inside the app.',
   },
   {
     q: 'Is my data private?',
-    a: 'Yes. You control whether your data is woven into the shared commons, and whether Lichen’s AI assists you — both are opt-in, never required. Sensitive details like your home location, phone number and financial picture stay hidden by default and are only ever shared at the level you choose.',
+    a: 'Yes. You control whether your data is woven into the shared commons, and whether Lichen’s AI assists you — always your choice, switchable any time, per section of the app and per community or group. Sensitive details like your home location, phone number and financial picture stay hidden by default and are only ever shared at the level you choose.',
   },
   {
     q: 'Do I have to use the AI assistant?',
-    a: 'No. The assistant is a partner you can turn on or off per section of the app — home, chat, calendar, wherever. Nothing is read or acted on without your say.',
+    a: 'No. The assistant starts on — collaboration is the premise of the platform — but it is yours to switch off per section of the app, and per community or group. Nothing is read outside the scopes you allow, and nothing is acted on without your say.',
   },
   {
     q: 'How is Lichen different from other social networks?',
@@ -30,6 +30,11 @@ const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is Lichen a nonprofit?',
     a: 'Yes, a 501(c)(3). Lean operations, no investors — membership revenue not needed to run the platform flows back into subsidizing care for members who need it.',
+  },
+  {
+    q: 'What if I can’t afford it? How do subsidies work?',
+    a: 'Donors fill the well, and Lichen identifies who is most in need of a drink. If you need support — care through Concierge, or a good, service, event or course in the community — you complete a Web of Wellbeing assessment: an honest picture, not a means-test. A human steward decides every request against written criteria, with reasons recorded. Subsidized care is identical to paid care, and nothing about your subsidy is visible to anyone who doesn’t need to know — including the donors who funded it.',
+    link: { href: '/subsidy-policy', label: 'Read the full subsidy policy →' },
   },
   {
     q: 'Can my organization, community or business join?',
@@ -123,7 +128,12 @@ export default function AboutFAQ() {
                 <span>{f.q}</span>
                 <Icon name="chevron-right" size={14} strokeWidth={1.5} className={open ? 'afaq__chev afaq__chev--open' : 'afaq__chev'} />
               </button>
-              {open && <p className="afaq__a">{f.a}</p>}
+              {open && (
+                <p className="afaq__a">
+                  {f.a}
+                  {f.link && <> <a href={f.link.href}>{f.link.label}</a></>}
+                </p>
+              )}
             </div>
           );
         })}

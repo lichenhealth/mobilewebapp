@@ -391,3 +391,16 @@ input, textarea, select { font: inherit; color: inherit; }
 
 /* De-branded top bar: the entity's own mark centered (founder 2026-07-30). */
 .top-bar__ident { display: flex; align-items: center; justify-content: center; padding-top: 4px; }
+
+/* A member's WEBSITE fills the window (founder 2026-08-28). The app shell's
+   centred column, bone ground and frame are how Lichen holds an app screen;
+   a barn's website inheriting them read as "a page inside something else",
+   with beige margins that no background choice could reach. PublicPage adds
+   this to <body> for any signed-out rendering and removes it on the way out,
+   so nothing about the app itself changes. */
+body.is-website .app-shell {
+  max-width: none;
+  background: transparent;
+  box-shadow: none;
+}
+body.is-website::before { content: none; }   /* the paper grain is Lichen's, not theirs */

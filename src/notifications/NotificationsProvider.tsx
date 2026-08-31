@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import type { Scope } from '../lib/sections';
 import {
   NotificationRow, loadNotifications, markNotificationRead, markScopeReadRemote, rowsForScope,
@@ -29,6 +30,17 @@ const NotificationsContext = createContext<NotificationsState>({
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const me = user?.id ?? '';
+  // NOTIFICATIONS FOLLOW THE HAT (founder 2026-08-24): every badge the app
+  // shows derives from this provider, so filtering here swaps the desktop
+  // sidebar, the bottom nav, the hamburger, and the bell's section counts
+  // together. Acting as a space, only rows stamped with THAT space count;
+  // as yourself, every row addressed to you counts (space-stamped rows are
+  // still yours — a message "via the space" sits in your inbox too).
+  // ⚠ Wait for `ready` (the acting-as rule): until the persisted hat has
+  // restored, the actor reads as the boot default "self" — counting under it
+  // would flash the person's numbers at someone wearing a space.
+  const { actor, ready: actingReady } = useActing();
+  const actingSpace = actor.type === 'space' ? actor.id : null;
   const [rows, setRows] = useState<NotificationRow[]>([]);
 
   // Initial load + realtime subscription, keyed on the signed-in user.
@@ -76,12 +88,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     let total = 0;
     for (const r of rows) {
       if (r.read_at || isDeskRow(r)) continue;
-      total += 1;
+      // Per-space buckets stay actor-independent — a space PAGE's scope
+      // reads them whoever you're wearing.
       if (r.space_id) spc[r.space_id] = (spc[r.space_id] ?? 0) + 1;
-      else sec[r.section] = (sec[r.section] ?? 0) + 1;
+      // The hat decides what the badges count: the acting space's rows, or
+      // (as yourself) everything addressed to you, each in its section.
+      // Not ready yet = badge silence, never the wrong identity's numbers.
+      if (!actingReady) continue;
+      if (actingSpace ? r.space_id === actingSpace : true) {
+        total += 1;
+        sec[r.section] = (sec[r.section] ?? 0) + 1;
+      }
     }
     return { countsBySection: sec, countsBySpace: spc, totalUnread: total };
-  }, [rows]);
+  }, [rows, actingSpace, actingReady]);
 
   const unreadForScope = (scope: Scope) => {
     if (scope.kind === 'global') return totalUnread;
