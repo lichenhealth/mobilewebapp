@@ -9,9 +9,10 @@ import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
   loadAssistantFeed, postToAssistantFeed, loadThreadCounts, loadProfileContext,
-  loadSpaceContext, spaceIdOfThread,
+  loadSpaceContext, spaceIdOfThread, loadSectionPresence,
   ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
+import type { IconName } from '../components/Icon';
 import { possessive } from '../lib/names';
 import SnapshotPanel from '../components/SnapshotPanel';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
@@ -47,6 +48,17 @@ export default function AssistantFeed() {
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // Which sections hold real content (founder 2026-08-31): an icon goes gray
+  // until the member has something IN that section, and the thread's greeting
+  // offers to create instead of welcoming back. null = still checking, and
+  // nothing is called empty before we know.
+  const [setup, setSetup] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadSectionPresence(me).then((s) => { if (live) setSetup(s); }).catch(() => {});
+    return () => { live = false; };
+  }, [me]);
   // Your page beside Claude (founder 2026-08-11: "toggle between their
   // public profile and claude to speak to claude about what to change").
   // The page is the real thing in an iframe, so it always shows the truth —
@@ -251,29 +263,38 @@ export default function AssistantFeed() {
         </div>
       )}
 
-      {/* The threads. General leads; a thread with history shows its weight,
-          and the rest stay available so work has somewhere to land. */}
+      {/* The threads as SECTION DOORS (founder 2026-08-31: "replace the text
+          boxes with the icons for each space"): each thread wears its
+          section's own mark — the circle grammar, "a circle is something you
+          open" — with its message tally at the upper right, TopBar-badge
+          style. A section with nothing in it yet reads GRAY until it's set
+          up; General is always lit, it's the front door. */}
       <div className="afeed__threads h-scroll">
-        {ASSISTANT_THREADS.map((t) => (
-          <button
-            key={t.id}
-            className={'afeed__thread' + (t.id === thread ? ' is-on' : '')}
-            title={t.blurb}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set('thread', t.id);
-              setParams(next, { replace: true });
-            }}
-          >
-            {t.label}
-            {counts[t.id] ? <em>{counts[t.id]}</em> : null}
-          </button>
-        ))}
+        {ASSISTANT_THREADS.map((t) => {
+          const off = setup ? !setup[t.id] : false;
+          return (
+            <button
+              key={t.id}
+              className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
+              title={`${t.label} — ${t.blurb}`}
+              aria-label={t.label}
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                next.set('thread', t.id);
+                setParams(next, { replace: true });
+              }}
+            >
+              <Icon name={t.icon as IconName} size={20} />
+              {counts[t.id] ? <em>{counts[t.id]}</em> : null}
+            </button>
+          );
+        })}
         {/* A space's build thread joins the rail while you're in it — a
-            dynamic room, not one of the six standing ones. */}
+            dynamic room, not one of the six standing ones; it wears the
+            space's own face. */}
         {spaceId && (
-          <button className="afeed__thread is-on" title={`Building ${possessive(sctx?.name ?? 'this space')} page`}>
-            {sctx?.name ?? 'This space'}
+          <button className="afeed__thread afeed__thread--space is-on" title={`Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
+            <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
             {counts[thread] ? <em>{counts[thread]}</em> : null}
           </button>
         )}
@@ -467,9 +488,18 @@ export default function AssistantFeed() {
           what's wanted, so the intent is now stated rather than mis-stated.) */}
       <div className="afeed__list">
         {loading && <p className="afeed__muted">Loading…</p>}
-        {!loading && visible.length === 0 && posts.length === 0 && (
-          <p className="afeed__muted">Nothing here yet — say hello below, or share a post into this feed from anywhere on Lichen.</p>
-        )}
+        {/* The greeting knows the section (founder 2026-08-31): an empty
+            thread over an empty section offers to CREATE; over a section
+            already holding their work, it welcomes them back. */}
+        {!loading && visible.length === 0 && posts.length === 0 && (() => {
+          const tdef = ASSISTANT_THREADS.find((t) => t.id === thread);
+          const line = spaceId
+            ? `Nothing here yet — tell me about ${sctx?.name ?? 'this space'} and we’ll build its page together.`
+            : tdef && setup
+              ? (setup[thread] ? tdef.welcome : tdef.emptyAsk)
+              : 'Nothing here yet — say hello below, or share a post into this feed from anywhere on Lichen.';
+          return <p className="afeed__muted">{line}</p>;
+        })()}
         {!loading && visible.length === 0 && posts.length > 0 && (
           <p className="afeed__muted">No matches for &ldquo;{q}&rdquo;.</p>
         )}

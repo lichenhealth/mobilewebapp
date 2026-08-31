@@ -20,16 +20,89 @@ export interface FeedPostRow {
 // those into the whole ecosystem — which is what General reads across.
 // (A space-scoped thread — Countryman Stables' Marketplace — is the same
 // idea one level in; the column is free text so it needs no migration.)
-export interface AssistantThread { id: string; label: string; blurb: string }
+export interface AssistantThread {
+  id: string; label: string; blurb: string;
+  /** The section's own mark — the same icon the TopBar wears there. */
+  icon: string;
+  /** Empty-thread greeting when the member has nothing IN that section yet. */
+  emptyAsk: string;
+  /** Empty-thread greeting when the section already holds their work. */
+  welcome: string;
+}
 
 export const ASSISTANT_THREADS: AssistantThread[] = [
-  { id: 'general', label: 'General', blurb: 'Anything at all — the whole weave, drawing on every other thread.' },
-  { id: 'profile', label: 'Profile management', blurb: 'Your presence: page, story, what you offer.' },
-  { id: 'market', label: 'Marketplace', blurb: 'What you’re offering and looking for.' },
-  { id: 'events', label: 'Events', blurb: 'Gatherings you host or attend.' },
-  { id: 'calendar', label: 'Calendar', blurb: 'Time, bookings, who can see what.' },
-  { id: 'concierge', label: 'Concierge', blurb: 'Care — yours and the people you hold.' },
+  {
+    id: 'general', label: 'General', icon: 'brain',
+    blurb: 'Anything at all — the whole weave, drawing on every other thread.',
+    emptyAsk: 'Say hello — this thread is for anything at all, and I draw on every other one here.',
+    welcome: 'Welcome back. Say anything at all — this thread draws on every other one.',
+  },
+  {
+    id: 'profile', label: 'Profile management', icon: 'profile',
+    blurb: 'Your presence: page, story, what you offer.',
+    emptyAsk: 'No page yet. Tell me about yourself and I’ll draft your profile and public page for you!',
+    welcome: 'Welcome back to Profile management. Tell me what to change on your page and I’ll make it happen.',
+  },
+  {
+    id: 'market', label: 'Marketplace', icon: 'store',
+    blurb: 'What you’re offering and looking for.',
+    emptyAsk: 'No Marketplace listings yet. Describe what you’d like to offer — or find — and I’ll draft the listings for you!',
+    welcome: 'Welcome back to Marketplace. Let me know what you want to contribute to the commerce ecosystem.',
+  },
+  {
+    id: 'events', label: 'Events', icon: 'rsvp',
+    blurb: 'Gatherings you host or attend.',
+    emptyAsk: 'No Events yet. Describe the Event(s) you want to create and I’ll generate them for you!',
+    welcome: 'Welcome back to Events. Tell me about the next gathering and I’ll help you shape it.',
+  },
+  {
+    id: 'calendar', label: 'Calendar', icon: 'calendar',
+    blurb: 'Time, bookings, who can see what.',
+    emptyAsk: 'Nothing on your Calendar yet. Tell me your hours, or what needs scheduling, and I’ll set it up with you!',
+    welcome: 'Welcome back to Calendar. Tell me what to schedule, or how your hours should change.',
+  },
+  {
+    id: 'concierge', label: 'Concierge', icon: 'concierge',
+    blurb: 'Care — yours and the people you hold.',
+    emptyAsk: 'No Concierge care set up yet. Tell me what wellbeing looks like for you right now, and we’ll begin your Web of Wellbeing together.',
+    welcome: 'Welcome back to Concierge. Tell me how care is going, or what needs tending.',
+  },
 ];
+
+/** Which sections the member has actually SET UP (founder 2026-08-31: the
+ *  thread rail's icons go gray for a section with nothing in it yet, and its
+ *  greeting offers to create rather than welcoming back). "Set up" means real
+ *  content in the section itself, not thread chatter about it. Any read that
+ *  fails counts as not-set-up — gray is the honest fallback. */
+export async function loadSectionPresence(me: string): Promise<Record<string, boolean>> {
+  const any = async (q: PromiseLike<{ count: number | null }>) => {
+    const { count } = await q;
+    return (count ?? 0) > 0;
+  };
+  const [prof, market, events, avail, remind, care] = await Promise.all([
+    supabase.from('profiles').select('headline, bio, page').eq('id', me).maybeSingle(),
+    any(supabase.from('posts').select('id', { count: 'exact', head: true })
+      .eq('author_id', me).contains('service_areas', ['marketplace'])),
+    any(supabase.from('posts').select('id', { count: 'exact', head: true })
+      .eq('author_id', me).contains('service_areas', ['events'])),
+    any(supabase.from('availability_windows').select('id', { count: 'exact', head: true })
+      .eq('profile_id', me)),
+    any(supabase.from('reminders').select('id', { count: 'exact', head: true })
+      .eq('profile_id', me)),
+    any(supabase.from('care_team_members').select('id', { count: 'exact', head: true })
+      .or(`patient_id.eq.${me},caregiver_id.eq.${me}`)),
+  ]);
+  const p = (prof.data ?? null) as { headline: string | null; bio: string | null; page: Record<string, unknown> | null } | null;
+  const pageBegun = !!(p && (p.headline || p.bio || (p.page && Object.keys(p.page).length > 0)));
+  return {
+    general: true,          // the front door is always open
+    profile: pageBegun,
+    market,
+    events,
+    calendar: avail || remind,
+    concierge: care,
+  };
+}
 
 export const threadLabel = (id: string) =>
   ASSISTANT_THREADS.find((t) => t.id === id)?.label ?? 'General';
