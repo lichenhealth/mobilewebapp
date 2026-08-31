@@ -78,6 +78,9 @@
    when those routes' stylesheets haven't loaded) */
 .bkg .cmp__back, .cmp__back {
   display: inline-flex; align-items: center; gap: 7px;
+  /* Only as wide as its words — the platform back-chip rule (2026-08-31);
+     see Compose.css for why all three properties are needed. */
+  width: fit-content; align-self: flex-start; justify-self: start;
   margin-bottom: var(--s-3); padding: 6px 12px;
   border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);

@@ -8,14 +8,17 @@ import './BuildModeSplit.css';
  *  2026-08-22: the shared door hardcoded the member destination, so building
  *  Countryman Stables dropped its admin into their personal thread). */
 export interface BuildSpace { id: string; name: string }
-function buildDoorPath(back: string, space?: BuildSpace, ask?: string): string {
+function buildDoorPath(back: string, space?: BuildSpace, ask?: string, pagePane = true): string {
   const askPart = ask ? `&ask=${encodeURIComponent(ask)}` : '';
   // `page=1`: arriving from a PAGE builder, the page pane opens with the
-  // conversation (founder 2026-08-31: landing on a bare chat about tagline/
-  // description read as "the Lichen Profile builder", not the website's) —
-  // the thread then mirrors the manual builder's chat-beside-page shape.
+  // conversation and the thread dresses as the Public Profile Builder's
+  // Claude mode (founder 2026-08-31: landing on a bare chat about tagline/
+  // description read as "the Lichen Profile builder", not the website's).
+  // The LICHEN builder's door passes pagePane={false} — the plain thread IS
+  // the right framing for the in-Lichen profile.
+  const pagePart = pagePane ? '&page=1' : '';
   return space
-    ? `/assistant/feed?thread=${spaceThreadId(space.id)}&back=${encodeURIComponent(back)}&page=1${askPart}`
+    ? `/assistant/feed?thread=${spaceThreadId(space.id)}&back=${encodeURIComponent(back)}${pagePart}${askPart}`
     : `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}${askPart}`;
 }
 
@@ -26,7 +29,7 @@ function buildDoorPath(back: string, space?: BuildSpace, ask?: string): string {
  *
  *  `back` rides along so the Snapshot screen can offer the way home in the
  *  founder's words: "back to manual mode". */
-export default function BuildModeSplit({ back, onBeforeGo, space }: {
+export default function BuildModeSplit({ back, onBeforeGo, space, pagePane = true }: {
   back: string;
   /** Persist any unsaved manual work before crossing over (founder
    *  2026-08-21: "import and remember anything you've entered in the manual
@@ -36,6 +39,9 @@ export default function BuildModeSplit({ back, onBeforeGo, space }: {
   /** Present on a SPACE's builder — the door then opens the space's own
    *  build thread instead of the member's profile thread. */
   space?: BuildSpace;
+  /** false = a builder about the IN-LICHEN profile, not the website — the
+   *  thread opens plain, without the page pane or builder dressing. */
+  pagePane?: boolean;
 }) {
   const navigate = useNavigate();
   // The app's ONE segmented-toggle idiom (view-toggle — the same control as
@@ -54,7 +60,7 @@ export default function BuildModeSplit({ back, onBeforeGo, space }: {
           type="button"
           onClick={() => {
             void Promise.resolve(onBeforeGo?.()).then(() =>
-              navigate(buildDoorPath(back, space)));
+              navigate(buildDoorPath(back, space, undefined, pagePane)));
           }}
         >
           <Icon name="brain" size={12} /> Build with Claude
