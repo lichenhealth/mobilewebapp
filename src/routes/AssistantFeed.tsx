@@ -15,6 +15,7 @@ import {
 } from '../lib/assistantFeedApi';
 import type { IconName } from '../components/Icon';
 import { possessive } from '../lib/names';
+import { readDraft, publishDraft } from '../lib/pageDrafts';
 import SnapshotPanel from '../components/SnapshotPanel';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import './AssistantFeed.css';
@@ -90,10 +91,10 @@ export default function AssistantFeed() {
   // Your page beside Claude (founder 2026-08-11: "toggle between their
   // public profile and claude to speak to claude about what to change").
   // The page is the real thing in an iframe, so it always shows the truth —
-  // and reloads the moment a change lands. `?page=1` (the page builders'
-  // Build-with-Claude door) opens it from the first paint, so arriving from
-  // the website builder you land facing the website, not a bare chat.
-  const [showPage, setShowPage] = useState(() => params.get('page') === '1');
+  // and reloads the moment a change lands. The split no longer auto-opens
+  // (founder 2026-08-31: "the split screen is too busy") — previewing lives
+  // in a NEW TAB now, via the Preview button under Claude's edits.
+  const [showPage, setShowPage] = useState(false);
   const [pageNonce, setPageNonce] = useState(0);
 
   // The receipt of what Claude is working from, at the top of the profile
@@ -181,6 +182,49 @@ export default function AssistantFeed() {
     }
   };
   useEffect(() => { setLoading(true); void load(); }, [me, thread]);
+
+  // THE DRAFT'S STATE, FOR THE BUTTONS (founder 2026-08-31): a Claude reply
+  // that edited a page carries a page_edit marker, and the newest such reply
+  // wears Preview + Publish. Whether a draft still EXISTS decides which —
+  // published (or discarded) elsewhere, the buttons say "see it live"
+  // instead of offering to publish nothing.
+  const lastPageEdit = (() => {
+    for (let i = posts.length - 1; i >= 0; i--) {
+      const p = posts[i];
+      if (p.author !== 'claude') continue;
+      const mark = (p.attachments ?? []).find((a) => a.type === 'page_edit');
+      if (mark && mark.type === 'page_edit') return { postId: p.id, mark };
+    }
+    return null;
+  })();
+  const [chatDraft, setChatDraft] = useState<'has' | 'none' | null>(null);
+  const [pubBusy, setPubBusy] = useState(false);
+  const [pubErr, setPubErr] = useState('');
+  useEffect(() => {
+    setPubErr('');
+    if (!lastPageEdit) { setChatDraft(null); return; }
+    let live = true;
+    void readDraft(lastPageEdit.mark.subject, lastPageEdit.mark.id)
+      .then((d) => { if (live) setChatDraft(d ? 'has' : 'none'); })
+      .catch(() => { if (live) setChatDraft(null); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPageEdit?.postId]);
+  const editPageUrl = (draft: boolean) => {
+    if (!lastPageEdit) return '';
+    const { subject, id: sid, tab } = lastPageEdit.mark;
+    const base = subject === 'space' ? `/spaces/${sid}` : `/members/${sid}`;
+    return `${base}?preview=1${draft ? '&draft=1' : ''}${tab ? `&ptab=${encodeURIComponent(tab)}` : ''}`;
+  };
+  async function publishFromChat() {
+    if (!lastPageEdit) return;
+    setPubBusy(true); setPubErr('');
+    try {
+      const res = await publishDraft(lastPageEdit.mark.subject, lastPageEdit.mark.id);
+      if (res.ok) setChatDraft('none');
+      else setPubErr(res.error ?? 'Could not publish.');
+    } finally { setPubBusy(false); }
+  }
 
   // ENLIVENED IN THE MOMENT (founder 2026-08-31: "once the conversation
   // generates an actual content post to the section, even if done via the
@@ -446,6 +490,10 @@ export default function AssistantFeed() {
           conversation shape the profile thread has, about the space. */}
       {spaceId && (
         <>
+          {/* In builder mode the split is gone (founder 2026-08-31: "too
+              busy") — Preview under Claude's replies opens the page in its
+              own tab instead. */}
+          {!builderMode && (
           <div className="afeed__split">
             <button
               className={'afeed__split-side' + (!showPage ? ' is-on' : '')}
@@ -460,6 +508,7 @@ export default function AssistantFeed() {
               {possessive(sctx?.name ?? 'The space')} page
             </button>
           </div>
+          )}
           {showPage ? (
             <div className="afeed__page">
               <iframe
@@ -593,15 +642,46 @@ export default function AssistantFeed() {
                   </button>
                 )}
                 {/* Pasted photos ride the entry (founder 2026-08-22). */}
-                {(p.attachments?.length ?? 0) > 0 && (
+                {(p.attachments ?? []).some((a) => a.type === 'photo') && (
                   <div className="afeed__entry-shots">
-                    {p.attachments!.filter((a) => a.type === 'photo').map((a) => (
+                    {(p.attachments ?? []).flatMap((a) => (a.type === 'photo' ? [a] : [])).map((a) => (
                       <img key={a.url} src={a.url} alt="" loading="lazy"
                         onClick={() => window.open(a.url, '_blank')} />
                     ))}
                   </div>
                 )}
                 {p.body && <p className="afeed__entry-text">{p.body}</p>}
+                {/* PREVIEW AND PUBLISH LIVE IN THE TEXT (founder 2026-08-31):
+                    the newest reply that edited the page carries the doors.
+                    Preview opens a NEW TAB on the draft, landed on the tab
+                    the edit touched; Publish makes the draft live. Once
+                    published (here or in the builder), the row says so. */}
+                {lastPageEdit?.postId === p.id && chatDraft && (
+                  <div className="afeed__pubrow">
+                    {chatDraft === 'has' ? (
+                      <>
+                        <span className="afeed__pubstate">In the draft — not live yet</span>
+                        <button className="afeed__publink" type="button"
+                          onClick={() => window.open(editPageUrl(true), '_blank')}>
+                          ↗ Preview
+                        </button>
+                        <button className="afeed__pubbtn" type="button" disabled={pubBusy}
+                          onClick={() => void publishFromChat()}>
+                          {pubBusy ? 'Publishing…' : 'Publish changes'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="afeed__pubstate afeed__pubstate--live">Published ✓</span>
+                        <button className="afeed__publink" type="button"
+                          onClick={() => window.open(editPageUrl(false), '_blank')}>
+                          ↗ See it live
+                        </button>
+                      </>
+                    )}
+                    {pubErr && <span className="afeed__puberr">{pubErr}</span>}
+                  </div>
+                )}
               </div>
             </div>
           );

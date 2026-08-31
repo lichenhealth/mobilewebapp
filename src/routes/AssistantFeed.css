@@ -287,6 +287,28 @@
    left; compound selector so import order can't lose the tie. */
 .cmp__back.afeed__back { align-self: flex-start; margin-bottom: var(--s-4); }
 
+/* PREVIEW + PUBLISH under a reply that edited the page (founder 2026-08-31):
+   the change sits in the draft until the person makes it live, and the doors
+   live in the text where the change was announced. */
+.afeed__pubrow {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px; padding: 8px 12px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); width: fit-content;
+}
+.afeed__pubstate { font-size: 12px; color: var(--ink-muted); }
+.afeed__pubstate--live { color: var(--green-deep, #2c7a4b); }
+.afeed__publink {
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: 12px; color: var(--peach-deep); text-decoration: underline;
+}
+.afeed__pubbtn {
+  padding: 5px 14px; border-radius: var(--r-full); cursor: pointer; font-family: inherit;
+  font-size: 12px; border: 1px solid var(--peach); background: var(--peach); color: #fff;
+}
+.afeed__pubbtn:disabled { opacity: 0.6; cursor: default; }
+.afeed__puberr { font-size: 12px; color: #a33; flex-basis: 100%; }
+
 /* The edit-permission offer, in the conversation rather than the context card
    above it (founder 2026-08-28) — asking Claude to change the page IS the
    signal, so the switch belongs beside the asking. */

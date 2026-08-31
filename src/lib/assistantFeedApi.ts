@@ -1,7 +1,13 @@
 import { supabase } from './supabase';
 
-/** A photo pasted into the feed — the same shape chat attachments wear. */
-export interface FeedAttachment { type: 'photo'; url: string }
+/** A photo pasted into the feed — the same shape chat attachments wear — or
+ *  the marker a Claude reply carries after editing a page (founder
+ *  2026-08-31): the edit landed in the DRAFT, and the client hangs Preview
+ *  and Publish buttons on the reply. `tab` is where the edit landed, so the
+ *  smart Preview opens the page on the content in question. */
+export type FeedAttachment =
+  | { type: 'photo'; url: string }
+  | { type: 'page_edit'; subject: 'space' | 'profile'; id: string; tab?: string };
 
 export interface FeedPostRow {
   id: string;
