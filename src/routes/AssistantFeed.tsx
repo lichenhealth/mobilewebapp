@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
@@ -47,18 +48,37 @@ export default function AssistantFeed() {
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
+
+  // THE PROFILE THREAD FOLLOWS THE HAT (founder 2026-08-31, the same bug's
+  // third face: acting as Countryman Stables, the profile thread showed
+  // GALYN's page). /profile already redirects to the space's backstage while
+  // a hat is on — the assistant's profile-management thread is the same door,
+  // so wearing a space's hat it opens that space's BUILD thread instead of
+  // the person's. One choke point: rail clicks, section brains, and direct
+  // ?thread=profile arrivals all pass through here. Waits on acting `ready`
+  // (the standing rule) so a boot-default "self" never decides. Beings stay
+  // personal — a being's page is its steward's work, and build threads are
+  // space-shaped server-side.
+  const { actor, ready: actingReady } = useActing();
+  useEffect(() => {
+    if (!actingReady) return;
+    if (thread === 'profile' && actor.type === 'space') {
+      const next = new URLSearchParams(params);
+      next.set('thread', `space:${actor.id}`);
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actingReady, actor, thread]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Which sections hold real content (founder 2026-08-31): an icon goes gray
-  // until the member has something IN that section, and the thread's greeting
-  // offers to create instead of welcoming back. null = still checking, and
-  // nothing is called empty before we know.
+  // until the member has something IN that section — the AI-off gray, minus
+  // the slash: "it isn't turned off, it's just not been enlivened with
+  // content" — and the thread's greeting offers to create instead of
+  // welcoming back. null = still checking, and nothing is called empty
+  // before we know. (The re-check effect lives below the posts state: it
+  // watches Claude's replies so a post born IN the conversation lights the
+  // icon the moment it lands.)
   const [setup, setSetup] = useState<Record<string, boolean> | null>(null);
-  useEffect(() => {
-    if (!me) return;
-    let live = true;
-    void loadSectionPresence(me).then((s) => { if (live) setSetup(s); }).catch(() => {});
-    return () => { live = false; };
-  }, [me]);
   // Your page beside Claude (founder 2026-08-11: "toggle between their
   // public profile and claude to speak to claude about what to change").
   // The page is the real thing in an iframe, so it always shows the truth —
@@ -151,6 +171,19 @@ export default function AssistantFeed() {
     }
   };
   useEffect(() => { setLoading(true); void load(); }, [me, thread]);
+
+  // ENLIVENED IN THE MOMENT (founder 2026-08-31: "once the conversation
+  // generates an actual content post to the section, even if done via the
+  // claude builder, it goes from gray to darker gray"): re-check section
+  // presence on every Claude reply, since a reply is when created content
+  // would have just landed. Six head-count reads — cheap enough to re-ask.
+  const claudeReplies = posts.filter((p) => p.author === 'claude').length;
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadSectionPresence(me).then((s) => { if (live) setSetup(s); }).catch(() => {});
+    return () => { live = false; };
+  }, [me, claudeReplies]);
 
   useEffect(() => {
     if (!me) return;
