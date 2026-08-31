@@ -49,16 +49,14 @@ export default function AssistantFeed() {
   const spaceId = spaceIdOfThread(thread);
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Which sections hold real content (founder 2026-08-31): an icon goes gray
-  // until the member has something IN that section, and the thread's greeting
-  // offers to create instead of welcoming back. null = still checking, and
-  // nothing is called empty before we know.
+  // until the member has something IN that section — the AI-off gray, minus
+  // the slash: "it isn't turned off, it's just not been enlivened with
+  // content" — and the thread's greeting offers to create instead of
+  // welcoming back. null = still checking, and nothing is called empty
+  // before we know. (The re-check effect lives below the posts state: it
+  // watches Claude's replies so a post born IN the conversation lights the
+  // icon the moment it lands.)
   const [setup, setSetup] = useState<Record<string, boolean> | null>(null);
-  useEffect(() => {
-    if (!me) return;
-    let live = true;
-    void loadSectionPresence(me).then((s) => { if (live) setSetup(s); }).catch(() => {});
-    return () => { live = false; };
-  }, [me]);
   // Your page beside Claude (founder 2026-08-11: "toggle between their
   // public profile and claude to speak to claude about what to change").
   // The page is the real thing in an iframe, so it always shows the truth —
@@ -151,6 +149,19 @@ export default function AssistantFeed() {
     }
   };
   useEffect(() => { setLoading(true); void load(); }, [me, thread]);
+
+  // ENLIVENED IN THE MOMENT (founder 2026-08-31: "once the conversation
+  // generates an actual content post to the section, even if done via the
+  // claude builder, it goes from gray to darker gray"): re-check section
+  // presence on every Claude reply, since a reply is when created content
+  // would have just landed. Six head-count reads — cheap enough to re-ask.
+  const claudeReplies = posts.filter((p) => p.author === 'claude').length;
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadSectionPresence(me).then((s) => { if (live) setSetup(s); }).catch(() => {});
+    return () => { live = false; };
+  }, [me, claudeReplies]);
 
   useEffect(() => {
     if (!me) return;

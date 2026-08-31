@@ -135,8 +135,13 @@
   cursor: pointer; font-family: inherit;
 }
 .afeed__thread.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
-/* Not set up yet — the glyph reads gray even while selected (the ring says
-   "you're here", the gray says "nothing here yet"). */
+/* Not set up yet — the AI-off gray WITHOUT the slash (founder 2026-08-31:
+   "it isn't turned off, it's just not been enlivened with content"):
+   ink-faint on a bone-edge ring, the exact pair .icon-row__btn--ai.ai-off
+   wears. Content lands (even born in the conversation) → the class drops
+   and the glyph deepens to the default ink-soft. The glyph reads gray even
+   while selected — the ring says "you're here", the gray says "nothing
+   here yet". */
 .afeed__thread.is-off { color: var(--ink-faint); }
 .afeed__thread em {
   position: absolute; top: -5px; right: -5px;
