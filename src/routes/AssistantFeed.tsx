@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
@@ -47,6 +48,27 @@ export default function AssistantFeed() {
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
+
+  // THE PROFILE THREAD FOLLOWS THE HAT (founder 2026-08-31, the same bug's
+  // third face: acting as Countryman Stables, the profile thread showed
+  // GALYN's page). /profile already redirects to the space's backstage while
+  // a hat is on — the assistant's profile-management thread is the same door,
+  // so wearing a space's hat it opens that space's BUILD thread instead of
+  // the person's. One choke point: rail clicks, section brains, and direct
+  // ?thread=profile arrivals all pass through here. Waits on acting `ready`
+  // (the standing rule) so a boot-default "self" never decides. Beings stay
+  // personal — a being's page is its steward's work, and build threads are
+  // space-shaped server-side.
+  const { actor, ready: actingReady } = useActing();
+  useEffect(() => {
+    if (!actingReady) return;
+    if (thread === 'profile' && actor.type === 'space') {
+      const next = new URLSearchParams(params);
+      next.set('thread', `space:${actor.id}`);
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actingReady, actor, thread]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Which sections hold real content (founder 2026-08-31): an icon goes gray
   // until the member has something IN that section — the AI-off gray, minus
