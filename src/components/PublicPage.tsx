@@ -207,10 +207,101 @@ export interface PublicPageProps {
   /** Page-owner-independent actions (e.g. a space's "See it on Maps") that
    *  belong BESIDE the page's own CTAs — one place for every action. */
   extraCtas?: { label: React.ReactNode; onClick: () => void }[];
+  /** IN-PLACE EDITING (founder 2026-08-31: "the actual content should be
+   *  laid out exactly as the profile is... but the text boxes are edit-able
+   *  and the images are adjustable and replaceable"). Set by the manual
+   *  builder ONLY: text regions become click-to-edit where they sit and the
+   *  hero photo gains replace/reposition controls, all writing through
+   *  `update` into the builder's draft state. When unset, nothing in this
+   *  template behaves differently — every affordance is additive and
+   *  guarded, because this same component is every live site on Lichen. */
+  editable?: PageEditor;
+}
+
+export interface PageEditor {
+  update: (mut: (p: PageMeta) => PageMeta) => void;
+  uploadImage: (file: File) => Promise<string | null>;
+}
+
+/** Click-to-edit text that keeps the exact class (and so the exact look) of
+ *  the node it replaces. Empty shows a faint placeholder — the field is
+ *  visible where its words would sit, which IS the layout teaching you what
+ *  goes where. Blur saves. */
+function EText({ value, save, className, placeholder }: {
+  value: string; save: (v: string) => void; className: string; placeholder: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => { if (!editing) setV(value); }, [value, editing]);
+  const size = () => {
+    const el = ref.current;
+    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
+  };
+  useEffect(() => { if (editing) { size(); ref.current?.focus(); } }, [editing]);
+  if (editing) {
+    return (
+      <textarea
+        ref={ref} rows={1}
+        className={className + ' ppage__etext is-editing'}
+        value={v}
+        onChange={(e) => { setV(e.target.value); size(); }}
+        onBlur={() => { setEditing(false); save(v.trim()); }}
+      />
+    );
+  }
+  return (
+    <p
+      className={className + ' ppage__etext' + (value ? '' : ' is-empty')}
+      onClick={() => setEditing(true)}
+      title="Click to edit"
+    >
+      {value || placeholder}
+    </p>
+  );
+}
+
+/** Multi-paragraph twin of EText: displays as the section's own paragraphs,
+ *  clicking anywhere opens the WHOLE text in one seamless box (blank lines
+ *  between paragraphs, exactly what's stored). */
+function EArea({ value, save, paraClass, placeholder }: {
+  value: string; save: (v: string) => void; paraClass?: string; placeholder: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => { if (!editing) setV(value); }, [value, editing]);
+  const size = () => {
+    const el = ref.current;
+    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
+  };
+  useEffect(() => { if (editing) { size(); ref.current?.focus(); } }, [editing]);
+  if (editing) {
+    return (
+      <textarea
+        ref={ref} rows={2}
+        className={'ppage__etext ppage__etext--area is-editing' + (paraClass ? ` ${paraClass}` : '')}
+        value={v}
+        onChange={(e) => { setV(e.target.value); size(); }}
+        onBlur={() => { setEditing(false); save(v.trim()); }}
+      />
+    );
+  }
+  return (
+    <div className={'ppage__etext' + (value ? '' : ' is-empty')} onClick={() => setEditing(true)} title="Click to edit">
+      {value
+        ? value.split(/\n{2,}/).filter(Boolean).map((para, i) => (
+            <p className={paraClass} key={i}>{para}</p>
+          ))
+        : <p className={paraClass}>{placeholder}</p>}
+    </div>
+  );
 }
 
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
+  // The manual builder's in-place editor, when present (founder 2026-08-31).
+  const ed = props.editable;
   // TRYING COLOURS ON THE REAL PAGE (founder 2026-08-28: "the preview is too
   // small — open a new tab where they can see the entire thing"). ?brand= and
   // ?ground= override the saved colours for THIS VIEW ONLY. Nothing is
@@ -533,8 +624,22 @@ export default function PublicPage(props: PublicPageProps) {
   // Uniform door anatomy (founder 2026-07-29): each door owns the cover
   // slot — About wears the page cover, every other door wears its own
   // section image up top; the lead reads as the section's title below it.
+  const saveSectionLead = (id: string) => (v: string) =>
+    ed?.update((p) => ({
+      ...p,
+      sections: { ...p.sections, [id]: { ...p.sections?.[id], lead: v || undefined } },
+    }));
   const flavor = (id: 'about' | 'services' | 'goods' | 'facilities') => {
     const lead = page.sections?.[id]?.lead;
+    if (ed) {
+      return (
+        <EText
+          className="ppage__lead" value={lead ?? ''}
+          placeholder="Add a summary line for this section…"
+          save={saveSectionLead(id)}
+        />
+      );
+    }
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
   // SMART SUMMARIES (founder 2026-08-26): Home used to tease a tab by
@@ -581,7 +686,9 @@ export default function PublicPage(props: PublicPageProps) {
       <section className={'ppage__sec ppage__sec--split' + (splitOrder.indexOf(id) % 2 === 1 ? ' is-flip' : '')} data-edit-region={id}>
         <div className="ppage__split-copy">
           {label && <h2 className="ppage__h2">{label}</h2>}
-          <p className="ppage__lead">{secLead(id)}</p>
+          {ed
+            ? <EText className="ppage__lead" value={secLead(id) ?? ''} placeholder="Add a summary line…" save={saveSectionLead(id)} />
+            : <p className="ppage__lead">{secLead(id)}</p>}
           <SecDoor id={id}>{door}</SecDoor>
         </div>
         <img
@@ -610,6 +717,53 @@ export default function PublicPage(props: PublicPageProps) {
   const usingSectionImage = !doors && !!activeSec?.image && coverSrc === activeSec.image;
   const coverPos = (usingSectionImage ? activeSec?.imagePos : undefined) ?? page.coverPos;
   const coverFull = usingSectionImage && activeSec?.imageSize === 'full';
+
+  // ── The hero photo's in-place controls (builder only) ─────────────────
+  // Which slot this tab's photo lives in decides where a change lands:
+  // Home/Feed (and About's fallback) wear page.cover; every other tab its
+  // own sections[tab].image. Dragging writes the position back to the slot
+  // the photo actually came from.
+  const coverFileRef = useRef<HTMLInputElement | null>(null);
+  const [coverDrag, setCoverDrag] = useState<{ startY: number; startPct: number; pct: number } | null>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const coverSlotIsPage = !tabbed || tab === 'home' || tab === 'feed'
+    || (!usingSectionImage && !!coverSrc && coverSrc === page.cover);
+  const currentCoverPct = (() => {
+    if (usingSectionImage) {
+      const m = /([\d.]+)%\s*$/.exec(String(activeSec?.imagePos ?? ''));
+      if (m) return Math.max(0, Math.min(100, Number(m[1])));
+      if (activeSec?.imagePos === 'top') return 0;
+      if (activeSec?.imagePos === 'bottom') return 100;
+      return 50;
+    }
+    return typeof page.coverPos === 'number' ? page.coverPos : 50;
+  })();
+  const setCoverImage = (url: string | null) => ed?.update((p) => {
+    if (coverSlotIsPage || !coverSrc) {
+      // No photo yet, or the page-cover slot: adding always fills the slot
+      // this tab actually shows — Home fills the cover, a bare tab fills
+      // its own section image.
+      if (!tabbed || tab === 'home' || tab === 'feed' || (coverSlotIsPage && coverSrc)) {
+        if (url) return { ...p, cover: url, coverStyle: 'photo' as const, coverPos: 50 };
+        const { cover: _c, ...rest } = p;
+        return { ...rest, coverStyle: 'plain' as const };
+      }
+    }
+    const sections = {
+      ...p.sections,
+      [tab]: { ...p.sections?.[tab], image: url ?? undefined, imagePos: undefined, imageSize: undefined },
+    };
+    return { ...p, sections };
+  });
+  const commitCoverPct = (pct: number) => ed?.update((p) => {
+    if (usingSectionImage) {
+      return {
+        ...p,
+        sections: { ...p.sections, [tab]: { ...p.sections?.[tab], imagePos: `50% ${Math.round(pct)}%` } },
+      };
+    }
+    return { ...p, coverPos: Math.round(pct) };
+  });
 
   return (
     <div
@@ -687,7 +841,13 @@ export default function PublicPage(props: PublicPageProps) {
               <Icon name={props.kindIcon} size={15} />
             </p>
           )}
-          {(page.tagline || (!props.kindIcon && kindLabel)) && !(asGuest && tab === 'home' && page.tagline && coverSrc) && (
+          {ed ? (
+            <EText
+              className="ppage__tagline" value={page.tagline ?? ''}
+              placeholder="Add a tagline — the one line under the name…"
+              save={(v) => ed.update((p) => ({ ...p, tagline: v || undefined }))}
+            />
+          ) : (page.tagline || (!props.kindIcon && kindLabel)) && !(asGuest && tab === 'home' && page.tagline && coverSrc) && (
             <p className="ppage__tagline">
               {page.tagline || kindLabel}
             </p>
@@ -703,7 +863,73 @@ export default function PublicPage(props: PublicPageProps) {
           ))}
         </div>
         {navInHero && navNode}
-        {coverSrc && (
+        {ed ? (
+          <div className={'ppage__ecover' + (coverSrc ? '' : ' is-empty')}>
+            <input
+              ref={coverFileRef} type="file" accept="image/*" hidden
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (!f) return;
+                setCoverBusy(true);
+                try {
+                  const url = await ed.uploadImage(f);
+                  if (url) setCoverImage(url);
+                } finally { setCoverBusy(false); }
+              }}
+            />
+            {coverSrc ? (
+              <>
+                <img
+                  className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '') + ' is-draggable'}
+                  src={coverSrc} alt="" key={coverSrc} draggable={false}
+                  style={coverFull ? undefined : { objectPosition: `50% ${coverDrag ? coverDrag.pct : currentCoverPct}%` }}
+                  onPointerDown={(e) => {
+                    if (coverFull) return;
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    setCoverDrag({ startY: e.clientY, startPct: currentCoverPct, pct: currentCoverPct });
+                  }}
+                  onPointerMove={(e) => {
+                    if (!coverDrag) return;
+                    const h = (e.target as HTMLElement).getBoundingClientRect().height || 1;
+                    const pct = Math.max(0, Math.min(100, coverDrag.startPct - ((e.clientY - coverDrag.startY) / h) * 100));
+                    setCoverDrag({ ...coverDrag, pct });
+                  }}
+                  onPointerUp={() => {
+                    if (!coverDrag) return;
+                    if (Math.round(coverDrag.pct) !== Math.round(coverDrag.startPct)) commitCoverPct(coverDrag.pct);
+                    setCoverDrag(null);
+                  }}
+                />
+                <div className="ppage__ecover-bar">
+                  {!coverFull && <span className="ppage__ecover-hint">Drag the photo to choose what shows</span>}
+                  <button type="button" onClick={() => coverFileRef.current?.click()} disabled={coverBusy}>
+                    {coverBusy ? 'Uploading…' : 'Change'}
+                  </button>
+                  {usingSectionImage && (
+                    <button
+                      type="button"
+                      onClick={() => ed.update((p) => ({
+                        ...p,
+                        sections: { ...p.sections, [tab]: { ...p.sections?.[tab], imageSize: coverFull ? undefined : 'full' } },
+                      }))}
+                    >
+                      {coverFull ? 'Standard crop' : 'Expand to full size'}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setCoverImage(null)}>Remove</button>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button" className="ppage__ecover-add"
+                onClick={() => coverFileRef.current?.click()} disabled={coverBusy}
+              >
+                {coverBusy ? 'Uploading…' : (tab === 'home' || tab === 'feed' || !tabbed ? '+ Add a cover photo' : `+ Add a photo for this tab`)}
+              </button>
+            )}
+          </div>
+        ) : coverSrc && (
           <img
             className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
             data-edit-region="cover"
@@ -741,10 +967,33 @@ export default function PublicPage(props: PublicPageProps) {
       {activeChosen && (
         <section className="ppage__sec">
           <h2 className="ppage__sec-title">{activeChosen.label ?? tabById(activeChosen.id)?.label}</h2>
-          {activeChosen.lead && <p className="ppage__lead">{activeChosen.lead}</p>}
-          {(activeChosen.body ?? '').split(/\n{2,}/).filter(Boolean).map((para, i) => (
-            <p className="ppage__para" key={i}>{para}</p>
-          ))}
+          {ed ? (
+            <>
+              <EText
+                className="ppage__lead" value={activeChosen.lead ?? ''}
+                placeholder="Add a first line for this tab…"
+                save={(v) => ed.update((p) => ({
+                  ...p,
+                  tabs: p.tabs?.map((t) => (t.id === activeChosen.id ? { ...t, lead: v || undefined } : t)),
+                }))}
+              />
+              <EArea
+                value={activeChosen.body ?? ''} paraClass="ppage__para"
+                placeholder="Write this tab — blank lines split paragraphs."
+                save={(v) => ed.update((p) => ({
+                  ...p,
+                  tabs: p.tabs?.map((t) => (t.id === activeChosen.id ? { ...t, body: v || undefined } : t)),
+                }))}
+              />
+            </>
+          ) : (
+            <>
+              {activeChosen.lead && <p className="ppage__lead">{activeChosen.lead}</p>}
+              {(activeChosen.body ?? '').split(/\n{2,}/).filter(Boolean).map((para, i) => (
+                <p className="ppage__para" key={i}>{para}</p>
+              ))}
+            </>
+          )}
         </section>
       )}
 
@@ -776,9 +1025,35 @@ export default function PublicPage(props: PublicPageProps) {
       {story && show('about') && splitting('about') && (
         <SumSplit id="about" door="Read the whole story" />
       )}
+      {ed && !story && show('about') && tab !== 'home' && (
+        // An empty story still needs somewhere to be written (founder
+        // 2026-08-31: the layout IS the form) — the About door offers the
+        // blank where the words will live.
+        <section className="ppage__sec">
+          {flavor('about')}
+          <div className="ppage__story">
+            <EArea
+              value="" placeholder="Write the story — who you are, how this began, what it's for. Blank lines split paragraphs."
+              save={(v) => ed.update((p) => ({ ...p, story: v || undefined }))}
+            />
+          </div>
+        </section>
+      )}
       {story && show('about') && !splitting('about') && (
         <section className="ppage__sec" data-edit-region="about">
           {flavor('about')}
+          {ed && tab !== 'home' ? (
+            // Editable in place: the whole story opens as one seamless box.
+            // Story images re-appear on save — they're managed in Page
+            // settings, and interleaving them into a textarea would lie
+            // about what's stored.
+            <div className="ppage__story">
+              <EArea
+                value={story} placeholder="Write the story…"
+                save={(v) => ed.update((p) => ({ ...p, story: v || undefined }))}
+              />
+            </div>
+          ) : (
           <div className="ppage__story">
             {(tab !== 'home' || openSecs.has('about')
               ? story.split(/\n{2,}/)
@@ -804,6 +1079,7 @@ export default function PublicPage(props: PublicPageProps) {
               <SecDoor id="about">Read the whole story</SecDoor>
             )}
           </div>
+          )}
         </section>
       )}
 
@@ -901,6 +1177,15 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__sec" data-edit-region="facilities">
           <h2 className="ppage__h2">The facilities</h2>
           {flavor('facilities')}
+          {ed && tab !== 'home' ? (
+            <div className="ppage__story">
+              <EArea
+                value={page.facilities?.trim() || facilities}
+                placeholder="Describe the grounds…"
+                save={(v) => ed.update((p) => ({ ...p, facilities: v || undefined }))}
+              />
+            </div>
+          ) : (
           <div className="ppage__story">
             {(summarized('facilities')
               ? []
@@ -911,6 +1196,7 @@ export default function PublicPage(props: PublicPageProps) {
               <SecDoor id="facilities">See the grounds</SecDoor>
             )}
           </div>
+          )}
         </section>
       )}
 

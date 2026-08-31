@@ -280,35 +280,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [restoring, setRestoring] = useState('');
-  // CLICK THE PAGE, LAND IN ITS EDITOR (founder 2026-08-29: "laid out as the
-  // actual profile is laid out, except you can click on things and edit them
-  // here"). The stage renders the REAL PublicPage from the draft state, so
-  // it moves as you type; data-edit-region attributes on its sections say
-  // what was clicked, and this routes the click — into the right tab panel
-  // (via openSignal) or to the loose field it belongs to. Tab-nav clicks
-  // pass through untouched: switching tabs is part of looking at the page.
+  // THE PAGE IS THE FORM (founder 2026-08-31, superseding 2026-08-29's
+  // click-to-route: "the text boxes are edit-able and the images are
+  // adjustable and replaceable" — editing happens IN the layout via
+  // PublicPage's `editable`, not by routing clicks to a side pane). What
+  // in-place editing doesn't cover lives in the Page settings drawer.
   const [tabSignal, setTabSignal] = useState<{ id: string; n: number } | null>(null);
-  const stageEdit = (e: React.MouseEvent) => {
-    const t = e.target as HTMLElement;
-    if (t.closest('.ppage__nav-link')) return;
-    e.preventDefault(); e.stopPropagation();
-    const region = t.closest('[data-edit-region]')?.getAttribute('data-edit-region');
-    if (!region) return;
-    const toTab: Record<string, string> = {
-      cover: 'home', about: 'about', team: 'about',
-      facilities: 'facilities', contact: 'contact', services: 'services', goods: 'goods',
-    };
-    const toAnchor: Record<string, string> = { identity: 'b-tagline', offerings: 'b-offerings', join: 'b-join' };
-    if (toTab[region]) {
-      setTabSignal({ id: toTab[region], n: Date.now() });
-      document.getElementById('b-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (toAnchor[region]) {
-      const el = document.getElementById(toAnchor[region]);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el?.classList.add('is-flash');
-      setTimeout(() => el?.classList.remove('is-flash'), 1600);
-    }
-  };
+  const [buildSettingsOpen, setBuildSettingsOpen] = useState(false);
   // Who among THIS layer's members is around (founder 2026-08-06).
   const [present, setPresent] = useState<number | null>(null);
   const [presentWho, setPresentWho] = useState<PresentMember[]>([]);
@@ -1625,71 +1603,82 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
               <strong className="sprof__buildtitle">Public Profile Builder</strong>
             </div>
-            <div className="sprof__buildsplit">
-              {/* THE PAGE IS THE BUILDER (founder 2026-08-29: "like
-                  Squarespace or Wix… but more elegant"). The stage is the
-                  REAL PublicPage rendered from the DRAFT — it moves as you
-                  type, and clicking a section routes you to its editor in
-                  the pane. Tab nav still switches tabs; everything else on
-                  the stage is a door into editing, not a live control. */}
-              <div className="sprof__stage" onClickCapture={stageEdit}>
-                <PublicPage
-                  id={space.id}
-                  name={name || space.name}
-                  firstPerson
-                  kindLabel={kindLabel}
-                  kindIcon={KIND_ICON[space.kind]}
-                  avatarUrl={space.avatar_url}
-                  description={description}
-                  location={locText}
-                  contact={contact}
-                  page={pageEdit}
-                  preview
-                  signedIn={false}
-                  knockSpace={{ id: space.id, name: name || space.name, kindLabel }}
-                />
-              </div>
-              <div className="sprof__buildpane">
-          {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
-              kept — it went into the draft as you typed. This button is
-              about the open web: it decides when strangers see it. The row
-              always says which of the two states the page is in, because
-              "is this live?" is the only question that matters here. */}
-          <div className="prof__save-row">
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
-            </button>
-            {/* Preview in a NEW TAB (founder 2026-08-31): the draft as the
-                open web would see it, no builder chrome — close the tab to
-                come back. */}
-            <button
-              className="btn" type="button"
-              onClick={() => window.open(`/spaces/${id}?preview=1&draft=1`, '_blank')}
-            >
-              ↗ Preview
-            </button>
-            {draftPending && (
-              <button
-                className="btn" type="button" disabled={saving}
-                onClick={async () => {
-                  await clearDraft('space', id);
-                  setDraftPending(false);
-                  setDraftMsg('');
-                  await load();
-                }}
-              >
-                Discard draft
+            {/* THE PAGE IS THE FORM NOW (founder 2026-08-31: "the actual
+                content should be laid out exactly as the profile is... the
+                text boxes are edit-able and the images are adjustable and
+                replaceable" — the split screen was too busy). The publish
+                bar persists up here; the page itself, editable in place,
+                fills the width below; everything structural lives in the
+                Page settings drawer. */}
+            {/* PUBLISH, NOT SAVE (founder 2026-08-29). Your work is already
+                kept — it went into the draft as you typed. This button is
+                about the open web: it decides when strangers see it. */}
+            <div className="prof__save-row sprof__pubbar">
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
               </button>
+              {/* Preview in a NEW TAB (founder 2026-08-31): the draft as the
+                  open web would see it, no builder chrome — close the tab to
+                  come back. */}
+              <button
+                className="btn" type="button"
+                onClick={() => window.open(`/spaces/${id}?preview=1&draft=1`, '_blank')}
+              >
+                ↗ Preview
+              </button>
+              {draftPending && (
+                <button
+                  className="btn" type="button" disabled={saving}
+                  onClick={async () => {
+                    await clearDraft('space', id);
+                    setDraftPending(false);
+                    setDraftMsg('');
+                    await load();
+                  }}
+                >
+                  Discard draft
+                </button>
+              )}
+              <button
+                className="btn" type="button"
+                onClick={() => setBuildSettingsOpen((o) => !o)}
+                aria-expanded={buildSettingsOpen}
+              >
+                {buildSettingsOpen ? 'Hide page settings' : 'Page settings'}
+              </button>
+              {msg && <span className="prof__msg">{msg}</span>}
+              {!msg && (
+                <span className="prof__msg prof__draft-state">
+                  {draftPending
+                    ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
+                    : 'Everything here is live.'}
+                </span>
+              )}
+            </div>
+            <BuildModeSplit back={`/spaces/${id}?manage=1&build=public`} space={{ id: space.id, name: space.name }} />
+            {pageAhead && (
+              <div className="sprof__ahead">
+                <p className="sprof__ahead-say">
+                  This page changed while the builder was open — Claude, or another steward, has
+                  written something newer than what&rsquo;s on screen here. Saving now would write
+                  over it.
+                </p>
+                <button
+                  type="button" className="btn"
+                  onClick={() => {
+                    sharedBase.current = JSON.stringify(pageAhead);
+                    setPageEdit(pageAhead.page);
+                    setContact(pageAhead.contact);
+                    setPageAhead(null);
+                  }}
+                >
+                  Load the current page
+                </button>
+                <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
+              </div>
             )}
-            {msg && <span className="prof__msg">{msg}</span>}
-            {!msg && (
-              <span className="prof__msg prof__draft-state">
-                {draftPending
-                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — the live page still shows what you published last.`
-                  : 'Everything here is live.'}
-              </span>
-            )}
-          </div>
+            {buildSettingsOpen && (
+              <div className="sprof__buildpane sprof__buildpane--drawer">
           {/* WHAT THE PAGE USED TO SAY (founder 2026-08-29). Claude writes
               straight to live, so the page can move without anyone pressing
               anything — this is where you find out what it said before, and
@@ -1750,31 +1739,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </ul>
             )}
           </div>
-          <BuildModeSplit back={`/spaces/${id}?manage=1&build=public`} space={{ id: space.id, name: space.name }} />
-          {/* Only ever shown when there are unsaved edits here AND a newer
-              page on the server — with nothing typed, the form just catches
-              up quietly and this never appears. */}
-          {pageAhead && (
-            <div className="sprof__ahead">
-              <p className="sprof__ahead-say">
-                This page changed while the builder was open — Claude, or another steward, has
-                written something newer than what&rsquo;s on screen here. Saving now would write
-                over it.
-              </p>
-              <button
-                type="button" className="btn"
-                onClick={() => {
-                  sharedBase.current = JSON.stringify(pageAhead);
-                  setPageEdit(pageAhead.page);
-                  setContact(pageAhead.contact);
-                  setPageAhead(null);
-                }}
-              >
-                Load the current page
-              </button>
-              <span className="sprof__ahead-cost">Your unsaved edits here would be dropped.</span>
-            </div>
-          )}
           {/* Contact & hours moved INTO the Contact tab's Style panel in the
               tabs list (founder 2026-08-22: "contact and hours is supposed
               to be a tab that you select, not a default part of the page
@@ -2227,6 +2191,33 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           />
 
               </div>
+            )}
+            {/* THE EDITABLE PAGE — the real PublicPage rendered from the
+                draft, full width, with in-place text editing and photo
+                controls (PublicPage's `editable`). Walk it by its own tab
+                nav; type where the words live; drag the photo to frame it. */}
+            <div className="sprof__stage sprof__stage--inplace">
+              <PublicPage
+                id={space.id}
+                name={name || space.name}
+                firstPerson
+                kindLabel={kindLabel}
+                kindIcon={KIND_ICON[space.kind]}
+                avatarUrl={space.avatar_url}
+                description={description}
+                location={locText}
+                contact={contact}
+                page={pageEdit}
+                preview
+                signedIn={false}
+                knockSpace={{ id: space.id, name: name || space.name, kindLabel }}
+                editable={{
+                  update: (mut) => setPageEdit((pm) => mut(pm)),
+                  uploadImage: async (f) => {
+                    try { return await uploadPageImage(me, f); } catch { return null; }
+                  },
+                }}
+              />
             </div>
           </div>
         )}
