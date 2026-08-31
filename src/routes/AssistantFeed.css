@@ -218,6 +218,30 @@
   .afeed__page-note.afeed__page-note--wide { display: none; }
   .afeed__page-note.afeed__page-note--narrow { display: block; }
 }
+/* CHAT LEFT, PAGE RIGHT (founder 2026-08-31 — the same shape the manual
+   builder wears at this width: you talk on the left and watch the site
+   respond beside you; the stacked sticky layout above stays for
+   1024–1099px). The page cell spans a generous run of rows so every other
+   child — header, rail, cards, conversation, composer — files down the left
+   column; unused implicit rows collapse to nothing. */
+@media (min-width: 1100px) {
+  .afeed--paged {
+    display: grid;
+    max-width: 1280px;
+    grid-template-columns: minmax(0, 560px) minmax(360px, 1fr);
+    column-gap: var(--s-5);
+    align-content: start;
+  }
+  .afeed--paged > * { grid-column: 1; min-width: 0; }
+  .afeed--paged > .afeed__page {
+    grid-column: 2; grid-row: 1 / span 60;
+    position: sticky; top: calc(var(--top-h) + var(--s-4));
+    height: calc(100vh - var(--top-h) - var(--s-6));
+    margin-bottom: 0; padding-bottom: 0;
+    display: flex; flex-direction: column;
+  }
+  .afeed--paged > .afeed__page .afeed__page-frame { flex: 1; height: auto; min-height: 0; }
+}
 .afeed__page-note {
   font-size: 12px; color: var(--ink-faint); margin: 6px 0 0;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

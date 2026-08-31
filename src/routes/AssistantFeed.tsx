@@ -82,8 +82,10 @@ export default function AssistantFeed() {
   // Your page beside Claude (founder 2026-08-11: "toggle between their
   // public profile and claude to speak to claude about what to change").
   // The page is the real thing in an iframe, so it always shows the truth —
-  // and reloads the moment a change lands.
-  const [showPage, setShowPage] = useState(false);
+  // and reloads the moment a change lands. `?page=1` (the page builders'
+  // Build-with-Claude door) opens it from the first paint, so arriving from
+  // the website builder you land facing the website, not a bare chat.
+  const [showPage, setShowPage] = useState(() => params.get('page') === '1');
   const [pageNonce, setPageNonce] = useState(0);
 
   // The receipt of what Claude is working from, at the top of the profile
@@ -252,7 +254,7 @@ export default function AssistantFeed() {
   }
 
   return (
-    <div className="afeed">
+    <div className={'afeed' + (showPage && (thread === 'profile' || spaceId) ? ' afeed--paged' : '')}>
       <button className="cmp__back afeed__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
         ← {back ? 'Back to manual mode' : 'Back'}
       </button>

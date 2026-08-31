@@ -10,8 +10,12 @@ import './BuildModeSplit.css';
 export interface BuildSpace { id: string; name: string }
 function buildDoorPath(back: string, space?: BuildSpace, ask?: string): string {
   const askPart = ask ? `&ask=${encodeURIComponent(ask)}` : '';
+  // `page=1`: arriving from a PAGE builder, the page pane opens with the
+  // conversation (founder 2026-08-31: landing on a bare chat about tagline/
+  // description read as "the Lichen Profile builder", not the website's) —
+  // the thread then mirrors the manual builder's chat-beside-page shape.
   return space
-    ? `/assistant/feed?thread=${spaceThreadId(space.id)}&back=${encodeURIComponent(back)}${askPart}`
+    ? `/assistant/feed?thread=${spaceThreadId(space.id)}&back=${encodeURIComponent(back)}&page=1${askPart}`
     : `/assistant?section=profile&intent=build&back=${encodeURIComponent(back)}${askPart}`;
 }
 
