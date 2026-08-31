@@ -384,3 +384,41 @@
   width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
   border-radius: var(--r-md); margin-bottom: 10px; cursor: zoom-in;
 }
+
+/* ── IN-PLACE EDITING (founder 2026-08-31) — only rendered when the manual
+   builder passes `editable`; none of this reaches a live site. ── */
+.ppage__etext { cursor: text; border-radius: 6px; }
+.ppage__etext:not(.is-editing):hover { outline: 1.5px dashed var(--ppage-accent, var(--peach)); outline-offset: 4px; }
+.ppage__etext.is-empty { opacity: 0.45; font-style: italic; }
+.ppage__etext.is-editing {
+  display: block; width: 100%; resize: none; overflow: hidden;
+  font: inherit; color: inherit; line-height: inherit; text-align: inherit;
+  letter-spacing: inherit; background: rgba(255, 255, 255, 0.5);
+  border: 1.5px dashed var(--ppage-accent, var(--peach));
+  outline: 0; padding: 4px 6px; margin: -4px -6px;
+  box-sizing: content-box;
+}
+/* EArea's display shell keeps its paragraphs' own margins. */
+.ppage__etext--area { min-height: 90px; }
+
+.ppage__ecover { position: relative; }
+.ppage__ecover .ppage__cover.is-draggable { cursor: ns-resize; touch-action: none; user-select: none; }
+.ppage__ecover-bar {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  padding: 6px 10px; border-radius: var(--r-full);
+  background: rgba(20, 20, 20, 0.62); backdrop-filter: blur(3px);
+  max-width: calc(100% - 20px);
+}
+.ppage__ecover-hint { font-size: 11px; color: rgba(255, 255, 255, 0.85); }
+.ppage__ecover-bar button {
+  border: 0; border-radius: var(--r-full); padding: 4px 10px; cursor: pointer;
+  font: inherit; font-size: 11px; background: rgba(255, 255, 255, 0.92); color: #222;
+}
+.ppage__ecover-add {
+  display: block; width: 100%; padding: 40px 16px; cursor: pointer;
+  border: 1.5px dashed var(--ppage-edge, var(--bone-edge)); border-radius: var(--r-md);
+  background: transparent; color: var(--ppage-ink-muted, var(--ink-muted));
+  font: inherit; font-size: 14px; margin-top: 12px;
+}
+.ppage__ecover-add:hover { border-color: var(--ppage-accent, var(--peach)); color: var(--ppage-ink, var(--ink)); }

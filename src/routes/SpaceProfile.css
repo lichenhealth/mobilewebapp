@@ -369,25 +369,27 @@
 .sprof__buildtitle { font-size: 14px; }
 .sprof__buildpane--lone { max-width: 560px; padding-top: 12px; }
 
-/* THE STAGE: builder pane on the LEFT, the real page on the RIGHT (founder
-   2026-08-31 — you edit on the left and watch the site respond beside it).
-   row-reverse keeps the stage first in the DOM (stageEdit's capture order and
-   the existing markup untouched) while the pane leads visually. Below 1100px
-   the pane stands alone — the full-tab preview covers seeing it. */
-.sprof__stage { display: none; }
+/* THE PAGE IS THE FORM (founder 2026-08-31, superseding the split: "the
+   split screen is too busy... the actual content should be laid out exactly
+   as the profile is"): one full-width stage — the real PublicPage rendered
+   editable-in-place — with the publish bar above it and the settings in a
+   drawer. Works at every width; a phone edits the same page it shows. */
 .sprof__buildpane { padding: 12px 4px 48px; }
-@media (min-width: 1100px) {
-  .sprof__buildsplit { display: flex; flex-direction: row-reverse; align-items: stretch; height: calc(100vh - 58px); }
-  .sprof__stage {
-    display: block; flex: 1; overflow-y: auto;
-    border-left: 1px solid var(--bone-edge);
-  }
-  .sprof__buildpane { width: 460px; flex: none; overflow-y: auto; padding: 12px 16px 48px; }
+.sprof__buildpane--drawer {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); padding: 12px 16px 24px; margin: var(--s-3) 0;
+  max-width: 640px;
 }
-
-/* Click anything on the stage to edit it — the hover says so. */
-.sprof__stage [data-edit-region] { cursor: pointer; }
-.sprof__stage [data-edit-region]:hover { outline: 2px dashed #F5A36D; outline-offset: 3px; }
+.sprof__pubbar {
+  position: sticky; top: 42px; z-index: 30;
+  background: var(--bone); padding: 8px 0;
+  border-bottom: 1px solid var(--bone-edge);
+}
+.sprof__stage--inplace {
+  display: block; margin-top: var(--s-3);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  overflow: hidden;
+}
 
 /* Where a stage click landed you in the pane. */
 .is-flash { outline: 2px solid var(--peach); border-radius: 8px; }
