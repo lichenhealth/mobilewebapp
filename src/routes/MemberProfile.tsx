@@ -24,6 +24,7 @@ import './MemberProfile.css';
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import { type ContactInfo } from '../components/ContactFields';
 import { readDraft, type PageDraft } from '../lib/pageDrafts';
+import GrabPen from '../components/GrabPen';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -398,6 +399,13 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const canSeeIt = !!me || previewing || pub?.on;
   if (pub && canSeeIt) {
     return (
+      <>
+      {/* The grab + pen on your own preview (founder 2026-08-31): grab,
+          circle what you mean, and it lands in your profile thread with
+          Claude — the Shottr loop, on-platform. */}
+      {previewing && isSelf && !embedded && (
+        <GrabPen thread="profile" uploaderId={me!} />
+      )}
       <PublicPage
         id={id}
         name={name}
@@ -450,6 +458,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         feed={memberFeed}
         beforeContent={me ? identityExtras : undefined}
       />
+      </>
     );
   }
 
