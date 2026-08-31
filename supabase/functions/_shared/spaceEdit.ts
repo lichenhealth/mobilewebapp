@@ -8,6 +8,7 @@
 // (claude-chat) — server-side facts the model cannot supply.
 
 import { readBrandScheme } from './brandColors.ts';
+import { readPageState, writePageDraft } from './pageDraft.ts';
 
 export const SPACE_CONTACT_FIELDS = ['website', 'email', 'phone', 'booking', 'hours', 'address', 'instagram', 'facebook'];
 export const SPACE_TAGLINE_MAX = 90;
@@ -316,25 +317,45 @@ export async function runSpacePageTool(
   sb: SbFn, spaceId: string, spaceName: string,
   name: string, input: Record<string, string & string[]>,
 ): Promise<SpaceToolOutcome> {
+  // DRAFT-FIRST (founder 2026-08-31): reads see the draft when one exists —
+  // the state the person's next publish would make live — and page-shaped
+  // writes land IN the draft, never on the live row. Only `description`
+  // (in-Lichen identity, outside the page draft's scope) still writes live.
   const readSpacePage = async () => {
-    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=page,contact,description`)).json();
+    const [state, cur] = await Promise.all([
+      readPageState(sb, 'space', spaceId),
+      (async () => (await (await sb(`spaces?id=eq.${spaceId}&select=description`)).json()))(),
+    ]);
     const r = Array.isArray(cur) ? cur[0] : null;
     return {
-      page: (r?.page ?? {}) as Record<string, unknown>,
-      contact: (r?.contact ?? {}) as Record<string, string>,
+      page: state.page,
+      contact: state.contact,
       description: (r?.description ?? null) as string | null,
+      hasDraft: state.hasDraft,
     };
   };
-  const patchSpace = (body: Record<string, unknown>) =>
-    sb(`spaces?id=eq.${spaceId}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body),
-    });
+  const patchSpace = async (body: Record<string, unknown>) => {
+    if ('description' in body) {
+      await sb(`spaces?id=eq.${spaceId}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ description: body.description }),
+      });
+      const rest = { ...body };
+      delete rest.description;
+      if (!Object.keys(rest).length) return;
+      body = rest;
+    }
+    await writePageDraft(sb, 'space', spaceId, body as { page?: Record<string, unknown>; contact?: Record<string, string> | null });
+  };
 
   if (name === 'get_space_page') {
-    const { page, contact, description } = await readSpacePage();
+    const { page, contact, description, hasDraft } = await readSpacePage();
     // No `change` key: a read is not an edit, and the calling surfaces use
     // `change` to tell the steward what was done to their page.
-    return { ok: true, name: spaceName, description, contact, page };
+    return {
+      ok: true, name: spaceName, description, contact, page,
+      ...(hasDraft ? { note: 'This is the unpublished DRAFT of the page — the live page still shows what was last published.' } : {}),
+    };
   }
 
   // ── History ─────────────────────────────────────────────────────────────
@@ -396,6 +417,7 @@ export async function runSpacePageTool(
       ok: true,
       change: `put ${spaceName}'s page back to how it was before the change of `
         + `${(check[0] as { created_at: string }).created_at} — the WHOLE page, so anything done since is undone too`,
+      note: 'A restore writes the LIVE page directly. If an unpublished draft exists it still shadows the builder and preview — mention that they can discard it there.',
     };
   }
 
@@ -623,7 +645,7 @@ export async function runSpacePageTool(
   }
 
   if (name === 'set_space_page_colours_from_logo') {
-    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=avatar_url,page`)).json();
+    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=avatar_url`)).json();
     const row = Array.isArray(cur) ? cur[0] : null;
     const logo = (row?.avatar_url ?? '') as string;
     if (!logo) {
@@ -634,7 +656,7 @@ export async function runSpacePageTool(
     if (!scheme || (!scheme.accent && scheme.ground === 'white')) {
       return { ok: false, error: `Couldn't read a colour from ${spaceName}'s logo — it may be black and white. Ask them what colour they want.` };
     }
-    const page = (row?.page ?? {}) as Record<string, unknown>;
+    const { page } = await readSpacePage();
     const previous = { accent: page.accent ?? null, ground: page.surface ?? null };
     if (scheme.accent) page.accent = scheme.accent; else delete page.accent;
     if (scheme.ground === 'warm') delete page.surface; else page.surface = scheme.ground;

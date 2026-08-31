@@ -134,6 +134,8 @@ export async function rehostWebImage(
 
 export const PLACE_SECTIONS = ['about', 'services', 'goods', 'contact', 'facilities', 'home_cover', 'profile_photo'];
 
+import { readPageState, writePageDraft } from './pageDraft.ts';
+
 type SbFn = (path: string, init?: RequestInit) => Promise<Response>;
 
 /** Put an already-rehosted image onto a page: a tab's photo slot, the Home
@@ -151,8 +153,11 @@ export async function placeImage(
     });
     return { ok: true, change: table === 'profiles' ? 'set their profile photo' : 'set its logo/profile photo' };
   }
-  const cur = await (await sb(`${table}?id=eq.${id}&select=page`)).json();
-  const page = ((Array.isArray(cur) ? cur[0]?.page : null) ?? {}) as Record<string, unknown>;
+  // Page-shaped placements land in the DRAFT (founder 2026-08-31) — the
+  // person publishes. The profile-photo branch above stays live: an avatar
+  // is identity, not part of the page draft's scope.
+  const subject = table === 'spaces' ? 'space' as const : 'profile' as const;
+  const { page } = await readPageState(sb, subject, id);
   if (section === 'home_cover') {
     page.cover = url; page.coverStyle = 'photo'; page.coverPos = 50;
   } else {
@@ -160,9 +165,7 @@ export async function placeImage(
     sections[section] = { ...sections[section], image: url, imagePos: undefined, imageSize: undefined };
     page.sections = sections;
   }
-  await sb(`${table}?id=eq.${id}`, {
-    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ page }),
-  });
+  await writePageDraft(sb, subject, id, { page });
   return { ok: true, change: section === 'home_cover' ? 'made it the Home cover' : `put it on the ${section} tab` };
 }
 

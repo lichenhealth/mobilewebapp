@@ -10,13 +10,14 @@ import type { ContactInfo } from '../components/ContactFields';
  *  overwrite an edit Claude had made in the chat. Now the builder writes
  *  here as you type, and the live page only moves when someone publishes.
  *
- *  ⚠ Claude still writes STRAIGHT TO LIVE (founder's call: "you can ask
- *  Claude: revert this change and you can go back" — and the two modes are
- *  meant to feel different, chat as a command, the builder as a canvas). So
- *  a draft can be branched from a version of the page that Claude has since
- *  moved on from. `base` is what it was branched from, and publish compares
- *  it against live before writing — that comparison is the only thing
- *  standing between a draft and someone's lost work. */
+ *  Claude writes to THIS SAME DRAFT now too (founder 2026-08-31, reversing
+ *  the 2026-08-29 straight-to-live call: "In the chat claude confirms the
+ *  change made... then there's a preview, and/or publish button"). The edge
+ *  functions' pageDraft.ts is the server-side twin of this file. The one
+ *  live-writing exception is restore_page_version, an explicit undo of the
+ *  live page. `base` is what a draft branched from, and publish compares it
+ *  against live before writing — that comparison is the only thing standing
+ *  between a draft and someone's lost work. */
 export interface PageDraft {
   page: PageMeta;
   description?: string;
@@ -87,6 +88,41 @@ export function normalize(d: PageDraft): string {
 }
 
 export const sameDraft = (a: PageDraft, b: PageDraft): boolean => normalize(a) === normalize(b);
+
+/** Make the draft live (founder 2026-08-31 — publish from the chat's button
+ *  as well as the builder's). Guarded the same way the builder's publish is:
+ *  if the live page moved since the draft branched, refuse rather than
+ *  overwrite, and send the person to the builder to look. Writes only the
+ *  draft's own scope (page, and contact when the draft carries it) — never
+ *  handle/description/visibility, which belong to their own saves. */
+export async function publishDraft(type: DraftSubject, id: string): Promise<{ ok: boolean; error?: string }> {
+  const stored = await readDraft(type, id);
+  if (!stored) return { ok: false, error: 'Nothing to publish — there is no unpublished draft.' };
+  const table = type === 'space' ? 'spaces' : 'profiles';
+  const { data, error: readErr } = await supabase.from(table).select('page, contact').eq('id', id).maybeSingle();
+  if (readErr) return { ok: false, error: 'Could not read the live page: ' + readErr.message };
+  const live = (data ?? {}) as { page?: PageMeta | null; contact?: ContactInfo | null };
+  // Compare only the keys the base actually recorded — a draft branched
+  // before contact entered its scope must not false-alarm on contact.
+  const scoped = (d: PageDraft, liveSide: boolean): PageDraft => ({
+    page: (liveSide ? live.page : d.page) ?? {},
+    ...(stored.base.contact !== undefined
+      ? { contact: (liveSide ? live.contact : d.contact) ?? {} }
+      : {}),
+  });
+  if (normalize(scoped(stored.base, false)) !== normalize(scoped(stored.base, true))) {
+    return {
+      ok: false,
+      error: 'The live page has changed since this draft began — open the builder to look before publishing, so nothing gets written over.',
+    };
+  }
+  const patch: Record<string, unknown> = { page: stored.draft.page ?? {} };
+  if (stored.draft.contact !== undefined) patch.contact = stored.draft.contact;
+  const { error } = await supabase.from(table).update(patch).eq('id', id);
+  if (error) return { ok: false, error: 'Could not publish: ' + error.message };
+  await clearDraft(type, id);
+  return { ok: true };
+}
 
 /** ── Version history ──────────────────────────────────────────────────────
  *  Every write to a live page snapshots what it replaced — recorded by a

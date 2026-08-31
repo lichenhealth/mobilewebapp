@@ -326,6 +326,20 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     void hasClaudeFeedActivity(me).then(setClaudeInUse);
   }, [me]);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
+  // PREVIEW THE DRAFT (founder 2026-08-31): ?draft=1 renders the unpublished
+  // draft in place of the live page — the chat's Preview button and the
+  // builder's preview both open this. RLS keeps page_drafts to stewards, so
+  // anyone else quietly sees the live page instead.
+  const draftPreview = searchParams.get('draft') === '1';
+  const [draftOverlay, setDraftOverlay] = useState<PageDraft | null>(null);
+  useEffect(() => {
+    if (!draftPreview || !me || !id) { setDraftOverlay(null); return; }
+    let live = true;
+    void readDraft('space', id)
+      .then((d) => { if (live) setDraftOverlay(d ? d.draft : null); })
+      .catch(() => { if (live) setDraftOverlay(null); });
+    return () => { live = false; };
+  }, [draftPreview, me, id]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -1297,8 +1311,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         avatarUrl={space.avatar_url}
         description={space.description}
         location={space.location}
-        contact={contact}
-        page={pageMeta}
+        contact={draftOverlay?.contact ?? contact}
+        page={draftOverlay?.page ?? pageMeta}
+        draftBanner={!!draftOverlay}
         preview={previewing}
         signedIn={!!me && !trialView && !embedView}
         // A space's page is a gateway into Lichen (founder 2026-08-17): a
@@ -1643,6 +1658,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <div className="prof__save-row">
             <button className="btn btn-primary" onClick={save} disabled={saving}>
               {saving ? 'Publishing…' : draftPending ? 'Publish changes' : 'Publish'}
+            </button>
+            {/* Preview in a NEW TAB (founder 2026-08-31): the draft as the
+                open web would see it, no builder chrome — close the tab to
+                come back. */}
+            <button
+              className="btn" type="button"
+              onClick={() => window.open(`/spaces/${id}?preview=1&draft=1`, '_blank')}
+            >
+              ↗ Preview
             </button>
             {draftPending && (
               <button

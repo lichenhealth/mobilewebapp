@@ -23,6 +23,7 @@ import './Profile.css';
 import './MemberProfile.css';
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import { type ContactInfo } from '../components/ContactFields';
+import { readDraft, type PageDraft } from '../lib/pageDrafts';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -106,6 +107,19 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   // PAGE, not as an app you can steer — a view toggle in there would just
   // navigate the frame out from under the conversation.
   const embedded = params.get('embed') === '1';
+  // PREVIEW THE DRAFT (founder 2026-08-31): ?draft=1 renders the member's
+  // unpublished draft in place of the live page — the chat's Preview button
+  // opens this. RLS keeps page_drafts to the owner; others see live.
+  const draftPreview = params.get('draft') === '1';
+  const [draftOverlay, setDraftOverlay] = useState<PageDraft | null>(null);
+  useEffect(() => {
+    if (!draftPreview || !me || me !== id) { setDraftOverlay(null); return; }
+    let live = true;
+    void readDraft('profile', id)
+      .then((d) => { if (live) setDraftOverlay(d ? d.draft : null); })
+      .catch(() => { if (live) setDraftOverlay(null); });
+    return () => { live = false; };
+  }, [draftPreview, me, id]);
   const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
   useEffect(() => {
     let live = true;
@@ -427,9 +441,10 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
             </button>
           );
         } : undefined}
-        contact={pub.contact}
+        contact={draftOverlay?.contact ?? pub.contact}
         bizLocations={bizLocs}
-        page={pub.page}
+        page={draftOverlay?.page ?? pub.page}
+        draftBanner={!!draftOverlay}
         preview={previewing}
         signedIn={!!me}
         feed={memberFeed}

@@ -17,6 +17,7 @@
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
 import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/spaceEdit.ts';
+import { DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage } from '../_shared/webRead.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
 
@@ -504,6 +505,12 @@ Deno.serve(async (req) => {
         : await runLookup(c.name ?? '', trigger.sender_id, sb);
       if ((out as { ok?: boolean; change?: string }).ok && (out as { change?: string }).change) {
         changes.push((out as { change: string }).change);
+        // Page writes land in the DRAFT now (founder 2026-08-31) — make sure
+        // the model says so instead of announcing a live change. A suggestion
+        // room has no Publish button, so the builder is the door it names.
+        if (isSpacePageTool(c.name ?? '') && c.name !== 'get_space_page' && c.name !== 'list_space_page_versions') {
+          (out as Record<string, unknown>).saved_to = DRAFT_NOTE;
+        }
       }
       results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(out) });
     }

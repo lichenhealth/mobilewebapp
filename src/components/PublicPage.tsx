@@ -193,6 +193,9 @@ export interface PublicPageProps {
   bizLocations?: { label: string; location: string }[];
   /** Owner previewing their own page. */
   preview?: boolean;
+  /** True when the page being shown is an unpublished DRAFT (?draft=1 with a
+   *  real draft behind it) — the preview banner says so honestly. */
+  draftBanner?: boolean;
   /** A signed-in Lichen member viewing this in-app (founder 2026-08-03) —
    *  they keep their normal app chrome and skip the guest-facing invite
    *  doors/section; their real join/trust controls arrive via `children`. */
@@ -414,14 +417,24 @@ export default function PublicPage(props: PublicPageProps) {
   const firstContentDoor = asGuest
     ? 'home'
     : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : undefined));
-  const [tab, setTab] = useState(firstContentDoor ?? navItems[0]?.id ?? 'about');
+  // SMART PREVIEW LANDING (founder 2026-08-31): ?ptab=<id> opens the page on
+  // one tab — the chat's Preview button passes the tab its edit touched, so
+  // "push the About photo down" previews on About, not Home. Read from the
+  // URL directly (this component also renders in iframes and on custom
+  // domains); an id that doesn't exist here is simply ignored.
+  const wantTab = (() => {
+    try { return new URLSearchParams(window.location.search).get('ptab') ?? ''; } catch { return ''; }
+  })();
+  const wantTabValid = !!wantTab && navItems.some((n) => n.id === wantTab);
+  const [tab, setTab] = useState(wantTabValid ? wantTab : (firstContentDoor ?? navItems[0]?.id ?? 'about'));
   // Re-land when the VIEW ITSELF changes (Lichen View ⇄ Public View swaps
   // ?preview= in place): the old tab may not exist on the other side, which
   // used to leave a blank page until a hand refresh re-initialized state.
   const relandKey = asGuest ? 'guest' : 'member';
   const relandInit = useRef(relandKey);
   // A tab the VIEWER chose sticks; only automatic landings may be replaced.
-  const touched = useRef(false);
+  // A ?ptab= landing counts as chosen — the person asked for that tab.
+  const touched = useRef(wantTabValid);
   const chooseTab = (id: string) => { touched.current = true; setTab(id); };
   useEffect(() => {
     if (relandInit.current === relandKey) return;
@@ -611,7 +624,11 @@ export default function PublicPage(props: PublicPageProps) {
       }}
     >
       {props.preview && (
-        <p className="ppage__preview">Preview — this is what the open web sees.</p>
+        <p className="ppage__preview">
+          {props.draftBanner
+            ? 'Previewing the unpublished draft — the live page still shows what was last published.'
+            : 'Preview — this is what the open web sees.'}
+        </p>
       )}
       {trying && !props.preview && (
         <p className="ppage__preview">

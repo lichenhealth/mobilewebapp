@@ -28,6 +28,7 @@ import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
 import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/spaceEdit.ts';
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage } from '../_shared/webRead.ts';
+import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
@@ -505,8 +506,9 @@ Deno.serve(async (req) => {
     const cats = await (await sb('categories?select=id,name,domain&domain=in.(service,good)&order=sort')).json();
     const lines = (Array.isArray(cats) ? cats : [])
       .map((c: { id: string; name: string; domain: string }) => `${c.id} = ${c.name} (${c.domain})`);
-    editRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR PAGE. They have turned on "Let Claude edit my page directly", so the tools you have write straight to their own public page. How to hold that:'
+    editRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR PAGE. They have turned on "Let Claude edit my page directly", so the tools you have write to their page. How to hold that:'
       + '\n- Make the change when they ask for one. Do not hand back a draft to paste — that is what the tools are for.'
+      + '\n- YOUR EDITS LAND IN AN UNPUBLISHED DRAFT, not on the live page (founder 2026-08-31 — draft and publish, like the builder). After editing, say the change is in their draft and point at the Preview and Publish buttons that appear under your reply. Never say a change is live until they publish it.'
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
@@ -516,8 +518,9 @@ Deno.serve(async (req) => {
 
   let spaceEditRule = '';
   if (canSpaceEdit) {
-    spaceEditRule = `\n\nYOU CAN ACTUALLY CHANGE ${spaceName.toUpperCase()}'S PAGE. The member stewards it, its assistant switch is on, and they have turned on "Let Claude edit my page directly" — so your space tools write straight to ITS public page (never to the member's own page). How to hold that:`
+    spaceEditRule = `\n\nYOU CAN ACTUALLY CHANGE ${spaceName.toUpperCase()}'S PAGE. The member stewards it, its assistant switch is on, and they have turned on "Let Claude edit my page directly" — so your space tools write to ITS page (never to the member's own page). How to hold that:`
       + '\n- Make the change when they ask for one. Do not hand back a draft to paste — that is what the tools are for.'
+      + '\n- YOUR EDITS LAND IN AN UNPUBLISHED DRAFT, not on the live page (founder 2026-08-31 — draft and publish, like the builder). After editing, say the change is in the draft and point at the Preview and Publish buttons that appear under your reply. Never say a change is live until someone publishes it.'
       + '\n- Say plainly what you changed, and what it said before, every single time. A change you did not name is a broken promise.'
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach the space\'s PUBLIC page and description only. You cannot touch its members, its treasury, its location pin, or any other space — do not offer to.'
@@ -568,38 +571,30 @@ Deno.serve(async (req) => {
       + '\n- on_call belongs to active caregivers only; the tool refuses otherwise — do not offer it to anyone else.';
   }
 
+  // DRAFT-FIRST (founder 2026-08-31): the assistant's page edits land in the
+  // page_drafts row the manual builder shares, and the PERSON publishes —
+  // from the builder, or from the Preview/Publish buttons the chat renders.
   const readPage = async () => {
-    const cur = await (await sb(`profiles?id=eq.${profile_id}&select=page,contact`)).json();
-    const r = Array.isArray(cur) ? cur[0] : null;
-    return {
-      page: (r?.page ?? {}) as Record<string, unknown>,
-      contact: (r?.contact ?? {}) as Record<string, string>,
-    };
+    const st = await readPageState(sb, 'profile', profile_id);
+    return { page: st.page, contact: st.contact };
   };
   const patchMe = (body: Record<string, unknown>) =>
-    sb(`profiles?id=eq.${profile_id}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body),
-    });
+    writePageDraft(sb, 'profile', profile_id,
+      body as { page?: Record<string, unknown>; contact?: Record<string, string> | null });
   const catNames = async (ids: string[]) => {
     const found = await (await sb(`categories?select=id,name,domain&id=in.(${ids.map(encodeURIComponent).join(',')})`)).json();
     return (Array.isArray(found) ? found : []) as { id: string; name: string; domain: string }[];
   };
 
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space,
-  // never a model-supplied id.
+  // never a model-supplied id. Draft-first like the member pair above.
   const readSpacePage = async () => {
-    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=page,contact,description`)).json();
-    const r = Array.isArray(cur) ? cur[0] : null;
-    return {
-      page: (r?.page ?? {}) as Record<string, unknown>,
-      contact: (r?.contact ?? {}) as Record<string, string>,
-      description: (r?.description ?? null) as string | null,
-    };
+    const st = await readPageState(sb, 'space', spaceId!);
+    return { page: st.page, contact: st.contact };
   };
   const patchSpace = (body: Record<string, unknown>) =>
-    sb(`spaces?id=eq.${spaceId}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body),
-    });
+    writePageDraft(sb, 'space', spaceId!,
+      body as { page?: Record<string, unknown>; contact?: Record<string, string> | null });
 
   // Images the system ITSELF surfaced from a member-linked page this
   // exchange — the only set save_web_image may touch (the pasted-photo
@@ -1013,6 +1008,48 @@ Deno.serve(async (req) => {
   // the daily cap, the same as a conversation, and the usage is summed.
   const MAX_TOOL_ROUNDS = 4;
   const changes: string[] = [];
+
+  // WHICH TAB DID THE EDIT LAND ON (founder 2026-08-31: the chat's Preview
+  // button is "smart enough that it takes you to the page/content in
+  // question"). An ALLOWLIST, not a blocklist: a future tool left out just
+  // means no buttons under that reply — the words still say it was drafted —
+  // while a blocklist would put Publish buttons under calendar edits.
+  const SECTION_TABS = ['about', 'services', 'goods', 'contact', 'facilities'];
+  const TAB_BY_TOOL: Record<string, string> = {
+    set_tagline: 'home', set_space_tagline: 'home',
+    set_home_summary: 'home', set_space_home_summary: 'home',
+    set_story: 'about', set_space_story: 'about',
+    set_contact_field: 'contact', set_space_contact_field: 'contact',
+    set_space_practical: 'contact',
+    set_space_offerings: 'services',
+    set_space_facilities: 'facilities',
+    move_photo_to_home_cover: 'home', move_space_photo_to_home_cover: 'home',
+    set_space_cover_style: 'home', set_space_page_colours: 'home',
+    set_space_page_colours_from_logo: 'home', set_space_join_level: 'home',
+    set_space_page_visibility: 'home',
+  };
+  const pageEdits: { subject: 'space' | 'profile'; tab: string }[] = [];
+  const pageEditTab = (name: string, input: Record<string, unknown>): { subject: 'space' | 'profile'; tab: string } | null => {
+    const subjectOf = (): 'space' | 'profile' => (isSpacePageTool(name) || (canSpaceEdit && !!spaceId) ? 'space' : 'profile');
+    const sec = (v: unknown, fb = 'home') => (SECTION_TABS.includes(String(v ?? '')) ? String(v) : fb);
+    if (TAB_BY_TOOL[name]) return { subject: subjectOf(), tab: TAB_BY_TOOL[name] };
+    switch (name) {
+      case 'move_section_photo': case 'move_space_section_photo':
+        return { subject: subjectOf(), tab: sec(input.to_section) };
+      case 'set_space_section_photo_position':
+        return { subject: subjectOf(), tab: sec(input.section) };
+      case 'set_page_tab': case 'set_space_page_tab': {
+        const t = String(input.title ?? '').toLowerCase().trim();
+        return { subject: subjectOf(), tab: SECTION_TABS.includes(t) ? t : 'home' };
+      }
+      case 'place_uploaded_photo': case 'save_web_image': {
+        const s = String(input.section ?? '');
+        if (s === 'profile_photo') return null; // identity — written live, not drafted
+        return { subject: subjectOf(), tab: s === 'home_cover' ? 'home' : sec(s) };
+      }
+    }
+    return null;
+  };
   let inputTokens = 0;
   let outputTokens = 0;
   let round = 0;
@@ -1063,7 +1100,14 @@ Deno.serve(async (req) => {
     const results = [];
     for (const c of calls) {
       const out = await runTool(c.name ?? '', c.input ?? {} as Record<string, string & string[]>);
-      if (out.ok && out.change) changes.push(out.change);
+      if (out.ok && out.change) {
+        changes.push(out.change);
+        const edit = pageEditTab(c.name ?? '', (c.input ?? {}) as Record<string, unknown>);
+        if (edit) {
+          pageEdits.push(edit);
+          (out as Record<string, unknown>).saved_to = DRAFT_NOTE;
+        }
+      }
       results.push({
         type: 'tool_result', tool_use_id: c.id,
         content: JSON.stringify(out),
@@ -1103,8 +1147,20 @@ Deno.serve(async (req) => {
     return json({ ok: true, skipped: 'empty-reply' });
   }
 
+  // A reply that carried page edits wears a page_edit marker so the client
+  // can hang Preview and Publish buttons on it (founder 2026-08-31). One
+  // marker, the LAST tab touched — the smart Preview lands there.
+  const lastEdit = pageEdits[pageEdits.length - 1];
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread,
+    ...(lastEdit ? {
+      attachments: [{
+        type: 'page_edit',
+        subject: lastEdit.subject,
+        id: lastEdit.subject === 'space' ? spaceId : profile_id,
+        tab: lastEdit.tab,
+      }],
+    } : {}),
   }) });
 
   // UVA seed: record the silicon contribution with its exact cost.
