@@ -1,8 +1,10 @@
+/* No min-height stretch (founder 2026-08-31: "get rid of the open space —
+   it serves no purpose and puts the text box below the fold"): the composer
+   sits right under whatever the thread holds, even one greeting line. */
 .afeed {
   display: flex; flex-direction: column;
   padding: var(--s-4) var(--s-5);
   max-width: 640px; margin: 0 auto;
-  min-height: 100%;
 }
 
 .afeed__head {
@@ -36,8 +38,8 @@
 }
 .afeed__search button { color: var(--ink-faint); display: inline-flex; }
 
-.afeed__list { display: flex; flex-direction: column; gap: var(--s-4); flex: 1; padding-bottom: var(--s-4); }
-.afeed__muted { color: var(--ink-muted); font-size: 13px; text-align: center; padding: var(--s-6) 0; }
+.afeed__list { display: flex; flex-direction: column; gap: var(--s-4); padding-bottom: var(--s-4); }
+.afeed__muted { color: var(--ink-muted); font-size: 13px; text-align: center; padding: var(--s-4) 0; }
 
 /* Two sides of the conversation (founder 2026-08-24): Claude's entries sit
    LEFT, the member's sit RIGHT — the messenger grammar, so a glance tells
@@ -119,19 +121,34 @@
 .afeed__ref:hover { border-color: var(--blue); }
 
 /* The threads — the assistant mirrors the platform, so work stays where it
-   belongs (founder 2026-08-11). */
-.afeed__threads { display: flex; gap: 6px; margin: var(--s-2) 0 var(--s-3); }
+   belongs (founder 2026-08-11). Since 2026-08-31 each thread is its
+   SECTION'S ICON in a circle (the doors grammar), gray until that section
+   holds something of the member's, with its message tally riding the upper
+   right like a TopBar badge. The badge overhangs the circle, so the row
+   needs a little headroom instead of clipping it. */
+.afeed__threads { display: flex; gap: 10px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
 .afeed__thread {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  padding: 6px 12px; border-radius: var(--r-full);
-  border: 1px solid var(--bone-edge); background: var(--bone-warm);
-  font-size: 12px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+  position: relative; width: 46px; height: 46px; flex-shrink: 0;
+  border-radius: 50%; border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; font-family: inherit;
 }
 .afeed__thread.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
+/* Not set up yet — the glyph reads gray even while selected (the ring says
+   "you're here", the gray says "nothing here yet"). */
+.afeed__thread.is-off { color: var(--ink-faint); }
 .afeed__thread em {
-  font-style: normal; font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint);
+  position: absolute; top: -5px; right: -5px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  background: var(--peach); color: var(--bone-warm);
+  border-radius: var(--r-full); border: 2px solid var(--bone);
+  font-style: normal; font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.afeed__thread.is-on em { color: var(--peach-deep); }
+/* A space's build thread wears the space's own face in the same circle. */
+.afeed__thread--space { padding: 0; overflow: visible; border-width: 2px; }
+.afeed__thread--space > :first-child { border-radius: 50%; overflow: hidden; }
 
 /* Snapshot, hosted inside the profile thread rather than a page of its own —
    a composed card in the thread's own rhythm (founder 2026-08-20: the bare
