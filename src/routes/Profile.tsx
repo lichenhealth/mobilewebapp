@@ -36,6 +36,7 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
+import BuilderPreview from '../components/BuilderPreview';
 import type { PageTab } from '../lib/pageTabs';
 import { type PageMeta } from '../components/PublicPage';
 
@@ -442,6 +443,8 @@ export default function Profile() {
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(false);
   const [webMsg, setWebMsg] = useState('');
+  // Reloads the builder-side preview frame; bumped on Save (BuilderPreview).
+  const [prevNonce, setPrevNonce] = useState(0);
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const setPage = (patch: Partial<PageMeta>) => setPageMeta((m) => ({ ...m, ...patch }));
   // Your vanity address (founder 2026-08-03) — lichen.health/<handle>
@@ -483,6 +486,8 @@ export default function Profile() {
     } else {
       setSavedHandle(h);
       setWebMsg('Saved.');
+      // The preview beside the builder shows saves — bring it current.
+      setPrevNonce((n) => n + 1);
     }
   }
   /** Crossing to build-with-Claude carries your manual work (founder
@@ -758,7 +763,7 @@ export default function Profile() {
   const iCareFor = care.filter((c) => c.caregiver_id === meId); // people I care for
 
   return (
-    <div className="prof is-adminview">
+    <div className={'prof is-adminview' + (openSections.has('public-page') ? ' is-building' : '')}>
       <div className="prof__head">
         <button
           className="prof__avatar-btn"
@@ -877,6 +882,11 @@ export default function Profile() {
           (founder consolidation): your Lichen profile first, the open-web
           page as the add-on it is. */}
       <CollapsibleSection id="public-page" title="Add a public page" meta="like a website, visible to the open web" open={openSections.has('public-page')} onToggle={() => toggleSection('public-page')}>
+        {/* Builder left, page right (founder 2026-08-22) — the manual twin
+            of the assistant thread's split. Below 1024px the form stands
+            alone and the preview is a door. */}
+        <div className="build-split">
+        <div className="build-split__form">
           <p className="prof__care-lead">
             This is what someone finds when they search your name or follow a link — no Lichen
             account needed. Everything deeper (recommending you, booking, messaging, your
@@ -1032,7 +1042,16 @@ export default function Profile() {
             )}
             {webMsg && <span className="prof__msg">{webMsg}</span>}
           </div>
-
+        </div>
+        {user && (
+          <BuilderPreview
+            frameSrc={`/members/${user.id}?preview=1&embed=1`}
+            tabHref={savedHandle ? `/${savedHandle}?preview=1` : `/members/${user.id}?preview=1`}
+            nonce={prevNonce}
+            onRefresh={() => setPrevNonce((n) => n + 1)}
+          />
+        )}
+        </div>
       </CollapsibleSection>
 
 

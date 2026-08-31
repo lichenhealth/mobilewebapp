@@ -49,6 +49,7 @@ import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
+import BuilderPreview from '../components/BuilderPreview';
 import HomeSummaryButton from '../components/HomeSummaryButton';
 import CurrentcyCard from '../components/CurrentcyCard';
 import { spacePresentCount, spacePresentList, type PresentMember } from '../lib/presenceApi';
@@ -252,6 +253,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  // Reloads the builder-side preview frame; bumped on Save (BuilderPreview).
+  const [prevNonce, setPrevNonce] = useState(0);
   const [error, setError] = useState('');
   const [retireMode, setRetireMode] = useState<'offline' | 'delete' | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -634,6 +637,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       await updateSpaceProfile(space.id, patch);
       setMsg(note);
       setTimeout(() => setMsg(''), 2000);
+      // The preview beside the builder shows saves — bring it current.
+      setPrevNonce((n) => n + 1);
       await load();
     } catch (e) {
       setError((e as Error)?.message || 'Could not save. Please try again.');
@@ -1061,7 +1066,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }
 
   return (
-    <div className={'prof is-space' + (backstage ? ' is-adminview' : '')}>
+    <div className={'prof is-space' + (backstage ? ' is-adminview' : '') + (backstage && openSections.has('about') ? ' is-building' : '')}>
       {adminBar}
       <div className="prof__head">
         <div className="sprof__avatar-wrap">
@@ -1148,6 +1153,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
       {adminTools && (
         <CollapsibleSection id="about" title="Public Profile Builder" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
+          {/* Builder left, page right (founder 2026-08-22) — same split the
+              member builder and the assistant thread wear. */}
+          <div className="build-split">
+          <div className="build-split__form">
           <BuildModeSplit back={`/spaces/${id}?manage=1#about`} space={{ id: space.id, name: space.name }} />
           <div className="prof__field">
             <label className="prof__label">Name</label>
@@ -1358,6 +1367,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {saving ? 'Saving…' : 'Save'}
             </button>
             {msg && <span className="prof__msg">{msg}</span>}
+          </div>
+          </div>
+          <BuilderPreview
+            frameSrc={`/spaces/${space.id}?preview=1&embed=1`}
+            tabHref={`/spaces/${space.id}?preview=1`}
+            nonce={prevNonce}
+            onRefresh={() => setPrevNonce((n) => n + 1)}
+          />
           </div>
         </CollapsibleSection>
       )}
