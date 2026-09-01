@@ -17,6 +17,28 @@
   scrollbar-width: thin;
 }
 
+/* Search rides the top and stays put while the grid scrolls under it
+   (founder 2026-08-31). Opaque, or emoji scroll up through its gaps. */
+.emoji-pop__search {
+  position: sticky; top: calc(-1 * var(--s-3)); z-index: 2;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bone-warm);
+  margin: calc(-1 * var(--s-3)) calc(-1 * var(--s-3)) var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--bone-edge);
+}
+.emoji-pop__search input {
+  flex: 1; min-width: 0; border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  background: var(--bone); padding: 6px 12px; font: inherit; font-size: 13px;
+  color: var(--ink); outline: 0;
+}
+.emoji-pop__search input:focus { border-color: var(--peach); }
+.emoji-pop__search button {
+  border: 0; background: none; cursor: pointer; color: var(--ink-faint);
+  font-size: 16px; line-height: 1; padding: 2px 4px;
+}
+.emoji-pop__none { font-size: 12px; color: var(--ink-muted); text-align: center; padding: var(--s-4) 0; }
+
 .emoji-pop__section + .emoji-pop__section { margin-top: var(--s-3); }
 
 .emoji-pop__label {
