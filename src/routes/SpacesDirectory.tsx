@@ -44,9 +44,11 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
   const me = user?.id ?? '';
   const copy = KIND_COPY[kind];
   const kindWord = kind === 'organization' ? 'organization' : kind;
-  // Creation lives here only for groups; the other kinds are created from
-  // Profile (organization/community) or Maps (place), so no empty door.
-  const canCreate = kind === 'group' && !!user;
+  // Creation lives here for groups and, since 2026-08-31, communities
+  // (founder: "I want to add a community and there's no plus button").
+  // Organizations are still created from Profile, places from Maps — those
+  // kinds keep no door here.
+  const canCreate = (kind === 'group' || kind === 'community') && !!user;
   const assistantSection = kind === 'community' ? 'communities'
     : kind === 'group' ? 'groups'
     : kind === 'organization' ? 'organizations' : 'places';
@@ -267,7 +269,7 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Name your group"
+                placeholder={`Name your ${kindWord}`}
                 onKeyDown={(e) => { if (e.key === 'Escape') { setCreating(false); setNewName(''); } }}
               />
               <button
@@ -276,7 +278,7 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    const gid = await createSpaceWithLocation(me, newName.trim(), 'group', '', null, null);
+                    const gid = await createSpaceWithLocation(me, newName.trim(), kind, '', null, null);
                     navigate(`/spaces/${gid}`);
                   } catch (e) { console.error(e); setBusy(false); }
                 }}
@@ -289,7 +291,12 @@ export default function SpacesDirectory({ kind }: { kind: SpaceKind }) {
             </div>
           )}
           <p className="sdir__create-hint">
-            Standalone is fine — a group can join a community later from its own page.
+            {kind === 'community'
+              // The identities-vs-communities doctrine, at the door where a
+              // community is born (founder 2026-08-20: a community needs
+              // human work; an identity asks none).
+              ? 'A community is a circle you tend — members who actually engage, with you as its first steward.'
+              : 'Standalone is fine — a group can join a community later from its own page.'}
           </p>
         </div>
       )}
