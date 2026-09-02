@@ -89,12 +89,18 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
   perks/benefits to donors circle." Page redesign v2 shipped ~2026-09-01
   (/founders-circle static page; copy drafts in ~/Downloads).
 - **Pilot land partnership** = the other named next step ("research
-  efficacy of the model"). Live prospect: **Four Winds Wholeness Sanctuary
-  + Audacity Lab** — deck at lichen.health/weave/audacitylabs-4winds,
-  working gdoc shared with Andrea Pomarico + Steve Dobo; open items:
-  homestead date (1882/1888/1892), Steve's corrections, AFMOCON number,
-  Andrea's owner-financing terms, whether to passphrase-gate while the
-  $4.8M figure is live. Framing: first property of **Lichen's Land Trust**.
+  efficacy of the model"). Live prospect: **Four Winds Wholeness
+  Sanctuary** — Andrea Pomarico is gathering a COALITION of nonprofits to
+  steward the property. Canonical deck since 2026-09-01:
+  **lichen.health/4winds** (stewardship-circle orientation — what Lichen
+  is + its role; struck seats for healing/education/operations partners;
+  NO financial content by design). It supersedes
+  /weave/audacitylabs-4winds (308s there now); the old trifecta deck's
+  gdoc mirror (Andrea + Steve Dobo) is historical. Old open items that
+  still matter if that content returns anywhere: homestead date
+  (1882/1888/1892), Steve's Audacity Lab corrections, AFMOCON number,
+  Andrea's owner-financing terms. Framing: first property held in a
+  purpose-formed land trust.
 - **Gaia, Inc.** — founding media partner framing ("New Earth Living
   Resonance Site"); Four Winds approved for Gaia's Partnership Program
   2026-06-12 (contact: Sierra Samuel). Separate retreat-property proposal
@@ -115,7 +121,7 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
 | "Lichen Pitch Deck" outline | gdoc `1UHzP444yd8FLqpL7qcvJvQ7kee_jphUWRUTuP5KO-8I` | July 2026, 8 slides → merges into Gaia/Four Winds brief |
 | "Lichen Weave" narrative | gdoc `1BDCkQSiz3HyWS1z3ZlfIkCEHDgcoCPXE3XMOTB-j4j8` | The general weave-deck script; data-ownership + economy slides |
 | WeavePitch deck system | `lichen-health` repo (`WeavePitch.astro` + `EcosystemStack.astro`) | Same opening every deck (literal /about copy), `slot="weave"` for the partner half; alpha badges; struck-seat pattern; no financial claims without founder's explicit go-ahead |
-| Four Winds deck (reference instance) | lichen.health/weave/audacitylabs-4winds + shared gdoc | The one to copy |
+| Four Winds circle deck (canonical) | lichen.health/4winds | Supersedes /weave/audacitylabs-4winds (308) — orientation for the steward coalition, no financials |
 | HJC × Mons Sana deck | Drive pptx `1unYR0OP01yNbCkmwu729FPAzDuGxA5L3` | Jan 2026; verify currency before reuse |
 | Figma pitch deck | Figma | Narratives: Founder Burnout, Platte County FD, "a member profile of her own" |
 | Audited public narrative | lichen.health /about /care /business /platform /economy | Safe source for public claims |
