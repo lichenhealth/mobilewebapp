@@ -131,7 +131,9 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
 ## Honesty rules for every deck (standing)
 
 1. Claims about the platform come from the audited website or APP_OVERVIEW.md
-   — alpha badges on, "what's built" never inflated (the State-of-Platform
+   — alpha badges on, "what's built" never inflated. All five ecosystem
+   cards read ALPHA as of 2026-09-01 (Business graduated from In
+   Development on the strength of the donation/subsidy policy work) (the State-of-Platform
    slide framing: full backend-supported Community and Concierge v1; basic
    algorithm for the new economy; a container alpha users inform).
 2. No financial figures without the founder's explicit go-ahead, per deck.
