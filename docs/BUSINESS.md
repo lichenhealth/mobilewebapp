@@ -101,6 +101,21 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
   (1882/1888/1892), Steve's Audacity Lab corrections, AFMOCON number,
   Andrea's owner-financing terms. Framing: first property held in a
   purpose-formed land trust.
+  ⚠ REBUILT AGAIN 2026-09-01 to Andrea's synopsis brief (her structure:
+  Lichen-in-brief/fit, Galyn bio, who-it-assists, why-Four-Winds): leads
+  with EQUINE-ASSISTED THERAPY for first responders/veterans ("8,700
+  veterans in Castle Rock" — her figure) and AI SCHEDULING ("breathing
+  time for the land, animals and practitioners"); the mycelium economy is
+  DEFERRED by her explicit ask — one quiet closing paragraph only. Note:
+  this reopens the healing seat the founder struck 2026-08-08; founder
+  directed the change ("make changes based on Andrea's request").
+  Pipeline facts from Andrea (2026-08-31): Steve's two teams committed to
+  Four Winds as a permanent venue ("second Global Lab for nature-based
+  experiential research"); Steve is introducing Lichen+Andrea to an
+  international "Mycelium Network" group (his email — founder to read);
+  Linda (Bree's volunteer) moved onsite, Bree to follow when Andrea
+  leaves for Sedona; Andrea has asked Galyn for a candid
+  commitment conversation (100% in / toe-in-water / stepping out).
 - **Gaia, Inc.** — founding media partner framing ("New Earth Living
   Resonance Site"); Four Winds approved for Gaia's Partnership Program
   2026-06-12 (contact: Sierra Samuel). Separate retreat-property proposal
