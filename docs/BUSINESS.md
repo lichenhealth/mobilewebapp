@@ -106,9 +106,16 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
   with EQUINE-ASSISTED THERAPY for first responders/veterans ("8,700
   veterans in Castle Rock" — her figure) and AI SCHEDULING ("breathing
   time for the land, animals and practitioners"); the mycelium economy is
-  DEFERRED by her explicit ask — one quiet closing paragraph only. Note:
-  this reopens the healing seat the founder struck 2026-08-08; founder
-  directed the change ("make changes based on Andrea's request").
+  DEFERRED by her explicit ask. Note: this reopens the healing seat the
+  founder struck 2026-08-08; founder directed the change. THIRD PASS same
+  day (founder's synthesis, the live version): the fungus-and-algae
+  metaphor returns up front, the two platforms named plainly (Community /
+  Concierge), the Galyn×Claude lean-build story, the flow-through business
+  model (deep links: /business#philanthropic-model, /business#land-trust —
+  ProjectPage slugifies section titles, no page change needed), and the
+  land-trust ROLES: Andrea passes stewardship to the Place entity,
+  Audacity Lab = education partner, Bree stewards the mustangs' Current-cy,
+  open seats marked. Equine focus is rescued-and-gentled MUSTANGS.
   Pipeline facts from Andrea (2026-08-31): Steve's two teams committed to
   Four Winds as a permanent venue ("second Global Lab for nature-based
   experiential research"); Steve is introducing Lichen+Andrea to an
