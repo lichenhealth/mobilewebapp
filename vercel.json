@@ -86,6 +86,11 @@
       "source": "/weave",
       "destination": "/about",
       "permanent": true
+    },
+    {
+      "source": "/weave/audacitylabs-4winds",
+      "destination": "/4winds",
+      "permanent": true
     }
   ],
   "rewrites": [
