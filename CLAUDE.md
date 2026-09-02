@@ -9,6 +9,14 @@ For the dated, PR-by-PR story of how any of this got built — the "why" behind
 a non-obvious decision — see [`docs/HISTORY.md`](docs/HISTORY.md). This file
 is the current-state reference only.
 
+**Business/marketing intelligence lives in [`docs/BUSINESS.md`](docs/BUSINESS.md)**
+(founder 2026-09-01) — the CLAUDE.md pattern for the non-technical brain:
+money doctrines, policy state with pending flags, fundraising pipeline, deck
+inventory, honesty rules for decks. THE SAME RULE APPLIES: a session that
+lands a business-relevant decision (pricing, policy, a partner conversation,
+a deck shipped) folds it into BUSINESS.md as part of shipping. It's in the
+private repo on purpose — never copy its private facts to the public site.
+
 ⚠ **SESSION-START PROTOCOL — check the bug bridge** (founder 2026-08-24): the
 in-app assistants file member-reported bugs into **`dev_reports`** via their
 `file_dev_report` tool (`_shared/devReport.ts`; via = which room, member's own
