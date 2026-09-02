@@ -115,7 +115,10 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
   ProjectPage slugifies section titles, no page change needed), and the
   land-trust ROLES: Andrea passes stewardship to the Place entity,
   Audacity Lab = education partner, Bree stewards the mustangs' Current-cy,
-  open seats marked. Equine focus is rescued-and-gentled MUSTANGS.
+  open seats marked. Equine focus is rescued-and-gentled MUSTANGS; pilot focus widened
+  2026-09-01 to include PLANT MEDICINE, stated as legal via Colorado's
+  regulated Natural Medicine program (licensed facilitators, lawful
+  settings — never a bare "it's legal").
   Pipeline facts from Andrea (2026-08-31): Steve's two teams committed to
   Four Winds as a permanent venue ("second Global Lab for nature-based
   experiential research"); Steve is introducing Lichen+Andrea to an
