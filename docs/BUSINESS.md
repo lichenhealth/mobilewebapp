@@ -147,7 +147,7 @@ claude/goofy-cori-eb2846 (PR #156, docs-only).
 | "Lichen Weave" narrative | gdoc `1BDCkQSiz3HyWS1z3ZlfIkCEHDgcoCPXE3XMOTB-j4j8` | The general weave-deck script; data-ownership + economy slides |
 | WeavePitch deck system | `lichen-health` repo (`WeavePitch.astro` + `EcosystemStack.astro`) | Same opening every deck (literal /about copy), `slot="weave"` for the partner half; alpha badges; struck-seat pattern; no financial claims without founder's explicit go-ahead |
 | Four Winds circle deck (canonical) | lichen.health/4winds | Supersedes /weave/audacitylabs-4winds (308) — orientation for the steward coalition, no financials |
-| Four Winds deck gdoc mirror | gdoc `16Wii5HWFEutyNfeLYbZ-aLRZqj88-ie0xOAAIoZCDj8` | Words-only mirror of /4winds for Andrea collab (created 2026-09-02, Andrea liked the deck); founder shares; sync edits back to the page by hand |
+| Four Winds deck gdoc mirror | gdoc `1PL1p5lgKzu3TJRALG807qeni2hJmaXtjAVr1827lhBw` | Words-only mirror of /4winds for Andrea collab (2026-09-02, Andrea liked the deck; recreated same day for the role-bullet rewording — Drive connector can't edit doc bodies, only replace); founder shares; sync edits back to the page by hand. Note: founder's 09-02 trim cut the 8,700-veterans/breathing-time passage from the deck |
 | HJC × Mons Sana deck | Drive pptx `1unYR0OP01yNbCkmwu729FPAzDuGxA5L3` | Jan 2026; verify currency before reuse |
 | Figma pitch deck | Figma | Narratives: Founder Burnout, Platte County FD, "a member profile of her own" |
 | Audited public narrative | lichen.health /about /care /business /platform /economy | Safe source for public claims |
