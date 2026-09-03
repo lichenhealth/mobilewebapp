@@ -62,16 +62,16 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
         : `This invitation includes a gifted ${giftLabel} membership — Lichen is yours from the moment you sign up.`)
     : '';
 
-  // The "sweet note" — thank-you framing (founder 2026-09-03): the
-  // state-of-the-platform talk happens BEFORE the knock (AlphaGate on both
-  // knock doors); the invitation itself is gratitude for the time and
-  // feedback — with one honest line kept for people invited directly, who
-  // never passed the popup. Kept in step with Invite.tsx's DEFAULT_MISSION.
+  // The "sweet note" — welcome framing (founder 2026-09-03, second pass:
+  // "let people in"): no gate, one honest alpha line, and the Alpha Tester
+  // group as the self-selected door for those who feel called to help
+  // build. Kept in step with Invite.tsx's DEFAULT_MISSION.
   const DEFAULT_MISSION =
-    `Thanks in advance for your (precious) time, and for the invaluable feedback we'll get from Lichen's alpha `
-    + `testers. The foundation of the corrective social network and healthcare system is built, much is still in `
-    + `development, and there will be bugs along the way — those who feel called to use the network will ask for `
-    + `the features they need, and we'll implement them. We're grateful to be building it with you.`;
+    `Thanks in advance for your (precious) time. The foundation of the corrective social network and healthcare `
+    + `system is built, much is still in development, and there will be bugs along the way. Come use the network `
+    + `as it grows — and if you feel called to help build it out, let Galyn know: members who want to give `
+    + `feedback are invited into the Alpha Tester group, where suggestions become features. We're grateful to be `
+    + `building it with you.`;
   // An admin may rewrite this paragraph before sending (founder 2026-08-06:
   // "give you the boilerplate language as a template to edit"). Empty falls
   // back to the standard words.
@@ -94,7 +94,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   const missionHtml = (mission ?? '').trim()
     ? missionText.split(/\n{2,}/).filter(Boolean).map((para) =>
         `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">${esc(para)}</p>`).join('')
-    : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f"><strong>Thanks in advance</strong> for your (precious) time, and for the invaluable feedback we'll get from Lichen's alpha testers. The foundation of the <em>corrective</em> social network and healthcare system is built, much is still in development, and there will be bugs along the way — those who feel called to use the network will ask for the features they need, and we'll implement them. We're grateful to be building it with you.</p>`;
+    : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f"><strong>Thanks in advance</strong> for your (precious) time. The foundation of the <em>corrective</em> social network and healthcare system is built, much is still in development, and there will be bugs along the way. Come use the network as it grows — and if you feel called to help build it out, let Galyn know: members who want to give feedback are invited into the <strong>Alpha Tester group</strong>, where suggestions become features. We're grateful to be building it with you.</p>`;
   const noteHtml = note
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#fff;border-radius:12px;color:#4a463f">${esc(note)}</p>`
     : '';

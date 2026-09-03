@@ -5,17 +5,16 @@ import { supabase } from '../lib/supabase';
 /** The invitation's standard paragraph — kept in step with send-invite's
  *  DEFAULT_MISSION by hand. Shown as the starting text when an admin chooses
  *  to customize, so they edit the real words rather than a blank box.
- *  Thank-you framing (founder 2026-09-03): the state-of-the-platform talk
- *  happens BEFORE the knock (AlphaGate on both knock doors); the invitation
- *  itself is gratitude for the time and feedback — with one honest line kept
- *  for people invited directly, who never passed the popup. */
+ *  Welcome framing (founder 2026-09-03, second pass — "let people in"):
+ *  no gate, one honest alpha line, and the Alpha Tester group as the
+ *  self-selected door for those who feel called to help build. */
 const DEFAULT_MISSION =
-  'Thanks in advance for your (precious) time, and for the invaluable feedback '
-  + "we'll get from Lichen's alpha testers. The foundation of the corrective social "
-  + 'network and healthcare system is built, much is still in development, and there '
-  + 'will be bugs along the way — those who feel called to use the network will ask '
-  + "for the features they need, and we'll implement them. We're grateful to be "
-  + 'building it with you.';
+  'Thanks in advance for your (precious) time. The foundation of the corrective '
+  + 'social network and healthcare system is built, much is still in development, '
+  + 'and there will be bugs along the way. Come use the network as it grows — and '
+  + 'if you feel called to help build it out, let Galyn know: members who want to '
+  + 'give feedback are invited into the Alpha Tester group, where suggestions '
+  + "become features. We're grateful to be building it with you.";
 import { useAuth } from '../auth/AuthProvider';
 import './Invite.css';
 
