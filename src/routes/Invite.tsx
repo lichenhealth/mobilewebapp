@@ -4,13 +4,17 @@ import { supabase } from '../lib/supabase';
 
 /** The invitation's standard paragraph — kept in step with send-invite's
  *  DEFAULT_MISSION by hand. Shown as the starting text when an admin chooses
- *  to customize, so they edit the real words rather than a blank box. */
+ *  to customize, so they edit the real words rather than a blank box.
+ *  Thank-you framing (founder 2026-09-03): the state-of-the-platform talk
+ *  happens BEFORE the knock (AlphaGate on both knock doors); the invitation
+ *  itself is gratitude for the time and feedback — with one honest line kept
+ *  for people invited directly, who never passed the popup. */
 const DEFAULT_MISSION =
-  "We're building something different — a corrective social network. One trusted web for "
-  + 'the whole of a life: care, work and offerings, jobs, events, the places we gather, and '
-  + 'a fairer economy — made to help us actually be in relationship, not perform for one '
-  + "another. It's early, and that's the invitation: come build it with us — shape it, test "
-  + 'it, ship it — the beginning of a better world.';
+  "Thank you — for your time, and for the feedback you'll give as one of Lichen's alpha "
+  + 'testers. The foundation of the corrective social network and healthcare system is '
+  + 'built, much is still in development, and there will be bugs along the way — '
+  + "you'll suggest the features you need, and we'll implement them. We're grateful "
+  + 'to be building it with you.';
 import { useAuth } from '../auth/AuthProvider';
 import './Invite.css';
 

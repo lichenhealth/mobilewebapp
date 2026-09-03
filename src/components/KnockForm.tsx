@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import AlphaGate from './AlphaGate';
 import './KnockForm.css';
 
 /** The knock at a SPACE's door (founder 2026-08-17: a public page is a
@@ -14,19 +15,27 @@ export default function KnockForm({ spaceId, spaceName }: { spaceId: string; spa
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // The alpha-state notice stands between a filled form and a sent knock
+  // (founder 2026-09-03) — the send happens only from its "Count me in".
+  const [confirming, setConfirming] = useState(false);
 
-  async function knock(e: FormEvent) {
+  function knock(e: FormEvent) {
     e.preventDefault();
     setError('');
     if (!name.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       setError('Your name and a real email, so someone can write back.'); return;
     }
+    setConfirming(true);
+  }
+
+  async function send() {
     setBusy(true);
     const { error: err } = await supabase.functions.invoke('join-request', {
       body: { name: name.trim(), email: email.trim(), story: story.trim(), space_id: spaceId },
     });
     setBusy(false);
-    if (err) { setError('Something went wrong — try again in a moment.'); return; }
+    if (err) { setConfirming(false); setError('Something went wrong — try again in a moment.'); return; }
+    setConfirming(false);
     setSent(true);
   }
 
@@ -65,6 +74,9 @@ export default function KnockForm({ spaceId, spaceName }: { spaceId: string; spa
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? 'Sending…' : `Request to join ${spaceName}`}
       </button>
+      {confirming && (
+        <AlphaGate busy={busy} onConfirm={() => { void send(); }} onCancel={() => setConfirming(false)} />
+      )}
     </form>
   );
 }

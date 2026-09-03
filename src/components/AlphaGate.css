@@ -1,0 +1,36 @@
+.agate__overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(24, 22, 19, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--s-4, 16px);
+}
+.agate__card {
+  background: var(--bone, #f3efe9);
+  border-radius: var(--r-lg, 18px);
+  max-width: 420px; width: 100%;
+  padding: var(--s-6, 24px);
+  box-shadow: 0 18px 44px rgba(18, 24, 28, 0.28);
+}
+.agate__eyebrow {
+  font-family: var(--font-mono, monospace); font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--peach-deep, #c26a3f); margin: 0 0 6px;
+}
+.agate__title {
+  font-family: var(--font-display, serif); font-weight: 400;
+  font-size: 22px; line-height: 1.2; color: var(--ink, #2b2b28);
+  margin: 0 0 12px;
+}
+.agate__body {
+  font-size: 14px; line-height: 1.55; color: var(--ink-soft, #4a463f);
+  margin: 0 0 12px;
+}
+.agate__actions {
+  display: flex; align-items: center; gap: var(--s-4, 16px);
+  margin-top: var(--s-4, 16px); flex-wrap: wrap;
+}
+.agate__back {
+  background: none; border: none; padding: 6px 2px; cursor: pointer;
+  font-size: 14px; color: var(--ink-muted, #6d675e);
+  text-decoration: underline; text-underline-offset: 3px;
+}

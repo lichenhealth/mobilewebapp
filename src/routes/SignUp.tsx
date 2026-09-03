@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { LichenMark } from '../components/LichenMark';
+import AlphaGate from '../components/AlphaGate';
 import './Auth.css';
 import Turnstile, { TURNSTILE_SITE_KEY } from '../components/Turnstile';
 
@@ -55,12 +56,18 @@ export default function SignUp() {
   const [kSent, setKSent] = useState(false);
   const [kBusy, setKBusy] = useState(false);
   const [kError, setKError] = useState('');
-  async function knock(e: FormEvent) {
+  // The alpha-state notice stands between a filled form and a sent knock
+  // (founder 2026-09-03) — the send happens only from its "Count me in".
+  const [kConfirming, setKConfirming] = useState(false);
+  function knock(e: FormEvent) {
     e.preventDefault();
     setKError('');
     if (!kName.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(kEmail.trim())) {
       setKError('Your name and a real email, so we can write back.'); return;
     }
+    setKConfirming(true);
+  }
+  async function sendKnock() {
     setKBusy(true);
     const { error } = await supabase.functions.invoke('join-request', {
       // ?from=<space id> — set by the floor line on a space's public page, so
@@ -70,7 +77,8 @@ export default function SignUp() {
       body: { name: kName.trim(), email: kEmail.trim(), story: kStory.trim(), ...(knockFrom ? { space_id: knockFrom } : {}) },
     });
     setKBusy(false);
-    if (error) { setKError('Something went wrong — try again in a moment.'); return; }
+    if (error) { setKConfirming(false); setKError('Something went wrong — try again in a moment.'); return; }
+    setKConfirming(false);
     setKSent(true);
   }
   const [fullName, setFullName] = useState('');
@@ -154,6 +162,9 @@ export default function SignUp() {
               <button className="btn btn-primary auth__submit" type="submit" disabled={kBusy}>
                 {kBusy ? 'Sending…' : 'Introduce yourself'}
               </button>
+              {kConfirming && (
+                <AlphaGate busy={kBusy} onConfirm={() => { void sendKnock(); }} onCancel={() => setKConfirming(false)} />
+              )}
             </form>
           )}
           <p className="auth__switch">
