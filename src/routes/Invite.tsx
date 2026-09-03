@@ -10,11 +10,12 @@ import { supabase } from '../lib/supabase';
  *  itself is gratitude for the time and feedback — with one honest line kept
  *  for people invited directly, who never passed the popup. */
 const DEFAULT_MISSION =
-  "Thank you — for your time, and for the feedback you'll give as one of Lichen's alpha "
-  + 'testers. The foundation of the corrective social network and healthcare system is '
-  + 'built, much is still in development, and there will be bugs along the way — '
-  + "you'll suggest the features you need, and we'll implement them. We're grateful "
-  + 'to be building it with you.';
+  'Thanks in advance for your (precious) time, and for the invaluable feedback '
+  + "we'll get from Lichen's alpha testers. The foundation of the corrective social "
+  + 'network and healthcare system is built, much is still in development, and there '
+  + 'will be bugs along the way — those who feel called to use the network will ask '
+  + "for the features they need, and we'll implement them. We're grateful to be "
+  + 'building it with you.';
 import { useAuth } from '../auth/AuthProvider';
 import './Invite.css';
 

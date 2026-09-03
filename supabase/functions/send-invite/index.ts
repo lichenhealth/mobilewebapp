@@ -68,10 +68,10 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   // feedback — with one honest line kept for people invited directly, who
   // never passed the popup. Kept in step with Invite.tsx's DEFAULT_MISSION.
   const DEFAULT_MISSION =
-    `Thank you — for your time, and for the feedback you'll give as one of Lichen's alpha testers. The foundation `
-    + `of the corrective social network and healthcare system is built, much is still in development, and there `
-    + `will be bugs along the way — you'll suggest the features you need, and we'll implement them. We're grateful `
-    + `to be building it with you.`;
+    `Thanks in advance for your (precious) time, and for the invaluable feedback we'll get from Lichen's alpha `
+    + `testers. The foundation of the corrective social network and healthcare system is built, much is still in `
+    + `development, and there will be bugs along the way — those who feel called to use the network will ask for `
+    + `the features they need, and we'll implement them. We're grateful to be building it with you.`;
   // An admin may rewrite this paragraph before sending (founder 2026-08-06:
   // "give you the boilerplate language as a template to edit"). Empty falls
   // back to the standard words.
@@ -94,7 +94,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   const missionHtml = (mission ?? '').trim()
     ? missionText.split(/\n{2,}/).filter(Boolean).map((para) =>
         `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">${esc(para)}</p>`).join('')
-    : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f"><strong>Thank you</strong> — for your time, and for the feedback you'll give as one of Lichen's alpha testers. The foundation of the <em>corrective</em> social network and healthcare system is built, much is still in development, and there will be bugs along the way — you'll suggest the features you need, and we'll implement them. We're grateful to be building it with you.</p>`;
+    : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f"><strong>Thanks in advance</strong> for your (precious) time, and for the invaluable feedback we'll get from Lichen's alpha testers. The foundation of the <em>corrective</em> social network and healthcare system is built, much is still in development, and there will be bugs along the way — those who feel called to use the network will ask for the features they need, and we'll implement them. We're grateful to be building it with you.</p>`;
   const noteHtml = note
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#fff;border-radius:12px;color:#4a463f">${esc(note)}</p>`
     : '';
