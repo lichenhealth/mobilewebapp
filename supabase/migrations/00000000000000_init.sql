@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
+\restrict gWaexSn2GwuGoRGEIzqrrwzBQTea7ZrNxAu4amBvVREgsTHxM6l6gjud72SCGqB
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -3195,6 +3195,25 @@ end $$;
 ALTER FUNCTION public.match_marketplace_post() OWNER TO postgres;
 
 --
+-- Name: may_edit_page_draft(text, uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.may_edit_page_draft(p_type text, p_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select case
+    when auth.uid() is null then false
+    when p_type = 'profile' then p_id = auth.uid()
+    when p_type = 'space'   then public.is_space_admin(p_id, auth.uid())
+    else false
+  end;
+$$;
+
+
+ALTER FUNCTION public.may_edit_page_draft(p_type text, p_id uuid) OWNER TO postgres;
+
+--
 -- Name: mint_currentcy(text, uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4339,6 +4358,48 @@ end; $$;
 ALTER FUNCTION public.respond_booking(p_booking uuid, p_accept boolean) OWNER TO postgres;
 
 --
+-- Name: restore_page_version(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.restore_page_version(p_version uuid) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v public.page_versions%rowtype;
+begin
+  select * into v from public.page_versions where id = p_version;
+  if not found then return false; end if;
+  -- A signed-in caller must be the member, or a steward of the space. A call
+  -- with no auth.uid() is the service role — the assistant's edge functions,
+  -- which have already checked stewardship, the space's AI switch and the
+  -- member's own edit consent before any tool runs. `anon` cannot reach this
+  -- function at all (execute is granted to authenticated and service_role
+  -- only), so "no uid" here means service role and nothing else.
+  if auth.uid() is not null and not public.may_edit_page_draft(v.subject_type, v.subject_id) then
+    raise exception 'Not yours to restore.';
+  end if;
+
+  if v.subject_type = 'space' then
+    update public.spaces set
+      page = coalesce(v.snapshot -> 'page', '{}'::jsonb),
+      description = nullif(v.snapshot ->> 'description', ''),
+      contact = coalesce(v.snapshot -> 'contact', '{}'::jsonb)
+    where id = v.subject_id;
+  else
+    update public.profiles set
+      page = coalesce(v.snapshot -> 'page', '{}'::jsonb),
+      contact = coalesce(v.snapshot -> 'contact', '{}'::jsonb)
+    where id = v.subject_id;
+  end if;
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION public.restore_page_version(p_version uuid) OWNER TO postgres;
+
+--
 -- Name: restore_space(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -4415,6 +4476,56 @@ $$;
 
 
 ALTER FUNCTION public.rls_auto_enable() OWNER TO postgres;
+
+--
+-- Name: seat_from_invite(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.seat_from_invite() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_role public.space_member_role;
+begin
+  -- Only a live space seats anyone.
+  if new.space_id is null or not public.space_alive(new.space_id) then return new; end if;
+
+  -- Authority is re-checked at CLAIM time, mirroring set_member_role's
+  -- rules: an admin-carrying invite needs its minter to still be the space's
+  -- super admin; a member invite needs them to still be an admin. A stale
+  -- token can never seat someone in a space whose stewardship has changed.
+  if coalesce(new.space_role, 'member') = 'admin' then
+    if not exists (select 1 from public.space_members m
+                   where m.space_id = new.space_id
+                     and m.profile_id = new.created_by
+                     and m.role = 'super_admin') then
+      return new;
+    end if;
+    v_role := 'admin';
+  else
+    if not public.is_space_admin(new.space_id, new.created_by) then
+      return new;
+    end if;
+    v_role := 'member';
+  end if;
+
+  -- Seat them (the chat-sync trigger follows the insert). An existing plain
+  -- member is raised by an admin-carrying invite; an existing admin or the
+  -- super admin is never touched, and nothing ever downgrades.
+  insert into public.space_members (space_id, profile_id, role)
+  values (new.space_id, new.claimed_by, v_role)
+  on conflict (space_id, profile_id) do update
+    set role = 'admin'::public.space_member_role
+    where space_members.role = 'member'::public.space_member_role
+      and excluded.role = 'admin'::public.space_member_role;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.seat_from_invite() OWNER TO postgres;
 
 --
 -- Name: send_currentcy(text, uuid, text, uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4597,6 +4708,59 @@ $$;
 
 
 ALTER FUNCTION public.set_space_public_page_default() OWNER TO postgres;
+
+--
+-- Name: snapshot_page_version(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.snapshot_page_version() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_type text := tg_argv[0];
+  v_snap jsonb;
+  v_keep constant int := 30;
+begin
+  if v_type = 'space' then
+    if new.page is not distinct from old.page
+       and new.description is not distinct from old.description
+       and new.contact is not distinct from old.contact then
+      return new;
+    end if;
+    v_snap := jsonb_build_object(
+      'page', coalesce(old.page, '{}'::jsonb),
+      'description', coalesce(old.description, ''),
+      'contact', coalesce(old.contact, '{}'::jsonb));
+  else
+    if new.page is not distinct from old.page
+       and new.contact is not distinct from old.contact then
+      return new;
+    end if;
+    v_snap := jsonb_build_object(
+      'page', coalesce(old.page, '{}'::jsonb),
+      'contact', coalesce(old.contact, '{}'::jsonb));
+  end if;
+
+  insert into public.page_versions (subject_type, subject_id, snapshot, changed_by, source)
+  values (v_type, old.id, v_snap, auth.uid(),
+          case when auth.uid() is null then 'assistant' else 'builder' end);
+
+  -- A page keeps its last 30 turns. Enough to walk back from a bad afternoon,
+  -- not so many that the table becomes a second copy of every page ever.
+  delete from public.page_versions old_rows
+  where old_rows.id in (
+    select id from public.page_versions
+    where subject_type = v_type and subject_id = old.id
+    order by created_at desc
+    offset v_keep
+  );
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.snapshot_page_version() OWNER TO postgres;
 
 --
 -- Name: space_alive(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5910,7 +6074,10 @@ CREATE TABLE public.invite_tokens (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     for_minor boolean DEFAULT false NOT NULL,
     opened_at timestamp with time zone,
-    declined_at timestamp with time zone
+    declined_at timestamp with time zone,
+    space_id uuid,
+    space_role text,
+    CONSTRAINT invite_tokens_space_role_check CHECK ((space_role = ANY (ARRAY['member'::text, 'admin'::text])))
 );
 
 
@@ -6089,6 +6256,42 @@ CREATE TABLE public.notifications (
 
 
 ALTER TABLE public.notifications OWNER TO postgres;
+
+--
+-- Name: page_drafts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.page_drafts (
+    subject_type text NOT NULL,
+    subject_id uuid NOT NULL,
+    draft jsonb NOT NULL,
+    base jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by uuid,
+    CONSTRAINT page_drafts_subject_type_check CHECK ((subject_type = ANY (ARRAY['space'::text, 'profile'::text])))
+);
+
+
+ALTER TABLE public.page_drafts OWNER TO postgres;
+
+--
+-- Name: page_versions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.page_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    subject_type text NOT NULL,
+    subject_id uuid NOT NULL,
+    snapshot jsonb NOT NULL,
+    changed_by uuid,
+    source text DEFAULT 'builder'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT page_versions_source_check CHECK ((source = ANY (ARRAY['builder'::text, 'assistant'::text]))),
+    CONSTRAINT page_versions_subject_type_check CHECK ((subject_type = ANY (ARRAY['space'::text, 'profile'::text])))
+);
+
+
+ALTER TABLE public.page_versions OWNER TO postgres;
 
 --
 -- Name: posts; Type: TABLE; Schema: public; Owner: postgres
@@ -7105,6 +7308,22 @@ ALTER TABLE ONLY public.notifications
 
 
 --
+-- Name: page_drafts page_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.page_drafts
+    ADD CONSTRAINT page_drafts_pkey PRIMARY KEY (subject_type, subject_id);
+
+
+--
+-- Name: page_versions page_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.page_versions
+    ADD CONSTRAINT page_versions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: posts posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7655,6 +7874,20 @@ CREATE INDEX notifications_recipient_space_unread_idx ON public.notifications US
 
 
 --
+-- Name: page_drafts_subject_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX page_drafts_subject_idx ON public.page_drafts USING btree (subject_type, subject_id);
+
+
+--
+-- Name: page_versions_subject_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX page_versions_subject_idx ON public.page_versions USING btree (subject_type, subject_id, created_at DESC);
+
+
+--
 -- Name: posts_audience_spaces_gin; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7998,6 +8231,13 @@ CREATE TRIGGER on_event_rsvp_notify_trg AFTER UPDATE ON public.event_attendees F
 
 
 --
+-- Name: invite_tokens on_invite_claimed_seat; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER on_invite_claimed_seat AFTER UPDATE ON public.invite_tokens FOR EACH ROW WHEN (((old.claimed_by IS NULL) AND (new.claimed_by IS NOT NULL) AND (new.space_id IS NOT NULL))) EXECUTE FUNCTION public.seat_from_invite();
+
+
+--
 -- Name: space_members on_member_sync_chat; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -8068,6 +8308,13 @@ CREATE TRIGGER profiles_compose_full_name BEFORE INSERT OR UPDATE ON public.prof
 
 
 --
+-- Name: profiles profiles_page_version; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER profiles_page_version BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.snapshot_page_version('profile');
+
+
+--
 -- Name: profiles profiles_sync_is_adult; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -8100,6 +8347,13 @@ CREATE TRIGGER recommendations_check_offering BEFORE INSERT OR UPDATE ON public.
 --
 
 CREATE TRIGGER recommendations_check_voice BEFORE INSERT OR UPDATE ON public.recommendations FOR EACH ROW EXECUTE FUNCTION public.check_recommend_voice();
+
+
+--
+-- Name: spaces spaces_page_version; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER spaces_page_version BEFORE UPDATE ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.snapshot_page_version('space');
 
 
 --
@@ -8877,6 +9131,14 @@ ALTER TABLE ONLY public.invite_tokens
 
 
 --
+-- Name: invite_tokens invite_tokens_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.invite_tokens
+    ADD CONSTRAINT invite_tokens_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE SET NULL;
+
+
+--
 -- Name: join_requests join_requests_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -8978,6 +9240,22 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: page_drafts page_drafts_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.page_drafts
+    ADD CONSTRAINT page_drafts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: page_versions page_versions_changed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.page_versions
+    ADD CONSTRAINT page_versions_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 
 --
@@ -10541,6 +10819,32 @@ CREATE POLICY "own locations: all" ON public.profile_locations TO authenticated 
 
 
 --
+-- Name: page_drafts; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.page_drafts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: page_drafts page_drafts_rw; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY page_drafts_rw ON public.page_drafts USING (public.may_edit_page_draft(subject_type, subject_id)) WITH CHECK (public.may_edit_page_draft(subject_type, subject_id));
+
+
+--
+-- Name: page_versions; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.page_versions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: page_versions page_versions_read; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY page_versions_read ON public.page_versions FOR SELECT USING (public.may_edit_page_draft(subject_type, subject_id));
+
+
+--
 -- Name: posts; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -11954,6 +12258,15 @@ GRANT ALL ON FUNCTION public.match_marketplace_post() TO service_role;
 
 
 --
+-- Name: FUNCTION may_edit_page_draft(p_type text, p_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.may_edit_page_draft(p_type text, p_id uuid) TO anon;
+GRANT ALL ON FUNCTION public.may_edit_page_draft(p_type text, p_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.may_edit_page_draft(p_type text, p_id uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION mint_currentcy(p_to_type text, p_to_id uuid, p_amount numeric, p_memo text, p_context text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12309,6 +12622,16 @@ GRANT ALL ON FUNCTION public.respond_booking(p_booking uuid, p_accept boolean) T
 
 
 --
+-- Name: FUNCTION restore_page_version(p_version uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.restore_page_version(p_version uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.restore_page_version(p_version uuid) TO anon;
+GRANT ALL ON FUNCTION public.restore_page_version(p_version uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.restore_page_version(p_version uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION restore_space(p_space uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12334,6 +12657,15 @@ GRANT ALL ON FUNCTION public.revoke_subscription(p_email text) TO service_role;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO anon;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO authenticated;
 GRANT ALL ON FUNCTION public.rls_auto_enable() TO service_role;
+
+
+--
+-- Name: FUNCTION seat_from_invite(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.seat_from_invite() TO anon;
+GRANT ALL ON FUNCTION public.seat_from_invite() TO authenticated;
+GRANT ALL ON FUNCTION public.seat_from_invite() TO service_role;
 
 
 --
@@ -12371,6 +12703,15 @@ GRANT ALL ON FUNCTION public.set_member_role(p_space uuid, p_profile uuid, p_rol
 GRANT ALL ON FUNCTION public.set_space_public_page_default() TO anon;
 GRANT ALL ON FUNCTION public.set_space_public_page_default() TO authenticated;
 GRANT ALL ON FUNCTION public.set_space_public_page_default() TO service_role;
+
+
+--
+-- Name: FUNCTION snapshot_page_version(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.snapshot_page_version() TO anon;
+GRANT ALL ON FUNCTION public.snapshot_page_version() TO authenticated;
+GRANT ALL ON FUNCTION public.snapshot_page_version() TO service_role;
 
 
 --
@@ -12958,6 +13299,24 @@ GRANT ALL ON TABLE public.mycelium TO service_role;
 GRANT ALL ON TABLE public.notifications TO anon;
 GRANT ALL ON TABLE public.notifications TO authenticated;
 GRANT ALL ON TABLE public.notifications TO service_role;
+
+
+--
+-- Name: TABLE page_drafts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.page_drafts TO anon;
+GRANT ALL ON TABLE public.page_drafts TO authenticated;
+GRANT ALL ON TABLE public.page_drafts TO service_role;
+
+
+--
+-- Name: TABLE page_versions; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.page_versions TO anon;
+GRANT ALL ON TABLE public.page_versions TO authenticated;
+GRANT ALL ON TABLE public.page_versions TO service_role;
 
 
 --
@@ -13594,7 +13953,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z2tpD3zvUlAZx3Nw97Q38NvW723D3PhtQNqlPIbZPU2Ni6oQshuxuUnk9q4UPbB
+\unrestrict gWaexSn2GwuGoRGEIzqrrwzBQTea7ZrNxAu4amBvVREgsTHxM6l6gjud72SCGqB
 
 
 

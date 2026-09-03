@@ -151,6 +151,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [invQ, setInvQ] = useState('');
   const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
   const invInputRef = useRef<HTMLInputElement | null>(null);
+  // Invite-with-a-seat (founder 2026-09-03): typing an EMAIL in the invite
+  // box invites someone not yet on Lichen — the platform invite carries this
+  // space (+ role), and they're seated the moment they join. Admin seats are
+  // super-admin-only, the same rule set_member_role enforces.
+  const [invRole, setInvRole] = useState<'member' | 'admin'>('member');
+  const [invSent, setInvSent] = useState<{ email: string; role: 'member' | 'admin' } | null>(null);
   // + New group (admins of a community/organization)
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -567,7 +573,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // admin invite type-ahead (members + already-pending filtered out)
   useEffect(() => {
     const q = invQ.trim();
-    if (q.length < 2) { setInvHits([]); return; }
+    if (q.length < 2 || q.includes('@')) { setInvHits([]); return; }
     let live = true;
     (async () => {
       const { data } = await supabase.from('profiles')
@@ -2730,11 +2736,59 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               ref={invInputRef}
               className="prof__input"
               value={invQ}
-              onChange={(e) => setInvQ(e.target.value)}
-              placeholder={memberTools ? 'Invite a member by name…' : 'Suggest a member to the admins…'}
+              onChange={(e) => { setInvQ(e.target.value); setInvSent(null); }}
+              placeholder={memberTools ? 'Invite a member by name — or an email for someone new…' : 'Suggest a member to the admins…'}
             />
             {!memberTools && invQ.trim().length >= 2 && (
               <p className="prof__hint">The admins review suggestions before anyone is invited.</p>
+            )}
+            {memberTools && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(invQ.trim()) && (
+              <div className="sprof__emailinv">
+                <p className="prof__hint">
+                  Not on Lichen yet? This sends a Lichen invitation that seats them in {space.name} the
+                  moment they join{myRole === 'super_admin' ? ' — as a member, or as an admin' : ''}.
+                </p>
+                <div className="sprof__rolepills">
+                  <label className="sprof__emailinv-role">
+                    <input type="radio" name="inv-seat-role" checked={invRole === 'member'}
+                      onChange={() => setInvRole('member')} /> Member
+                  </label>
+                  {myRole === 'super_admin' && (
+                    <label className="sprof__emailinv-role">
+                      <input type="radio" name="inv-seat-role" checked={invRole === 'admin'}
+                        onChange={() => setInvRole('admin')} /> Admin
+                    </label>
+                  )}
+                  <button className="btn btn-primary sprof__invite-btn" disabled={memBusy}
+                    onClick={() => {
+                      const em = invQ.trim();
+                      const role = invRole;
+                      void act(async () => {
+                        const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: em });
+                        if (((existing as unknown[] | null) ?? []).length > 0) {
+                          throw new Error(`${em} is already on Lichen — invite them by name above instead.`);
+                        }
+                        const { error: err } = await supabase.functions.invoke('send-invite', {
+                          body: {
+                            email: em, inviterName: myRow?.profile?.full_name ?? '',
+                            space_id: id, space_role: role,
+                          },
+                        });
+                        if (err) throw new Error('Couldn’t send the invite just now. Please try again in a moment.');
+                        setInvQ(''); setInvRole('member'); setInvSent({ email: em, role });
+                      });
+                    }}>
+                    {memBusy ? 'Sending…' : 'Send the invitation'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {invSent && (
+              <p className="prof__hint">
+                Invitation sent to {invSent.email} — they&rsquo;ll arrive in {space.name} as
+                {invSent.role === 'admin' ? ' an admin' : ' a member'} the moment they join.
+                It&rsquo;s trackable on your Invite screen.
+              </p>
             )}
             {invHits.length > 0 && (
               <div className="sprof__invhits">

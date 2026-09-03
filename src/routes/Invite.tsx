@@ -54,6 +54,8 @@ export default function Invite() {
     opened_at: string | null; declined_at?: string | null;
     created_at: string; created_by?: string;
     claimed_name?: string; inviter_name?: string;
+    // Invite-with-a-seat (2026-09-03): the space + role riding this invite.
+    space_role?: string | null; space?: { name: string } | null;
   };
   type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; space?: { name: string } | null };
   const [invites, setInvites] = useState<InviteRow[]>([]);
@@ -66,7 +68,7 @@ export default function Invite() {
     // Admins see the whole picture — every invitation, and who sent it.
     // Members see their own (RLS decides; the query is the same shape).
     let q = supabase.from('invite_tokens')
-      .select('token, invitee_email, claimed_by, opened_at, declined_at, created_at, created_by')
+      .select('token, invitee_email, claimed_by, opened_at, declined_at, created_at, created_by, space_role, space:spaces(name)')
       .order('created_at', { ascending: false }).limit(200);
     if (!isAdmin) q = q.eq('created_by', user.id);
     const { data } = await q;
@@ -428,6 +430,11 @@ export default function Invite() {
                 <li className="invite__row" key={i.token}>
                   <span className="invite__row-who">
                     {i.invitee_email ?? 'a shared link'}
+                    {i.space?.name && (
+                      <em className="invite__by">
+                        {i.space_role === 'admin' ? 'admin of ' : 'joins '}{i.space.name}
+                      </em>
+                    )}
                     {i.claimed_name && <em> — now {i.claimed_name}</em>}
                     {isAdmin && i.inviter_name && i.created_by !== user?.id && (
                       <em className="invite__by">invited by {i.inviter_name}</em>

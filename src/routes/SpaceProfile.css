@@ -393,3 +393,13 @@
 
 /* Where a stage click landed you in the pane. */
 .is-flash { outline: 2px solid var(--peach); border-radius: 8px; }
+
+/* Invite-with-a-seat (2026-09-03): the email-invite panel inside the
+   Members invite box — role pick + one send. */
+.sprof__emailinv { margin-top: 6px; }
+.sprof__emailinv .sprof__rolepills { flex-wrap: wrap; }
+.sprof__emailinv .sprof__invite-btn { max-width: 100%; white-space: normal; }
+.sprof__emailinv-role {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink-soft); margin-right: 6px;
+}
