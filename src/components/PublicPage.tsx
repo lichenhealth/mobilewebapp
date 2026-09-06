@@ -348,7 +348,12 @@ export default function PublicPage(props: PublicPageProps) {
   // reads as a bug. Restored on unmount so leaving a dark page doesn't leave
   // the app dark (founder 2026-08-28).
   useEffect(() => {
-    if (props.signedIn) return;
+    // The BUILDER keeps the app around the page (founder 2026-09-06:
+    // "shouldn't the entire page around the builder be beige… we're in dev
+    // mode") — the page paints its own ground inside the stage frame
+    // (SpaceProfile.css), and the shell stands down only for real
+    // signed-out renderings.
+    if (props.signedIn || props.editable) return;
     const prev = document.body.style.background;
     document.body.style.background = surface.ground;
     // A WEBSITE IS NOT AN APP SCREEN (founder 2026-08-28: "can we get rid of
@@ -364,7 +369,7 @@ export default function PublicPage(props: PublicPageProps) {
       document.body.style.background = prev;
       document.body.classList.remove('is-website');
     };
-  }, [props.signedIn, surface.ground]);
+  }, [props.signedIn, !props.editable, surface.ground]);
 
   const go = (path: string) => {
     const u = appUrl(path);

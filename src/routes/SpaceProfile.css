@@ -403,3 +403,21 @@
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 13px; color: var(--ink-soft); margin-right: 6px;
 }
+
+/* THE WORKBENCH SITS ON LICHEN'S BONE (founder 2026-09-06: "we're in dev
+   mode") — PublicPage no longer stands the app shell down when editable, so
+   the page must paint its own ground inside the stage frame. */
+.sprof__stage--inplace { background: var(--bone, #f3efe9); }
+.sprof__stage--inplace .ppage { background: var(--ppage-ground, var(--bone)); }
+/* Room for the page's real desktop measure (860px) inside the frame. */
+@media (min-width: 1024px) {
+  .prof.is-space.sprof--building { max-width: 960px; }
+}
+/* Mobile view: the stage narrows to phone width and desktop-only layouts
+   step back to their stacked shape (the split card is the one two-column). */
+.sprof__stage--mobilew { max-width: 430px; margin-inline: auto; }
+.sprof__stage--mobilew .ppage { max-width: none; }
+.sprof__stage--mobilew .ppage__sec--split { display: block; }
+.sprof__stage--mobilew .ppage__sec--split .ppage__split-img { margin-top: var(--s-4); }
+/* The draft reassurance on the backstage door. */
+.sprof__door-draft { display: block; color: var(--blue, #4a6b8a); font-style: normal; font-size: 12px; margin-top: 4px; }

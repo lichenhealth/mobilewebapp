@@ -151,6 +151,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   const [invQ, setInvQ] = useState('');
   const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
   const invInputRef = useRef<HTMLInputElement | null>(null);
+  // Mobile view in the public builder (founder 2026-09-06): narrows the
+  // stage to phone width for a mobile-first editing pass.
+  const [stageMobile, setStageMobile] = useState(false);
   // Invite-with-a-seat (founder 2026-09-03): typing an EMAIL in the invite
   // box invites someone not yet on Lichen — the platform invite carries this
   // space (+ role), and they're seated the moment they join. Admin seats are
@@ -1462,6 +1465,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
               <strong>Public Profile Builder</strong>
               <em>The website the open web sees — laid out as the page itself. Click anything to edit it.</em>
+              {/* The reassurance for stepping out mid-edit (founder
+                  2026-09-06): the draft is kept, and the door says so. */}
+              {draftPending && (
+                <em className="sprof__door-draft">Draft in progress — saved, but not live until you publish.</em>
+              )}
             </button>
             <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'lichen' })}>
               <strong>Lichen Profile Builder</strong>
@@ -1615,9 +1623,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
 
         {buildView === 'public' && (
           <div className="sprof__buildview">
+            {/* Just the way back (founder 2026-09-06: "they know they're in
+                public web builder, so we don't need the title"). */}
             <div className="sprof__buildbar">
               <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
-              <strong className="sprof__buildtitle">Public Profile Builder</strong>
             </div>
             {/* THE PAGE IS THE FORM NOW (founder 2026-08-31: "the actual
                 content should be laid out exactly as the profile is... the
@@ -1661,6 +1670,12 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 aria-expanded={buildSettingsOpen}
               >
                 {buildSettingsOpen ? 'Hide page settings' : 'Page settings'}
+              </button>
+              {/* Edit at the width your visitors will hold (founder
+                  2026-09-06): desktop is the default on a desktop; this
+                  narrows the stage to phone width for mobile-first passes. */}
+              <button className="btn" type="button" onClick={() => setStageMobile((m) => !m)}>
+                {stageMobile ? 'Desktop view' : 'Mobile view'}
               </button>
               {msg && <span className="prof__msg">{msg}</span>}
               {!msg && (
@@ -2212,7 +2227,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 draft, full width, with in-place text editing and photo
                 controls (PublicPage's `editable`). Walk it by its own tab
                 nav; type where the words live; drag the photo to frame it. */}
-            <div className="sprof__stage sprof__stage--inplace">
+            <div className={'sprof__stage sprof__stage--inplace' + (stageMobile ? ' sprof__stage--mobilew' : '')}>
               <PublicPage
                 id={space.id}
                 name={name || space.name}
