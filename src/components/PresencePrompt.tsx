@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import {
@@ -39,6 +40,7 @@ export default function PresencePrompt({ anchor, onChange }: {
 }) {
   const { user } = useAuth();
   const { actor } = useActing();
+  const loc = useLocation();
   const [pres, setPres] = useState<MyPresence | null>(null);
   const [why, setWhy] = useState<'open' | 'switch' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,7 +81,13 @@ export default function PresencePrompt({ anchor, onChange }: {
     if (why === null && !promptSeen('presence-switch')) setWhy('switch');
   }, [actor, user, pres, why]);
 
-  if (!user || !pres || !why) return null;
+  // A PREVIEW is about the page, not presence (founder 2026-09-03: the
+  // candle bubble popped over "Preview — this is what the open web sees").
+  // Stay quiet on preview/trial views; the lesson isn't marked seen, so it
+  // still teaches later, in a moment that's actually about being present.
+  const previewing = /[?&](preview|embed|brand|ground)=/.test(loc.search);
+
+  if (!user || !pres || !why || previewing) return null;
 
   const lit = candleLit(pres) || pres.alwaysPresent;
   const actorName = actor.type === 'self' ? null : actor.name;
