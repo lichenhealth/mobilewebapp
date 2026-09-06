@@ -765,9 +765,27 @@ export default function PublicPage(props: PublicPageProps) {
     return { ...p, coverPos: Math.round(pct) };
   });
 
+  // BUILDER: a Home click opens the section where its words actually live
+  // (founder 2026-09-03: "make it edit-able when you click on a section").
+  // Home shows summaries/excerpts, so their full text can't edit in place
+  // here — clicking the section routes to its tab, where EArea takes over.
+  // Already-interactive things (an editable line, a door, a photo) keep
+  // their own click.
+  const routeHomeClick = (e: React.MouseEvent) => {
+    if (!ed || tab !== 'home') return;
+    const t = e.target as HTMLElement;
+    if (t.closest('button, a, textarea, input, .ppage__etext, img')) return;
+    const region = t.closest('[data-edit-region]')?.getAttribute('data-edit-region');
+    if (!region) return;
+    const dest = region === 'offerings' ? 'services' : region;
+    if (hasTab(dest)) chooseTab(dest);
+  };
+
   return (
     <div
-      className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')}
+      className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')
+        + (ed && tab === 'home' ? ' ppage--edit-home' : '')}
+      onClick={routeHomeClick}
       style={{
         ['--ppage-accent' as string]: accent,
         ['--ppage-ground' as string]: surface.ground,
@@ -779,9 +797,15 @@ export default function PublicPage(props: PublicPageProps) {
     >
       {props.preview && (
         <p className="ppage__preview">
-          {props.draftBanner
-            ? 'Previewing the unpublished draft — the live page still shows what was last published.'
-            : 'Preview — this is what the open web sees.'}
+          {ed
+            // The builder is a WORKBENCH, not a preview (founder 2026-09-03:
+            // "it isn't a preview, it is a dev space where you edit the
+            // website") — the banner says how to edit, not what this looks
+            // like.
+            ? 'Your page, editable — click any text or photo to change it. A section summarized here on Home opens on its own tab to edit.'
+            : props.draftBanner
+              ? 'Previewing the unpublished draft — the live page still shows what was last published.'
+              : 'Preview — this is what the open web sees.'}
         </p>
       )}
       {trying && !props.preview && (

@@ -422,3 +422,11 @@
   font: inherit; font-size: 14px; margin-top: 12px;
 }
 .ppage__ecover-add:hover { border-color: var(--ppage-accent, var(--peach)); color: var(--ppage-ink, var(--ink)); }
+
+/* Builder Home (2026-09-03): a summarized section is clickable — it opens
+   its own tab, where the words edit in place. Same dashed cue as etext. */
+.ppage--edit-home [data-edit-region] { cursor: pointer; }
+.ppage--edit-home [data-edit-region]:hover {
+  outline: 1.5px dashed var(--ppage-accent, var(--peach));
+  outline-offset: 6px; border-radius: 8px;
+}
