@@ -430,3 +430,30 @@
   outline: 1.5px dashed var(--ppage-accent, var(--peach));
   outline-offset: 6px; border-radius: 8px;
 }
+
+/* In-place photo controls (2026-09-07: every picture the page shows edits
+   where it sits). Corner ×, dashed add tiles — builder-only markup. */
+.ppage__imgwrap { position: relative; display: inline-block; }
+.ppage__imgwrap--block { display: block; }
+.ppage__imgx {
+  position: absolute; top: 6px; right: 6px; width: 26px; height: 26px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(24, 22, 19, 0.6); color: #fff; font-size: 15px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ppage__imgx:hover { background: rgba(24, 22, 19, 0.85); }
+.ppage__strip-addtile {
+  min-height: 120px; border: 1.5px dashed var(--ppage-accent, var(--peach));
+  border-radius: var(--r-md); background: transparent; cursor: pointer;
+  color: var(--ppage-ink-muted, var(--ink-muted)); font-size: 13px;
+}
+.ppage__estrip { margin-top: 12px; }
+.ppage__estrip-note { font-size: 12px; color: var(--ppage-ink-faint, var(--ink-faint)); margin-top: 6px; }
+.ppage__person-addphoto {
+  width: 100%; aspect-ratio: 1 / 1; margin-bottom: 10px;
+  border: 1.5px dashed var(--ppage-accent, var(--peach)); border-radius: var(--r-md);
+  background: transparent; cursor: pointer;
+  color: var(--ppage-ink-muted, var(--ink-muted)); font-size: 13px;
+}
+.ppage__person-photo[title] { cursor: pointer; }
+.ppage__note-etext { display: block; margin-top: 2px; }

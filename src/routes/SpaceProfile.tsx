@@ -1674,7 +1674,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {/* Edit at the width your visitors will hold (founder
                   2026-09-06): desktop is the default on a desktop; this
                   narrows the stage to phone width for mobile-first passes. */}
-              <button className="btn" type="button" onClick={() => setStageMobile((m) => !m)}>
+              {/* Offered only where the alternative is real (founder
+                  2026-09-07): a phone is already the mobile view and can't
+                  hold the desktop one — the button lives on wide screens. */}
+              <button className="btn sprof__stagew-btn" type="button" onClick={() => setStageMobile((m) => !m)}>
                 {stageMobile ? 'Desktop view' : 'Mobile view'}
               </button>
               {msg && <span className="prof__msg">{msg}</span>}
@@ -2247,6 +2250,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   uploadImage: async (f) => {
                     try { return await uploadPageImage(me, f); } catch { return null; }
                   },
+                  // Contact & hours edit in place on the Contact tab — the
+                  // SAME state the Page-settings drawer edits (founder
+                  // 2026-09-07: editable in multiple locations, one draft).
+                  contact: { value: contact, onChange: setContact },
                 }}
               />
             </div>

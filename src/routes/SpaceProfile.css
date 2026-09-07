@@ -421,3 +421,8 @@
 .sprof__stage--mobilew .ppage__sec--split .ppage__split-img { margin-top: var(--s-4); }
 /* The draft reassurance on the backstage door. */
 .sprof__door-draft { display: block; color: var(--blue, #4a6b8a); font-style: normal; font-size: 12px; margin-top: 4px; }
+
+/* The width toggle only where the alternative is real — a phone is already
+   the mobile view (founder 2026-09-07). */
+.sprof__stagew-btn { display: none; }
+@media (min-width: 1024px) { .sprof__stagew-btn { display: inline-flex; } }

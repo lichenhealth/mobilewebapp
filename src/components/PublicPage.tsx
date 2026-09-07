@@ -4,7 +4,7 @@ import { appUrl } from '../lib/customDomain';
 import { resolveSurface, readableAccent } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
 import Avatar from './Avatar';
-import { ContactList, type ContactInfo } from './ContactFields';
+import ContactFields, { ContactList, type ContactInfo } from './ContactFields';
 import { tabById, tabHasContent, isSectionTab, type PageTab } from '../lib/pageTabs';
 import { subjectPronoun } from '../lib/names';
 import KnockForm from './KnockForm';
@@ -221,6 +221,10 @@ export interface PublicPageProps {
 export interface PageEditor {
   update: (mut: (p: PageMeta) => PageMeta) => void;
   uploadImage: (file: File) => Promise<string | null>;
+  /** Contact & hours edited IN PLACE on the Contact tab (founder 2026-09-07)
+   *  — the same state the Page-settings drawer edits, deliberately: both
+   *  doors write one draft, so they can never disagree. */
+  contact?: { value: ContactInfo; onChange: (next: ContactInfo) => void };
 }
 
 /** Click-to-edit text that keeps the exact class (and so the exact look) of
@@ -417,7 +421,10 @@ export default function PublicPage(props: PublicPageProps) {
   // only the active section renders below the hero. Only doors whose
   // section exists render; with no doors, everything shows inline.
   const bizLocations = props.bizLocations ?? [];
-  const hasContact = Object.keys(contact).length > 0 || !!page.practical || bizLocations.length > 0;
+  // In the builder the Contact tab is always offered — an empty section IS
+  // the form waiting to be filled (the empty-story EArea rule).
+  const hasContact = Object.keys(contact).length > 0 || !!page.practical || bizLocations.length > 0
+    || !!props.editable?.contact;
   // ONE tab row (founder 2026-08-05, merging the in-app profile with the web
   // page): Feed first, then whichever templated sections actually have
   // content. A person with nothing but posts sees no tabs at all — the right
@@ -699,7 +706,10 @@ export default function PublicPage(props: PublicPageProps) {
         <img
           className="ppage__split-img" src={sec.image} alt="" loading="lazy"
           style={{ objectPosition: pos }}
-          onClick={() => setLightbox(sec.image!)}
+          /* Builder: this photo's full controls (change/remove/drag) live on
+             its own tab, where it renders as the hero — route there. */
+          onClick={() => (ed && hasTab(id) ? chooseTab(id) : setLightbox(sec.image!))}
+          title={ed && hasTab(id) ? 'Open the tab to edit this photo' : undefined}
         />
       </section>
     );
@@ -731,6 +741,14 @@ export default function PublicPage(props: PublicPageProps) {
   const coverFileRef = useRef<HTMLInputElement | null>(null);
   const [coverDrag, setCoverDrag] = useState<{ startY: number; startPct: number; pct: number } | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
+  // In-place controls for the OTHER pictures (founder 2026-09-07: "the text
+  // is editable, but you can't edit the pictures, except the cover") — the
+  // photo strip and each person's photo get their own pickers.
+  const stripFileRef = useRef<HTMLInputElement | null>(null);
+  const [stripBusy, setStripBusy] = useState(false);
+  const teamFileRef = useRef<HTMLInputElement | null>(null);
+  const teamPickFor = useRef<number>(-1);
+  const [teamBusy, setTeamBusy] = useState(false);
   const coverSlotIsPage = !tabbed || tab === 'home' || tab === 'feed'
     || (!usingSectionImage && !!coverSrc && coverSrc === page.cover);
   const currentCoverPct = (() => {
@@ -1081,6 +1099,30 @@ export default function PublicPage(props: PublicPageProps) {
                 value={story} placeholder="Write the story…"
                 save={(v) => ed.update((p) => ({ ...p, story: v || undefined }))}
               />
+              {/* The story's woven photos — hidden entirely while the story
+                  edits as one box (the textarea never lies about what's
+                  stored), so they show HERE with their own controls
+                  (founder 2026-09-07). Placement between paragraphs stays
+                  in Page settings. */}
+              {(page.storyImages?.length ?? 0) > 0 && (
+                <>
+                  <div className="ppage__strip ppage__estrip">
+                    {page.storyImages!.map((si) => (
+                      <span className="ppage__imgwrap" key={si.src}>
+                        <img className="ppage__strip-img" src={si.src} alt="" loading="lazy"
+                          onClick={() => setLightbox(si.src)} />
+                        <button type="button" className="ppage__imgx" title="Remove from the story"
+                          onClick={() => ed.update((p) => ({
+                            ...p, storyImages: (p.storyImages ?? []).filter((x) => x.src !== si.src),
+                          }))}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="ppage__estrip-note">
+                    Woven into the story between paragraphs — add or re-place them in Page settings.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
           <div className="ppage__story">
@@ -1113,12 +1155,42 @@ export default function PublicPage(props: PublicPageProps) {
       )}
 
       {/* 2b · A few more images, if there are any */}
-      {(page.photos?.length ?? 0) > 0 && show('about') && (
+      {((page.photos?.length ?? 0) > 0 || !!ed) && show('about') && (
         <div className="ppage__strip">
-          {page.photos!.slice(0, 6).map((src) => (
-            <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src}
-              onClick={() => setLightbox(src)} />
+          {(ed ? (page.photos ?? []) : page.photos!.slice(0, 6)).map((src) => (
+            ed ? (
+              <span className="ppage__imgwrap" key={src}>
+                <img className="ppage__strip-img" src={src} alt="" loading="lazy"
+                  onClick={() => setLightbox(src)} />
+                <button type="button" className="ppage__imgx" title="Remove this photo"
+                  onClick={() => ed.update((p) => ({
+                    ...p, photos: (p.photos ?? []).filter((x) => x !== src),
+                  }))}>×</button>
+              </span>
+            ) : (
+              <img className="ppage__strip-img" src={src} alt="" loading="lazy" key={src}
+                onClick={() => setLightbox(src)} />
+            )
           ))}
+          {ed && (
+            <>
+              <input ref={stripFileRef} type="file" accept="image/*" hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  setStripBusy(true);
+                  try {
+                    const url = await ed.uploadImage(f);
+                    if (url) ed.update((p) => ({ ...p, photos: [...(p.photos ?? []), url] }));
+                  } finally { setStripBusy(false); }
+                }} />
+              <button type="button" className="ppage__strip-addtile" disabled={stripBusy}
+                onClick={() => stripFileRef.current?.click()}>
+                {stripBusy ? 'Uploading…' : '+ Add a photo'}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -1233,7 +1305,19 @@ export default function PublicPage(props: PublicPageProps) {
       {hasContact && show('contact') && (
         <section className="ppage__sec" data-edit-region="contact">
           <h2 className="ppage__h2">Contact &amp; hours</h2>
-          <ContactList contact={contact} />
+          {/* Builder: the REAL fields, in place (founder 2026-09-07: "Contact
+              and Hours should be editable text, too" — and editable in
+              MULTIPLE places: this and the Page-settings drawer write the
+              same draft, so they can never disagree). */}
+          {ed?.contact ? (
+            <ContactFields
+              value={ed.contact.value}
+              onChange={ed.contact.onChange}
+              lead="These publish with the page — fill in what the open web should see."
+            />
+          ) : (
+            <ContactList contact={contact} />
+          )}
           {bizLocations.length > 0 && (
             <div className="contactl">
               {bizLocations.map((b, i) => (
@@ -1245,9 +1329,24 @@ export default function PublicPage(props: PublicPageProps) {
               ))}
             </div>
           )}
-          {page.practical?.bring && <p className="ppage__note"><strong>What to bring</strong> {page.practical.bring}</p>}
-          {page.practical?.parking && <p className="ppage__note"><strong>Parking</strong> {page.practical.parking}</p>}
-          {page.practical?.access && <p className="ppage__note"><strong>Accessibility</strong> {page.practical.access}</p>}
+          {ed ? (
+            ([['bring', 'What to bring'], ['parking', 'Parking'], ['access', 'Accessibility']] as const).map(([k, label]) => (
+              <div className="ppage__note" key={k}>
+                <strong>{label}</strong>
+                <EText className="ppage__note-etext" value={page.practical?.[k] ?? ''}
+                  placeholder={`Add a ${label.toLowerCase()} note…`}
+                  save={(v) => ed.update((p) => ({
+                    ...p, practical: { ...p.practical, [k]: v || undefined },
+                  }))} />
+              </div>
+            ))
+          ) : (
+            <>
+              {page.practical?.bring && <p className="ppage__note"><strong>What to bring</strong> {page.practical.bring}</p>}
+              {page.practical?.parking && <p className="ppage__note"><strong>Parking</strong> {page.practical.parking}</p>}
+              {page.practical?.access && <p className="ppage__note"><strong>Accessibility</strong> {page.practical.access}</p>}
+            </>
+          )}
         </section>
       )}
 
@@ -1255,18 +1354,74 @@ export default function PublicPage(props: PublicPageProps) {
       {(page.team?.length ?? 0) > 0 && show('about') && (
         <section className="ppage__sec" data-edit-region="team">
           <h2 className="ppage__h2">The people</h2>
+          {ed && (
+            <input ref={teamFileRef} type="file" accept="image/*" hidden
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                const i = teamPickFor.current;
+                e.target.value = '';
+                if (!f || i < 0) return;
+                setTeamBusy(true);
+                try {
+                  const url = await ed.uploadImage(f);
+                  if (url) ed.update((p) => {
+                    const team = [...(p.team ?? [])];
+                    if (team[i]) team[i] = { ...team[i], photo: url };
+                    return { ...p, team };
+                  });
+                } finally { setTeamBusy(false); teamPickFor.current = -1; }
+              }} />
+          )}
           <div className="ppage__team">
-            {page.team!.map((t) => (
-              <div className="ppage__person" key={t.name}>
-                {t.photo && (
-                  <img className="ppage__person-photo" src={t.photo} alt="" loading="lazy"
-                    onClick={() => setLightbox(t.photo!)} />
-                )}
-                <p className="ppage__person-name">{t.name}</p>
-                {t.role && <p className="ppage__person-role">{t.role}</p>}
-                {t.note && <p className="ppage__person-note">{t.note}</p>}
-              </div>
-            ))}
+            {page.team!.map((t, i) => {
+              // One patch door for a person's fields — both the drawer's
+              // People editor and these write the same draft.
+              const patch = (chg: Partial<NonNullable<PageMeta['team']>[number]>) =>
+                ed?.update((p) => {
+                  const team = [...(p.team ?? [])];
+                  if (team[i]) team[i] = { ...team[i], ...chg };
+                  return { ...p, team };
+                });
+              return (
+                <div className="ppage__person" key={ed ? i : t.name}>
+                  {t.photo ? (
+                    ed ? (
+                      <span className="ppage__imgwrap ppage__imgwrap--block">
+                        <img className="ppage__person-photo" src={t.photo} alt="" loading="lazy"
+                          title="Change this photo"
+                          onClick={() => { teamPickFor.current = i; teamFileRef.current?.click(); }} />
+                        <button type="button" className="ppage__imgx" title="Remove the photo"
+                          onClick={() => patch({ photo: undefined })}>×</button>
+                      </span>
+                    ) : (
+                      <img className="ppage__person-photo" src={t.photo} alt="" loading="lazy"
+                        onClick={() => setLightbox(t.photo!)} />
+                    )
+                  ) : ed ? (
+                    <button type="button" className="ppage__person-addphoto" disabled={teamBusy}
+                      onClick={() => { teamPickFor.current = i; teamFileRef.current?.click(); }}>
+                      {teamBusy && teamPickFor.current === i ? 'Uploading…' : '+ Add their photo'}
+                    </button>
+                  ) : null}
+                  {ed ? (
+                    <>
+                      <EText className="ppage__person-name" value={t.name} placeholder="Their name"
+                        save={(v) => patch({ name: v })} />
+                      <EText className="ppage__person-role" value={t.role ?? ''} placeholder="Their role"
+                        save={(v) => patch({ role: v || undefined })} />
+                      <EText className="ppage__person-note" value={t.note ?? ''} placeholder="A line about them…"
+                        save={(v) => patch({ note: v || undefined })} />
+                    </>
+                  ) : (
+                    <>
+                      <p className="ppage__person-name">{t.name}</p>
+                      {t.role && <p className="ppage__person-role">{t.role}</p>}
+                      {t.note && <p className="ppage__person-note">{t.note}</p>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
