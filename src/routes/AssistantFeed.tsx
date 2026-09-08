@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
@@ -164,6 +164,28 @@ export default function AssistantFeed() {
 
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // THE THREAD OPENS AT ITS NEWEST WORDS (founder 2026-09-09: "it doesn't
+  // take me to the latest chat, so I have to scroll down"). On open/thread
+  // switch: an instant snap to the foot (newest entry + composer both in
+  // view). On a new entry arriving: follow it — but only when the reader is
+  // already near the foot or the newest entry is their own send, so someone
+  // scrolled up reading history is never yanked.
+  const feedEndRef = useRef<HTMLDivElement | null>(null);
+  const feedSeen = useRef(0);
+  useEffect(() => { feedSeen.current = 0; }, [thread]);
+  useEffect(() => {
+    if (loading || posts.length === 0) return;
+    const first = feedSeen.current === 0;
+    const grew = posts.length > feedSeen.current;
+    feedSeen.current = posts.length;
+    if (!first && !grew) return;
+    const end = feedEndRef.current;
+    if (!end) return;
+    const nearFoot = end.getBoundingClientRect().top - window.innerHeight < 600;
+    const lastIsMine = posts[posts.length - 1]?.author === 'member';
+    if (first) end.scrollIntoView({ block: 'end' });
+    else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [loading, posts, thread]);
   const [sourcePosts, setSourcePosts] = useState<Map<string, FeedPost>>(new Map());
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -735,6 +757,7 @@ export default function AssistantFeed() {
         placeholder="Say something…"
         uploaderId={me || undefined}
       />
+      <div ref={feedEndRef} aria-hidden="true" />
     </div>
   );
 }
