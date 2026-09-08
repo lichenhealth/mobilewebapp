@@ -154,6 +154,22 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Mobile view in the public builder (founder 2026-09-06): narrows the
   // stage to phone width for a mobile-first editing pass.
   const [stageMobile, setStageMobile] = useState(false);
+  // CTRL/CMD+Z UNDO in the public builder (founder 2026-09-08: "Can we have
+  // control z undo changes?"). Every committed change to the draft — an
+  // in-place save, a photo move, a drawer edit, even one of Claude's writes
+  // arriving via sync — becomes a step; a burst of changes within 800ms
+  // coalesces into one gesture (so typing in the contact fields undoes a
+  // field at a time, not a keystroke at a time). Shift+Z redoes. While a
+  // text field has focus the browser's NATIVE text undo keeps the keys —
+  // ours acts only once the edit is committed. Undo rewrites the same
+  // pageEdit/contact state the autosave watches, so the draft (and Publish)
+  // always tell the truth about what's on screen.
+  const undoStack = useRef<{ page: PageMeta; contact: ContactInfo }[]>([]);
+  const redoStack = useRef<{ page: PageMeta; contact: ContactInfo }[]>([]);
+  const undoPrev = useRef<{ page: PageMeta; contact: ContactInfo } | null>(null);
+  const undoLast = useRef(0);
+  const undoing = useRef(false);
+  const undoFlashTimer = useRef<number | undefined>(undefined);
   // Invite-with-a-seat (founder 2026-09-03): typing an EMAIL in the invite
   // box invites someone not yet on Lichen — the platform invite carries this
   // space (+ role), and they're seated the moment they join. Admin seats are
@@ -775,6 +791,63 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     return () => clearTimeout(t);
     // sharedNow is a ref; these are the values that actually change it.
   }, [backstage, loading, id, me, pageEdit, contact, draftPending]);
+
+  // Undo history capture: whenever the draft state changes, the PREVIOUS
+  // state becomes a step (coalesced by the 800ms burst rule). An undo/redo
+  // sets `undoing` so its own state change never re-enters the stack.
+  useEffect(() => {
+    if (!backstage) return;
+    const snap = { page: pageEdit, contact };
+    if (undoing.current) { undoing.current = false; undoPrev.current = snap; return; }
+    if (undoPrev.current && (undoPrev.current.page !== pageEdit || undoPrev.current.contact !== contact)) {
+      const now = Date.now();
+      if (now - undoLast.current > 800 || undoStack.current.length === 0) {
+        undoStack.current.push(undoPrev.current);
+        if (undoStack.current.length > 60) undoStack.current.shift();
+      }
+      undoLast.current = now;
+      redoStack.current = [];
+    }
+    undoPrev.current = snap;
+  }, [backstage, pageEdit, contact]);
+
+  useEffect(() => {
+    if (buildView !== 'public') return;
+    const flash = (word: string) => {
+      setMsg(word);
+      window.clearTimeout(undoFlashTimer.current);
+      undoFlashTimer.current = window.setTimeout(() => setMsg(''), 1500);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      // A focused field keeps the browser's own text undo.
+      if (t && t.closest('input, textarea, [contenteditable="true"]')) return;
+      const from = undoPrev.current;
+      if (e.shiftKey) {
+        const next = redoStack.current.pop();
+        if (!next) return;
+        e.preventDefault();
+        if (from) undoStack.current.push(from);
+        undoing.current = true;
+        setPageEdit(next.page); setContact(next.contact);
+        flash('Redone ✓');
+      } else {
+        const prev = undoStack.current.pop();
+        if (!prev) return;
+        e.preventDefault();
+        if (from) redoStack.current.push(from);
+        undoing.current = true;
+        setPageEdit(prev.page); setContact(prev.contact);
+        flash('Undone ✓');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.clearTimeout(undoFlashTimer.current);
+    };
+  }, [buildView]);
 
   // Catch up when the builder opens, and again whenever this tab comes back
   // to the front — going to the chat, asking Claude for a change and coming
