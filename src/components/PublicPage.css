@@ -457,3 +457,8 @@
 }
 .ppage__person-photo[title] { cursor: pointer; }
 .ppage__note-etext { display: block; margin-top: 2px; }
+
+/* The website line on the in-app view (2026-09-07). */
+.ppage__site { margin-top: 2px; }
+.ppage__site-link { font-size: 12px; color: var(--peach-deep, var(--peach)); text-decoration: none; }
+.ppage__site-link:hover { text-decoration: underline; }

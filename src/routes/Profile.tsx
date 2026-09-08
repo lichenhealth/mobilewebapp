@@ -852,7 +852,9 @@ export default function Profile() {
 
       {/* YOUR LICHEN PROFILE leads (founder 2026-08-20 consolidation):
           who you are inside the network — name, story, how you show up. */}
-      <CollapsibleSection id="about" title="Build / edit your Lichen profile" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
+      {/* "Profile" plainly (founder 2026-09-07: the Lichen profile "builds
+          itself" — this drawer is just the standard info). */}
+      <CollapsibleSection id="about" title="Profile" meta="logo, name, headline — the standard info" open={openSections.has('about')} onToggle={() => toggleSection('about')}>
         <div className="prof__field">
           <label className="prof__label">First name</label>
           <input className="prof__input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
@@ -1623,7 +1625,14 @@ export default function Profile() {
         const mine = spaces.filter((s) => s.kind === sec.kind);
         const article = /^[aeiou]/i.test(sec.one) ? 'an' : 'a';
         return (
-          <CollapsibleSection key={sec.kind} id={sec.kind} title={sec.title} open={openSections.has(sec.kind)} onToggle={() => toggleSection(sec.kind)}>
+          <CollapsibleSection
+            key={sec.kind} id={sec.kind} title={sec.title}
+            /* Each element of your presence is a drawer with a count and a +
+               (founder 2026-09-07) — the + opens the drawer, where the
+               create form already lives. */
+            meta={mine.length === 0 ? 'none yet' : `${mine.length} ${mine.length === 1 ? sec.one : sec.one + 's'}`}
+            action={{ label: '+', onClick: () => setOpenSections((s) => new Set(s).add(sec.kind)) }}
+            open={openSections.has(sec.kind)} onToggle={() => toggleSection(sec.kind)}>
             {mine.length === 0 && <p className="prof__empty">None yet.</p>}
             <div className="prof__spaces">
               {mine.map((s) => {

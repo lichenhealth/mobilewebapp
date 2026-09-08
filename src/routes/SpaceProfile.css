@@ -426,3 +426,11 @@
    the mobile view (founder 2026-09-07). */
 .sprof__stagew-btn { display: none; }
 @media (min-width: 1024px) { .sprof__stagew-btn { display: inline-flex; } }
+
+/* The website line — one quiet outward link on the internal profile
+   (founder 2026-09-07: like a website on a social profile). */
+.sprof__site { text-align: center; margin-top: 4px; }
+.sprof__site-link {
+  font-size: 12px; color: var(--peach-deep, var(--peach)); text-decoration: none;
+}
+.sprof__site-link:hover { text-decoration: underline; }

@@ -60,6 +60,9 @@ export interface SpaceProfileRow {
   kind: SpaceKind;
   name: string;
   handle: string | null;
+  /** The page is live on the open web (the select always fetched it; typed
+   *  2026-09-07 for the internal profile's website line). */
+  public_page?: boolean | null;
   description: string | null;
   avatar_url: string | null;
   location: string | null;

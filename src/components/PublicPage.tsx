@@ -142,6 +142,9 @@ export interface PublicPageProps {
   id: string;
   name: string;
   kindLabel?: string;          // "Place", "Organization", or a person's headline
+  /** The public site's pretty address (custom domain or lichen.health/handle)
+   *  — rendered as one outward link on the signed-in view only. */
+  siteAddress?: string | null;
   /** Optional, stated by the member. Sits under the name — a fact about how
    *  to refer to someone, not a claim about them. */
   pronouns?: string | null;
@@ -900,6 +903,19 @@ export default function PublicPage(props: PublicPageProps) {
             </p>
           )}
           {location && <p className="ppage__where"><Icon name="location" size={13} /> {location}</p>}
+          {/* The website, one quiet line on the IN-APP view only (founder
+              2026-09-07: the internal profile links out to the public site
+              "as one would list their website on a social media profile" —
+              custom tabs and branding live there, in-app stays consistent).
+              Guests are already ON the site; the builder edits it. */}
+          {props.signedIn && !ed && props.siteAddress && (
+            <p className="ppage__site">
+              <a className="ppage__site-link" href={`https://${props.siteAddress}`}
+                target="_blank" rel="noopener">
+                {props.siteAddress} ↗
+              </a>
+            </p>
+          )}
           {navItems.length === 0 && ctas.map((c) => (
             <a className="ppage__cta" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
               {c.label}

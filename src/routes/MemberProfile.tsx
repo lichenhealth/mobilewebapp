@@ -121,7 +121,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       .catch(() => { if (live) setDraftOverlay(null); });
     return () => { live = false; };
   }, [draftPreview, me, id]);
-  const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean } | null>(null);
+  const [pub, setPub] = useState<{ contact: ContactInfo; page: PageMeta; on: boolean; handle?: string | null } | null>(null);
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -139,7 +139,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         const pb = await publicBookingPage(r.handle);
         if (pb && pb.types.length > 0) contact.booking = `/book/${r.handle}`;
       }
-      if (live) setPub({ contact, page: r.page ?? {}, on: !!r.public_page });
+      if (live) setPub({ contact, page: r.page ?? {}, on: !!r.public_page, handle: r.handle ?? null });
     })();
     return () => { live = false; };
   }, [id]);
@@ -409,6 +409,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       <PublicPage
         id={id}
         name={name}
+        siteAddress={pub?.on && pub.handle ? `lichen.health/${pub.handle}` : null}
         kindLabel={member.headline ?? undefined}
         pronouns={member.pronouns}
         avatarUrl={member.avatar_url}
@@ -484,6 +485,18 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         {member.pronouns && <p className="mprof__pronouns">{member.pronouns}</p>}
         {member.headline && <p className="mprof__headline">{member.headline}</p>}
         {member.bio && <p className="mprof__bio">{member.bio}</p>}
+        {/* The website, one quiet line (founder 2026-09-07: the internal
+            profile links OUT to the public site, like a website on a social
+            profile) — the rich custom content lives there, in-app stays
+            Lichen-consistent. */}
+        {me && pub?.on && pub.handle && (
+          <p className="mprof__site">
+            <a className="mprof__site-link" href={`https://lichen.health/${pub.handle}`}
+              target="_blank" rel="noopener">
+              lichen.health/{pub.handle} ↗
+            </a>
+          </p>
+        )}
       </div>
       {identityExtras}
       {memberFeed({ showing: true, open: () => {}, guest: !me })}

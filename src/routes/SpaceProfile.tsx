@@ -539,7 +539,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // laid out as the page itself, editable; ?build=lichen opens the in-app
   // identity. Either one takes over the whole backstage — the doors and the
   // drop-downs step aside until "Back to profile".
-  const buildView = adminTools ? searchParams.get('build') : null;
+  // PROFILE IS A DRAWER NOW (founder 2026-09-07: "the lichen profile
+  // essentially builds itself... get rid of that build box") — only the
+  // PUBLIC builder is a full-screen door; `build=lichen` from old links
+  // lands on the backstage with the Profile drawer open (effect below).
+  const buildView = adminTools && searchParams.get('build') === 'public' ? 'public' : null;
+  useEffect(() => {
+    if (!adminTools || searchParams.get('build') !== 'lichen') return;
+    setOpenSections((s) => new Set(s).add('lichenprofile'));
+    setSearchParams({ manage: '1' }, { replace: true });
+  }, [adminTools, searchParams, setSearchParams]);
   // Scoped stewardship: membership machinery (approve/invite/endorse) belongs
   // to admins holding the 'members' duty; full admins hold everything.
   const memberTools = holdsDuty(myRole, myRow?.duties, 'members') && backstage;
@@ -1302,6 +1311,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         id={space.id}
         name={space.name}
         firstPerson
+        siteAddress={space.public_page && space.handle
+          ? (domainsForHandle(space.handle)[0] ?? `lichen.health/${space.handle}`)
+          : null}
         kindLabel={kindLabel}
         kindIcon={KIND_ICON[space.kind]}
         avatarUrl={space.avatar_url}
@@ -1426,6 +1438,21 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             )}
           </p>
         )}
+        {/* The website, one quiet line (founder 2026-09-07: the internal
+            profile links OUT to the public site "as one would list their
+            website on a social media profile") — custom tabs and branding
+            live there; in-app stays Lichen-consistent. */}
+        {me && space.public_page && space.handle && (
+          <p className="sprof__site">
+            <a
+              className="sprof__site-link"
+              href={`https://${domainsForHandle(space.handle)[0] ?? `lichen.health/${space.handle}`}`}
+              target="_blank" rel="noopener"
+            >
+              {domainsForHandle(space.handle)[0] ?? `lichen.health/${space.handle}`} ↗
+            </a>
+          </p>
+        )}
         {!me && (
           <div className="sprof__guest">
             <p className="sprof__guest-lead">
@@ -1459,9 +1486,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       {adminTools && (<>
         {!buildView && (
           <div className="sprof__doors">
-            {/* TWO DOORS, NOT A DROP-DOWN (founder 2026-08-29): the builders
-                open as full screens; everything else on the backstage stays
-                a drop-down below. */}
+            {/* ONE DOOR — the website workbench (founder 2026-09-07,
+                superseding the two-door design: the Lichen profile "builds
+                itself", so its identity fields live in the Profile drawer
+                below; only the public site still needs a full screen). */}
             <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
               <strong>Public Profile Builder</strong>
               <em>The website the open web sees — laid out as the page itself. Click anything to edit it.</em>
@@ -1471,29 +1499,23 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 <em className="sprof__door-draft">Draft in progress — saved, but not live until you publish.</em>
               )}
             </button>
-            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'lichen' })}>
-              <strong>Lichen Profile Builder</strong>
-              <em>Name, description, location — how this {kindLabel.toLowerCase()} shows up inside Lichen.</em>
-            </button>
           </div>
         )}
 
-        {buildView === 'lichen' && (
-          <div className="sprof__buildview">
-            <div className="sprof__buildbar">
-              <button className="btn" onClick={() => setSearchParams({ manage: '1' })}>&larr; Back to profile</button>
-              <strong className="sprof__buildtitle">Lichen Profile Builder</strong>
-            </div>
-            <div className="sprof__buildpane sprof__buildpane--lone">
-              {/* Both builders carry the two modes (founder 2026-08-31: "It
-                  should have both"). pagePane={false}: this door is about the
-                  in-Lichen profile, so the thread opens plain — the website
-                  pane belongs to the Public builder's door. */}
-              <BuildModeSplit
-                back={`/spaces/${id}?manage=1&build=lichen`}
-                space={{ id: space.id, name: space.name }}
-                pagePane={false}
-              />
+        {/* PROFILE IS A DRAWER, NOT A BUILDER (founder 2026-09-07: "the
+            lichen profile essentially builds itself... we can then get rid
+            of that build box. Then we can have Profile as a drop down, where
+            you input the standard info like the logo and the tagline"). The
+            internal profile's substance is DERIVED — feed, members, events —
+            so only the identity fields remain, first in the accordion. */}
+        <CollapsibleSection
+          id="lichenprofile" title="Profile"
+          open={openSections.has('lichenprofile')} onToggle={() => toggleSection('lichenprofile')}
+        >
+              <p className="prof__care-lead">
+                The standard info — logo, name, a few words. Everything else on your
+                Lichen profile builds itself from what happens here.
+              </p>
               <div className="prof__field">
                 <label className="prof__label">Photo</label>
                 <button className="btn" onClick={() => avatarInputRef.current?.click()} disabled={avatarBusy}>
@@ -1516,7 +1538,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               placeholder={`A few words about this ${kindLabel.toLowerCase()} — what it is, who it's for`}
             />
             <FillWithClaude
-              back={`/spaces/${id}?manage=1&build=lichen`}
+              back={`/spaces/${id}?manage=1`}
               label="Fill out with Claude"
               space={{ id: space.id, name: space.name }}
               ask={`Help me write ${possessive(space.name)} description — what it is, who it's for.`}
@@ -1617,9 +1639,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 </button>
                 {msg && <span className="prof__msg">{msg}</span>}
               </div>
-            </div>
-          </div>
-        )}
+        </CollapsibleSection>
 
         {buildView === 'public' && (
           <div className="sprof__buildview">
@@ -2397,7 +2417,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
       {backstage && (
-        <CollapsibleSection id="rooms" title="Bookable Items & Spaces" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
+        <CollapsibleSection id="rooms" title="Bookable areas & things" open={openSections.has('rooms')} onToggle={() => toggleSection('rooms')}>
           {resources.length === 0 && !newResOpen && (
             <p className="sprof__muted">Nothing listed yet — a stall, an arena, a tool, the dinner plates. Anything members can book.</p>
           )}
