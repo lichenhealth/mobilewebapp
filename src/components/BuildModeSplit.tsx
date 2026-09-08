@@ -29,8 +29,12 @@ function buildDoorPath(back: string, space?: BuildSpace, ask?: string, pagePane 
  *
  *  `back` rides along so the Snapshot screen can offer the way home in the
  *  founder's words: "back to manual mode". */
-export default function BuildModeSplit({ back, onBeforeGo, space, pagePane = true }: {
+export default function BuildModeSplit({ back, onBeforeGo, space, pagePane = true, mode = 'manual' }: {
   back: string;
+  /** Which side is CURRENT (founder 2026-09-09: "a true toggle" — the Claude
+   *  builder renders this same control with its own side lit, and the manual
+   *  side switches back to `back`, instead of a one-way link). */
+  mode?: 'manual' | 'claude';
   /** Persist any unsaved manual work before crossing over (founder
    *  2026-08-21: "import and remember anything you've entered in the manual
    *  build") — the two modes are one document, so what you typed must be IN
@@ -49,16 +53,21 @@ export default function BuildModeSplit({ back, onBeforeGo, space, pagePane = tru
   // "the other button doesn't go away, it just signifies a toggle"). Manual
   // is the side you're on; the other side switches to building with Claude —
   // the assistant's page for this section, arriving with build context.
+  const onClaude = mode === 'claude';
   return (
     <div className="view-toggle-row bmode-row">
       <span className="view-toggle" role="group" aria-label="How to build this page">
-        <button className="view-toggle__side is-on" type="button">
+        <button
+          className={'view-toggle__side' + (onClaude ? '' : ' is-on')}
+          type="button"
+          onClick={onClaude ? () => navigate(back) : undefined}
+        >
           Build manually
         </button>
         <button
-          className="view-toggle__side"
+          className={'view-toggle__side' + (onClaude ? ' is-on' : '')}
           type="button"
-          onClick={() => {
+          onClick={onClaude ? undefined : () => {
             void Promise.resolve(onBeforeGo?.()).then(() =>
               navigate(buildDoorPath(back, space, undefined, pagePane)));
           }}
@@ -67,9 +76,13 @@ export default function BuildModeSplit({ back, onBeforeGo, space, pagePane = tru
         </button>
       </span>
       <span className="bmode-row__hint">
-        {space
-          ? `Fill in the fields yourself, or tell Claude about ${space.name}.`
-          : 'Fill in the fields yourself, or tell Claude about you.'}
+        {onClaude
+          ? (space
+              ? `Tell Claude what you want for ${space.name} — or flip back to the fields.`
+              : 'Tell Claude what you want — or flip back to the fields.')
+          : (space
+              ? `Fill in the fields yourself, or tell Claude about ${space.name}.`
+              : 'Fill in the fields yourself, or tell Claude about you.')}
       </span>
     </div>
   );

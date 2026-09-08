@@ -455,7 +455,9 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         page={draftOverlay?.page ?? pub.page}
         draftBanner={!!draftOverlay}
         preview={previewing}
-        signedIn={!!me}
+        /* Preview = the naked site, members too (founder 2026-09-09 —
+           src/lib/siteView.ts). */
+        signedIn={!!me && !previewing && !embedded}
         feed={memberFeed}
         beforeContent={me ? identityExtras : undefined}
       />

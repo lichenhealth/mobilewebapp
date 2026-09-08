@@ -319,3 +319,14 @@
   background: var(--bone-warm);
 }
 .afeed__arm .afeed__ctx-off { margin: 0; }
+
+/* The frozen builder head (2026-09-09): Back to profile + the mode toggle
+   stay put while the long thread scrolls under them. */
+.afeed__buildhead {
+  position: sticky; top: 42px; z-index: 30;
+  background: var(--bone); padding: 6px 0 4px;
+  border-bottom: 1px solid var(--bone-edge);
+  margin-bottom: var(--s-3);
+}
+.afeed__buildbar { margin-bottom: 6px; }
+.afeed--paged .afeed__buildhead { grid-column: 1 / -1; }

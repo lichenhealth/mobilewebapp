@@ -81,6 +81,7 @@ import { hostSpaceHandle } from './lib/customDomain';
 import ReminderAlerts from './components/ReminderAlerts';
 import { PullToRefresh } from './components/PullToRefresh';
 import ComingSoon, { AdminGateNote } from './components/ComingSoon';
+import { nakedSiteView } from './lib/siteView';
 
 // Reachable without a membership: auth flows, the paywall itself, and Help
 // (a member with a payment problem must be able to reach support).
@@ -115,11 +116,11 @@ export default function App() {
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding' || pathname === '/invite/decline';
   const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
-  // Rendered INSIDE a frame — the page beside the assistant conversation
-  // (docs/ASSISTANT_ACTIONS.md step 4). Without this the frame shows a whole
-  // second app: two top bars, two bottom navs, two identity switchers. The
-  // point is to see the PAGE, so the chrome around it stands down.
-  const isEmbed = new URLSearchParams(search).get('embed') === '1';
+  // A NAKED-SITE rendering — embed pane, ?preview=1, or a colour trial (one
+  // shared decision, src/lib/siteView.ts — founder 2026-09-09 after the
+  // builder's Preview showed the side nav and bone ground). The chrome
+  // around the page stands down for all of them.
+  const isEmbed = nakedSiteView(search);
   const customHandle = hostSpaceHandle();        // this hostname IS a space's website
   const isAbout = pathname === '/about';         // About page has its own header
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
@@ -427,7 +428,10 @@ export default function App() {
         )}
       </main>
       {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
-      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      {/* The docked desktop rail is app chrome too — it stands down with the
+          rest on a naked-site rendering (founder 2026-09-09: the builder's
+          Preview showed the side nav). */}
+      {!isEmbed && <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />}
       {/* The install nudge lives IN Home's page now, not floating over every
           screen (founder 2026-08-17: it covered two listing tiles). See
           Home.tsx — an invitation belongs where you land, once, in the flow. */}

@@ -1396,7 +1396,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         page={draftOverlay?.page ?? pageMeta}
         draftBanner={!!draftOverlay}
         preview={previewing}
-        signedIn={!!me && !trialView && !embedView}
+        /* PREVIEW IS THE NAKED SITE (founder 2026-09-09, one shared rule —
+           src/lib/siteView.ts): the owner previewing sees exactly what a
+           guest sees, which fires is-website and hides member signals. */
+        signedIn={!!me && !previewing && !trialView && !embedView}
         // A space's page is a gateway into Lichen (founder 2026-08-17): a
         // signed-out visitor knocks right here, and the knock names us.
         knockSpace={{ id: space.id, name: space.name, kindLabel }}

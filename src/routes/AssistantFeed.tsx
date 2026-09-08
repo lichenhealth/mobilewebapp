@@ -17,6 +17,7 @@ import type { IconName } from '../components/Icon';
 import { possessive } from '../lib/names';
 import { readDraft, publishDraft } from '../lib/pageDrafts';
 import SnapshotPanel from '../components/SnapshotPanel';
+import BuildModeSplit from '../components/BuildModeSplit';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import './AssistantFeed.css';
 
@@ -329,9 +330,30 @@ export default function AssistantFeed() {
 
   return (
     <div className={'afeed' + (showPage && (thread === 'profile' || spaceId) ? ' afeed--paged' : '')}>
-      <button className="cmp__back afeed__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
-        ← {back ? 'Back to manual mode' : 'Back'}
-      </button>
+      {builderMode ? (
+        /* A TRUE TOGGLE, FROZEN (founder 2026-09-09: "let's have a toggle
+           back to manual mode frozen in the upper bar, instead of the
+           inconsistency now where building with claude disappears the
+           manual mode button" — with Back to profile frozen above it, since
+           the thread's scroll history gets long). Same segmented control as
+           the manual builder, Claude side lit; the manual side switches. */
+        <div className="afeed__buildhead">
+          <div className="afeed__buildbar">
+            <button className="btn" onClick={() => navigate(`/spaces/${spaceId}?manage=1`)}>
+              ← Back to profile
+            </button>
+          </div>
+          <BuildModeSplit
+            mode="claude"
+            back={back ?? `/spaces/${spaceId}?manage=1&build=public`}
+            space={{ id: spaceId!, name: sctx?.name ?? 'this space' }}
+          />
+        </div>
+      ) : (
+        <button className="cmp__back afeed__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
+          ← {back ? 'Back to manual mode' : 'Back'}
+        </button>
+      )}
 
       <header className="afeed__head">
         <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={44} />
