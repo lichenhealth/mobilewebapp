@@ -1042,6 +1042,10 @@ Deno.serve(async (req) => {
         const t = String(input.title ?? '').toLowerCase().trim();
         return { subject: subjectOf(), tab: SECTION_TABS.includes(t) ? t : 'home' };
       }
+      case 'restore_space_section_photo': {
+        const s = String(input.section ?? '');
+        return { subject: subjectOf(), tab: s === 'home_cover' ? 'home' : sec(s) };
+      }
       case 'place_uploaded_photo': case 'save_web_image': {
         const s = String(input.section ?? '');
         if (s === 'profile_photo') return null; // identity — written live, not drafted

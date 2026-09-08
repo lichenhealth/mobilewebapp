@@ -230,11 +230,40 @@ export const SPACE_PAGE_TOOLS = [
     name: 'list_space_page_versions',
     description:
       "The page's recent history, newest first — each entry is what the page said BEFORE that "
-      + 'change, who made it (you or a person in the builder), and when. Use it whenever someone '
-      + 'asks what changed, what it used to say, or wants something put back — including changes '
-      + 'from days ago and from other conversations, which you cannot otherwise know about. '
-      + 'Read this BEFORE saying you do not know what a page used to say.',
+      + 'change, who made it (you or a person in the builder), and when. Snapshots hold the WHOLE '
+      + "page, PHOTOS INCLUDED — each entry lists the cover and every section's photo, so a "
+      + '"removed" photo is almost always recoverable (removing a photo from a page never deletes '
+      + 'the stored file). Use it whenever someone asks what changed, what it used to say, or '
+      + 'wants something put back — including changes from days ago and from other conversations, '
+      + 'which you cannot otherwise know about. Read this BEFORE saying you do not know what a '
+      + 'page used to say, and BEFORE telling anyone to re-upload a photo — '
+      + 'restore_space_section_photo puts one back.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    // A photo restore that doesn't undo everything else (founder 2026-09-08,
+    // after the chat told a steward to RE-UPLOAD a photo she'd removed —
+    // the versions brief showed only text, so the model believed photos
+    // weren't tracked). The version id + section name resolve server-side
+    // against the recorded snapshot — the model never supplies a URL, the
+    // same no-invented-targets rule as every photo tool.
+    name: 'restore_space_section_photo',
+    description:
+      'Put ONE photo back from a recorded version without touching anything else: pass the '
+      + "version_id from list_space_page_versions and where the photo lived ('home_cover' for the "
+      + "page cover, otherwise the tab/section id — 'about', 'facilities', a custom tab). The "
+      + 'photo, its crop position and its size are copied from that snapshot into the draft; the '
+      + 'person previews and publishes as usual. Use this instead of restore_space_page_version '
+      + 'when only a photo was lost, and instead of asking anyone to re-upload — removed photos '
+      + 'still exist.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        version_id: { type: 'string', description: 'The id from list_space_page_versions.' },
+        section: { type: 'string', description: "'home_cover' or a tab/section id like 'facilities'." },
+      },
+      required: ['version_id', 'section'],
+    },
   },
   {
     name: 'restore_space_page_version',
@@ -390,10 +419,61 @@ export async function runSpacePageTool(
           tab_names: Array.isArray(page.tabs)
             ? (page.tabs as { id?: string; label?: string }[]).map((t) => t.label ?? t.id) : null,
           description: r.snapshot?.description ?? null,
+          // Photos are part of the record (2026-09-08 — leaving them out
+          // taught the model that versions "only track text fields", and a
+          // steward was told to re-upload a photo that still existed).
+          cover_photo: (page.cover as string | undefined) ?? null,
+          section_photos: page.sections
+            ? Object.fromEntries(
+                Object.entries(page.sections as Record<string, { image?: string } | undefined>)
+                  .filter(([, s]) => !!s?.image)
+                  .map(([k, s]) => [k, s!.image]),
+              )
+            : null,
         },
       };
     });
     return { ok: true, change: `read ${brief.length} recorded versions of ${spaceName}'s page`, versions: brief };
+  }
+
+  if (name === 'restore_space_section_photo') {
+    const vid = String(input.version_id ?? '').trim();
+    const secId = String(input.section ?? '').trim();
+    if (!/^[0-9a-f-]{36}$/.test(vid) || !secId) {
+      return { ok: false, error: 'Pass a version_id from list_space_page_versions and where the photo lived.' };
+    }
+    const rows = await (await sb(
+      `page_versions?subject_type=eq.space&subject_id=eq.${spaceId}&id=eq.${vid}&select=snapshot,created_at`,
+    )).json();
+    const row = Array.isArray(rows) ? rows[0] as { snapshot?: Record<string, unknown>; created_at?: string } | undefined : undefined;
+    if (!row?.snapshot) {
+      return { ok: false, error: 'No such version for this page — read list_space_page_versions again.' };
+    }
+    const vpage = (row.snapshot.page ?? {}) as Record<string, unknown>;
+    const { page } = await readSpacePage();
+    if (secId === 'home_cover') {
+      const img = vpage.cover as string | undefined;
+      if (!img) return { ok: false, error: 'That version had no cover photo — list_space_page_versions shows which versions carried one.' };
+      page.cover = img;
+      if (vpage.coverPos !== undefined) page.coverPos = vpage.coverPos;
+      await patchSpace({ page });
+      return { ok: true, change: `put the cover photo back from the version recorded ${row.created_at ?? 'earlier'} (drafted — publish makes it live)` };
+    }
+    const vsec = ((vpage.sections ?? {}) as Record<string, Record<string, unknown> | undefined>)[secId];
+    const img = vsec?.image as string | undefined;
+    if (!img) {
+      return { ok: false, error: `That version had no photo on "${secId}" — each entry in list_space_page_versions names the sections that carried photos.` };
+    }
+    const sections = { ...((page.sections ?? {}) as Record<string, unknown>) };
+    sections[secId] = {
+      ...((sections[secId] ?? {}) as Record<string, unknown>),
+      image: img,
+      ...(vsec?.imagePos !== undefined ? { imagePos: vsec.imagePos } : {}),
+      ...(vsec?.imageSize !== undefined ? { imageSize: vsec.imageSize } : {}),
+    };
+    page.sections = sections;
+    await patchSpace({ page });
+    return { ok: true, change: `put the "${secId}" photo back from the version recorded ${row.created_at ?? 'earlier'} (drafted — publish makes it live)` };
   }
 
   if (name === 'restore_space_page_version') {
