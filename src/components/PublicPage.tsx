@@ -305,6 +305,126 @@ function EArea({ value, save, paraClass, placeholder }: {
   );
 }
 
+/** Where a stored image position points, as a 0–100 percent from the top. */
+function pctOf(pos: string | number | undefined): number {
+  if (typeof pos === 'number') return Math.max(0, Math.min(100, pos));
+  const m = /([\d.]+)%\s*$/.exec(String(pos ?? ''));
+  if (m) return Math.max(0, Math.min(100, Number(m[1])));
+  if (pos === 'top') return 0;
+  if (pos === 'bottom') return 100;
+  return 50;
+}
+
+/** The photo twin of EText (founder 2026-09-08 redesign): every editable
+ *  photo wears an × in its top corner — which becomes a small blank white
+ *  box when the slot is empty — and a bar of four: Change · Make full
+ *  size · Crop · Reposition. Repositioning is a MODE now: the drag (and
+ *  its hint) arm only when asked, so a stray drag never re-crops a photo.
+ *  MUST stay module-level, like EText — defined inside the component it
+ *  would remount every parent render. */
+function EPhoto(props: {
+  src?: string | null;
+  className: string;               // the exact class of the img it replaces
+  fullClass?: string;              // appended when full-size
+  pct: number;
+  full: boolean;
+  /** Full-size is only real where the renderer honours imageSize. */
+  canFull?: boolean;
+  addTitle?: string;
+  upload: (f: File) => Promise<string | null>;
+  onImage: (url: string | null) => void;
+  onPct: (pct: number) => void;
+  onFull?: (full: boolean) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [repo, setRepo] = useState(false);
+  const [drag, setDrag] = useState<{ startY: number; startPct: number; pct: number } | null>(null);
+  const picker = (
+    <input
+      ref={fileRef} type="file" accept="image/*" hidden
+      onChange={async (e) => {
+        const f = e.target.files?.[0];
+        e.target.value = '';
+        if (!f) return;
+        setBusy(true);
+        try {
+          const url = await props.upload(f);
+          if (url) props.onImage(url);
+        } finally { setBusy(false); }
+      }}
+    />
+  );
+  if (!props.src) {
+    return (
+      <div className="ppage__ephoto-empty">
+        {picker}
+        <button
+          type="button" className="ppage__addbox" disabled={busy}
+          title={props.addTitle ?? 'Add a photo'} aria-label={props.addTitle ?? 'Add a photo'}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? '…' : ''}
+        </button>
+      </div>
+    );
+  }
+  const dragging = repo && !props.full;
+  return (
+    <div className="ppage__ephoto">
+      {picker}
+      <img
+        className={props.className
+          + (props.full && props.fullClass ? ` ${props.fullClass}` : '')
+          + (dragging ? ' is-draggable' : '')}
+        src={props.src} alt="" key={props.src} draggable={false}
+        style={props.full ? undefined : { objectPosition: `50% ${drag ? drag.pct : props.pct}%` }}
+        onPointerDown={dragging ? (e) => {
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          setDrag({ startY: e.clientY, startPct: props.pct, pct: props.pct });
+        } : undefined}
+        onPointerMove={dragging ? (e) => {
+          if (!drag) return;
+          const h = (e.target as HTMLElement).getBoundingClientRect().height || 1;
+          const pct = Math.max(0, Math.min(100, drag.startPct - ((e.clientY - drag.startY) / h) * 100));
+          setDrag({ ...drag, pct });
+        } : undefined}
+        onPointerUp={dragging ? () => {
+          if (!drag) return;
+          if (Math.round(drag.pct) !== Math.round(drag.startPct)) props.onPct(drag.pct);
+          setDrag(null);
+        } : undefined}
+      />
+      <button type="button" className="ppage__imgx" title="Remove this photo"
+        onClick={() => { setRepo(false); props.onImage(null); }}>×</button>
+      <div className="ppage__ecover-bar">
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>
+          {busy ? 'Uploading…' : 'Change'}
+        </button>
+        {props.canFull && props.onFull && (
+          <>
+            <button type="button" disabled={props.full}
+              onClick={() => { setRepo(false); props.onFull!(true); }}>
+              Make full size
+            </button>
+            <button type="button" disabled={!props.full} onClick={() => props.onFull!(false)}>
+              Crop
+            </button>
+          </>
+        )}
+        <button type="button" className={repo ? 'is-on' : ''} disabled={props.full}
+          title={props.full ? 'Crop first — a full-size photo shows all of itself' : undefined}
+          onClick={() => setRepo((r) => !r)}>
+          Reposition
+        </button>
+      </div>
+      {dragging && (
+        <p className="ppage__repo-hint">Click and drag the photo to reposition</p>
+      )}
+    </div>
+  );
+}
+
 export default function PublicPage(props: PublicPageProps) {
   const navigate = useNavigate();
   // The manual builder's in-place editor, when present (founder 2026-08-31).
@@ -490,6 +610,15 @@ export default function PublicPage(props: PublicPageProps) {
       && !page.sections?.facilities?.tabOff) {
     const at = liveChosen.findIndex((t) => t.id === 'contact');
     liveChosen.splice(at >= 0 ? at : liveChosen.length, 0, { id: 'facilities' });
+  }
+  // Content creates the People tab the same way (founder 2026-09-08): a page
+  // holding team members grows one, slotted before Contact, declinable via
+  // sections.team.tabOff.
+  if (liveChosen.length > 0 && (page.team?.length ?? 0) > 0
+      && !liveChosen.some((t) => t.id === 'team')
+      && !page.sections?.team?.tabOff) {
+    const at = liveChosen.findIndex((t) => t.id === 'contact');
+    liveChosen.splice(at >= 0 ? at : liveChosen.length, 0, { id: 'team' });
   }
 
   const sectionItems = liveChosen.length
@@ -706,14 +835,37 @@ export default function PublicPage(props: PublicPageProps) {
             : <p className="ppage__lead">{secLead(id)}</p>}
           <SecDoor id={id}>{door}</SecDoor>
         </div>
-        <img
-          className="ppage__split-img" src={sec.image} alt="" loading="lazy"
-          style={{ objectPosition: pos }}
-          /* Builder: this photo's full controls (change/remove/drag) live on
-             its own tab, where it renders as the hero — route there. */
-          onClick={() => (ed && hasTab(id) ? chooseTab(id) : setLightbox(sec.image!))}
-          title={ed && hasTab(id) ? 'Open the tab to edit this photo' : undefined}
-        />
+        {ed ? (
+          /* Editable RIGHT HERE on Home too (founder 2026-09-08: "let people
+             reposition, remove and change them from the Home page as well —
+             editable in multiple locations"). Same slot the tab's hero
+             edits: sections[id].image/imagePos. Full-size stays a tab-hero
+             affair (a split card is two columns by design), so canFull off. */
+          <EPhoto
+            src={sec.image}
+            className="ppage__split-img"
+            pct={pctOf(sec.imagePos)}
+            full={false}
+            upload={ed.uploadImage}
+            onImage={(url) => ed.update((p) => ({
+              ...p,
+              sections: {
+                ...p.sections,
+                [id]: { ...p.sections?.[id], image: url ?? undefined, ...(url ? {} : { imagePos: undefined, imageSize: undefined }) },
+              },
+            }))}
+            onPct={(pct) => ed.update((p) => ({
+              ...p,
+              sections: { ...p.sections, [id]: { ...p.sections?.[id], imagePos: `50% ${Math.round(pct)}%` } },
+            }))}
+          />
+        ) : (
+          <img
+            className="ppage__split-img" src={sec.image} alt="" loading="lazy"
+            style={{ objectPosition: pos }}
+            onClick={() => setLightbox(sec.image!)}
+          />
+        )}
       </section>
     );
   };
@@ -741,9 +893,8 @@ export default function PublicPage(props: PublicPageProps) {
   // Home/Feed (and About's fallback) wear page.cover; every other tab its
   // own sections[tab].image. Dragging writes the position back to the slot
   // the photo actually came from.
-  const coverFileRef = useRef<HTMLInputElement | null>(null);
-  const [coverDrag, setCoverDrag] = useState<{ startY: number; startPct: number; pct: number } | null>(null);
-  const [coverBusy, setCoverBusy] = useState(false);
+  // (The hero's own file-input/drag/busy states moved into EPhoto — the
+  // shared photo-control component — 2026-09-08.)
   // In-place controls for the OTHER pictures (founder 2026-09-07: "the text
   // is editable, but you can't edit the pictures, except the cover") — the
   // photo strip and each person's photo get their own pickers.
@@ -928,69 +1079,27 @@ export default function PublicPage(props: PublicPageProps) {
         {navInHero && navNode}
         {ed ? (
           <div className={'ppage__ecover' + (coverSrc ? '' : ' is-empty')}>
-            <input
-              ref={coverFileRef} type="file" accept="image/*" hidden
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (!f) return;
-                setCoverBusy(true);
-                try {
-                  const url = await ed.uploadImage(f);
-                  if (url) setCoverImage(url);
-                } finally { setCoverBusy(false); }
-              }}
+            {/* One photo-control grammar everywhere (founder 2026-09-08):
+                corner × (a blank white box when empty), then Change · Make
+                full size · Crop · Reposition — dragging arms only when
+                asked. EPhoto owns it; this call just wires the hero's slot
+                (page cover vs the tab's section image). */}
+            <EPhoto
+              src={coverSrc}
+              className="ppage__cover"
+              fullClass="ppage__cover--full"
+              pct={currentCoverPct}
+              full={coverFull}
+              canFull={usingSectionImage}
+              addTitle={tab === 'home' || tab === 'feed' || !tabbed ? 'Add a cover photo' : 'Add a photo for this tab'}
+              upload={ed.uploadImage}
+              onImage={(url) => setCoverImage(url)}
+              onPct={(pct) => commitCoverPct(pct)}
+              onFull={(f) => ed.update((p) => ({
+                ...p,
+                sections: { ...p.sections, [tab]: { ...p.sections?.[tab], imageSize: f ? 'full' : undefined } },
+              }))}
             />
-            {coverSrc ? (
-              <>
-                <img
-                  className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '') + ' is-draggable'}
-                  src={coverSrc} alt="" key={coverSrc} draggable={false}
-                  style={coverFull ? undefined : { objectPosition: `50% ${coverDrag ? coverDrag.pct : currentCoverPct}%` }}
-                  onPointerDown={(e) => {
-                    if (coverFull) return;
-                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    setCoverDrag({ startY: e.clientY, startPct: currentCoverPct, pct: currentCoverPct });
-                  }}
-                  onPointerMove={(e) => {
-                    if (!coverDrag) return;
-                    const h = (e.target as HTMLElement).getBoundingClientRect().height || 1;
-                    const pct = Math.max(0, Math.min(100, coverDrag.startPct - ((e.clientY - coverDrag.startY) / h) * 100));
-                    setCoverDrag({ ...coverDrag, pct });
-                  }}
-                  onPointerUp={() => {
-                    if (!coverDrag) return;
-                    if (Math.round(coverDrag.pct) !== Math.round(coverDrag.startPct)) commitCoverPct(coverDrag.pct);
-                    setCoverDrag(null);
-                  }}
-                />
-                <div className="ppage__ecover-bar">
-                  {!coverFull && <span className="ppage__ecover-hint">Drag the photo to choose what shows</span>}
-                  <button type="button" onClick={() => coverFileRef.current?.click()} disabled={coverBusy}>
-                    {coverBusy ? 'Uploading…' : 'Change'}
-                  </button>
-                  {usingSectionImage && (
-                    <button
-                      type="button"
-                      onClick={() => ed.update((p) => ({
-                        ...p,
-                        sections: { ...p.sections, [tab]: { ...p.sections?.[tab], imageSize: coverFull ? undefined : 'full' } },
-                      }))}
-                    >
-                      {coverFull ? 'Standard crop' : 'Expand to full size'}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setCoverImage(null)}>Remove</button>
-                </div>
-              </>
-            ) : (
-              <button
-                type="button" className="ppage__ecover-add"
-                onClick={() => coverFileRef.current?.click()} disabled={coverBusy}
-              >
-                {coverBusy ? 'Uploading…' : (tab === 'home' || tab === 'feed' || !tabbed ? '+ Add a cover photo' : `+ Add a photo for this tab`)}
-              </button>
-            )}
           </div>
         ) : coverSrc && (
           <img
@@ -1366,10 +1475,25 @@ export default function PublicPage(props: PublicPageProps) {
         </section>
       )}
 
-      {/* 4b · The people — part of the story, so they live on About */}
-      {(page.team?.length ?? 0) > 0 && show('about') && (
+      {/* 4b · The people — a SECTION with its own tab now (founder
+          2026-09-08: "it feels like a common tab for most websites to
+          showcase their team"). Words written into the OLD template People
+          tab (lead/body, before it was built-in) still render above the
+          grid — the facilities migration rule. */}
+      {(page.team?.length ?? 0) > 0 && show('team') && (
         <section className="ppage__sec" data-edit-region="team">
           <h2 className="ppage__h2">The people</h2>
+          {(() => {
+            const legacy = (page.tabs ?? []).find((t) => t.id === 'team');
+            return (
+              <>
+                {legacy?.lead && <p className="ppage__lead">{legacy.lead}</p>}
+                {legacy?.body && legacy.body.split(/\n{2,}/).filter(Boolean).map((para, i) => (
+                  <p className="ppage__para" key={i}>{para}</p>
+                ))}
+              </>
+            );
+          })()}
           {ed && (
             <input ref={teamFileRef} type="file" accept="image/*" hidden
               onChange={async (e) => {

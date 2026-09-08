@@ -462,3 +462,24 @@
 .ppage__site { margin-top: 2px; }
 .ppage__site-link { font-size: 12px; color: var(--peach-deep, var(--peach)); text-decoration: none; }
 .ppage__site-link:hover { text-decoration: underline; }
+
+/* EPhoto — the one photo-control grammar (2026-09-08). */
+.ppage__ephoto { position: relative; }
+.ppage__ephoto .is-draggable { cursor: ns-resize; touch-action: none; user-select: none; }
+.ppage__ephoto-empty { display: flex; justify-content: flex-end; padding: 6px 0; }
+.ppage__addbox {
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  background: #fff; border: 1px solid var(--bone-edge, #e2ddd3);
+  box-shadow: var(--sh-soft, 0 1px 4px rgba(0,0,0,0.08));
+}
+.ppage__addbox:hover { border-color: var(--ppage-accent, var(--peach)); }
+.ppage__ecover-bar button.is-on {
+  background: var(--ppage-accent, var(--peach)); color: #fff;
+}
+.ppage__ecover-bar button:disabled { opacity: 0.45; cursor: default; }
+.ppage__repo-hint {
+  font-size: 12px; color: var(--ppage-ink-muted, var(--ink-muted));
+  text-align: center; margin-top: 6px;
+}
+/* The flip must move the WRAPPER when the builder nests the img (2026-09-08). */
+.ppage__sec--split.is-flip .ppage__ephoto { order: 1; }

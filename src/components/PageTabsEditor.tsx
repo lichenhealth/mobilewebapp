@@ -629,6 +629,32 @@ export default function PageTabsEditor({
           )}
         </div>
       )}
+      {/* Content creates the People tab too (founder 2026-09-08): team
+          members on the page grow one — this row names it; the × declines
+          (sections.team.tabOff). Its content is the People editor below. */}
+      {(team?.length ?? 0) > 0 && !tabs.some((t) => t.id === 'team') && !sections?.team?.tabOff && (
+        <div className="ptabs__tab">
+          <div className="ptabs__row">
+            <span className="ptabs__name">
+              <Icon name="user-multiple" size={15} /> People
+              <em className="ptabs__auto">added by itself — your page has people on it</em>
+            </span>
+            <span className="ptabs__moves">
+              <button className="ptabs__mv ptabs__mv--rm"
+                onClick={() => patchSection('team', { tabOff: true })}
+                aria-label="Hide the People tab">×</button>
+            </span>
+          </div>
+        </div>
+      )}
+      {(team?.length ?? 0) > 0 && !tabs.some((t) => t.id === 'team') && sections?.team?.tabOff && (
+        <p className="ptabs__note">
+          The People tab is hidden — the people show on Home only.{' '}
+          <button type="button" className="ptabs__restore" onClick={() => patchSection('team', { tabOff: false })}>
+            Bring the tab back
+          </button>
+        </p>
+      )}
       {hasFacilities && !tabs.some((t) => t.id === 'facilities') && sections?.facilities?.tabOff && (
         <p className="ptabs__note">
           The Facilities tab is hidden — its content shows on Home only.{' '}

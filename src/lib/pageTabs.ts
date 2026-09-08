@@ -48,6 +48,13 @@ export const TAB_TEMPLATES: TabTemplate[] = [
   // comes from data Lichen already holds. SECTION_IDS below now enforces it.
   { id: 'facilities', label: 'Facilities', icon: 'location', builtIn: true,
     blurb: 'The rooms, the land, the equipment.' },
+  // PEOPLE IS BUILT-IN TOO (founder 2026-09-08: "shouldn't we have a people
+  // tab, since it feels like a common tab for most websites to showcase
+  // their team?"). It sat below as a writable TEMPLATE tab while PublicPage
+  // rendered "The people" from page.team — the exact double-renderer shape
+  // that made the facilities bug. Its body is the People editor's data.
+  { id: 'team', label: 'People', icon: 'user-multiple', builtIn: true,
+    blurb: 'Who does the work — the People editor fills this.' },
 
   // ── The ones most websites have ─────────────────────────────────────────
   { id: 'hours', label: 'Hours', icon: 'calendar',
@@ -59,9 +66,6 @@ export const TAB_TEMPLATES: TabTemplate[] = [
   { id: 'faq', label: 'FAQ', icon: 'chat',
     blurb: 'The questions you answer over and over.',
     starter: 'The things people ask most.' },
-  { id: 'team', label: 'People', icon: 'user-multiple',
-    blurb: 'Who does the work.',
-    starter: 'Who you’ll be working with.' },
   { id: 'gallery', label: 'Gallery', icon: 'image',
     blurb: 'Photographs, with a line about each.',
     starter: '' },
@@ -106,7 +110,7 @@ export const tabById = (id: string): TabTemplate | undefined =>
  *     list, whatever the flag says — so a future drift can't duplicate.
  *   · The assertion below, and `npm run check:sections`, fail loudly the
  *     moment the two disagree. */
-export const SECTION_IDS = ['about', 'services', 'goods', 'facilities', 'contact'] as const;
+export const SECTION_IDS = ['about', 'services', 'goods', 'facilities', 'contact', 'team'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 export const isSectionTab = (id: string): boolean =>
   (SECTION_IDS as readonly string[]).includes(id);
