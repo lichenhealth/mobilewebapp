@@ -82,8 +82,17 @@ purpose funds beside the general pool ("You choose the well — Lichen
 chooses who drinks"), restrictions name open charitable classes never
 persons, family/household rule is funding-SEGREGATION never denial
 (negative-proof tranche accounting — prove whose money it wasn't, never
-show whose it was). ⚠ NONE of it is built; the gap must never be described
-to third parties as closed. Six build decisions await the founder in the
+show whose it was). **Operating allocation finalized on the page 2026-09-09**
+(founder's copy, applied to lichen-health/subsidy-policy.astro): designated
+gifts carry 5% min / 15% max, the rate set ANNUALLY to actual trailing-
+twelve-month operating costs; overage while young is covered by earned
+revenue, unrestricted gifts, and the founder's unpaid time and personal
+funds; UNRESTRICTED gifts carry no cap (may fund operations in full); the
+page names what operations cost as of Sept 2026 (Vercel/Supabase/Figma/
+Claude, legal, accounting, periodic engineering consultation; founder
+unpaid). Assistants: say "5–15% on designated gifts, set annually to real
+costs", never a fixed 95/5. ⚠ NONE of the mechanics are built; the gap must
+never be described to third parties as closed. Six build decisions await the founder in the
 "Filling the Well" artifact; the mechanics proposal lives on branch
 claude/goofy-cori-eb2846 (PR #156, docs-only).
 
