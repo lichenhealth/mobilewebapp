@@ -77,7 +77,15 @@ the WeavePitch template.
 
 ## Subsidy policy — state as of 2026-09-01
 
-Live at lichen.health/subsidy-policy, **DRAFT pending Eva + attorney**:
+Live at lichen.health/subsidy-policy. **Eva (accountant, Eva 990 &
+Associates) BLESSED the page** — in writing 2026-08-28 ("I read your HOW
+SUBSIDIES WORK AT LICHEN and it looks good to me", with her plain
+not-a-lawyer caveat) and as-is per founder 2026-09-09, advising the page
+be LESS detailed — her written principle: the public page states the
+principle, the individualized written commitment carries the
+legally-operative detail (FMV + deduction-limit language). Trim pass
+awaits the founder's go; ATTORNEY review still open, DRAFT banner stays
+until it lands. Original state, **DRAFT pending Eva + attorney**:
 purpose funds beside the general pool ("You choose the well — Lichen
 chooses who drinks"), restrictions name open charitable classes never
 persons, family/household rule is funding-SEGREGATION never denial
