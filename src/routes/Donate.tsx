@@ -8,6 +8,10 @@ import './Donate.css';
 const PORTAL = 'https://billing.stripe.com/p/login/9B6bJ00MU047bRidT3bII00';
 const PAYPAL = 'https://www.paypal.com/donate/?hosted_button_id=F2A847YRU7EPU';
 const CALENDLY = 'https://calendly.com/galyntime';
+// The check card asks donors to email for the mailing address rather than
+// printing one — no home address on the open web (founder 2026-09-08).
+const CHECK_EMAIL = 'connect@lichen.health';
+const CHECK_MAILTO = 'mailto:connect@lichen.health?subject=Mailing%20address%20for%20a%20check&body=Hello%2C%0A%0AI%20would%20like%20to%20send%20a%20check.%20Could%20you%20share%20the%20current%20mailing%20address%3F%0A%0AThank%20you%2C';
 const PRESETS = [25, 50, 100, 250];
 
 // The intentions donors reach for most — one tap fills the field.
@@ -166,7 +170,7 @@ export default function Donate() {
 
   async function copyCheck() {
     try {
-      await navigator.clipboard.writeText('Lichen Health\nGalyn Burke\n2076 Nova Rd.\nPine, CO 80470');
+      await navigator.clipboard.writeText(CHECK_EMAIL);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {}
@@ -442,10 +446,14 @@ export default function Donate() {
             </div>
             <div className="donate__check-row">
               <span className="donate__check-label">Mail to</span>
-              <span className="donate__check-val">Galyn Burke<br />2076 Nova Rd.<br />Pine, CO 80470</span>
+              {/* The email shows as TEXT, not only a mailto link — plenty of
+                  desktops have no mail client configured, and a dead click
+                  with nothing to copy is a lost check. */}
+              <span className="donate__check-val">Email us for current mailing details<br />{CHECK_EMAIL}</span>
             </div>
+            <a className="donate__way-cta" href={CHECK_MAILTO}>Email us</a>
             <button type="button" className="donate__check-copy" onClick={copyCheck}>
-              {copied ? 'Copied!' : 'Copy details'}
+              {copied ? 'Copied!' : 'Copy email'}
             </button>
           </div>
         </div>

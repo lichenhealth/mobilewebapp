@@ -48,6 +48,11 @@ the WeavePitch template.
   95% as Current-cy — ⚠ code lags the new policy (see subsidy section).
   Sponsorships (donor picks the recipient, the "Give" flow) are the
   non-deductible conduit carve-out, separate from donations.
+- **No home address on the open web** (2026-09-08): the /donate check card
+  no longer prints a mailing address — it shows connect@lichen.health as
+  visible text plus an "Email us" mailto, and donors are sent the current
+  address by reply. Any future printed mailing address must be a PO box or
+  registered-agent address, never the founder's home.
 - **The float rule** (inviolable): never mint more Current-cy than donation
   dollars actually held. `currentcy_float_summary()` is the gauge.
 - **Current-cy** = DB ledger + $1 peg, NO blockchain (settled 2026-07-18,
