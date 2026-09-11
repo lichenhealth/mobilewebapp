@@ -177,7 +177,17 @@ promise was SOFTENED (founder 2026-09-11 late pass): the page now says
 be reviewed by an algorithm alone" — the founder wants the model to
 read words and become a bigger part of subsidy decision-making over
 time, with the human steward and the member's omit lever as the
-standing guarantees. Never re-introduce "no model ever reads" claims. Caps
+standing guarantees. Never re-introduce "no model ever reads" claims.
+**PER-SESSION CAP IS FMV, NOT A DOLLAR FIGURE (founder 2026-09-11, late
+pass):** "$150/session" retired — the fund contributes up to the fair
+market value of the session delivered, so practitioners can't game
+pricing; a $300 five-hour session at or below FMV is subsidized in
+full, an inflated price only ever up to FMV. Per-member cap RAISED to
+$1,000/member/month, framed as a while-the-well-is-small number ("While
+the platform is in its infancy…"); the fund hard-stop stands. This chimes with Eva's individualized-
+commitment principle — FMV language was already hers. Build note:
+session billing needs an FMV reference per service type, not a flat
+cap constant. Caps
 ($150/session, $600/member/month, hard-stop) survive unchanged.
 **NEW DOCTRINE — SMALL ON PURPOSE (founder, same message):** "we err on
 the side of keeping the platform small and adequately supporting current
