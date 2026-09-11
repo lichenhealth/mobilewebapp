@@ -171,8 +171,13 @@ distress gets ADDICTION care — different interventions, nobody ranked).
 The governing question: what most reduces depletion of collective
 resources and most restores capacity for positive contribution. A HUMAN
 STEWARD sets rate + aim at enrollment against the written criteria,
-recorded with reasons; automatic per-session after; the no-AI promise
-now reads "a human does the reading" (no formula to claim). Caps
+recorded with reasons; automatic per-session after. ⚠ The no-AI-ever
+promise was SOFTENED (founder 2026-09-11 late pass): the page now says
+"Whether AI reads your picture is up to you, but your story will never
+be reviewed by an algorithm alone" — the founder wants the model to
+read words and become a bigger part of subsidy decision-making over
+time, with the human steward and the member's omit lever as the
+standing guarantees. Never re-introduce "no model ever reads" claims. Caps
 ($150/session, $600/member/month, hard-stop) survive unchanged.
 **NEW DOCTRINE — SMALL ON PURPOSE (founder, same message):** "we err on
 the side of keeping the platform small and adequately supporting current
