@@ -118,6 +118,21 @@ export async function loadCarePosts(patientId: string, kind: CareKind, opts: Loa
   return (data as unknown as CarePostRow[] | null) ?? [];
 }
 
+/** Which dimensions the member has ALREADY spoken to in their own voice —
+ *  the guided intake (founder 2026-09-11, onboarding Mark's cohort) lands on
+ *  the first unanswered one and never re-asks what's been given. */
+export async function myAnsweredWowDimensions(me: string): Promise<Set<Dimension>> {
+  const { data } = await supabase
+    .from('care_posts')
+    .select('dimensions')
+    .eq('patient_id', me).eq('author_id', me).eq('kind', 'wow');
+  const out = new Set<Dimension>();
+  for (const r of (data as { dimensions: Dimension[] }[] | null) ?? []) {
+    for (const d of r.dimensions ?? []) out.add(d);
+  }
+  return out;
+}
+
 // ─── Derived WOW radar ───────────────────────────────────────────────────────
 export interface WowScores { byDimension: Record<Dimension, number | null>; overall: number | null }
 
