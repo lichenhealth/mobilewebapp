@@ -103,6 +103,39 @@ costs", never a fixed 95/5. ⚠ NONE of the mechanics are built; the gap must
 never be described to third parties as closed. Six build decisions await the founder in the
 "Filling the Well" artifact; the mechanics proposal lives on branch
 claude/goofy-cori-eb2846 (PR #156, docs-only).
+**FAMILY RULE SIMPLIFIED (founder 2026-09-11, the Mark's-sister case).**
+The segregation mechanics are RETIRED from the page: with one donor and
+zero earned revenue (all alpha members use the platform free, by choice)
+"funded from dollars given by unrelated donors" was a pool of zero, so
+the tranche promise produced the very denial it was written to avoid.
+Settled: it was OUR policy, not an IRS rule — the law has no bar on a
+donor's relative (or a past donor) receiving a need-based subsidy; what
+it polices is EARMARKING (a gift understood to be for a named person),
+QUID PRO QUO (a gift replacing care the donor would otherwise pay for),
+and INSIDER BENEFIT (a benefit to a disqualified person or their family
+beyond what an unrelated applicant would get — siblings count as family
+there, nieces/nephews do not, and it bites only if the donor is an
+insider at all). Replacement copy for the "Donor Neutrality" section
+(pending Eva's read, to be applied in lichen-health/subsidy-policy.astro):
+"Being a donor, or being related to one, neither qualifies nor
+disqualifies anyone. Subsidies are decided against our written criteria,
+never by relationship." The pooled/untraceable paragraph above it stays
+and does the legal work; the onboarding household-disclosure ask goes.
+⚠ Say "written criteria" — there is NO published criteria/algorithm
+page yet; link it the day it exists. ⚠ Suggested same pass: the bright
+line about paying for "a specific person's care" should name "your own
+care, or a specific person's" — it is now the only place quid-pro-quo
+lives on the page. THE AUDIT DEFENSE IS THE FILE, NOT THE RATIO: one
+record per subsidy decision (who, how much, why, how selected, any
+relationship to officers or major contributors — written IN the file,
+never around it), criteria dated before applications, the donor's
+acknowledgment saying unrestricted/general fund, no conversation between
+donor and Lichen about a relative's application, board recusal if the
+donor ever sits. Founder's plan: a broad alpha client pool in Concierge
+so any related applicant is one of many drawing on the same gift, plus a
+few more dollars in before launch for optics — comfort measures, neither
+legally required. Assistants: never tell a member a relative of a donor
+can't receive a subsidy.
 
 ## Fundraising strategy & pipeline
 
