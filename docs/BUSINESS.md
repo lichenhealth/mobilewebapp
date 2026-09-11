@@ -121,8 +121,7 @@ insider at all). Replacement copy for the "Donor Neutrality" section
 disqualifies anyone. Subsidies are decided against our written criteria,
 never by relationship." The pooled/untraceable paragraph above it stays
 and does the legal work; the onboarding household-disclosure ask goes.
-⚠ Say "written criteria" — there is NO published criteria/algorithm
-page yet; link it the day it exists. ⚠ Suggested same pass: the bright
+The criteria page EXISTS now — see the 2026-09-11 block below. ⚠ Suggested same pass: the bright
 line about paying for "a specific person's care" should name "your own
 care, or a specific person's" — it is now the only place quid-pro-quo
 lives on the page. THE AUDIT DEFENSE IS THE FILE, NOT THE RATIO: one
@@ -136,6 +135,37 @@ so any related applicant is one of many drawing on the same gift, plus a
 few more dollars in before launch for optics — comfort measures, neither
 legally required. Assistants: never tell a member a relative of a donor
 can't receive a subsidy.
+**THE CRITERIA PAGE IS PUBLISHED (2026-09-11)** — lichen.health/subsidy-criteria,
+linked from the policy page three times (the donor paragraph's
+"need-based criteria" anchor — founder's exact wording: "By default, your
+gift joins the general subsidy fund, pooled with every other donation
+allocated by Lichen alone against the need-based criteria within our Web
+of Wellbeing assessment." — plus both "written criteria" phrases), with a
+back button to the policy. It carries the assessment→formula story: WOW
+assessment as front door, four financial numbers + household size are ALL
+the formula reads, deterministic-not-AI stated plainly, FPL tier table
+(≤150% pay 0 / 150–200% pay 25% / 200–250% pay 50% / 250–300% pay 75% /
+>300% full price), margin adjustment (income−expenses < $200/mo moves one
+tier toward more support, only ever in the member's favor), payment flows
+through Lichen (practitioner paid in full, never told who's subsidized),
+human steward look ONCE at enrollment recorded with reasons then automatic
+per-session, exposure door funded in full outside the formula, caps
+($150/session, $600/member/month, fund hard-stop), relationship-neutral
+line (the simplified family rule), versioned-in-the-open promise.
+⚠ Banner reads "Working draft · Numbers pending final approval" — the
+percentages/caps are the PROPOSAL the founder has seen but not explicitly
+blessed; the structure is presented as settled. FPL dollar figures are
+deliberately NOT printed (the page defers to "the federal guidelines
+published each year"), so no annual copy edit and no wrong-year number.
+**Subsidy build decisions (founder 2026-09-11, this session):** whole
+payment runs through Lichen (member pays computed rate via Stripe, fund
+covers the rest — what makes practitioner-blindness true); Mark's $10K =
+program-restricted donation at 5% operating (his generosity with general
+gifts earned the minimum rate); practitioners accrue Current-cy and cash
+out to dollars (mint→grant→burn), 1099 tracked per practitioner per year.
+Guided WOW intake shipped at /concierge/intake (PR #157) — the front door
+the policy names. Still to build: fund+policy tables, rate computation,
+session billing.
 
 ## Fundraising strategy & pipeline
 
