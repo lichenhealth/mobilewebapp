@@ -1391,7 +1391,7 @@ export default function Concierge() {
                   <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
                   <span className="wow__overall-lbl">Overall wellbeing</span>
                 </div>
-                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={200} /></div>
+                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={260} /></div>
               </>
             )}
             {dataReady && wowPosts.length > 0 && (
