@@ -1382,13 +1382,20 @@ export default function Concierge() {
         return (
           <>
             {!dataReady && <p className="conc__care-hint">Loading…</p>}
-            {dataReady && wowPosts.length > 0 && (
+            {/* The web itself always leads the board (founder 2026-09-11):
+                with no entries it renders blank — the web waiting for inputs —
+                rather than nothing. */}
+            {dataReady && (
               <>
                 <div className="wow__overall">
                   <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
                   <span className="wow__overall-lbl">Overall wellbeing</span>
                 </div>
                 <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={200} /></div>
+              </>
+            )}
+            {dataReady && wowPosts.length > 0 && (
+              <>
                 <div className="wow__chips">
                   {(['All', ...WOW_DIMENSIONS] as const).map((c) => (
                     <button key={c} className={'wow__chip' + (wowFilter === c ? ' is-on' : '')} onClick={() => setWowFilter(c)}>{c}</button>
