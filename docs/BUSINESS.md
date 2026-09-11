@@ -157,6 +157,32 @@ percentages/caps are the PROPOSAL the founder has seen but not explicitly
 blessed; the structure is presented as settled. FPL dollar figures are
 deliberately NOT printed (the page defers to "the federal guidelines
 published each year"), so no annual copy edit and no wrong-year number.
+**FPL TIERS RETIRED SAME DAY (founder 2026-09-11, before ever taking
+effect):** "I don't think we should use the standard poverty line
+metrics" — an income line can't see a life. The page's "The tiers"
+became **"The Criteria"**: whole-picture reading — what comes in AND HOW
+(the work behind it), what goes out AND TOWARD WHAT (spending that
+resources a life reads as need, not discretion; support given to others
+counts), what's left, and **WHAT CARE COMES NEXT** — a subsidy is AIMED,
+not just sized (founder's pair: a poorly-paid teacher funding a
+niece/nephew's clean food gets naturopathic care; someone at the same
+income dependent on alcohol/online gambling to avoid unresolved-PTSD
+distress gets ADDICTION care — different interventions, nobody ranked).
+The governing question: what most reduces depletion of collective
+resources and most restores capacity for positive contribution. A HUMAN
+STEWARD sets rate + aim at enrollment against the written criteria,
+recorded with reasons; automatic per-session after; the no-AI promise
+now reads "a human does the reading" (no formula to claim). Caps
+($150/session, $600/member/month, hard-stop) survive unchanged.
+**NEW DOCTRINE — SMALL ON PURPOSE (founder, same message):** "we err on
+the side of keeping the platform small and adequately supporting current
+members before expanding the community... fewer people getting more
+support and expand carefully" — stated on the page as its own section;
+aligns with the alpha posture ("test this out with a small group and do
+it right"). Growth conversations must honor it.
+⚠ Build shape change: task "rate computation" is no longer an FPL
+formula — it's steward-set rate + aim stored as versioned data at
+enrollment; sessions bill against the stored rate.
 **Subsidy build decisions (founder 2026-09-11, this session):** whole
 payment runs through Lichen (member pays computed rate via Stripe, fund
 covers the rest — what makes practitioner-blindness true); Mark's $10K =
