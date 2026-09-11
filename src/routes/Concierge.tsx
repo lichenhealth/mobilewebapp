@@ -467,7 +467,7 @@ function MeansCard({ subjectId, me, openSignal, web, standalone }: {
                 It is important to look at the causes and solutions to your
                 financial needs holistically in order to best support you.
                 Please fill out the rest of your{' '}
-                <Link className="means__web-link" to="/concierge/wow/edit">Web of Wellbeing</Link>{' '}
+                <Link className="means__web-link" to="/concierge/intake">Web of Wellbeing</Link>{' '}
                 to get started.
               </span>
             </p>
@@ -692,6 +692,14 @@ function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void
         one life. Write as much or as little as you like, score any you want on
         the web, and skip what isn&rsquo;t ready. Your care team can read what
         you share here, and their entries will weave in alongside yours.
+      </p>
+      {/* The guided walk (founder 2026-09-11): one dimension at a time, the
+          what's-in-the-way questions, and the money picture — the onboarding
+          door for people arriving through Concierge. */}
+      <p className="selfaudit__fine">
+        Prefer to be walked through it?{' '}
+        <Link className="selfaudit__meanslink" to="/concierge/intake">Take the guided intake</Link>
+        {' '}— one aspect at a time, about ten minutes.
       </p>
       {WOW_DIMENSIONS.map((d) => (
         <div className="selfaudit__dim" key={d}>

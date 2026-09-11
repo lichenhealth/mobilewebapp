@@ -10,6 +10,7 @@ import Bookings from './routes/Bookings';
 import BookSession from './routes/BookSession';
 import Marketplace from './routes/Marketplace';
 import Concierge, { FinancialProfilePage } from './routes/Concierge';
+import WowIntake from './routes/WowIntake';
 import Caregiver from './routes/Caregiver';
 import CarePostComposer from './routes/CarePostComposer';
 import Directory from './routes/Directory';
@@ -251,6 +252,9 @@ export default function App() {
           <Route path="/concierge/client/:patientId"           element={<Concierge />} />
           {/* No :patientId = your own board — the WOW self-entry door. */}
           <Route path="/concierge/wow/edit" element={<CarePostComposer kind="wow" />} />
+          {/* The guided walk through all six dimensions (founder 2026-09-11
+              — the onboarding front door for the first Concierge cohort). */}
+          <Route path="/concierge/intake" element={<WowIntake />} />
           <Route path="/concierge/client/:patientId/wow/edit"  element={<CarePostComposer kind="wow" />} />
           <Route path="/concierge/client/:patientId/koc/edit"  element={<CarePostComposer kind="koc" />} />
           <Route path="/concierge/client/:patientId/:tab"      element={<Concierge />} />
