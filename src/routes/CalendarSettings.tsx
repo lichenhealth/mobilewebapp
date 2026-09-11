@@ -163,9 +163,8 @@ export default function CalendarSettings() {
   if (!me) {
     return (
       <div className="cedit">
-        <header className="cedit__head">
-          <button className="conc__back" onClick={() => navigate('/calendar')} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
-          <h1 className="cedit__title">Calendar settings</h1>
+        <header className="cedit__head cedit__head--noback">
+                    <h1 className="cedit__title">Calendar settings</h1>
           <span />
         </header>
         <p className="cedit__hint" style={{ padding: 'var(--s-4)' }}>Loading…</p>
@@ -175,9 +174,8 @@ export default function CalendarSettings() {
 
   return (
     <div className="cedit">
-      <header className="cedit__head">
-        <button className="conc__back" onClick={() => navigate('/calendar')} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
-        <h1 className="cedit__title">Calendar settings</h1>
+      <header className="cedit__head cedit__head--noback">
+                <h1 className="cedit__title">Calendar settings</h1>
         <span />
       </header>
 

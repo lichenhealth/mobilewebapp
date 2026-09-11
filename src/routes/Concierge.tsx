@@ -1599,10 +1599,8 @@ export function FinancialProfilePage() {
   if (!me) return null;
   return (
     <div className="cedit">
-      <header className="cedit__head">
-        <button className="conc__back" onClick={() => navigate('/concierge')} aria-label="Back">
-          <Icon name="arrow-left" size={18} />
-        </button>
+      <header className="cedit__head cedit__head--noback">
+        {/* TopBar's arrow is a real back button — no second one (founder 2026-09-11) */}
         <h1 className="cedit__title">Financial health profile</h1>
       </header>
       <p className="means__pagelead">
