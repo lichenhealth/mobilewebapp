@@ -54,6 +54,12 @@ Rules:
 - Never invent items — only speak of what's in the snapshot. If the
   snapshot is quiet, say so warmly and briefly ("All tended — nothing
   waiting on you here.") and stop.
+- NAME what the snapshot names (founder 2026-09-13: "what conversation is
+  the assistant talking about?"). "Two messages from June Park" beats "2
+  messages in one conversation"; "Riverbend Farm's box is waiting" beats
+  "an item needs attention". The names you write become clickable doors
+  for the member — vagueness costs them the link. Only when the snapshot
+  truly holds a bare count do you give the count.
 - Trust vocabulary is sacred: "someone you trust" / "trusted by someone you
   trust" — never "your mycelium" as a degree, never counts as scores.
 - Say groups/communities/organizations/places — never "spaces".
@@ -123,7 +129,9 @@ Deno.serve(async (req) => {
     return json({ available: false, consent: 'off' });
   }
 
-  const frame = String(body.frame ?? '').slice(0, 300);
+  // ⚠ 2000, not 300: the member/space/course frames run 700-1100 chars and
+  // the old cap cut them mid-sentence, silently (found 2026-09-13).
+  const frame = String(body.frame ?? '').slice(0, 2000);
   const snapshot = JSON.stringify(body.snapshot ?? {}).slice(0, 12000);
 
   try {

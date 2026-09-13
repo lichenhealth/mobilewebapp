@@ -601,13 +601,23 @@ export default function AssistantBrief() {
               conversations: waiting.length,
               messages: waiting.reduce((a, b) => a + b.unread, 0),
             };
+            // WHICH conversation, by name, on Home too (founder 2026-09-13:
+            // "the message here is vague. What conversation is the assistant
+            // talking about?") — the model can only name what it's given,
+            // and Home's snapshot used to carry bare counts. Names double as
+            // doors: each room title joins the linkify refs. The deeper
+            // message-content read stays Chat's own.
+            const vms = await loadChatList(me).catch(() => []);
+            const byId = new Map(vms.map((v) => [v.id, v]));
+            extras.waiting_on_you = waiting.slice(0, 10).map((w) => {
+              const room = byId.get(w.chat_id);
+              return { room: room?.title ?? 'a conversation', unread: w.unread };
+            });
+            waiting.slice(0, 10).forEach((w) => {
+              const room = byId.get(w.chat_id);
+              if (room?.title) found.push({ label: room.title, to: `/chat/${w.chat_id}` });
+            });
             if (section === 'chat') {
-              const vms = await loadChatList(me).catch(() => []);
-              const byId = new Map(vms.map((v) => [v.id, v]));
-              extras.waiting_on_you = waiting.slice(0, 10).map((w) => {
-                const room = byId.get(w.chat_id);
-                return { room: room?.title ?? 'a conversation', unread: w.unread };
-              });
               // The deeper read (founder 2026-07-28): recent exchanges across
               // your rooms, so the brief can say what threads are actually
               // about — not just who's waiting. Newest first, capped, and
@@ -791,11 +801,20 @@ export default function AssistantBrief() {
 
       {section === 'profile' && buildIntent && buildCard}
 
+      {/* The briefing IS a chat run (founder 2026-09-13, second pass:
+          "still not consistent with chat, so can you reconcile?") — the
+          exact anatomy every conversation on Lichen wears: speaker name +
+          role above, the face bottom-aligned beside a white bubble. The
+          first pass's floating corner brain read as a decoration, not a
+          speaker. */}
+      <div className="abrief__run">
+        <div className="abrief__run-meta">
+          <span className="abrief__run-name">Claude</span>
+          <span className="abrief__run-role">· AI Assistant</span>
+        </div>
+        <div className="abrief__run-row">
+          <span className="abrief__run-ava" aria-hidden><Icon name="brain" size={15} /></span>
       <div className="abrief__card">
-        {/* The briefing wears its SPEAKER (founder 2026-09-13, the
-            personification grammar: every utterance wears who said it —
-            the mockups' corner brain, now real). */}
-        <span className="abrief__cardava" aria-hidden><Icon name="brain" size={12} /></span>
         {!doorOn && (
           <p className="abrief__text">
             The assistant is <strong>off</strong> for this part of your Lichen life — nothing
@@ -819,6 +838,8 @@ export default function AssistantBrief() {
         {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
+      </div>
+        </div>
       </div>
 
       {section === 'profile' && !buildIntent && buildCard}
