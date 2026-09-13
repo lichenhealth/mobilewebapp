@@ -659,6 +659,14 @@ function MessageRun({
           );
         })}
       </div>
+      {/* Your own face on your own messages (founder 2026-09-13 — the
+          personification grammar: every utterance wears its speaker, both
+          directions; mirrors the mockups' Maya-avatar-on-the-right). */}
+      {isMe && (
+        <span className="msg-run__avatar msg-run__avatar--mine" aria-hidden>
+          <Avatar id={run.senderId} name={sender?.name ?? 'You'} url={sender?.avatarUrl} size={28} />
+        </span>
+      )}
     </div>
   );
 }
