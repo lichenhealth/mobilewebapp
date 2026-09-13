@@ -264,6 +264,36 @@ const CALENDAR_TOOLS = [
 // from the THREAD, never from the model — no tool takes a target.
 const SPACE_EDIT_TOOLS = [PLACE_PHOTO_TOOL, ...SPACE_PAGE_TOOLS];
 
+// SMALL HANDS ACROSS THEIR LIFE (founder 2026-09-13: the mycelium reader
+// "saves documents, current-cy, adds to cal, etc for the person"). The two
+// SAFE acts ship first — a Drive save and a task — both private-to-them
+// writes, both behind the same hand-that-writes flag, personal threads only.
+// save_post_to_drive deliberately takes NO input: the only savable thing is
+// the post the member themselves shared into this conversation, so there is
+// no target a model could be talked into naming. Current-cy is NOT here on
+// purpose: money moving on a model's word needs its own confirm step, a
+// design the founder blesses first — never add a send tool quietly.
+const ACT_TOOLS = [
+  {
+    name: 'save_post_to_drive',
+    description: 'Save the post the member shared into this conversation to their Drive (their private repository — nobody else sees their saves). Only works when a shared post is on the table in THIS exchange; you cannot save anything else, so never offer to save a post that was not shared here.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'add_task',
+    description: 'Add a task to their calendar and to-do list. date is YYYY-MM-DD. time_min optional: minutes since midnight (9am = 540) for an exact-time reminder; leave it out for a finish-by day task with a morning nudge. Private to them by default (their own task-visibility rules apply). Never invent a date — ask when unsure, and say plainly what you added and for when.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The task, in their words.' },
+        date: { type: 'string', description: 'YYYY-MM-DD.' },
+        time_min: { type: 'number', description: 'Optional. Minutes since midnight for a timed reminder.' },
+      },
+      required: ['title', 'date'],
+    },
+  },
+];
+
 /** What a tool call did, in one plain line — the fallback report if the model
  *  writes and then says nothing (a write with no report is a bug). */
 type ToolOutcome = { ok: boolean; change?: string; [k: string]: unknown };
@@ -397,6 +427,61 @@ Deno.serve(async (req) => {
     }
   }
 
+  // THE MYCELIUM READER (founder 2026-09-13: "briefed on all happenings
+  // across the platform that are relevant to the person and bring that info
+  // into the assistant chats, obviously not integrating anything it has been
+  // blocked from reading"). THE PULSE: what is alive across the member's
+  // whole Lichen right now — their unseen bells, their coming week — each
+  // piece filtered by ITS OWN section's consent, not just this thread's.
+  // Personal threads only: a space build thread stays about the space, and
+  // claude-chat's SHARED rooms must never get this — a reply there is read
+  // by every member in the room, and your bells are yours alone.
+  let pulse = '';
+  if (!spaceId) {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const week = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+      const [offRes, bellRes, attRes, hostRes, remRes] = await Promise.all([
+        sb(`assistant_consent?profile_id=eq.${profile_id}&scope_type=eq.section&enabled=eq.false&select=scope_id`),
+        sb(`notifications?recipient_id=eq.${profile_id}&read_at=is.null&select=type,title,body,section,created_at&order=created_at.desc&limit=20`),
+        sb(`event_attendees?profile_id=eq.${profile_id}&status=in.(going,tentative)&select=status,events(title,start_date,recurrence)&limit=50`),
+        sb(`events?creator_id=eq.${profile_id}&start_date=gte.${today}&start_date=lte.${week}&select=title,start_date&limit=10`),
+        sb(`reminders?profile_id=eq.${profile_id}&recurrence=is.null&start_date=lte.${today}&end_date=gte.${today}&select=title,at_min&limit=8`),
+      ]);
+      // Blocked stays blocked: a de-selected section's bells never enter,
+      // even here — the whole point of a per-section switch.
+      const off = new Set((((await offRes.json()) as { scope_id: string }[] | null) ?? []).map((r) => r.scope_id));
+      const bells = ((((await bellRes.json()) as { type: string; title: string; body: string | null; section: string; created_at: string }[] | null) ?? []))
+        .filter((b) => !off.has(b.section ?? ''));
+      const att = (((await attRes.json()) as { status: string; events: { title: string; start_date: string; recurrence: unknown } | null }[] | null) ?? [])
+        .filter((r) => r.events && ((r.events.start_date >= today && r.events.start_date <= week) || r.events.recurrence != null));
+      const hosting = (((await hostRes.json()) as { title: string; start_date: string }[] | null) ?? []);
+      const rems = off.has('calendar') ? [] : (((await remRes.json()) as { title: string; at_min: number | null }[] | null) ?? []);
+      const lines: string[] = [];
+      // Each bell answers to ITS OWN section's switch (filtered above) —
+      // no blanket gate, or one switched-off section would silence the rest.
+      if (bells.length) {
+        lines.push('Unseen bells (every one of these is news they have NOT read yet):');
+        for (const b of bells.slice(0, 15)) {
+          lines.push(`- [${b.section}] ${b.title}${b.body ? ` — ${b.body.slice(0, 100)}` : ''} (${b.created_at.slice(0, 10)})`);
+        }
+      }
+      if ((att.length || hosting.length) && !off.has('calendar')) {
+        lines.push('Their next 7 days:');
+        for (const r of att.slice(0, 8)) lines.push(`- ${r.events!.title}${r.events!.recurrence != null ? ' (recurring)' : ` on ${r.events!.start_date}`} — they answered ${r.status}`);
+        for (const e of hosting) lines.push(`- ${e.title} on ${e.start_date} — they are hosting`);
+      }
+      if (rems.length) {
+        lines.push(`Tasks due today: ${rems.map((r) => r.title).join('; ')}`);
+      }
+      if (lines.length) {
+        pulse = 'THE PULSE — what is alive across their whole Lichen right now, gathered live just for this reply (sections they switched off for assistants are already absent — never guess at what is missing):\n'
+          + lines.join('\n')
+          + '\nHold it lightly: weave a piece in ONLY when it is relevant to what they just said, or when they ask what is going on / what needs them — then name things by name, never "a conversation" or "an item". Do not open with the pulse uninvited, do not recite it, and never present it as new twice.';
+      }
+    } catch { /* a failed read means a lighter reply, never a broken one */ }
+  }
+
   // THE SPACE ON THE TABLE (founder 2026-08-22): a space build thread reads
   // the SPACE's page as its working context and the sender's standing in it.
   // The reply then talks about the right subject — the 2026-08-22 bug was
@@ -498,6 +583,10 @@ Deno.serve(async (req) => {
     // switch never reaches here). Three consents, all required.
     canSpaceEdit = !!spaceId && flag && spaceIsAdmin && spaceAiOn;
   }
+  // The small hands (Drive save, task) ride every PERSONAL thread behind the
+  // same flag — the pulse names what's happening, these let the assistant
+  // actually do the small next thing (founder 2026-09-13).
+  const canAct = !spaceId && handThatWrites;
 
   // The real taxonomy travels with the request, so a category can only ever be
   // one that exists (the profile-snapshot / listing-autofill pattern).
@@ -560,6 +649,11 @@ Deno.serve(async (req) => {
   const imageRule = triggerImages.length
     ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.`
     : '';
+
+  let actRule = '';
+  if (canAct) {
+    actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Anything bigger a hand could do (sending Current-cy, booking someone, joining anything) is not yours — say who or where does it.';
+  }
 
   let calendarRule = '';
   if (canCalendar) {
@@ -982,6 +1076,37 @@ Deno.serve(async (req) => {
       return { ok: true, change: `${active ? 'switched on' : 'switched off'} the session "${title}"` };
     }
 
+    // ── The small hands (founder 2026-09-13) ─────────────────────────────
+    if (name === 'save_post_to_drive') {
+      // The only savable target is the post THE MEMBER shared into this
+      // conversation — resolved from the trigger row, never from the model.
+      if (!trigger.source_post_id) return { ok: false, error: 'No shared post is on the table in this exchange — nothing to save. Only a post they share into this conversation can be saved.' };
+      const dup = await (await sb(`saved_items?profile_id=eq.${profile_id}&target_type=eq.post&target_id=eq.${trigger.source_post_id}&select=target_id&limit=1`)).json();
+      if (Array.isArray(dup) && dup.length) return { ok: true, change: 'confirmed the shared post was already in their Drive (no double-save)' };
+      const r = await sb('saved_items', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ profile_id, target_type: 'post', target_id: trigger.source_post_id }),
+      });
+      if (!r.ok) return { ok: false, error: `The save failed: ${(await r.text()).slice(0, 120)}` };
+      return { ok: true, change: 'saved the shared post to their Drive' };
+    }
+
+    if (name === 'add_task') {
+      const title = String(input.title ?? '').trim().slice(0, 140);
+      const date = String(input.date ?? '').trim();
+      if (!title) return { ok: false, error: 'A task needs a title.' };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'date must be YYYY-MM-DD. Ask them for the day rather than guessing.' };
+      const raw = input.time_min == null || input.time_min === '' ? null : Number(input.time_min);
+      const atMin = raw == null || !Number.isFinite(raw) ? null : Math.max(0, Math.min(1439, Math.round(raw)));
+      const r = await sb('reminders', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ profile_id, title, start_date: date, end_date: date, at_min: atMin, lead_min: 0, recurrence: null, done_mode: 'shared' }),
+      });
+      if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 120)}` };
+      const when = atMin != null ? `${date} at ${String(Math.floor(atMin / 60)).padStart(2, '0')}:${String(atMin % 60).padStart(2, '0')}` : `${date} (finish-by, morning nudge)`;
+      return { ok: true, change: `added the task "${title}" for ${when}` };
+    }
+
     return { ok: false, error: `No such tool: ${name}` };
   }
 
@@ -1071,8 +1196,15 @@ Deno.serve(async (req) => {
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar || canSpaceEdit) ? 1600 : 1200,
-        system: [{ type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } }],
+        max_tokens: (canEdit || canCalendar || canSpaceEdit || canAct) ? 1600 : 1200,
+        // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
+        // (claude-chat's roster pattern): it changes with every message, and
+        // inside the cached block it would bust the doctrine's prompt cache
+        // on every exchange.
+        system: [
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          ...(pulse ? [{ type: 'text', text: pulse }] : []),
+        ],
         messages,
         // Tools stay declared for the whole exchange — the history holds
         // tool_use blocks and the API rejects it otherwise. On the last round
@@ -1081,6 +1213,7 @@ Deno.serve(async (req) => {
         // member linked needs no edit consent; only writing does.
         ...{ tools: [READ_WEBSITE_TOOL, FILE_DEV_REPORT_TOOL,
                      ...((canEdit || canSpaceEdit) ? [SAVE_WEB_IMAGE_TOOL] : []),
+                     ...(canAct ? ACT_TOOLS : []),
                      ...(canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
