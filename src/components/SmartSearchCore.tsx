@@ -858,9 +858,12 @@ export default function SmartSearchCore({
       {searching && <p className="ssrch__status">Searching…</p>}
       {!searching && results && (assistantBusy || assistant) && !assistDismissed && (
         <div className="ssrch__assist">
-          <span className="ssrch__assist-mark"><Icon name="sparkle" size={14} /></span>
+          {/* The narration wears its speaker — the brain, the same mark every
+              assistant door wears (founder 2026-09-13 personification audit;
+              the sparkle read as a feature, not a speaker). */}
+          <span className="ssrch__assist-mark"><Icon name="brain" size={14} /></span>
           <span className="ssrch__assist-body">
-            <span className="ssrch__assist-eyebrow">Assistant</span>
+            <span className="ssrch__assist-eyebrow">AI Assistant</span>
             {assistantBusy && <span className="ssrch__assist-text ssrch__assist-text--thinking">Reading the results&hellip;</span>}
             {!assistantBusy && assistant?.capped && (
               <span className="ssrch__assist-text">

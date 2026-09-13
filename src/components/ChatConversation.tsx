@@ -17,7 +17,10 @@ import '../routes/ChatThread.css';
 
 interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; helpMemberId?: string | null;
   /** The space whose OWN room this is — the header wears its logo (founder 2026-08-25). */
-  roomSpace?: { id: string; name: string; avatarUrl: string | null } | null; }
+  roomSpace?: { id: string; name: string; avatarUrl: string | null } | null;
+  /** care_team only: whose Concierge room this is — the room is named for
+   *  the person, never "Care team" (founder 2026-09-13). */
+  patientId?: string | null; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -94,17 +97,18 @@ export default function ChatConversation({
     (async () => {
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
-        supabase.from('chats').select('id, kind, title, space_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
+        supabase.from('chats').select('id, kind, title, space_id, patient_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
         supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
       if (!cRes.data) { setMissing(true); setLoading(false); return; }
-      const c = cRes.data as unknown as { id: string; kind: ChatKind; title: string | null; space_id: string | null; direct_key: string | null;
+      const c = cRes.data as unknown as { id: string; kind: ChatKind; title: string | null; space_id: string | null; patient_id: string | null; direct_key: string | null;
         party: { id: string; name: string; avatar_url: string | null } | null;
         room_space: { id: string; name: string; avatar_url: string | null } | null };
       setChat({
         id: c.id, kind: c.kind, title: c.title, space_id: c.space_id,
+        patientId: c.patient_id,
         roomSpace: c.room_space ? { id: c.room_space.id, name: c.room_space.name, avatarUrl: c.room_space.avatar_url } : null,
         party: c.party ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) } : undefined,
         // A help room is keyed 'help:<member>' — the person being helped.
@@ -270,7 +274,7 @@ export default function ChatConversation({
   }
 
   const memberList = Object.values(members);
-  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId);
+  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId, chat.patientId);
 
   return (
     <div className="conv">
@@ -449,7 +453,18 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
         <div className="thread__head-text">
           <h2 className="thread__head-name">{title}</h2>
           <p className="thread__head-sub">
-            {partyView ? partyView.sub : chat.kind === 'help' ? (chat.helpMemberId && chat.helpMemberId !== me ? 'Help desk — you answer for Lichen Help' : 'Lichen help') : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+            {partyView ? partyView.sub
+              : chat.kind === 'help' ? (chat.helpMemberId && chat.helpMemberId !== me ? 'Help desk — you answer for Lichen Help' : 'Lichen help')
+              : isDirect ? 'Direct message'
+              /* A Concierge room's sub names the PEOPLE, the group-chat
+                 grammar — never "Care team · N members", the entity that
+                 was retired (founder 2026-09-13). */
+              : chat.kind === 'care_team' ? (() => {
+                  const others = members.filter((m) => m.profile_id !== me).map((m) => m.name);
+                  const shown = others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '');
+                  return others.length ? `${shown} & you` : 'Just you so far';
+                })()
+              : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </p>
         </div>
       </div>

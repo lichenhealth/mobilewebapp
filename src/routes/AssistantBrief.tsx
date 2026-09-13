@@ -72,6 +72,10 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   maps: { title: 'The map', frame: 'You help them see what has appeared around them: places newly pinned, gatherings with a location coming up, and members who have put themselves on the map. Lead with what is NEW since they last looked, then what is worth going to. Never guess at distances you were not given.' },
   saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
+  // Doors found unframed in the 2026-09-13 audit — they fell back to the
+  // whole-life frame, so My-celium's brain briefed "Your Lichen life".
+  mycelium: { title: 'Your web', frame: 'You help them tend their web: who they hold close, who has newly woven in, and relationships worth returning to. Never score a relationship, never rank people.' },
+  search: { title: 'Search', frame: 'You help them find what they are looking for across Lichen, and shape a sharper search when the first one comes back thin.' },
   // ONE PERSON, not a section (founder 2026-08-14: "like getting a briefing
   // on someone you're meeting with from your assistant"). Reached from the
   // brain on another member's profile, with ?member=<id>.
@@ -119,6 +123,9 @@ export default function AssistantBrief() {
     events: 'Events', maps: 'Maps', saved: 'Drive', profile: 'Profile', home: 'Home',
     communities: 'Communities', groups: 'Groups', organizations: 'Organizations',
     places: 'Places', membership: 'Membership',
+    // Every door that opens this screen names its way back (founder
+    // 2026-09-13 audit): My-celium, a course's brain, search.
+    mycelium: 'My-celium', courses: 'Courses', search: 'Search',
   };
   const backName = BACK_NAMES[section];
   // ?member=<id> — the relationship briefing for one person.
@@ -785,6 +792,10 @@ export default function AssistantBrief() {
       {section === 'profile' && buildIntent && buildCard}
 
       <div className="abrief__card">
+        {/* The briefing wears its SPEAKER (founder 2026-09-13, the
+            personification grammar: every utterance wears who said it —
+            the mockups' corner brain, now real). */}
+        <span className="abrief__cardava" aria-hidden><Icon name="brain" size={12} /></span>
         {!doorOn && (
           <p className="abrief__text">
             The assistant is <strong>off</strong> for this part of your Lichen life — nothing

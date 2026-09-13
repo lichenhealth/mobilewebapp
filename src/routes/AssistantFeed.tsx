@@ -359,6 +359,10 @@ export default function AssistantFeed() {
         <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={44} />
         <div className="afeed__head-text">
           <h1 className="afeed__title">{builderMode ? 'Public Profile Builder' : 'Claude'}</h1>
+          {/* The assistant's PROFILE, same grammar as the brief screen
+              (founder 2026-09-13: every assistant surface wears the identity
+              + the gray blurb — "the profile and chat blurb"). */}
+          {!builderMode && <p className="afeed__eyebrow">Your Lichen Partner</p>}
           <p className="afeed__sub">
             {builderMode
               ? `Build with Claude — ${possessive(sctx?.name ?? 'this space')} website changes beside the conversation.`
@@ -669,17 +673,24 @@ export default function AssistantFeed() {
                 />
               )}
               <div className="afeed__entry-body">
-                <div className="afeed__entry-meta">
-                  {/* In a space's build thread the STEWARD speaks — the space
-                      never talks to Claude itself (the chat rule: humans
-                      answer for a space). Saying so is what keeps the CS hat
-                      + your face from reading as a bug (founder 2026-08-22). */}
-                  <span className="afeed__entry-name">
-                    {p.author === 'claude' ? 'Claude'
-                      : spaceId ? `You · steward of ${sctx?.name ?? 'this space'}` : 'You'}
-                  </span>
-                  <span className="afeed__entry-time">{timeAgo(p.created_at)}</span>
-                </div>
+                {/* The chat grammar, everywhere (founder 2026-09-13: "make
+                    that update everything"): the speaker's name + role above
+                    the run, the time inside the bubble, and your OWN entries
+                    unlabeled — a peach bubble on the right already says it's
+                    you, the way chat does. In a space's build thread the
+                    STEWARD speaks — the space never talks to Claude itself
+                    (the chat rule: humans answer for a space), so that label
+                    stays (founder 2026-08-22). */}
+                {(p.author === 'claude' || spaceId) && (
+                  <div className="afeed__entry-meta">
+                    <span className="afeed__entry-name">
+                      {p.author === 'claude' ? 'Claude' : 'You'}
+                    </span>
+                    <span className="afeed__entry-role">
+                      · {p.author === 'claude' ? 'AI Assistant' : `steward of ${sctx?.name ?? 'this space'}`}
+                    </span>
+                  </div>
+                )}
                 {shared && (
                   <button className="afeed__ref" onClick={() => navigate(`/posts/${shared.id}`)}>
                     {shared.title || shared.body.slice(0, 60)}
@@ -694,7 +705,17 @@ export default function AssistantFeed() {
                     ))}
                   </div>
                 )}
-                {p.body && <p className="afeed__entry-text">{p.body}</p>}
+                {p.body && (
+                  <p className="afeed__entry-text">
+                    {p.body}
+                    {/* Time rides INSIDE the bubble, lower right — the chat
+                        grammar (founder 2026-09-13). */}
+                    <span className="afeed__entry-when">{timeAgo(p.created_at)}</span>
+                  </p>
+                )}
+                {!p.body && (
+                  <span className="afeed__entry-when afeed__entry-when--bare">{timeAgo(p.created_at)}</span>
+                )}
                 {/* PREVIEW AND PUBLISH LIVE IN THE TEXT (founder 2026-08-31):
                     the newest reply that edited the page carries the doors.
                     Preview opens a NEW TAB on the draft, landed on the tab
@@ -736,6 +757,7 @@ export default function AssistantFeed() {
             <div className="afeed__entry-body">
               <div className="afeed__entry-meta">
                 <span className="afeed__entry-name">Claude</span>
+                <span className="afeed__entry-role">· AI Assistant</span>
               </div>
               <p className="afeed__thinking" aria-label="Claude is thinking">
                 <span /><span /><span />

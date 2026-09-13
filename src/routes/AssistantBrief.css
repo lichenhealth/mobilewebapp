@@ -72,3 +72,16 @@
    Snapshot.css owns .snap__invite; this only orders it when it's the reason
    you came. */
 .abrief__build { margin-bottom: var(--s-3); }
+
+/* The briefing card wears its speaker — the corner brain, the mockups'
+   grammar made real (founder 2026-09-13: every utterance wears who said
+   it). Below the base rules on purpose (the same-file ordering doctrine). */
+.abrief__card { position: relative; }
+.abrief__cardava {
+  position: absolute; top: -10px; left: -8px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--blue);
+  color: var(--blue); display: inline-flex;
+  align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgb(18 24 28 / 0.08);
+}
