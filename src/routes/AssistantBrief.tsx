@@ -112,6 +112,15 @@ export default function AssistantBrief() {
   // the AI update show up with a blue link?").
   const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(params.get('section') ?? 'home')?.refs ?? []);
   const section = params.get('section') ?? 'home';
+  // "← Back" says WHERE it goes (founder 2026-09-13: "so people remember
+  // where they came from") — chip-friendly names, not FRAMES' sentence titles.
+  const BACK_NAMES: Record<string, string> = {
+    calendar: 'Calendar', market: 'Marketplace', chat: 'Chat', concierge: 'Concierge',
+    events: 'Events', maps: 'Maps', saved: 'Drive', profile: 'Profile', home: 'Home',
+    communities: 'Communities', groups: 'Groups', organizations: 'Organizations',
+    places: 'Places', membership: 'Membership',
+  };
+  const backName = BACK_NAMES[section];
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
   // ?space=<id> — the briefing on one space (founder 2026-08-22): the brain
@@ -730,7 +739,7 @@ export default function AssistantBrief() {
         </div>
       ) : (
         <button className="cmp__back calp__backchip" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
-          ← {backTo ? 'Back to manual mode' : 'Back'}
+          ← {backTo ? 'Back to manual mode' : backName ? `Back to ${backName}` : 'Back'}
         </button>
       )}
       {/* Shaped like every other profile on Lichen (founder 2026-08-05):
