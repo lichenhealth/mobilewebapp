@@ -10,6 +10,7 @@ import { useAdminView } from '../lib/adminView';
 import { supabase } from '../lib/supabase';
 import { getIdentityTags } from '../lib/meansApi';
 import './SideMenu.css';
+import { buildStamp } from '../lib/autoUpdate';
 
 interface SideMenuProps {
   open: boolean;
@@ -49,6 +50,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
   { to: '/events',    label: 'Events',    icon: 'rsvp' },
   { to: '/drive',     label: 'Drive',     icon: 'drive' },
+  { to: '/currentcy', label: 'Current-cy', icon: 'dollar' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
@@ -63,7 +65,9 @@ const SUPPORT_EMAIL = 'connect@lichen.health';
  *  Calendar) and Public profile (reachable from the Profile page) — founder
  *  2026-07-24. The platform doors (Invite/Help/Membership) stay: they have no
  *  other mobile home. Desktop sidebar shows everything. */
-const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/drive', '/maps', '/profile', '/events']);
+// Profile LEFT the bottom nav for the wallet (founder 2026-09-13) — it
+// lives here on mobile now; /currentcy hides because the bottom nav has it.
+const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/drive', '/currentcy', '/maps', '/events']);
 const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/members/');
 
 /** The four space sections' sub-items are the member's REAL memberships,
@@ -394,6 +398,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               Give
             </button>
           </div>
+
+          {/* The build this page is running — so a screenshot always says
+              which build it came from (founder 2026-09-13, after a stale
+              months-old window kept resurrecting long-fixed bugs). */}
+          {buildStamp() && <p className="side-menu__build">build {buildStamp()}</p>}
         </nav>
       </aside>
     </div>

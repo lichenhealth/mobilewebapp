@@ -4,7 +4,7 @@
 
 export type Section =
   | 'concierge' | 'chat' | 'calendar' | 'events' | 'saved' | 'maps'
-  | 'profile' | 'mycelium' | 'communities' | 'groups' | 'organizations' | 'places' | 'market'
+  | 'profile' | 'currentcy' | 'mycelium' | 'communities' | 'groups' | 'organizations' | 'places' | 'market'
   | 'invite' | 'membership';
 
 export type Scope =
@@ -21,6 +21,7 @@ const PREFIX_SECTIONS: { prefix: string; section: Section }[] = [
   { prefix: '/saved', section: 'saved' },
   { prefix: '/maps', section: 'maps' },
   { prefix: '/profile', section: 'profile' },
+  { prefix: '/currentcy', section: 'currentcy' },
   { prefix: '/mycelium', section: 'mycelium' },
   { prefix: '/communities', section: 'communities' },
   { prefix: '/groups', section: 'groups' },

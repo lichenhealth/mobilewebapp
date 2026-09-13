@@ -40,8 +40,22 @@ export function startAutoUpdate(): void {
       const html = await (await fetch('/index.html', { cache: 'no-store' })).text();
       const latest = html.match(BUNDLE_RE)?.[0];
       if (!latest || latest === booted) return;
-      // A new build is live. Guard against reload loops if the CDN briefly lags.
-      if (sessionStorage.getItem('lichen:reloadedFor') === latest) return;
+      // A new build is live. One plain reload per target build — but if we
+      // ALREADY reloaded for this build and still booted the old one, the
+      // browser served a cached shell: escalate ONCE with a cache-busting
+      // query instead of going quiet for the whole session (founder
+      // 2026-09-13, the stale-build class of "recurring" bugs).
+      const reloadedFor = sessionStorage.getItem('lichen:reloadedFor');
+      if (reloadedFor === latest) {
+        if (sessionStorage.getItem('lichen:bustedFor') === latest) return;
+        if (force || safeToReload()) {
+          sessionStorage.setItem('lichen:bustedFor', latest);
+          const u = new URL(location.href);
+          u.searchParams.set('fresh', String(Date.now()));
+          location.replace(u.toString());
+        }
+        return;
+      }
       if (force || safeToReload()) {
         sessionStorage.setItem('lichen:reloadedFor', latest);
         location.reload();
@@ -61,4 +75,12 @@ export function startAutoUpdate(): void {
   // gentle interval while it stays open.
   window.setTimeout(() => void check(), 30_000);
   window.setInterval(() => void check(), 20 * 60_000);
+}
+
+/** Short fingerprint of the build this page booted with — SideMenu's foot
+ *  wears it so a screenshot always says which build it came from. */
+export function buildStamp(): string | null {
+  const b = bootedBundle();
+  const m = b?.match(/index-([A-Za-z0-9_-]+)\.js/);
+  return m ? m[1].slice(0, 8) : null;
 }

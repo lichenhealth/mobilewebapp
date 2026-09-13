@@ -50,6 +50,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/maps',        label: 'Maps',        icon: 'globe'         },
   { prefix: '/events',      label: 'Events',      icon: 'rsvp'          },
   { prefix: '/profile',     label: 'Profile',     icon: 'profile'       },
+  { prefix: '/currentcy',   label: 'Current-cy',  icon: 'dollar'        },
   { prefix: '/work',        label: 'Work',        icon: 'briefcase'     },
   { prefix: '/events',      label: 'Events',      icon: 'sparkle'       },
   { prefix: '/library',     label: 'Library',     icon: 'book'          },
@@ -184,20 +185,17 @@ export default function TopBar({
   return (
     <header className={'top-bar' + (compact ? ' top-bar--compact' : '')}>
       <div className="top-bar__left">
+        {/* No badge on the hamburger (founder 2026-09-13: notifications live
+            in the BELL alone on mobile; the desktop left nav carries its own).
+            The 2026-08-24 ☰ badge also made this aria-label dynamic, which
+            broke the desktop CSS that hides the hamburger by matching
+            aria-label="Open menu" — the class below is the stable hook. */}
         <button
-          className="top-bar__icon"
+          className="top-bar__icon top-bar__hamburger"
           onClick={onMenu}
-          aria-label={totalUnread > 0 ? `Open menu (${totalUnread} unread)` : 'Open menu'}
+          aria-label="Open menu"
         >
           <Icon name="menu" size={20} />
-          {/* The audit-at-a-glance dot (founder 2026-08-24): landing anywhere,
-              the hamburger says whether the menu holds news — the counts
-              follow the hat, like every badge. */}
-          {totalUnread > 0 && (
-            <span className="top-bar__badge">
-              {totalUnread > 99 ? '99+' : totalUnread}
-            </span>
-          )}
         </button>
         {/* Back-to-Home beside the hamburger on section screens (founder
             2026-07-25): same circle, same size — one tap returns to Home. */}

@@ -20,7 +20,10 @@ const ITEMS: NavItem[] = [
   { to: '/calendar',  label: 'CALENDAR',  icon: 'calendar' },
   { to: '/drive',     label: 'DRIVE',     icon: 'drive' },
   { to: '/maps',      label: 'MAPS',      icon: 'maps' },
-  { to: '/profile',   label: 'PROFILE',   icon: 'profile' },
+  // Profile moved to the hamburger; the wallet takes its seat
+  // (founder 2026-09-13: Current-cy deserves the bottom nav once the
+  // subsidy economy makes it a daily door).
+  { to: '/currentcy', label: 'CURRENT‑CY', icon: 'dollar' },
 ];
 
 export default function BottomNav() {

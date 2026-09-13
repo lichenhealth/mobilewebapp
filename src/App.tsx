@@ -50,6 +50,7 @@ function StaticAboutRedirect() {
   return null;
 }
 import Profile from './routes/Profile';
+import Currentcy from './routes/Currentcy';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
 import SignUp from './routes/SignUp';
@@ -314,6 +315,7 @@ export default function App() {
             </Suspense>
           } />
           <Route path="/profile"   element={<Profile />} />
+          <Route path="/currentcy" element={<Currentcy />} />
           <Route path="/spaces/:id" element={<SpaceProfile />} />
           <Route path="/members/:id" element={<MemberProfile />} />
           {/* The separate About page is retired (founder 2026-08-05) — its bio
