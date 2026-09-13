@@ -249,9 +249,11 @@
   align-self: flex-start;
 }
 .msg-run--me {
-  grid-template-columns: 1fr;
+  /* your own avatar rides the right column (founder 2026-09-13) */
+  grid-template-columns: 1fr 30px;
   align-self: flex-end;
 }
+.msg-run__avatar--mine { align-self: flex-end; }
 
 .msg-run__avatar {
   align-self: flex-end;
