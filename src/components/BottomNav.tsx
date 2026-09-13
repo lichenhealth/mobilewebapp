@@ -23,7 +23,7 @@ const ITEMS: NavItem[] = [
   // Profile moved to the hamburger; the wallet takes its seat
   // (founder 2026-09-13: Current-cy deserves the bottom nav once the
   // subsidy economy makes it a daily door).
-  { to: '/currentcy', label: 'CURRENT‑CY', icon: 'dollar' },
+  { to: '/currentcy', label: 'CURRENT‑CY', icon: 'currentcy' },
 ];
 
 export default function BottomNav() {

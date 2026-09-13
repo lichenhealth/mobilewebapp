@@ -50,7 +50,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
   { to: '/events',    label: 'Events',    icon: 'rsvp' },
   { to: '/drive',     label: 'Drive',     icon: 'drive' },
-  { to: '/currentcy', label: 'Current-cy', icon: 'dollar' },
+  { to: '/currentcy', label: 'Current-cy', icon: 'currentcy' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },

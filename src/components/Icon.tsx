@@ -33,6 +33,7 @@ export type IconName =
   | 'close'
   | 'concierge'
   | 'dollar'
+  | 'currentcy'
   | 'fork-spoon'
   | 'fingerprint'
   | 'globe'
@@ -495,6 +496,13 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.5,
     content: <><path d="M12 3v18M16.5 7.5C16.5 5.84 14.49 4.5 12 4.5S7.5 5.84 7.5 7.5s2.01 3 4.5 3 4.5 1.34 4.5 3-2.01 3-4.5 3-4.5-1.34-4.5-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // Current-cy's mark: the dollar inside a coin circle (founder 2026-09-13,
+  // "a circle around Current-cy") — the wallet is a thing you open.
+  'currentcy': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.5,
+    content: <><circle cx="12" cy="12" r="10.5" stroke="currentColor" fill="none"/><path d="M12 6v12M15 9c0-1.1-1.34-2-3-2s-3 .9-3 2 1.34 2 3 2 3 .9 3 2-1.34 2-3 2-3-.9-3-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'leaf': {
     viewBox: '0.43 1.49 24 24',
