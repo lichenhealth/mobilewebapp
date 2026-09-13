@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from './Icon';
 import './Avatar.css';
@@ -27,9 +28,15 @@ export default function Avatar({
    *  when they have one; a `pulse` mark is the fallback when they don't. */
   stewardFace?: { id: string; name: string; url?: string | null };
 }) {
+  // A photo that fails to load must degrade to the monogram, never to an
+  // invisible box — a face is load-bearing in the personification grammar
+  // (founder 2026-09-13: "it doesn't have the profile"), and a broken <img>
+  // renders as a 30px hole.
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [url]);
   const style = { width: size, height: size };
-  const face = url
-    ? <img className={`avatar ${className}`} style={style} src={url} alt={name} />
+  const face = url && !broken
+    ? <img className={`avatar ${className}`} style={style} src={url} alt={name} onError={() => setBroken(true)} />
     : (
       <span
         className={`avatar avatar--mono ${className}`}

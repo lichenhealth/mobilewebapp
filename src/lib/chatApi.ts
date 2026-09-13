@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { possessive } from './names';
 
 /** Claude the member — a real Lichen profile, not a bot account. Every
  *  surface that special-cases Claude's row (avatar, sort order, the "Ask
@@ -147,7 +148,20 @@ export function chatTitle(
   me: string,
   party?: PartySpace,
   helpMemberId?: string | null,
+  patientId?: string | null,
 ): string {
+  // "CARE TEAM" IS NOT AN ENTITY (founder 2026-09-13: "get rid of 'care
+  // team' as an entire entity, doesn't make sense to have everyone in one
+  // chat bubble") — the room is the Concierge GROUP CHAT for one person,
+  // and it's named for that person, the way any group is named for what
+  // gathers it. Members are the people on the team.
+  if (kind === 'care_team') {
+    if (patientId && patientId !== me) {
+      const patient = members.find((m) => m.profile_id === patientId);
+      if (patient?.name) return `${possessive(patient.name)} Concierge`;
+    }
+    return patientId === me ? 'Your Concierge' : storedTitle ?? 'Concierge';
+  }
   // A help room holds MORE than one responder now — Lichen Health and the
   // assistant both sit in it (founder 2026-08-16) — so naming it after
   // whichever member happened to sort first was arbitrary, and it started

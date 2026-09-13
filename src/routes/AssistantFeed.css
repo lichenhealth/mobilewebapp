@@ -330,3 +330,24 @@
 }
 .afeed__buildbar { margin-bottom: 6px; }
 .afeed--paged .afeed__buildhead { grid-column: 1 / -1; }
+
+/* ── THE CHAT GRAMMAR, EVERYWHERE (founder 2026-09-13: "make that update
+   everything… visual consistency with chat") — these sit BELOW the base
+   rules on purpose (the same-file ordering doctrine). The speaker's face
+   bottom-aligns to its bubble, names carry a muted role suffix, and the
+   time lives inside the bubble's lower right in the tiny mono chat wears. */
+.afeed__entry { align-items: flex-end; }
+.afeed__entry > .avatar, .afeed__entry > .avatar-wrap { margin-bottom: 2px; }
+.afeed__entry-role { font-size: 12px; color: var(--ink-faint); font-weight: 400; }
+.afeed__entry-when {
+  display: block; text-align: right;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+  color: var(--ink-faint); margin-top: 4px;
+}
+.afeed__entry-when--bare { margin-top: 2px; }
+/* The assistant's profile eyebrow, matching the brief screen's
+   "YOUR LICHEN PARTNER" line. */
+.afeed__eyebrow {
+  margin: 1px 0 0; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue-deep, var(--blue));
+}
