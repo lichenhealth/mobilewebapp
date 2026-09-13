@@ -829,9 +829,8 @@ export default function AssistantBrief() {
         initialText={params.get('ask') ?? undefined}
       />
 
-      <p className="abrief__foot">
-        Carbon decides; silicon organizes. Nothing here is a score, and nothing leaves your view.
-      </p>
+      {/* The "Carbon decides; silicon organizes" foot was CUT (founder
+          2026-09-13) — the promise lives in the consent checkbox above. */}
     </div>
   );
 }
