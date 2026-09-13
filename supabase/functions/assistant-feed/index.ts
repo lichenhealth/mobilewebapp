@@ -650,6 +650,44 @@ Deno.serve(async (req) => {
     ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.`
     : '';
 
+  // THE MONEY COACH (founder 2026-09-13: "a money coach feels like a
+  // relevant assistant and it can notice inefficiencies or suggest areas to
+  // make more current-cy"). The currentcy thread reads the member's OWN
+  // wallet — balance, recent statement, open listings — plus the platform's
+  // open asks (ISOs), the demand-side signal for "where could I earn more".
+  // Coaching Lichen's economy is the job; regulated financial advice is not.
+  let coachFrame = '';
+  if (thread === 'currentcy') {
+    try {
+      const [entRes, mineRes, isoRes] = await Promise.all([
+        sb(`ledger_entries?or=(and(from_type.eq.profile,from_id.eq.${profile_id}),and(to_type.eq.profile,to_id.eq.${profile_id}))&select=from_type,from_id,to_type,to_id,amount,context,memo,created_at&order=created_at.desc&limit=200`),
+        sb(`posts?author_id=eq.${profile_id}&service_areas=cs.{marketplace}&select=title,body,details,created_at&order=created_at.desc&limit=10`),
+        sb(`posts?service_areas=cs.{marketplace}&author_id=neq.${profile_id}&visibility=eq.public&select=title,details,created_at&order=created_at.desc&limit=40`),
+      ]);
+      const ents = (((await entRes.json()) as { from_type: string | null; from_id: string | null; to_type: string | null; to_id: string | null; amount: string | number; context: string; memo: string; created_at: string }[] | null) ?? []);
+      const bal = ents.reduce((a, e) => a
+        + (e.to_type === 'profile' && e.to_id === profile_id ? Number(e.amount) : 0)
+        - (e.from_type === 'profile' && e.from_id === profile_id ? Number(e.amount) : 0), 0);
+      const mine = (((await mineRes.json()) as { title: string | null; body: string; details: { modes?: string[]; mode?: string; aiExcluded?: boolean } | null; created_at: string }[] | null) ?? [])
+        .filter((p) => !p.details?.aiExcluded);
+      const asks = (((await isoRes.json()) as { title: string | null; details: { modes?: string[]; mode?: string; aiExcluded?: boolean } | null; created_at: string }[] | null) ?? [])
+        .filter((p) => !p.details?.aiExcluded && ((p.details?.modes ?? [p.details?.mode]) as string[]).includes('iso'))
+        .slice(0, 8);
+      coachFrame = `\n\nYOU ARE THEIR MONEY COACH HERE, for Lichen's gift-and-exchange economy (Current-cy is dollar-pegged; it moves through gifts, trades, sales, contributions). Their wallet right now:`
+        + `\n- Balance: ${bal} Current`
+        + (ents.length
+          ? `\n- Recent moves: ${ents.slice(0, 10).map((e) => `${e.amount} ${e.from_type === 'profile' && e.from_id === profile_id ? 'out' : 'in'} (${e.context}${e.memo ? `, "${e.memo.slice(0, 40)}"` : ''}, ${e.created_at.slice(0, 10)})`).join('; ')}`
+          : '\n- No Current has moved for them yet.')
+        + (mine.length
+          ? `\n- Their open listings: ${mine.map((p) => `"${p.title ?? p.body.slice(0, 40)}" (${(p.details?.modes ?? [p.details?.mode ?? '?']).join('/')}, since ${p.created_at.slice(0, 10)})`).join('; ')}`
+          : '\n- They have NO marketplace listings — offering something is the first door to earning.')
+        + (asks.length
+          ? `\n- Open asks others posted (demand they might serve): ${asks.map((p) => `"${p.title ?? 'an ask'}"`).join('; ')}`
+          : '')
+        + '\nCoach from THIS, never invented demand: notice one real inefficiency or opportunity when there is one — a quiet listing a clearer mode or title might move, an open ask their offerings could serve, a skill they mention but never listed. This is participation coaching inside Lichen, NOT investment, tax, debt or legal advice — that bar from your ground rules still holds; for real financial hardship, point warmly to the Financial Health Profile in Concierge (a human coordinator gives every request a real look). Never mention anyone else\'s balance (you cannot see one), never rank members.';
+    } catch { /* a failed read means a lighter reply, never a broken one */ }
+  }
+
   let actRule = '';
   if (canAct) {
     actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Anything bigger a hand could do (sending Current-cy, booking someone, joining anything) is not yours — say who or where does it.';
@@ -1202,7 +1240,7 @@ Deno.serve(async (req) => {
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,

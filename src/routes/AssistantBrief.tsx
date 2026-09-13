@@ -20,6 +20,7 @@ import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 import './Snapshot.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
+import { myBalance, myStatement } from '../lib/ledgerApi';
 import { loadMyWeb, loadMyRecommendations } from '../lib/myceliumApi';
 import { listBookableTypes } from '../lib/bookingApi';
 
@@ -75,6 +76,9 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   // Doors found unframed in the 2026-09-13 audit — they fell back to the
   // whole-life frame, so My-celium's brain briefed "Your Lichen life".
   mycelium: { title: 'Your web', frame: 'You help them tend their web: who they hold close, who has newly woven in, and relationships worth returning to. Never score a relationship, never rank people.' },
+  // The MONEY COACH (founder 2026-09-13): notices inefficiencies, suggests
+  // ways to earn — inside Lichen's economy, never regulated financial advice.
+  currentcy: { title: 'Your Current-cy', frame: 'You are their money COACH for Lichen\'s gift-and-exchange economy — Current-cy is dollar-pegged and moves through gifts, trades, sales and contributions. Two jobs: say plainly what moved and where they stand, then notice ONE real opportunity — an open ask (ISO) their offerings could serve, a listing of theirs sitting quiet that a different mode or clearer title might move, a skill they list but never offer. Ground every suggestion in what the snapshot holds, never invent demand. This coaching is about participating in Lichen\'s economy — it is NOT investment, tax, debt or legal advice; for real financial hardship, point warmly to the Financial Health Profile in Concierge, where a human coordinator gives every request a real look. Never mention anyone else\'s balance (you cannot see one) and never rank members.' },
   search: { title: 'Search', frame: 'You help them find what they are looking for across Lichen, and shape a sharper search when the first one comes back thin.' },
   // ONE PERSON, not a section (founder 2026-08-14: "like getting a briefing
   // on someone you're meeting with from your assistant"). Reached from the
@@ -126,6 +130,7 @@ export default function AssistantBrief() {
     // Every door that opens this screen names its way back (founder
     // 2026-09-13 audit): My-celium, a course's brain, search.
     mycelium: 'My-celium', courses: 'Courses', search: 'Search',
+    currentcy: 'Current-cy',
   };
   const backName = BACK_NAMES[section];
   // ?member=<id> — the relationship briefing for one person.
@@ -506,6 +511,52 @@ export default function AssistantBrief() {
             .neq('author_id', me)
             .gte('created_at', weekAgo);
           if (count) extras.new_marketplace_listings_this_week = count;
+        }
+        if (section === 'currentcy') {
+          // The money coach's eyes (founder 2026-09-13): their OWN wallet —
+          // balance + recent statement, names resolved — their open
+          // listings, and the platform's open asks (ISOs) as the demand-side
+          // signal for "where could I earn more". All RLS-scoped as the
+          // member; nobody else's balance is reachable, by construction.
+          const [bal, stmt, { data: mineRows }, { data: recent }] = await Promise.all([
+            myBalance(me), myStatement(me, 12),
+            supabase.from('posts').select('id, title, body, details, created_at')
+              .eq('author_id', me).contains('service_areas', ['marketplace'])
+              .order('created_at', { ascending: false }).limit(10),
+            supabase.from('posts').select('id, title, details, created_at')
+              .contains('service_areas', ['marketplace']).neq('author_id', me)
+              .order('created_at', { ascending: false }).limit(40),
+          ]);
+          if (bal != null) extras.your_balance_in_current = bal;
+          if (stmt.length) {
+            extras.recent_statement = stmt.map((e) => ({
+              on: e.created_at.slice(0, 10),
+              moved: `${e.amount} Current, ${e.from_name} → ${e.to_name}`,
+              kind: e.context, memo: e.memo || undefined,
+            }));
+            for (const e of stmt) {
+              if (e.from_id && e.from_name) found.push({ label: e.from_name, to: e.from_type === 'space' ? `/spaces/${e.from_id}` : `/members/${e.from_id}` });
+              if (e.to_id && e.to_name) found.push({ label: e.to_name, to: e.to_type === 'space' ? `/spaces/${e.to_id}` : `/members/${e.to_id}` });
+            }
+          }
+          const myListings = ((mineRows as { id: string; title: string | null; body: string; details: { modes?: string[]; mode?: string; aiExcluded?: boolean } | null; created_at: string }[] | null) ?? [])
+            .filter((p) => !p.details?.aiExcluded);
+          if (myListings.length) {
+            extras.your_open_listings = myListings.map((p) => ({
+              title: p.title || p.body.slice(0, 48),
+              modes: p.details?.modes ?? [p.details?.mode ?? 'unlabeled'],
+              since: p.created_at.slice(0, 10),
+            }));
+            myListings.forEach((p) => { if (p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
+          }
+          const asks = ((recent as { id: string; title: string | null; details: { modes?: string[]; mode?: string; aiExcluded?: boolean } | null; created_at: string }[] | null) ?? [])
+            .filter((p) => !p.details?.aiExcluded
+              && (p.details?.modes ?? [p.details?.mode]).includes('iso'))
+            .slice(0, 8);
+          if (asks.length) {
+            extras.open_asks_others_posted = asks.map((p) => ({ looking_for: p.title ?? 'an ask', since: p.created_at.slice(0, 10) }));
+            asks.forEach((p) => { if (p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
+          }
         }
         if (section === 'calendar' || section === 'home') {
           // Recurring events keep their FIRST occurrence in start/end_date —

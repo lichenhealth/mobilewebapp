@@ -27,6 +27,7 @@ export const CONSENT_SECTIONS: { id: string; label: string }[] = [
   { id: 'market', label: 'Marketplace' },
   { id: 'events', label: 'Events' },
   { id: 'calendar', label: 'Calendar' },
+  { id: 'currentcy', label: 'Current-cy' },
   { id: 'chat', label: 'Chat' },
   { id: 'concierge', label: 'Concierge' },
   { id: 'courses', label: 'Courses' },
