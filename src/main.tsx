@@ -6,6 +6,14 @@ import { AuthProvider } from './auth/AuthProvider';
 import { ActingProvider } from './acting/ActingProvider';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
 import { startAutoUpdate } from './lib/autoUpdate';
+
+// A cache-busted recovery reload (autoUpdate's escape hatch) carries ?fresh=…
+// — drop it immediately so it never sticks in the address bar or a shared link.
+if (new URLSearchParams(location.search).has('fresh')) {
+  const u = new URL(location.href);
+  u.searchParams.delete('fresh');
+  history.replaceState(history.state, '', u.toString());
+}
 import './styles/global.css';
 
 // Register the push service worker (no-op for members who never opt in; keeps

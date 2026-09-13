@@ -267,3 +267,41 @@
 
 /* Section headers wear their kind's mark (founder 2026-08-21) */
 .side-menu__header > svg { color: var(--ink); flex-shrink: 0; }
+
+.side-menu__build { margin: var(--s-2) var(--s-4); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--ink-faint); }
+
+/* ===== Desktop docked rail (>=1024px) ==================================
+   These OVERRIDE the drawer base rules above at equal specificity, so they
+   must live in THIS file, below them — moved here from global.css
+   (2026-09-13): bundle order between files is not guaranteed, and when it
+   flipped, the desktop sidebar rendered as the hidden drawer (the
+   recurring "left nav rendering bug"). Same file + later = deterministic.
+   The shell/grid halves of this layout stay in global.css. */
+@media (min-width: 1024px) {
+  .side-menu {
+    position: sticky;
+    inset: auto;
+    top: 0;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: start;
+    height: 100dvh;
+    pointer-events: auto;
+    z-index: 1;
+  }
+  .side-menu__scrim { display: none; }
+  .side-menu__close { display: none; }
+  .side-menu__panel {
+    position: static;
+    transform: none;
+    /* the drawer's closed state hides itself (PR #79) — the permanent
+       desktop sidebar must override that */
+    visibility: visible;
+    left: auto;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    padding-top: calc(var(--safe-top) + 32px);
+    border-right: 1px solid var(--bone-edge);
+  }
+}

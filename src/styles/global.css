@@ -224,7 +224,12 @@ input, textarea, select { font: inherit; color: inherit; }
 .h-scroll::-webkit-scrollbar { display: none; }
 .h-scroll > * { scroll-snap-align: start; flex: 0 0 auto; }
 
-/* ===== Desktop layout — persistent sidebar, fuller content (>=1024px) ===== */
+/* ===== Desktop layout — persistent sidebar, fuller content (>=1024px) =====
+   ⚠ The .side-menu docked-rail overrides LIVE IN SideMenu.css (below its
+   drawer base rules) — an equal-specificity tie between global.css and a
+   component's css is decided by BUNDLE ORDER, which flips when imports
+   move; same-file-and-later is the only order that cannot break
+   (founder 2026-09-13: "remedy that for good"). */
 @media (min-width: 1024px) {
   .app-shell {
     max-width: 1240px;
@@ -233,32 +238,6 @@ input, textarea, select { font: inherit; color: inherit; }
     grid-template-rows: auto 1fr;
   }
   /* Side menu becomes a permanent left sidebar */
-  .side-menu {
-    position: sticky;
-    inset: auto;
-    top: 0;
-    grid-column: 1;
-    grid-row: 1 / -1;
-    align-self: start;
-    height: 100dvh;
-    pointer-events: auto;
-    z-index: 1;
-  }
-  .side-menu__scrim { display: none; }
-  .side-menu__close { display: none; }
-  .side-menu__panel {
-    position: static;
-    transform: none;
-    /* the drawer's closed state hides itself (PR #79) — the permanent
-       desktop sidebar must override that */
-    visibility: visible;
-    left: auto;
-    width: 100%;
-    max-width: none;
-    height: 100dvh;
-    padding-top: calc(var(--safe-top) + 32px);
-    border-right: 1px solid var(--bone-edge);
-  }
   /* Top bar sits above the content column; hamburger no longer needed */
   .top-bar {
     position: sticky;
@@ -270,7 +249,7 @@ input, textarea, select { font: inherit; color: inherit; }
     grid-column: 2;
     grid-row: 1;
   }
-  .top-bar__icon[aria-label="Open menu"] { display: none; }
+  .top-bar__hamburger { display: none; }
   .top-bar__logo { grid-column: 2; justify-self: center; }
   .top-bar__right { grid-column: 3; justify-self: end; }
   /* Content column fills the remaining width */
@@ -295,6 +274,7 @@ input, textarea, select { font: inherit; color: inherit; }
     align-items: start;
   }
 }
+
 
 /* ── Example-content badge (details.demo) — shared by cards, tiles, rows.
    Dashed = clearly a stand-in; teaches the platform without polluting the
