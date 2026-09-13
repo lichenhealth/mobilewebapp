@@ -73,15 +73,23 @@
    you came. */
 .abrief__build { margin-bottom: var(--s-3); }
 
-/* The briefing card wears its speaker — the corner brain, the mockups'
-   grammar made real (founder 2026-09-13: every utterance wears who said
-   it). Below the base rules on purpose (the same-file ordering doctrine). */
-.abrief__card { position: relative; }
-.abrief__cardava {
-  position: absolute; top: -10px; left: -8px;
-  width: 24px; height: 24px; border-radius: 50%;
-  background: #fff; border: 1px solid var(--blue);
-  color: var(--blue); display: inline-flex;
-  align-items: center; justify-content: center;
-  box-shadow: 0 1px 3px rgb(18 24 28 / 0.08);
+/* THE BRIEFING IS A CHAT RUN (founder 2026-09-13, second pass: "still not
+   consistent with chat") — speaker name + muted role above, the brain face
+   bottom-aligned beside a white bubble, the updated-line lower right. Below
+   the base rules on purpose (the same-file ordering doctrine). */
+.abrief__run { display: flex; flex-direction: column; gap: 3px; text-align: left; margin-bottom: var(--s-4); }
+.abrief__run-meta { display: flex; align-items: baseline; gap: 6px; margin-left: 38px; }
+.abrief__run-name { font-size: 12px; font-weight: 600; color: var(--peach); }
+.abrief__run-role { font-size: 12px; color: var(--ink-faint); }
+.abrief__run-row { display: flex; align-items: flex-end; gap: 8px; }
+.abrief__run-ava {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: #fff; border: 1px solid var(--blue); color: var(--blue);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 2px;
 }
+.abrief__run .abrief__card {
+  flex: 1; min-width: 0; margin-bottom: 0;
+  background: #fff; border-radius: 16px; border-bottom-left-radius: 6px;
+}
+.abrief__run .abrief__updated { text-align: right; }
