@@ -50,7 +50,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/maps',        label: 'Maps',        icon: 'globe'         },
   { prefix: '/events',      label: 'Events',      icon: 'rsvp'          },
   { prefix: '/profile',     label: 'Profile',     icon: 'profile'       },
-  { prefix: '/currentcy',   label: 'Current-cy',  icon: 'dollar'        },
+  { prefix: '/currentcy',   label: 'Current-cy',  icon: 'currentcy'     },
   { prefix: '/work',        label: 'Work',        icon: 'briefcase'     },
   { prefix: '/events',      label: 'Events',      icon: 'sparkle'       },
   { prefix: '/library',     label: 'Library',     icon: 'book'          },
