@@ -73,6 +73,15 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
     emptyAsk: 'No Concierge care set up yet. Tell me what wellbeing looks like for you right now, and we’ll begin your Web of Wellbeing together.',
     welcome: 'Welcome back to Concierge. Tell me how care is going, or what needs tending.',
   },
+  // The MONEY COACH (founder 2026-09-13: "a money coach feels like a
+  // relevant assistant and it can notice inefficiencies or suggest areas
+  // to make more current-cy to help the person, financially").
+  {
+    id: 'currentcy', label: 'Current-cy', icon: 'currentcy',
+    blurb: 'Your wallet — a money coach for the gift-and-exchange economy.',
+    emptyAsk: 'No Current has moved for you yet. Tell me what you offer — or what you need — and we’ll find your first exchange together.',
+    welcome: 'Welcome back to Current-cy. Ask what moved, or where you could earn more.',
+  },
 ];
 
 /** Which sections the member has actually SET UP (founder 2026-08-31: the
@@ -85,7 +94,7 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
     const { count } = await q;
     return (count ?? 0) > 0;
   };
-  const [prof, market, events, avail, remind, care] = await Promise.all([
+  const [prof, market, events, avail, remind, care, ledger] = await Promise.all([
     supabase.from('profiles').select('headline, bio, page').eq('id', me).maybeSingle(),
     any(supabase.from('posts').select('id', { count: 'exact', head: true })
       .eq('author_id', me).contains('service_areas', ['marketplace'])),
@@ -97,6 +106,8 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
       .eq('profile_id', me)),
     any(supabase.from('care_team_members').select('id', { count: 'exact', head: true })
       .or(`patient_id.eq.${me},caregiver_id.eq.${me}`)),
+    any(supabase.from('ledger_entries').select('id', { count: 'exact', head: true })
+      .or(`and(from_type.eq.profile,from_id.eq.${me}),and(to_type.eq.profile,to_id.eq.${me})`)),
   ]);
   const p = (prof.data ?? null) as { headline: string | null; bio: string | null; page: Record<string, unknown> | null } | null;
   const pageBegun = !!(p && (p.headline || p.bio || (p.page && Object.keys(p.page).length > 0)));
@@ -107,6 +118,8 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
     events,
     calendar: avail || remind,
     concierge: care,
+    // Lit once any Current has ever moved for them — a wallet with history.
+    currentcy: ledger,
   };
 }
 
