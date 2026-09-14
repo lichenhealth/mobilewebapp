@@ -12,7 +12,7 @@ import {
   type MediaType, type Attachment,
 } from '../lib/chatApi';
 import {
-  loadCarePosts, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
+  loadCarePosts, loadCarePost, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
   createCarePost, DIMENSION_META,
   getCareSettings, setWowWindowAuto, tuneWowWindow, WOW_WINDOW_DEFAULT, type CareSettings,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
@@ -1198,6 +1198,36 @@ export default function Concierge() {
     navigate(target === 'wow' ? basePath : `${basePath}/${target}`);
   };
 
+  // "Ask about this entry" (founder 2026-09-14): a WOW/KOC card's chat door
+  // lands on the Chat tab with ?ask=<entry id> — the entry pins above the
+  // composer and its author rides chat_messages.mentions, so in this room
+  // only the person being asked is belled, not the whole care team.
+  const askId = searchParams.get('ask');
+  const [careAsk, setCareAsk] = useState<{ entryId: string; snippet: string; authorId: string; authorName: string } | null>(null);
+  useEffect(() => {
+    if (!askId || activeTab !== 'chat') { setCareAsk(null); return; }
+    let active = true;
+    const build = (p: CarePostRow | null) => {
+      if (!active || !p) return;
+      const snippet = (p.body || (p.kind === 'wow' ? 'a Web of Wellbeing entry' : 'a care plan entry'))
+        .replace(/\s+/g, ' ').slice(0, 80);
+      setCareAsk({ entryId: p.id, snippet, authorId: p.author_id, authorName: p.author?.full_name ?? 'Care team' });
+    };
+    const local = [...wowPosts, ...kocPosts].find((p) => p.id === askId);
+    if (local) build(local);
+    else void loadCarePost(askId).then(build); // a reload, or an entry outside the loaded week
+    return () => { active = false; };
+    // wowPosts/kocPosts deliberately not deps — one resolve per ask.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askId, activeTab]);
+  const askEntry = useCallback((p: CarePostRow) => {
+    navigate(`${basePath}/chat?ask=${p.id}`);
+  }, [navigate, basePath]);
+  const clearAsk = useCallback(() => {
+    setCareAsk(null);
+    navigate(`${basePath}/chat`, { replace: true });
+  }, [navigate, basePath]);
+
   // Caregivers author their client's snapshots/plans — and since 2026-08-14
   // you author on YOUR OWN board too (the self-audit + updated scores;
   // care_posts RLS gained the matching self-arm).
@@ -1484,7 +1514,8 @@ export default function Concierge() {
             )}
             {feed.map((p) => (
               <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
-                canDelete={canAuthor && p.author_id === me} onDelete={removePost} />
+                canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                onAsk={p.author_id !== me ? askEntry : undefined} />
             ))}
           </>
         );
@@ -1514,7 +1545,8 @@ export default function Concierge() {
                   ? <p className="koc__dayempty">Nothing scheduled</p>
                   : posts.map((p) => (
                     <CarePostCard key={p.id + day.iso} post={p} mediaUrls={mediaUrls}
-                      canDelete={canAuthor && p.author_id === me} onDelete={removePost} />
+                      canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                      onAsk={p.author_id !== me ? askEntry : undefined} />
                   ))}
               </section>
             );
@@ -1557,7 +1589,8 @@ export default function Concierge() {
 
           {careReady && careAllowed && careChatId && (
             <div className="conc__care" style={{ top: careTop }}>
-              <ChatConversation chatId={careChatId} me={me} showIntro={false} onInfo={() => handleTabClick('team')} />
+              <ChatConversation chatId={careChatId} me={me} showIntro={false} onInfo={() => handleTabClick('team')}
+                careAsk={careAsk} onCareAskDone={clearAsk} />
             </div>
           )}
         </>

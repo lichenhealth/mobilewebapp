@@ -118,6 +118,17 @@ export async function loadCarePosts(patientId: string, kind: CareKind, opts: Loa
   return (data as unknown as CarePostRow[] | null) ?? [];
 }
 
+/** One entry by id — the "?ask=" landing when the board state doesn't hold it
+ *  (a KOC entry from another week, a reloaded URL). RLS scopes to parties. */
+export async function loadCarePost(id: string): Promise<CarePostRow | null> {
+  const { data } = await supabase
+    .from('care_posts')
+    .select(`${CARE_POST_COLS}, author:profiles!care_posts_author_id_fkey(full_name)`)
+    .eq('id', id)
+    .maybeSingle();
+  return (data as unknown as CarePostRow | null) ?? null;
+}
+
 /** Which dimensions the member has ALREADY spoken to in their own voice —
  *  the guided intake (founder 2026-09-11, onboarding Mark's cohort) lands on
  *  the first unanswered one and never re-asks what's been given. */

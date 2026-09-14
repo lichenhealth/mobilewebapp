@@ -28,7 +28,7 @@ interface Pending { type: MediaType; path: string; localUrl: string; }
  *  attachments / reactions / replies. Fills its parent (give the parent a bounded
  *  height). Used by the full-screen thread route and the Concierge care tab. */
 export default function ChatConversation({
-  chatId, me, onBack, showIntro = true, onInfo, onRead,
+  chatId, me, onBack, showIntro = true, onInfo, onRead, careAsk, onCareAskDone,
 }: {
   chatId: string;
   me: string;
@@ -40,6 +40,13 @@ export default function ChatConversation({
    *  zeroes its unread pill from this (founder 2026-08-24: the "2" that
    *  wouldn't go away while sitting inside the very chat it counted). */
   onRead?: (chatId: string) => void;
+  /** "Ask about this entry" (founder 2026-09-14): a WOW/KOC card's chat door
+   *  carries the entry here — it pins above the composer like the post
+   *  about-card, the first message names the entry and TAGS its author
+   *  (chat_messages.mentions), and in a care room only tagged caregivers are
+   *  belled. The tag is structural — the entry's author — never typed. */
+  careAsk?: { entryId: string; snippet: string; authorId: string; authorName: string } | null;
+  onCareAskDone?: () => void;
 }) {
   const [chat, setChat] = useState<ChatInfo | null>(null);
   const [members, setMembers] = useState<Record<string, MemberInfo>>({});
@@ -224,19 +231,28 @@ export default function ChatConversation({
 
   const sendMessage = async () => {
     const text = draft.trim();
-    if ((!text && pending.length === 0 && !about) || !me || !chat || uploading) return;
+    const ask = careAsk ?? null;
+    if ((!text && pending.length === 0 && !about && !ask) || !me || !chat || uploading) return;
     const attachments: Attachment[] | null = pending.length
       ? pending.map((p) => ({ type: p.type, url: p.path }))
       : null;
     const reply = replyTo?.id ?? null;
-    // The pinned post rides along on the first message, then steps aside.
+    // The pinned post/entry rides along on the first message, then steps aside.
     const bodyText = about
       ? `About "${about.title}" — ${window.location.origin}${about.path}${text ? `\n\n${text}` : ''}`
+      : ask
+      ? `@${ask.authorName} · about "${ask.snippet}"${text ? `\n\n${text}` : ''}`
       : (text || null);
     setDraft(''); setPending([]); setReplyTo(null); setAbout(null);
+    if (ask) onCareAskDone?.();
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({ chat_id: chat.id, sender_id: me, body: bodyText, attachments, reply_to: reply })
+      .insert({
+        chat_id: chat.id, sender_id: me, body: bodyText, attachments, reply_to: reply,
+        // The bell rule reads this server-side: in a care room, caregivers
+        // are belled only when named (the patient always hears their room).
+        ...(ask ? { mentions: [ask.authorId] } : {}),
+      })
       .select(MESSAGE_COLS)
       .single();
     if (!error && data) {
@@ -320,6 +336,18 @@ export default function ChatConversation({
             )}
           </button>
           <button className="thread__about-x" onClick={() => setAbout(null)} aria-label="Just chat, without the post">×</button>
+        </div>
+      )}
+      {careAsk && (
+        <div className="thread__about" role="note">
+          <div className="thread__about-body">
+            <span className="thread__about-kicker">About this care entry</span>
+            <span className="thread__about-title">{careAsk.snippet}</span>
+            <span className="thread__about-who">
+              Asking {careAsk.authorName} — they&rsquo;ll get a bell for this one
+            </span>
+          </div>
+          <button className="thread__about-x" onClick={() => onCareAskDone?.()} aria-label="Just chat, without the entry">×</button>
         </div>
       )}
       <ChatInputBar
