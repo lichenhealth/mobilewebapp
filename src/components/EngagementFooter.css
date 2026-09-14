@@ -62,19 +62,19 @@
   min-width: 0;
 }
 
-/* The app content column is capped at ~430px until the desktop layout kicks in
-   at 1024px, so five labeled actions crowd on ALL phones/tablets (Pro Max
-   viewports are ~440px yet the column is still 430px). Icons carry the row
-   below 1024; labels return once the shell actually widens. */
+/* THE WORDS STAY ON PHONES (founder 2026-09-14: "the stories on the actual
+   platform don't have copy to explain each button, which they should").
+   The old hide-below-1024 rule was written when the row held FIVE labeled
+   actions; at four, compact spacing fits the 430px column and a word under
+   a hand beats a mystery glyph. Phones get tighter gaps, not fewer words. */
 @media (max-width: 1023px) {
-  .engage__action span { display: none; }
-  .engage__action { gap: 0; padding: 10px 4px; }
-  .engage__actions { gap: 2px; }
+  .engage__action { gap: 3px; padding: 10px 3px; }
+  .engage__actions { gap: 0; }
 }
-/* Belt and braces: whatever the viewport, if the FOOTER ITSELF is tight
-   (narrow columns, embeds), labels give way to icons. */
+/* Only a genuinely tight EMBED (narrow columns inside frames) still gives
+   way to icons — a floor, not the phone default. */
 .engage { container-type: inline-size; }
-@container (max-width: 559px) {
+@container (max-width: 299px) {
   .engage__action span { display: none; }
   .engage__action { gap: 0; padding: 10px 4px; }
   .engage__actions { gap: 2px; }
@@ -197,3 +197,16 @@
 .engage__action:disabled svg,
 .engage__action:disabled:hover svg { color: #C2C2C2; }
 .engage__action:disabled:active { opacity: 1; }
+
+/* Breathing room for the labeled row on the tightest phones (founder
+   2026-09-14: copy back OR icons closer — we keep the copy and let the
+   type shrink a step instead of colliding). Below the base rules on
+   purpose (the same-file ordering doctrine). */
+@container (max-width: 429px) {
+  /* flex:1 hands every button an EQUAL box, and "Recommend"'s content is
+     wider than a quarter of a tight row — its nowrap text spilled into the
+     next button's icon. Content-sized buttons spread evenly instead. */
+  .engage__action { flex: 0 1 auto; font-size: 9px; letter-spacing: -0.01em; }
+  .engage__actions { justify-content: space-between; gap: 2px; }
+  .engage__action svg { width: 12px; height: 12px; }
+}
