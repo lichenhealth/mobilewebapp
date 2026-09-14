@@ -72,12 +72,16 @@ function CareLinkChip({ link }: { link: CareLink }) {
 }
 
 export default function CarePostCard({
-  post, mediaUrls, canDelete, onDelete,
+  post, mediaUrls, canDelete, onDelete, onAsk,
 }: {
   post: CarePostRow;
   mediaUrls: Record<string, string>;
   canDelete: boolean;
   onDelete: (id: string) => void;
+  /** "Ask about this entry" (founder 2026-09-14): opens the Concierge chat
+   *  with this entry pinned and its author tagged — pass only when the
+   *  viewer isn't the author (you don't tag yourself). */
+  onAsk?: (post: CarePostRow) => void;
 }) {
   const name = post.author?.full_name ?? 'Care team';
   const [portrait, setPortrait] = useState(false);
@@ -154,6 +158,12 @@ export default function CarePostCard({
               ? recurrenceLabel(post.recurrence, post.start_date)
               : rangeLabel(post.start_date, post.end_date ?? post.start_date)}
           </span>
+        )}
+        {onAsk && (
+          <button className="cpost__ask" onClick={() => onAsk(post)}>
+            <Icon name="message" size={12} />
+            Ask {(name.split(' ')[0]) || 'them'}
+          </button>
         )}
       </footer>
     </article>

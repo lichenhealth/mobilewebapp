@@ -98,3 +98,17 @@
   display: inline-flex; align-items: center; gap: 4px;
   font-family: var(--font-mono); font-size: 10px; color: var(--ink-muted);
 }
+
+/* "Ask about this entry" (founder 2026-09-14): the chat door on every WOW/KOC
+   card — opens the Concierge chat with the entry pinned and its author tagged.
+   Sits at the footer's right edge; the tags/range keep the left. */
+.cpost__ask {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: auto; flex-shrink: 0;
+  padding: 4px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone);
+  color: var(--peach-deep); font-size: 12px; font-weight: 400;
+  font-family: inherit; cursor: pointer;
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.cpost__ask:hover { border-color: var(--peach); }
