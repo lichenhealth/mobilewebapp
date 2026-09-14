@@ -99,7 +99,17 @@ export default function CarePostCard({
       <header className="cpost__head">
         <span className="cpost__avatar" style={{ background: colorFor(post.author_id) }}>{monogramFor(name)}</span>
         <span className="cpost__head-text">
-          <span className="cpost__author">{name}</span>
+          <span className="cpost__author">
+            {name}
+            {/* Recommended vs prescribed (founder 2026-09-14): how the plan
+                entry is held, said on the byline — the mock's grammar
+                ("Galyn Burke prescribed this course"). */}
+            {post.intent && (
+              <em className={'cpost__intent' + (post.intent === 'prescribed' ? ' cpost__intent--prescribed' : '')}>
+                {' · '}{post.intent}
+              </em>
+            )}
+          </span>
           <span className="cpost__time">
             {formatRelative(post.created_at)}
             {/* The promise this entry is keeping, said on its face
