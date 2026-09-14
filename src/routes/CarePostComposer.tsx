@@ -44,6 +44,10 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   // you keep every detail. null = Claude may help with it, which is often
   // the point (the right intervention for a diagnosis, a way through).
   const [aiOmit, setAiOmit] = useState<'medical' | 'financial' | null>(null);
+  // Recommended vs prescribed (founder 2026-09-14: "delineate suggested
+  // versus prescribed"): how a plan entry is held — worth trying, or part
+  // of the plan. Optional; tap again to clear. KOC only.
+  const [intent, setIntent] = useState<'recommended' | 'prescribed' | null>(null);
   const [error, setError] = useState('');
 
   const photoRef = useRef<HTMLInputElement>(null);
@@ -101,6 +105,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
         recurrence: kind === 'koc' ? recurrence : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
         links: cleanedLinks, previews, aiOmit,
+        intent: kind === 'koc' ? intent : null,
       });
       back();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); setSaving(false); }
@@ -211,6 +216,24 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
               range={range} recurrence={recurrence}
               onRangeChange={setRange} onRecurrenceChange={setRecurrence}
             />
+          </div>
+        )}
+
+        {/* KOC: recommended vs prescribed (founder 2026-09-14) */}
+        {kind === 'koc' && (
+          <div className="cedit__field">
+            <span className="cedit__label">How is this held?</span>
+            <span className="cedit__omit-btns">
+              {(['recommended', 'prescribed'] as const).map((v) => (
+                <button key={v}
+                  className={'cedit__omit-btn' + (intent === v ? ' is-on' : '')}
+                  aria-pressed={intent === v}
+                  onClick={() => setIntent((cur) => (cur === v ? null : v))}
+                >
+                  {v === 'recommended' ? 'Recommended — worth trying' : 'Prescribed — part of the plan'}
+                </button>
+              ))}
+            </span>
           </div>
         )}
       </div>

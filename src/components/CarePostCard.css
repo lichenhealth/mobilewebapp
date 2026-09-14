@@ -112,3 +112,9 @@
   transition: border-color var(--d-fast) var(--ease-out);
 }
 .cpost__ask:hover { border-color: var(--peach); }
+
+/* Recommended vs prescribed on the byline (founder 2026-09-14): a quiet
+   delineation, not a badge — prescribed is part of the plan and leans on
+   the stewardship blue; recommended stays muted. */
+.cpost__intent { font-style: normal; font-size: 11px; color: var(--ink-muted); }
+.cpost__intent--prescribed { color: var(--blue-deep); }

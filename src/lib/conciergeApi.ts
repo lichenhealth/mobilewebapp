@@ -31,6 +31,9 @@ export interface CarePostRow {
   id: string;
   /** Set = no assistant reads this entry; the reason shows on the card. */
   ai_omit?: 'medical' | 'financial' | 'other' | null;
+  /** How a plan entry is held (founder 2026-09-14): a RECOMMENDED thing is
+   *  worth trying, a PRESCRIBED one is part of the plan. Null = unlabeled. */
+  intent?: 'recommended' | 'prescribed' | null;
   patient_id: string;
   author_id: string;
   kind: CareKind;
@@ -48,7 +51,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit';
+  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, intent';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -242,6 +245,8 @@ export interface CarePostInput {
   /** 'medical' | 'financial' | 'other' — held back from every assistant,
    *  chosen when writing (founder 2026-08-20). Absent = Claude may help. */
   aiOmit?: 'medical' | 'financial' | 'other' | null;
+  /** koc only: recommended vs prescribed (founder 2026-09-14). */
+  intent?: 'recommended' | 'prescribed' | null;
 }
 export async function createCarePost(me: string, input: CarePostInput): Promise<string> {
   const recurring = input.kind === 'koc' && !!input.recurrence;
@@ -256,6 +261,8 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     attachments: input.attachments, links: input.links, previews: input.previews,
     // Per-entry AI omission with its reason (founder 2026-08-20).
     ai_omit: input.aiOmit ?? null,
+    // How a plan entry is held (founder 2026-09-14) — plan items only.
+    intent: input.kind === 'koc' ? (input.intent ?? null) : null,
   };
   const { data, error } = await supabase.from('care_posts').insert(row).select('id').single();
   if (error) throw error;
