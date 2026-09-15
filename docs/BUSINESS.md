@@ -105,6 +105,14 @@ never be described to third parties as closed. Six build decisions await the fou
 claude/goofy-cori-eb2846 (PR #156, docs-only) — SUPERSEDED 2026-09-15 by
 `docs/SUBSIDY_MECHANICS.md` on main (the build spec, written after the
 family-rule simplification; reviewed by the builder session same day).
+**V1 RESTRICTION SCOPE settled (founder 2026-09-15)**: restrictions are
+structured — purpose (care | goods/services | unrestricted) plus
+optionally WHICH PROVIDERS the fund buys through; never who receives.
+Restricted funds sit until a qualifying request. Population/class
+restrictions deferred until identity categories can carry them — donor
+free text never defines a fund. Human intake check per Eva: a
+provider-restricted gift (esp. DAF) is accepted only after confirming the
+provider doesn't personally serve the donor.
 **FAMILY RULE SIMPLIFIED (founder 2026-09-11, the Mark's-sister case).**
 The segregation mechanics are RETIRED from the page: with one donor and
 zero earned revenue (all alpha members use the platform free, by choice)

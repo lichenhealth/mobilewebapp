@@ -28,6 +28,24 @@ ceiling on designated gifts, set annually to trailing-twelve-month actual
 operating costs; unrestricted gifts carry no cap. The rate is a stored
 parameter, not a literal.
 
+## V1 restriction scope (founder, 2026-09-15)
+
+Restrictions are STRUCTURED in v1, not free text:
+
+- A gift's **purpose** is one of `care` | `community` (goods/services) |
+  `unrestricted` — the enum below is deliberate and sufficient.
+- A gift may additionally restrict **which providers** the fund buys
+  through (`fund_providers`: tranche → provider profile ids — real members,
+  standard rates, never a gift *to* them). Never who receives.
+- A restricted fund with no qualifying request SITS until one exists —
+  the escalate-and-wait behavior in step 3, by design.
+- **Population/class restrictions ("clean food for first responders") are
+  DEFERRED** until identity categories can carry them — donor free text
+  never becomes a fund definition. Decline or hold such asks for now.
+- Intake check, human not machinery (Eva's §4967 line): before accepting a
+  provider-restricted gift — especially from a DAF — confirm the named
+  provider does not personally serve the donor.
+
 ## Step 1 — Pool the money, keep the tranche
 
 Donations stop naming a recipient. A donation becomes a **tranche**: a pool
