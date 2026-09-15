@@ -102,7 +102,9 @@ unpaid). Assistants: say "5–15% on designated gifts, set annually to real
 costs", never a fixed 95/5. ⚠ NONE of the mechanics are built; the gap must
 never be described to third parties as closed. Six build decisions await the founder in the
 "Filling the Well" artifact; the mechanics proposal lives on branch
-claude/goofy-cori-eb2846 (PR #156, docs-only).
+claude/goofy-cori-eb2846 (PR #156, docs-only) — SUPERSEDED 2026-09-15 by
+`docs/SUBSIDY_MECHANICS.md` on main (the build spec, written after the
+family-rule simplification; reviewed by the builder session same day).
 **FAMILY RULE SIMPLIFIED (founder 2026-09-11, the Mark's-sister case).**
 The segregation mechanics are RETIRED from the page: with one donor and
 zero earned revenue (all alpha members use the platform free, by choice)
