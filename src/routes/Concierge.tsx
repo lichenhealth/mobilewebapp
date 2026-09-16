@@ -781,7 +781,7 @@ function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void
  *  Concierge you manage the team right here (invite by email, approve,
  *  remove); viewing a client's Concierge it stays a read-only roster —
  *  who joins their team is the patient's call. */
-function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string }) {
+function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string; me: string; addNonce?: number }) {
   const navigate = useNavigate();
   const managing = !!me && subjectId === me;
   // ADMIN vs LICHEN view (founder 2026-08-20): living your care team is a
@@ -791,6 +791,17 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
   const [searchParams] = useSearchParams();
   const [adminMode, setAdminMode] = useState(() => searchParams.get('manage') === '1');
   const admin = managing && adminMode;
+
+  // The toolbar's + door (founder 2026-09-15): adding stays ONE flow — the
+  // Admin invite box — so the + opens Admin and lands focus there rather
+  // than growing a second add-UI.
+  const addInputRef = useRef<HTMLInputElement | null>(null);
+  const wantAddFocus = useRef(false);
+  useEffect(() => {
+    if (!addNonce || !managing) return;
+    wantAddFocus.current = true;
+    setAdminMode(true);
+  }, [addNonce, managing]);
 
   const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
   const [links, setLinks] = useState<CareLink[]>([]);
@@ -833,6 +844,14 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
     }
   }, [subjectId, me, managing]);
   useEffect(() => { setReady(false); void load(); }, [load]);
+
+  // Focus lands only once the Admin view (and its input) actually exists.
+  useEffect(() => {
+    if (!wantAddFocus.current || !admin || !ready) return;
+    wantAddFocus.current = false;
+    addInputRef.current?.focus();
+    addInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [admin, ready]);
 
   async function act(fn: () => Promise<void>) {
     setBusy(true); setMsg('');
@@ -994,7 +1013,7 @@ function CareTeamDirectory({ subjectId, me }: { subjectId: string; me: string })
       {ready && admin && (
         <div className="conc__team-addwrap">
           <div className="conc__team-add">
-            <input className="conc__team-input" value={email}
+            <input className="conc__team-input" ref={addInputRef} value={email}
               onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter' || busy || !email.trim()) return;
@@ -1057,6 +1076,9 @@ export default function Concierge() {
   // chose — silence in either direction is the failure.
   const [clientAiOff, setClientAiOff] = useState(false);
   const [scope, setScope] = useState<'Day' | 'Week' | 'Month'>('Day');
+  // Bumped by the Care Team tab's + door — opens Admin and focuses the
+  // invite box inside CareTeamDirectory.
+  const [teamAdd, setTeamAdd] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -1327,7 +1349,22 @@ export default function Concierge() {
       </nav>
 
       {/* Tool row (search · AI brain · scope · pagination) */}
+      {/* The Care Team tab sheds the board chrome (founder 2026-09-15: "the
+          WOW and KOC nav shouldn't persist") and carries ONE door instead —
+          a + that opens Admin with the invite box focused. */}
+      {(activeTab !== 'team' || me === subjectId) && (
       <div className="conc__tools">
+        {activeTab === 'team' ? (
+          <button
+            className="conc__tool-circle"
+            onClick={() => setTeamAdd((n) => n + 1)}
+            aria-label="Add to your care team"
+            title="Add to your care team"
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        ) : (
+        <>
         <button
           className={'conc__tool-circle' + (showSearch ? ' is-active' : '')}
           onClick={() => {
@@ -1352,7 +1389,9 @@ export default function Concierge() {
         >
           <Icon name="brain" size={20} />
         </button>
-        {activeTab !== 'chat' && activeTab !== 'urgent' && (
+        </>
+        )}
+        {activeTab !== 'chat' && activeTab !== 'urgent' && activeTab !== 'team' && (
           <>
             {/* Same control language as the Calendar's view picker (founder,
                 2026-07-17) — a dropdown, not a tap-to-cycle pill. */}
@@ -1375,9 +1414,10 @@ export default function Concierge() {
           </>
         )}
       </div>
+      )}
 
       {/* Search bar (toggleable) */}
-      {showSearch && (
+      {showSearch && activeTab !== 'team' && (
         <div className="conc__search">
           <Icon name="search" size={14} />
           <input
@@ -1597,7 +1637,7 @@ export default function Concierge() {
       )}
 
       {activeTab === 'urgent' && <UrgentCare subjectId={subjectId} me={me} />}
-      {activeTab === 'team' && <CareTeamDirectory subjectId={subjectId} me={me} />}
+      {activeTab === 'team' && <CareTeamDirectory subjectId={subjectId} me={me} addNonce={teamAdd} />}
     </div>
   );
 }
