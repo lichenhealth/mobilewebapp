@@ -118,3 +118,10 @@
    the stewardship blue; recommended stays muted. */
 .cpost__intent { font-style: normal; font-size: 11px; color: var(--ink-muted); }
 .cpost__intent--prescribed { color: var(--blue-deep); }
+
+/* The author's name is a door to their profile (founder 2026-09-21 —
+   the link-cue rule; the peach thread comes from the shared .link-cue). */
+.cpost__author-btn {
+  background: transparent; border: 0; padding: 0; font: inherit;
+  color: inherit; cursor: pointer;
+}

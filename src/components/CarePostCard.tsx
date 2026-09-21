@@ -84,6 +84,7 @@ export default function CarePostCard({
   onAsk?: (post: CarePostRow) => void;
 }) {
   const name = post.author?.full_name ?? 'Care team';
+  const navigate = useNavigate();
   const [portrait, setPortrait] = useState(false);
 
   // A single tall photo → lay text beside it; otherwise stack (text above media).
@@ -100,7 +101,11 @@ export default function CarePostCard({
         <span className="cpost__avatar" style={{ background: colorFor(post.author_id) }}>{monogramFor(name)}</span>
         <span className="cpost__head-text">
           <span className="cpost__author">
-            {name}
+            {/* The author's name goes to their profile and says so (the
+                link-cue rule, founder 2026-09-21). */}
+            <button className="cpost__author-btn link-cue" onClick={() => navigate(`/members/${post.author_id}`)}>
+              {name}
+            </button>
             {/* Recommended vs prescribed (founder 2026-09-14): how the plan
                 entry is held, said on the byline — the mock's grammar
                 ("Galyn Burke prescribed this course"). */}

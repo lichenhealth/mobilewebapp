@@ -182,7 +182,7 @@ export default function FeedCard({
       <div className={'feed-card-shell feed-card-shell--activity' + (demo ? ' feed-card-shell--demo' : '')}>
         <article className="feed-activity">
           {onAuthor ? (
-            <button className="feed-activity__who" onClick={onAuthor} aria-label={`Open ${handle}'s profile`}>
+            <button className="feed-activity__who link-cue" onClick={onAuthor} aria-label={`Open ${handle}'s profile`}>
               {avatarEl}
             </button>
           ) : avatarEl}
@@ -235,7 +235,7 @@ export default function FeedCard({
         ) : avatarEl}
         <div className="feed-card__head-text">
           {onOpen && !expanded ? (
-            <button className="feed-card__title feed-card__title--btn" onClick={onOpen}>{title}</button>
+            <button className="feed-card__title feed-card__title--btn link-cue" onClick={onOpen}>{title}</button>
           ) : (
             <h3 className="feed-card__title">{title}</h3>
           )}
@@ -251,7 +251,7 @@ export default function FeedCard({
           )}
           <div className="feed-card__handle-row">
             {onAuthor ? (
-              <button className="feed-card__handle feed-card__handle--btn" onClick={onAuthor}>
+              <button className="feed-card__handle feed-card__handle--btn link-cue" onClick={onAuthor}>
                 {handle}
               </button>
             ) : (
@@ -274,7 +274,7 @@ export default function FeedCard({
                 {eyebrow === 'Mycelium' ? (
                   // the lens the post reached you through — YOUR my-celium's
                   // door ('Mycelium' stays the internal sentinel value)
-                  <button className="feed-card__eyebrow-link" onClick={() => navigate('/mycelium')}>
+                  <button className="feed-card__eyebrow-link link-cue" onClick={() => navigate('/mycelium')}>
                     My-celium
                   </button>
                 ) : eyebrow}
