@@ -8,7 +8,7 @@ import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
 import { supabase } from '../lib/supabase';
 import {
-  loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia,
+  loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia, formatRelative,
   type MediaType, type Attachment,
 } from '../lib/chatApi';
 import {
@@ -651,6 +651,16 @@ function MeansCard({ subjectId, me, openSignal, web, standalone }: {
 }
 
 /** Empty-state card for WOW/KOC — doubles as the caregiver's "author the first one" entry. */
+/** The Summary view's recent digest (founder 2026-09-21): the most recent
+ *  entries inside the score window — up to three — or, when the window is
+ *  quiet, the latest older entry carried forward (the same rule the scores
+ *  live by). Deterministic on purpose: the board must be instant. */
+function wowDigest(posts: CarePostRow[], windowDays: number): CarePostRow[] {
+  const cutoff = new Date(Date.now() - windowDays * 86400_000).toISOString();
+  const recent = posts.filter((p) => p.created_at >= cutoff).slice(0, 3);
+  return recent.length ? recent : posts.slice(0, 1);
+}
+
 function ConciergeEmpty({ icon, title, sub, action }: {
   icon: IconName; title: string; sub: string; action?: { label: string; onClick: () => void };
 }) {
@@ -1095,7 +1105,9 @@ export default function Concierge() {
   // WOW/KOC care-post board for whoever we're viewing (RLS scopes to care-team reads).
   const [wowPosts, setWowPosts] = useState<CarePostRow[]>([]);
   const [kocPosts, setKocPosts] = useState<CarePostRow[]>([]);
-  const [wowFilter, setWowFilter] = useState<Dimension | 'All'>('All');
+  // THE SECTIONED BOARD (founder 2026-09-21): Overall + the six threads,
+  // each a summary with its own + door — per-section view choice lives here.
+  const [wowView, setWowView] = useState<Record<string, 'summary' | 'chron'>>({});
   // THREE WOW ANGLES (founder 2026-09-21): Self / Care team / Self + Care
   // team, toggled from the list at the web's upper left. Combo is the
   // default — with no care team it reads identically to Self.
@@ -1460,7 +1472,13 @@ export default function Concierge() {
         // the first scores for their entire web, once complete"). Own board
         // only — a caregiver reading a client's board sees what exists.
         const gated = !isClientView && ownWeb.answered.length < WOW_DIMENSIONS.length;
-        const feed = wowFilter === 'All' ? wowPosts : wowPosts.filter((p) => p.dimensions.includes(wowFilter));
+        // Overall first, then the six threads (founder 2026-09-21): an
+        // Overall entry is a wow post with NO dimensions — the existing
+        // "All" semantics, which already weighs into every thread's score.
+        const wowSections: Array<'Overall' | Dimension> = ['Overall', ...WOW_DIMENSIONS];
+        const postsFor = (s: 'Overall' | Dimension) => wowPosts
+          .filter((p) => (s === 'Overall' ? p.dimensions.length === 0 : p.dimensions.includes(s)))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at));
         return (
           <>
             {!dataReady && <p className="conc__care-hint">Loading…</p>}
@@ -1469,6 +1487,7 @@ export default function Concierge() {
                 rather than nothing. */}
             {dataReady && gated && (
               <div className="wow__gate">
+                <span className="wow__gate-step">Step 1</span>
                 <p className="wow__gate-lead">
                   Your web begins with the self assessment — walk the six
                   threads in your own words, and your answers become the
@@ -1484,37 +1503,37 @@ export default function Concierge() {
                 </button>
               </div>
             )}
-            {dataReady && !gated && (
-              <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
-                {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
-                  <button key={k} role="tab" aria-selected={wowLens === k}
-                    className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
-                    onClick={() => setWowLens(k)}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* The lens list sits LEFT OF THE WEB itself (founder 2026-09-21,
+                the screenshot's arrows); on narrow columns the row wraps and
+                the list lands above-left. */}
             {dataReady && (
-              <>
+              <div className="wow__webrow">
                 {!gated && (
-                  <div className="wow__overall">
-                    <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
-                    <span className="wow__overall-lbl">Overall wellbeing</span>
+                  <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
+                    {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
+                      <button key={k} role="tab" aria-selected={wowLens === k}
+                        className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
+                        onClick={() => setWowLens(k)}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 )}
-                <div className={'wow__radar' + (gated ? ' wow__radar--gray' : '')}>
-                  <HexagonRadar axes={wowAxes(scores.byDimension)} size={260} />
+                <div className="wow__webcenter">
+                  {!gated && (
+                    <div className="wow__overall">
+                      <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
+                      <span className="wow__overall-lbl">Overall wellbeing</span>
+                    </div>
+                  )}
+                  <div className={'wow__radar' + (gated ? ' wow__radar--gray' : '')}>
+                    <HexagonRadar axes={wowAxes(scores.byDimension)} size={260} />
+                  </div>
                 </div>
-              </>
+              </div>
             )}
             {dataReady && wowPosts.length > 0 && (
               <>
-                <div className="wow__chips">
-                  {(['All', ...WOW_DIMENSIONS] as const).map((c) => (
-                    <button key={c} className={'wow__chip' + (wowFilter === c ? ' is-on' : '')} onClick={() => setWowFilter(c)}>{c}</button>
-                  ))}
-                </div>
                 {/* THE SELF-DRIVING WINDOW (founder 2026-08-14): the score is
                     a now-reading over a window; whose hands the window is in
                     is the member's choice — visible, reasoned, revocable. */}
@@ -1561,46 +1580,73 @@ export default function Concierge() {
                 )}
               </>
             )}
-            {canAuthor && (
-              <button className="board__post-btn" onClick={() => navigate(`${basePath}/wow/edit`)} aria-label="Post to Web of Wellbeing">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
-            )}
-            {/* Your web KICKS OFF with the self-evaluation (founder
-                2026-08-14) — it shows until you've authored something
-                yourself, even if the care team spoke first. */}
-            {dataReady && !isClientView && !wowPosts.some((p) => p.author_id === me) && (
-              <SelfAudit
-                me={me}
-                onDone={() => setBoardNonce((n) => n + 1)}
-                onOpenMeans={() => navigate('/concierge/financial')}
-              />
-            )}
-            {/* The financial picture sits UNDER the self-evaluation (founder
-                2026-08-15): it's the sixth aspect's structured companion, not
-                a banner over the whole board — and it carries the honest
-                condition for subsidised care. */}
-            {/* THE OWNER'S FORM MOVED OUT (founder 2026-08-20): "create a
-                financial health profile should click you through to the loan
-                app form" — it's /concierge/financial now, not a bubble at the
-                foot of the board. What stays here is the READ side: a
-                caregiver looking at their client's picture. */}
+            {/* The financial picture: the READ side for a caregiver looking
+                at their client (founder 2026-08-20 — the owner's form lives
+                at /concierge/financial). */}
             {dataReady && isClientView && (
               <MeansCard subjectId={subjectId} me={me} web={ownWeb} />
             )}
-            {dataReady && isClientView && wowPosts.length === 0 && (
-              <ConciergeEmpty icon="health" title="Web of Wellbeing"
-                sub={canAuthor
-                  ? 'Post the first entry — add content, tag a dimension, and give it a wellbeing score.'
-                  : "They haven't been woven into their web yet."} />
-            )}
-            {feed.map((p) => (
-              <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
-                canDelete={canAuthor && p.author_id === me} onDelete={removePost}
-                onAsk={p.author_id !== me ? askEntry : undefined} />
-            ))}
+            {/* THE SECTIONED BOARD (founder 2026-09-21, replacing the flat
+                feed AND the inline six-bubble intake form — the guided
+                walk-through is the way in, the + on each section is the
+                ongoing door): Overall leads (a global update with a score),
+                then each thread as a SUMMARY with its own + — and every
+                section reads two ways, Summary (the recent picture) or
+                Chronological (entries and scores in time order). Gated
+                sections gray out with the web, so the ask above is plainly
+                step 1. */}
+            {dataReady && wowSections.map((s) => {
+              const isOverall = s === 'Overall';
+              const posts = postsFor(s);
+              const score = isOverall ? scores.overall : scores.byDimension[s as Dimension];
+              const view = wowView[s] ?? 'summary';
+              const digest = wowDigest(posts, wowWindow);
+              return (
+                <section key={s} className={'wowsec' + (gated ? ' wowsec--gray' : '')}>
+                  <header className="wowsec__head">
+                    <span className="wowsec__name">
+                      {!isOverall && <Icon name={DIMENSION_META[s as Dimension]} size={15} />}
+                      {s}
+                    </span>
+                    {!gated && score != null && <span className="wowsec__score">{score}%</span>}
+                    <span className="wowsec__viewtog">
+                      <button className={view === 'summary' ? 'is-on' : ''}
+                        onClick={() => setWowView((v) => ({ ...v, [s]: 'summary' }))}>Summary</button>
+                      <button className={view === 'chron' ? 'is-on' : ''}
+                        onClick={() => setWowView((v) => ({ ...v, [s]: 'chron' }))}>Chronological</button>
+                    </span>
+                    {canAuthor && (
+                      <button className="wowsec__add" disabled={gated}
+                        onClick={() => navigate(`${basePath}/wow/edit?dim=${isOverall ? 'overall' : s}`)}
+                        aria-label={`Add an entry to ${s}`}>
+                        +
+                      </button>
+                    )}
+                  </header>
+                  {view === 'summary' ? (
+                    posts.length === 0
+                      ? <p className="wowsec__empty">Nothing woven here yet.</p>
+                      : digest.map((p) => (
+                        <p className="wowsec__line" key={p.id}>
+                          {p.body.trim() ? (p.body.length > 220 ? p.body.slice(0, 220) + '…' : p.body) : 'A score, without words'}
+                          <span className="wowsec__meta">
+                            {' — '}{p.author?.full_name ?? 'Care team'}, {formatRelative(p.created_at)}
+                            {p.score != null && <> · {p.score}%</>}
+                          </span>
+                        </p>
+                      ))
+                  ) : (
+                    posts.length === 0
+                      ? <p className="wowsec__empty">Nothing woven here yet.</p>
+                      : posts.map((p) => (
+                        <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
+                          canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                          onAsk={p.author_id !== me ? askEntry : undefined} />
+                      ))
+                  )}
+                </section>
+              );
+            })}
           </>
         );
       })()}

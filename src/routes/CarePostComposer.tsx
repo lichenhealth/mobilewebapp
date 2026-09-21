@@ -1,5 +1,5 @@
 import { useRef, useState, ChangeEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { DateRange } from '../components/DateRangeCalendar';
 import RecurrencePicker from '../components/RecurrencePicker';
@@ -25,6 +25,11 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   // your care team can enter an updated score any time — same composer,
   // same dimension ticks, the entry just lands on your own web).
   const patient = patientId || me;
+  // The sectioned board's + doors arrive with ?dim=<Dimension> (founder
+  // 2026-09-21) — that thread arrives pre-ticked; ?dim=overall leaves the
+  // ticks empty, which is the existing "All"/global-entry semantics.
+  const [searchParams] = useSearchParams();
+  const dimParam = searchParams.get('dim');
   const navigate = useNavigate();
   const back = () => navigate(patientId
     ? (kind === 'wow' ? `/concierge/client/${patientId}` : `/concierge/client/${patientId}/koc`)
@@ -34,7 +39,9 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [uploading, setUploading] = useState(false);
   const [links, setLinks] = useState<LinkRow[]>([]);
-  const [dims, setDims] = useState<Set<Dimension>>(new Set());   // wow; empty = All
+  const [dims, setDims] = useState<Set<Dimension>>(
+    () => new Set((WOW_DIMENSIONS as readonly string[]).includes(dimParam ?? '') ? [dimParam as Dimension] : []),
+  );   // wow; empty = All
   const [score, setScore] = useState(70);                        // wow
   const [range, setRange] = useState<DateRange>({ start: null, end: null }); // koc
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
