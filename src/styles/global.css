@@ -384,3 +384,20 @@ body.is-website .app-shell {
   box-shadow: none;
 }
 body.is-website::before { content: none; }   /* the paper grain is Lichen's, not theirs */
+
+/* EVERYTHING THAT GOES SOMEWHERE SAYS SO (founder 2026-09-21: "everything
+   that's link-able … create a design cue that lets them know"). Text that
+   navigates wears a thin PEACH THREAD under ink — the web's oldest link cue
+   in Lichen's color, always on (phones have no hover). Ink stays ink so
+   cards don't flood orange and peach keeps meaning engagement; full-peach
+   text stays reserved for buttons/pills/active states. Whole-surface doors
+   (tiles, rows, icon circles) already read as openable and skip it. The
+   assistant's rooms already speak this shape in silicon blue (.abrief__ref);
+   this is the platform-side twin. */
+.link-cue {
+  text-decoration: underline;
+  text-decoration-color: var(--peach);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.link-cue:hover { text-decoration-color: var(--peach-deep); }
