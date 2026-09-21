@@ -1485,51 +1485,56 @@ export default function Concierge() {
             {/* The web itself always leads the board (founder 2026-09-11):
                 with no entries it renders blank — the web waiting for inputs —
                 rather than nothing. */}
-            {dataReady && gated && (
-              <div className="wow__gate">
-                <span className="wow__gate-step">Step 1</span>
-                <p className="wow__gate-lead">
-                  Your web begins with the self assessment — walk the six
-                  threads in your own words, and your answers become the
-                  first scores across your whole web.
-                </p>
-                {ownWeb.answered.length > 0 && (
-                  <p className="wow__gate-progress">
-                    {ownWeb.answered.length} of {WOW_DIMENSIONS.length} threads woven so far.
-                  </p>
-                )}
-                <button className="btn btn-primary" onClick={() => navigate('/concierge/intake')}>
-                  {ownWeb.answered.length > 0 ? 'Continue the self assessment' : 'Take the self assessment'}
-                </button>
-              </div>
-            )}
             {/* The lens list sits LEFT OF THE WEB itself (founder 2026-09-21,
                 the screenshot's arrows); on narrow columns the row wraps and
-                the list lands above-left. */}
+                the list lands above-left. While gated, the STEP 1 card
+                FLOATS OVER the gray web as an overlay (founder 2026-09-21,
+                second pass: "move it down here and have it be an overlay so
+                it's clear that this is an initial, setup process"). */}
             {dataReady && (
-              <div className="wow__webrow">
-                {!gated && (
-                  <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
-                    {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
-                      <button key={k} role="tab" aria-selected={wowLens === k}
-                        className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
-                        onClick={() => setWowLens(k)}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="wow__webcenter">
+              <div className={'wow__webwrap' + (gated ? ' wow__webwrap--gated' : '')}>
+                <div className="wow__webrow">
                   {!gated && (
-                    <div className="wow__overall">
-                      <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
-                      <span className="wow__overall-lbl">Overall wellbeing</span>
+                    <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
+                      {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
+                        <button key={k} role="tab" aria-selected={wowLens === k}
+                          className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
+                          onClick={() => setWowLens(k)}>
+                          {label}
+                        </button>
+                      ))}
                     </div>
                   )}
-                  <div className={'wow__radar' + (gated ? ' wow__radar--gray' : '')}>
-                    <HexagonRadar axes={wowAxes(scores.byDimension)} size={260} />
+                  <div className="wow__webcenter">
+                    {!gated && (
+                      <div className="wow__overall">
+                        <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
+                        <span className="wow__overall-lbl">Overall wellbeing</span>
+                      </div>
+                    )}
+                    <div className={'wow__radar' + (gated ? ' wow__radar--gray' : '')}>
+                      <HexagonRadar axes={wowAxes(scores.byDimension)} size={260} />
+                    </div>
                   </div>
                 </div>
+                {gated && (
+                  <div className="wow__gate wow__gate--overlay">
+                    <span className="wow__gate-step">Step 1</span>
+                    <p className="wow__gate-lead">
+                      Your web begins with the self assessment — walk the six
+                      threads in your own words, and your answers become the
+                      first scores across your whole web.
+                    </p>
+                    {ownWeb.answered.length > 0 && (
+                      <p className="wow__gate-progress">
+                        {ownWeb.answered.length} of {WOW_DIMENSIONS.length} threads woven so far.
+                      </p>
+                    )}
+                    <button className="btn btn-primary" onClick={() => navigate('/concierge/intake')}>
+                      {ownWeb.answered.length > 0 ? 'Continue the self assessment' : 'Take the self assessment'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {dataReady && wowPosts.length > 0 && (
