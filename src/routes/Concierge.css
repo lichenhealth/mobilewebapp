@@ -1369,3 +1369,29 @@
 
 /* The wallet page's door row (Currentcy.tsx shares this stylesheet). */
 .cedit__doors { display: flex; gap: 10px; margin: 2px 0 8px; }
+
+/* THREE WOW LENSES + THE GRAY GATE (founder 2026-09-21). Below the base
+   rules on purpose — the same-file ordering doctrine. */
+.wow__lensbox {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 2px; margin: 4px 0 0;
+}
+.wow__lensbtn {
+  background: none; border: 0; padding: 2px 8px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 300;
+  color: var(--ink-muted); border-left: 2px solid transparent;
+  transition: color var(--d-fast) var(--ease-out);
+}
+.wow__lensbtn.is-on { color: var(--ink); font-weight: 400; border-left-color: var(--peach); }
+.wow__lensbtn:hover { color: var(--ink); }
+
+/* The gray web: every aspect stands down until the self assessment is
+   complete — the ask sits above it, the web waits underneath. */
+.wow__radar--gray svg { filter: grayscale(1) opacity(0.4); }
+.wow__gate {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  border: 1px solid var(--bone-edge); border-radius: 14px;
+  background: #fff; padding: 14px 16px; margin: 4px 0 6px;
+}
+.wow__gate-lead { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
+.wow__gate-progress { margin: 0; font-size: 12px; color: var(--ink-muted); }
