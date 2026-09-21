@@ -50,7 +50,7 @@ export default function Invite() {
   const { loading, user, isAdmin } = useAuth();
   // The ledger: my invitations (RLS: created_by = me) + the knocks (admins).
   type InviteRow = {
-    token: string; invitee_email: string | null; claimed_by: string | null;
+    token: string; invitee_email: string | null; invitee_phone?: string | null; claimed_by: string | null;
     opened_at: string | null; declined_at?: string | null;
     created_at: string; created_by?: string;
     claimed_name?: string; inviter_name?: string;
@@ -68,7 +68,7 @@ export default function Invite() {
     // Admins see the whole picture — every invitation, and who sent it.
     // Members see their own (RLS decides; the query is the same shape).
     let q = supabase.from('invite_tokens')
-      .select('token, invitee_email, claimed_by, opened_at, declined_at, created_at, created_by, space_role, space:spaces(name)')
+      .select('token, invitee_email, invitee_phone, claimed_by, opened_at, declined_at, created_at, created_by, space_role, space:spaces(name)')
       .order('created_at', { ascending: false }).limit(200);
     if (!isAdmin) q = q.eq('created_by', user.id);
     const { data } = await q;
@@ -164,17 +164,55 @@ export default function Invite() {
   // Email invites send from our server (Resend). Phone invites can't be
   // server-sent without an SMS provider, so the inviter texts it themselves —
   // a prefilled Messages link + a copy fallback (the Care Team pattern).
+  // SEVERAL AT ONCE, mixed (founder 2026-09-21: "invite people via email and
+  // phone, with a comma, so they get a notification to each"): the box splits
+  // on commas, each address is classified, every email gets its own emailed
+  // invitation and every phone gets its own prepared text — one token each,
+  // never a shared link (a token claims once).
   const isEmail = (s: string) => /\S+@\S+\.\S+/.test(s.trim());
   const isPhone = (s: string) => /^[\d\s()+.-]{7,}$/.test(s.trim());
-  const recipient = email.trim();
-  const channel: 'email' | 'phone' | '' = isEmail(recipient) ? 'email' : isPhone(recipient) ? 'phone' : '';
+  type Recip = { raw: string; kind: 'email' | 'phone' | 'unknown' };
+  const recipients: Recip[] = email.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    .map((r) => ({ raw: r, kind: isEmail(r) ? 'email' as const : isPhone(r) ? 'phone' as const : 'unknown' as const }));
+  const emailsIn = recipients.filter((r) => r.kind === 'email');
+  const phonesIn = recipients.filter((r) => r.kind === 'phone');
+  const unknownIn = recipients.filter((r) => r.kind === 'unknown');
+  // Legacy single-recipient hints keep their voice through this.
+  const channel: 'email' | 'phone' | '' =
+    phonesIn.length > 0 && emailsIn.length === 0 ? 'phone' : emailsIn.length > 0 ? 'email' : '';
 
   const inviteMessage = () => {
     const who = fullName.trim() || 'A friend';
     const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
     return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
   };
-  const smsHref = `sms:${recipient}?&body=${encodeURIComponent(inviteMessage())}`;
+
+  // A prepared text: one minted token per phone, the invitation ready to send
+  // from the inviter's own Messages (no SMS provider — deliberate, free, and
+  // the invite comes from a number the friend knows).
+  type PreparedText = { phone: string; href: string; message: string };
+  const [texts, setTexts] = useState<PreparedText[]>([]);
+  /** One tokened invitation per phone. ⚠ Each phone gets its OWN token —
+   *  tokens claim once, so a shared link would lock out the second friend.
+   *  This also closed a real gap: the old single-phone "Text the invite"
+   *  carried a BARE tokenless signup link, which dropped the friend at the
+   *  knock form instead of a real invitation. */
+  async function preparePhoneTexts(phones: string[]): Promise<PreparedText[]> {
+    if (!user) return [];
+    const out: PreparedText[] = [];
+    for (const p of phones) {
+      const stored = p.replace(/[^\d+]/g, '');
+      const { data } = await supabase.from('invite_tokens')
+        .insert({ created_by: user.id, invitee_phone: stored, ...(forMinor ? { for_minor: true } : {}) })
+        .select('token').maybeSingle();
+      const tok = (data as { token: string } | null)?.token;
+      const message = tok
+        ? inviteMessage().replace('https://lichen.health/signup', `https://lichen.health/signup?invite=${tok}`)
+        : inviteMessage();
+      out.push({ phone: p, href: `sms:${stored}?&body=${encodeURIComponent(message)}`, message });
+    }
+    return out;
+  }
 
   /** Lichen is invite-only: the copied message needs a real token so the
    *  signup door opens. Minted fresh per copy (RLS: created_by = me). */
@@ -204,34 +242,27 @@ export default function Invite() {
       .then(({ data }) => setFullName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user, loading, navigate]);
 
-  async function send(toArg?: string, missionArg?: string) {
-    const to = (toArg ?? email).trim();
-    const theNote = note.trim();
-    // A rewritten opening replaces the standard paragraph; empty keeps it.
-    const theMission = (missionArg ?? '').trim();
-    if (!to || !user) return;
+  /** One emailed invitation, start to finish: member check (gift-instead for
+   *  admins), gift parking, the send itself, knock resolution. Returns the
+   *  line the summary speaks for this address. */
+  async function sendEmailOne(to: string, theNote: string, theMission: string): Promise<{ ok: boolean; text: string }> {
+    if (!user) return { ok: false, text: '' };
     const gifting = isAdmin && gift;
-    setBusy(true); setMsg(''); setError('');
     // Don't send a "join Lichen" invite to someone who's already a member —
     // but if an admin is gifting, gift the existing member directly instead.
     const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: to });
     if (((existing as unknown[] | null) ?? []).length > 0) {
       if (gifting) {
         const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
-        setBusy(false);
-        if (ge) { setError(ge.message); return; }
+        if (ge) return { ok: false, text: `${to}: ${ge.message}` };
         // Email echo — the in-app bell comes from gift_subscription itself,
         // so a failed send here shouldn't fail the gift.
         void supabase.functions.invoke('send-gift-notice', {
           body: { email: to, inviterName: fullName, tier: giftTier, months: giftMonths },
         }).catch(console.warn);
-        setMsg(`${to} is already on Lichen 🌿 — gifted ${giftMonths ? spanText(giftMonths) + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.`);
-        setEmail(''); setNote('');
-        return;
+        return { ok: true, text: `${to} is already on Lichen 🌿 — gifted ${giftMonths ? spanText(giftMonths) + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.` };
       }
-      setBusy(false);
-      setMsg(`${to} is already on Lichen 🌿 — no invite needed.`);
-      return;
+      return { ok: true, text: `${to} is already on Lichen 🌿 — no invite needed.` };
     }
     if (gifting) {
       // Park the gift on their email; the membership gate redeems it the
@@ -241,34 +272,78 @@ export default function Invite() {
         .delete().eq('invitee_email', to.toLowerCase()).eq('status', 'pending');
       const { error: mg } = await supabase.from('membership_gifts')
         .insert({ inviter_id: user.id, invitee_email: to.toLowerCase(), tier: giftTier, months: giftMonths });
-      if (mg) { setBusy(false); setError(mg.message); return; }
+      if (mg) return { ok: false, text: `${to}: ${mg.message}` };
     }
     const { error: e } = await supabase.functions.invoke('send-invite', {
       body: {
         email: to, inviterName: fullName, note: theNote,
         mission: theMission || undefined,
+        // Guardianship rides the emailed token too now (it used to reach
+        // only the copy-link mint — the checkbox silently did nothing here).
+        forMinor: forMinor || undefined,
         giftTier: gifting ? giftTier : undefined,
         giftMonths: gifting ? giftMonths : undefined,
       },
     });
-    setBusy(false);
     if (e) {
-      setError(gifting
-        ? 'The membership is reserved for them, but the email didn’t send. Try again in a moment.'
-        : 'Couldn’t send the invite just now. Please try again in a moment.');
-      return;
+      return {
+        ok: false,
+        text: gifting
+          ? `${to}: the membership is reserved for them, but the email didn’t send. Try again in a moment.`
+          : `${to}: couldn’t send just now. Please try again in a moment.`,
+      };
     }
     // NOW the knock is genuinely handled — matched on the address that was
     // actually sent to, so a direct send from a row resolves that row.
     const hit = knocks.find((k) => k.email.toLowerCase() === to.toLowerCase());
     if (hit && hit.status !== 'invited') void resolveKnock(hit.id, 'invited');
     if (pendingKnock?.email === to.toLowerCase()) setPendingKnock(null);
-    void loadLedger();   // the fresh invitation appears in the list right away
-    setMsg(gifting
-      ? `Invitation sent to ${to} — ${giftMonths ? (spanText(giftMonths) + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
-      : `Invitation sent to ${to}.`);
-    setEmail('');
-    setNote('');
+    return {
+      ok: true,
+      text: gifting
+        ? `Invitation sent to ${to} — ${giftMonths ? (spanText(giftMonths) + ' of ') : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} is waiting for them at signup.`
+        : `Invitation sent to ${to}.`,
+    };
+  }
+
+  /** The knock rows' door — one email, the row's own mission text. */
+  async function send(toArg: string, missionArg?: string) {
+    const to = toArg.trim();
+    if (!to || !user) return;
+    setBusy(true); setMsg(''); setError('');
+    const r = await sendEmailOne(to, note.trim(), (missionArg ?? '').trim());
+    setBusy(false);
+    if (r.ok) { setMsg(r.text); void loadLedger(); } else setError(r.text);
+  }
+
+  /** The main button: every comma-separated recipient, each by its own
+   *  channel — emails send now, phones become ready-to-send texts. */
+  async function sendAll() {
+    if (!user || recipients.length === 0 || unknownIn.length > 0) return;
+    setBusy(true); setMsg(''); setError(''); setTexts([]);
+    const lines: string[] = [];
+    const fails: string[] = [];
+    for (const r of emailsIn) {
+      const res = await sendEmailOne(r.raw, note.trim(), '');
+      (res.ok ? lines : fails).push(res.text);
+    }
+    const prepared = await preparePhoneTexts(phonesIn.map((p) => p.raw));
+    if (prepared.length) {
+      setTexts(prepared);
+      lines.push(prepared.length === 1
+        ? 'Their text is ready below — tap it to send from your Messages.'
+        : `${prepared.length} texts are ready below — tap each to send from your Messages.`);
+    }
+    setBusy(false);
+    if (lines.length) setMsg(lines.join(' '));
+    if (fails.length) setError(fails.join(' '));
+    if (emailsIn.length || prepared.length) void loadLedger();
+    if (fails.length === 0) { setEmail(''); setNote(''); }
+    // One phone and nothing else: keep the old one-tap feel — straight into
+    // Messages with the (now tokened) invitation filled in.
+    if (fails.length === 0 && emailsIn.length === 0 && prepared.length === 1) {
+      window.location.href = prepared[0].href;
+    }
   }
 
   if (loading) return <div className="invite"><p className="invite__muted">Loading…</p></div>;
@@ -288,20 +363,34 @@ export default function Invite() {
       {msg && <p className="invite__msg">{msg}</p>}
 
       <div className="invite__form">
-        <label className="invite__label" htmlFor="invite-email">Their email or phone</label>
+        <label className="invite__label" htmlFor="invite-email">Their email or phone — several at once with commas</label>
         <input
           id="invite-email"
           className="invite__input"
           type="text"
           autoComplete="off"
           autoCapitalize="off"
-          placeholder="friend@example.com  or  (555) 123-4567"
+          placeholder="friend@example.com, (555) 123-4567"
           value={email}
-          onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
+          onChange={(e) => { setEmail(e.target.value); setMsg(''); setTexts([]); }}
         />
-        {channel === 'phone' && (
+        {/* Each address, read back before anything sends — the smart-composer
+            honesty rule: the reading is always shown (founder 2026-08-14). */}
+        {(recipients.length > 1 || unknownIn.length > 0) && (
+          <div className="invite__recips">
+            {recipients.map((r, i) => (
+              <span key={`${r.raw}-${i}`} className={'invite__recip' + (r.kind === 'unknown' ? ' is-bad' : '')}>
+                {r.raw}
+                <em>{r.kind === 'email' ? 'email' : r.kind === 'phone' ? 'text' : 'not an email or phone'}</em>
+              </span>
+            ))}
+          </div>
+        )}
+        {phonesIn.length > 0 && (
           <p className="invite__hint">
-            We’ll open your Messages with the invite ready to send — free, straight from your phone.
+            {phonesIn.length === 1 && recipients.length === 1
+              ? 'We’ll open your Messages with the invite ready to send — free, straight from your phone.'
+              : 'Phone invitations open in your Messages, each one ready to send — free, straight from your phone.'}
           </p>
         )}
 
@@ -382,20 +471,48 @@ export default function Invite() {
               <p className="invite__gift-hint">
                 This replaces the standard 3-month welcome — it activates the moment they sign up
                 with this email, no paywall.
+                {phonesIn.length > 0 && ' The gift rides the email invitations; texted invites carry the standard welcome.'}
               </p>
             )}
           </div>
         )}
 
-        {channel === 'phone' ? (
-          <div className="invite__phone-actions">
-            <a className="btn btn-primary invite__send" href={smsHref}>Text the invite</a>
-            <button type="button" className="btn invite__send" onClick={() => void copyInvite()}>Copy invite</button>
-          </div>
-        ) : (
-          <button className="btn btn-primary invite__send" onClick={() => void send()} disabled={busy || channel !== 'email'}>
-            {busy ? 'Sending…' : 'Send invitation'}
+        <div className="invite__phone-actions">
+          <button
+            className="btn btn-primary invite__send"
+            onClick={() => void sendAll()}
+            disabled={busy || recipients.length === 0 || unknownIn.length > 0}
+          >
+            {busy ? 'Sending…'
+              : channel === 'phone'
+                ? (phonesIn.length === 1 ? 'Text the invite' : `Prepare ${phonesIn.length} texts`)
+                : recipients.length > 1 ? `Send ${recipients.length} invitations` : 'Send invitation'}
           </button>
+          {channel === 'phone' && phonesIn.length === 1 && (
+            <button type="button" className="btn invite__send" onClick={() => void copyInvite()}>Copy invite</button>
+          )}
+        </div>
+
+        {/* Each phone's invitation, minted and ready — its own token, its own
+            tap. Sent from the inviter's OWN phone (no SMS provider, by
+            design): free, and the text comes from a number the friend knows. */}
+        {texts.length > 0 && (
+          <div className="invite__texts">
+            {texts.map((t) => (
+              <div className="invite__text-row" key={t.phone}>
+                <span className="invite__text-num">{t.phone}</span>
+                <a className="btn btn-primary invite__text-go" href={t.href}>Text&nbsp;›</a>
+                <button type="button" className="btn invite__text-copy"
+                  onClick={() => {
+                    navigator.clipboard.writeText(t.message)
+                      .then(() => setMsg(`Copied the invitation for ${t.phone} — paste it into a text or DM.`))
+                      .catch(() => setError('Couldn’t copy automatically — long-press the message to copy it.'));
+                  }}>
+                  Copy
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
         <p className="invite__give">
@@ -429,7 +546,7 @@ export default function Invite() {
               return (
                 <li className="invite__row" key={i.token}>
                   <span className="invite__row-who">
-                    {i.invitee_email ?? 'a shared link'}
+                    {i.invitee_email ?? i.invitee_phone ?? 'a shared link'}
                     {i.space?.name && (
                       <em className="invite__by">
                         {i.space_role === 'admin' ? 'admin of ' : 'joins '}{i.space.name}
