@@ -271,9 +271,15 @@ export default function WowIntake() {
           <p className="wintake__promise">
             What you write stays inside Lichen: your care team can read it,
             nobody else — it is never sold and never shared outside the
-            network. Any entry can be held out of AI entirely, and the money
-            questions exist for one purpose: so support can reach you without
-            you ever having to ask twice.
+            network. Any entry can be held out of AI entirely, and the
+            economic questions exist because humans have collectively decided
+            to funnel safety, resources and respect through a common currency,
+            making one&rsquo;s economic circumstances a critical aspect of
+            their overall wellbeing. Since we&rsquo;re at a period of great
+            imbalance and inequity — and health is a synonym for balance —
+            restoring economic interconnection and balance is a critical,
+            foundational thread that influences our mental, physical,
+            spiritual and social and environmental wellbeing.
           </p>
           <button className="btn btn-primary" onClick={() => {
             // Land on the first dimension not yet spoken to.
