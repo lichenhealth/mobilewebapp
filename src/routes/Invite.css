@@ -135,3 +135,26 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 
 /* The knock the bell was about, lit on arrival (2026-08-21) */
 .invite__row--knock.is-called { border-color: var(--peach); background: var(--peach-tint); }
+
+/* SEVERAL AT ONCE, mixed email + phone (founder 2026-09-21: "invite people
+   via email and phone, with a comma"). Below the base rules — the same-file
+   ordering doctrine. The chips read the box back before anything sends
+   (the smart-composer honesty rule); the text rows are per-phone minted
+   invitations, sent from the inviter's own Messages. */
+.invite__recips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.invite__recip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12.5px; color: var(--ink);
+}
+.invite__recip em { font-style: normal; font-size: 10.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.invite__recip.is-bad { border-color: var(--rust); }
+.invite__recip.is-bad em { color: var(--rust); text-transform: none; letter-spacing: 0; }
+.invite__texts { display: flex; flex-direction: column; gap: 8px; margin-top: var(--s-3); }
+.invite__text-row {
+  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: 12px; background: #fff;
+}
+.invite__text-num { flex: 1 1 auto; min-width: 0; font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.invite__text-go, .invite__text-copy { margin-top: 0; }

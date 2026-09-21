@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string; forMinor?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -206,8 +206,11 @@ Deno.serve(async (req) => {
   let token: string | null = null;
   try {
     if (sub) {
+      // Guardianship rides the token (founder 2026-08-05) — the client's
+      // "setting this up for a young person" box used to reach only the
+      // copy-link mint, never this emailed one (fixed 2026-09-21).
       const { data: tok } = await svc.from('invite_tokens')
-        .insert({ created_by: sub, invitee_email: email, ...(seatCols ?? {}) })
+        .insert({ created_by: sub, invitee_email: email, ...(body.forMinor ? { for_minor: true } : {}), ...(seatCols ?? {}) })
         .select('token').single();
       token = (tok as { token: string } | null)?.token ?? null;
     }
