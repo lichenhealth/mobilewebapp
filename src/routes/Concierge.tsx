@@ -1487,12 +1487,13 @@ export default function Concierge() {
                 rather than nothing. */}
             {/* The lens list sits LEFT OF THE WEB itself (founder 2026-09-21,
                 the screenshot's arrows); on narrow columns the row wraps and
-                the list lands above-left. While gated, the STEP 1 card
-                FLOATS OVER the gray web as an overlay (founder 2026-09-21,
-                second pass: "move it down here and have it be an overlay so
-                it's clear that this is an initial, setup process"). */}
+                the list lands above-left. While gated, the STEP 1 card sits
+                BELOW the fully visible gray web (founder 2026-09-21, third
+                pass: "move it down so it's not blocking the WOW, but the
+                WOW is still grayed out"), wider on desktop so the ask reads
+                in fewer lines. */}
             {dataReady && (
-              <div className={'wow__webwrap' + (gated ? ' wow__webwrap--gated' : '')}>
+              <div className="wow__webwrap">
                 <div className="wow__webrow">
                   {!gated && (
                     <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
@@ -1518,7 +1519,7 @@ export default function Concierge() {
                   </div>
                 </div>
                 {gated && (
-                  <div className="wow__gate wow__gate--overlay">
+                  <div className="wow__gate wow__gate--setup">
                     <span className="wow__gate-step">Step 1</span>
                     <p className="wow__gate-lead">
                       Your web begins with the self assessment — walk the six

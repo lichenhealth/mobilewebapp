@@ -1442,20 +1442,18 @@
 .wowsec__line { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
 .wowsec__meta { color: var(--ink-muted); font-size: 12px; }
 
-/* THE OVERLAY GATE (founder 2026-09-21, screenshot 2: "move it down here and
-   have it be an overlay so its clear that this is an initial, setup process").
-   The Step 1 card floats OVER the gray web instead of sitting above it —
-   the web is visibly waiting underneath, and the card reads as a setup
-   dialog you resolve before the board is yours. Below the base rules —
-   the same-file ordering doctrine. */
-.wow__webwrap--gated { position: relative; padding-bottom: 84px; }
-.wow__gate--overlay {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  margin: 0 auto;
+/* THE SETUP GATE (founder 2026-09-21, third pass: "move it down so it's not
+   blocking the WOW, but the WOW is still grayed out. Then make it wider so
+   more text can fit on each line on desktop"). The Step 1 card sits BELOW
+   the fully visible gray web — a setup dialog under the thing it unlocks,
+   covering nothing. Below the base rules — the same-file ordering doctrine. */
+.wow__gate--setup {
+  margin: 4px auto 6px;
   width: min(340px, calc(100% - 24px));
-  z-index: 2;
   align-items: center;
   text-align: center;
   box-shadow: 0 10px 34px rgba(42, 51, 56, 0.16);
+}
+@media (min-width: 1024px) {
+  .wow__gate--setup { width: min(560px, calc(100% - 24px)); }
 }
