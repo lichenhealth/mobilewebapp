@@ -262,10 +262,11 @@ export default function WowIntake() {
       {ready && step === 'welcome' && (
         <section className="wintake__card">
           <p className="wintake__lead">
-            Six aspects of one life — mental, physical, social, spiritual,
-            environmental, economic. You&rsquo;ll walk them one at a time, in
-            your own words. About ten minutes, and you can stop anywhere —
-            each step is kept the moment you finish it.
+            Six interwoven threads weaving the strong yet flexible web of
+            wellbeing surrounding your life — mental, physical, social,
+            spiritual, environmental, economic. You&rsquo;ll walk them one at a
+            time, in your own words. About ten minutes, and you can stop
+            anywhere — each step is kept the moment you finish it.
           </p>
           <p className="wintake__promise">
             What you write stays inside Lichen: your care team can read it,
