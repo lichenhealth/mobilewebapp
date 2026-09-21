@@ -688,8 +688,9 @@ function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void
     <section className="selfaudit">
       <h3 className="selfaudit__title">Start with your own words</h3>
       <p className="selfaudit__sub">
-        Your Web of Wellbeing begins with how YOU see yourself — six aspects of
-        one life. Write as much or as little as you like, score any you want on
+        Your Web of Wellbeing begins with how YOU see yourself — six interwoven
+        threads weaving the strong yet flexible web of wellbeing surrounding
+        your life. Write as much or as little as you like, score any you want on
         the web, and skip what isn&rsquo;t ready. Your care team can read what
         you share here, and their entries will weave in alongside yours.
       </p>
