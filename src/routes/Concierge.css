@@ -1442,13 +1442,17 @@
 .wowsec__line { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
 .wowsec__meta { color: var(--ink-muted); font-size: 12px; }
 
-/* THE SETUP GATE (founder 2026-09-21, third pass: "move it down so it's not
-   blocking the WOW, but the WOW is still grayed out. Then make it wider so
-   more text can fit on each line on desktop"). The Step 1 card sits BELOW
-   the fully visible gray web — a setup dialog under the thing it unlocks,
-   covering nothing. Below the base rules — the same-file ordering doctrine. */
+/* THE SETUP GATE (founder 2026-09-21, third + fourth pass: below the fully
+   visible gray web, wider on desktop — and dropped LOW enough to slightly
+   overlap the first gray section card ("covers the 6 layers input fields
+   slightly, but not much, to make it more clear its an overlay"). The
+   overlap is the negative bottom margin + z-index; the gray sections are
+   pointer-events: none while gated, so nothing clickable is covered.
+   Below the base rules — the same-file ordering doctrine. */
 .wow__gate--setup {
-  margin: 4px auto 6px;
+  margin: 20px auto -48px;
+  position: relative;
+  z-index: 2;
   width: min(340px, calc(100% - 24px));
   align-items: center;
   text-align: center;
