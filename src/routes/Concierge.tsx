@@ -12,7 +12,7 @@ import {
   type MediaType, type Attachment,
 } from '../lib/chatApi';
 import {
-  loadCarePosts, loadCarePost, computeWowScores, wowAxes, signCareMedia, deleteCarePost,
+  loadCarePosts, loadCarePost, computeWowLenses, type WowLens, wowAxes, signCareMedia, deleteCarePost,
   createCarePost, DIMENSION_META,
   getCareSettings, setWowWindowAuto, tuneWowWindow, WOW_WINDOW_DEFAULT, type CareSettings,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
@@ -1096,6 +1096,10 @@ export default function Concierge() {
   const [wowPosts, setWowPosts] = useState<CarePostRow[]>([]);
   const [kocPosts, setKocPosts] = useState<CarePostRow[]>([]);
   const [wowFilter, setWowFilter] = useState<Dimension | 'All'>('All');
+  // THREE WOW ANGLES (founder 2026-09-21): Self / Care team / Self + Care
+  // team, toggled from the list at the web's upper left. Combo is the
+  // default — with no care team it reads identically to Self.
+  const [wowLens, setWowLens] = useState<WowLens>('combo');
   const [weekStart, setWeekStart] = useState<string>(mondayOfWeek(todayISO()));
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [dataReady, setDataReady] = useState(false);
@@ -1438,7 +1442,8 @@ export default function Concierge() {
 
       {/* Active tab content */}
       {activeTab === 'wow' && (() => {
-        const scores = computeWowScores(wowPosts, new Date(), wowWindow);
+        const lenses = computeWowLenses(wowPosts, subjectId, new Date(), wowWindow);
+        const scores = lenses[wowLens];
         // The member's OWN answers, latest per aspect — the gate for the
         // financial profile and the picture it shows (founder 2026-08-20).
         const mine = wowPosts.filter((p) => p.author_id === subjectId);
@@ -1449,6 +1454,12 @@ export default function Concierge() {
           }
         }
         const ownWeb = { answered: WOW_DIMENSIONS.filter((d) => !!latest[d]), latest };
+        // THE WEB STAYS GRAY UNTIL THE SELF ASSESSMENT IS COMPLETE (founder
+        // 2026-09-21: "gray out all of the aspects and ask the person to do
+        // the self assessment first, and that the answers will populate as
+        // the first scores for their entire web, once complete"). Own board
+        // only — a caregiver reading a client's board sees what exists.
+        const gated = !isClientView && ownWeb.answered.length < WOW_DIMENSIONS.length;
         const feed = wowFilter === 'All' ? wowPosts : wowPosts.filter((p) => p.dimensions.includes(wowFilter));
         return (
           <>
@@ -1456,13 +1467,45 @@ export default function Concierge() {
             {/* The web itself always leads the board (founder 2026-09-11):
                 with no entries it renders blank — the web waiting for inputs —
                 rather than nothing. */}
+            {dataReady && gated && (
+              <div className="wow__gate">
+                <p className="wow__gate-lead">
+                  Your web begins with the self assessment — walk the six
+                  threads in your own words, and your answers become the
+                  first scores across your whole web.
+                </p>
+                {ownWeb.answered.length > 0 && (
+                  <p className="wow__gate-progress">
+                    {ownWeb.answered.length} of {WOW_DIMENSIONS.length} threads woven so far.
+                  </p>
+                )}
+                <button className="btn btn-primary" onClick={() => navigate('/concierge/intake')}>
+                  {ownWeb.answered.length > 0 ? 'Continue the self assessment' : 'Take the self assessment'}
+                </button>
+              </div>
+            )}
+            {dataReady && !gated && (
+              <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
+                {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
+                  <button key={k} role="tab" aria-selected={wowLens === k}
+                    className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
+                    onClick={() => setWowLens(k)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {dataReady && (
               <>
-                <div className="wow__overall">
-                  <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
-                  <span className="wow__overall-lbl">Overall wellbeing</span>
+                {!gated && (
+                  <div className="wow__overall">
+                    <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
+                    <span className="wow__overall-lbl">Overall wellbeing</span>
+                  </div>
+                )}
+                <div className={'wow__radar' + (gated ? ' wow__radar--gray' : '')}>
+                  <HexagonRadar axes={wowAxes(scores.byDimension)} size={260} />
                 </div>
-                <div className="wow__radar"><HexagonRadar axes={wowAxes(scores.byDimension)} size={260} /></div>
               </>
             )}
             {dataReady && wowPosts.length > 0 && (

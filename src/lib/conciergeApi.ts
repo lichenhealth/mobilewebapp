@@ -192,6 +192,30 @@ export function computeWowScores(posts: CarePostRow[], now = new Date(), windowD
   return { byDimension, overall: oCnt ? Math.round(oSum / oCnt) : null };
 }
 
+/** THREE WOW LENSES (founder 2026-09-21: "Self Assessment, Care Team
+ *  Assessment, Self + Care Team Assessment … helpful and interesting to see
+ *  how differently we assess ourselves than our care team"). The combo is
+ *  50/50 BY SIDE, never by entry count — six caregivers with 25 entries and
+ *  one person with 6 still meet in the middle: half your reflection, half
+ *  your care team's. A dimension only one side has spoken to carries that
+ *  side's reading (half of silence isn't a lower score). */
+export type WowLens = 'self' | 'team' | 'combo';
+export function computeWowLenses(
+  posts: CarePostRow[], patientId: string, now = new Date(), windowDays = WOW_WINDOW_DEFAULT,
+): Record<WowLens, WowScores> {
+  const self = computeWowScores(posts.filter((p) => p.author_id === patientId), now, windowDays);
+  const team = computeWowScores(posts.filter((p) => p.author_id !== patientId), now, windowDays);
+  const byDimension = {} as Record<Dimension, number | null>;
+  let oSum = 0, oCnt = 0;
+  for (const d of WOW_DIMENSIONS) {
+    const s = self.byDimension[d], t = team.byDimension[d];
+    const v = s != null && t != null ? Math.round((s + t) / 2) : (s ?? t);
+    byDimension[d] = v;
+    if (v != null) { oSum += v; oCnt += 1; }
+  }
+  return { self, team, combo: { byDimension, overall: oCnt ? Math.round(oSum / oCnt) : null } };
+}
+
 // ─── The self-driving window (founder 2026-08-14) ────────────────────────────
 // A member may hand their score window to Claude — opt-in, visible, revocable
 // ("kinda like self driving cars"). care_settings holds the consent and
