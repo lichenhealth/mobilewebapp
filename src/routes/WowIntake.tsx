@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import {
   WOW_DIMENSIONS, DIMENSION_META, createCarePost, myAnsweredWowDimensions, type Dimension,
@@ -31,7 +32,18 @@ import './WowIntake.css';
  *  Each step saves when you finish it (Next weaves it in; Skip doesn't), so
  *  stopping halfway loses nothing. A dimension already spoken to shows ✓ and
  *  is never re-asked — the board stays an append-only journal; more words
- *  are always welcome from the board itself. */
+ *  are always welcome from the board itself.
+ *
+ *  REAL-TIME AUTOSAVE (founder 2026-09-22, after toggling away lost an
+ *  unwoven answer): everything typed but not yet woven autosaves into
+ *  wow_intake_drafts on a 1.2s debounce (the page_drafts idiom), and the
+ *  page reopens ON THE STEP you left, words intact — cross-device, since
+ *  the draft lives in the DB, not this browser. Woven dimensions are
+ *  EXCLUDED from the draft (hydrating their text back would re-arm "Weave
+ *  it in" and double-post); the row is deleted when the draft empties or
+ *  the intake finishes — a row means unsaved work, always. Owner-only RLS;
+ *  no assistant path ever reads a draft (the per-entry AI hold-back is
+ *  chosen at weave time, so nothing may read the words before then). */
 
 type StepId = 'welcome' | Dimension | 'close';
 
@@ -39,8 +51,12 @@ interface DimAnswers { where: string; inner: string; outer: string; score: numbe
 
 const blankDim = (): DimAnswers => ({ where: '', inner: '', outer: '', score: null, omit: false });
 
-/** The two-layer prompts, tuned per dimension so nothing reads generic. */
-const PROMPTS: Record<Dimension, { where: string; way: string }> = {
+/** The two-layer prompts, tuned per dimension so nothing reads generic.
+ *  `inner` overrides the Inner layer's label where the generic
+ *  "beliefs, feelings, the stories you carry" doesn't fit the thread
+ *  (founder 2026-09-22: the body's inner layer is "beliefs, habits and
+ *  body care routines"). */
+const PROMPTS: Record<Dimension, { where: string; way: string; inner?: string }> = {
   Mental: {
     where: 'How is your mind these days — clarity, mood, what occupies you?',
     way: 'caring for your mental wellbeing',
@@ -48,6 +64,7 @@ const PROMPTS: Record<Dimension, { where: string; way: string }> = {
   Physical: {
     where: 'How is your body — energy, pain, sleep, movement?',
     way: 'caring for your body',
+    inner: 'beliefs, habits and body care routines',
   },
   Social: {
     where: 'How held are you by other people — friends, family, community?',
@@ -104,11 +121,26 @@ export default function WowIntake() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // The live draft (see the header note): hydrate before first paint of the
+  // form, and never autosave until hydration has run — a save fired before
+  // the read lands would clobber the very words we're restoring.
+  type IntakeDraft = {
+    step?: string;
+    dims?: Partial<Record<Dimension, DimAnswers>>;
+    money?: { income?: string; expenses?: string; assets?: string; debt?: string; household?: string };
+    needs?: SubsidyNeed[]; obstacles?: string;
+  };
+  const hydrated = useRef(false);
+
   useEffect(() => {
     if (!me) return;
     let live = true;
     void (async () => {
-      const [done, p] = await Promise.all([myAnsweredWowDimensions(me), getFinancialPosition(me)]);
+      const [done, p, draftRow] = await Promise.all([
+        myAnsweredWowDimensions(me),
+        getFinancialPosition(me),
+        supabase.from('wow_intake_drafts').select('draft').eq('profile_id', me).maybeSingle(),
+      ]);
       if (!live) return;
       setAnswered(done);
       if (p) {
@@ -121,10 +153,75 @@ export default function WowIntake() {
         setNeeds((p.needs ?? []) as SubsidyNeed[]);
         setObstacles(p.obstacles ?? '');
       }
+      const draft = (draftRow.data as { draft?: IntakeDraft } | null)?.draft;
+      if (draft) {
+        if (draft.dims) {
+          setDims((cur) => {
+            const next = { ...cur };
+            for (const d of WOW_DIMENSIONS) {
+              // A woven dimension never re-hydrates — its words are on the
+              // board, and restoring them would re-arm the weave button.
+              if (done.has(d)) continue;
+              const v = draft.dims?.[d];
+              if (v) next[d] = { ...blankDim(), ...v };
+            }
+            return next;
+          });
+        }
+        const m = draft.money;
+        if (m) {
+          // Draft money strings win only when they hold something — an old
+          // draft must not blank numbers edited since on the financial page.
+          if (m.income?.trim()) setIncome(m.income);
+          if (m.expenses?.trim()) setExpenses(m.expenses);
+          if (m.assets?.trim()) setAssets(m.assets);
+          if (m.debt?.trim()) setDebt(m.debt);
+          if (m.household?.trim()) setHousehold(m.household);
+        }
+        if (Array.isArray(draft.needs) && draft.needs.length) setNeeds(draft.needs);
+        if (draft.obstacles?.trim()) setObstacles(draft.obstacles);
+        // Reopen ON the step they left — not back at the welcome prompt.
+        if (draft.step === 'close' || (WOW_DIMENSIONS as readonly string[]).includes(draft.step ?? '')) {
+          setStep(draft.step as StepId);
+        }
+      }
+      hydrated.current = true;
       setReady(true);
     })();
     return () => { live = false; };
   }, [me]);
+
+  // REAL-TIME AUTOSAVE: everything unwoven, 1.2s after the last keystroke.
+  // Woven dims are excluded; an empty draft DELETES the row (a row means
+  // unsaved work). Best-effort — a failed save just retries on the next edit.
+  useEffect(() => {
+    if (!me || !ready || !hydrated.current) return;
+    const t = setTimeout(() => {
+      const dimsOut: Partial<Record<Dimension, DimAnswers>> = {};
+      for (const d of WOW_DIMENSIONS) {
+        if (answered.has(d) || savedNow.current.has(d)) continue;
+        const a = dims[d];
+        if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) dimsOut[d] = a;
+      }
+      const payload: IntakeDraft = {
+        step: step === 'welcome' ? undefined : step,
+        dims: dimsOut,
+        money: { income, expenses, assets, debt, household },
+        needs, obstacles,
+      };
+      const empty = !payload.step && Object.keys(dimsOut).length === 0
+        && needs.length === 0 && !obstacles.trim();
+      if (empty) {
+        void supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
+        return;
+      }
+      void supabase.from('wow_intake_drafts')
+        .upsert({ profile_id: me, draft: payload, updated_at: new Date().toISOString() })
+        .then(({ error: e }) => { if (e) console.warn('intake draft save:', e.message); });
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, ready, step, dims, income, expenses, assets, debt, household, needs, obstacles, answered]);
 
   const steps: StepId[] = ['welcome', ...WOW_DIMENSIONS, 'close'];
   const at = steps.indexOf(step);
@@ -212,6 +309,9 @@ export default function WowIntake() {
       // Asking for support summons a human coordinator — the policy's
       // promise that every request gets a real look (once, at the door).
       if (needs.length > 0 && !hadNeeds) await requestFinancialCoordinator();
+      // The intake is finished — the draft row steps out (best-effort;
+      // a leftover would only re-land them on the close step).
+      await supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
       navigate('/concierge');
     } catch (e) {
       setError((e as Error)?.message || 'Something went wrong — try again.');
@@ -396,7 +496,7 @@ export default function WowIntake() {
             )}
             <div className="wintake__way">
               <label className="wintake__q">
-                <span>Inner — beliefs, feelings, the stories you carry</span>
+                <span>Inner — {PROMPTS[d].inner ?? 'beliefs, feelings, the stories you carry'}</span>
                 <textarea
                   value={a.inner} disabled={locked}
                   onChange={(e) => setDim(d, { inner: e.target.value })}
