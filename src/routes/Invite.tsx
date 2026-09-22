@@ -169,10 +169,22 @@ export default function Invite() {
   // on commas, each address is classified, every email gets its own emailed
   // invitation and every phone gets its own prepared text — one token each,
   // never a shared link (a token claims once).
+  // ⚠ A number pasted from a phone's Contacts/Messages arrives wrapped in
+  //   INVISIBLE bidi/format characters (iOS uses U+202A…U+202C) — they don't
+  //   render, they don't screenshot, and they made a real number read as
+  //   "not a phone" (founder 2026-09-22). Strip them before classifying.
+  const stripInvisibles = (s: string) => s.replace(/[​-‏‪-‮⁠﻿]/g, '');
   const isEmail = (s: string) => /\S+@\S+\.\S+/.test(s.trim());
-  const isPhone = (s: string) => /^[\d\s()+.-]{7,}$/.test(s.trim());
+  const isPhone = (s: string) => {
+    const t = s.trim();
+    if (/^[\d\s()+.\- ‐-―]{7,}$/.test(t)) return true;
+    // Forgiving fallback: no letters and at least 7 digits reads as a phone,
+    // whatever punctuation a paste dragged along.
+    const digits = t.replace(/\D/g, '');
+    return digits.length >= 7 && digits.length <= 16 && !/[a-zA-Z@]/.test(t);
+  };
   type Recip = { raw: string; kind: 'email' | 'phone' | 'unknown' };
-  const recipients: Recip[] = email.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+  const recipients: Recip[] = stripInvisibles(email).split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
     .map((r) => ({ raw: r, kind: isEmail(r) ? 'email' as const : isPhone(r) ? 'phone' as const : 'unknown' as const }));
   const emailsIn = recipients.filter((r) => r.kind === 'email');
   const phonesIn = recipients.filter((r) => r.kind === 'phone');
