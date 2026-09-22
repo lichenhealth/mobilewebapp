@@ -10,7 +10,7 @@ export const WOW_DIMENSIONS = ['Mental', 'Physical', 'Social', 'Spiritual', 'Env
 export type Dimension = typeof WOW_DIMENSIONS[number];
 export const DIMENSION_META: Record<Dimension, IconName> = {
   Mental: 'brain', Physical: 'health', Social: 'user-multiple',
-  Spiritual: 'leaf', Economic: 'dollar', Environmental: 'globe',
+  Spiritual: 'merkaba', Economic: 'dollar', Environmental: 'globe',
 };
 
 export type CareKind = 'wow' | 'koc';
