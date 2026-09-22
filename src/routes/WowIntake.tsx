@@ -702,9 +702,10 @@ export default function WowIntake() {
               ) : (
                 <div className="wintake__mqs">
                   <p className="wintake__waylead">
-                    What&rsquo;s in the way? Check the question you&rsquo;re
-                    answering — it&rsquo;s the one your finished assessment
-                    will show.
+                    What&rsquo;s in the way of a healthier relationship to
+                    money and resource allocation? Check the question
+                    you&rsquo;re answering — it&rsquo;s the one your finished
+                    assessment will show.
                   </p>
                   {[Q_LITTLE, Q_MUCH].map((q) => (
                     <label className={'wintake__mq' + (econAsked === q ? ' is-on' : '')} key={q}>
