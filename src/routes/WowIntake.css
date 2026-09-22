@@ -91,3 +91,24 @@
 .wintake__error { color: #a33; font-size: 12.5px; margin: 0; }
 .wintake__nav { display: flex; align-items: center; gap: var(--s-2); }
 .wintake__navgap { flex: 1; }
+
+/* What's already woven — shown on an answered step so the checkmark never
+   sits against empty fields (founder 2026-09-22). Read-only by design: the
+   board is append-only, the fields below add alongside. */
+.wintake__wovenbox { display: flex; flex-direction: column; gap: var(--s-2); }
+.wintake__wovenentry {
+  margin: 0; padding: 10px 12px;
+  border-left: 3px solid var(--green, #7fae8f); border-radius: 0 var(--r-md) var(--r-md) 0;
+  background: var(--bone); display: flex; flex-direction: column; gap: 6px;
+}
+.wintake__wovenentry p {
+  margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.wintake__wovenentry footer {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; color: var(--ink-muted);
+}
+.wintake__wovenscore {
+  font-weight: 500; color: var(--green-deep, #2c7a4b);
+}

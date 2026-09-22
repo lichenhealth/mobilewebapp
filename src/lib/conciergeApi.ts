@@ -147,6 +147,29 @@ export async function myAnsweredWowDimensions(me: string): Promise<Set<Dimension
   return out;
 }
 
+/** The member's own woven WOW entries, grouped per dimension, newest first —
+ *  what the guided intake DISPLAYS on an already-answered step (founder
+ *  2026-09-22: green checkmarks against empty fields read as lost work; the
+ *  words and scores must come back). An "All" entry (empty dimensions) is a
+ *  board-level update, not a thread answer, so it stays out of this map. */
+export interface WovenWowEntry { body: string; score: number | null; dimensions: Dimension[]; created_at: string }
+export async function myWovenWowEntries(me: string): Promise<Partial<Record<Dimension, WovenWowEntry[]>>> {
+  const { data } = await supabase
+    .from('care_posts')
+    .select('body, score, dimensions, created_at')
+    .eq('patient_id', me).eq('author_id', me).eq('kind', 'wow')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  const out: Partial<Record<Dimension, WovenWowEntry[]>> = {};
+  for (const r of (data as WovenWowEntry[] | null) ?? []) {
+    for (const d of r.dimensions ?? []) {
+      if (!(WOW_DIMENSIONS as readonly string[]).includes(d)) continue;
+      (out[d] ??= []).push(r);
+    }
+  }
+  return out;
+}
+
 // ─── Derived WOW radar ───────────────────────────────────────────────────────
 export interface WowScores { byDimension: Record<Dimension, number | null>; overall: number | null }
 

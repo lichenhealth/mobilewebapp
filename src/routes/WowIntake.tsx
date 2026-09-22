@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import {
-  WOW_DIMENSIONS, DIMENSION_META, createCarePost, myAnsweredWowDimensions, type Dimension,
+  WOW_DIMENSIONS, DIMENSION_META, createCarePost, myWovenWowEntries,
+  type Dimension, type WovenWowEntry,
 } from '../lib/conciergeApi';
 import {
   getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator,
@@ -30,17 +31,22 @@ import './WowIntake.css';
  *  formula reads only numbers, providers see neither.
  *
  *  Each step saves when you finish it (Next weaves it in; Skip doesn't), so
- *  stopping halfway loses nothing. A dimension already spoken to shows ✓ and
- *  is never re-asked — the board stays an append-only journal; more words
- *  are always welcome from the board itself.
+ *  stopping halfway loses nothing. A dimension already spoken to shows ✓
+ *  AND SHOWS WHAT WAS WOVEN (founder 2026-09-22: a checkmark against empty
+ *  fields read as lost work) — its entries render read-only above the
+ *  fields, which stay open as an "add more" composer; the board stays an
+ *  append-only journal, nothing is replaced. A score alone weaves as a
+ *  valid entry (care_posts_nonempty carries a wow-score arm for exactly
+ *  this — going back to add a number to something already spoken to).
  *
  *  REAL-TIME AUTOSAVE (founder 2026-09-22, after toggling away lost an
  *  unwoven answer): everything typed but not yet woven autosaves into
- *  wow_intake_drafts on a 1.2s debounce (the page_drafts idiom), and the
- *  page reopens ON THE STEP you left, words intact — cross-device, since
- *  the draft lives in the DB, not this browser. Woven dimensions are
- *  EXCLUDED from the draft (hydrating their text back would re-arm "Weave
- *  it in" and double-post); the row is deleted when the draft empties or
+ *  wow_intake_drafts on a 1.2s debounce (the page_drafts idiom) and is
+ *  FLUSHED IMMEDIATELY when the tab hides or unloads, and the page reopens
+ *  ON THE STEP you left, words intact — cross-device, since the draft lives
+ *  in the DB, not this browser. The fields only ever hold UNWOVEN words
+ *  (weaving clears them into the read-only display above), so the draft can
+ *  never re-arm a double-post; the row is deleted when the draft empties or
  *  the intake finishes — a row means unsaved work, always. Owner-only RLS;
  *  no assistant path ever reads a draft (the per-entry AI hold-back is
  *  chosen at weave time, so nothing may read the words before then). */
@@ -100,9 +106,11 @@ export default function WowIntake() {
   const [dims, setDims] = useState<Record<Dimension, DimAnswers>>(
     () => Object.fromEntries(WOW_DIMENSIONS.map((d) => [d, blankDim()])) as Record<Dimension, DimAnswers>,
   );
-  // Woven-in this session — a saved step locks rather than double-posting.
+  // Woven-in this session — feeds the progress dots alongside `answered`.
   const savedNow = useRef(new Set<Dimension>());
-  const [, bump] = useState(0);
+  // What's already on the board, per dimension, newest first — displayed on
+  // each answered step so the checkmark never sits against empty fields.
+  const [woven, setWoven] = useState<Partial<Record<Dimension, WovenWowEntry[]>>>({});
 
   // The Economic numbers (merged over the existing financial position, never
   // clobbering fields this screen doesn't carry).
@@ -136,13 +144,14 @@ export default function WowIntake() {
     if (!me) return;
     let live = true;
     void (async () => {
-      const [done, p, draftRow] = await Promise.all([
-        myAnsweredWowDimensions(me),
+      const [wovenMap, p, draftRow] = await Promise.all([
+        myWovenWowEntries(me),
         getFinancialPosition(me),
         supabase.from('wow_intake_drafts').select('draft').eq('profile_id', me).maybeSingle(),
       ]);
       if (!live) return;
-      setAnswered(done);
+      setWoven(wovenMap);
+      setAnswered(new Set(Object.keys(wovenMap) as Dimension[]));
       if (p) {
         setPos(p);
         if (p.monthly_income != null) setIncome(String(p.monthly_income));
@@ -159,9 +168,9 @@ export default function WowIntake() {
           setDims((cur) => {
             const next = { ...cur };
             for (const d of WOW_DIMENSIONS) {
-              // A woven dimension never re-hydrates — its words are on the
-              // board, and restoring them would re-arm the weave button.
-              if (done.has(d)) continue;
+              // Fields only ever hold UNWOVEN words (weaving clears them),
+              // so every drafted dimension hydrates — on an answered step
+              // it's an unsent addition, shown under the woven display.
               const v = draft.dims?.[d];
               if (v) next[d] = { ...blankDim(), ...v };
             }
@@ -191,37 +200,57 @@ export default function WowIntake() {
     return () => { live = false; };
   }, [me]);
 
-  // REAL-TIME AUTOSAVE: everything unwoven, 1.2s after the last keystroke.
-  // Woven dims are excluded; an empty draft DELETES the row (a row means
-  // unsaved work). Best-effort — a failed save just retries on the next edit.
+  // REAL-TIME AUTOSAVE: everything unwoven, 1.2s after the last keystroke —
+  // and FLUSHED at once when the tab hides or unloads, so toggling away
+  // inside the debounce window never loses the last field typed. An empty
+  // draft DELETES the row (a row means unsaved work). Best-effort — a failed
+  // save just retries on the next edit.
+  const writeDraft = (justWove?: Dimension) => {
+    if (!me || !hydrated.current) return;
+    const dimsOut: Partial<Record<Dimension, DimAnswers>> = {};
+    for (const d of WOW_DIMENSIONS) {
+      // A dim woven this very call flushes as blank — its words just moved
+      // to the board, and React's state clear hasn't re-rendered yet.
+      if (d === justWove) continue;
+      const a = dims[d];
+      if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) dimsOut[d] = a;
+    }
+    const payload: IntakeDraft = {
+      step: step === 'welcome' ? undefined : step,
+      dims: dimsOut,
+      money: { income, expenses, assets, debt, household },
+      needs, obstacles,
+    };
+    const empty = !payload.step && Object.keys(dimsOut).length === 0
+      && needs.length === 0 && !obstacles.trim();
+    if (empty) {
+      void supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
+      return;
+    }
+    void supabase.from('wow_intake_drafts')
+      .upsert({ profile_id: me, draft: payload, updated_at: new Date().toISOString() })
+      .then(({ error: e }) => { if (e) console.warn('intake draft save:', e.message); });
+  };
+  const writeDraftRef = useRef(writeDraft);
+  writeDraftRef.current = writeDraft;
+
   useEffect(() => {
-    if (!me || !ready || !hydrated.current) return;
-    const t = setTimeout(() => {
-      const dimsOut: Partial<Record<Dimension, DimAnswers>> = {};
-      for (const d of WOW_DIMENSIONS) {
-        if (answered.has(d) || savedNow.current.has(d)) continue;
-        const a = dims[d];
-        if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) dimsOut[d] = a;
-      }
-      const payload: IntakeDraft = {
-        step: step === 'welcome' ? undefined : step,
-        dims: dimsOut,
-        money: { income, expenses, assets, debt, household },
-        needs, obstacles,
-      };
-      const empty = !payload.step && Object.keys(dimsOut).length === 0
-        && needs.length === 0 && !obstacles.trim();
-      if (empty) {
-        void supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
-        return;
-      }
-      void supabase.from('wow_intake_drafts')
-        .upsert({ profile_id: me, draft: payload, updated_at: new Date().toISOString() })
-        .then(({ error: e }) => { if (e) console.warn('intake draft save:', e.message); });
-    }, 1200);
+    if (!me || !ready) return;
+    const t = setTimeout(() => writeDraftRef.current(), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, ready, step, dims, income, expenses, assets, debt, household, needs, obstacles, answered]);
+  }, [me, ready, step, dims, income, expenses, assets, debt, household, needs, obstacles]);
+
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') writeDraftRef.current(); };
+    const onGone = () => writeDraftRef.current();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onGone);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onGone);
+    };
+  }, []);
 
   const steps: StepId[] = ['welcome', ...WOW_DIMENSIONS, 'close'];
   const at = steps.indexOf(step);
@@ -251,7 +280,7 @@ export default function WowIntake() {
 
   async function saveDim(d: Dimension): Promise<void> {
     const a = dims[d];
-    if (savedNow.current.has(d) || !dimHasContent(d)) return;
+    if (!dimHasContent(d)) return;
     await createCarePost(me, {
       patientId: me, kind: 'wow', body: composeBody(a),
       dimensions: [d], score: a.score ?? undefined,
@@ -259,7 +288,19 @@ export default function WowIntake() {
       aiOmit: a.omit ? (d === 'Economic' ? 'financial' : 'other') : null,
     });
     savedNow.current.add(d);
-    bump((n) => n + 1);
+    // The words move to the board: show them in the woven display, clear the
+    // fields (they're the "add more" composer now), and flush the draft so a
+    // reload can never re-arm what was just posted.
+    setWoven((cur) => ({
+      ...cur,
+      [d]: [
+        { body: composeBody(a), score: a.score, dimensions: [d], created_at: new Date().toISOString() },
+        ...(cur[d] ?? []),
+      ],
+    }));
+    setAnswered((cur) => new Set(cur).add(d));
+    setDims((cur) => ({ ...cur, [d]: blankDim() }));
+    writeDraft(d);
   }
 
   async function saveEconNumbers(): Promise<void> {
@@ -400,42 +441,47 @@ export default function WowIntake() {
       {ready && WOW_DIMENSIONS.map((d) => {
         if (step !== d) return null;
         const a = dims[d];
-        const locked = savedNow.current.has(d);
-        const alreadyBefore = answered.has(d) && !locked;
+        const wovenHere = woven[d] ?? [];
+        const isWoven = wovenHere.length > 0 || answered.has(d);
         return (
           <section className="wintake__card" key={d}>
             <div className="wintake__dimhead">
               <Icon name={DIMENSION_META[d]} size={20} />
               <h2 className="wintake__dimname">{d}</h2>
               {a.score == null ? (
-                !locked && (
-                  <button className="wintake__scorebtn" onClick={() => setDim(d, { score: 70 })}>
-                    Add a score
-                  </button>
-                )
+                <button className="wintake__scorebtn" onClick={() => setDim(d, { score: 70 })}>
+                  Add a score
+                </button>
               ) : (
                 <span className="wintake__scorewrap">
                   <input
                     type="range" min={0} max={100} value={a.score}
-                    disabled={locked}
                     onChange={(e) => setDim(d, { score: Number(e.target.value) })}
                     aria-label={`${d} score`}
                   />
                   <span className="wintake__scoreval">{a.score}</span>
-                  {!locked && (
-                    <button className="wintake__scoreclear" onClick={() => setDim(d, { score: null })} aria-label="Remove score">×</button>
-                  )}
+                  <button className="wintake__scoreclear" onClick={() => setDim(d, { score: null })} aria-label="Remove score">×</button>
                 </span>
               )}
             </div>
 
-            {alreadyBefore && (
-              <p className="wintake__already">
-                You&rsquo;ve written about {d.toLowerCase()} before — anything
-                you add here weaves in alongside it, nothing is replaced.
-              </p>
+            {wovenHere.length > 0 && (
+              <div className="wintake__wovenbox">
+                <p className="wintake__woven">
+                  Woven into your board ✓ — anything you add below weaves in
+                  alongside it, nothing is replaced.
+                </p>
+                {wovenHere.map((w, i) => (
+                  <blockquote className="wintake__wovenentry" key={w.created_at + i}>
+                    {w.body.trim() && <p>{w.body}</p>}
+                    <footer>
+                      {w.score != null && <span className="wintake__wovenscore">Score {w.score}</span>}
+                      <time>{new Date(w.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>
+                    </footer>
+                  </blockquote>
+                ))}
+              </div>
             )}
-            {locked && <p className="wintake__woven">Woven in ✓ — add more anytime from your board.</p>}
 
             {d === 'Economic' && (
               <div className="wintake__money">
@@ -447,23 +493,23 @@ export default function WowIntake() {
                 </p>
                 <div className="wintake__moneygrid">
                   <label>Monthly income
-                    <input inputMode="decimal" value={income} disabled={locked}
+                    <input inputMode="decimal" value={income}
                       onChange={(e) => setIncome(e.target.value)} placeholder="$" />
                   </label>
                   <label>Monthly expenses
-                    <input inputMode="decimal" value={expenses} disabled={locked}
+                    <input inputMode="decimal" value={expenses}
                       onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
                   </label>
                   <label>Assets
-                    <input inputMode="decimal" value={assets} disabled={locked}
+                    <input inputMode="decimal" value={assets}
                       onChange={(e) => setAssets(e.target.value)} placeholder="$ — savings, home, vehicles" />
                   </label>
                   <label>Debts
-                    <input inputMode="decimal" value={debt} disabled={locked}
+                    <input inputMode="decimal" value={debt}
                       onChange={(e) => setDebt(e.target.value)} placeholder="$ — loans, cards, medical" />
                   </label>
                   <label>People in your household
-                    <input inputMode="numeric" value={household} disabled={locked}
+                    <input inputMode="numeric" value={household}
                       onChange={(e) => setHousehold(e.target.value)} placeholder="including you" />
                   </label>
                 </div>
@@ -473,9 +519,9 @@ export default function WowIntake() {
             <label className="wintake__q">
               <span>{PROMPTS[d].where}</span>
               <textarea
-                value={a.where} disabled={locked}
+                value={a.where}
                 onChange={(e) => setDim(d, { where: e.target.value })}
-                placeholder="In your own words…"
+                placeholder={isWoven ? 'Add more in your own words…' : 'In your own words…'}
               />
             </label>
 
@@ -498,7 +544,7 @@ export default function WowIntake() {
               <label className="wintake__q">
                 <span>Inner — {PROMPTS[d].inner ?? 'beliefs, feelings, the stories you carry'}</span>
                 <textarea
-                  value={a.inner} disabled={locked}
+                  value={a.inner}
                   onChange={(e) => setDim(d, { inner: e.target.value })}
                   placeholder={d === 'Economic' ? '“I’m bad with money”, “asking is shameful”…' : 'What you tell yourself…'}
                 />
@@ -506,31 +552,29 @@ export default function WowIntake() {
               <label className="wintake__q">
                 <span>Outer — real-world obstacles</span>
                 <textarea
-                  value={a.outer} disabled={locked}
+                  value={a.outer}
                   onChange={(e) => setDim(d, { outer: e.target.value })}
                   placeholder={d === 'Economic' ? 'Hours, childcare, credentials, a market that won’t pay…' : 'Time, money, distance, access…'}
                 />
               </label>
             </div>
 
-            {!locked && (
-              <label className="wintake__omit">
-                <input type="checkbox" checked={a.omit} onChange={(e) => setDim(d, { omit: e.target.checked })} />
-                <span>Keep this entry out of AI — only humans on your care team read it</span>
-              </label>
-            )}
+            <label className="wintake__omit">
+              <input type="checkbox" checked={a.omit} onChange={(e) => setDim(d, { omit: e.target.checked })} />
+              <span>Keep this entry out of AI — only humans on your care team read it</span>
+            </label>
 
             {error && <p className="wintake__error">{error}</p>}
             <div className="wintake__nav">
               {at > 1 && <button className="btn" onClick={() => go(-1)}>Back</button>}
               <span className="wintake__navgap" />
-              {!locked && dimHasContent(d) ? (
+              {dimHasContent(d) ? (
                 <button className="btn btn-primary" disabled={busy} onClick={() => void next(d)}>
                   {busy ? 'Weaving in…' : 'Weave it in & continue'}
                 </button>
               ) : (
-                <button className="btn" disabled={busy} onClick={() => (locked ? go(1) : void next(locked ? undefined : d))}>
-                  {locked ? 'Continue' : 'Skip for now'}
+                <button className="btn" disabled={busy} onClick={() => void next(d)}>
+                  {isWoven ? 'Continue' : 'Skip for now'}
                 </button>
               )}
             </div>
