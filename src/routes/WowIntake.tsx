@@ -92,7 +92,7 @@ const PROMPTS: Record<Dimension, { where: string; way: string; inner?: string }>
   },
   Social: {
     where: 'How held are you by other people — friends, family, community?',
-    way: 'connection with others',
+    way: 'building healthier connections with others',
   },
   Spiritual: {
     where: 'What feeds your spirit right now — practice, nature, meaning — and how connected to it are you?',
