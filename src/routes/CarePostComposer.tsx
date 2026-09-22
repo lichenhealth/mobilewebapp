@@ -188,7 +188,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
             <div className="cpost-compose__link" key={i}>
               <input className="cedit__input" placeholder="Label" value={l.label}
                 onChange={(e) => setLinks((ls) => ls.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x))} />
-              <input className="cedit__input" placeholder="https://…  or  /market" value={l.url}
+              <input className="cedit__input" placeholder="https://…  or  /market" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="url" value={l.url}
                 onChange={(e) => setLinks((ls) => ls.map((x, idx) => idx === i ? { ...x, url: e.target.value } : x))} />
               <button className="cedit__remove" onClick={() => setLinks((ls) => ls.filter((_, idx) => idx !== i))} aria-label="Remove"><Icon name="close" size={13} /></button>
             </div>

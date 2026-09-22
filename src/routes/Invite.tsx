@@ -382,6 +382,8 @@ export default function Invite() {
           type="text"
           autoComplete="off"
           autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="friend@example.com, (555) 123-4567"
           value={email}
           onChange={(e) => { setEmail(e.target.value); setMsg(''); setTexts([]); }}

@@ -968,7 +968,7 @@ export default function Profile() {
             <label className="prof__label">Your address</label>
             <div className="prof__handle">
               <span className="prof__handle-prefix">lichen.health/</span>
-              <input className="prof__input" value={handle} onChange={(e) => setHandle(e.target.value)}
+              <input className="prof__input" value={handle} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setHandle(e.target.value)}
                 placeholder="yourname" />
             </div>
             <p className="prof__hint">
