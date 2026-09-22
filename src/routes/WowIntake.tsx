@@ -86,11 +86,14 @@ interface DimAnswers {
 
 const blankDim = (): DimAnswers => ({ where: '', extra: '', inner: '', outer: '', asked: '', give: '', score: null, omit: false });
 
-// The Economic mirror questions, both always visible now — the member checks
-// the one they're answering (founder 2026-09-22; the "earning more" clause
-// generalized the same day: assets and livelihood are more than money).
-const Q_LITTLE = 'If money is tighter than you need — what’s keeping you from procuring adequate resources to support your livelihood, sustainably?';
-const Q_MUCH = 'If you hold more than you need — what is keeping you from re-allocating it?';
+// The Economic mirror questions, all visible — the member checks the one
+// they're answering (founder 2026-09-22; the "earning more" clause
+// generalized the same day: assets and livelihood are more than money; the
+// BALANCED third option added the same day — a healthy relationship with
+// money is a real answer, not a missing one).
+const Q_LITTLE = 'If you do not have what you need — what’s keeping you from procuring adequate resources to support your livelihood, sustainably?';
+const Q_MUCH = 'If you’re holding on to more than you need — what’s keeping you from re-allocating it?';
+const Q_BALANCED = 'If you’re maintaining a healthy balance of resourcing yourselves and contributing to the rebalancing of the collective — what keeps you in that balance?';
 
 /** The two-layer prompts, tuned per dimension so nothing reads generic —
  *  every dimension carries its OWN Inner and Outer label (founder
@@ -523,7 +526,13 @@ export default function WowIntake() {
   // suggests the default — nobody is told which they are, always flippable.
   const autoQ = haveNumbers && margin > 300 && (money(assets) ?? 0) >= (money(debt) ?? 0) ? Q_MUCH : Q_LITTLE;
   const econAsked = dims.Economic.asked || autoQ;
-  const econFrame: 'little' | 'much' = econAsked === Q_MUCH ? 'much' : 'little';
+  // Matched by each question's distinctive words, not exact text, so an
+  // entry woven under an older phrasing keeps its frame if the copy shifts
+  // again. Balanced is self-declared only — the margin heuristic never
+  // presumes someone's relationship with money is settled.
+  const econFrame: 'little' | 'much' | 'balanced' = econAsked.includes('healthy balance')
+    ? 'balanced'
+    : econAsked.includes('re-allocat') ? 'much' : 'little';
 
   // The assessment's overall reading so far — the average of its saved
   // scores (one per dimension, structurally), shown above the steps.
@@ -703,11 +712,9 @@ export default function WowIntake() {
                 <div className="wintake__mqs">
                   <p className="wintake__waylead">
                     What&rsquo;s in the way of a healthier relationship to
-                    money and resource allocation? Check the question
-                    you&rsquo;re answering — it&rsquo;s the one your finished
-                    assessment will show.
+                    money and resource allocation?
                   </p>
-                  {[Q_LITTLE, Q_MUCH].map((q) => (
+                  {[Q_LITTLE, Q_MUCH, Q_BALANCED].map((q) => (
                     <label className={'wintake__mq' + (econAsked === q ? ' is-on' : '')} key={q}>
                       <input
                         type="checkbox" checked={econAsked === q}
@@ -799,7 +806,9 @@ export default function WowIntake() {
                   </p>
                 </div>
               );
-              return econFrame === 'much' ? <>{giveBlock}{subsidyBlock}</> : <>{subsidyBlock}{giveBlock}</>;
+              // Holding more than needed, or in balance and contributing —
+              // the give-back door leads; tighter than needed, subsidies do.
+              return econFrame === 'little' ? <>{subsidyBlock}{giveBlock}</> : <>{giveBlock}{subsidyBlock}</>;
             })()}
 
             <label className="wintake__omit" onClick={unlock}>
