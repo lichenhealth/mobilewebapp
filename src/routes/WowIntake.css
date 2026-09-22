@@ -92,23 +92,30 @@
 .wintake__nav { display: flex; align-items: center; gap: var(--s-2); }
 .wintake__navgap { flex: 1; }
 
-/* What's already woven — shown on an answered step so the checkmark never
-   sits against empty fields (founder 2026-09-22). Read-only by design: the
-   board is append-only, the fields below add alongside. */
-.wintake__wovenbox { display: flex; flex-direction: column; gap: var(--s-2); }
-.wintake__wovenentry {
-  margin: 0; padding: 10px 12px;
-  border-left: 3px solid var(--green, #7fae8f); border-radius: 0 var(--r-md) var(--r-md) 0;
-  background: var(--bone); display: flex; flex-direction: column; gap: 6px;
+/* Saved answers live IN their bubbles (founder 2026-09-22, third pass:
+   "Put the answers where they belong with green to signal they're saved") —
+   green ring + tint says saved; tapping Edit or any answer unlocks it. */
+.wintake__q--saved textarea {
+  border-color: var(--green);
+  background: var(--green-tint);
+  color: var(--ink-soft);
 }
-.wintake__wovenentry p {
-  margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft);
-  white-space: pre-wrap; overflow-wrap: anywhere;
+.wintake__scorewrap.is-saved input[type=range] { accent-color: var(--green-deep); }
+.wintake__scorewrap.is-saved .wintake__scoreval { color: var(--green-deep); }
+.wintake__editbtn {
+  border: 1px solid var(--green);
+  background: var(--green-tint);
+  color: var(--green-deep);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
 }
-.wintake__wovenentry footer {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 11px; color: var(--ink-muted);
-}
-.wintake__wovenscore {
-  font-weight: 500; color: var(--green-deep, #2c7a4b);
+.wintake__editbtn:hover { border-color: var(--green-deep); }
+
+/* The assessment's overall reading — the average of its saved scores
+   (founder 2026-09-22: "an overall score at the top"). */
+.wintake__overall { margin: 0; font-size: 13px; color: var(--ink-muted); }
+.wintake__overall strong {
+  font-size: 19px; font-weight: 600; color: var(--green-deep); margin-right: 2px;
 }

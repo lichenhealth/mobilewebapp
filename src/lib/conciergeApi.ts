@@ -148,18 +148,20 @@ export async function myAnsweredWowDimensions(me: string): Promise<Set<Dimension
 }
 
 /** The member's own woven WOW entries, grouped per dimension, newest first —
- *  what the guided intake DISPLAYS on an already-answered step (founder
+ *  what the guided intake hydrates an already-answered step FROM (founder
  *  2026-09-22: green checkmarks against empty fields read as lost work; the
- *  words and scores must come back). An "All" entry (empty dimensions) is a
+ *  words and scores must come back, in their own bubbles). Scoped to ONE
+ *  assessment (`assessmentId`), or `null` for pre-assessment (ungrouped)
+ *  entries — the adoption pool. An "All" entry (empty dimensions) is a
  *  board-level update, not a thread answer, so it stays out of this map. */
-export interface WovenWowEntry { body: string; score: number | null; dimensions: Dimension[]; created_at: string }
-export async function myWovenWowEntries(me: string): Promise<Partial<Record<Dimension, WovenWowEntry[]>>> {
-  const { data } = await supabase
+export interface WovenWowEntry { id: string; body: string; score: number | null; ai_omit: string | null; dimensions: Dimension[]; created_at: string }
+export async function myWovenWowEntries(me: string, assessmentId: string | null): Promise<Partial<Record<Dimension, WovenWowEntry[]>>> {
+  let q = supabase
     .from('care_posts')
-    .select('body, score, dimensions, created_at')
-    .eq('patient_id', me).eq('author_id', me).eq('kind', 'wow')
-    .order('created_at', { ascending: false })
-    .limit(200);
+    .select('id, body, score, ai_omit, dimensions, created_at')
+    .eq('patient_id', me).eq('author_id', me).eq('kind', 'wow');
+  q = assessmentId ? q.eq('assessment_id', assessmentId) : q.is('assessment_id', null);
+  const { data } = await q.order('created_at', { ascending: false }).limit(200);
   const out: Partial<Record<Dimension, WovenWowEntry[]>> = {};
   for (const r of (data as WovenWowEntry[] | null) ?? []) {
     for (const d of r.dimensions ?? []) {
@@ -168,6 +170,42 @@ export async function myWovenWowEntries(me: string): Promise<Partial<Record<Dime
     }
   }
   return out;
+}
+
+// ─── Assessments (founder 2026-09-22: editable until SUBMITTED, one score per
+//     category per assessment, timestamped on submit for assessments-over-time) ──
+export async function myOpenAssessment(me: string): Promise<string | null> {
+  const { data } = await supabase.from('wow_assessments').select('id')
+    .eq('profile_id', me).is('submitted_at', null).maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+export async function ensureOpenAssessment(me: string): Promise<string> {
+  const open = await myOpenAssessment(me);
+  if (open) return open;
+  const { data, error } = await supabase.from('wow_assessments')
+    .insert({ profile_id: me }).select('id').single();
+  if (error) {
+    // Lost a race against ourselves — the partial unique index means the
+    // open row now exists; read it instead of failing the weave.
+    const again = await myOpenAssessment(me);
+    if (again) return again;
+    throw error;
+  }
+  return (data as { id: string }).id;
+}
+export async function submitAssessment(id: string): Promise<void> {
+  const { error } = await supabase.from('wow_assessments')
+    .update({ submitted_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+/** Fold a pre-assessment entry into an assessment (the one-time adoption
+ *  when the feature arrives mid-intake); `score` optionally consolidates a
+ *  newer score-only duplicate's number into the substantive entry. */
+export async function adoptWowEntry(id: string, assessmentId: string, score?: number | null): Promise<void> {
+  const patch: Record<string, unknown> = { assessment_id: assessmentId };
+  if (score !== undefined) patch.score = score;
+  const { error } = await supabase.from('care_posts').update(patch).eq('id', id);
+  if (error) throw error;
 }
 
 // ─── Derived WOW radar ───────────────────────────────────────────────────────
@@ -294,6 +332,8 @@ export interface CarePostInput {
   aiOmit?: 'medical' | 'financial' | 'other' | null;
   /** koc only: recommended vs prescribed (founder 2026-09-14). */
   intent?: 'recommended' | 'prescribed' | null;
+  /** wow only: the open assessment this entry belongs to (founder 2026-09-22). */
+  assessmentId?: string | null;
 }
 export async function createCarePost(me: string, input: CarePostInput): Promise<string> {
   const recurring = input.kind === 'koc' && !!input.recurrence;
@@ -310,6 +350,8 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     ai_omit: input.aiOmit ?? null,
     // How a plan entry is held (founder 2026-09-14) — plan items only.
     intent: input.kind === 'koc' ? (input.intent ?? null) : null,
+    // The assessment an intake entry belongs to (founder 2026-09-22).
+    assessment_id: input.kind === 'wow' ? (input.assessmentId ?? null) : null,
   };
   const { data, error } = await supabase.from('care_posts').insert(row).select('id').single();
   if (error) throw error;
@@ -317,6 +359,19 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
 }
 export async function deleteCarePost(id: string): Promise<void> {
   const { error } = await supabase.from('care_posts').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Edit one of your OWN wow entries in place (founder 2026-09-22: a saved
+ *  intake answer clicks into edit mode and saving updates it — no duplicate
+ *  entry). RLS's self-arm (author = patient = you) is what allows this. */
+export async function updateWowCarePost(
+  id: string,
+  patch: { body: string; score: number | null; aiOmit: 'medical' | 'financial' | 'other' | null },
+): Promise<void> {
+  const { error } = await supabase.from('care_posts')
+    .update({ body: patch.body, score: patch.score, ai_omit: patch.aiOmit, updated_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) throw error;
 }
 
