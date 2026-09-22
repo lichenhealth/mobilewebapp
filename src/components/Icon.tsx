@@ -49,6 +49,7 @@ export type IconName =
   | 'location'
   | 'maps'
   | 'menu'
+  | 'merkaba'
   | 'message'
   | 'mic'
   | 'newsfeed'
@@ -263,6 +264,13 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '315 836 26 26',
     strokeWidth: 1.62,
     content: <><path d="M328 862C335.18 862 341 856.18 341 849C341 841.82 335.18 836 328 836C320.82 836 315 841.82 315 849C315 856.18 320.82 862 328 862Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M316 854H319.5C320.428 854 321.319 853.631 321.975 852.975C322.631 852.318 323 851.428 323 850.5V847.5C323 846.572 323.369 845.681 324.025 845.025C324.682 844.369 325.572 844 326.5 844C327.428 844 328.319 843.631 328.975 842.975C329.631 842.318 330 841.428 330 840.5V836.14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M341 848.8C339.999 848.28 338.888 848.006 337.76 848H333.5C332.572 848 331.681 848.369 331.025 849.025C330.369 849.681 330 850.572 330 851.5C330 852.428 330.369 853.319 331.025 853.975C331.681 854.631 332.572 855 333.5 855C334.163 855 334.799 855.263 335.268 855.732C335.737 856.201 336 856.837 336 857.5V859.24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  'merkaba': {
+    // Star tetrahedron in 2D — two interlocked triangles with the vertical
+    // axis as the 3D cue (the Spiritual dimension's mark, founder 2026-09-22).
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.3,
+    content: <><path d="M12 3.2 19.62 16.4H4.38ZM12 20.8 4.38 7.6h15.24ZM12 3.2v17.6" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'menu': {
     viewBox: '0 0 36 36',
