@@ -264,22 +264,23 @@ export default function WowIntake() {
           <p className="wintake__lead">
             Six interwoven threads weaving the strong yet flexible web of
             wellbeing surrounding your life — mental, physical, social,
-            spiritual, environmental, economic. You&rsquo;ll walk them one at a
-            time, in your own words. About ten minutes, and you can stop
-            anywhere — each step is kept the moment you finish it.
+            spiritual, environmental, economic. Your self assessment will take
+            about ten minutes. Your work will be saved if you need to step
+            away.
           </p>
           <p className="wintake__promise">
-            What you write stays inside Lichen: your care team can read it,
+            What you share stays inside Lichen: your care team can read it,
             nobody else — it is never sold and never shared outside the
-            network. Any entry can be held out of AI entirely, and the
-            economic questions exist because humans have collectively decided
-            to funnel safety, resources and respect through a common currency,
-            making one&rsquo;s economic circumstances a critical aspect of
-            their overall wellbeing. Since we&rsquo;re at a period of great
-            imbalance and inequity — and health is a synonym for balance —
-            restoring economic interconnection and balance is a critical,
-            foundational thread that influences our mental, physical,
-            spiritual and social and environmental wellbeing.
+            network. Any entry can be held out of AI entirely. Your economic
+            wellbeing is included as a thread in the web because humans have
+            collectively decided to funnel safety, resources and respect
+            through a common currency, making one&rsquo;s economic
+            circumstances a critical aspect of their overall wellbeing. Since
+            we&rsquo;re at a period of great imbalance and inequity — and
+            health is a synonym for balance — restoring economic health,
+            interconnection and balance is a critical, foundational thread
+            that influences our mental, physical, spiritual and social and
+            environmental wellbeing.
           </p>
           <button className="btn btn-primary" onClick={() => {
             // Land on the first dimension not yet spoken to.
