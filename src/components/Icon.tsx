@@ -268,7 +268,7 @@ const ICONS: Record<IconName, IconEntry> = {
   'merkaba': {
     // Star tetrahedron in 2D — two interlocked triangles with the vertical
     // axis as the 3D cue (the Spiritual dimension's mark, founder 2026-09-22).
-    viewBox: '0 0 24 24',
+    viewBox: '3.53 2.35 16.94 19.3',
     strokeWidth: 1.3,
     content: <><path d="M12 3.2 19.62 16.4H4.38ZM12 20.8 4.38 7.6h15.24ZM12 3.2v17.6" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
@@ -481,8 +481,8 @@ const ICONS: Record<IconName, IconEntry> = {
     content: <><path d="M8.5 5.5h9a3 3 0 013 3v4a3 3 0 01-3 3h-1.2l-2.8 3v-3H8.5a3 3 0 01-3-3v-4a3 3 0 013-3z" stroke="currentColor" strokeLinejoin="round"/><path d="M5.5 9.5H4a2.5 2.5 0 00-2.5 2.5v3A2.5 2.5 0 004 17.5h.8v2.6l2.4-2.6h3.3" stroke="currentColor" strokeLinejoin="round"/><circle cx="10.5" cy="10.5" r="1" fill="currentColor"/><circle cx="13.5" cy="10.5" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></>,
   },
   'brain': {
-    viewBox: '0 -0.98 24 24',
-    strokeWidth: 1.4,
+    viewBox: '3.1 2.6 17.8 16.85',
+    strokeWidth: 1.1,
     content: <><path d="M9.5 3.5a3 3 0 00-3 3v.6a3 3 0 00-2.5 2.95V12a3 3 0 002.5 2.95v.6a3 3 0 003 3h2.5V3.5H9.5z" stroke="currentColor" strokeLinejoin="round"/><path d="M14.5 3.5a3 3 0 013 3v.6a3 3 0 012.5 2.95V12a3 3 0 01-2.5 2.95v.6a3 3 0 01-3 3H12V3.5h2.5z" stroke="currentColor" strokeLinejoin="round"/><path d="M9.5 8h-1M9.5 11.5h-1M14.5 8h1M14.5 11.5h1" stroke="currentColor" strokeLinecap="round"/></>,
   },
   'settings': {
@@ -501,8 +501,8 @@ const ICONS: Record<IconName, IconEntry> = {
     content: <><path d="M9 6l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'dollar': {
-    viewBox: '0 0 24 24',
-    strokeWidth: 1.5,
+    viewBox: '6.55 2.05 10.9 19.9',
+    strokeWidth: 1.25,
     content: <><path d="M12 3v18M16.5 7.5C16.5 5.84 14.49 4.5 12 4.5S7.5 5.84 7.5 7.5s2.01 3 4.5 3 4.5 1.34 4.5 3-2.01 3-4.5 3-4.5-1.34-4.5-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   // Current-cy's mark: the dollar inside a coin circle (founder 2026-09-13,

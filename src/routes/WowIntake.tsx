@@ -71,40 +71,60 @@ import './WowIntake.css';
 
 type StepId = 'welcome' | Dimension | 'close';
 
-interface DimAnswers { where: string; inner: string; outer: string; score: number | null; omit: boolean }
+interface DimAnswers { where: string; extra: string; inner: string; outer: string; score: number | null; omit: boolean }
 
-const blankDim = (): DimAnswers => ({ where: '', inner: '', outer: '', score: null, omit: false });
+const blankDim = (): DimAnswers => ({ where: '', extra: '', inner: '', outer: '', score: null, omit: false });
 
-/** The two-layer prompts, tuned per dimension so nothing reads generic.
- *  `inner` overrides the Inner layer's label where the generic
- *  "beliefs, feelings, the stories you carry" doesn't fit the thread
- *  (founder 2026-09-22: the body's inner layer is "beliefs, habits and
- *  body care routines"). */
-const PROMPTS: Record<Dimension, { where: string; way: string; inner?: string }> = {
+/** The two-layer prompts, tuned per dimension so nothing reads generic —
+ *  every dimension carries its OWN Inner and Outer label (founder
+ *  2026-09-22: "the mental ones aren't a comprehensive boiler plate...
+ *  customize as needed across all 6"; reusing a word like "beliefs" across
+ *  threads is fine where it fits). */
+const PROMPTS: Record<Dimension, {
+  where: string; way: string; inner: string; outer: string;
+  /** An extra dimension-specific section (founder 2026-09-22: the Body step
+   *  asks for diagnostics, diagnoses and illnesses currently carried). */
+  extra?: { label: string; placeholder: string };
+}> = {
   Mental: {
     where: 'How is your mind these days — clarity, mood, what occupies you?',
     way: 'caring for your mental wellbeing',
+    inner: 'thought patterns, worries, the stories you tell yourself',
+    outer: 'pressures, workload, what your days demand',
   },
   Physical: {
     where: 'How is your body — energy, pain, sleep, movement?',
     way: 'caring for your body',
-    inner: 'beliefs, habits and body care routines',
+    inner: 'beliefs, habits, diet, exercise and body care practices',
+    outer: 'access to care, time, food, rest',
+    extra: {
+      label: 'Diagnostics, diagnoses and physical illnesses you currently carry',
+      placeholder: 'Test results, conditions, what you’re living with…',
+    },
   },
   Social: {
     where: 'How held are you by other people — friends, family, community?',
     way: 'building healthier connections with others',
+    inner: 'trust, shyness, beliefs about belonging',
+    outer: 'distance, schedules, finding your people',
   },
   Spiritual: {
     where: 'What feeds your spirit right now — practice, nature, meaning — and how connected to it are you?',
     way: 'your spiritual life',
+    inner: 'beliefs, doubts, the stories you carry',
+    outer: 'time, space and community for practice',
   },
   Environmental: {
     where: 'How are the places you live and move through — home, land, neighborhood — treating you?',
     way: 'your surroundings supporting you',
+    inner: 'habits, attachments, how you relate to your surroundings',
+    outer: 'housing, noise, access to nature',
   },
   Economic: {
     where: 'What are your thoughts and feelings around money right now?',
     way: '', // Economic asks its own adaptive question below.
+    inner: 'beliefs and feelings about money and worth',
+    outer: 'hours, childcare, credentials, the market',
   },
 };
 
@@ -116,20 +136,24 @@ const money = (s: string): number | null => {
 // composeBody's labels are fixed strings, so a woven entry splits back into
 // its bubbles exactly. An entry written elsewhere (free text) lands whole in
 // the first field — nothing is ever dropped.
+const DIAG_TAG = 'Diagnostics & diagnoses: ';
 const INNER_TAG = 'In the way — inner (beliefs, feelings): ';
 const OUTER_TAG = 'In the way — outer (the world): ';
-const decomposeBody = (body: string): { where: string; inner: string; outer: string } => {
-  let where = body; let inner = ''; let outer = '';
+const decomposeBody = (body: string): { where: string; extra: string; inner: string; outer: string } => {
+  let where = body; let extra = ''; let inner = ''; let outer = '';
   const oi = where.indexOf(OUTER_TAG);
   if (oi >= 0) { outer = where.slice(oi + OUTER_TAG.length).trim(); where = where.slice(0, oi); }
   const ii = where.indexOf(INNER_TAG);
   if (ii >= 0) { inner = where.slice(ii + INNER_TAG.length).trim(); where = where.slice(0, ii); }
-  return { where: where.trim(), inner, outer };
+  const di = where.indexOf(DIAG_TAG);
+  if (di >= 0) { extra = where.slice(di + DIAG_TAG.length).trim(); where = where.slice(0, di); }
+  return { where: where.trim(), extra, inner, outer };
 };
 
 const sameAnswers = (a: DimAnswers, b: DimAnswers): boolean =>
-  a.where.trim() === b.where.trim() && a.inner.trim() === b.inner.trim()
-  && a.outer.trim() === b.outer.trim() && a.score === b.score && a.omit === b.omit;
+  a.where.trim() === b.where.trim() && a.extra.trim() === b.extra.trim()
+  && a.inner.trim() === b.inner.trim() && a.outer.trim() === b.outer.trim()
+  && a.score === b.score && a.omit === b.omit;
 
 export default function WowIntake() {
   const navigate = useNavigate();
@@ -302,7 +326,7 @@ export default function WowIntake() {
       if (base) {
         // Saved dims draft only their UNSAVED edits.
         if (!sameAnswers(a, base)) dimsOut[d] = a;
-      } else if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) {
+      } else if (a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) {
         dimsOut[d] = a;
       }
     }
@@ -361,14 +385,15 @@ export default function WowIntake() {
   const composeBody = (a: DimAnswers): string => {
     const parts: string[] = [];
     if (a.where.trim()) parts.push(a.where.trim());
-    if (a.inner.trim()) parts.push(`In the way — inner (beliefs, feelings): ${a.inner.trim()}`);
-    if (a.outer.trim()) parts.push(`In the way — outer (the world): ${a.outer.trim()}`);
+    if (a.extra.trim()) parts.push(`${DIAG_TAG}${a.extra.trim()}`);
+    if (a.inner.trim()) parts.push(`${INNER_TAG}${a.inner.trim()}`);
+    if (a.outer.trim()) parts.push(`${OUTER_TAG}${a.outer.trim()}`);
     return parts.join('\n\n');
   };
 
   const dimHasContent = (d: Dimension) => {
     const a = dims[d];
-    return !!(a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null);
+    return !!(a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.score != null);
   };
 
   async function saveDim(d: Dimension): Promise<void> {
@@ -661,6 +686,17 @@ export default function WowIntake() {
               />
             </label>
 
+            {PROMPTS[d].extra && (
+              <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
+                <span>{PROMPTS[d].extra.label}</span>
+                <textarea
+                  value={a.extra} readOnly={lock} onFocus={unlock}
+                  onChange={(e) => setDim(d, { extra: e.target.value })}
+                  placeholder={PROMPTS[d].extra.placeholder}
+                />
+              </label>
+            )}
+
             {d === 'Economic' ? (
               <>
                 <p className="wintake__waylead">
@@ -678,7 +714,7 @@ export default function WowIntake() {
             )}
             <div className="wintake__way">
               <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
-                <span>Inner — {PROMPTS[d].inner ?? 'beliefs, feelings, the stories you carry'}</span>
+                <span>Inner — {PROMPTS[d].inner}</span>
                 <textarea
                   value={a.inner} readOnly={lock} onFocus={unlock}
                   onChange={(e) => setDim(d, { inner: e.target.value })}
@@ -686,7 +722,7 @@ export default function WowIntake() {
                 />
               </label>
               <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
-                <span>Outer — real-world obstacles</span>
+                <span>Outer — {PROMPTS[d].outer}</span>
                 <textarea
                   value={a.outer} readOnly={lock} onFocus={unlock}
                   onChange={(e) => setDim(d, { outer: e.target.value })}
