@@ -580,13 +580,36 @@ export default function WowIntake() {
                     aria-label={`${d} score`}
                   />
                   <span className="wintake__scoreval">{a.score}</span>
-                  {!lock && (
+                  {/* The bare × means "never mind, no score" — right for an
+                      answer not yet saved, but on a SAVED one it read as
+                      "close editing" and seemed to eat the score (founder
+                      2026-09-22): saved dims say "Remove score" in words. */}
+                  {!lock && !sv && (
                     <button className="wintake__scoreclear" onClick={() => setDim(d, { score: null })} aria-label="Remove score">×</button>
                   )}
                 </span>
               )}
+              {!lock && sv && a.score != null && (
+                <button className="wintake__scoreremove" onClick={() => setDim(d, { score: null })}>
+                  Remove score
+                </button>
+              )}
               {lock && (
                 <button className="wintake__editbtn" onClick={unlock}>Edit</button>
+              )}
+              {sv && editing.has(d) && (
+                <button
+                  className="wintake__cancelbtn"
+                  onClick={() => {
+                    // Back out of the edit: everything saved comes back —
+                    // words, score, the AI hold-back — and the fields re-lock.
+                    setDims((cur) => ({ ...cur, [d]: { ...sv.base } }));
+                    setEditing((cur) => { const n = new Set(cur); n.delete(d); return n; });
+                    writeDraft(d);
+                  }}
+                >
+                  Cancel
+                </button>
               )}
             </div>
 

@@ -93,11 +93,11 @@
 .wintake__navgap { flex: 1; }
 
 /* Saved answers live IN their bubbles (founder 2026-09-22, third pass:
-   "Put the answers where they belong with green to signal they're saved") —
-   green ring + tint says saved; tapping Edit or any answer unlocks it. */
+   "Put the answers where they belong with green to signal they're saved";
+   fifth pass: "I don't think the entire box needs to be green... Maybe just
+   the outline") — a green OUTLINE says saved, the paper stays paper. */
 .wintake__q--saved textarea {
   border-color: var(--green);
-  background: var(--green-tint);
   color: var(--ink-soft);
 }
 .wintake__scorewrap.is-saved input[type=range] { accent-color: var(--green-deep); }
@@ -119,3 +119,24 @@
 .wintake__overall strong {
   font-size: 19px; font-weight: 600; color: var(--green-deep); margin-right: 2px;
 }
+
+/* Editing a saved answer can be backed out of (founder 2026-09-22: the
+   score ×  read as "close" and seemed to lose the score): Cancel restores
+   the saved answer and re-locks; removing a saved score is said in words. */
+.wintake__cancelbtn {
+  border: 1px solid var(--bone-edge);
+  background: var(--bone);
+  color: var(--ink-muted);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+}
+.wintake__cancelbtn:hover { border-color: var(--ink-faint); color: var(--ink-soft); }
+.wintake__scoreremove {
+  border: 0; background: none; padding: 0;
+  color: var(--ink-faint); font: inherit; font-size: 11.5px;
+  text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer;
+}
+.wintake__scoreremove:hover { color: var(--ink-muted); }
