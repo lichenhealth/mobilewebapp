@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import {
-  WOW_DIMENSIONS, DIMENSION_META, createCarePost, myWovenWowEntries,
+  WOW_DIMENSIONS, DIMENSION_META, createCarePost, updateWowCarePost, deleteCarePost,
+  myWovenWowEntries, myOpenAssessment, ensureOpenAssessment, submitAssessment, adoptWowEntry,
   type Dimension, type WovenWowEntry,
 } from '../lib/conciergeApi';
 import {
@@ -32,24 +33,41 @@ import './WowIntake.css';
  *
  *  Each step saves when you finish it (Next weaves it in; Skip doesn't), so
  *  stopping halfway loses nothing. A dimension already spoken to shows ✓
- *  AND SHOWS WHAT WAS WOVEN (founder 2026-09-22: a checkmark against empty
- *  fields read as lost work) — its entries render read-only above the
- *  fields, which stay open as an "add more" composer; the board stays an
- *  append-only journal, nothing is replaced. A score alone weaves as a
- *  valid entry (care_posts_nonempty carries a wow-score arm for exactly
- *  this — going back to add a number to something already spoken to).
+ *  AND ITS ANSWERS SIT IN THEIR OWN BUBBLES (founder 2026-09-22, second and
+ *  third pass: a checkmark against empty fields read as lost work, and a
+ *  summary box at the top wasn't it — "Put the answers where they belong
+ *  with green to signal they're saved"): the latest woven entry hydrates
+ *  the fields via decomposeBody() (composeBody's exact inverse — its labels
+ *  are fixed strings), rendered green/read-only. Clicking any answer, or
+ *  the Edit CTA top-right, unlocks edit mode; saving UPDATES the entry in
+ *  place through updateWowCarePost() (RLS's self-arm allows it) — never a
+ *  duplicate. A score alone weaves as a valid entry (care_posts_nonempty
+ *  carries a wow-score arm for exactly this).
+ *
+ *  ASSESSMENTS (founder 2026-09-22, fourth pass): the intake's entries
+ *  group under one OPEN wow_assessments row — editable here until Finish
+ *  SUBMITS it (submitted_at is the timestamp that lets assessments be read
+ *  over time), after which the next visit starts a fresh one. One entry —
+ *  one score — per dimension per assessment, structurally. An overall
+ *  number (the average of this assessment's saved scores) reads at the
+ *  top. Pre-assessment entries are ADOPTED into the member's first open
+ *  assessment on arrival, folding any newer score-only duplicate's number
+ *  into the substantive entry and removing the duplicate row.
  *
  *  REAL-TIME AUTOSAVE (founder 2026-09-22, after toggling away lost an
  *  unwoven answer): everything typed but not yet woven autosaves into
  *  wow_intake_drafts on a 1.2s debounce (the page_drafts idiom) and is
  *  FLUSHED IMMEDIATELY when the tab hides or unloads, and the page reopens
  *  ON THE STEP you left, words intact — cross-device, since the draft lives
- *  in the DB, not this browser. The fields only ever hold UNWOVEN words
- *  (weaving clears them into the read-only display above), so the draft can
- *  never re-arm a double-post; the row is deleted when the draft empties or
- *  the intake finishes — a row means unsaved work, always. Owner-only RLS;
- *  no assistant path ever reads a draft (the per-entry AI hold-back is
- *  chosen at weave time, so nothing may read the words before then). */
+ *  in the DB, not this browser. The draft holds only what DIFFERS from the
+ *  saved baseline (unwoven answers, or in-progress edits of a saved one),
+ *  so it can never re-arm a double-post; the row is deleted when the draft
+ *  empties or the intake finishes — a row means unsaved work, always.
+ *  Owner-only RLS; no assistant path ever reads a draft (the per-entry AI
+ *  hold-back is chosen at weave time, so nothing may read the words before
+ *  then). ⚠ The app's scroller is #root, not window — go() scrolls it
+ *  the way App.tsx's route-change reset does, or "continue" lands the
+ *  reader mid-page. */
 
 type StepId = 'welcome' | Dimension | 'close';
 
@@ -95,22 +113,44 @@ const money = (s: string): number | null => {
   return s.trim() === '' || !Number.isFinite(n) ? null : Math.round(n);
 };
 
+// composeBody's labels are fixed strings, so a woven entry splits back into
+// its bubbles exactly. An entry written elsewhere (free text) lands whole in
+// the first field — nothing is ever dropped.
+const INNER_TAG = 'In the way — inner (beliefs, feelings): ';
+const OUTER_TAG = 'In the way — outer (the world): ';
+const decomposeBody = (body: string): { where: string; inner: string; outer: string } => {
+  let where = body; let inner = ''; let outer = '';
+  const oi = where.indexOf(OUTER_TAG);
+  if (oi >= 0) { outer = where.slice(oi + OUTER_TAG.length).trim(); where = where.slice(0, oi); }
+  const ii = where.indexOf(INNER_TAG);
+  if (ii >= 0) { inner = where.slice(ii + INNER_TAG.length).trim(); where = where.slice(0, ii); }
+  return { where: where.trim(), inner, outer };
+};
+
+const sameAnswers = (a: DimAnswers, b: DimAnswers): boolean =>
+  a.where.trim() === b.where.trim() && a.inner.trim() === b.inner.trim()
+  && a.outer.trim() === b.outer.trim() && a.score === b.score && a.omit === b.omit;
+
 export default function WowIntake() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
 
-  const [answered, setAnswered] = useState<Set<Dimension>>(new Set());
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<StepId>('welcome');
   const [dims, setDims] = useState<Record<Dimension, DimAnswers>>(
     () => Object.fromEntries(WOW_DIMENSIONS.map((d) => [d, blankDim()])) as Record<Dimension, DimAnswers>,
   );
-  // Woven-in this session — feeds the progress dots alongside `answered`.
-  const savedNow = useRef(new Set<Dimension>());
-  // What's already on the board, per dimension, newest first — displayed on
-  // each answered step so the checkmark never sits against empty fields.
-  const [woven, setWoven] = useState<Partial<Record<Dimension, WovenWowEntry[]>>>({});
+  // Each woven dimension's entry id + the answers as saved — the fields show
+  // this baseline in green until edited, and saving updates the same row.
+  const [saved, setSaved] = useState<Partial<Record<Dimension, { id: string; base: DimAnswers }>>>({});
+  // Saved dims currently unlocked for editing (click an answer or the Edit CTA).
+  const [editing, setEditing] = useState<Set<Dimension>>(new Set());
+  // The OPEN assessment these answers belong to (founder 2026-09-22:
+  // editable until submitted, one entry — one score — per dimension per
+  // assessment; Finish stamps it and the next visit starts a new one).
+  // Created lazily on the first weave; ref mirrors state for async saves.
+  const assessmentRef = useRef<string | null>(null);
 
   // The Economic numbers (merged over the existing financial position, never
   // clobbering fields this screen doesn't carry).
@@ -144,14 +184,53 @@ export default function WowIntake() {
     if (!me) return;
     let live = true;
     void (async () => {
-      const [wovenMap, p, draftRow] = await Promise.all([
-        myWovenWowEntries(me),
+      const [openAid, p, draftRow] = await Promise.all([
+        myOpenAssessment(me),
         getFinancialPosition(me),
         supabase.from('wow_intake_drafts').select('draft').eq('profile_id', me).maybeSingle(),
       ]);
+      let aid = openAid;
+      let wovenMap: Partial<Record<Dimension, WovenWowEntry[]>> = {};
+      if (aid) {
+        wovenMap = await myWovenWowEntries(me, aid);
+      } else {
+        // No open assessment. Pre-assessment entries (from before assessments
+        // existed) become the member's first OPEN assessment, so nobody loses
+        // in-flight work: adopt the newest substantive entry per dimension,
+        // and a NEWER score-only duplicate folds its number in and steps out
+        // (the one-score-per-category rule, and the founder's ✗ on hers).
+        const legacy = await myWovenWowEntries(me, null);
+        if (Object.keys(legacy).length > 0) {
+          aid = await ensureOpenAssessment(me);
+          for (const d of WOW_DIMENSIONS) {
+            const list = legacy[d];
+            if (!list?.length) continue;
+            const text = list.find((e) => e.body.trim().length > 0) ?? list[0];
+            const dupes = list.filter((e) =>
+              e.id !== text.id && !e.body.trim() && e.score != null && e.created_at > text.created_at);
+            const foldScore = dupes.length ? dupes[0].score : undefined;
+            try {
+              await adoptWowEntry(text.id, aid, foldScore);
+              for (const dup of dupes) await deleteCarePost(dup.id);
+            } catch (e) { console.warn('assessment adoption:', (e as Error).message); continue; }
+            wovenMap[d] = [{ ...text, score: foldScore !== undefined ? foldScore : text.score }];
+          }
+        }
+      }
+      assessmentRef.current = aid;
       if (!live) return;
-      setWoven(wovenMap);
-      setAnswered(new Set(Object.keys(wovenMap) as Dimension[]));
+      // Saved answers land IN their bubbles: the latest entry per dimension,
+      // split back into its fields, held as the baseline saving compares to.
+      const sv: Partial<Record<Dimension, { id: string; base: DimAnswers }>> = {};
+      const nextDims = Object.fromEntries(WOW_DIMENSIONS.map((d) => [d, blankDim()])) as Record<Dimension, DimAnswers>;
+      for (const d of WOW_DIMENSIONS) {
+        const e = wovenMap[d]?.[0];
+        if (!e) continue;
+        const base: DimAnswers = { ...decomposeBody(e.body), score: e.score, omit: !!e.ai_omit };
+        sv[d] = { id: e.id, base };
+        nextDims[d] = { ...base };
+      }
+      setSaved(sv);
       if (p) {
         setPos(p);
         if (p.monthly_income != null) setIncome(String(p.monthly_income));
@@ -165,17 +244,17 @@ export default function WowIntake() {
       const draft = (draftRow.data as { draft?: IntakeDraft } | null)?.draft;
       if (draft) {
         if (draft.dims) {
-          setDims((cur) => {
-            const next = { ...cur };
-            for (const d of WOW_DIMENSIONS) {
-              // Fields only ever hold UNWOVEN words (weaving clears them),
-              // so every drafted dimension hydrates — on an answered step
-              // it's an unsent addition, shown under the woven display.
-              const v = draft.dims?.[d];
-              if (v) next[d] = { ...blankDim(), ...v };
-            }
-            return next;
-          });
+          // The draft is what DIFFERS from the saved baseline: an unwoven
+          // answer, or an unsaved edit of a woven one — which reopens in
+          // edit mode so the reader sees they have changes pending.
+          const editSet = new Set<Dimension>();
+          for (const d of WOW_DIMENSIONS) {
+            const v = draft.dims?.[d];
+            if (!v) continue;
+            nextDims[d] = { ...blankDim(), ...v };
+            if (sv[d]) editSet.add(d);
+          }
+          setEditing(editSet);
         }
         const m = draft.money;
         if (m) {
@@ -194,6 +273,7 @@ export default function WowIntake() {
           setStep(draft.step as StepId);
         }
       }
+      setDims(nextDims);
       hydrated.current = true;
       setReady(true);
     })();
@@ -205,15 +285,26 @@ export default function WowIntake() {
   // inside the debounce window never loses the last field typed. An empty
   // draft DELETES the row (a row means unsaved work). Best-effort — a failed
   // save just retries on the next edit.
+  // Set when Finish runs — the debounced autosave must not resurrect the
+  // draft row after finish() deletes it (a timer armed on the close step
+  // can fire mid-finish).
+  const finished = useRef(false);
+
   const writeDraft = (justWove?: Dimension) => {
-    if (!me || !hydrated.current) return;
+    if (!me || !hydrated.current || finished.current) return;
     const dimsOut: Partial<Record<Dimension, DimAnswers>> = {};
     for (const d of WOW_DIMENSIONS) {
-      // A dim woven this very call flushes as blank — its words just moved
-      // to the board, and React's state clear hasn't re-rendered yet.
+      // A dim saved this very call flushes as clean — its words just landed
+      // on the board, and React's state update hasn't re-rendered yet.
       if (d === justWove) continue;
       const a = dims[d];
-      if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) dimsOut[d] = a;
+      const base = saved[d]?.base;
+      if (base) {
+        // Saved dims draft only their UNSAVED edits.
+        if (!sameAnswers(a, base)) dimsOut[d] = a;
+      } else if (a.where.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) {
+        dimsOut[d] = a;
+      }
     }
     const payload: IntakeDraft = {
       step: step === 'welcome' ? undefined : step,
@@ -257,7 +348,9 @@ export default function WowIntake() {
   const go = (delta: number) => {
     const next = steps[Math.min(steps.length - 1, Math.max(0, at + delta))];
     setStep(next);
-    window.scrollTo({ top: 0 });
+    // #root is the app's scroller (App.tsx's route-change reset does the
+    // same) — window.scrollTo is a no-op here and left readers mid-page.
+    (document.getElementById('root') ?? window).scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   };
 
   const setDim = (d: Dimension, patch: Partial<DimAnswers>) =>
@@ -280,26 +373,28 @@ export default function WowIntake() {
 
   async function saveDim(d: Dimension): Promise<void> {
     const a = dims[d];
-    if (!dimHasContent(d)) return;
-    await createCarePost(me, {
-      patientId: me, kind: 'wow', body: composeBody(a),
-      dimensions: [d], score: a.score ?? undefined,
-      attachments: [], links: [], previews: [],
-      aiOmit: a.omit ? (d === 'Economic' ? 'financial' : 'other') : null,
-    });
-    savedNow.current.add(d);
-    // The words move to the board: show them in the woven display, clear the
-    // fields (they're the "add more" composer now), and flush the draft so a
-    // reload can never re-arm what was just posted.
-    setWoven((cur) => ({
-      ...cur,
-      [d]: [
-        { body: composeBody(a), score: a.score, dimensions: [d], created_at: new Date().toISOString() },
-        ...(cur[d] ?? []),
-      ],
-    }));
-    setAnswered((cur) => new Set(cur).add(d));
-    setDims((cur) => ({ ...cur, [d]: blankDim() }));
+    const sv = saved[d];
+    const aiOmit = a.omit ? (d === 'Economic' ? 'financial' as const : 'other' as const) : null;
+    if (sv) {
+      // Editing a saved answer updates the SAME entry — never a duplicate.
+      if (sameAnswers(a, sv.base)) return;
+      await updateWowCarePost(sv.id, { body: composeBody(a), score: a.score, aiOmit });
+      setSaved((cur) => ({ ...cur, [d]: { id: sv.id, base: { ...a } } }));
+    } else {
+      if (!dimHasContent(d)) return;
+      const aid = assessmentRef.current ?? await ensureOpenAssessment(me);
+      assessmentRef.current = aid;
+      const id = await createCarePost(me, {
+        patientId: me, kind: 'wow', body: composeBody(a),
+        dimensions: [d], score: a.score ?? undefined,
+        attachments: [], links: [], previews: [],
+        aiOmit, assessmentId: aid,
+      });
+      setSaved((cur) => ({ ...cur, [d]: { id, base: { ...a } } }));
+    }
+    // The answers STAY in their bubbles, now green/saved; flush the draft so
+    // a reload can never re-arm what was just posted.
+    setEditing((cur) => { const n = new Set(cur); n.delete(d); return n; });
     writeDraft(d);
   }
 
@@ -335,6 +430,7 @@ export default function WowIntake() {
 
   async function finish() {
     setBusy(true); setError('');
+    finished.current = true;
     try {
       const hadNeeds = (pos?.needs?.length ?? 0) > 0;
       await saveFinancialPosition({
@@ -350,11 +446,15 @@ export default function WowIntake() {
       // Asking for support summons a human coordinator — the policy's
       // promise that every request gets a real look (once, at the door).
       if (needs.length > 0 && !hadNeeds) await requestFinancialCoordinator();
+      // Finishing SUBMITS the assessment — the timestamp that lets
+      // assessments be read over time; the next intake starts a fresh one.
+      if (assessmentRef.current) await submitAssessment(assessmentRef.current);
       // The intake is finished — the draft row steps out (best-effort;
       // a leftover would only re-land them on the close step).
       await supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
       navigate('/concierge');
     } catch (e) {
+      finished.current = false;
       setError((e as Error)?.message || 'Something went wrong — try again.');
       setBusy(false);
     }
@@ -368,10 +468,19 @@ export default function WowIntake() {
     ? moneyFrame
     : haveNumbers && margin > 300 && (money(assets) ?? 0) >= (money(debt) ?? 0) ? 'much' : 'little';
 
+  // The assessment's overall reading so far — the average of its saved
+  // scores (one per dimension, structurally), shown above the steps.
+  const assessScores = WOW_DIMENSIONS
+    .map((d) => saved[d]?.base.score)
+    .filter((s): s is number => s != null);
+  const overall = assessScores.length
+    ? Math.round(assessScores.reduce((sum, s) => sum + s, 0) / assessScores.length)
+    : null;
+
   const dots = (
     <div className="wintake__dots" aria-label="Your progress">
       {WOW_DIMENSIONS.map((d) => {
-        const done = answered.has(d) || savedNow.current.has(d);
+        const done = !!saved[d];
         return (
           <button
             key={d} type="button"
@@ -397,6 +506,12 @@ export default function WowIntake() {
         <h1 className="wintake__title">Your Web of Wellbeing</h1>
       </header>
       {step !== 'welcome' && dots}
+      {ready && step !== 'welcome' && overall != null && (
+        <p className="wintake__overall">
+          <strong>{overall}</strong> overall — the average of your {assessScores.length} scored
+          thread{assessScores.length > 1 ? 's' : ''} so far
+        </p>
+      )}
 
       {!ready && <p className="wintake__muted">Loading…</p>}
 
@@ -425,14 +540,14 @@ export default function WowIntake() {
           </p>
           <button className="btn btn-primary" onClick={() => {
             // Land on the first dimension not yet spoken to.
-            const first = WOW_DIMENSIONS.find((d) => !answered.has(d)) ?? WOW_DIMENSIONS[0];
+            const first = WOW_DIMENSIONS.find((d) => !saved[d]) ?? WOW_DIMENSIONS[0];
             setStep(first);
           }}>
             Begin
           </button>
-          {answered.size > 0 && (
+          {Object.keys(saved).length > 0 && (
             <p className="wintake__fine">
-              You&rsquo;ve already spoken to {answered.size} of 6 — we&rsquo;ll start at the next one.
+              You&rsquo;ve already spoken to {Object.keys(saved).length} of 6 — we&rsquo;ll start at the next one.
             </p>
           )}
         </section>
@@ -441,46 +556,44 @@ export default function WowIntake() {
       {ready && WOW_DIMENSIONS.map((d) => {
         if (step !== d) return null;
         const a = dims[d];
-        const wovenHere = woven[d] ?? [];
-        const isWoven = wovenHere.length > 0 || answered.has(d);
+        const sv = saved[d];
+        const lock = !!sv && !editing.has(d);
+        const changed = sv ? !sameAnswers(a, sv.base) : dimHasContent(d);
+        const unlock = () => { if (sv && !editing.has(d)) setEditing((cur) => new Set(cur).add(d)); };
         return (
           <section className="wintake__card" key={d}>
             <div className="wintake__dimhead">
               <Icon name={DIMENSION_META[d]} size={20} />
               <h2 className="wintake__dimname">{d}</h2>
               {a.score == null ? (
-                <button className="wintake__scorebtn" onClick={() => setDim(d, { score: 70 })}>
-                  Add a score
-                </button>
+                !lock && (
+                  <button className="wintake__scorebtn" onClick={() => setDim(d, { score: 70 })}>
+                    Add a score
+                  </button>
+                )
               ) : (
-                <span className="wintake__scorewrap">
+                <span className={'wintake__scorewrap' + (lock ? ' is-saved' : '')} onClick={unlock}>
                   <input
                     type="range" min={0} max={100} value={a.score}
+                    disabled={lock}
                     onChange={(e) => setDim(d, { score: Number(e.target.value) })}
                     aria-label={`${d} score`}
                   />
                   <span className="wintake__scoreval">{a.score}</span>
-                  <button className="wintake__scoreclear" onClick={() => setDim(d, { score: null })} aria-label="Remove score">×</button>
+                  {!lock && (
+                    <button className="wintake__scoreclear" onClick={() => setDim(d, { score: null })} aria-label="Remove score">×</button>
+                  )}
                 </span>
+              )}
+              {lock && (
+                <button className="wintake__editbtn" onClick={unlock}>Edit</button>
               )}
             </div>
 
-            {wovenHere.length > 0 && (
-              <div className="wintake__wovenbox">
-                <p className="wintake__woven">
-                  Woven into your board ✓ — anything you add below weaves in
-                  alongside it, nothing is replaced.
-                </p>
-                {wovenHere.map((w, i) => (
-                  <blockquote className="wintake__wovenentry" key={w.created_at + i}>
-                    {w.body.trim() && <p>{w.body}</p>}
-                    <footer>
-                      {w.score != null && <span className="wintake__wovenscore">Score {w.score}</span>}
-                      <time>{new Date(w.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>
-                    </footer>
-                  </blockquote>
-                ))}
-              </div>
+            {lock && (
+              <p className="wintake__woven">
+                Saved on your board ✓ — tap Edit, or any answer, to change it.
+              </p>
             )}
 
             {d === 'Economic' && (
@@ -516,12 +629,12 @@ export default function WowIntake() {
               </div>
             )}
 
-            <label className="wintake__q">
+            <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
               <span>{PROMPTS[d].where}</span>
               <textarea
-                value={a.where}
+                value={a.where} readOnly={lock} onFocus={unlock}
                 onChange={(e) => setDim(d, { where: e.target.value })}
-                placeholder={isWoven ? 'Add more in your own words…' : 'In your own words…'}
+                placeholder="In your own words…"
               />
             </label>
 
@@ -541,26 +654,26 @@ export default function WowIntake() {
               <p className="wintake__waylead">What&rsquo;s in the way of {PROMPTS[d].way}?</p>
             )}
             <div className="wintake__way">
-              <label className="wintake__q">
+              <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
                 <span>Inner — {PROMPTS[d].inner ?? 'beliefs, feelings, the stories you carry'}</span>
                 <textarea
-                  value={a.inner}
+                  value={a.inner} readOnly={lock} onFocus={unlock}
                   onChange={(e) => setDim(d, { inner: e.target.value })}
                   placeholder={d === 'Economic' ? '“I’m bad with money”, “asking is shameful”…' : 'What you tell yourself…'}
                 />
               </label>
-              <label className="wintake__q">
+              <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
                 <span>Outer — real-world obstacles</span>
                 <textarea
-                  value={a.outer}
+                  value={a.outer} readOnly={lock} onFocus={unlock}
                   onChange={(e) => setDim(d, { outer: e.target.value })}
                   placeholder={d === 'Economic' ? 'Hours, childcare, credentials, a market that won’t pay…' : 'Time, money, distance, access…'}
                 />
               </label>
             </div>
 
-            <label className="wintake__omit">
-              <input type="checkbox" checked={a.omit} onChange={(e) => setDim(d, { omit: e.target.checked })} />
+            <label className="wintake__omit" onClick={unlock}>
+              <input type="checkbox" checked={a.omit} disabled={lock} onChange={(e) => setDim(d, { omit: e.target.checked })} />
               <span>Keep this entry out of AI — only humans on your care team read it</span>
             </label>
 
@@ -568,13 +681,13 @@ export default function WowIntake() {
             <div className="wintake__nav">
               {at > 1 && <button className="btn" onClick={() => go(-1)}>Back</button>}
               <span className="wintake__navgap" />
-              {dimHasContent(d) ? (
+              {changed ? (
                 <button className="btn btn-primary" disabled={busy} onClick={() => void next(d)}>
-                  {busy ? 'Weaving in…' : 'Weave it in & continue'}
+                  {busy ? (sv ? 'Saving…' : 'Weaving in…') : sv ? 'Save changes & continue' : 'Weave it in & continue'}
                 </button>
               ) : (
                 <button className="btn" disabled={busy} onClick={() => void next(d)}>
-                  {isWoven ? 'Continue' : 'Skip for now'}
+                  {sv ? 'Continue' : 'Skip for now'}
                 </button>
               )}
             </div>
