@@ -71,9 +71,26 @@ import './WowIntake.css';
 
 type StepId = 'welcome' | Dimension | 'close';
 
-interface DimAnswers { where: string; extra: string; inner: string; outer: string; score: number | null; omit: boolean }
+interface DimAnswers {
+  where: string; extra: string; inner: string; outer: string;
+  /** Economic only: the FULL text of the mirror question being answered —
+   *  check-marked by the member, written into the finished assessment
+   *  (founder 2026-09-22: '"ask me the other question" goes away and
+   *  becomes the other question'). Empty = the auto frame decides. */
+  asked: string;
+  /** Economic only: the optional give-back offer — assets are defined many
+   *  ways (founder 2026-09-22). */
+  give: string;
+  score: number | null; omit: boolean;
+}
 
-const blankDim = (): DimAnswers => ({ where: '', extra: '', inner: '', outer: '', score: null, omit: false });
+const blankDim = (): DimAnswers => ({ where: '', extra: '', inner: '', outer: '', asked: '', give: '', score: null, omit: false });
+
+// The Economic mirror questions, both always visible now — the member checks
+// the one they're answering (founder 2026-09-22; the "earning more" clause
+// generalized the same day: assets and livelihood are more than money).
+const Q_LITTLE = 'If money is tighter than you need — what’s keeping you from procuring adequate resources to support your livelihood, sustainably?';
+const Q_MUCH = 'If you hold more than you need — what is keeping you from re-allocating it?';
 
 /** The two-layer prompts, tuned per dimension so nothing reads generic —
  *  every dimension carries its OWN Inner and Outer label (founder
@@ -137,22 +154,29 @@ const money = (s: string): number | null => {
 // its bubbles exactly. An entry written elsewhere (free text) lands whole in
 // the first field — nothing is ever dropped.
 const DIAG_TAG = 'Diagnostics & diagnoses: ';
+const ASKED_TAG = 'Asked: ';
 const INNER_TAG = 'In the way — inner (beliefs, feelings): ';
 const OUTER_TAG = 'In the way — outer (the world): ';
-const decomposeBody = (body: string): { where: string; extra: string; inner: string; outer: string } => {
-  let where = body; let extra = ''; let inner = ''; let outer = '';
+const GIVE_TAG = 'Giving back: ';
+const decomposeBody = (body: string): { where: string; extra: string; inner: string; outer: string; asked: string; give: string } => {
+  let where = body; let extra = ''; let inner = ''; let outer = ''; let asked = ''; let give = '';
+  const gi = where.indexOf(GIVE_TAG);
+  if (gi >= 0) { give = where.slice(gi + GIVE_TAG.length).trim(); where = where.slice(0, gi); }
   const oi = where.indexOf(OUTER_TAG);
   if (oi >= 0) { outer = where.slice(oi + OUTER_TAG.length).trim(); where = where.slice(0, oi); }
   const ii = where.indexOf(INNER_TAG);
   if (ii >= 0) { inner = where.slice(ii + INNER_TAG.length).trim(); where = where.slice(0, ii); }
+  const ai = where.indexOf(ASKED_TAG);
+  if (ai >= 0) { asked = where.slice(ai + ASKED_TAG.length).trim(); where = where.slice(0, ai); }
   const di = where.indexOf(DIAG_TAG);
   if (di >= 0) { extra = where.slice(di + DIAG_TAG.length).trim(); where = where.slice(0, di); }
-  return { where: where.trim(), extra, inner, outer };
+  return { where: where.trim(), extra, inner, outer, asked, give };
 };
 
 const sameAnswers = (a: DimAnswers, b: DimAnswers): boolean =>
   a.where.trim() === b.where.trim() && a.extra.trim() === b.extra.trim()
   && a.inner.trim() === b.inner.trim() && a.outer.trim() === b.outer.trim()
+  && a.asked === b.asked && a.give.trim() === b.give.trim()
   && a.score === b.score && a.omit === b.omit;
 
 export default function WowIntake() {
@@ -184,9 +208,6 @@ export default function WowIntake() {
   const [assets, setAssets] = useState('');
   const [debt, setDebt] = useState('');
   const [household, setHousehold] = useState('');
-  // The founder's mirror question: too little vs too much. Adaptive from
-  // their own numbers, always flippable — nobody is told which they are.
-  const [moneyFrame, setMoneyFrame] = useState<'auto' | 'little' | 'much'>('auto');
 
   const [needs, setNeeds] = useState<SubsidyNeed[]>([]);
   const [obstacles, setObstacles] = useState('');
@@ -326,7 +347,7 @@ export default function WowIntake() {
       if (base) {
         // Saved dims draft only their UNSAVED edits.
         if (!sameAnswers(a, base)) dimsOut[d] = a;
-      } else if (a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.score != null || a.omit) {
+      } else if (a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.give.trim() || a.asked || a.score != null || a.omit) {
         dimsOut[d] = a;
       }
     }
@@ -386,18 +407,27 @@ export default function WowIntake() {
     const parts: string[] = [];
     if (a.where.trim()) parts.push(a.where.trim());
     if (a.extra.trim()) parts.push(`${DIAG_TAG}${a.extra.trim()}`);
+    // The finished assessment shows WHICH mirror question was answered.
+    if (a.asked) parts.push(`${ASKED_TAG}${a.asked}`);
     if (a.inner.trim()) parts.push(`${INNER_TAG}${a.inner.trim()}`);
     if (a.outer.trim()) parts.push(`${OUTER_TAG}${a.outer.trim()}`);
+    if (a.give.trim()) parts.push(`${GIVE_TAG}${a.give.trim()}`);
     return parts.join('\n\n');
   };
 
   const dimHasContent = (d: Dimension) => {
     const a = dims[d];
-    return !!(a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.score != null);
+    return !!(a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.give.trim() || a.score != null);
   };
 
   async function saveDim(d: Dimension): Promise<void> {
-    const a = dims[d];
+    let a = dims[d];
+    // The finished assessment records which mirror question was answered —
+    // nobody's ever asked to pick before weaving, the auto frame stands in.
+    if (d === 'Economic' && !a.asked && dimHasContent(d)) {
+      a = { ...a, asked: econAsked };
+      setDims((cur) => ({ ...cur, [d]: a }));
+    }
     const sv = saved[d];
     const aiOmit = a.omit ? (d === 'Economic' ? 'financial' as const : 'other' as const) : null;
     if (sv) {
@@ -489,9 +519,11 @@ export default function WowIntake() {
 
   const margin = (money(income) ?? 0) - (money(expenses) ?? 0);
   const haveNumbers = money(income) != null && money(expenses) != null;
-  const frame: 'little' | 'much' = moneyFrame !== 'auto'
-    ? moneyFrame
-    : haveNumbers && margin > 300 && (money(assets) ?? 0) >= (money(debt) ?? 0) ? 'much' : 'little';
+  // The check-marked question wins; before anyone picks, their own margin
+  // suggests the default — nobody is told which they are, always flippable.
+  const autoQ = haveNumbers && margin > 300 && (money(assets) ?? 0) >= (money(debt) ?? 0) ? Q_MUCH : Q_LITTLE;
+  const econAsked = dims.Economic.asked || autoQ;
+  const econFrame: 'little' | 'much' = econAsked === Q_MUCH ? 'much' : 'little';
 
   // The assessment's overall reading so far — the average of its saved
   // scores (one per dimension, structurally), shown above the steps.
@@ -644,39 +676,6 @@ export default function WowIntake() {
               </p>
             )}
 
-            {d === 'Economic' && (
-              <div className="wintake__money">
-                <p className="wintake__moneylead">
-                  First, the picture in numbers — these are what the subsidy
-                  formula reads. Your care team can see them; providers never
-                  do, and no AI reads any line you hold back on your{' '}
-                  <a href="/concierge/financial">financial profile</a>.
-                </p>
-                <div className="wintake__moneygrid">
-                  <label>Monthly income
-                    <input inputMode="decimal" value={income}
-                      onChange={(e) => setIncome(e.target.value)} placeholder="$" />
-                  </label>
-                  <label>Monthly expenses
-                    <input inputMode="decimal" value={expenses}
-                      onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
-                  </label>
-                  <label>Assets
-                    <input inputMode="decimal" value={assets}
-                      onChange={(e) => setAssets(e.target.value)} placeholder="$ — savings, home, vehicles" />
-                  </label>
-                  <label>Debts
-                    <input inputMode="decimal" value={debt}
-                      onChange={(e) => setDebt(e.target.value)} placeholder="$ — loans, cards, medical" />
-                  </label>
-                  <label>People in your household
-                    <input inputMode="numeric" value={household}
-                      onChange={(e) => setHousehold(e.target.value)} placeholder="including you" />
-                  </label>
-                </div>
-              </div>
-            )}
-
             <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
               <span>{PROMPTS[d].where}</span>
               <textarea
@@ -698,17 +697,26 @@ export default function WowIntake() {
             )}
 
             {d === 'Economic' ? (
-              <>
-                <p className="wintake__waylead">
-                  {frame === 'little'
-                    ? 'If money is tighter than you need — what is keeping you from earning more?'
-                    : 'If you hold more than you need — what is keeping you from re-allocating it?'}
-                  {' '}
-                  <button type="button" className="wintake__flip" onClick={() => setMoneyFrame(frame === 'little' ? 'much' : 'little')}>
-                    {frame === 'little' ? 'Ask me the other question' : 'Ask me the other question'}
-                  </button>
-                </p>
-              </>
+              lock ? (
+                <p className="wintake__waylead">{econAsked}</p>
+              ) : (
+                <div className="wintake__mqs">
+                  <p className="wintake__waylead">
+                    What&rsquo;s in the way? Check the question you&rsquo;re
+                    answering — it&rsquo;s the one your finished assessment
+                    will show.
+                  </p>
+                  {[Q_LITTLE, Q_MUCH].map((q) => (
+                    <label className={'wintake__mq' + (econAsked === q ? ' is-on' : '')} key={q}>
+                      <input
+                        type="checkbox" checked={econAsked === q}
+                        onChange={() => setDim(d, { asked: q })}
+                      />
+                      <span>{q}</span>
+                    </label>
+                  ))}
+                </div>
+              )
             ) : (
               <p className="wintake__waylead">What&rsquo;s in the way of {PROMPTS[d].way}?</p>
             )}
@@ -730,6 +738,68 @@ export default function WowIntake() {
                 />
               </label>
             </div>
+
+            {d === 'Economic' && (() => {
+              // Two OPTIONAL doors, the relevant one first per the checked
+              // question (founder 2026-09-22): tighter-than-you-need leads
+              // with receiving subsidies, more-than-you-need with giving back.
+              const subsidyBlock = (
+                <div className="wintake__money" key="subsidy">
+                  <p className="wintake__optlead">Optional — if you&rsquo;d like to receive subsidies on the platform, fill this out.</p>
+                  <p className="wintake__moneylead">
+                    These numbers are what the subsidy formula reads. Your care
+                    team can see them; providers never do, and no AI reads any
+                    line you hold back on your{' '}
+                    <a href="/concierge/financial">financial profile</a>.
+                  </p>
+                  <div className="wintake__moneygrid">
+                    <label>Monthly income
+                      <input inputMode="decimal" value={income}
+                        onChange={(e) => setIncome(e.target.value)} placeholder="$" />
+                    </label>
+                    <label>Monthly expenses
+                      <input inputMode="decimal" value={expenses}
+                        onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
+                    </label>
+                    <label>Assets
+                      <input inputMode="decimal" value={assets}
+                        onChange={(e) => setAssets(e.target.value)} placeholder="$ — savings, home, vehicles" />
+                    </label>
+                    <label>Debts
+                      <input inputMode="decimal" value={debt}
+                        onChange={(e) => setDebt(e.target.value)} placeholder="$ — loans, cards, medical" />
+                    </label>
+                    <label>People in your household
+                      <input inputMode="numeric" value={household}
+                        onChange={(e) => setHousehold(e.target.value)} placeholder="including you" />
+                    </label>
+                  </div>
+                </div>
+              );
+              const giveBlock = (
+                <div className="wintake__money" key="give">
+                  <p className="wintake__optlead">Optional — if you&rsquo;d like to give back on the platform.</p>
+                  <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
+                    <span>
+                      Your assets are defined many ways — money, goods,
+                      services, skills, time. What would you like to offer
+                      the collective?
+                    </span>
+                    <textarea
+                      value={a.give} readOnly={lock} onFocus={unlock}
+                      onChange={(e) => setDim(d, { give: e.target.value })}
+                      placeholder="A service you’d volunteer, goods you’d gift, time, skills…"
+                    />
+                  </label>
+                  <p className="wintake__moneylead">
+                    Lichen can suggest ways to give that help the collective —
+                    like volunteering a service or gifting an offering in the
+                    Marketplace.
+                  </p>
+                </div>
+              );
+              return econFrame === 'much' ? <>{giveBlock}{subsidyBlock}</> : <>{subsidyBlock}{giveBlock}</>;
+            })()}
 
             <label className="wintake__omit" onClick={unlock}>
               <input type="checkbox" checked={a.omit} disabled={lock} onChange={(e) => setDim(d, { omit: e.target.checked })} />
