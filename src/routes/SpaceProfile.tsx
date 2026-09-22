@@ -1921,7 +1921,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <label className="prof__label">Address</label>
             <div className="prof__handle">
               <span className="prof__handle-prefix">lichen.health/</span>
-              <input className="prof__input" value={handle} onChange={(e) => setHandle(e.target.value)}
+              <input className="prof__input" value={handle} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setHandle(e.target.value)}
                 placeholder={kindLabel.toLowerCase().replace(/\s+/g, '-')} />
             </div>
             <p className="prof__hint">
