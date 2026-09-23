@@ -1485,3 +1485,11 @@
 @media (min-width: 1024px) {
   .wow__gate--setup { width: min(560px, calc(100% - 24px)); }
 }
+
+/* THE CARE PLAN board label (founder 2026-09-23, from the marketing mocks):
+   whose plan, which week — the mock's mono eyebrow, sitting between the
+   week pager's arrows. */
+.koc__planlbl {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-muted); text-align: center;
+}

@@ -35,6 +35,9 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     ? (kind === 'wow' ? `/concierge/client/${patientId}` : `/concierge/client/${patientId}/koc`)
     : (kind === 'wow' ? '/concierge' : '/concierge/koc'));
 
+  // The plan entry's headline — the NAME of the thing (founder 2026-09-23,
+  // the mock's grammar: the card leads with the course/retreat/practice).
+  const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [pending, setPending] = useState<Pending[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -94,7 +97,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     if (!me) return;
     const cleanedLinks = links.filter((l) => l.url.trim())
       .map((l) => ({ label: l.label.trim() || l.url.trim(), url: l.url.trim(), internal: isInternalUrl(l.url.trim()) }));
-    if (!body.trim() && pending.length === 0 && cleanedLinks.length === 0) { setError('Add some text, media, or a link.'); return; }
+    if (!title.trim() && !body.trim() && pending.length === 0 && cleanedLinks.length === 0) { setError('Add a title, some text, media, or a link.'); return; }
     if (kind === 'koc') {
       if (!range.start) { setError('Pick a start day.'); return; }
       if (!recurrence && !range.end) { setError('Pick a day or a date range.'); return; }
@@ -106,6 +109,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
       const previews = await resolvePreviews(parseBodyUrls(body));
       await createCarePost(me, {
         patientId: patient, kind, body: body.trim(),
+        title: kind === 'koc' ? title.trim() : null,
         dimensions: [...dims], score,
         startDate: range.start ?? undefined,
         endDate: recurrence ? undefined : (range.end ?? undefined),
@@ -150,8 +154,19 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
       </div>
 
       <div className="cedit__body">
-        <textarea className="cedit__textarea" rows={4} placeholder="Write something…" value={body}
-          onChange={(e) => setBody(e.target.value)} />
+        {kind === 'koc' && (
+          <div className="cedit__field">
+            <span className="cedit__label">What is it?</span>
+            <input
+              className="cedit__input cedit__titlein"
+              placeholder="The course, session, retreat, or practice…"
+              value={title} onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+        )}
+        <textarea className="cedit__textarea" rows={4}
+          placeholder={kind === 'koc' ? 'A note to go with it — how to hold it, what it pairs with…' : 'Write something…'}
+          value={body} onChange={(e) => setBody(e.target.value)} />
 
         {/* Media */}
         <div className="cedit__field">

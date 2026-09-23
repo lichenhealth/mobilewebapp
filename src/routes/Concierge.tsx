@@ -6,6 +6,7 @@ import HexagonRadar from '../components/HexagonRadar';
 import { getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator, INCOME_BANDS, SUBSIDY_NEEDS, MEANS_FIELDS, bandLabel, type FinancialPosition, type SubsidyNeed, type MeansField } from '../lib/meansApi';
 import ChatConversation from '../components/ChatConversation';
 import CarePostCard from '../components/CarePostCard';
+import { possessive } from '../lib/names';
 import { supabase } from '../lib/supabase';
 import {
   loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia, formatRelative,
@@ -15,7 +16,7 @@ import {
   loadCarePosts, loadCarePost, computeWowLenses, type WowLens, wowAxes, wowScoreBand, signCareMedia, deleteCarePost,
   createCarePost, DIMENSION_META,
   getCareSettings, setWowWindowAuto, tuneWowWindow, WOW_WINDOW_DEFAULT, type CareSettings,
-  WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
+  WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, prettyWeekRange, localDate, toISO,
   loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel,
   type CarePostRow, type Dimension, type OnCallCaregiver,
 } from '../lib/conciergeApi';
@@ -1699,9 +1700,13 @@ export default function Concierge() {
 
       {activeTab === 'koc' && (
         <>
+          {/* One row, the mock's grammar (founder 2026-09-23): whose plan,
+              which week, the pager flanking it. */}
           <div className="koc__weeknav">
             <button className="conc__tool-circle" onClick={() => shiftWeek(-7)} aria-label="Previous week"><Icon name="chevron-left" size={14} /></button>
-            <span className="koc__weeklbl">{formatWeekRange(weekStart)}</span>
+            <span className="koc__planlbl">
+              {isClientView ? (clientName ? `${possessive(clientName)} care plan` : 'Care plan') : 'Your care plan'} · {prettyWeekRange(weekStart)}
+            </span>
             <button className="conc__tool-circle" onClick={() => shiftWeek(7)} aria-label="Next week"><Icon name="chevron-right" size={14} /></button>
           </div>
           {canAuthor && (
@@ -1714,13 +1719,15 @@ export default function Concierge() {
           {!dataReady && <p className="conc__care-hint">Loading…</p>}
           {dataReady && weekDays(weekStart).map((day) => {
             const posts = kocPosts.filter((p) => occursOn(p, day.iso));
+            const d = localDate(day.iso);
+            const daylbl = `${d.toLocaleDateString(undefined, { weekday: 'long' })} · ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
             return (
               <section className="koc__daysec" key={day.iso}>
-                <h3 className="koc__daylbl">{day.label}</h3>
+                <h3 className="koc__daylbl">{daylbl}</h3>
                 {posts.length === 0
                   ? <p className="koc__dayempty">Nothing scheduled</p>
                   : posts.map((p) => (
-                    <CarePostCard key={p.id + day.iso} post={p} mediaUrls={mediaUrls}
+                    <CarePostCard key={p.id + day.iso} post={p} mediaUrls={mediaUrls} me={me}
                       canDelete={canAuthor && p.author_id === me} onDelete={removePost}
                       onAsk={p.author_id !== me ? askEntry : undefined} />
                   ))}
