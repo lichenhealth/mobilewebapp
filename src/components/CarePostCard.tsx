@@ -2,7 +2,8 @@ import { useState, SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { colorFor, monogramFor, formatRelative } from '../lib/chatApi';
-import { CarePostRow, CareAttachment, CareLink, CarePostPreview, rangeLabel } from '../lib/conciergeApi';
+import { CarePostRow, CareAttachment, CareLink, CarePostPreview, rangeLabel, kocLinkKind } from '../lib/conciergeApi';
+import { createReminder } from '../lib/remindersApi';
 import { linkify, hrefFor } from '../lib/linkify';
 import { recurrenceLabel } from '../lib/recurrence';
 import './CarePostCard.css';
@@ -72,7 +73,7 @@ function CareLinkChip({ link }: { link: CareLink }) {
 }
 
 export default function CarePostCard({
-  post, mediaUrls, canDelete, onDelete, onAsk,
+  post, mediaUrls, canDelete, onDelete, onAsk, me,
 }: {
   post: CarePostRow;
   mediaUrls: Record<string, string>;
@@ -82,10 +83,147 @@ export default function CarePostCard({
    *  with this entry pinned and its author tagged — pass only when the
    *  viewer isn't the author (you don't tag yourself). */
   onAsk?: (post: CarePostRow) => void;
+  /** The VIEWER — powers the plan card's "Add to calendar" door (a private
+   *  reminder on their own calendar, never anyone else's). */
+  me?: string;
 }) {
   const name = post.author?.full_name ?? 'Care team';
   const navigate = useNavigate();
   const [portrait, setPortrait] = useState(false);
+  // Add-to-calendar state for the plan card (per mount is honest enough —
+  // the reminder itself is the durable record).
+  const [onCal, setOnCal] = useState(false);
+  const [calBusy, setCalBusy] = useState(false);
+
+  // ── The PLAN ENTRY card (founder 2026-09-23, built from the marketing
+  //    mocks): title leads and opens the linked thing, the byline says how
+  //    it's held in the mock's grammar ("Cherlynn Resager recommends this
+  //    retreat" / "Galyn Burke prescribed this course"), the linked kind's
+  //    mark sits in the corner, the schedule reads as a fine line, and the
+  //    doors are ghost pills. WOW entries keep the feed-card shape below.
+  if (post.kind === 'koc') {
+    const kindInfo = kocLinkKind(post.links);
+    const noun = kindInfo?.noun || '';
+    const held = post.intent === 'recommended'
+      ? `recommends this${noun ? ' ' + noun : ''}`
+      : post.intent === 'prescribed'
+        ? `prescribed this${noun ? ' ' + noun : ''}`
+        : `added this${noun ? ' ' + noun : ''}`;
+    const schedule = post.start_date
+      ? (post.recurrence
+        ? recurrenceLabel(post.recurrence, post.start_date)
+        : rangeLabel(post.start_date, post.end_date ?? post.start_date))
+      : null;
+    const addToCal = async () => {
+      if (!me || !post.start_date || calBusy) return;
+      setCalBusy(true);
+      try {
+        await createReminder(me, {
+          title: post.title?.trim() || post.body.trim().slice(0, 80) || 'Care plan',
+          date: post.start_date, atMin: null, leadMin: 0,
+          recurrence: post.recurrence,
+        });
+        setOnCal(true);
+      } catch { /* the button simply stays offered */ }
+      setCalBusy(false);
+    };
+    return (
+      <article className="cpost cpost--plan">
+        <header className="cpost__planhead">
+          <span className="cpost__plantit">
+            {post.title?.trim() && (
+              kindInfo ? (
+                <button className="cpost__ktitle link-cue" onClick={() => navigate(kindInfo.link.url)}>
+                  {post.title}
+                </button>
+              ) : (
+                <span className="cpost__ktitle">{post.title}</span>
+              )
+            )}
+            <span className="cpost__byline">
+              <span className="cpost__avatar cpost__avatar--xs" style={{ background: colorFor(post.author_id) }}>
+                {monogramFor(name)}
+              </span>
+              <button className="cpost__author-btn link-cue" onClick={() => navigate(`/members/${post.author_id}`)}>
+                {name}
+              </button>
+              <em className={'cpost__bywhat' + (post.intent === 'prescribed' ? ' cpost__bywhat--prescribed' : '')}>
+                {held}
+              </em>
+            </span>
+          </span>
+          {kindInfo && (
+            <span className="cpost__kicon" aria-hidden>
+              <Icon name={kindInfo.icon} size={16} />
+            </span>
+          )}
+          {canDelete && (
+            <button className="cpost__del" onClick={() => onDelete(post.id)} aria-label="Delete post">
+              <Icon name="close" size={14} />
+            </button>
+          )}
+        </header>
+
+        {(schedule || post.ai_omit) && (
+          <p className="cpost__planfine">
+            {schedule && (
+              <>
+                <Icon name={post.recurrence ? 'repeat' : 'calendar'} size={11} /> {schedule}
+              </>
+            )}
+            {post.ai_omit && (
+              <em className="cpost__omit" title={`Held back from every assistant — sensitive ${post.ai_omit} information`}>
+                {schedule ? ' · ' : ''}no AI · sensitive {post.ai_omit}
+              </em>
+            )}
+          </p>
+        )}
+
+        {post.body && <p className="cpost__plannote"><LinkifiedText text={post.body} /></p>}
+
+        {post.attachments.length > 0 && (
+          <div className="cpost__media">
+            {post.attachments.map((a, i) => (
+              <CareMedia key={i} a={a} url={mediaUrls[a.path]} />
+            ))}
+          </div>
+        )}
+        {post.previews?.length > 0 && (
+          <div className="cpost__previews">
+            {post.previews.map((p, i) => <CarePreview key={i} p={p} />)}
+          </div>
+        )}
+
+        {(post.links.length > 0 || (me && post.start_date)) && (
+          <div className="cpost__doors">
+            {me && post.start_date && (
+              <button className="cpost__door" onClick={addToCal} disabled={calBusy || onCal}>
+                {onCal ? 'On your calendar ✓' : 'Add to calendar ›'}
+              </button>
+            )}
+            {post.links.map((l, i) => l.internal ? (
+              <button key={i} className="cpost__door" onClick={() => navigate(l.url)}>
+                {l.label && l.label !== l.url ? l.label : (noun ? `${noun[0].toUpperCase()}${noun.slice(1)} details` : 'Open')} ›
+              </button>
+            ) : (
+              <a key={i} className="cpost__door" href={l.url} target="_blank" rel="noopener noreferrer">
+                {l.label && l.label !== l.url ? l.label : 'Open link'} ›
+              </a>
+            ))}
+          </div>
+        )}
+
+        {onAsk && (
+          <footer className="cpost__foot cpost__foot--plan">
+            <button className="cpost__ask" onClick={() => onAsk(post)}>
+              <Icon name="message" size={12} />
+              Ask {(name.split(' ')[0]) || 'them'}
+            </button>
+          </footer>
+        )}
+      </article>
+    );
+  }
 
   // A single tall photo → lay text beside it; otherwise stack (text above media).
   const onImgLoad = (e: SyntheticEvent<HTMLImageElement>) => {
@@ -165,14 +303,6 @@ export default function CarePostCard({
               ? <span className="cpost__tag">All</span>
               : post.dimensions.map((d) => <span key={d} className="cpost__tag">{d}</span>)}
           </div>
-        )}
-        {post.kind === 'koc' && post.start_date && (
-          <span className="cpost__range">
-            <Icon name={post.recurrence ? 'repeat' : 'calendar'} size={12} />{' '}
-            {post.recurrence
-              ? recurrenceLabel(post.recurrence, post.start_date)
-              : rangeLabel(post.start_date, post.end_date ?? post.start_date)}
-          </span>
         )}
         {onAsk && (
           <button className="cpost__ask" onClick={() => onAsk(post)}>

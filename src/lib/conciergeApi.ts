@@ -16,6 +16,20 @@ export const DIMENSION_META: Record<Dimension, IconName> = {
 /** The one banding rule for every WOW score the board shows (founder
  *  2026-09-23): 90+ green, 70–89 peach, below 70 the platform red. */
 export type WowBand = 'high' | 'mid' | 'low';
+/** What a plan entry points AT, read off its first internal link (founder
+ *  2026-09-23, the mock's grammar: "recommends this retreat", an RSVP mark
+ *  in the corner). Null = no internal link, the card stays plain. */
+export function kocLinkKind(links: CareLink[]): { noun: string; icon: IconName; link: CareLink } | null {
+  const l = links.find((x) => x.internal);
+  if (!l) return null;
+  const p = l.url;
+  if (p.startsWith('/events')) return { noun: 'event', icon: 'rsvp', link: l };
+  if (p.startsWith('/collections') || p.startsWith('/courses')) return { noun: 'course', icon: 'graduation-cap', link: l };
+  if (p.startsWith('/library')) return { noun: 'resource', icon: 'book', link: l };
+  if (p.startsWith('/market') || p.startsWith('/posts')) return { noun: 'offering', icon: 'store', link: l };
+  return { noun: '', icon: 'arrow-right', link: l };
+}
+
 export const wowScoreBand = (v: number): WowBand => (v >= 90 ? 'high' : v >= 70 ? 'mid' : 'low');
 
 export type CareKind = 'wow' | 'koc';
@@ -34,6 +48,10 @@ export interface CarePostPreview {
 
 export interface CarePostRow {
   id: string;
+  /** The plan entry's headline — the NAME of the thing (founder 2026-09-23,
+   *  the mock's grammar: the card leads with the course/retreat/practice).
+   *  Null on WOW entries and all pre-title history. */
+  title?: string | null;
   /** Set = no assistant reads this entry; the reason shows on the card. */
   ai_omit?: 'medical' | 'financial' | 'other' | null;
   /** How a plan entry is held (founder 2026-09-14): a RECOMMENDED thing is
@@ -56,7 +74,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, intent';
+  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, intent';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -89,6 +107,17 @@ export function formatWeekRange(weekStartIso: string): string {
   const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
   return `${fmt(a)} – ${fmt(b)}`;
 }
+/** The mock's week-range grammar (founder 2026-09-23): "Sep 21 – 27",
+ *  crossing a month as "Sep 28 – Oct 4". */
+export function prettyWeekRange(weekStartIso: string): string {
+  const a = localDate(weekStartIso);
+  const b = new Date(a); b.setDate(a.getDate() + 6);
+  const mon = (d: Date) => d.toLocaleDateString(undefined, { month: 'short' });
+  return a.getMonth() === b.getMonth()
+    ? `${mon(a)} ${a.getDate()} – ${b.getDate()}`
+    : `${mon(a)} ${a.getDate()} – ${mon(b)} ${b.getDate()}`;
+}
+
 /** The 7 dates of a Monday-anchored week, with labels. */
 export function weekDays(weekStartIso: string): { iso: string; label: string }[] {
   const start = localDate(weekStartIso);
@@ -327,6 +356,7 @@ export function wowAxes(byDimension: Record<Dimension, number | null>): RadarAxi
 
 // ─── Create / delete ─────────────────────────────────────────────────────────
 export interface CarePostInput {
+  title?: string | null;
   patientId: string; kind: CareKind; body: string;
   dimensions?: Dimension[]; score?: number;      // wow
   startDate?: string; endDate?: string;          // koc
@@ -344,6 +374,7 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
   const recurring = input.kind === 'koc' && !!input.recurrence;
   const row = {
     patient_id: input.patientId, author_id: me, kind: input.kind, body: input.body,
+    title: input.kind === 'koc' ? (input.title?.trim() || null) : null,
     dimensions: input.kind === 'wow' ? (input.dimensions ?? []) : [],
     score: input.kind === 'wow' ? input.score : null,
     start_date: input.kind === 'koc' ? input.startDate : null,

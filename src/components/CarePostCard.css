@@ -125,3 +125,44 @@
   background: transparent; border: 0; padding: 0; font: inherit;
   color: inherit; cursor: pointer;
 }
+
+/* ── THE PLAN ENTRY CARD (founder 2026-09-23, from the marketing mocks):
+   title leads and opens the linked thing (link-cue, never full peach — the
+   mocks keep their own storytelling look), the byline holds the intent
+   grammar, the linked kind's mark sits in the corner, doors are ghost
+   pills. WOW cards keep the feed shape above. ─────────────────────────── */
+.cpost--plan { background: #fff; }
+.cpost__planhead { display: flex; align-items: flex-start; gap: var(--s-2); }
+.cpost__plantit { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin-right: auto; }
+.cpost__ktitle {
+  border: 0; background: none; padding: 0;
+  font: inherit; font-size: 15px; font-weight: 600; line-height: 1.35;
+  color: var(--ink); text-align: left; width: fit-content;
+}
+button.cpost__ktitle { cursor: pointer; }
+.cpost__byline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; }
+.cpost__avatar--xs {
+  width: 18px; height: 18px; font-size: 9px; font-style: normal;
+}
+.cpost__bywhat { font-style: normal; color: var(--ink-muted); }
+.cpost__bywhat--prescribed { color: var(--blue-deep); }
+.cpost__kicon {
+  flex-shrink: 0; color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+}
+.cpost__planfine {
+  margin: 0; font-size: 12px; color: var(--ink-muted);
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+}
+.cpost__plannote { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
+.cpost__doors { display: flex; flex-wrap: wrap; gap: 8px; }
+.cpost__door {
+  border: 1px solid var(--peach); background: none; border-radius: var(--r-full);
+  padding: 5px 13px; font: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--peach-deep); cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.cpost__door:hover { background: var(--peach-tint); }
+.cpost__door:disabled { border-color: var(--bone-edge); color: var(--ink-muted); cursor: default; background: none; }
+.cpost__foot--plan { justify-content: flex-end; }
