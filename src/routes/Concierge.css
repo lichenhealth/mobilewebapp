@@ -328,7 +328,11 @@
 /* ─── Concierge authoring editors (SnapshotEditor / CarePlanEditor) ──── */
 .cedit { display: flex; flex-direction: column; padding-bottom: var(--s-9); }
 .cedit__head {
-  position: sticky; top: 0; z-index: 5;
+  /* Sticks BELOW the top bar, not at 0 — the bar is solid bone at z 50
+     (fixed on phones, sticky in the desktop grid), so top:0 slid this row
+     underneath it and the Post button "disappeared" on scroll
+     (founder 2026-09-23). Same offset idiom as the chat split pane. */
+  position: sticky; top: calc(var(--top-h) + var(--safe-top)); z-index: 5;
   display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: var(--s-3);
   padding: var(--s-4) var(--s-4) var(--s-3);
   background: var(--bone);
