@@ -137,8 +137,9 @@
 }
 .wintake__scoreremove:hover { color: var(--ink-muted); }
 
-/* The Economic mirror questions, both visible — check the one you're
-   answering (founder 2026-09-22; "Ask me the other question" retired). */
+/* The Economic relationship-statement selector — first thing on the step
+   (founder 2026-09-23: "Let's allow you to select first"); check the
+   statement that's true for you. Saved, the chosen one wears green. */
 .wintake__mqs { display: flex; flex-direction: column; gap: var(--s-2); }
 .wintake__mq {
   display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
@@ -147,16 +148,14 @@
 }
 .wintake__mq.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
 .wintake__mq input { margin-top: 2px; accent-color: var(--peach); }
+.wintake__mqs--saved .wintake__mq.is-on { border-color: var(--green); background: var(--bone); color: var(--ink-soft); }
 
-/* The two OPTIONAL doors at the foot of the Economic step. */
-.wintake__optlead {
-  margin: 0; font-size: 12.5px; font-weight: 600;
-  letter-spacing: 0.02em; color: var(--ink-soft);
-}
+/* Economic's in-the-way answer is long form (founder 2026-09-23). */
+.wintake__q--long textarea { min-height: 150px; }
 
-/* The trailing optional door rolls up until asked for (founder 2026-09-23),
-   and a written give-back offer opens weave doors — text that navigates
-   wears the link-cue. */
+/* The two OPTIONAL sections are drop-downs, header row staying put so an
+   open one closes back up (founder 2026-09-23). */
+.wintake__optsec { display: flex; flex-direction: column; gap: var(--s-3); }
 .wintake__optfold {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   width: 100%; padding: 10px 12px;
@@ -165,8 +164,16 @@
   color: var(--ink-soft); text-align: left; cursor: pointer;
 }
 .wintake__optfold:hover { border-color: var(--ink-faint); }
-.wintake__givedoors { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-.wintake__givedoor {
-  border: 0; background: none; padding: 0; width: fit-content;
-  font: inherit; font-size: 13px; color: var(--ink); text-align: left; cursor: pointer;
+.wintake__optfold svg { flex: none; transition: transform 0.15s ease; }
+.wintake__optfold.is-open svg { transform: rotate(90deg); }
+
+/* The give-back weave doors — two columns, each a card door into a pop-up
+   flow (Marketplace gift · dollars via Donate); the form stays underneath. */
+.wintake__givecols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+@media (max-width: 460px) { .wintake__givecols { grid-template-columns: 1fr; } }
+.wintake__givecol {
+  padding: 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); font: inherit; font-size: 13px; line-height: 1.5;
+  color: var(--ink); text-align: left; cursor: pointer;
 }
+.wintake__givecol:hover { border-color: var(--peach); background: var(--peach-tint); }
