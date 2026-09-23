@@ -130,8 +130,12 @@ export default function Compose() {
   const [inkind, setInkind] = useState(false);
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  // ?title=/?body= prefill words carried in from another surface (the task
+  // quick-add's ?title= precedent; the intake's give-back doors use ?body=
+  // — founder 2026-09-23: an offer written there weaves into Marketplace).
+  // An edit (?post=) overwrites these when the post loads.
+  const [title, setTitle] = useState(() => params.get('title') ?? '');
+  const [body, setBody] = useState(() => params.get('body') ?? '');
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
   // Where it happens (founder 2026-07-27): Online and In person are

@@ -197,6 +197,10 @@ export default function WowIntake() {
   const [saved, setSaved] = useState<Partial<Record<Dimension, { id: string; base: DimAnswers }>>>({});
   // Saved dims currently unlocked for editing (click an answer or the Edit CTA).
   const [editing, setEditing] = useState<Set<Dimension>>(new Set());
+  // The Economic step's TRAILING optional door (the one the checked question
+  // says you likely won't use) rolls up into a drop-down (founder 2026-09-23:
+  // "should it smart roll this up as a drop down I likely won't use?").
+  const [optOpen, setOptOpen] = useState(false);
   // The OPEN assessment these answers belong to (founder 2026-09-22:
   // editable until submitted, one entry — one score — per dimension per
   // assessment; Finish stamps it and the next visit starts a new one).
@@ -227,6 +231,12 @@ export default function WowIntake() {
     needs?: SubsidyNeed[]; obstacles?: string;
   };
   const hydrated = useRef(false);
+  // True once we've SEEN a draft row (at hydration or by writing one). The
+  // autosave's empty-branch delete is gated on it: a boot whose draft READ
+  // failed or raced the token refresh looks identical to "no draft", and an
+  // ungated delete then destroys the member's real row (found live
+  // 2026-09-23 in the harness — an expired token's silent empty read).
+  const hadDraft = useRef(false);
 
   useEffect(() => {
     if (!me) return;
@@ -291,6 +301,7 @@ export default function WowIntake() {
       }
       const draft = (draftRow.data as { draft?: IntakeDraft } | null)?.draft;
       if (draft) {
+        hadDraft.current = true;
         if (draft.dims) {
           // The draft is what DIFFERS from the saved baseline: an unwoven
           // answer, or an unsaved edit of a woven one — which reopens in
@@ -363,9 +374,14 @@ export default function WowIntake() {
     const empty = !payload.step && Object.keys(dimsOut).length === 0
       && needs.length === 0 && !obstacles.trim();
     if (empty) {
-      void supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
+      // Only delete a row we KNOW exists — see hadDraft above.
+      if (hadDraft.current) {
+        hadDraft.current = false;
+        void supabase.from('wow_intake_drafts').delete().eq('profile_id', me);
+      }
       return;
     }
+    hadDraft.current = true;
     void supabase.from('wow_intake_drafts')
       .upsert({ profile_id: me, draft: payload, updated_at: new Date().toISOString() })
       .then(({ error: e }) => { if (e) console.warn('intake draft save:', e.message); });
@@ -784,6 +800,14 @@ export default function WowIntake() {
                   </div>
                 </div>
               );
+              // The offer WEAVES into the network through existing doors
+              // (founder 2026-09-23: "woven into our current-cy as
+              // contribution to the network, and... into marketplace"):
+              // a gift listing, a Lichen*-entrusted offering the Routing
+              // Desk allocates, or dollars that mint Current via Donate.
+              // Current never moves on the intake's own word — the doors
+              // open the flows that already carry the consent steps.
+              const goWeave = (path: string) => { writeDraft(); navigate(path); };
               const giveBlock = (
                 <div className="wintake__money" key="give">
                   <p className="wintake__optlead">Optional — if you&rsquo;d like to give back on the platform.</p>
@@ -799,16 +823,43 @@ export default function WowIntake() {
                       placeholder="A service you’d volunteer, goods you’d gift, time, skills…"
                     />
                   </label>
-                  <p className="wintake__moneylead">
-                    Lichen can suggest ways to give that help the collective —
-                    like volunteering a service or gifting an offering in the
-                    Marketplace.
-                  </p>
+                  {a.give.trim() ? (
+                    <div className="wintake__givedoors">
+                      <p className="wintake__moneylead">Weave it into the network — your words carry over:</p>
+                      <button type="button" className="wintake__givedoor link-cue"
+                        onClick={() => goWeave('/compose?area=marketplace&body=' + encodeURIComponent(a.give.trim()))}>
+                        Gift it in the Marketplace
+                      </button>
+                      <button type="button" className="wintake__givedoor link-cue"
+                        onClick={() => goWeave('/compose?area=marketplace&entrust=1&body=' + encodeURIComponent(a.give.trim()))}>
+                        Entrust it to Lichen to route where it&rsquo;s most needed
+                      </button>
+                      <button type="button" className="wintake__givedoor link-cue"
+                        onClick={() => goWeave('/donate')}>
+                        Give dollars — they become Current flowing in the network
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="wintake__moneylead">
+                      Name something and doors open to weave it in — a gift
+                      listing in the Marketplace, an offering entrusted to
+                      Lichen, or dollars that become Current in the network.
+                    </p>
+                  )}
                 </div>
               );
               // Holding more than needed, or in balance and contributing —
               // the give-back door leads; tighter than needed, subsidies do.
-              return econFrame === 'little' ? <>{subsidyBlock}{giveBlock}</> : <>{giveBlock}{subsidyBlock}</>;
+              // The TRAILING section rolls up into a drop-down until opened.
+              const fold = (label: string, block: JSX.Element) => (optOpen ? block : (
+                <button type="button" className="wintake__optfold" key={'fold:' + label} onClick={() => setOptOpen(true)}>
+                  <span>{label}</span>
+                  <Icon name="chevron-right" size={13} />
+                </button>
+              ));
+              return econFrame === 'little'
+                ? <>{subsidyBlock}{fold('Optional — if you’d like to give back on the platform', giveBlock)}</>
+                : <>{giveBlock}{fold('Optional — if you’d like to receive subsidies on the platform', subsidyBlock)}</>;
             })()}
 
             <label className="wintake__omit" onClick={unlock}>
