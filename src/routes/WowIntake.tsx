@@ -893,6 +893,13 @@ export default function WowIntake() {
                       </div>
                     </div>
                   )}
+                  {/* The honest term, stated up front (founder 2026-09-23):
+                      subsidies are allocated by an objective algorithm, and
+                      asking for them means your information goes into it. */}
+                  <p className="wintake__subnote">
+                    If you want subsidies, your information has to be put into
+                    the algorithm for subsidy allocation — objectively.
+                  </p>
                 </div>
               );
               const giveSec = (

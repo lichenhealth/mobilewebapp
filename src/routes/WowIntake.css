@@ -167,6 +167,11 @@
 .wintake__optfold svg { flex: none; transition: transform 0.15s ease; }
 .wintake__optfold.is-open svg { transform: rotate(90deg); }
 
+/* The standing term under the subsidies drop-down (founder 2026-09-23, "in
+   peach"): peach-deep, because peach TEXT at small sizes fails contrast
+   where the deeper shade holds (the link-cue rule's own reasoning). */
+.wintake__subnote { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--peach-deep); }
+
 /* The give-back weave doors — two columns, each a card door into a pop-up
    flow (Marketplace gift · dollars via Donate); the form stays underneath. */
 .wintake__givecols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
