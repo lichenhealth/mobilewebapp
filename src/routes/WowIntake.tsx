@@ -921,7 +921,7 @@ export default function WowIntake() {
                         />
                       </label>
                       <p className="wintake__moneylead">
-                        Weave it into the network{a.give.trim() ? ' — your words carry over:' : ':'}
+                        Weave it into the network — turn words into action
                       </p>
                       <div className="wintake__givecols">
                         <button
