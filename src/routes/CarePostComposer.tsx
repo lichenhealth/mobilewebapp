@@ -49,11 +49,15 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const [range, setRange] = useState<DateRange>({ start: null, end: null }); // koc
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
-  // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20): importing a
-  // cancer scan, you say so here and no assistant ever reads this entry —
-  // you keep every detail. null = Claude may help with it, which is often
-  // the point (the right intervention for a diagnosis, a way through).
-  const [aiOmit, setAiOmit] = useState<'medical' | 'financial' | null>(null);
+  // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20; reshaped
+  // 2026-09-23 to the platform's checkbox grammar): tick it and no assistant
+  // ever reads this entry — you keep every detail. Off = Claude may help,
+  // which is often the point (the right intervention for a diagnosis).
+  const [omitAi, setOmitAi] = useState(false);
+  // The sensitivity MARK (founder 2026-09-23), deliberately separate from
+  // the AI hold-back: a label the entry wears now; how it's treated
+  // differently is a later decision.
+  const [sensitive, setSensitive] = useState(false);
   // Recommended vs prescribed (founder 2026-09-14: "delineate suggested
   // versus prescribed"): how a plan entry is held — worth trying, or part
   // of the plan. Optional; tap again to clear. KOC only.
@@ -115,7 +119,8 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
         endDate: recurrence ? undefined : (range.end ?? undefined),
         recurrence: kind === 'koc' ? recurrence : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
-        links: cleanedLinks, previews, aiOmit,
+        links: cleanedLinks, previews,
+        aiOmit: omitAi ? 'other' : null, sensitive,
         intent: kind === 'koc' ? intent : null,
       });
       back();
@@ -134,23 +139,23 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
 
       {error && <p className="cedit__error">{error}</p>}
 
-      {/* Sensitive by name, held back by choice — case by case. */}
+      {/* Held back by choice, sensitive by name — two separate checkboxes
+          (founder 2026-09-23), matching the intake's checkbox grammar. */}
       <div className="cedit__omit">
-        <span className="cedit__omit-lead">
-          {aiOmit
-            ? `Held back from AI — sensitive ${aiOmit} information. You keep every detail; no assistant reads this entry.`
-            : 'Claude may help with this entry — useful when you want an intervention found, or a way through. Sensitive? Hold it back:'}
-        </span>
-        <span className="cedit__omit-btns">
-          {(['medical', 'financial'] as const).map((r) => (
-            <button key={r} type="button"
-              className={'cedit__omit-btn' + (aiOmit === r ? ' is-on' : '')}
-              aria-pressed={aiOmit === r}
-              onClick={() => setAiOmit((cur) => cur === r ? null : r)}>
-              Omit from AI — sensitive {r}
-            </button>
-          ))}
-        </span>
+        <label className="cedit__check">
+          <input type="checkbox" checked={omitAi} onChange={(e) => setOmitAi(e.target.checked)} />
+          <span>
+            Omit this content from AI
+            <em className="cedit__check-hint">No assistant reads this entry — only the humans on the care team.</em>
+          </span>
+        </label>
+        <label className="cedit__check">
+          <input type="checkbox" checked={sensitive} onChange={(e) => setSensitive(e.target.checked)} />
+          <span>
+            Mark as sensitive financial and/or medical information
+            <em className="cedit__check-hint">The entry wears the mark so everyone reading knows to hold it with care.</em>
+          </span>
+        </label>
       </div>
 
       <div className="cedit__body">
