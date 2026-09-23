@@ -1326,10 +1326,11 @@
 
 /* ── Held back from AI: per-entry, per-field (founder 2026-08-20) ───────── */
 .cpost__omit { font-style: normal; color: var(--ink-faint); }
+/* No panel behind the checkboxes (founder 2026-09-23: "get rid of the
+   beige") — plain rows on the page canvas, white inside the boxes. */
 .cedit__omit {
-  display: flex; flex-direction: column; gap: 6px;
-  margin: 0 var(--s-4) var(--s-3); padding: 10px 12px;
-  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 var(--s-4) var(--s-3);
 }
 .cedit__omit-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .cedit__omit-btn {
@@ -1337,9 +1338,20 @@
   border: 1px solid var(--bone-edge); background: var(--bone); font-size: 12px; color: var(--ink-soft);
 }
 .cedit__omit-btn.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
-/* The two checkboxes (founder 2026-09-23) — the intake's checkbox grammar. */
+/* The two checkboxes (founder 2026-09-23) — the intake's checkbox grammar,
+   custom-drawn so the box's inside is WHITE on every browser (native
+   rendering tints it), with a peach check when on. */
 .cedit__check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
-.cedit__check input { margin-top: 2px; accent-color: var(--peach); }
+.cedit__check input {
+  appearance: none; -webkit-appearance: none;
+  width: 17px; height: 17px; flex: none; margin: 1px 0 0;
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 4px;
+  cursor: pointer; display: grid; place-content: center;
+}
+.cedit__check input:checked { border-color: var(--peach); }
+.cedit__check input:checked::before {
+  content: '✓'; font-size: 12px; line-height: 1; font-weight: 700; color: var(--peach-deep);
+}
 .cedit__check-hint { display: block; font-style: normal; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
 .means__omit { display: flex; flex-wrap: wrap; gap: 6px; }
 .means__omit-chip {
