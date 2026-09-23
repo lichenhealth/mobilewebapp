@@ -1039,6 +1039,11 @@
 /* Board: overall score + dimension filter chips */
 .wow__overall { text-align: center; padding: var(--s-2) var(--s-5) 0; }
 .wow__overall-num { font-family: var(--font-display); font-size: var(--t-2xl); color: var(--peach-deep); font-variation-settings: '"opsz" 144'; }
+/* Scores are banded platform-wide on the WOW board (founder 2026-09-23):
+   90+ green · 70–89 peach · below 70 the platform red. */
+.wow__overall-num.is-high { color: var(--green-deep); }
+.wow__overall-num.is-mid { color: var(--peach-deep); }
+.wow__overall-num.is-low { color: var(--red-deep); }
 .wow__overall-lbl { display: block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 .wow__radar { display: flex; justify-content: center; padding: var(--s-2) 0; }
 .wow__chips { display: flex; gap: 6px; overflow-x: auto; padding: var(--s-2) var(--s-5); scrollbar-width: none; }
@@ -1416,13 +1421,31 @@
   display: flex; flex-direction: column; gap: 8px;
 }
 .wowsec--gray { opacity: 0.45; pointer-events: none; }
-.wowsec__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* The header row IS the drop-down (founder 2026-09-23): whole row toggles,
+   the chevron at the far right rotates open, and collapsed the card holds
+   only name + score + the + door — no preview text. */
+.wowsec__head { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.wowsec__fold {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--ink-muted);
+  /* Reaches the far right on its own when no + renders; sits beside the +
+     when it does (the + then carries the auto margin). */
+  margin-left: auto;
+}
+.wowsec__add + .wowsec__fold { margin-left: 0; }
+.wowsec__fold svg { transition: transform 0.15s ease; }
+.wowsec__head.is-open .wowsec__fold svg { transform: rotate(90deg); }
 .wowsec__name {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 14px; font-weight: 500; color: var(--ink); flex-shrink: 0;
 }
 .wowsec__score { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); }
-.wowsec__viewtog { margin-left: auto; display: inline-flex; gap: 10px; flex-shrink: 0; }
+.wowsec__score.is-high { color: var(--green-deep); }
+.wowsec__score.is-mid { color: var(--peach-deep); }
+.wowsec__score.is-low { color: var(--red-deep); }
+/* Summary | Chronological live INSIDE the open section now (founder
+   2026-09-23: they organize its content, so they show after expanding). */
+.wowsec__viewtog { display: inline-flex; gap: 10px; flex-shrink: 0; }
 .wowsec__viewtog button {
   background: none; border: 0; padding: 0; cursor: pointer;
   font-family: inherit; font-size: 12px; font-weight: 300; color: var(--ink-muted);
@@ -1432,6 +1455,7 @@
   text-decoration: underline; text-decoration-color: var(--peach); text-underline-offset: 3px;
 }
 .wowsec__add {
+  margin-left: auto;
   width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   border: 1px solid var(--bone-edge); background: var(--bone);
   color: var(--peach-deep); font-size: 16px; line-height: 1; cursor: pointer;

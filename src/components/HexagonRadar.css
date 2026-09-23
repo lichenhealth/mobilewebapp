@@ -38,5 +38,11 @@
   white-space: nowrap;
 }
 
+/* The scores carry the reading now — banded (founder 2026-09-23):
+   90+ green · 70–89 peach · below 70 the platform red. */
+.hex-radar__label.is-high { color: var(--green-deep); }
+.hex-radar__label.is-mid { color: var(--peach-deep); }
+.hex-radar__label.is-low { color: var(--red-deep); }
+
 /* No-data dimension: muted "—" instead of a 0% */
 .hex-radar__label--empty { color: var(--ink-faint); opacity: 0.7; }

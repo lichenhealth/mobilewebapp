@@ -1,4 +1,5 @@
 import { Icon, IconName } from './Icon';
+import { wowScoreBand } from '../lib/conciergeApi';
 import './HexagonRadar.css';
 
 export interface RadarAxis {
@@ -12,10 +13,12 @@ interface Props {
   size?: number;
 }
 
-/** Flat-top hexagonal "web": six triangular wedges (one per dimension). A
- *  dimension with a score fills its wedge transparent-orange from the center out
- *  to the score level; empty dimensions stay unfilled and show "—". Icons + %
- *  sit outside each wedge's outer edge. */
+/** Flat-top hexagonal "web": the bare grid, with each dimension's SCORE doing
+ *  the talking (founder 2026-09-23: "get rid of the beige fill in for the
+ *  quadrants and just have the scores" — the wedge fills are retired). Score
+ *  labels wear their band's colour: 90+ green, 70–89 peach, below 70 the
+ *  platform red; empty dimensions show a muted "—". Icons + % sit outside
+ *  each wedge's outer edge. */
 export default function HexagonRadar({ axes, size = 220 }: Props) {
   if (axes.length !== 6) console.warn('HexagonRadar expects exactly 6 axes');
   const cx = size / 2;
@@ -36,17 +39,6 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
   // Concentric hexagon rings (25/50/75/100).
   const rings = [0.25, 0.5, 0.75, 1].map((s) => vertAngles.map((a) => pt(a, r * s)));
 
-  // Wedge for dimension i is bounded by corners vertAngles[i] and vertAngles[i-1];
-  // fill a triangle from the center out to the score level.
-  const wedgePath = (i: number): string | null => {
-    const v = axes[i]?.value;
-    if (v == null || v <= 0) return null;
-    const s = v / 100;
-    const a = pt(vertAngles[(i + 5) % 6], r * s);
-    const b = pt(vertAngles[i], r * s);
-    return `M ${cx} ${cy} L ${a[0].toFixed(1)} ${a[1].toFixed(1)} L ${b[0].toFixed(1)} ${b[1].toFixed(1)} Z`;
-  };
-
   // Icons centered on each wedge's outer edge (the edge midpoint = cos30·r);
   // % labels sit just beyond, outside the hexagon.
   const edgeMid = Math.cos(Math.PI / 6); // ≈ 0.866
@@ -56,11 +48,6 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
   return (
     <div className="hex-radar" style={{ width: size, height: size }} role="img" aria-label="Web of Wellbeing">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="hex-radar__svg" overflow="visible">
-        {/* Per-dimension wedge fills, to the score level */}
-        {axes.map((_, i) => {
-          const d = wedgePath(i);
-          return d ? <path key={`w-${i}`} d={d} fill="var(--peach)" fillOpacity={0.5} /> : null;
-        })}
         {/* Concentric grid rings */}
         {rings.map((ring, i) => (
           <path key={`r-${i}`} d={toPath(ring)} fill="none" stroke="var(--ink)" strokeWidth="0.6" opacity={i === 3 ? 0.32 : 0.2} />
@@ -78,13 +65,14 @@ export default function HexagonRadar({ axes, size = 220 }: Props) {
         </div>
       ))}
 
-      {/* % labels just beyond the icons ("—" when the dimension has no entries) */}
+      {/* % labels just beyond the icons, wearing their band's colour
+          ("—" when the dimension has no entries) */}
       {labelPts.map(([x, y], i) => {
         const v = axes[i]?.value;
         return (
           <div
             key={`label-${i}`}
-            className={'hex-radar__label' + (v == null ? ' hex-radar__label--empty' : '')}
+            className={'hex-radar__label' + (v == null ? ' hex-radar__label--empty' : ` is-${wowScoreBand(v)}`)}
             style={{ left: x, top: y }}
           >
             {v == null ? '—' : `${v}%`}

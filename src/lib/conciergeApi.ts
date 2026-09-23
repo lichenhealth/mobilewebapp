@@ -13,6 +13,11 @@ export const DIMENSION_META: Record<Dimension, IconName> = {
   Spiritual: 'merkaba', Economic: 'dollar', Environmental: 'globe',
 };
 
+/** The one banding rule for every WOW score the board shows (founder
+ *  2026-09-23): 90+ green, 70–89 peach, below 70 the platform red. */
+export type WowBand = 'high' | 'mid' | 'low';
+export const wowScoreBand = (v: number): WowBand => (v >= 90 ? 'high' : v >= 70 ? 'mid' : 'low');
+
 export type CareKind = 'wow' | 'koc';
 export type MediaKind = 'photo' | 'video' | 'audio';
 export interface CareAttachment { type: MediaKind; path: string }

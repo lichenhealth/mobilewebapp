@@ -12,7 +12,7 @@ import {
   type MediaType, type Attachment,
 } from '../lib/chatApi';
 import {
-  loadCarePosts, loadCarePost, computeWowLenses, type WowLens, wowAxes, signCareMedia, deleteCarePost,
+  loadCarePosts, loadCarePost, computeWowLenses, type WowLens, wowAxes, wowScoreBand, signCareMedia, deleteCarePost,
   createCarePost, DIMENSION_META,
   getCareSettings, setWowWindowAuto, tuneWowWindow, WOW_WINDOW_DEFAULT, type CareSettings,
   WOW_DIMENSIONS, mondayOfWeek, todayISO, weekDays, formatWeekRange, localDate, toISO,
@@ -1108,6 +1108,9 @@ export default function Concierge() {
   // THE SECTIONED BOARD (founder 2026-09-21): Overall + the six threads,
   // each a summary with its own + door — per-section view choice lives here.
   const [wowView, setWowView] = useState<Record<string, 'summary' | 'chron'>>({});
+  // Each board section is a DROP-DOWN, closed until opened (founder
+  // 2026-09-23) — the collapsed card is just name + score.
+  const [wowOpen, setWowOpen] = useState<Set<string>>(new Set());
   // THREE WOW ANGLES (founder 2026-09-21): Self / Care team / Self + Care
   // team, toggled from the list at the web's upper left. Combo is the
   // default — with no care team it reads identically to Self.
@@ -1509,7 +1512,9 @@ export default function Concierge() {
                   <div className="wow__webcenter">
                     {!gated && (
                       <div className="wow__overall">
-                        <span className="wow__overall-num">{scores.overall != null ? `${scores.overall}%` : '—'}</span>
+                        <span className={'wow__overall-num' + (scores.overall != null ? ` is-${wowScoreBand(scores.overall)}` : '')}>
+                          {scores.overall != null ? `${scores.overall}%` : '—'}
+                        </span>
                         <span className="wow__overall-lbl">Overall wellbeing</span>
                       </div>
                     )}
@@ -1606,49 +1611,84 @@ export default function Concierge() {
               const posts = postsFor(s);
               const score = isOverall ? scores.overall : scores.byDimension[s as Dimension];
               const view = wowView[s] ?? 'summary';
+              const open = wowOpen.has(s);
               const digest = wowDigest(posts, wowWindow);
               return (
                 <section key={s} className={'wowsec' + (gated ? ' wowsec--gray' : '')}>
-                  <header className="wowsec__head">
+                  {/* Each section is a DROP-DOWN (founder 2026-09-23: "no way
+                      to click in to each section... get rid of the preview
+                      text... a drop down to the far right"): the header row
+                      toggles, the chevron at the far right says so, and the
+                      collapsed card is just name + score + the + door. */}
+                  <header
+                    className={'wowsec__head' + (open ? ' is-open' : '')}
+                    role="button" aria-expanded={open} tabIndex={gated ? -1 : 0}
+                    onClick={() => {
+                      if (gated) return;
+                      setWowOpen((cur) => {
+                        const n = new Set(cur);
+                        if (n.has(s)) n.delete(s); else n.add(s);
+                        return n;
+                      });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click(); }
+                    }}
+                  >
                     <span className="wowsec__name">
                       {!isOverall && <Icon name={DIMENSION_META[s as Dimension]} size={15} />}
                       {s}
                     </span>
-                    {!gated && score != null && <span className="wowsec__score">{score}%</span>}
-                    <span className="wowsec__viewtog">
-                      <button className={view === 'summary' ? 'is-on' : ''}
-                        onClick={() => setWowView((v) => ({ ...v, [s]: 'summary' }))}>Summary</button>
-                      <button className={view === 'chron' ? 'is-on' : ''}
-                        onClick={() => setWowView((v) => ({ ...v, [s]: 'chron' }))}>Chronological</button>
-                    </span>
+                    {!gated && score != null && (
+                      <span className={`wowsec__score is-${wowScoreBand(score)}`}>{score}%</span>
+                    )}
                     {canAuthor && (
                       <button className="wowsec__add" disabled={gated}
-                        onClick={() => navigate(`${basePath}/wow/edit?dim=${isOverall ? 'overall' : s}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`${basePath}/wow/edit?dim=${isOverall ? 'overall' : s}`);
+                        }}
                         aria-label={`Add an entry to ${s}`}>
                         +
                       </button>
                     )}
+                    <span className="wowsec__fold" aria-hidden>
+                      <Icon name="chevron-right" size={13} />
+                    </span>
                   </header>
-                  {view === 'summary' ? (
-                    posts.length === 0
-                      ? <p className="wowsec__empty">Nothing woven here yet.</p>
-                      : digest.map((p) => (
-                        <p className="wowsec__line" key={p.id}>
-                          {p.body.trim() ? (p.body.length > 220 ? p.body.slice(0, 220) + '…' : p.body) : 'A score, without words'}
-                          <span className="wowsec__meta">
-                            {' — '}{p.author?.full_name ?? 'Care team'}, {formatRelative(p.created_at)}
-                            {p.score != null && <> · {p.score}%</>}
-                          </span>
-                        </p>
-                      ))
-                  ) : (
-                    posts.length === 0
-                      ? <p className="wowsec__empty">Nothing woven here yet.</p>
-                      : posts.map((p) => (
-                        <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
-                          canDelete={canAuthor && p.author_id === me} onDelete={removePost}
-                          onAsk={p.author_id !== me ? askEntry : undefined} />
-                      ))
+                  {open && !gated && (
+                    <>
+                      {/* Summary | Chronological organize the OPEN section's
+                          content — links you see AFTER expanding (founder
+                          2026-09-23). */}
+                      <span className="wowsec__viewtog">
+                        <button className={view === 'summary' ? 'is-on' : ''}
+                          onClick={() => setWowView((v) => ({ ...v, [s]: 'summary' }))}>Summary</button>
+                        <button className={view === 'chron' ? 'is-on' : ''}
+                          onClick={() => setWowView((v) => ({ ...v, [s]: 'chron' }))}>Chronological</button>
+                      </span>
+                      {view === 'summary' ? (
+                        posts.length === 0
+                          ? <p className="wowsec__empty">Nothing woven here yet.</p>
+                          : digest.map((p) => (
+                            <p className="wowsec__line" key={p.id}>
+                              {p.body.trim() ? (p.body.length > 220 ? p.body.slice(0, 220) + '…' : p.body) : 'A score, without words'}
+                              <span className="wowsec__meta">
+                                {' — '}{p.author?.full_name ?? 'Care team'}, {formatRelative(p.created_at)}
+                                {p.score != null && <> · {p.score}%</>}
+                              </span>
+                            </p>
+                          ))
+                      ) : (
+                        posts.length === 0
+                          ? <p className="wowsec__empty">Nothing woven here yet.</p>
+                          : posts.map((p) => (
+                            <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls}
+                              canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                              onAsk={p.author_id !== me ? askEntry : undefined} />
+                          ))
+                      )}
+                    </>
                   )}
                 </section>
               );

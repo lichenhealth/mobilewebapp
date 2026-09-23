@@ -29,6 +29,10 @@
   --green-deep:  #7CA13A;
   --green-tint:  #EDF3DF;
 
+  --red:         #C0563E;     /* needs-attention — a terracotta that sits with peach & green (WOW scores below 70) */
+  --red-deep:    #A3462F;
+  --red-tint:    #F8E7E1;
+
   --blue:        #7FA8C9;     /* stewardship / admin — the elements blue; peach = life, blue = tending the structure */
   --blue-deep:   #5E89AD;
   --blue-tint:   #EAF1F7;
