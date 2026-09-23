@@ -136,6 +136,12 @@ export default function Compose() {
   // An edit (?post=) overwrites these when the post loads.
   const [title, setTitle] = useState(() => params.get('title') ?? '');
   const [body, setBody] = useState(() => params.get('body') ?? '');
+  // ?popup=1 — this composer is a POP-UP flow over another screen (the WOW
+  // intake's weave doors, founder 2026-09-23): publishing closes the window
+  // so the member lands back on the form underneath. If the browser refuses
+  // the close (e.g. the door fell back to plain navigation), the ordinary
+  // after-post landing still runs.
+  const isPopup = params.get('popup') === '1';
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
   // Where it happens (founder 2026-07-27): Online and In person are
@@ -745,6 +751,7 @@ export default function Compose() {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
         throw postErr;
       }
+      if (isPopup) window.close();
       navigate(afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
@@ -761,6 +768,8 @@ export default function Compose() {
       <button
         className="cmp__back"
         onClick={() => {
+          // In a pop-up flow, Back means "never mind" — close the window.
+          if (isPopup) { window.close(); return; }
           if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
           else navigate(afterPostDestination(isEvent));
         }}

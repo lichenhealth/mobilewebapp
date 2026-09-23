@@ -86,14 +86,24 @@ interface DimAnswers {
 
 const blankDim = (): DimAnswers => ({ where: '', extra: '', inner: '', outer: '', asked: '', give: '', score: null, omit: false });
 
-// The Economic mirror questions, all visible — the member checks the one
-// they're answering (founder 2026-09-22; the "earning more" clause
-// generalized the same day: assets and livelihood are more than money; the
-// BALANCED third option added the same day — a healthy relationship with
-// money is a real answer, not a missing one).
-const Q_LITTLE = 'If you do not have what you need — what’s keeping you from procuring adequate resources to support your livelihood, sustainably?';
-const Q_MUCH = 'If you’re holding on to more than you need — what’s keeping you from re-allocating it?';
-const Q_BALANCED = 'If you’re maintaining a healthy balance of resourcing yourselves and contributing to the rebalancing of the collective — what keeps you in that balance?';
+// The Economic RELATIONSHIP statements — selected FIRST, at the top of the
+// step (founder 2026-09-23: "Let's allow you to select first", title "What
+// is your current relationship with money and resources", all three
+// re-written as declarations in her words). The chosen statement is written
+// into the finished entry; the checked one decides which optional door
+// leads. Order is hers: needs unmet · balanced · holding more.
+const Q_LITTLE = 'I am not getting my needs met. I struggle to earn sufficient money, and/or procure adequate resources to support myself and those who rely on me.';
+const Q_BALANCED = 'I maintain a healthy balance of resourcing myself and contributing to the rebalancing of the collective.';
+const Q_MUCH = 'I hold on to more resource and financial abundance than I need to live a rich and fulfilling life. I struggle to release value back into the collective where it is needed.';
+// An entry woven under an older phrasing (the retired mirror QUESTIONS)
+// maps onto today's statement by its distinctive words, so the selector
+// lights the right chip and a re-save upgrades the stored line quietly.
+const normalizeAsked = (asked: string): string => {
+  if (!asked || asked === Q_LITTLE || asked === Q_BALANCED || asked === Q_MUCH) return asked;
+  if (asked.includes('healthy balance')) return Q_BALANCED;
+  if (asked.includes('hold on to more') || asked.includes('re-allocat')) return Q_MUCH;
+  return Q_LITTLE;
+};
 
 /** The two-layer prompts, tuned per dimension so nothing reads generic —
  *  every dimension carries its OWN Inner and Outer label (founder
@@ -141,10 +151,13 @@ const PROMPTS: Record<Dimension, {
     outer: 'housing, noise, access to nature',
   },
   Economic: {
+    // Economic runs its own shape: the relationship-statement selector
+    // leads, then this, then ONE long-form in-the-way field — so `way`,
+    // `inner` and `outer` never render for it (founder 2026-09-23).
     where: 'What are your thoughts and feelings around money right now?',
-    way: '', // Economic asks its own adaptive question below.
-    inner: 'beliefs and feelings about money and worth',
-    outer: 'hours, childcare, credentials, the market',
+    way: '',
+    inner: '',
+    outer: '',
   },
 };
 
@@ -160,6 +173,11 @@ const DIAG_TAG = 'Diagnostics & diagnoses: ';
 const ASKED_TAG = 'Asked: ';
 const INNER_TAG = 'In the way — inner (beliefs, feelings): ';
 const OUTER_TAG = 'In the way — outer (the world): ';
+// Economic's in-the-way answer is ONE long-form field now (founder
+// 2026-09-23: "What is in the way should be long form") — composed under
+// this general tag; legacy Economic entries with INNER/OUTER sections
+// hydrate merged into it (see the hydration effect).
+const WAY_TAG = 'In the way: ';
 const GIVE_TAG = 'Giving back: ';
 const decomposeBody = (body: string): { where: string; extra: string; inner: string; outer: string; asked: string; give: string } => {
   let where = body; let extra = ''; let inner = ''; let outer = ''; let asked = ''; let give = '';
@@ -169,6 +187,10 @@ const decomposeBody = (body: string): { where: string; extra: string; inner: str
   if (oi >= 0) { outer = where.slice(oi + OUTER_TAG.length).trim(); where = where.slice(0, oi); }
   const ii = where.indexOf(INNER_TAG);
   if (ii >= 0) { inner = where.slice(ii + INNER_TAG.length).trim(); where = where.slice(0, ii); }
+  // The general long-form tag (Economic) lands in the same `inner` slot —
+  // an entry carries either the inner/outer pair or this, never both.
+  const wi = where.indexOf(WAY_TAG);
+  if (wi >= 0) { inner = where.slice(wi + WAY_TAG.length).trim(); where = where.slice(0, wi); }
   const ai = where.indexOf(ASKED_TAG);
   if (ai >= 0) { asked = where.slice(ai + ASKED_TAG.length).trim(); where = where.slice(0, ai); }
   const di = where.indexOf(DIAG_TAG);
@@ -197,10 +219,12 @@ export default function WowIntake() {
   const [saved, setSaved] = useState<Partial<Record<Dimension, { id: string; base: DimAnswers }>>>({});
   // Saved dims currently unlocked for editing (click an answer or the Edit CTA).
   const [editing, setEditing] = useState<Set<Dimension>>(new Set());
-  // The Economic step's TRAILING optional door (the one the checked question
-  // says you likely won't use) rolls up into a drop-down (founder 2026-09-23:
-  // "should it smart roll this up as a drop down I likely won't use?").
-  const [optOpen, setOptOpen] = useState(false);
+  // BOTH of the Economic step's optional sections are drop-downs now
+  // (founder 2026-09-23: "have both the giving to the platform and the
+  // receiving subsidies be drop downs" — and the header row stays put when
+  // open, so a section can be closed back up).
+  const [giveOpen, setGiveOpen] = useState(false);
+  const [subsidyOpen, setSubsidyOpen] = useState(false);
   // The OPEN assessment these answers belong to (founder 2026-09-22:
   // editable until submitted, one entry — one score — per dimension per
   // assessment; Finish stamps it and the next visit starts a new one).
@@ -285,6 +309,18 @@ export default function WowIntake() {
         const e = wovenMap[d]?.[0];
         if (!e) continue;
         const base: DimAnswers = { ...decomposeBody(e.body), score: e.score, omit: !!e.ai_omit };
+        if (d === 'Economic') {
+          // The in-the-way answer is one long-form field now: a legacy
+          // entry's inner/outer sections hydrate merged so no words hide
+          // behind a field the screen no longer shows, and an old mirror
+          // QUESTION reads back as today's statement. The stored entry is
+          // untouched until the member actually re-saves.
+          if (base.outer.trim()) {
+            base.inner = [base.inner.trim(), base.outer.trim()].filter(Boolean).join('\n\n');
+            base.outer = '';
+          }
+          base.asked = normalizeAsked(base.asked);
+        }
         sv[d] = { id: e.id, base };
         nextDims[d] = { ...base };
       }
@@ -422,44 +458,48 @@ export default function WowIntake() {
 
   /** Compose one honest entry from the two layers — labeled sections, prose
    *  in the feed, nothing invented. */
-  const composeBody = (a: DimAnswers): string => {
+  const composeBody = (a: DimAnswers, d: Dimension): string => {
     const parts: string[] = [];
     if (a.where.trim()) parts.push(a.where.trim());
     if (a.extra.trim()) parts.push(`${DIAG_TAG}${a.extra.trim()}`);
-    // The finished assessment shows WHICH mirror question was answered.
+    // The finished assessment shows WHICH relationship statement was checked.
     if (a.asked) parts.push(`${ASKED_TAG}${a.asked}`);
-    if (a.inner.trim()) parts.push(`${INNER_TAG}${a.inner.trim()}`);
-    if (a.outer.trim()) parts.push(`${OUTER_TAG}${a.outer.trim()}`);
+    if (d === 'Economic') {
+      // One long-form in-the-way answer under the general tag; hydration
+      // already folded any legacy outer section into it.
+      if (a.inner.trim()) parts.push(`${WAY_TAG}${a.inner.trim()}`);
+    } else {
+      if (a.inner.trim()) parts.push(`${INNER_TAG}${a.inner.trim()}`);
+      if (a.outer.trim()) parts.push(`${OUTER_TAG}${a.outer.trim()}`);
+    }
     if (a.give.trim()) parts.push(`${GIVE_TAG}${a.give.trim()}`);
     return parts.join('\n\n');
   };
 
   const dimHasContent = (d: Dimension) => {
     const a = dims[d];
-    return !!(a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.give.trim() || a.score != null);
+    // A checked relationship statement is a real answer on its own.
+    return !!(a.where.trim() || a.extra.trim() || a.inner.trim() || a.outer.trim() || a.give.trim() || a.asked || a.score != null);
   };
 
   async function saveDim(d: Dimension): Promise<void> {
-    let a = dims[d];
-    // The finished assessment records which mirror question was answered —
-    // nobody's ever asked to pick before weaving, the auto frame stands in.
-    if (d === 'Economic' && !a.asked && dimHasContent(d)) {
-      a = { ...a, asked: econAsked };
-      setDims((cur) => ({ ...cur, [d]: a }));
-    }
+    const a = dims[d];
+    // The Asked: line records only a statement the member CHECKED — an
+    // unpicked selector writes nothing (a first-person statement is theirs
+    // to declare, never presumed on their behalf).
     const sv = saved[d];
     const aiOmit = a.omit ? (d === 'Economic' ? 'financial' as const : 'other' as const) : null;
     if (sv) {
       // Editing a saved answer updates the SAME entry — never a duplicate.
       if (sameAnswers(a, sv.base)) return;
-      await updateWowCarePost(sv.id, { body: composeBody(a), score: a.score, aiOmit });
+      await updateWowCarePost(sv.id, { body: composeBody(a, d), score: a.score, aiOmit });
       setSaved((cur) => ({ ...cur, [d]: { id: sv.id, base: { ...a } } }));
     } else {
       if (!dimHasContent(d)) return;
       const aid = assessmentRef.current ?? await ensureOpenAssessment(me);
       assessmentRef.current = aid;
       const id = await createCarePost(me, {
-        patientId: me, kind: 'wow', body: composeBody(a),
+        patientId: me, kind: 'wow', body: composeBody(a, d),
         dimensions: [d], score: a.score ?? undefined,
         attachments: [], links: [], previews: [],
         aiOmit, assessmentId: aid,
@@ -538,17 +578,21 @@ export default function WowIntake() {
 
   const margin = (money(income) ?? 0) - (money(expenses) ?? 0);
   const haveNumbers = money(income) != null && money(expenses) != null;
-  // The check-marked question wins; before anyone picks, their own margin
-  // suggests the default — nobody is told which they are, always flippable.
+  // The checked statement is EMPTY until the member picks. The retired
+  // mirror QUESTIONS took an auto-default from the margin; a first-person
+  // STATEMENT is theirs to declare, never pre-checked for them — the
+  // heuristic only steers which optional door leads below.
+  const econAsked = dims.Economic.asked;
   const autoQ = haveNumbers && margin > 300 && (money(assets) ?? 0) >= (money(debt) ?? 0) ? Q_MUCH : Q_LITTLE;
-  const econAsked = dims.Economic.asked || autoQ;
-  // Matched by each question's distinctive words, not exact text, so an
-  // entry woven under an older phrasing keeps its frame if the copy shifts
-  // again. Balanced is self-declared only — the margin heuristic never
-  // presumes someone's relationship with money is settled.
-  const econFrame: 'little' | 'much' | 'balanced' = econAsked.includes('healthy balance')
+  // Matched by each statement's distinctive words, not exact text, so an
+  // entry woven under an older phrasing keeps its frame when copy shifts
+  // ('re-allocat' covers the retired too-much QUESTION). Balanced is
+  // self-declared only — the margin heuristic never presumes someone's
+  // relationship with money is settled.
+  const econFrameOf = (econAsked || autoQ);
+  const econFrame: 'little' | 'much' | 'balanced' = econFrameOf.includes('healthy balance')
     ? 'balanced'
-    : econAsked.includes('re-allocat') ? 'much' : 'little';
+    : (econFrameOf.includes('hold on to more') || econFrameOf.includes('re-allocat')) ? 'much' : 'little';
 
   // The assessment's overall reading so far — the average of its saved
   // scores (one per dimension, structurally), shown above the steps.
@@ -701,6 +745,30 @@ export default function WowIntake() {
               </p>
             )}
 
+            {/* Economic selects FIRST (founder 2026-09-23: "Let's allow you
+                to select first") — the statement checked here frames the
+                rest of the step. Locked, only the chosen statement shows. */}
+            {d === 'Economic' && (!lock || econAsked) && (
+              <div className={'wintake__mqs' + (lock ? ' wintake__mqs--saved' : '')}>
+                <p className="wintake__waylead">
+                  What is your current relationship with money and resources?
+                </p>
+                {(lock ? [econAsked] : [Q_LITTLE, Q_BALANCED, Q_MUCH]).map((q) => (
+                  <label
+                    className={'wintake__mq' + (econAsked === q ? ' is-on' : '')}
+                    key={q}
+                    onClick={lock ? unlock : undefined}
+                  >
+                    <input
+                      type="checkbox" checked={econAsked === q} disabled={lock}
+                      onChange={() => setDim(d, { asked: q })}
+                    />
+                    <span>{q}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
             <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
               <span>{PROMPTS[d].where}</span>
               <textarea
@@ -722,144 +790,163 @@ export default function WowIntake() {
             )}
 
             {d === 'Economic' ? (
-              lock ? (
-                <p className="wintake__waylead">{econAsked}</p>
-              ) : (
-                <div className="wintake__mqs">
-                  <p className="wintake__waylead">
-                    What&rsquo;s in the way of a healthier relationship to
-                    money and resource allocation?
-                  </p>
-                  {[Q_LITTLE, Q_MUCH, Q_BALANCED].map((q) => (
-                    <label className={'wintake__mq' + (econAsked === q ? ' is-on' : '')} key={q}>
-                      <input
-                        type="checkbox" checked={econAsked === q}
-                        onChange={() => setDim(d, { asked: q })}
-                      />
-                      <span>{q}</span>
-                    </label>
-                  ))}
-                </div>
-              )
-            ) : (
-              <p className="wintake__waylead">What&rsquo;s in the way of {PROMPTS[d].way}?</p>
-            )}
-            <div className="wintake__way">
-              <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
-                <span>Inner — {PROMPTS[d].inner}</span>
+              /* In-the-way follows the selection it relates to, LONG FORM
+                 (founder 2026-09-23: "'What is in the way...' makes more
+                 sense, as it will be related to what you selected" + "What
+                 is in the way should be long form") — one field, no
+                 inner/outer split here. */
+              <label className={'wintake__q wintake__q--long' + (lock ? ' wintake__q--saved' : '')}>
+                <span>
+                  What&rsquo;s in the way of a healthier relationship to
+                  money and resource allocation?
+                </span>
                 <textarea
                   value={a.inner} readOnly={lock} onFocus={unlock}
                   onChange={(e) => setDim(d, { inner: e.target.value })}
-                  placeholder={d === 'Economic' ? '“I’m bad with money”, “asking is shameful”…' : 'What you tell yourself…'}
+                  placeholder="Take your time — beliefs, feelings, real-world obstacles, whatever stands in the way…"
                 />
               </label>
-              <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
-                <span>Outer — {PROMPTS[d].outer}</span>
-                <textarea
-                  value={a.outer} readOnly={lock} onFocus={unlock}
-                  onChange={(e) => setDim(d, { outer: e.target.value })}
-                  placeholder={d === 'Economic' ? 'Hours, childcare, credentials, a market that won’t pay…' : 'Time, money, distance, access…'}
-                />
-              </label>
-            </div>
-
-            {d === 'Economic' && (() => {
-              // Two OPTIONAL doors, the relevant one first per the checked
-              // question (founder 2026-09-22): tighter-than-you-need leads
-              // with receiving subsidies, more-than-you-need with giving back.
-              const subsidyBlock = (
-                <div className="wintake__money" key="subsidy">
-                  <p className="wintake__optlead">Optional — if you&rsquo;d like to receive subsidies on the platform, fill this out.</p>
-                  <p className="wintake__moneylead">
-                    These numbers are what the subsidy formula reads. Your care
-                    team can see them; providers never do, and no AI reads any
-                    line you hold back on your{' '}
-                    <a href="/concierge/financial">financial profile</a>.
-                  </p>
-                  <div className="wintake__moneygrid">
-                    <label>Monthly income
-                      <input inputMode="decimal" value={income}
-                        onChange={(e) => setIncome(e.target.value)} placeholder="$" />
-                    </label>
-                    <label>Monthly expenses
-                      <input inputMode="decimal" value={expenses}
-                        onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
-                    </label>
-                    <label>Assets
-                      <input inputMode="decimal" value={assets}
-                        onChange={(e) => setAssets(e.target.value)} placeholder="$ — savings, home, vehicles" />
-                    </label>
-                    <label>Debts
-                      <input inputMode="decimal" value={debt}
-                        onChange={(e) => setDebt(e.target.value)} placeholder="$ — loans, cards, medical" />
-                    </label>
-                    <label>People in your household
-                      <input inputMode="numeric" value={household}
-                        onChange={(e) => setHousehold(e.target.value)} placeholder="including you" />
-                    </label>
-                  </div>
-                </div>
-              );
-              // The offer WEAVES into the network through existing doors
-              // (founder 2026-09-23: "woven into our current-cy as
-              // contribution to the network, and... into marketplace"):
-              // a gift listing, a Lichen*-entrusted offering the Routing
-              // Desk allocates, or dollars that mint Current via Donate.
-              // Current never moves on the intake's own word — the doors
-              // open the flows that already carry the consent steps.
-              const goWeave = (path: string) => { writeDraft(); navigate(path); };
-              const giveBlock = (
-                <div className="wintake__money" key="give">
-                  <p className="wintake__optlead">Optional — if you&rsquo;d like to give back on the platform.</p>
+            ) : (
+              <>
+                <p className="wintake__waylead">What&rsquo;s in the way of {PROMPTS[d].way}?</p>
+                <div className="wintake__way">
                   <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
-                    <span>
-                      Your assets are defined many ways — money, goods,
-                      services, skills, time. What would you like to offer
-                      the collective?
-                    </span>
+                    <span>Inner — {PROMPTS[d].inner}</span>
                     <textarea
-                      value={a.give} readOnly={lock} onFocus={unlock}
-                      onChange={(e) => setDim(d, { give: e.target.value })}
-                      placeholder="A service you’d volunteer, goods you’d gift, time, skills…"
+                      value={a.inner} readOnly={lock} onFocus={unlock}
+                      onChange={(e) => setDim(d, { inner: e.target.value })}
+                      placeholder="What you tell yourself…"
                     />
                   </label>
-                  {a.give.trim() ? (
-                    <div className="wintake__givedoors">
-                      <p className="wintake__moneylead">Weave it into the network — your words carry over:</p>
-                      <button type="button" className="wintake__givedoor link-cue"
-                        onClick={() => goWeave('/compose?area=marketplace&body=' + encodeURIComponent(a.give.trim()))}>
-                        Gift it in the Marketplace
-                      </button>
-                      <button type="button" className="wintake__givedoor link-cue"
-                        onClick={() => goWeave('/compose?area=marketplace&entrust=1&body=' + encodeURIComponent(a.give.trim()))}>
-                        Entrust it to Lichen to route where it&rsquo;s most needed
-                      </button>
-                      <button type="button" className="wintake__givedoor link-cue"
-                        onClick={() => goWeave('/donate')}>
-                        Give dollars — they become Current flowing in the network
-                      </button>
+                  <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
+                    <span>Outer — {PROMPTS[d].outer}</span>
+                    <textarea
+                      value={a.outer} readOnly={lock} onFocus={unlock}
+                      onChange={(e) => setDim(d, { outer: e.target.value })}
+                      placeholder="Time, money, distance, access…"
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+
+            {d === 'Economic' && (() => {
+              // Two OPTIONAL sections, BOTH drop-downs whose header row
+              // stays put so an open one closes back up (founder
+              // 2026-09-23); the relevant one still leads per the checked
+              // statement — tighter-than-you-need leads with receiving
+              // subsidies, more-than-you-need with giving back.
+              //
+              // The weave doors open POP-UP flows (founder 2026-09-23: "a
+              // pop up marketplace and a pop up donations page") — the
+              // form stays right here underneath, so finishing the gift or
+              // the donation lands the member back on it by construction.
+              // Current never moves on the intake's own word — the pop-ups
+              // are the flows that already carry the consent steps. The
+              // draft flushes first in case the browser refuses the popup
+              // and we fall back to plain navigation.
+              const goPopup = (path: string) => {
+                writeDraft();
+                const w = window.open(path, 'lichen-weave', 'popup=yes,width=560,height=800');
+                if (!w) navigate(path);
+              };
+              const subsidySec = (
+                <div className="wintake__optsec" key="subsidy">
+                  <button
+                    type="button"
+                    className={'wintake__optfold' + (subsidyOpen ? ' is-open' : '')}
+                    aria-expanded={subsidyOpen}
+                    onClick={() => setSubsidyOpen((v) => !v)}
+                  >
+                    <span>Optional — if you&rsquo;d like to receive subsidies on the platform</span>
+                    <Icon name="chevron-right" size={13} />
+                  </button>
+                  {subsidyOpen && (
+                    <div className="wintake__money">
+                      <p className="wintake__moneylead">
+                        These numbers are what the subsidy formula reads. Your care
+                        team can see them; providers never do, and no AI reads any
+                        line you hold back on your{' '}
+                        <a href="/concierge/financial">financial profile</a>.
+                      </p>
+                      <div className="wintake__moneygrid">
+                        <label>Monthly income
+                          <input inputMode="decimal" value={income}
+                            onChange={(e) => setIncome(e.target.value)} placeholder="$" />
+                        </label>
+                        <label>Monthly expenses
+                          <input inputMode="decimal" value={expenses}
+                            onChange={(e) => setExpenses(e.target.value)} placeholder="$" />
+                        </label>
+                        <label>Assets
+                          <input inputMode="decimal" value={assets}
+                            onChange={(e) => setAssets(e.target.value)} placeholder="$ — savings, home, vehicles" />
+                        </label>
+                        <label>Debts
+                          <input inputMode="decimal" value={debt}
+                            onChange={(e) => setDebt(e.target.value)} placeholder="$ — loans, cards, medical" />
+                        </label>
+                        <label>People in your household
+                          <input inputMode="numeric" value={household}
+                            onChange={(e) => setHousehold(e.target.value)} placeholder="including you" />
+                        </label>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="wintake__moneylead">
-                      Name something and doors open to weave it in — a gift
-                      listing in the Marketplace, an offering entrusted to
-                      Lichen, or dollars that become Current in the network.
-                    </p>
                   )}
                 </div>
               );
-              // Holding more than needed, or in balance and contributing —
-              // the give-back door leads; tighter than needed, subsidies do.
-              // The TRAILING section rolls up into a drop-down until opened.
-              const fold = (label: string, block: JSX.Element) => (optOpen ? block : (
-                <button type="button" className="wintake__optfold" key={'fold:' + label} onClick={() => setOptOpen(true)}>
-                  <span>{label}</span>
-                  <Icon name="chevron-right" size={13} />
-                </button>
-              ));
+              const giveSec = (
+                <div className="wintake__optsec" key="give">
+                  <button
+                    type="button"
+                    className={'wintake__optfold' + (giveOpen ? ' is-open' : '')}
+                    aria-expanded={giveOpen}
+                    onClick={() => setGiveOpen((v) => !v)}
+                  >
+                    <span>Optional — if you&rsquo;d like to give back on the platform</span>
+                    <Icon name="chevron-right" size={13} />
+                  </button>
+                  {giveOpen && (
+                    <div className="wintake__money">
+                      <label className={'wintake__q' + (lock ? ' wintake__q--saved' : '')}>
+                        <span>
+                          Your assets are defined many ways — money, goods,
+                          services, skills, time. What would you like to offer
+                          the collective?
+                        </span>
+                        <textarea
+                          value={a.give} readOnly={lock} onFocus={unlock}
+                          onChange={(e) => setDim(d, { give: e.target.value })}
+                          placeholder="A service you’d volunteer, goods you’d gift, time, skills…"
+                        />
+                      </label>
+                      <p className="wintake__moneylead">
+                        Weave it into the network{a.give.trim() ? ' — your words carry over:' : ':'}
+                      </p>
+                      <div className="wintake__givecols">
+                        <button
+                          type="button" className="wintake__givecol"
+                          onClick={() => goPopup('/compose?area=marketplace&popup=1'
+                            + (a.give.trim() ? '&body=' + encodeURIComponent(a.give.trim()) : ''))}
+                        >
+                          Gift time, expertise, goods and services to the
+                          network via Marketplace
+                        </button>
+                        <button
+                          type="button" className="wintake__givecol"
+                          onClick={() => goPopup('/donate?popup=1')}
+                        >
+                          Give dollars that translate into real goods and
+                          services distributed to those in need on the network
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
               return econFrame === 'little'
-                ? <>{subsidyBlock}{fold('Optional — if you’d like to give back on the platform', giveBlock)}</>
-                : <>{giveBlock}{fold('Optional — if you’d like to receive subsidies on the platform', subsidyBlock)}</>;
+                ? <>{subsidySec}{giveSec}</>
+                : <>{giveSec}{subsidySec}</>;
             })()}
 
             <label className="wintake__omit" onClick={unlock}>
