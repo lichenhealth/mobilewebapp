@@ -164,7 +164,7 @@ export default function CarePostCard({
           )}
         </header>
 
-        {(schedule || post.ai_omit) && (
+        {(schedule || post.ai_omit || post.sensitive) && (
           <p className="cpost__planfine">
             {schedule && (
               <>
@@ -172,8 +172,13 @@ export default function CarePostCard({
               </>
             )}
             {post.ai_omit && (
-              <em className="cpost__omit" title={`Held back from every assistant — sensitive ${post.ai_omit} information`}>
-                {schedule ? ' · ' : ''}no AI · sensitive {post.ai_omit}
+              <em className="cpost__omit" title="Held back from every assistant — only the humans on the care team read this entry">
+                {schedule ? ' · ' : ''}no AI{post.ai_omit !== 'other' ? ` · sensitive ${post.ai_omit}` : ''}
+              </em>
+            )}
+            {post.sensitive && (
+              <em className="cpost__omit" title="Marked as sensitive financial and/or medical information">
+                {(schedule || post.ai_omit) ? ' · ' : ''}sensitive info
               </em>
             )}
           </p>
@@ -258,8 +263,13 @@ export default function CarePostCard({
             {/* The promise this entry is keeping, said on its face
                 (founder 2026-08-20). */}
             {post.ai_omit && (
-              <em className="cpost__omit" title={`Held back from every assistant — sensitive ${post.ai_omit} information`}>
-                {' · '}no AI · sensitive {post.ai_omit}
+              <em className="cpost__omit" title="Held back from every assistant — only the humans on the care team read this entry">
+                {' · '}no AI{post.ai_omit !== 'other' ? ` · sensitive ${post.ai_omit}` : ''}
+              </em>
+            )}
+            {post.sensitive && (
+              <em className="cpost__omit" title="Marked as sensitive financial and/or medical information">
+                {' · '}sensitive info
               </em>
             )}
           </span>

@@ -54,6 +54,10 @@ export interface CarePostRow {
   title?: string | null;
   /** Set = no assistant reads this entry; the reason shows on the card. */
   ai_omit?: 'medical' | 'financial' | 'other' | null;
+  /** The sensitivity MARK (founder 2026-09-23), split from the AI hold-back:
+   *  a label the entry wears — how it's treated differently is a later
+   *  decision, deliberately. ai_omit stays the enforced flag. */
+  sensitive?: boolean;
   /** How a plan entry is held (founder 2026-09-14): a RECOMMENDED thing is
    *  worth trying, a PRESCRIBED one is part of the plan. Null = unlabeled. */
   intent?: 'recommended' | 'prescribed' | null;
@@ -74,7 +78,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, intent';
+  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -365,6 +369,8 @@ export interface CarePostInput {
   /** 'medical' | 'financial' | 'other' — held back from every assistant,
    *  chosen when writing (founder 2026-08-20). Absent = Claude may help. */
   aiOmit?: 'medical' | 'financial' | 'other' | null;
+  /** The sensitivity mark (founder 2026-09-23) — a label, not the AI gate. */
+  sensitive?: boolean;
   /** koc only: recommended vs prescribed (founder 2026-09-14). */
   intent?: 'recommended' | 'prescribed' | null;
   /** wow only: the open assessment this entry belongs to (founder 2026-09-22). */
@@ -384,6 +390,8 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     attachments: input.attachments, links: input.links, previews: input.previews,
     // Per-entry AI omission with its reason (founder 2026-08-20).
     ai_omit: input.aiOmit ?? null,
+    // The sensitivity mark (founder 2026-09-23) — worn, not yet acted on.
+    sensitive: input.sensitive ?? false,
     // How a plan entry is held (founder 2026-09-14) — plan items only.
     intent: input.kind === 'koc' ? (input.intent ?? null) : null,
     // The assessment an intake entry belongs to (founder 2026-09-22).

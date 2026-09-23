@@ -1331,13 +1331,16 @@
   margin: 0 var(--s-4) var(--s-3); padding: 10px 12px;
   background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
 }
-.cedit__omit-lead { font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
 .cedit__omit-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .cedit__omit-btn {
   padding: 5px 11px; border-radius: var(--r-full); cursor: pointer; font-family: inherit;
   border: 1px solid var(--bone-edge); background: var(--bone); font-size: 12px; color: var(--ink-soft);
 }
 .cedit__omit-btn.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--ink); }
+/* The two checkboxes (founder 2026-09-23) — the intake's checkbox grammar. */
+.cedit__check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+.cedit__check input { margin-top: 2px; accent-color: var(--peach); }
+.cedit__check-hint { display: block; font-style: normal; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
 .means__omit { display: flex; flex-wrap: wrap; gap: 6px; }
 .means__omit-chip {
   padding: 5px 11px; border-radius: var(--r-full); cursor: pointer; font-family: inherit;
