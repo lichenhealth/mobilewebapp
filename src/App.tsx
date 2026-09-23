@@ -251,8 +251,11 @@ export default function App() {
           <Route path="/concierge"      element={<Concierge />} />
           <Route path="/concierge/financial" element={<FinancialProfilePage />} />
           <Route path="/concierge/client/:patientId"           element={<Concierge />} />
-          {/* No :patientId = your own board — the WOW self-entry door. */}
+          {/* No :patientId = your own board — the WOW self-entry door, and
+              the care-plan one (its absence sent the own-board + through
+              the catch-all to Home, founder 2026-09-23). */}
           <Route path="/concierge/wow/edit" element={<CarePostComposer kind="wow" />} />
+          <Route path="/concierge/koc/edit" element={<CarePostComposer kind="koc" />} />
           {/* The guided walk through all six dimensions (founder 2026-09-11
               — the onboarding front door for the first Concierge cohort). */}
           <Route path="/concierge/intake" element={<WowIntake />} />
