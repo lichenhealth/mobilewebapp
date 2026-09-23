@@ -594,6 +594,15 @@ export default function WowIntake() {
     ? 'balanced'
     : (econFrameOf.includes('hold on to more') || econFrameOf.includes('re-allocat')) ? 'much' : 'little';
 
+  // The close step's support ask shows ONLY for members actually in the
+  // subsidy conversation (founder 2026-09-23: "This should only be included
+  // with those asking for subsidies" — the blanket ask was a leftover from
+  // when the intake WAS the subsidy enrollment path): numbers in the
+  // allocation grid — typed here or standing on their financial profile —
+  // or a support need already checked. Everyone else just finishes.
+  const subsidyAsk = !!(income.trim() || expenses.trim() || assets.trim()
+    || debt.trim() || household.trim() || needs.length > 0);
+
   // The assessment's overall reading so far — the average of its saved
   // scores (one per dimension, structurally), shown above the steps.
   const assessScores = WOW_DIMENSIONS
@@ -981,36 +990,54 @@ export default function WowIntake() {
 
       {ready && step === 'close' && (
         <section className="wintake__card">
-          <h2 className="wintake__dimname">One last thing</h2>
-          <p className="wintake__lead">
-            Is there anything you need the network&rsquo;s support to carry?
-            Checking a box asks a real person to take a look — every request
-            gets a human read, and every decision is recorded with its
-            reasons. Nothing here is ever visible to providers or donors.
-          </p>
-          <div className="wintake__needs">
-            {SUBSIDY_NEEDS.map((n) => {
-              const on = needs.includes(n.value);
-              return (
-                <label className={'wintake__need' + (on ? ' is-on' : '')} key={n.value}>
-                  <input
-                    type="checkbox" checked={on}
-                    onChange={() => setNeeds((cur) => (on ? cur.filter((x) => x !== n.value) : [...cur, n.value]))}
+          {subsidyAsk ? (
+            <>
+              <h2 className="wintake__dimname">One last thing</h2>
+              <p className="wintake__lead">
+                Is there anything you need the network&rsquo;s support to carry?
+                Checking a box asks a real person to take a look — every request
+                gets a human read, and every decision is recorded with its
+                reasons. Nothing here is ever visible to providers or donors.
+              </p>
+              <div className="wintake__needs">
+                {SUBSIDY_NEEDS.map((n) => {
+                  const on = needs.includes(n.value);
+                  return (
+                    <label className={'wintake__need' + (on ? ' is-on' : '')} key={n.value}>
+                      <input
+                        type="checkbox" checked={on}
+                        onChange={() => setNeeds((cur) => (on ? cur.filter((x) => x !== n.value) : [...cur, n.value]))}
+                      />
+                      <span><strong>{n.label}</strong><em>{n.hint}</em></span>
+                    </label>
+                  );
+                })}
+              </div>
+              {needs.length > 0 && (
+                <label className="wintake__q">
+                  <span>What&rsquo;s in the way that money alone won&rsquo;t fix? (optional)</span>
+                  <textarea
+                    value={obstacles}
+                    onChange={(e) => setObstacles(e.target.value)}
+                    placeholder="Leave that won’t be approved, a schedule that can’t bend, a system that won’t listen…"
                   />
-                  <span><strong>{n.label}</strong><em>{n.hint}</em></span>
                 </label>
-              );
-            })}
-          </div>
-          {needs.length > 0 && (
-            <label className="wintake__q">
-              <span>What&rsquo;s in the way that money alone won&rsquo;t fix? (optional)</span>
-              <textarea
-                value={obstacles}
-                onChange={(e) => setObstacles(e.target.value)}
-                placeholder="Leave that won’t be approved, a schedule that can’t bend, a system that won’t listen…"
-              />
-            </label>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="wintake__dimname">Your web is woven</h2>
+              <p className="wintake__lead">
+                Finish stamps this assessment with today&rsquo;s date, so the
+                next one can show how things move over time. Every thread you
+                wove is on your board.
+              </p>
+              <p className="wintake__fine">
+                If you ever want subsidies on the platform, the door is on the
+                Economic step — your information goes into the algorithm for
+                subsidy allocation, objectively.
+              </p>
+            </>
           )}
           {error && <p className="wintake__error">{error}</p>}
           <div className="wintake__nav">
