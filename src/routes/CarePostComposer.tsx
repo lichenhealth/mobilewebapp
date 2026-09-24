@@ -51,6 +51,11 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const dateParam = searchParams.get('date');
   const presetDay = kind === 'koc' && dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
   const [range, setRange] = useState<DateRange>({ start: presetDay, end: presetDay }); // koc
+  // Clicking an HOUR on the plan grids arrives with ?time=HH:MM (founder
+  // 2026-09-24) — the entry gets a time stamp; empty = all-day, as ever.
+  const timeParam = searchParams.get('time');
+  const presetTime = kind === 'koc' && timeParam && /^\d{2}:\d{2}$/.test(timeParam) ? timeParam : '';
+  const [atTime, setAtTime] = useState(presetTime);
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
   // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20; reshaped
@@ -122,6 +127,8 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
         startDate: range.start ?? undefined,
         endDate: recurrence ? undefined : (range.end ?? undefined),
         recurrence: kind === 'koc' ? recurrence : null,
+        atMin: kind === 'koc' && /^\d{2}:\d{2}$/.test(atTime)
+          ? Number(atTime.slice(0, 2)) * 60 + Number(atTime.slice(3, 5)) : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
         links: cleanedLinks, previews,
         aiOmit: omitAi ? 'other' : null, sensitive,
@@ -247,6 +254,15 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
               range={range} recurrence={recurrence}
               onRangeChange={setRange} onRecurrenceChange={setRecurrence}
             />
+            {/* Optional time of day (founder 2026-09-24) — empty = all-day. */}
+            <div className="cedit__timerow">
+              <span className="cedit__label">What time? <em>(optional)</em></span>
+              <input type="time" className="cedit__input cedit__timein" value={atTime}
+                onChange={(e) => setAtTime(e.target.value)} />
+              {atTime && (
+                <button type="button" className="cedit__timeclear" onClick={() => setAtTime('')}>All day</button>
+              )}
+            </div>
           </div>
         )}
 

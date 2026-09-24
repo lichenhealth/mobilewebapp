@@ -6,6 +6,7 @@ import { CarePostRow, CareAttachment, CareLink, CarePostPreview, rangeLabel, koc
 import { createReminder } from '../lib/remindersApi';
 import { linkify, hrefFor } from '../lib/linkify';
 import { recurrenceLabel } from '../lib/recurrence';
+import { minToLabel } from '../lib/calendarApi';
 import './CarePostCard.css';
 
 /** Render body text with pasted URLs turned into clickable links. */
@@ -109,10 +110,13 @@ export default function CarePostCard({
       : post.intent === 'prescribed'
         ? `prescribed this${noun ? ' ' + noun : ''}`
         : `added this${noun ? ' ' + noun : ''}`;
+    // A timed entry says its hour on the fine line (founder 2026-09-24).
+    const timeLbl = post.at_min != null ? minToLabel(post.at_min) : null;
     const schedule = post.start_date
       ? (post.recurrence
         ? recurrenceLabel(post.recurrence, post.start_date)
         : rangeLabel(post.start_date, post.end_date ?? post.start_date))
+        + (timeLbl ? ` · ${timeLbl}` : '')
       : null;
     const addToCal = async () => {
       if (!me || !post.start_date || calBusy) return;
@@ -120,7 +124,8 @@ export default function CarePostCard({
       try {
         await createReminder(me, {
           title: post.title?.trim() || post.body.trim().slice(0, 80) || 'Care plan',
-          date: post.start_date, atMin: null, leadMin: 0,
+          // A timed entry lands timed on the viewer's calendar too.
+          date: post.start_date, atMin: post.at_min ?? null, leadMin: 0,
           recurrence: post.recurrence,
         });
         setOnCal(true);
