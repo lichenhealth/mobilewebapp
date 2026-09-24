@@ -634,10 +634,8 @@ export default function WowIntake() {
 
   return (
     <div className="wintake">
+      {/* The TopBar's arrow is the one back button (founder 2026-09-24). */}
       <header className="wintake__head">
-        <button className="conc__back" onClick={() => navigate('/concierge')} aria-label="Back to Concierge">
-          <Icon name="arrow-left" size={18} />
-        </button>
         <h1 className="wintake__title">Your Web of Wellbeing</h1>
       </header>
       {step !== 'welcome' && dots}

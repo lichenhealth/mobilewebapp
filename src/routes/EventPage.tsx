@@ -175,10 +175,8 @@ export default function EventPage() {
     <div className="evp">
       {/* Sticky title + tabs (à la the calendar pin) */}
       <div className="evp__pin">
+        {/* The TopBar's arrow is the one back button (founder 2026-09-24). */}
         <div className="evp__titlerow">
-          <button className="conc__back" onClick={() => navigate('/events')} aria-label="Back to events">
-            <Icon name="arrow-left" size={18} />
-          </button>
           <h1 className="evp__title">{title}</h1>
           <button
             className="evp__host evp__host--link"

@@ -6,7 +6,7 @@ import RecurrencePicker from '../components/RecurrencePicker';
 import { useAuth } from '../auth/AuthProvider';
 import {
   CareKind, MediaKind, Dimension, WOW_DIMENSIONS,
-  createCarePost, uploadCareMedia, isInternalUrl, resolvePreviews,
+  createCarePost, uploadCareMedia, isInternalUrl, resolvePreviews, wowScoreBand,
 } from '../lib/conciergeApi';
 import type { Recurrence } from '../lib/recurrence';
 import { parseBodyUrls } from '../lib/linkify';
@@ -147,8 +147,9 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
 
   return (
     <div className="cedit">
-      <header className="cedit__head">
-        <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+      {/* ONE back per screen (founder 2026-09-24): the TopBar's arrow is the
+          back button — the frozen bar carries only the name and the act. */}
+      <header className="cedit__head cedit__head--noback">
         <h1 className="cedit__title">{kind === 'wow' ? 'New wellbeing post' : 'New care plan post'}</h1>
         <button className="btn btn-primary cedit__save" onClick={save} disabled={saving || uploading}>
           {saving ? 'Posting…' : 'Post'}
@@ -239,7 +240,9 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
             <div className="cedit__field">
               <span className="cedit__label">File under</span>
               <div className="cpost-compose__dims">
-                <button className={'cpost-compose__dim' + (dims.size === 0 ? ' is-on' : '')} onClick={() => setDims(new Set())}>All</button>
+                {/* "Overall" (founder 2026-09-24) — the board's own word for a
+                    no-dimension entry; the empty-dims semantics are unchanged. */}
+                <button className={'cpost-compose__dim' + (dims.size === 0 ? ' is-on' : '')} onClick={() => setDims(new Set())}>Overall</button>
                 {WOW_DIMENSIONS.map((d) => (
                   <button key={d} className={'cpost-compose__dim' + (dims.has(d) ? ' is-on' : '')} onClick={() => toggleDim(d)}>{d}</button>
                 ))}
@@ -247,7 +250,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
             </div>
             <div className="cedit__field">
               <span className="cedit__label">Wellbeing score — {score}%</span>
-              <input type="range" min={0} max={100} value={score} onChange={(e) => setScore(Number(e.target.value))} />
+              <input type="range" className={`cedit__score is-${wowScoreBand(score)}`} min={0} max={100} value={score} onChange={(e) => setScore(Number(e.target.value))} />
               <p className="cedit__hint">100% = thriving here · 70% ≈ a “C-”.</p>
             </div>
           </>

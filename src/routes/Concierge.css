@@ -11,7 +11,8 @@
 /* Client view header: back arrow + client name + tag */
 .conc__head--client {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  /* no back column — the TopBar's arrow is the one back (founder 2026-09-24) */
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--s-2);
   text-align: left;
@@ -377,13 +378,20 @@
 .cedit__score input[type=range] { width: 100%; accent-color: var(--peach); }
 .cedit__score-val { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); text-align: right; }
 
-.cedit__row-head { display: flex; align-items: center; justify-content: space-between; }
+/* The add button sits right beside its word (founder 2026-09-24: far-right
+   "gets a little lost on desktop"). */
+.cedit__row-head { display: flex; align-items: center; gap: var(--s-3); }
 .cedit__add {
   display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;
   border-radius: var(--r-full); border: 1px solid var(--bone-edge); background: var(--bone-warm);
   color: var(--ink-soft); font-size: 11px;
 }
 .cedit__add:hover { border-color: var(--peach); color: var(--peach-deep); }
+/* THE SCORE LINE WEARS ITS BAND (founder 2026-09-24) — wowScoreBand's one
+   rule, the same colors every board score wears. */
+.cedit__score { accent-color: var(--peach-deep); }
+.cedit__score.is-high { accent-color: var(--green-deep); }
+.cedit__score.is-low { accent-color: var(--red-deep); }
 .cedit__add--sm { font-size: 10px; padding: 4px 8px; }
 .cedit__remove {
   flex-shrink: 0; width: 28px; height: 28px; border-radius: var(--r-full);
