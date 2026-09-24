@@ -1535,19 +1535,23 @@ export default function Concierge() {
                 in fewer lines. */}
             {dataReady && (
               <div className="wow__webwrap">
+                {/* Lenses ABOVE the web, short names, everything centered
+                    under the Concierge mark (founder 2026-09-24: "remove
+                    assessment to make more room and reconfigure the
+                    positioning of the filters a bit above the hexagon"). */}
                 <div className="wow__webrow">
-                  {!gated && (
-                    <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
-                      {([['self', 'Self Assessment'], ['team', 'Care Team Assessment'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
-                        <button key={k} role="tab" aria-selected={wowLens === k}
-                          className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
-                          onClick={() => setWowLens(k)}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   <div className="wow__webcenter">
+                    {!gated && (
+                      <div className="wow__lensbox" role="tablist" aria-label="Whose assessment shapes the web">
+                        {([['self', 'Self'], ['team', 'Care Team'], ['combo', 'Self + Care Team']] as const).map(([k, label]) => (
+                          <button key={k} role="tab" aria-selected={wowLens === k}
+                            className={'wow__lensbtn' + (wowLens === k ? ' is-on' : '')}
+                            onClick={() => setWowLens(k)}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {!gated && (
                       <div className="wow__overall">
                         <span className={'wow__overall-num' + (scores.overall != null ? ` is-${wowScoreBand(scores.overall)}` : '')}>
