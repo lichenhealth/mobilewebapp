@@ -58,6 +58,9 @@ export interface CarePostRow {
    *  a label the entry wears — how it's treated differently is a later
    *  decision, deliberately. ai_omit stays the enforced flag. */
   sensitive?: boolean;
+  /** koc: minutes since midnight (founder 2026-09-24, the hour grids) —
+   *  null = all-day, the historical shape. */
+  at_min?: number | null;
   /** How a plan entry is held (founder 2026-09-14): a RECOMMENDED thing is
    *  worth trying, a PRESCRIBED one is part of the plan. Null = unlabeled. */
   intent?: 'recommended' | 'prescribed' | null;
@@ -78,7 +81,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent';
+  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent, at_min';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -364,6 +367,7 @@ export interface CarePostInput {
   patientId: string; kind: CareKind; body: string;
   dimensions?: Dimension[]; score?: number;      // wow
   startDate?: string; endDate?: string;          // koc
+  atMin?: number | null;                         // koc: time of day (founder 2026-09-24)
   recurrence?: Recurrence | null;                // koc (null = plain day/range)
   attachments: CareAttachment[]; links: CareLink[]; previews: CarePostPreview[];
   /** 'medical' | 'financial' | 'other' — held back from every assistant,
@@ -387,6 +391,7 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     // A recurring post's end lives in the recurrence spec, so end_date is null.
     end_date: input.kind === 'koc' && !recurring ? input.endDate : null,
     recurrence: input.kind === 'koc' ? (input.recurrence ?? null) : null,
+    at_min: input.kind === 'koc' ? (input.atMin ?? null) : null,
     attachments: input.attachments, links: input.links, previews: input.previews,
     // Per-entry AI omission with its reason (founder 2026-08-20).
     ai_omit: input.aiOmit ?? null,

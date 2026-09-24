@@ -26,6 +26,13 @@ import {
   copyCareInvite, sendCareInviteEmail, type CareLink, type CareInvite,
 } from '../lib/careTeamApi';
 import { occursOn } from '../lib/recurrence';
+
+// The plan's hour grids (founder 2026-09-24): the waking band the Day and
+// Week views draw — a timed entry outside it (rare) rides the all-day zone.
+const KOC_BAND_START = 6;   // 6am
+const KOC_BAND_END = 22;    // up to 10pm
+const KOC_HOUR_H = 44;      // px per hour in the week columns
+const KOC_CHIP_H = 44;      // the sweep's estimate of a timed chip's height
 import { useAuth } from '../auth/AuthProvider';
 import { consentOn, setConsent, careConsent } from '../lib/assistantConsentApi';
 import './Concierge.css';
@@ -1789,32 +1796,57 @@ export default function Concierge() {
             </button>
           )}
           {!dataReady && <p className="conc__care-hint">Loading…</p>}
-          {/* Day is a WHITE PANEL, blank when empty (founder 2026-09-24:
-              "blank white space for the day, even if no events — kinda
-              like google calendar"). */}
+          {/* HOURLY MARKERS on Day and Week (founder 2026-09-24: "click on
+              an hour to add something, which allows you to time stamp the
+              item") — waking band 6am–10pm; a timed entry outside it, or an
+              untimed one, lives in the all-day zone. */}
           {dataReady && scope === 'Day' && (() => {
             const posts = kocPosts.filter((p) => occursOn(p, anchor));
+            const inBand = (p: CarePostRow) => p.at_min != null && p.at_min >= KOC_BAND_START * 60 && p.at_min < KOC_BAND_END * 60;
+            const timed = posts.filter(inBand).sort((a, b) => (a.at_min ?? 0) - (b.at_min ?? 0));
+            const allDay = posts.filter((p) => !inBand(p));
+            const card = (p: CarePostRow) => (
+              // The wrapper stops the click reaching the hour row — a tap
+              // on a card is the card's, only empty hour space adds.
+              <div key={p.id + anchor} onClick={(e) => e.stopPropagation()}>
+                <CarePostCard post={p} mediaUrls={mediaUrls} me={me}
+                  canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                  onAsk={p.author_id !== me ? askEntry : undefined} />
+              </div>
+            );
             return (
               <div className="koc__daypanel">
-                {posts.map((p) => (
-                  <CarePostCard key={p.id + anchor} post={p} mediaUrls={mediaUrls} me={me}
-                    canDelete={canAuthor && p.author_id === me} onDelete={removePost}
-                    onAsk={p.author_id !== me ? askEntry : undefined} />
-                ))}
+                {allDay.length > 0 && <div className="koc__allday">{allDay.map(card)}</div>}
+                {Array.from({ length: KOC_BAND_END - KOC_BAND_START }, (_, i) => {
+                  const hour = KOC_BAND_START + i;
+                  const rows = timed.filter((p) => Math.floor((p.at_min ?? 0) / 60) === hour);
+                  return (
+                    <div className="koc__hour" key={hour}
+                      onClick={canAuthor ? () => navigate(`${basePath}/koc/edit?date=${anchor}&time=${String(hour).padStart(2, '0')}:00`) : undefined}
+                      role={canAuthor ? 'button' : undefined}
+                      aria-label={canAuthor ? `Add at ${minToLabel(hour * 60)}` : undefined}>
+                      <span className="koc__hour-lbl">{minToLabel(hour * 60)}</span>
+                      <div className="koc__hour-body">{rows.map(card)}</div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
-          {/* Week at desktop width: seven Google-style columns — compact
-              entry chips, each column a door-per-day; a chip drops into
-              that day's own view where the full card lives. */}
-          {dataReady && scope === 'Week' && wideBoard && (
-            <div className="koc__grid">
-              {weekDays(mondayOfWeek(anchor)).map((day) => {
-                const posts = kocPosts.filter((p) => occursOn(p, day.iso));
-                const d = localDate(day.iso);
-                return (
-                  <div className={'koc__col' + (day.iso === todayISO() ? ' is-today' : '')} key={day.iso}>
-                    <div className="koc__colhead">
+          {/* Week at desktop width: seven Google-style columns over one
+              shared hour grid — an aligned all-day band, timed chips at
+              their hour, and empty hour space is itself the add door. */}
+          {dataReady && scope === 'Week' && wideBoard && (() => {
+            const days = weekDays(mondayOfWeek(anchor));
+            const bandMin = KOC_BAND_START * 60;
+            const bandH = (KOC_BAND_END - KOC_BAND_START) * KOC_HOUR_H;
+            return (
+              <div className="koc__grid koc__grid--hours">
+                <span style={{ gridColumn: 1, gridRow: 1 }} aria-hidden="true" />
+                {days.map((day, i) => {
+                  const d = localDate(day.iso);
+                  return (
+                    <div className={'koc__colhead' + (day.iso === todayISO() ? ' is-today' : '')} key={'h' + day.iso} style={{ gridColumn: i + 2, gridRow: 1 }}>
                       <span className="koc__colday">
                         <em>{d.toLocaleDateString(undefined, { weekday: 'short' })}</em> {d.getDate()}
                       </span>
@@ -1824,19 +1856,63 @@ export default function Concierge() {
                         </button>
                       )}
                     </div>
-                    <div className="koc__colbody">
-                      {posts.map((p) => (
+                  );
+                })}
+                <span style={{ gridColumn: 1, gridRow: 2 }} aria-hidden="true" />
+                {days.map((day, i) => {
+                  const posts = kocPosts.filter((p) => occursOn(p, day.iso));
+                  const allDay = posts.filter((p) => !(p.at_min != null && p.at_min >= bandMin && p.at_min < KOC_BAND_END * 60));
+                  return (
+                    <div className={'koc__colallday' + (day.iso === todayISO() ? ' is-today' : '')} key={'a' + day.iso} style={{ gridColumn: i + 2, gridRow: 2 }}>
+                      {allDay.map((p) => (
                         <button key={p.id + day.iso} className="koc__chip" title={p.title || p.body}
                           onClick={() => { setAnchor(day.iso); setScope('Day'); }}>
                           {p.title || p.body}
                         </button>
                       ))}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+                <div className="koc__gutter" style={{ gridColumn: 1, gridRow: 3 }} aria-hidden="true">
+                  {Array.from({ length: KOC_BAND_END - KOC_BAND_START }, (_, i) => (
+                    <span className="koc__gutter-lbl" key={i}>{minToLabel((KOC_BAND_START + i) * 60)}</span>
+                  ))}
+                </div>
+                {days.map((day, i) => {
+                  const posts = kocPosts.filter((p) => occursOn(p, day.iso));
+                  const timed = posts
+                    .filter((p) => p.at_min != null && p.at_min >= bandMin && p.at_min < KOC_BAND_END * 60)
+                    .sort((a, b) => (a.at_min ?? 0) - (b.at_min ?? 0));
+                  // Same-hour entries sweep DOWN instead of overlapping.
+                  let prevBottom = -Infinity;
+                  const tops = timed.map((p) => {
+                    let top = (((p.at_min ?? 0) - bandMin) / 60) * KOC_HOUR_H;
+                    if (top < prevBottom + 2) top = prevBottom + 2;
+                    prevBottom = top + KOC_CHIP_H;
+                    return top;
+                  });
+                  return (
+                    <div className={'koc__colhours' + (day.iso === todayISO() ? ' is-today' : '')} key={'t' + day.iso}
+                      style={{ gridColumn: i + 2, gridRow: 3, height: bandH }}
+                      onClick={canAuthor ? (e) => {
+                        const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+                        const hour = KOC_BAND_START + Math.max(0, Math.min(KOC_BAND_END - KOC_BAND_START - 1, Math.floor(y / KOC_HOUR_H)));
+                        navigate(`${basePath}/koc/edit?date=${day.iso}&time=${String(hour).padStart(2, '0')}:00`);
+                      } : undefined}>
+                      {timed.map((p, j) => (
+                        <button key={p.id + day.iso} className="koc__chip koc__chip--timed" style={{ top: tops[j] }}
+                          title={`${minToLabel(p.at_min ?? 0)} · ${p.title || p.body}`}
+                          onClick={(e) => { e.stopPropagation(); setAnchor(day.iso); setScope('Day'); }}>
+                          <span className="koc__chip-time">{minToLabel(p.at_min ?? 0)}</span>
+                          <span className="koc__chip-title">{p.title || p.body}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {dataReady && scope === 'Week' && !wideBoard && weekDays(mondayOfWeek(anchor)).map((day) => daySection(day.iso))}
           {dataReady && scope === 'Month' && (() => {
             // The month is a CALENDAR (founder 2026-09-24): Monday-first

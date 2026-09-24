@@ -1085,6 +1085,14 @@
   min-height: 55vh; display: flex; flex-direction: column; gap: var(--s-2);
 }
 .koc__daypanel .cpost { margin: 0; }
+/* Day's hour rows (founder 2026-09-24): each row an add door at its hour. */
+.koc__allday { display: flex; flex-direction: column; gap: var(--s-2); padding-bottom: var(--s-2); border-bottom: 1px solid var(--bone-edge); }
+.koc__hour { display: flex; gap: 8px; min-height: 44px; border-top: 1px solid var(--bone-edge); cursor: pointer; }
+.koc__hour:first-of-type { border-top: none; }
+.koc__allday + .koc__hour { border-top: none; }
+.koc__hour-lbl { flex: none; width: 46px; padding-top: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; color: var(--ink-faint); }
+.koc__hour-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.koc__hour:hover { background: var(--bone-warm); }
 /* Week scope at desktop: seven Google-style columns. */
 .koc__grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
@@ -1109,6 +1117,49 @@
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .koc__chip:hover { background: var(--peach-soft, var(--peach-tint)); outline: 1px solid var(--peach); }
+/* Week over one shared HOUR GRID (founder 2026-09-24): a gutter column of
+   time labels + seven aligned day columns; grid rows keep the heads,
+   all-day band, and hour areas level across every column. */
+.koc__grid--hours { grid-template-columns: 40px repeat(7, 1fr); grid-template-rows: auto auto auto; row-gap: 2px; }
+.koc__grid--hours .koc__colhead { min-width: 0; }
+.koc__colhead.is-today .koc__colday { color: var(--peach-deep); }
+.koc__colallday {
+  min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px;
+  background: #fff; border: 1px solid var(--bone-edge); border-bottom: none;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+}
+.koc__colhours {
+  position: relative; min-width: 0;
+  background: #fff; border: 1px solid var(--bone-edge); border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  /* hour lines every 44px — keep in step with KOC_HOUR_H */
+  background-image: repeating-linear-gradient(to bottom, var(--bone-edge) 0 1px, transparent 1px 44px);
+  cursor: pointer;
+}
+.koc__colallday.is-today, .koc__colhours.is-today { border-color: var(--peach); }
+.koc__colallday.is-today { border-bottom: none; }
+.koc__colhours.is-today { border-top: none; }
+.koc__chip--timed {
+  position: absolute; left: 3px; right: 3px; height: 40px; overflow: hidden;
+  display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+.koc__chip-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.koc__chip-time { display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; color: var(--peach-deep); }
+.koc__gutter { display: flex; flex-direction: column; }
+.koc__gutter-lbl {
+  height: 44px; flex: none; text-align: right; padding-right: 4px; margin-top: -5px;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; color: var(--ink-faint);
+}
+/* The composer's optional time (founder 2026-09-24). */
+.cedit__timerow { display: flex; align-items: center; gap: 8px; margin-top: var(--s-2); }
+.cedit__timerow .cedit__label { margin: 0; }
+.cedit__timerow .cedit__label em { font-style: normal; font-weight: 300; color: var(--ink-faint); }
+.cedit__timein { width: auto; }
+.cedit__timeclear {
+  padding: 4px 10px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
+  background: var(--bone); font-size: 11px; color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
 /* Month scope: the plan as a Monday-first calendar (founder 2026-09-24) —
    each cell a door into that day's own view. */
 .koc__cal {
