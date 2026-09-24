@@ -33,7 +33,7 @@ export function SmartLocation({ loc, className }: { loc: string; className: stri
   );
 }
 import { supabase } from '../lib/supabase';
-import { localDate, toISO, todayISO, formatDateShort } from '../lib/conciergeApi';
+import { localDate, toISO, todayISO, formatDateShort, loadCarePosts } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
 import { listReminders, listDone, setDone, remindersOn, leaveReminder, type Reminder as ReminderRow } from '../lib/remindersApi';
 import {
@@ -162,6 +162,22 @@ export default function Calendar() {
     if (!me) return;
     (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name, url: c.url }))))();
   }, [me]);
+  // The CARE PLAN can overlay like an imported calendar (founder 2026-09-24:
+  // "overlay your care plan on your lichen calendar, just like you can
+  // overlay a google cal"). The chip earns its slot the platform way — it
+  // shows only once you HAVE a plan — and starts white: overlaying care on
+  // the everyday calendar is a deliberate choice, not a default.
+  const [hasCarePlan, setHasCarePlan] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    (async () => {
+      const { data } = await supabase.from('care_posts').select('id')
+        .eq('patient_id', me).eq('kind', 'koc').limit(1);
+      if (live) setHasCarePlan((data?.length ?? 0) > 0);
+    })();
+    return () => { live = false; };
+  }, [me]);
   // Follows whoever the TopBar says you're acting as (founder 2026-08-10) —
   // acting as a space shows ITS calendar, not "Mine" (Galyn's) by default.
   // As yourself, your imported calendars light up alongside Mine (they're
@@ -178,7 +194,7 @@ export default function Calendar() {
   // Find-a-time spans EVERY selected space (founder 2026-07-22): the more
   // groups you add, the more availability narrows toward when ALL their
   // members are free. Mine may be on alongside.
-  const spaceSel = selectedCals.filter((x) => x !== 'me' && !x.startsWith('ext:'));
+  const spaceSel = selectedCals.filter((x) => x !== 'me' && x !== 'care' && !x.startsWith('ext:'));
   const extSel = selectedCals.filter((x) => x.startsWith('ext:')).map((x) => x.slice(4));
   const spaceKey = spaceSel.join(',');
   const primarySpace = spaceSel[0] ?? null;   // organizer when creating from a slot
@@ -287,6 +303,23 @@ export default function Calendar() {
           start_min: b.start_min, end_min: b.end_min, recurrence: null,
           created_at: '', external: true, tint: colorFor('extcal:' + b.calendar_id),
           sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
+        });
+      }
+    }
+    // Care-plan entries overlay as read-only blocks: timed ones carry their
+    // span, untimed ride the all-day lane (the top-of-day reminder shape);
+    // recurrence comes along whole — the views expand it via occursOn(),
+    // same engine both boards already share.
+    if (selectedCals.includes('care')) {
+      for (const p of await loadCarePosts(me, 'koc', { from, to })) {
+        if (!p.start_date) continue;
+        byId.set('care:' + p.id, {
+          id: 'care:' + p.id, creator_id: '', owner_profile_id: me, owner_space_id: null,
+          title: (p.title || p.body || 'Care plan').slice(0, 80), description: '', location: '', lat: null, lng: null,
+          start_date: p.start_date, end_date: p.end_date ?? p.start_date, all_day: p.at_min == null,
+          start_min: p.at_min ?? null, end_min: p.at_min != null ? Math.min(1439, p.at_min + (p.duration_min ?? 45)) : null,
+          recurrence: p.recurrence ?? null, created_at: '',
+          external: true, carePlan: true, tint: colorFor('careplan'),
         });
       }
     }
@@ -789,6 +822,18 @@ export default function Calendar() {
               </button>
             );
           })}
+          {/* The care plan overlays like a Google cal (founder 2026-09-24) —
+              a standing chip once you have a plan, white until you choose it. */}
+          {hasCarePlan && actor.type !== 'space' && (
+            <button
+              className={'calp__calchip' + (selectedCals.includes('care') ? ' is-on' : '')}
+              onClick={() => toggleCal('care')}
+              aria-pressed={selectedCals.includes('care')}
+            >
+              <span className="calp__chipdot" style={{ background: colorFor('careplan') }} />
+              Care plan
+            </button>
+          )}
           <input
             ref={calAddRef}
             className="calp__addcal"
@@ -1192,7 +1237,18 @@ export default function Calendar() {
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
-            {selected.external && (
+            {selected.carePlan && (
+              <>
+                <p className="calp__sheet-ext">From your care plan.</p>
+                <button
+                  className="calp__sheet-extlink"
+                  onClick={() => navigate('/concierge/koc')}
+                >
+                  <Icon name="arrow-right" size={13} /> Open your care plan
+                </button>
+              </>
+            )}
+            {selected.external && !selected.carePlan && (
               <>
                 <p className="calp__sheet-ext">Imported from your external calendar — edit it there; Lichen re-syncs on its own.</p>
                 {/* A door back to where it actually lives (founder 2026-08-14).

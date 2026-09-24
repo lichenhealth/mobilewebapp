@@ -110,8 +110,13 @@ export default function CarePostCard({
       : post.intent === 'prescribed'
         ? `prescribed this${noun ? ' ' + noun : ''}`
         : `added this${noun ? ' ' + noun : ''}`;
-    // A timed entry says its hour on the fine line (founder 2026-09-24).
-    const timeLbl = post.at_min != null ? minToLabel(post.at_min) : null;
+    // A timed entry says its hour on the fine line (founder 2026-09-24) —
+    // and its whole span when it carries a duration ("7am – 7:45am").
+    const timeLbl = post.at_min != null
+      ? (post.duration_min != null
+        ? `${minToLabel(post.at_min)} – ${minToLabel(Math.min(1439, post.at_min + post.duration_min))}`
+        : minToLabel(post.at_min))
+      : null;
     const schedule = post.start_date
       ? (post.recurrence
         ? recurrenceLabel(post.recurrence, post.start_date)
