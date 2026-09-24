@@ -23,6 +23,16 @@ export default function AdminCategories() {
   // as an identity may honestly also be a service. Defaults to the domain it
   // was suggested in; the reviewer widens or moves it before approving.
   const [approveDomains, setApproveDomains] = useState<Record<string, Domain[]>>({});
+  // EDIT ON APPROVAL (founder 2026-09-24: "so I could make that one
+  // 'psychotherapist' and save it"): the reviewer can reshape the name
+  // before it joins the vocabulary. An edited approval adds nothing to the
+  // proposer — their bell asks them, and adding it stays their choice.
+  const [editing, setEditing] = useState<Set<string>>(new Set());
+  const [editNames, setEditNames] = useState<Record<string, string>>({});
+  const editedName = (s: Suggestion): string | null => {
+    const v = (editNames[s.id] ?? s.name).trim();
+    return v && v.toLowerCase() !== s.name.trim().toLowerCase() ? v : null;
+  };
   const [mapping, setMapping] = useState<string | null>(null);
   const [mapQ, setMapQ] = useState('');
   const [allCats, setAllCats] = useState<{ id: string; name: string; domain: string }[]>([]);
@@ -61,7 +71,8 @@ export default function AdminCategories() {
     if (isAdmin) load();
   }, [isAdmin, load]);
 
-  async function decide(id: string, approve: boolean) {
+  async function decide(s: Suggestion, approve: boolean) {
+    const id = s.id;
     setBusy(id);
     setError('');
     const chosen = approveDomains[id];
@@ -71,11 +82,13 @@ export default function AdminCategories() {
           // Only sent when the reviewer changed it — null keeps the RPC's
           // "as suggested" default.
           p_domains: chosen && chosen.length ? chosen : null,
+          // The edited name, when the reviewer reshaped it (null = as typed).
+          p_name: editedName(s),
         })
       : await supabase.rpc('reject_category_suggestion', { p_suggestion_id: id });
     setBusy(null);
     if (error) { setError(error.message); return; }
-    setItems((list) => list.filter((s) => s.id !== id));
+    setItems((list) => list.filter((x) => x.id !== id));
   }
 
   function toggleDomain(s: Suggestion, d: Domain) {
@@ -95,7 +108,9 @@ export default function AdminCategories() {
       <header className="adminc__head">
         <h1 className="adminc__title">Category suggestions</h1>
         <p className="adminc__sub">
-          Members proposed these. Approving adds it to the taxonomy and to their profile.
+          Members proposed these. Approving as-is adds it to the vocabulary and to their
+          profile; an edited name or &ldquo;Same as&hellip;&rdquo; asks them first. Every
+          decision sends them a bell.
         </p>
       </header>
 
@@ -110,11 +125,33 @@ export default function AdminCategories() {
           <li key={s.id} className="adminc__row">
             <div className="adminc__info">
               <span className={'adminc__badge adminc__badge--' + s.domain}>{s.domain}</span>
-              <span className="adminc__name">{s.name}</span>
+              {editing.has(s.id) ? (
+                <input className="adminc__editname" autoFocus
+                  value={editNames[s.id] ?? s.name}
+                  onChange={(e) => setEditNames((m) => ({ ...m, [s.id]: e.target.value }))} />
+              ) : (
+                <span className="adminc__name">
+                  {editedName(s) ? <>{s.name} <span className="adminc__name-arrow">→</span> {editedName(s)}</> : s.name}
+                </span>
+              )}
+              <button type="button" className="adminc__editbtn" disabled={busy === s.id}
+                onClick={() => setEditing((set) => {
+                  const n = new Set(set);
+                  if (n.has(s.id)) n.delete(s.id); else n.add(s.id);
+                  return n;
+                })}>
+                {editing.has(s.id) ? 'Done' : 'Edit name'}
+              </button>
               <span className="adminc__by">
                 {s.proposer?.full_name ? `by ${s.proposer.full_name}` : 'by a member'}
               </span>
             </div>
+            {editedName(s) && (
+              <p className="adminc__edithint">
+                Approves as &ldquo;{editedName(s)}&rdquo; — since it&rsquo;s not the word they typed,
+                nothing is added to their profile; their bell asks them first.
+              </p>
+            )}
             <div className="adminc__actions">
               {/* MAPPING IS THE DEFAULT ANSWER (founder 2026-08-06). Every new
                   category makes the picker longer and search less precise;
@@ -129,14 +166,14 @@ export default function AdminCategories() {
               </button>
               <button
                 className="adminc__btn"
-                onClick={() => decide(s.id, true)}
+                onClick={() => decide(s, true)}
                 disabled={busy === s.id}
               >
                 {busy === s.id ? '…' : 'New category'}
               </button>
               <button
                 className="adminc__btn adminc__btn--reject"
-                onClick={() => decide(s.id, false)}
+                onClick={() => decide(s, false)}
                 disabled={busy === s.id}
               >
                 Reject
