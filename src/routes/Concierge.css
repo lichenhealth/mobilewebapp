@@ -1077,6 +1077,38 @@
   color: var(--peach-deep); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .koc__dayadd:hover { border-color: var(--peach); }
+/* Day scope: a white panel, blank when empty (founder 2026-09-24 —
+   Google Calendar's grammar). */
+.koc__daypanel {
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  margin: var(--s-3) var(--s-5) var(--s-4); padding: var(--s-3);
+  min-height: 55vh; display: flex; flex-direction: column; gap: var(--s-2);
+}
+.koc__daypanel .cpost { margin: 0; }
+/* Week scope at desktop: seven Google-style columns. */
+.koc__grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  margin: var(--s-3) var(--s-5) var(--s-4); align-items: stretch;
+}
+.koc__col { display: flex; flex-direction: column; min-width: 0; }
+.koc__colhead { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px 6px; }
+.koc__colday { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.koc__colday em { font-style: normal; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--ink-faint); margin-right: 2px; }
+.koc__col.is-today .koc__colday { color: var(--peach-deep); }
+.koc__dayadd--col { width: 20px; height: 20px; margin: 0; flex: none; }
+.koc__colbody {
+  flex: 1; min-height: 420px; padding: 6px;
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.koc__col.is-today .koc__colbody { border-color: var(--peach); }
+.koc__chip {
+  text-align: left; padding: 6px 8px; border: none; border-radius: 8px;
+  background: var(--peach-tint); color: var(--ink); font-family: inherit;
+  font-size: 12px; line-height: 1.3; cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.koc__chip:hover { background: var(--peach-soft, var(--peach-tint)); outline: 1px solid var(--peach); }
 /* Month scope: the plan as a Monday-first calendar (founder 2026-09-24) —
    each cell a door into that day's own view. */
 .koc__cal {

@@ -1122,6 +1122,18 @@ export default function Concierge() {
   // its own way to add — Day's + carries the day, Week grows a + on every
   // day header, Month is a tappable calendar that drops into Day.
   const [anchor, setAnchor] = useState<string>(todayISO());
+  // Google-calendar shapes (founder 2026-09-24, second pass: "can the week
+  // look like this" — seven columns — "and the day have a blank white
+  // space"): at desktop width the Week renders as columns; the phone column
+  // keeps the stacked list — seven columns can't fit 430px honestly. Watch
+  // the media query, never sample it once (ChatThread's rule).
+  const [wideBoard, setWideBoard] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setWideBoard(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [dataReady, setDataReady] = useState(false);
 
@@ -1732,22 +1744,20 @@ export default function Concierge() {
         const planWhen = scope === 'Day' ? dayLbl(anchor)
           : scope === 'Month' ? localDate(anchor).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
           : prettyWeekRange(mondayOfWeek(anchor));
-        const daySection = (iso: string, showLabel: boolean) => {
+        const daySection = (iso: string) => {
           const posts = kocPosts.filter((p) => occursOn(p, iso));
           return (
             <section className="koc__daysec" key={iso}>
-              {showLabel && (
-                <div className="koc__dayhead">
-                  <h3 className="koc__daylbl">{dayLbl(iso)}</h3>
-                  {/* Week scope: every day carries its own + (founder
-                      2026-09-24) — adding lands on that day. */}
-                  {canAuthor && (
-                    <button className="koc__dayadd" onClick={() => navigate(`${basePath}/koc/edit?date=${iso}`)} aria-label={`Add to ${dayLbl(iso)}`}>
-                      <Icon name="plus" size={11} />
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="koc__dayhead">
+                <h3 className="koc__daylbl">{dayLbl(iso)}</h3>
+                {/* Week scope: every day carries its own + (founder
+                    2026-09-24) — adding lands on that day. */}
+                {canAuthor && (
+                  <button className="koc__dayadd" onClick={() => navigate(`${basePath}/koc/edit?date=${iso}`)} aria-label={`Add to ${dayLbl(iso)}`}>
+                    <Icon name="plus" size={11} />
+                  </button>
+                )}
+              </div>
               {posts.length === 0
                 ? <p className="koc__dayempty">Nothing scheduled</p>
                 : posts.map((p) => (
@@ -1779,8 +1789,55 @@ export default function Concierge() {
             </button>
           )}
           {!dataReady && <p className="conc__care-hint">Loading…</p>}
-          {dataReady && scope === 'Day' && daySection(anchor, false)}
-          {dataReady && scope === 'Week' && weekDays(mondayOfWeek(anchor)).map((day) => daySection(day.iso, true))}
+          {/* Day is a WHITE PANEL, blank when empty (founder 2026-09-24:
+              "blank white space for the day, even if no events — kinda
+              like google calendar"). */}
+          {dataReady && scope === 'Day' && (() => {
+            const posts = kocPosts.filter((p) => occursOn(p, anchor));
+            return (
+              <div className="koc__daypanel">
+                {posts.map((p) => (
+                  <CarePostCard key={p.id + anchor} post={p} mediaUrls={mediaUrls} me={me}
+                    canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                    onAsk={p.author_id !== me ? askEntry : undefined} />
+                ))}
+              </div>
+            );
+          })()}
+          {/* Week at desktop width: seven Google-style columns — compact
+              entry chips, each column a door-per-day; a chip drops into
+              that day's own view where the full card lives. */}
+          {dataReady && scope === 'Week' && wideBoard && (
+            <div className="koc__grid">
+              {weekDays(mondayOfWeek(anchor)).map((day) => {
+                const posts = kocPosts.filter((p) => occursOn(p, day.iso));
+                const d = localDate(day.iso);
+                return (
+                  <div className={'koc__col' + (day.iso === todayISO() ? ' is-today' : '')} key={day.iso}>
+                    <div className="koc__colhead">
+                      <span className="koc__colday">
+                        <em>{d.toLocaleDateString(undefined, { weekday: 'short' })}</em> {d.getDate()}
+                      </span>
+                      {canAuthor && (
+                        <button className="koc__dayadd koc__dayadd--col" onClick={() => navigate(`${basePath}/koc/edit?date=${day.iso}`)} aria-label={`Add to ${dayLbl(day.iso)}`}>
+                          <Icon name="plus" size={10} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="koc__colbody">
+                      {posts.map((p) => (
+                        <button key={p.id + day.iso} className="koc__chip" title={p.title || p.body}
+                          onClick={() => { setAnchor(day.iso); setScope('Day'); }}>
+                          {p.title || p.body}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {dataReady && scope === 'Week' && !wideBoard && weekDays(mondayOfWeek(anchor)).map((day) => daySection(day.iso))}
           {dataReady && scope === 'Month' && (() => {
             // The month is a CALENDAR (founder 2026-09-24): Monday-first
             // grid, entry dots per day, and every cell is a door into that
