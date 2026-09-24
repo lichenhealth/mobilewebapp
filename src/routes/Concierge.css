@@ -1068,6 +1068,37 @@
 .board__post-btn:active { transform: scale(0.94); }
 .koc__daysec { margin-bottom: var(--s-2); }
 .koc__daylbl { font-size: 12px; font-weight: 600; color: var(--ink); padding: var(--s-2) var(--s-5) 4px; }
+/* Week scope: the day header carries its own + (founder 2026-09-24). */
+.koc__dayhead { display: flex; align-items: center; }
+.koc__dayhead .koc__daylbl { padding-right: 0; }
+.koc__dayadd {
+  width: 22px; height: 22px; margin: var(--s-2) 0 0 8px; padding: 0;
+  border-radius: var(--r-full); border: 1px solid var(--bone-edge); background: #fff;
+  color: var(--peach-deep); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.koc__dayadd:hover { border-color: var(--peach); }
+/* Month scope: the plan as a Monday-first calendar (founder 2026-09-24) —
+   each cell a door into that day's own view. */
+.koc__cal {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  margin: var(--s-3) var(--s-5) var(--s-4);
+}
+.koc__cal-wd {
+  text-align: center; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.08em; color: var(--ink-faint); padding-bottom: 2px;
+}
+.koc__cal-blank { min-height: 44px; }
+.koc__cal-cell {
+  min-height: 44px; padding: 4px 2px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-family: inherit; cursor: pointer;
+}
+.koc__cal-cell:hover { border-color: var(--peach); }
+.koc__cal-cell.is-today { border-color: var(--peach); box-shadow: inset 0 0 0 1px var(--peach); }
+.koc__cal-num { font-size: 13px; color: var(--ink-soft); line-height: 1; }
+.koc__cal-dots { display: flex; gap: 3px; }
+.koc__cal-dots i { width: 5px; height: 5px; border-radius: var(--r-full); background: var(--peach-deep); }
 .koc__dayempty { font-size: 12px; font-weight: 300; color: var(--ink-faint); padding: 0 var(--s-5) var(--s-2); }
 .koc__weeknav { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-3) var(--s-5) 0; }
 .koc__weeklbl { font-family: var(--font-mono); font-size: 13px; color: var(--ink); min-width: 96px; text-align: center; }
