@@ -97,7 +97,7 @@ export default function CarePostCard({
 
   // ── The PLAN ENTRY card (founder 2026-09-23, built from the marketing
   //    mocks): title leads and opens the linked thing, the byline says how
-  //    it's held in the mock's grammar ("Cherlynn Resager recommends this
+  //    it's held in the mock's grammar ("Camille Reyes recommends this
   //    retreat" / "Galyn Burke prescribed this course"), the linked kind's
   //    mark sits in the corner, the schedule reads as a fine line, and the
   //    doors are ghost pills. WOW entries keep the feed-card shape below.
