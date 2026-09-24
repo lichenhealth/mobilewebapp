@@ -320,7 +320,7 @@ export default function CarePostCard({
         {post.kind === 'wow' && (
           <div className="cpost__tags">
             {post.dimensions.length === 0
-              ? <span className="cpost__tag">All</span>
+              ? <span className="cpost__tag">Overall</span>
               : post.dimensions.map((d) => <span key={d} className="cpost__tag">{d}</span>)}
           </div>
         )}

@@ -560,8 +560,8 @@ export default function EventComposer() {
   if (kind === 'reminder') {
     return (
       <div className="cedit">
-        <header className="cedit__head">
-          <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+        {/* The TopBar's arrow is the one back button (founder 2026-09-24). */}
+        <header className="cedit__head cedit__head--noback">
           <h1 className="cedit__title">{reminderId ? 'Edit reminder' : 'New reminder'}</h1>
           <div className="cedit__actions">
             {reminderId && (
@@ -667,8 +667,7 @@ export default function EventComposer() {
 
   return (
     <div className="cedit">
-      <header className="cedit__head">
-        <button className="conc__back" onClick={back} aria-label="Back"><Icon name="arrow-left" size={18} /></button>
+      <header className="cedit__head cedit__head--noback">
         <h1 className="cedit__title">{eventId ? 'Edit event' : 'New event'}</h1>
         <button className="btn btn-primary cedit__save" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}

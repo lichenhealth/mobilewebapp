@@ -1071,8 +1071,6 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
 export default function Concierge() {
   const { tab, patientId } = useParams<{ tab?: ConciergeTab; patientId?: string }>();
   const [searchParams] = useSearchParams();
-  // Arrived from Profile's "Set up my care team" door — offer the way back.
-  const fromProfile = searchParams.get('from') === 'profile';
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -1328,10 +1326,8 @@ export default function Concierge() {
   if (isClientView && careReady && (careAllowed === false || !clientAuthorized)) {
     return (
       <div className="conc">
+        {/* The TopBar's arrow is the one back button (founder 2026-09-24). */}
         <header className="conc__head conc__head--client">
-          <button className="conc__back" onClick={() => navigate('/caregiver')} aria-label="Back">
-            <Icon name="arrow-left" size={18} />
-          </button>
           <h1 className="conc__title">Concierge</h1>
         </header>
         <div className="conc__care-gate">
@@ -1355,15 +1351,6 @@ export default function Concierge() {
   return (
     <div className="conc">
       <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
-        {isClientView ? (
-          <button className="conc__back" onClick={() => navigate('/caregiver')} aria-label="Back to clients">
-            <Icon name="arrow-left" size={18} />
-          </button>
-        ) : fromProfile && (
-          <button className="conc__back" onClick={() => navigate('/profile')} aria-label="Back to profile">
-            <Icon name="arrow-left" size={18} />
-          </button>
-        )}
         <h1 className="conc__title">
           {isClientView ? (clientName ?? 'Client') : 'Concierge'}
         </h1>
