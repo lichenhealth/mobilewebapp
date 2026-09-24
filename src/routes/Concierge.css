@@ -1334,7 +1334,9 @@
    beige") — plain rows on the page canvas, white inside the boxes. */
 .cedit__omit {
   display: flex; flex-direction: column; gap: 8px;
-  margin: 0 var(--s-4) var(--s-3);
+  /* Real air under the frozen header (founder 2026-09-24: "so they aren't
+     so crowded with the frozen pane"). */
+  margin: var(--s-5) var(--s-4) var(--s-3);
 }
 .cedit__omit-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .cedit__omit-btn {
