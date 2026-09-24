@@ -1536,17 +1536,20 @@
 
 /* THREE WOW LENSES + THE GRAY GATE (founder 2026-09-21). Below the base
    rules on purpose — the same-file ordering doctrine. */
+/* A centered ROW above the hexagon (founder 2026-09-24 — the old vertical
+   left rail pushed the web off-center under the Concierge mark). The
+   active lens wears the peach UNDERLINE, the tab grammar above it. */
 .wow__lensbox {
-  display: flex; flex-direction: column; align-items: flex-start;
-  gap: 2px; margin: 4px 0 0;
+  display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center;
+  gap: 2px 12px; margin: 2px 0 8px;
 }
 .wow__lensbtn {
-  background: none; border: 0; padding: 2px 8px; cursor: pointer;
+  background: none; border: 0; padding: 2px 2px 4px; cursor: pointer;
   font-family: inherit; font-size: 12px; font-weight: 300;
-  color: var(--ink-muted); border-left: 2px solid transparent;
+  color: var(--ink-muted); border-bottom: 2px solid transparent;
   transition: color var(--d-fast) var(--ease-out);
 }
-.wow__lensbtn.is-on { color: var(--ink); font-weight: 400; border-left-color: var(--peach); }
+.wow__lensbtn.is-on { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
 .wow__lensbtn:hover { color: var(--ink); }
 
 /* The gray web: every aspect stands down until the self assessment is
@@ -1569,7 +1572,6 @@
   text-transform: uppercase; color: var(--peach-deep);
 }
 .wow__webrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.wow__webrow .wow__lensbox { flex: 0 0 auto; margin: 0; }
 .wow__webcenter {
   flex: 1 1 260px; min-width: 260px;
   display: flex; flex-direction: column; align-items: center;
