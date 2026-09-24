@@ -46,7 +46,11 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
     () => new Set((WOW_DIMENSIONS as readonly string[]).includes(dimParam ?? '') ? [dimParam as Dimension] : []),
   );   // wow; empty = All
   const [score, setScore] = useState(70);                        // wow
-  const [range, setRange] = useState<DateRange>({ start: null, end: null }); // koc
+  // A + pressed ON a day (Day scope's big +, Week scope's per-day +,
+  // founder 2026-09-24) arrives with ?date= — the schedule starts filled.
+  const dateParam = searchParams.get('date');
+  const presetDay = kind === 'koc' && dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
+  const [range, setRange] = useState<DateRange>({ start: presetDay, end: presetDay }); // koc
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
   // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20; reshaped

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
@@ -1116,7 +1116,12 @@ export default function Concierge() {
   // team, toggled from the list at the web's upper left. Combo is the
   // default — with no care team it reads identically to Self.
   const [wowLens, setWowLens] = useState<WowLens>('combo');
-  const [weekStart, setWeekStart] = useState<string>(mondayOfWeek(todayISO()));
+  // THE SCOPE IS REAL NOW (founder 2026-09-24: "the UI doesn't shift when I
+  // select day, week or month"): one ANCHOR date; Day/Week/Month derive
+  // their window from it, both pagers step by the scope, and each scope has
+  // its own way to add — Day's + carries the day, Week grows a + on every
+  // day header, Month is a tappable calendar that drops into Day.
+  const [anchor, setAnchor] = useState<string>(todayISO());
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [dataReady, setDataReady] = useState(false);
 
@@ -1168,8 +1173,20 @@ export default function Concierge() {
     return () => window.removeEventListener('resize', measure);
   }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName]);
 
-  // Load the subject's WOW posts (unfiltered → feeds the radar) + this week's KOC posts.
-  const weekEnd = weekDays(weekStart)[6].iso;
+  // Load the subject's WOW posts (unfiltered → feeds the radar) + the KOC
+  // posts inside the scoped window (a day, a week, or a whole month).
+  const kocRange = useMemo(() => {
+    if (scope === 'Day') return { from: anchor, to: anchor };
+    if (scope === 'Month') {
+      const d = localDate(anchor);
+      return {
+        from: toISO(new Date(d.getFullYear(), d.getMonth(), 1)),
+        to: toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0)),
+      };
+    }
+    const ws = mondayOfWeek(anchor);
+    return { from: ws, to: weekDays(ws)[6].iso };
+  }, [scope, anchor]);
   const [boardNonce, setBoardNonce] = useState(0);
 
   const [careSettings, setCareSettings] = useState<CareSettings | null>(null);
@@ -1181,7 +1198,7 @@ export default function Concierge() {
     (async () => {
       const [wow, koc, settings] = await Promise.all([
         loadCarePosts(subjectId, 'wow'),
-        loadCarePosts(subjectId, 'koc', { from: weekStart, to: weekEnd }),
+        loadCarePosts(subjectId, 'koc', { from: kocRange.from, to: kocRange.to }),
         getCareSettings(subjectId),
       ]);
       if (!active) return;
@@ -1201,7 +1218,7 @@ export default function Concierge() {
       }
     })();
     return () => { active = false; };
-  }, [me, subjectId, weekStart, weekEnd, boardNonce]);
+  }, [me, subjectId, kocRange.from, kocRange.to, boardNonce]);
   // The window the radar reads through: Claude's pick when the member handed
   // it over, the platform default otherwise. Caregivers see the same number
   // the member does — care_settings RLS lets the team read it.
@@ -1225,14 +1242,20 @@ export default function Concierge() {
       setKocPosts((cur) => cur.filter((p) => p.id !== id));
     } catch (e) { console.error(e); }
   }
-  function shiftWeek(days: number) {
-    const d = localDate(weekStart); d.setDate(d.getDate() + days); setWeekStart(toISO(d));
+  // One pager, three step sizes — the tool-row arrows and the plan-label
+  // arrows both step by whatever the scope is.
+  function shiftRange(dir: 1 | -1) {
+    const d = localDate(anchor);
+    if (scope === 'Day') d.setDate(d.getDate() + dir);
+    else if (scope === 'Month') { d.setDate(1); d.setMonth(d.getMonth() + dir); }
+    else d.setDate(d.getDate() + dir * 7);
+    setAnchor(toISO(d));
   }
 
-  // Default scope follows the active tab: Day for WOW, Week for KOC
+  // KOC opens on the week (the plan's natural rhythm); the scope selector
+  // only renders there — on WOW it was dead chrome (founder 2026-09-24).
   useEffect(() => {
-    if (activeTab === 'koc') setScope('Week');
-    else if (activeTab === 'wow') setScope('Day');
+    if (activeTab === 'koc') { setScope('Week'); setAnchor(todayISO()); }
   }, [activeTab]);
 
   // Tab routing — patient-aware so client view stays within /concierge/client/:id.
@@ -1412,10 +1435,12 @@ export default function Concierge() {
         </button>
         </>
         )}
-        {activeTab !== 'chat' && activeTab !== 'urgent' && activeTab !== 'team' && (
+        {activeTab === 'koc' && (
           <>
             {/* Same control language as the Calendar's view picker (founder,
-                2026-07-17) — a dropdown, not a tap-to-cycle pill. */}
+                2026-07-17) — a dropdown, not a tap-to-cycle pill. KOC only:
+                the scope actually drives the plan's window now, so it has
+                no business rendering on tabs it can't move. */}
             <select
               className="conc__vselect"
               value={scope}
@@ -1425,10 +1450,10 @@ export default function Concierge() {
               {(['Day', 'Week', 'Month'] as const).map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
             <div className="conc__pager">
-              <button className="conc__tool-circle conc__pager-btn" aria-label="Previous">
+              <button className="conc__tool-circle conc__pager-btn" onClick={() => shiftRange(-1)} aria-label="Previous">
                 <Icon name="chevron-left" size={12} />
               </button>
-              <button className="conc__tool-circle conc__pager-btn" aria-label="Next">
+              <button className="conc__tool-circle conc__pager-btn" onClick={() => shiftRange(1)} aria-label="Next">
                 <Icon name="chevron-right" size={12} />
               </button>
             </div>
@@ -1698,44 +1723,99 @@ export default function Concierge() {
         );
       })()}
 
-      {activeTab === 'koc' && (
+      {activeTab === 'koc' && (() => {
+        const dayLbl = (iso: string) => {
+          const d = localDate(iso);
+          return `${d.toLocaleDateString(undefined, { weekday: 'long' })} · ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        };
+        // The plan label speaks the scope: a day, a week range, or a month.
+        const planWhen = scope === 'Day' ? dayLbl(anchor)
+          : scope === 'Month' ? localDate(anchor).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+          : prettyWeekRange(mondayOfWeek(anchor));
+        const daySection = (iso: string, showLabel: boolean) => {
+          const posts = kocPosts.filter((p) => occursOn(p, iso));
+          return (
+            <section className="koc__daysec" key={iso}>
+              {showLabel && (
+                <div className="koc__dayhead">
+                  <h3 className="koc__daylbl">{dayLbl(iso)}</h3>
+                  {/* Week scope: every day carries its own + (founder
+                      2026-09-24) — adding lands on that day. */}
+                  {canAuthor && (
+                    <button className="koc__dayadd" onClick={() => navigate(`${basePath}/koc/edit?date=${iso}`)} aria-label={`Add to ${dayLbl(iso)}`}>
+                      <Icon name="plus" size={11} />
+                    </button>
+                  )}
+                </div>
+              )}
+              {posts.length === 0
+                ? <p className="koc__dayempty">Nothing scheduled</p>
+                : posts.map((p) => (
+                  <CarePostCard key={p.id + iso} post={p} mediaUrls={mediaUrls} me={me}
+                    canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+                    onAsk={p.author_id !== me ? askEntry : undefined} />
+                ))}
+            </section>
+          );
+        };
+        return (
         <>
           {/* One row, the mock's grammar (founder 2026-09-23): whose plan,
-              which week, the pager flanking it. */}
+              which window, the pager flanking it. */}
           <div className="koc__weeknav">
-            <button className="conc__tool-circle" onClick={() => shiftWeek(-7)} aria-label="Previous week"><Icon name="chevron-left" size={14} /></button>
+            <button className="conc__tool-circle" onClick={() => shiftRange(-1)} aria-label={`Previous ${scope.toLowerCase()}`}><Icon name="chevron-left" size={14} /></button>
             <span className="koc__planlbl">
-              {isClientView ? (clientName ? `${possessive(clientName)} care plan` : 'Care plan') : 'Your care plan'} · {prettyWeekRange(weekStart)}
+              {isClientView ? (clientName ? `${possessive(clientName)} care plan` : 'Care plan') : 'Your care plan'} · {planWhen}
             </span>
-            <button className="conc__tool-circle" onClick={() => shiftWeek(7)} aria-label="Next week"><Icon name="chevron-right" size={14} /></button>
+            <button className="conc__tool-circle" onClick={() => shiftRange(1)} aria-label={`Next ${scope.toLowerCase()}`}><Icon name="chevron-right" size={14} /></button>
           </div>
           {canAuthor && (
-            <button className="board__post-btn" onClick={() => navigate(`${basePath}/koc/edit`)} aria-label="Post to care plan">
+            /* Day scope's + adds TO the day on screen; the other scopes
+               open the composer unset. */
+            <button className="board__post-btn" onClick={() => navigate(`${basePath}/koc/edit${scope === 'Day' ? `?date=${anchor}` : ''}`)} aria-label="Post to care plan">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                 <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </button>
           )}
           {!dataReady && <p className="conc__care-hint">Loading…</p>}
-          {dataReady && weekDays(weekStart).map((day) => {
-            const posts = kocPosts.filter((p) => occursOn(p, day.iso));
-            const d = localDate(day.iso);
-            const daylbl = `${d.toLocaleDateString(undefined, { weekday: 'long' })} · ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+          {dataReady && scope === 'Day' && daySection(anchor, false)}
+          {dataReady && scope === 'Week' && weekDays(mondayOfWeek(anchor)).map((day) => daySection(day.iso, true))}
+          {dataReady && scope === 'Month' && (() => {
+            // The month is a CALENDAR (founder 2026-09-24): Monday-first
+            // grid, entry dots per day, and every cell is a door into that
+            // day's own view — where the + adds to it.
+            const d = localDate(anchor);
+            const lead = (new Date(d.getFullYear(), d.getMonth(), 1).getDay() + 6) % 7;
+            const daysIn = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            const today = todayISO();
             return (
-              <section className="koc__daysec" key={day.iso}>
-                <h3 className="koc__daylbl">{daylbl}</h3>
-                {posts.length === 0
-                  ? <p className="koc__dayempty">Nothing scheduled</p>
-                  : posts.map((p) => (
-                    <CarePostCard key={p.id + day.iso} post={p} mediaUrls={mediaUrls} me={me}
-                      canDelete={canAuthor && p.author_id === me} onDelete={removePost}
-                      onAsk={p.author_id !== me ? askEntry : undefined} />
-                  ))}
-              </section>
+              <div className="koc__cal" role="grid" aria-label={planWhen}>
+                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => <span key={'wd' + i} className="koc__cal-wd" aria-hidden="true">{w}</span>)}
+                {Array.from({ length: lead }, (_, i) => <span key={'b' + i} className="koc__cal-blank" />)}
+                {Array.from({ length: daysIn }, (_, i) => {
+                  const iso = toISO(new Date(d.getFullYear(), d.getMonth(), i + 1));
+                  const n = kocPosts.filter((p) => occursOn(p, iso)).length;
+                  return (
+                    <button key={iso}
+                      className={'koc__cal-cell' + (iso === today ? ' is-today' : '')}
+                      onClick={() => { setAnchor(iso); setScope('Day'); }}
+                      aria-label={`${dayLbl(iso)} — ${n === 0 ? 'nothing scheduled' : `${n} on the plan`}`}>
+                      <span className="koc__cal-num">{i + 1}</span>
+                      {n > 0 && (
+                        <span className="koc__cal-dots">
+                          {Array.from({ length: Math.min(n, 3) }, (_, j) => <i key={j} />)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             );
-          })}
+          })()}
         </>
-      )}
+        );
+      })()}
 
       {activeTab === 'chat' && (
         <>
