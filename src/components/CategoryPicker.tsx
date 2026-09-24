@@ -181,7 +181,7 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
     }
     setPending((p) => [...p, data as Pending]);
     setSuggestName('');
-    setNotice('Sent for review — it’ll appear on your profile once approved.');
+    setNotice('Sent for review — you’ll get a bell when it’s decided.');
   }
 
   return (

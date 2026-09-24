@@ -122,7 +122,7 @@ export function IdentitiesDirectory() {
     setPendingNames((p) => [...p, typed]);
     // Approval appends the tag to the proposer (the existing RPC behavior),
     // so the receipt can honestly promise it becomes theirs.
-    setSuggestNote(`“${typed}” sent to Lichen for review — once approved, it joins the vocabulary and your identities.`);
+    setSuggestNote(`“${typed}” sent to Lichen for review — you’ll get a bell when it’s decided.`);
   }
   const yours = hits.filter((c) => mineSet.has(c.name.trim().toLowerCase()));
   const rest = hits.filter((c) => !mineSet.has(c.name.trim().toLowerCase()));

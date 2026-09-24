@@ -105,3 +105,19 @@
 }
 .adminc__map-hit:hover { border-color: var(--peach); color: var(--peach-deep); }
 .adminc__map-note { margin-top: var(--s-2); font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5; }
+
+/* EDIT ON APPROVAL (founder 2026-09-24): reshape the word before it joins
+   the vocabulary — an edited approval asks the proposer instead of
+   auto-adding, and the hint says so while it's in play. */
+.adminc__editbtn {
+  border: none; background: none; padding: 2px 4px; cursor: pointer;
+  font-family: inherit; font-size: 11px; color: var(--peach-deep);
+}
+.adminc__editbtn:hover { text-decoration: underline; }
+.adminc__editname {
+  flex: 1; min-width: 120px; padding: 6px 10px;
+  border: 1px solid var(--peach); border-radius: 8px; background: #fff;
+  font-family: inherit; font-size: 14px; color: var(--ink);
+}
+.adminc__name-arrow { color: var(--peach-deep); }
+.adminc__edithint { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); }
