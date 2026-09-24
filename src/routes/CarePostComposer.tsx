@@ -56,6 +56,12 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
   const timeParam = searchParams.get('time');
   const presetTime = kind === 'koc' && timeParam && /^\d{2}:\d{2}$/.test(timeParam) ? timeParam : '';
   const [atTime, setAtTime] = useState(presetTime);
+  // Dragging a SPAN on the grids arrives with ?dur=<minutes> (founder
+  // 2026-09-24: "an hour or 45 minutes, like you do on google cal").
+  const durParam = searchParams.get('dur');
+  const presetDur = kind === 'koc' && durParam && /^\d{1,4}$/.test(durParam)
+    && Number(durParam) > 0 && Number(durParam) <= 1440 ? Number(durParam) : 60;
+  const [durMin, setDurMin] = useState<number>(presetDur);
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);     // koc
   const [saving, setSaving] = useState(false);
   // OMIT FROM AI, AT THE MOMENT OF WRITING (founder 2026-08-20; reshaped
@@ -129,6 +135,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
         recurrence: kind === 'koc' ? recurrence : null,
         atMin: kind === 'koc' && /^\d{2}:\d{2}$/.test(atTime)
           ? Number(atTime.slice(0, 2)) * 60 + Number(atTime.slice(3, 5)) : null,
+        durationMin: kind === 'koc' && /^\d{2}:\d{2}$/.test(atTime) ? durMin : null,
         attachments: pending.map((p) => ({ type: p.type, path: p.path })),
         links: cleanedLinks, previews,
         aiOmit: omitAi ? 'other' : null, sensitive,
@@ -263,6 +270,25 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
                 <button type="button" className="cedit__timeclear" onClick={() => setAtTime('')}>All day</button>
               )}
             </div>
+            {/* A timed entry can say how long it runs (founder 2026-09-24). */}
+            {atTime && (
+              <div className="cedit__timerow">
+                <span className="cedit__label">How long?</span>
+                <select className="cedit__input cedit__durin" value={durMin}
+                  onChange={(e) => setDurMin(Number(e.target.value))}>
+                  {[15, 30, 45, 60, 90, 120, 180].includes(durMin) ? null : (
+                    <option value={durMin}>{durMin} min</option>
+                  )}
+                  <option value={15}>15 min</option>
+                  <option value={30}>30 min</option>
+                  <option value={45}>45 min</option>
+                  <option value={60}>1 hour</option>
+                  <option value={90}>1½ hours</option>
+                  <option value={120}>2 hours</option>
+                  <option value={180}>3 hours</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 

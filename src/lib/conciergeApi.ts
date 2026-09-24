@@ -61,6 +61,9 @@ export interface CarePostRow {
   /** koc: minutes since midnight (founder 2026-09-24, the hour grids) —
    *  null = all-day, the historical shape. */
   at_min?: number | null;
+  /** koc: how long a timed entry runs, in minutes (founder 2026-09-24,
+   *  "an hour or 45 minutes, like google cal") — null = a point in time. */
+  duration_min?: number | null;
   /** How a plan entry is held (founder 2026-09-14): a RECOMMENDED thing is
    *  worth trying, a PRESCRIBED one is part of the plan. Null = unlabeled. */
   intent?: 'recommended' | 'prescribed' | null;
@@ -81,7 +84,7 @@ export interface CarePostRow {
   author?: { full_name: string | null } | null;
 }
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent, at_min';
+  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent, at_min, duration_min';
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
@@ -368,6 +371,7 @@ export interface CarePostInput {
   dimensions?: Dimension[]; score?: number;      // wow
   startDate?: string; endDate?: string;          // koc
   atMin?: number | null;                         // koc: time of day (founder 2026-09-24)
+  durationMin?: number | null;                   // koc: length in minutes, timed entries only
   recurrence?: Recurrence | null;                // koc (null = plain day/range)
   attachments: CareAttachment[]; links: CareLink[]; previews: CarePostPreview[];
   /** 'medical' | 'financial' | 'other' — held back from every assistant,
@@ -392,6 +396,8 @@ export async function createCarePost(me: string, input: CarePostInput): Promise<
     end_date: input.kind === 'koc' && !recurring ? input.endDate : null,
     recurrence: input.kind === 'koc' ? (input.recurrence ?? null) : null,
     at_min: input.kind === 'koc' ? (input.atMin ?? null) : null,
+    // A duration only means something on a timed entry.
+    duration_min: input.kind === 'koc' && input.atMin != null ? (input.durationMin ?? null) : null,
     attachments: input.attachments, links: input.links, previews: input.previews,
     // Per-entry AI omission with its reason (founder 2026-08-20).
     ai_omit: input.aiOmit ?? null,

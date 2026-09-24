@@ -1135,6 +1135,18 @@
   /* hour lines every 44px — keep in step with KOC_HOUR_H */
   background-image: repeating-linear-gradient(to bottom, var(--bone-edge) 0 1px, transparent 1px 44px);
   cursor: pointer;
+  /* a mouse drag selects a span — never page text */
+  user-select: none; -webkit-user-select: none;
+}
+/* The growing selection while dragging a span (founder 2026-09-24) —
+   Calendar's drag-to-create box, in the plan's grammar. */
+.koc__dragsel {
+  position: absolute; left: 3px; right: 3px; z-index: 2; pointer-events: none;
+  background: color-mix(in srgb, var(--peach) 20%, transparent);
+  border: 1px dashed var(--peach-deep); border-radius: 8px;
+  padding: 2px 6px; overflow: hidden;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  color: var(--peach-deep); white-space: nowrap;
 }
 .koc__colallday.is-today, .koc__colhours.is-today { border-color: var(--peach); }
 .koc__colallday.is-today { border-bottom: none; }
@@ -1146,6 +1158,10 @@
 }
 .koc__chip-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .koc__chip-time { display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; color: var(--peach-deep); }
+/* A SHORT entry (15–30 min) is a sliver — time and title share its one line. */
+.koc__chip--slim { padding: 2px 8px; white-space: nowrap; text-overflow: ellipsis; }
+.koc__chip--slim .koc__chip-time { display: inline; margin-right: 4px; }
+.koc__chip--slim .koc__chip-title { display: inline; white-space: nowrap; }
 .koc__gutter { display: flex; flex-direction: column; }
 .koc__gutter-lbl {
   height: 44px; flex: none; text-align: right; padding-right: 4px; margin-top: -5px;

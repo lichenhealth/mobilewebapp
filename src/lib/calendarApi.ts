@@ -38,6 +38,10 @@ export interface EventRow {
   sourceUrl?: string | null;
   /** Which imported calendar this row came from (external rows only). */
   extCalId?: string;
+  /** A CARE-PLAN entry overlaid on the calendar (founder 2026-09-24:
+   *  "overlay your care plan… just like a google cal") — read-only here,
+   *  edited on the Concierge board. */
+  carePlan?: boolean;
 }
 
 const EVENT_COLS =

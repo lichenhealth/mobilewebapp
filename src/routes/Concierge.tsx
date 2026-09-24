@@ -32,7 +32,6 @@ import { occursOn } from '../lib/recurrence';
 const KOC_BAND_START = 6;   // 6am
 const KOC_BAND_END = 22;    // up to 10pm
 const KOC_HOUR_H = 44;      // px per hour in the week columns
-const KOC_CHIP_H = 44;      // the sweep's estimate of a timed chip's height
 import { useAuth } from '../auth/AuthProvider';
 import { consentOn, setConsent, careConsent } from '../lib/assistantConsentApi';
 import './Concierge.css';
@@ -1123,6 +1122,13 @@ export default function Concierge() {
   // team, toggled from the list at the web's upper left. Combo is the
   // default — with no care team it reads identically to Self.
   const [wowLens, setWowLens] = useState<WowLens>('combo');
+  // Drag a SPAN on the week hour grid (founder 2026-09-24: "select an hour
+  // or 45 minutes, etc — like you do on google cal") — Calendar's own
+  // drag-to-create idiom: a mouse drag selects, touch stays scrolling
+  // (the browser fires pointercancel), a plain tap keeps the hour door.
+  // Minutes since midnight, snapped to 15.
+  const kocDragRef = useRef<{ iso: string; anchor: number; start: number; end: number; moved: boolean } | null>(null);
+  const [kocDrag, setKocDrag] = useState<{ iso: string; start: number; end: number } | null>(null);
   // THE SCOPE IS REAL NOW (founder 2026-09-24: "the UI doesn't shift when I
   // select day, week or month"): one ANCHOR date; Day/Week/Month derive
   // their window from it, both pagers step by the scope, and each scope has
@@ -1883,25 +1889,76 @@ export default function Concierge() {
                   const timed = posts
                     .filter((p) => p.at_min != null && p.at_min >= bandMin && p.at_min < KOC_BAND_END * 60)
                     .sort((a, b) => (a.at_min ?? 0) - (b.at_min ?? 0));
-                  // Same-hour entries sweep DOWN instead of overlapping.
+                  // A chip is as tall as its DURATION now (founder 2026-09-24)
+                  // — an entry with no stated length keeps the old 40px look.
+                  const chipH = (p: CarePostRow) => p.duration_min != null
+                    ? Math.max(22, (p.duration_min / 60) * KOC_HOUR_H - 2) : 40;
+                  // Overlapping entries sweep DOWN instead of stacking.
                   let prevBottom = -Infinity;
-                  const tops = timed.map((p) => {
+                  const geo = timed.map((p) => {
                     let top = (((p.at_min ?? 0) - bandMin) / 60) * KOC_HOUR_H;
                     if (top < prevBottom + 2) top = prevBottom + 2;
-                    prevBottom = top + KOC_CHIP_H;
-                    return top;
+                    const h = chipH(p);
+                    prevBottom = top + h;
+                    return { top, h };
                   });
+                  // 15-minute slots under the pointer (Calendar's slotAt).
+                  const slotAt = (e: React.PointerEvent, el: HTMLElement) => {
+                    const y = e.clientY - el.getBoundingClientRect().top;
+                    const max = (KOC_BAND_END - KOC_BAND_START) * 4 - 1;
+                    return bandMin + Math.max(0, Math.min(max, Math.floor(y / (KOC_HOUR_H / 4)))) * 15;
+                  };
                   return (
                     <div className={'koc__colhours' + (day.iso === todayISO() ? ' is-today' : '')} key={'t' + day.iso}
                       style={{ gridColumn: i + 2, gridRow: 3, height: bandH }}
-                      onClick={canAuthor ? (e) => {
-                        const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-                        const hour = KOC_BAND_START + Math.max(0, Math.min(KOC_BAND_END - KOC_BAND_START - 1, Math.floor(y / KOC_HOUR_H)));
-                        navigate(`${basePath}/koc/edit?date=${day.iso}&time=${String(hour).padStart(2, '0')}:00`);
-                      } : undefined}>
+                      onPointerDown={canAuthor ? (e) => {
+                        if ((e.target as HTMLElement).closest('button')) return; // chips own their clicks
+                        const s = slotAt(e, e.currentTarget);
+                        kocDragRef.current = { iso: day.iso, anchor: s, start: s, end: s + 15, moved: false };
+                        if (e.pointerType === 'mouse') {
+                          setKocDrag({ iso: day.iso, start: s, end: s + 15 });
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                        }
+                      } : undefined}
+                      onPointerMove={canAuthor ? (e) => {
+                        const d = kocDragRef.current;
+                        if (!d || d.iso !== day.iso || e.pointerType !== 'mouse') return;
+                        const s = slotAt(e, e.currentTarget);
+                        if (s !== d.anchor) d.moved = true;
+                        d.start = Math.min(d.anchor, s);
+                        d.end = Math.max(d.anchor + 15, s + 15);
+                        setKocDrag({ iso: day.iso, start: d.start, end: d.end });
+                      } : undefined}
+                      onPointerUp={canAuthor ? () => {
+                        const d = kocDragRef.current;
+                        kocDragRef.current = null;
+                        setKocDrag(null);
+                        if (!d || d.iso !== day.iso) return;
+                        if (!d.moved) {
+                          // a plain tap adds at the HOUR; length gets chosen
+                          // in the composer ("How long?").
+                          const hour = Math.floor(d.anchor / 60);
+                          navigate(`${basePath}/koc/edit?date=${day.iso}&time=${String(hour).padStart(2, '0')}:00`);
+                          return;
+                        }
+                        const hh = String(Math.floor(d.start / 60)).padStart(2, '0');
+                        const mm = String(d.start % 60).padStart(2, '0');
+                        navigate(`${basePath}/koc/edit?date=${day.iso}&time=${hh}:${mm}&dur=${d.end - d.start}`);
+                      } : undefined}
+                      onPointerCancel={() => { kocDragRef.current = null; setKocDrag(null); }}>
+                      {kocDrag?.iso === day.iso && (
+                        <div className="koc__dragsel" aria-hidden="true" style={{
+                          top: ((kocDrag.start - bandMin) / 60) * KOC_HOUR_H,
+                          height: ((kocDrag.end - kocDrag.start) / 60) * KOC_HOUR_H,
+                        }}>
+                          {minToLabel(kocDrag.start)} – {minToLabel(kocDrag.end)}
+                        </div>
+                      )}
                       {timed.map((p, j) => (
-                        <button key={p.id + day.iso} className="koc__chip koc__chip--timed" style={{ top: tops[j] }}
-                          title={`${minToLabel(p.at_min ?? 0)} · ${p.title || p.body}`}
+                        <button key={p.id + day.iso}
+                          className={'koc__chip koc__chip--timed' + (geo[j].h < 36 ? ' koc__chip--slim' : '')}
+                          style={{ top: geo[j].top, height: geo[j].h }}
+                          title={`${minToLabel(p.at_min ?? 0)}${p.duration_min != null ? ` – ${minToLabel(Math.min(1439, (p.at_min ?? 0) + p.duration_min))}` : ''} · ${p.title || p.body}`}
                           onClick={(e) => { e.stopPropagation(); setAnchor(day.iso); setScope('Day'); }}>
                           <span className="koc__chip-time">{minToLabel(p.at_min ?? 0)}</span>
                           <span className="koc__chip-title">{p.title || p.body}</span>
