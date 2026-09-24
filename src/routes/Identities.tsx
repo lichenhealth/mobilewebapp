@@ -64,6 +64,14 @@ export function IdentitiesDirectory() {
   const [mine, setMine] = useState<string[]>([]);   // names, from identity_tags
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  // SUGGEST FROM RIGHT HERE (founder 2026-09-24: typed "Therapist", found
+  // nothing, and the only door was a pointer to Profile's Identity field):
+  // a missing identity files into the SAME category_suggestions queue the
+  // Identity field uses — the insert trigger bells the platform admins and
+  // it lands at /admin/categories for the ordinary review.
+  const [pendingNames, setPendingNames] = useState<string[]>([]);
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [suggestNote, setSuggestNote] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -77,11 +85,45 @@ export function IdentitiesDirectory() {
     return () => { live = false; };
   }, [me]);
 
+  // Your own still-pending suggestions, so the button can say "Suggested ✓"
+  // instead of quietly filing the same name twice.
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void supabase.from('category_suggestions').select('name')
+      .eq('proposer_id', me).eq('domain', 'identity').eq('status', 'pending')
+      .then(({ data }) => {
+        if (live && data) setPendingNames((data as { name: string }[]).map((r) => r.name));
+      });
+    return () => { live = false; };
+  }, [me]);
+
   const mineSet = useMemo(() => new Set(mine.map((t) => t.trim().toLowerCase())), [mine]);
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? cats.filter((c) => c.name.toLowerCase().includes(q)) : cats;
   }, [cats, query]);
+
+  const norm = (s: string) => s.trim().toLowerCase();
+  const typed = query.trim();
+  // The button shows only when the typed name isn't already in the
+  // vocabulary — an existing identity is joined, never re-suggested.
+  const exactExists = cats.some((c) => norm(c.name) === norm(typed));
+  const alreadyPending = pendingNames.some((n) => norm(n) === norm(typed));
+  const canSuggest = !!me && typed.length >= 2 && !exactExists;
+
+  async function suggest() {
+    if (!canSuggest || suggestBusy || alreadyPending) return;
+    setSuggestBusy(true);
+    const { error } = await supabase.from('category_suggestions')
+      .insert({ proposer_id: me, domain: 'identity', name: typed });
+    setSuggestBusy(false);
+    if (error) { setSuggestNote('Could not send that just now — please try again.'); return; }
+    setPendingNames((p) => [...p, typed]);
+    // Approval appends the tag to the proposer (the existing RPC behavior),
+    // so the receipt can honestly promise it becomes theirs.
+    setSuggestNote(`“${typed}” sent to Lichen for review — once approved, it joins the vocabulary and your identities.`);
+  }
   const yours = hits.filter((c) => mineSet.has(c.name.trim().toLowerCase()));
   const rest = hits.filter((c) => !mineSet.has(c.name.trim().toLowerCase()));
 
@@ -103,21 +145,33 @@ export function IdentitiesDirectory() {
           Ways members name themselves — Firefighter, Teacher, Founder. An
           identity isn&rsquo;t a community: nobody runs it, it never needs
           tending, and it can hold any number of people. Naming one as yours
-          is how you join it. Don&rsquo;t see yours? Suggest it from the
-          Identity field on your profile.
+          is how you join it. Don&rsquo;t see yours? Search for it and
+          suggest it to Lichen right here.
         </p>
       </header>
 
-      <div className="dir__search">
-        <Icon name="search" size={16} />
-        <input className="dir__search-input" placeholder="Search identities"
-          value={query} onChange={(e) => setQuery(e.target.value)} />
-        {query && (
-          <button className="dir__search-clear" onClick={() => setQuery('')} aria-label="Clear">
-            <Icon name="close" size={14} />
+      {/* The search shell shortens to make room for the SUGGEST door at its
+          right (founder 2026-09-24) — shown only when the typed name isn't
+          already in the vocabulary. */}
+      <div className="idn__searchrow">
+        <div className="dir__search">
+          <Icon name="search" size={16} />
+          <input className="dir__search-input" placeholder="Search identities"
+            value={query} onChange={(e) => { setQuery(e.target.value); setSuggestNote(''); }} />
+          {query && (
+            <button className="dir__search-clear" onClick={() => setQuery('')} aria-label="Clear">
+              <Icon name="close" size={14} />
+            </button>
+          )}
+        </div>
+        {canSuggest && (
+          <button className="btn btn-primary idn__suggest" onClick={suggest}
+            disabled={suggestBusy || alreadyPending}>
+            {alreadyPending ? 'Suggested ✓' : suggestBusy ? 'Sending…' : 'Suggest'}
           </button>
         )}
       </div>
+      {suggestNote && <p className="idn__suggest-note">{suggestNote}</p>}
 
       <div className="dir__list">
         {loading && <div className="dir__empty"><p>Loading identities…</p></div>}
@@ -125,7 +179,13 @@ export function IdentitiesDirectory() {
           <div className="dir__empty">
             <Icon name="search" size={20} />
             <p>No identity matches &ldquo;{query}&rdquo;</p>
-            <p className="dir__empty-sub">Suggest it to Lichen from the Identity field on your profile.</p>
+            <p className="dir__empty-sub">
+              {me
+                ? (alreadyPending
+                  ? 'You’ve suggested it — Lichen is reviewing.'
+                  : 'Tap Suggest above to send it to Lichen for review.')
+                : 'Sign in to suggest it to Lichen.'}
+            </p>
           </div>
         )}
         {yours.length > 0 && (
