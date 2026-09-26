@@ -8,15 +8,19 @@ import {
 } from '../lib/chatApi';
 import {
   loadCarePosts, computeWowLenses, wowScoreBand, getCareSettings, WOW_WINDOW_DEFAULT,
+  loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel, type OnCallCaregiver,
 } from '../lib/conciergeApi';
+import { loadMyAvailability, minToLabel, type AvailabilityWindow } from '../lib/calendarApi';
 import './Caregiver.css';
 
-type CgTab = 'wow' | 'koc' | 'chat' | 'clients';
+type CgTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'clients';
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** Per-client glance data for the WOW and KOC tabs — the client's own
  *  numbers, read through their own window so the dashboard never disagrees
  *  with their board. */
-type ClientStats = { overall: number | null; kocWeek: number };
+type ClientStats = { overall: number | null; kocWeek: number; roster: OnCallCaregiver[] };
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -37,6 +41,10 @@ export default function Caregiver() {
   const [stats, setStats] = useState<Map<string, ClientStats>>(new Map());
   const [statsReady, setStatsReady] = useState(false);
   const [unread, setUnread] = useState<Map<string, number>>(new Map());
+  // Your own on-call rota (Urgent Care tab) — HOURS ARE SET in Calendar
+  // settings, the one editor (standing rule); this tab reads them back and
+  // holds the door.
+  const [myOnCall, setMyOnCall] = useState<AvailabilityWindow[]>([]);
 
   useEffect(() => {
     if (!me) return;
@@ -57,19 +65,24 @@ export default function Caregiver() {
         const now = new Date();
         const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
         const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-        const rows = await Promise.all(list.map(async (c) => {
-          const [wow, koc, settings] = await Promise.all([
-            loadCarePosts(c.patient_id, 'wow').catch(() => []),
-            loadCarePosts(c.patient_id, 'koc', { from: iso(mon), to: iso(sun) }).catch(() => []),
-            getCareSettings(c.patient_id).catch(() => null),
-          ]);
-          const windowDays = settings?.wow_window_auto && settings.wow_window_days
-            ? settings.wow_window_days : WOW_WINDOW_DEFAULT;
-          const lenses = computeWowLenses(wow, c.patient_id, new Date(), windowDays);
-          return [c.patient_id, { overall: lenses.combo.overall, kocWeek: koc.length }] as const;
-        }));
+        const [rows, mine] = await Promise.all([
+          Promise.all(list.map(async (c) => {
+            const [wow, koc, settings, roster] = await Promise.all([
+              loadCarePosts(c.patient_id, 'wow').catch(() => []),
+              loadCarePosts(c.patient_id, 'koc', { from: iso(mon), to: iso(sun) }).catch(() => []),
+              getCareSettings(c.patient_id).catch(() => null),
+              loadOnCallRoster(c.patient_id).catch(() => [] as OnCallCaregiver[]),
+            ]);
+            const windowDays = settings?.wow_window_auto && settings.wow_window_days
+              ? settings.wow_window_days : WOW_WINDOW_DEFAULT;
+            const lenses = computeWowLenses(wow, c.patient_id, new Date(), windowDays);
+            return [c.patient_id, { overall: lenses.combo.overall, kocWeek: koc.length, roster }] as const;
+          })),
+          loadMyAvailability(me).catch(() => [] as AvailabilityWindow[]),
+        ]);
         if (!active) return;
         setStats(new Map(rows));
+        setMyOnCall(mine.filter((w) => w.kind === 'on_call'));
         setStatsReady(true);
       } else {
         setLoading(false);
@@ -82,19 +95,44 @@ export default function Caregiver() {
     { id: 'wow', label: 'WOW' },
     { id: 'koc', label: 'KOC' },
     { id: 'chat', label: 'Chat' },
+    { id: 'urgent', label: 'Urgent Care' },
     { id: 'clients', label: 'Client List' },
   ];
   const SUBS: Record<CgTab, string> = {
     wow: 'Each client’s Web of Wellbeing at a glance. Open one to read their web and weave entries in.',
     koc: 'Each client’s care plan. Open one to see the week and add plan entries.',
     chat: 'Every care conversation you’re part of, one per client.',
+    urgent: 'Who answers urgently for each client — and your own on-call hours.',
     clients: 'People whose care team you’re on. Open a client to engage with any part of their board.',
   };
 
   const go = (c: CareClient) => {
     navigate(tab === 'koc' ? `/concierge/client/${c.patient_id}/koc`
       : tab === 'chat' ? `/concierge/client/${c.patient_id}/chat`
-        : `/concierge/client/${c.patient_id}`);
+        : tab === 'urgent' ? `/concierge/client/${c.patient_id}/urgent`
+          : `/concierge/client/${c.patient_id}`);
+  };
+
+  /** One line per client: who holds the urgent door right now, or next. */
+  const urgentLine = (s: ClientStats | undefined): string => {
+    if (!statsReady || !s) return '…';
+    if (!s.roster.length || s.roster.every((r) => r.windows.length === 0)) {
+      return 'No on-call hours set for this team';
+    }
+    const now = new Date();
+    const today = iso(now);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const live = s.roster.find((r) => onCallNow(r.windows, today, nowMin));
+    if (live) return `${live.name.split(' ')[0]} is on call now`;
+    let best: { name: string; next: { iso: string; startMin: number } } | null = null;
+    for (const r of s.roster) {
+      const n = nextOnCall(r.windows, today, nowMin);
+      if (n && (!best || n.iso < best.next.iso
+        || (n.iso === best.next.iso && n.startMin < best.next.startMin))) {
+        best = { name: r.name, next: n };
+      }
+    }
+    return best ? `${best.name.split(' ')[0]} · ${nextOnCallLabel(best.next)}` : 'No on-call hours set for this team';
   };
 
   return (
@@ -107,19 +145,13 @@ export default function Caregiver() {
         <p className="cg__sub">{SUBS[tab]}</p>
       </header>
 
-      {/* The dashboard switch, mirrored (founder 2026-09-26): the same
-          dropdown Concierge carries, here reading Provider Dashboard —
-          flipping back lands on your own board. */}
+      {/* The dashboard switch, top right in the WOW lenses' own grammar
+          (founder 2026-09-26 markup: "have the toggle for the WOW design
+          be mirrored for the provider versus your dashboard"). */}
       {!loading && allowed && (
-        <div className="cg__dashrow">
-          <select className="cg__dash-select" value="provider" aria-label="Dashboard"
-            onChange={(e) => { if (e.target.value === 'me') navigate('/concierge'); }}>
-            <option value="me">My Dashboard</option>
-            <option value="provider">Provider Dashboard</option>
-          </select>
-          <button className="cg__dashlink link-cue" onClick={() => navigate('/concierge')}>
-            Switch to my dashboard &rsaquo;
-          </button>
+        <div className="cg__dashtoggle" role="group" aria-label="Dashboard">
+          <button className="cg__dashbtn" onClick={() => navigate('/concierge')}>My Dashboard</button>
+          <button className="cg__dashbtn is-on">Provider Dashboard</button>
         </div>
       )}
 
@@ -160,6 +192,28 @@ export default function Caregiver() {
         </div>
       )}
 
+      {/* Urgent Care leads with YOUR rota (founder 2026-09-26: "the way
+          you go in and set 'on call' details for yourself"): hours are
+          read back here, and the door goes to Calendar settings — the one
+          hours editor, never a second. */}
+      {!loading && allowed && tab === 'urgent' && (
+        <div className="cg__oncall">
+          <p className="cg__oncall-lead">Your on-call hours</p>
+          {myOnCall.length === 0
+            ? <p className="cg__oncall-empty">You haven&rsquo;t set on-call hours yet — clients can&rsquo;t reach you urgently until you do.</p>
+            : (
+              <ul className="cg__oncall-list">
+                {myOnCall.map((w) => (
+                  <li key={w.id}>{DAY_NAMES[w.weekday]} {minToLabel(w.start_min)} – {minToLabel(w.end_min)}</li>
+                ))}
+              </ul>
+            )}
+          <button className="cg__oncall-set link-cue" onClick={() => navigate('/calendar/settings')}>
+            Set your on-call hours &rsaquo;
+          </button>
+        </div>
+      )}
+
       {!loading && allowed && clients.length > 0 && (
         <div className="cg__list">
           {clients.map((c) => {
@@ -192,6 +246,9 @@ export default function Caregiver() {
                           ? `${s.kocWeek} plan ${s.kocWeek === 1 ? 'entry' : 'entries'} this week`
                           : 'Nothing on the plan this week'}
                     </span>
+                  )}
+                  {tab === 'urgent' && (
+                    <span className="cg__row-preview">{urgentLine(s)}</span>
                   )}
                   {(tab === 'chat' || tab === 'clients') && (
                     <span className="cg__row-preview">
