@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminViewToggle from '../components/AdminViewToggle';
 import FilterRow from '../components/FilterRow';
-import { useAdminView } from '../lib/adminView';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -111,7 +109,6 @@ const CATEGORY_ICONS: IconRowItem[] = [
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const adminView = useAdminView();
   const { promptSaved, openPicker } = useCollect();
   const { actor, ready: actingReady } = useActing();
 
@@ -182,12 +179,10 @@ export default function Home() {
   }, [actor]);
 
   return (
-    <div className={'home' + (adminView ? ' is-adminview' : '')}>
-      {/* Lichen's own Member view | Admin view — the same pair a space page
-          carries, in the same place (founder 2026-08-08). Here it means
-          stewarding the platform itself. */}
-      <AdminViewToggle />
-
+    <div className="home">
+      {/* The Member view | Admin view pair is RETIRED (founder 2026-09-26:
+          "get rid of admin view altogether") — the side menu shows desk
+          work inline now, no mode to flip. */}
       <IconRow items={CATEGORY_ICONS.map((it) => (it.label === 'Assistant'
         ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
         : it))} />

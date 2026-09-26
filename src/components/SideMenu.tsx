@@ -6,7 +6,6 @@ import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type Adm
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
-import { useAdminView } from '../lib/adminView';
 import { supabase } from '../lib/supabase';
 import { getIdentityTags } from '../lib/meansApi';
 import './SideMenu.css';
@@ -93,14 +92,16 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     // views live as tabs INSIDE Profile — Admin · In Lichen · Web page.
     ;
   const { countsBySection, countsBySpace, totalUnread } = useNotifications();
-  // Admin view (founder 2026-07-27): the space lists flip from engagement
-  // (peach unreads) to stewardship — only the spaces you manage, blue badges
-  // counting what waits at each desk, taps landing backstage. Blue = tending
-  // the structure; peach = life inside it. The TOGGLE itself moved onto the
-  // page in 2026-08-08 (AdminViewToggle, where a space's own Member|Admin pair
-  // sits); the menu only reads the flag now.
-  const adminView = useAdminView();
+  // ADMIN VIEW IS RETIRED (founder 2026-09-26: "get rid of admin view
+  // altogether - it feels redundant"): ONE menu now. A space you steward
+  // wears its desk count merged into its ordinary badge — pending work is
+  // visible without flipping a mode — and platform admins always see the
+  // Lichen desk group. Everything is peach.
   const [desk, setDesk] = useState<AdminDesk>({ ids: new Set(), counts: {} });
+  // Pending category suggestions — the REAL count for "Review categories"
+  // (it used to show the member's unread profile BELLS, so a care-request
+  // bell read as a phantom suggestion — founder caught it 2026-09-26).
+  const [pendingCats, setPendingCats] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
@@ -166,15 +167,24 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     return () => { live = false; supabase.removeChannel(channel); };
   }, [platformAdmin]);
 
+  useEffect(() => {
+    if (!platformAdmin) return;
+    let live = true;
+    void supabase.from('category_suggestions').select('id', { count: 'exact', head: true })
+      .eq('status', 'pending').then(({ count }) => { if (live) setPendingCats(count ?? 0); });
+    return () => { live = false; };
+  }, [platformAdmin, open]);
+
   const itemsFor = (key: string): { label: string; href: string; count: number; admin: boolean }[] => {
     const kind = SPACE_SECTIONS.find((s) => s.key === key)?.kind;
     if (!kind) return [];
+    // One badge per space: engagement unreads + what waits at its desk (for
+    // spaces you steward) — pending work shows without a mode flip.
     return mySpaces.filter((s) => s.kind === kind)
-      .filter((s) => !adminView || desk.ids.has(s.id))
       .map((s) => ({
         label: s.name,
-        href: adminView ? `/spaces/${s.id}?manage=1` : `/spaces/${s.id}`,
-        count: adminView ? (desk.counts[s.id] ?? 0) : (countsBySpace[s.id] ?? 0),
+        href: `/spaces/${s.id}`,
+        count: (countsBySpace[s.id] ?? 0) + (desk.counts[s.id] ?? 0),
         admin: desk.ids.has(s.id),
       }));
   };
@@ -196,8 +206,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     onClose();
   };
 
-  // Lichen + My-celium; the web feed steps aside in admin view.
-  const lead = adminView ? LEAD.filter((p) => p.to !== '/mycelium') : LEAD;
+  const lead = LEAD;
 
   /** One row of the nav — used by both the lead pair and the tools below. */
   const navItem = (p: { to: string; label: string; icon: IconName }) => {
@@ -247,14 +256,15 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           {/* About button removed (founder 2026-08-04): /about is the static
               merged story on the marketing site now — "you figure it out
               before you enter the platform." */}
-          {/* THE TWO FEEDS lead the nav: everyone, then your web. In admin
-              view My-celium steps aside — that mode is about the spaces you
-              steward, not what you're reading. */}
+          {/* THE TWO FEEDS lead the nav: everyone, then your web. */}
           <div className="side-menu__primary">
             {lead.map(navItem)}
           </div>
 
-          {adminView && platformAdmin && (
+          {/* The platform desk, always visible to platform admins (founder
+              2026-09-26 — admin view is retired, nothing hides behind a
+              mode). */}
+          {platformAdmin && (
             <div className="side-menu__section">
               <button className="side-menu__header" aria-expanded>
                 <span className="side-menu__header-label">Lichen</span>
@@ -276,8 +286,8 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <li>
                   <button className="side-menu__sub-item" onClick={() => go('/admin/categories')}>
                     Review categories
-                    {(countsBySection['profile'] ?? 0) > 0 && (
-                      <span className="side-menu__deskbadge">{countsBySection['profile']}</span>
+                    {pendingCats > 0 && (
+                      <span className="side-menu__deskbadge">{pendingCats > 9 ? '9+' : pendingCats}</span>
                     )}
                   </button>
                 </li>
@@ -287,7 +297,6 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
           {SECTIONS.map((s) => {
             const items = itemsFor(s.key);
-            if (adminView && items.length === 0) return null;
             return (
               <div key={s.key} className="side-menu__section">
                 <button
@@ -304,7 +313,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   {!expanded[s.key] && (() => {
                     const sum = items.reduce((n, it) => n + it.count, 0);
                     return sum > 0
-                      ? <span className={'side-menu__deskbadge' + (adminView ? '' : ' side-menu__deskbadge--peach')}>{sum > 9 ? '9+' : sum}</span>
+                      ? <span className="side-menu__deskbadge">{sum > 9 ? '9+' : sum}</span>
                       : null;
                   })()}
                   {items.length > 0 && (
@@ -331,7 +340,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                         >
                           {item.label}
                           {item.count > 0 && (
-                            <span className={'side-menu__deskbadge' + (adminView ? '' : ' side-menu__deskbadge--peach')}>
+                            <span className="side-menu__deskbadge">
                               {item.count > 9 ? '9+' : item.count}
                             </span>
                           )}
@@ -346,9 +355,8 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
           {/* Identities ride below the spaces you belong to — same reach,
               different nature (founder 2026-08-20: an identity holds any
-              number of people and nobody runs it). Absent in admin view. */}
-          {!adminView && (
-            <div className="side-menu__section">
+              number of people and nobody runs it). */}
+          <div className="side-menu__section">
               {/* Identities sit WITH the space kinds — they're all filters
                   on the network, unlike the utilities below (founder
                   2026-08-21); the hairline now sits UNDER this section as
@@ -376,7 +384,6 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 </ul>
               )}
             </div>
-          )}
 
           {/* Filters above, utilities below (founder 2026-08-21): the kinds
               and Identities are ways of seeing the network; everything under
