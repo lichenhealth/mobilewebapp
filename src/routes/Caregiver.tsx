@@ -107,6 +107,22 @@ export default function Caregiver() {
         <p className="cg__sub">{SUBS[tab]}</p>
       </header>
 
+      {/* The dashboard switch, mirrored (founder 2026-09-26): the same
+          dropdown Concierge carries, here reading Provider Dashboard —
+          flipping back lands on your own board. */}
+      {!loading && allowed && (
+        <div className="cg__dashrow">
+          <select className="cg__dash-select" value="provider" aria-label="Dashboard"
+            onChange={(e) => { if (e.target.value === 'me') navigate('/concierge'); }}>
+            <option value="me">My Dashboard</option>
+            <option value="provider">Provider Dashboard</option>
+          </select>
+          <button className="cg__dashlink link-cue" onClick={() => navigate('/concierge')}>
+            Switch to my dashboard &rsaquo;
+          </button>
+        </div>
+      )}
+
       {!loading && allowed && (
         <nav className="cg__tabs" aria-label="Caregiver views">
           {TABS.map((t) => (

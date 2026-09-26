@@ -116,3 +116,21 @@
 .cg__score.is-high { color: var(--green-deep); }
 .cg__score.is-mid { color: var(--peach-deep); }
 .cg__score.is-low { color: var(--red-deep); }
+
+/* The dashboard switch, mirrored from Concierge (founder 2026-09-26). */
+.cg__dashrow { display: flex; align-items: center; padding: 0 var(--s-5); margin: -4px 0 6px; }
+.cg__dashlink {
+  background: none; border: 0; padding: 4px 0; cursor: pointer; font-family: inherit;
+  font-size: 12.5px; color: var(--ink);
+}
+.cg__dash-select {
+  display: none;
+  padding: 7px 8px 7px 16px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
+}
+.cg__dash-select:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
+@media (min-width: 1024px) {
+  .cg__dash-select { display: inline-flex; }
+  .cg__dashlink { display: none; }
+}

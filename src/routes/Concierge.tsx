@@ -1032,9 +1032,24 @@ export default function Concierge() {
   // chose — silence in either direction is the failure.
   const [clientAiOff, setClientAiOff] = useState(false);
   const [scope, setScope] = useState<'Day' | 'Week' | 'Month'>('Day');
-  // Bumped by the Care Team tab's + door — opens Admin and focuses the
-  // invite box inside CareTeamDirectory.
+  // Bumped by the Care Team tab's + door — focuses the invite box inside
+  // CareTeamDirectory.
   const [teamAdd, setTeamAdd] = useState(0);
+
+  // THE DASHBOARD SWITCH (founder 2026-09-26: "a smart link in Concierge …
+  // 'switch to provider dashboard' for all members who are also care team
+  // providers. On desktop … a drop down on the left that has My Dashboard
+  // and Provider Dashboard"): shown only to members who actively care for
+  // someone. Phones get the one-line link, ≥1024px gets the dropdown.
+  const [isProvider, setIsProvider] = useState(false);
+  useEffect(() => {
+    if (!me || isClientView) return;
+    let live = true;
+    void supabase.from('care_team_members').select('id', { count: 'exact', head: true })
+      .eq('caregiver_id', me).eq('status', 'active')
+      .then(({ count }) => { if (live) setIsProvider((count ?? 0) > 0); });
+    return () => { live = false; };
+  }, [me, isClientView]);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -1420,6 +1435,22 @@ export default function Concierge() {
           Care Team
         </button>
       </nav>
+
+      {/* The dashboard switch, for members who also provide care (founder
+          2026-09-26): a dropdown on the left at desktop, a one-line link on
+          phones — both land on /caregiver. */}
+      {!isClientView && isProvider && (
+        <div className="conc__dashrow">
+          <select className="conc__vselect conc__dash-select" value="me" aria-label="Dashboard"
+            onChange={(e) => { if (e.target.value === 'provider') navigate('/caregiver'); }}>
+            <option value="me">My Dashboard</option>
+            <option value="provider">Provider Dashboard</option>
+          </select>
+          <button className="conc__dashlink link-cue" onClick={() => navigate('/caregiver')}>
+            Switch to provider dashboard &rsaquo;
+          </button>
+        </div>
+      )}
 
       {/* Tool row (search · AI brain · scope · pagination) */}
       {/* The Care Team tab sheds the board chrome (founder 2026-09-15: "the
