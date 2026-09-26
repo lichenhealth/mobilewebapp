@@ -1,0 +1,39 @@
+/* CareAddBox — the smart care add (founder 2026-09-26). One class family,
+   shared by the Concierge Care Team tab and Profile's care section. */
+.careadd { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); }
+.careadd__row { display: flex; gap: var(--s-2); }
+.careadd__input {
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: var(--r-md);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  font-size: 13px; color: var(--ink); font-family: inherit;
+}
+.careadd__btn { white-space: nowrap; flex-shrink: 0; font-size: 12px; padding: 8px 12px; }
+.careadd__hits {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 6px;
+}
+.careadd__hit {
+  display: flex; align-items: baseline; gap: 8px; text-align: left;
+  background: transparent; border: 0; padding: 8px 10px; border-radius: var(--r-sm);
+  cursor: pointer; font-family: inherit; width: 100%;
+}
+.careadd__hit:hover { background: var(--bone-warm); }
+.careadd__hit-name { font-size: 14px; color: var(--ink); }
+.careadd__hit-sub {
+  font-size: 11px; color: var(--ink-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.careadd__hit-add {
+  margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 600;
+  color: var(--peach-deep); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.careadd__invite {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); padding: 10px 12px;
+}
+.careadd__invite-lead { font-size: 12px; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+.careadd__hint { font-size: 12px; color: var(--ink-faint); margin: 0; line-height: 1.5; }
+.careadd__text { display: flex; gap: var(--s-2); align-items: center; }
+.careadd__msg { font-size: 12px; color: var(--ink-soft); margin: 0; }
