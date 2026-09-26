@@ -14,10 +14,11 @@ import { useActing } from '../acting/ActingProvider';
 import { loadMyPhone } from '../lib/conciergeApi';
 import { readDraft, writeDraft, clearDraft, sameDraft, normalize, type PageDraft } from '../lib/pageDrafts';
 import {
-  loadCareLinks, inviteCare as careInvite, approveCare as careApprove,
+  loadCareLinks, approveCare as careApprove,
   removeCare as careRemove, cancelCareInvite as careCancelInvite,
-  copyCareInvite, sendCareInviteEmail, type CareStatus,
+  copyCareInvite, sendCareInviteEmail, prepareCareText, type CareStatus,
 } from '../lib/careTeamApi';
+import CareAddBox from '../components/CareAddBox';
 import Avatar from '../components/Avatar';
 import { Icon } from '../components/Icon';
 import HomeLocationSection from '../components/HomeLocationSection';
@@ -27,7 +28,6 @@ import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
 import './Profile.css';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { offerCareFor } from '../lib/careTeamApi';
 import { type ContactInfo, type ContactSuggestion } from '../components/ContactFields';
 import { listMyBookingTypes } from '../lib/bookingApi';
 import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } from '../lib/spacesApi';
@@ -166,10 +166,8 @@ export default function Profile() {
 
   const [pendingCats, setPendingCats] = useState(0);
   const [care, setCare] = useState<CareRow[]>([]);
-  const [invites, setInvites] = useState<{ id: string; email: string; role: 'caregiver' | 'patient' }[]>([]);
-  const [patientEmail, setPatientEmail] = useState('');
+  const [invites, setInvites] = useState<{ id: string; email: string | null; phone: string | null; role: 'caregiver' | 'patient' }[]>([]);
   const [careMsg, setCareMsg] = useState('');
-  const [careBusy, setCareBusy] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -297,18 +295,6 @@ export default function Profile() {
       .then(({ count }) => setPendingCats(count ?? 0));
   }, [isAdmin]);
 
-  async function inviteCare(role: 'caregiver' | 'patient', emailRaw: string) {
-    if (!user) return;
-    setCareMsg(''); setCareBusy(true);
-    const res = await careInvite(role, emailRaw);
-    setCareBusy(false);
-    setCareMsg(res.message);
-    if (res.ok) {
-      if (role === 'patient') setPatientEmail('');
-      loadCare();
-    }
-  }
-
   async function approveCare(id: string) {
     setError('');
     try { await careApprove(id); loadCare(); } catch (e) { setError((e as Error).message); }
@@ -327,6 +313,12 @@ export default function Profile() {
   async function sendInviteEmail(email: string, role: 'caregiver' | 'patient') {
     setCareMsg('Sending…');
     setCareMsg(await sendCareInviteEmail(email, role, fullName));
+  }
+  /** A listed phone invite's Text button — a fresh tokened text each time
+   *  (tokens claim once), never a second invitation row. */
+  async function textPatientInvite(phone: string) {
+    const t = await prepareCareText('patient', phone, fullName);
+    window.location.href = t.href;
   }
 
   // A #fragment lands you at the section you came for (the caregiver
@@ -567,22 +559,6 @@ export default function Profile() {
       .update({ assistant_can_edit: next }).eq('id', user.id);
     if (e) { setError(e.message); setAssistantCanEdit(!next); }
   }
-
-  const [offerQ, setOfferQ] = useState('');
-  const [offerHits, setOfferHits] = useState<{ id: string; full_name: string | null }[]>([]);
-  const [offerMsg, setOfferMsg] = useState('');
-  useEffect(() => {
-    const q = offerQ.trim();
-    if (q.length < 2) { setOfferHits([]); return; }
-    let live = true;
-    const t = window.setTimeout(async () => {
-      const { data } = await supabase.from('profiles')
-        .select('id, full_name').ilike('full_name', `%${q}%`).eq('onboarded', true).limit(6);
-      if (live) setOfferHits(((data as { id: string; full_name: string | null }[] | null) ?? [])
-        .filter((m) => m.id !== user?.id));
-    }, 250);
-    return () => { live = false; window.clearTimeout(t); };
-  }, [offerQ, user?.id]);
 
   const { hash } = useLocation();
   // Each section opens inline, click to edit, then collapses back down
@@ -1423,32 +1399,8 @@ export default function Profile() {
           <span aria-hidden="true"> →</span>
         </button>
         <div className="prof__offer">
-          <input
-            className="prof__input"
-            value={offerQ}
-            onChange={(e) => { setOfferQ(e.target.value); setOfferMsg(''); }}
-            placeholder="Offer to care for someone — type their name…"
-          />
-          {offerHits.length > 0 && (
-            <div className="prof__offer-hits">
-              {offerHits.map((h) => (
-                <button
-                  key={h.id}
-                  className="prof__offer-hit"
-                  onClick={() => {
-                    setOfferQ(''); setOfferHits([]);
-                    void offerCareFor(h.id).then((r) => {
-                      setOfferMsg(r.message);
-                      if (r.ok) void loadCare();
-                    });
-                  }}
-                >
-                  {h.full_name ?? 'Member'} <em>Offer</em>
-                </button>
-              ))}
-            </div>
-          )}
-          {offerMsg && <p className="prof__hint">{offerMsg}</p>}
+          <CareAddBox role="patient" me={meId} myName={fullName} onAdded={loadCare}
+            placeholder="Offer to care for someone — type their name…" />
           <p className="prof__hint">
             They decide — an offer arrives as &ldquo;wants to become a member of your care team.&rdquo;
           </p>
@@ -1477,23 +1429,22 @@ export default function Profile() {
         {invites.filter((i) => i.role === 'patient').map((i) => (
           <div className="prof__care-row prof__care-row--invite" key={i.id}>
             <div className="prof__care-id">
-              <span className="prof__care-name">{i.email}</span>
+              <span className="prof__care-name">{i.email ?? i.phone}</span>
               <span className="prof__care-tag">invited to Lichen</span>
             </div>
             <div className="prof__care-actions">
-              <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email, 'patient')}>Send email</button>
-              <button className="prof__care-btn" onClick={() => copyInvite(i.email)}>Copy</button>
+              {i.email ? (
+                <>
+                  <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email!, 'patient')}>Send email</button>
+                  <button className="prof__care-btn" onClick={() => copyInvite(i.email!)}>Copy</button>
+                </>
+              ) : (
+                <button className="prof__care-btn prof__care-btn--ok" onClick={() => void textPatientInvite(i.phone!)}>Text</button>
+              )}
               <button className="prof__care-btn" onClick={() => cancelInvite(i.id)}>Cancel</button>
             </div>
           </div>
         ))}
-        <div className="prof__add-row">
-          <input className="prof__input" type="email" value={patientEmail}
-            onChange={(e) => { setPatientEmail(e.target.value); setCareMsg(''); }}
-            placeholder="Offer to care for someone by email" />
-          <button className="btn btn-primary" onClick={() => inviteCare('patient', patientEmail)}
-            disabled={careBusy || !patientEmail.trim()}>Offer</button>
-        </div>
         {careMsg && <p className="prof__care-msg">{careMsg}</p>}
 
       {minors.length > 0 && (
