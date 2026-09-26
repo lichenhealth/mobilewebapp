@@ -105,6 +105,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.key, s.defaultExpanded]))
   );
+  // The platform desk folds like the kind sections (founder 2026-09-26:
+  // "maybe for me, this is a drop down - just call it lichen admin").
+  const [adminExpanded, setAdminExpanded] = useState(false);
   const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
   // Identities you carry (founder 2026-08-20): a nav section of their own —
   // structurally different from communities (nobody runs an identity), but
@@ -261,14 +264,23 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             {lead.map(navItem)}
           </div>
 
-          {/* The platform desk, always visible to platform admins (founder
-              2026-09-26 — admin view is retired, nothing hides behind a
-              mode). */}
+          {/* The platform desk — a fold like the kind sections, named
+              plainly (founder 2026-09-26: "just call it lichen admin").
+              Shut, it still carries the waiting-work sum — the shut-list
+              rule. */}
           {platformAdmin && (
             <div className="side-menu__section">
-              <button className="side-menu__header" aria-expanded>
-                <span className="side-menu__header-label">Lichen</span>
+              <button className="side-menu__header" onClick={() => setAdminExpanded((e) => !e)}
+                aria-expanded={adminExpanded}>
+                <span className="side-menu__header-label">Lichen admin</span>
+                {!adminExpanded && (knockCount + pendingCats) > 0 && (
+                  <span className="side-menu__deskbadge">
+                    {(knockCount + pendingCats) > 9 ? '9+' : knockCount + pendingCats}
+                  </span>
+                )}
+                <span className={'side-menu__chevron' + (adminExpanded ? ' is-open' : '')} aria-hidden="true" />
               </button>
+              {adminExpanded && (
               <ul className="side-menu__sub-list">
                 <li>
                   <button className="side-menu__sub-item" onClick={() => go('/invite')}>
@@ -292,6 +304,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   </button>
                 </li>
               </ul>
+              )}
             </div>
           )}
 
