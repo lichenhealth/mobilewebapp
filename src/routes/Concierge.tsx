@@ -1036,11 +1036,10 @@ export default function Concierge() {
   // CareTeamDirectory.
   const [teamAdd, setTeamAdd] = useState(0);
 
-  // THE DASHBOARD SWITCH (founder 2026-09-26: "a smart link in Concierge …
-  // 'switch to provider dashboard' for all members who are also care team
-  // providers. On desktop … a drop down on the left that has My Dashboard
-  // and Provider Dashboard"): shown only to members who actively care for
-  // someone. Phones get the one-line link, ≥1024px gets the dropdown.
+  // THE DASHBOARD SWITCH (founder 2026-09-26): shown only to members who
+  // actively care for someone. Renders top right, in the WOW lens row's own
+  // text-underline grammar, at every width (the same-day markup superseded
+  // the first pass's phone-link / desktop-dropdown split).
   const [isProvider, setIsProvider] = useState(false);
   useEffect(() => {
     if (!me || isClientView) return;
@@ -1402,6 +1401,19 @@ export default function Concierge() {
         </p>
       )}
 
+      {/* The dashboard switch, top right in the WOW lenses' own grammar
+          (founder 2026-09-26 markup: toggles move up, "the toggle for the
+          WOW design be mirrored for the provider versus your dashboard").
+          Shown only to members who also actively care for someone. */}
+      {!isClientView && isProvider && (
+        <div className="conc__dashtoggle" role="group" aria-label="Dashboard">
+          <button className="conc__dashbtn is-on">My Dashboard</button>
+          <button className="conc__dashbtn" onClick={() => navigate('/caregiver')}>
+            Provider Dashboard
+          </button>
+        </div>
+      )}
+
       {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
       <nav className="conc__tabs">
         <button
@@ -1435,22 +1447,6 @@ export default function Concierge() {
           Care Team
         </button>
       </nav>
-
-      {/* The dashboard switch, for members who also provide care (founder
-          2026-09-26): a dropdown on the left at desktop, a one-line link on
-          phones — both land on /caregiver. */}
-      {!isClientView && isProvider && (
-        <div className="conc__dashrow">
-          <select className="conc__vselect conc__dash-select" value="me" aria-label="Dashboard"
-            onChange={(e) => { if (e.target.value === 'provider') navigate('/caregiver'); }}>
-            <option value="me">My Dashboard</option>
-            <option value="provider">Provider Dashboard</option>
-          </select>
-          <button className="conc__dashlink link-cue" onClick={() => navigate('/caregiver')}>
-            Switch to provider dashboard &rsaquo;
-          </button>
-        </div>
-      )}
 
       {/* Tool row (search · AI brain · scope · pagination) */}
       {/* The Care Team tab sheds the board chrome (founder 2026-09-15: "the
