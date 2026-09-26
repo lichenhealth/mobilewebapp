@@ -804,23 +804,21 @@ function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void
 function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string; me: string; addNonce?: number }) {
   const navigate = useNavigate();
   const managing = !!me && subjectId === me;
-  // ADMIN vs LICHEN view (founder 2026-08-20): living your care team is a
-  // LIST — the people who hold you, calm. Tending it (invite, approve,
-  // remove) is admin work, behind the same toggle the rest of the platform
-  // uses. ?manage=1 arrives already wearing the admin hat.
-  const [searchParams] = useSearchParams();
-  const [adminMode, setAdminMode] = useState(() => searchParams.get('manage') === '1');
-  const admin = managing && adminMode;
+  // The ADMIN | LICHEN VIEW toggle is RETIRED here (founder 2026-09-26:
+  // "get rid of admin view altogether … I want my care team to show
+  // pending, regardless"): your own tab always shows the whole truth —
+  // active people, pending requests, standing invitations, and the add
+  // box. No mode to flip. Client view stays the calm roster.
+  const admin = managing;
 
   // The toolbar's + door (founder 2026-09-15): adding stays ONE flow — the
-  // Admin invite box — so the + opens Admin and lands focus there rather
-  // than growing a second add-UI.
+  // one invite box — so the + just lands focus there rather than growing a
+  // second add-UI.
   const addInputRef = useRef<HTMLInputElement | null>(null);
   const wantAddFocus = useRef(false);
   useEffect(() => {
     if (!addNonce || !managing) return;
     wantAddFocus.current = true;
-    setAdminMode(true);
   }, [addNonce, managing]);
 
   const [roster, setRoster] = useState<OnCallCaregiver[]>([]);
@@ -859,13 +857,13 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
   }, [subjectId, me, managing]);
   useEffect(() => { setReady(false); void load(); }, [load]);
 
-  // Focus lands only once the Admin view (and its input) actually exists.
+  // Focus lands only once the tab (and its input) actually exists.
   useEffect(() => {
     if (!wantAddFocus.current || !admin || !ready) return;
     wantAddFocus.current = false;
     addInputRef.current?.focus();
     addInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [admin, ready]);
+  }, [admin, ready, addNonce]);
 
   async function act(fn: () => Promise<void>) {
     setBusy(true); setMsg('');
@@ -897,22 +895,10 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
 
   return (
     <section className="conc__team">
-      {managing && (
-        <div className="view-toggle-row">
-          <span className="view-toggle" role="group" aria-label="Care team view">
-            <button className={'view-toggle__side view-toggle__side--admin' + (adminMode ? ' is-on' : '')}
-              onClick={() => setAdminMode(true)}>Admin</button>
-            <button className={'view-toggle__side' + (!adminMode ? ' is-on' : '')}
-              onClick={() => setAdminMode(false)}>Lichen view</button>
-          </span>
-        </div>
-      )}
       <p className="conc__team-lead">
-        {admin
+        {managing
           ? 'The people who help care for you. Add them by name — they approve before joining. Not on Lichen yet? You can invite them by email or phone.'
-          : managing
-            ? 'The people who hold you. Admin is where the team is tended.'
-            : 'The people actively caring here. Tap a name for their profile.'}
+          : 'The people actively caring here. Tap a name for their profile.'}
       </p>
       {!ready && <p className="conc__team-muted">Loading…</p>}
 
