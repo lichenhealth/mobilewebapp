@@ -118,20 +118,18 @@
 .cg__score.is-low { color: var(--red-deep); }
 
 /* The dashboard switch, mirrored from Concierge (founder 2026-09-26,
-   second pass — the markup): top right, the WOW lens row's text-underline
-   grammar, every width. */
-.cg__dashtoggle {
-  display: flex; justify-content: flex-end; gap: 2px 14px; flex-wrap: wrap;
-  padding: 0 var(--s-5); margin: -4px 0 2px;
+   third pass — her markup): a DROPDOWN at the upper right, above the
+   header, every width. */
+.cg__dashdrop {
+  display: flex; justify-content: flex-end;
+  padding: var(--s-2) var(--s-5) 0; margin-bottom: -6px;
 }
-.cg__dashbtn {
-  background: none; border: 0; padding: 2px 2px 4px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 300;
-  color: var(--ink-muted); border-bottom: 2px solid transparent;
-  transition: color var(--d-fast) var(--ease-out);
+.cg__dash-select {
+  padding: 7px 8px 7px 16px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
 }
-.cg__dashbtn.is-on { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
-.cg__dashbtn:hover { color: var(--ink); }
+.cg__dash-select:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
 
 /* ─── Urgent Care tab (founder 2026-09-26: "add urgent care back to the
    provider profile") — your own rota read back, the door to the one hours

@@ -137,6 +137,19 @@ export default function Caregiver() {
 
   return (
     <div className="cg">
+      {/* The dashboard switch is a DROPDOWN at the upper right (founder
+          2026-09-26, third pass — "a drop down to the upper right for My
+          Concierge versus Provider View"), mirrored from Concierge. */}
+      {!loading && allowed && (
+        <div className="cg__dashdrop">
+          <select className="cg__dash-select" value="provider" aria-label="Dashboard"
+            onChange={(e) => { if (e.target.value === 'me') navigate('/concierge'); }}>
+            <option value="me">My Concierge</option>
+            <option value="provider">Provider View</option>
+          </select>
+        </div>
+      )}
+
       <header className="cg__head">
         <span className="eyebrow">Caregiver</span>
         <h1 className="cg__title">
@@ -144,16 +157,6 @@ export default function Caregiver() {
         </h1>
         <p className="cg__sub">{SUBS[tab]}</p>
       </header>
-
-      {/* The dashboard switch, top right in the WOW lenses' own grammar
-          (founder 2026-09-26 markup: "have the toggle for the WOW design
-          be mirrored for the provider versus your dashboard"). */}
-      {!loading && allowed && (
-        <div className="cg__dashtoggle" role="group" aria-label="Dashboard">
-          <button className="cg__dashbtn" onClick={() => navigate('/concierge')}>My Dashboard</button>
-          <button className="cg__dashbtn is-on">Provider Dashboard</button>
-        </div>
-      )}
 
       {!loading && allowed && (
         <nav className="cg__tabs" aria-label="Caregiver views">

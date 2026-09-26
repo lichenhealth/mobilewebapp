@@ -1698,18 +1698,10 @@
 }
 .conc__cinbox-hint { font-size: 12px; color: var(--ink-faint); padding: var(--s-4) var(--s-2); line-height: 1.5; }
 
-/* THE DASHBOARD SWITCH (founder 2026-09-26, second pass — the markup):
-   top right, in the WOW lens row's own text-underline grammar, every
-   width. The active side wears the peach underline. */
-.conc__dashtoggle {
-  display: flex; justify-content: flex-end; gap: 2px 14px; flex-wrap: wrap;
-  padding: 0 var(--s-5); margin: 2px 0 0;
+/* THE DASHBOARD SWITCH (founder 2026-09-26, third pass — her markup circled
+   the corner above the title): a DROPDOWN at the upper right, above the
+   header, every width. */
+.conc__dashdrop {
+  display: flex; justify-content: flex-end;
+  padding: var(--s-2) var(--s-5) 0; margin-bottom: -6px;
 }
-.conc__dashbtn {
-  background: none; border: 0; padding: 2px 2px 4px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 300;
-  color: var(--ink-muted); border-bottom: 2px solid transparent;
-  transition: color var(--d-fast) var(--ease-out);
-}
-.conc__dashbtn.is-on { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
-.conc__dashbtn:hover { color: var(--ink); }

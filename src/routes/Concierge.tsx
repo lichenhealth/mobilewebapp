@@ -1381,6 +1381,20 @@ export default function Concierge() {
 
   return (
     <div className="conc">
+      {/* THE DASHBOARD SWITCH is a DROPDOWN at the upper right now (founder
+          2026-09-26, third pass — her markup circled the corner above the
+          title: "a drop down to the upper right for My Concierge versus
+          Provider View"). Own board only, provider members only. */}
+      {!isClientView && isProvider && (
+        <div className="conc__dashdrop">
+          <select className="conc__vselect" value="me" aria-label="Dashboard"
+            onChange={(e) => { if (e.target.value === 'provider') navigate('/caregiver'); }}>
+            <option value="me">My Concierge</option>
+            <option value="provider">Provider View</option>
+          </select>
+        </div>
+      )}
+
       <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
         <h1 className="conc__title">
           {isClientView ? (clientName ?? 'Client') : 'Concierge'}
@@ -1399,19 +1413,6 @@ export default function Concierge() {
             no assistant, yours included, reads or helps with this board.
           </span>
         </p>
-      )}
-
-      {/* The dashboard switch, top right in the WOW lenses' own grammar
-          (founder 2026-09-26 markup: toggles move up, "the toggle for the
-          WOW design be mirrored for the provider versus your dashboard").
-          Shown only to members who also actively care for someone. */}
-      {!isClientView && isProvider && (
-        <div className="conc__dashtoggle" role="group" aria-label="Dashboard">
-          <button className="conc__dashbtn is-on">My Dashboard</button>
-          <button className="conc__dashbtn" onClick={() => navigate('/caregiver')}>
-            Provider Dashboard
-          </button>
-        </div>
       )}
 
       {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
