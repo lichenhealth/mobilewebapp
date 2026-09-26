@@ -1697,3 +1697,17 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .conc__cinbox-hint { font-size: 12px; color: var(--ink-faint); padding: var(--s-4) var(--s-2); line-height: 1.5; }
+
+/* THE DASHBOARD SWITCH (founder 2026-09-26): provider members flip between
+   their own board and the caregiver dashboard — link on phones, dropdown
+   on the left at desktop. */
+.conc__dashrow { display: flex; align-items: center; padding: 0 var(--s-5); margin: 2px 0 4px; }
+.conc__dashlink {
+  background: none; border: 0; padding: 4px 0; cursor: pointer; font-family: inherit;
+  font-size: 12.5px; color: var(--ink);
+}
+.conc__dash-select { display: none; }
+@media (min-width: 1024px) {
+  .conc__dash-select { display: inline-flex; }
+  .conc__dashlink { display: none; }
+}
