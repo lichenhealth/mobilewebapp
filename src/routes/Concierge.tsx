@@ -10,8 +10,8 @@ import { possessive } from '../lib/names';
 import { supabase } from '../lib/supabase';
 import {
   loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia, formatRelative,
-  loadUnreadCounts,
-  type MediaType, type Attachment,
+  loadUnreadCounts, loadChatList, searchMessages, messagePreview,
+  type MediaType, type Attachment, type ChatVM, type MessageRow, type MessageHit,
 } from '../lib/chatApi';
 import {
   loadCarePosts, loadCarePost, computeWowLenses, type WowLens, wowAxes, wowScoreBand, signCareMedia, deleteCarePost,
@@ -1061,50 +1061,81 @@ export default function Concierge() {
   const careAnchor = useRef<HTMLDivElement>(null);
   const [careTop, setCareTop] = useState(0);
 
-  // THE CARE INBOX (founder 2026-09-26: "do the care team in total as a
-  // pinned chat at the top, but … individual chats with care team members
-  // are all pulled in as well"): on the OWN board the Chat tab is a small
-  // inbox — the whole-team Concierge room pinned first, then a direct line
-  // to each caregiver. Any row opens inline in the same panel
-  // (ChatConversation is the one shared conversation component). Client
-  // view keeps the room direct — a caregiver arrives to talk to the team.
+  // THE CARE INBOX (founder 2026-09-26: "look like signal, but with a
+  // filter. Pin the group chat, but if there are individual, or sub group
+  // chats for those within the care team, they're displayed there; but if
+  // not, they aren't"): on the OWN board the Chat tab is the big Chat's
+  // structure through a care filter — the whole-team Concierge room pinned
+  // first, then only the conversations with care-team members that ALREADY
+  // EXIST (no placeholder rows; a chat is started from a member's profile
+  // or the Care Team tab, and gathers here once real). Rows wear the
+  // inbox's grammar: face, name, "who: last words", time, unread pill.
+  // Any row opens inline in the same panel (ChatConversation, one shared
+  // component). Client view keeps the room direct.
   const [careOpen, setCareOpen] = useState<string | null>(null);
   const [careRoster, setCareRoster] = useState<OnCallCaregiver[]>([]);
-  const [dmByMember, setDmByMember] = useState<Map<string, string>>(new Map());
+  const [careVMs, setCareVMs] = useState<ChatVM[]>([]);
+  const [roomLast, setRoomLast] = useState<MessageRow | null>(null);
   const [careUnread, setCareUnread] = useState<Map<string, number>>(new Map());
   useEffect(() => {
     if (activeTab !== 'chat' || isClientView || !me) return;
     let active = true;
     (async () => {
-      const [roster, counts, dms] = await Promise.all([
+      const [roster, counts, vms, lastRes] = await Promise.all([
         loadOnCallRoster(me).catch(() => [] as OnCallCaregiver[]),
         loadUnreadCounts(),
-        supabase.from('chats').select('id, direct_key').eq('kind', 'direct'),
+        loadChatList(me).catch(() => [] as ChatVM[]),
+        careChatId
+          ? supabase.from('chat_messages')
+            .select('id, chat_id, sender_id, body, created_at, attachments')
+            .eq('chat_id', careChatId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+          : Promise.resolve(null),
       ]);
       if (!active) return;
       setCareRoster(roster);
       setCareUnread(counts);
-      // My existing DMs, keyed to caregivers — a 1:1 direct_key carries both
-      // member ids, and RLS only shows chats I'm in.
-      const map = new Map<string, string>();
-      for (const c of ((dms.data as { id: string; direct_key: string | null }[] | null) ?? [])) {
-        for (const r of roster) if (c.direct_key?.includes(r.id)) map.set(r.id, c.id);
-      }
-      setDmByMember(map);
+      const team = new Set(roster.map((r) => r.id));
+      // The filter: direct chats whose other party is on the care team —
+      // and only ones with real words ("if there are individual … chats …
+      // they're displayed there; but if not, they aren't": an empty
+      // just-created chat row is not a conversation). Ad-hoc sub-team
+      // group chats don't exist as machinery yet — when they do, they
+      // join this same filter.
+      setCareVMs(vms.filter((v) => v.kind === 'direct' && v.last
+        && v.members.some((m) => m.profile_id !== me && team.has(m.profile_id))));
+      setRoomLast((lastRes?.data as MessageRow | null) ?? null);
     })();
     return () => { active = false; };
-  }, [activeTab, isClientView, me]);
+  }, [activeTab, isClientView, me, careChatId]);
   // Arriving with ?ask= means a specific entry rides into the ROOM — open it.
   useEffect(() => {
     if (activeTab !== 'chat') { setCareOpen(null); return; }
     if (!isClientView && searchParams.get('ask') && careChatId) setCareOpen(careChatId);
   }, [activeTab, isClientView, careChatId, searchParams]);
-  async function openCareDm(memberId: string) {
-    const known = dmByMember.get(memberId);
-    if (known) { setCareOpen(known); return; }
-    const id = await ensureDirectChat(memberId);
-    setDmByMember((m) => new Map(m).set(memberId, id));
-    setCareOpen(id);
+  // SEARCH IS A SUBSET TOO (same message: "when you search within the
+  // concierge chat, you only get results within the care team"): message
+  // hits are filtered to the care-scoped chat ids — the room + the team
+  // DMs — never the whole inbox. Client view scopes to the client's room.
+  const careChatIds = useMemo(() => new Set([
+    ...(careChatId ? [careChatId] : []), ...careVMs.map((v) => v.id),
+  ]), [careChatId, careVMs]);
+  const [careHits, setCareHits] = useState<MessageHit[] | null>(null);
+  useEffect(() => {
+    if (activeTab !== 'chat' || query.trim().length < 2) { setCareHits(null); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const hits = await searchMessages(query, 60);
+      if (live) setCareHits(hits.filter((h) => careChatIds.has(h.chat_id)));
+    }, 250);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [query, activeTab, careChatIds]);
+  /** "who: last words" — the inbox row's preview grammar. */
+  function carePreview(msg: MessageRow | null | undefined, members?: { profile_id: string; name: string }[]): string {
+    if (!msg) return 'No messages yet';
+    const who = msg.sender_id === me ? 'You'
+      : (members?.find((m) => m.profile_id === msg.sender_id)?.name
+        ?? careRoster.find((r) => r.id === msg.sender_id)?.name ?? 'Someone').split(' ')[0];
+    return `${who}: ${messagePreview(msg)}`;
   }
 
   // WOW/KOC care-post board for whoever we're viewing (RLS scopes to care-team reads).
@@ -1481,7 +1512,7 @@ export default function Concierge() {
           <input
             autoFocus
             className="conc__search-input"
-            placeholder="Search your snapshots"
+            placeholder={activeTab === 'chat' ? 'Search your care conversations' : 'Search your snapshots'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -2041,40 +2072,77 @@ export default function Concierge() {
             </div>
           )}
 
-          {careReady && careAllowed && careChatId && !isClientView && !careOpen && (
+          {careReady && careAllowed && careChatId && !isClientView && !careOpen && careHits !== null && (
+            <div className="conc__cinbox">
+              {careHits.map((h) => {
+                const inRoom = h.chat_id === careChatId;
+                const vm = careVMs.find((v) => v.id === h.chat_id);
+                return (
+                  <button className="conc__cinbox-row" key={h.id} onClick={() => setCareOpen(h.chat_id)}>
+                    <span className="conc__cinbox-text">
+                      <span className="conc__cinbox-top">
+                        <span className="conc__cinbox-name">{inRoom ? 'Your Concierge' : vm?.title ?? 'Conversation'}</span>
+                        <span className="conc__cinbox-when">{formatRelative(h.created_at)}</span>
+                      </span>
+                      <span className="conc__cinbox-sub">
+                        {h.sender_id === me ? 'You'
+                          : (h.senderName ?? careRoster.find((r) => r.id === h.sender_id)?.name ?? 'Someone').split(' ')[0]}: {h.body}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+              {careHits.length === 0 && (
+                <p className="conc__cinbox-hint">Nothing in your care conversations matches that.</p>
+              )}
+            </div>
+          )}
+
+          {careReady && careAllowed && careChatId && !isClientView && !careOpen && careHits === null && (
             <div className="conc__cinbox">
               <button className="conc__cinbox-row conc__cinbox-row--pinned" onClick={() => setCareOpen(careChatId)}>
                 <span className="conc__cinbox-ava conc__cinbox-ava--room" aria-hidden>
                   <Icon name="heart-line" size={17} />
                 </span>
                 <span className="conc__cinbox-text">
-                  <span className="conc__cinbox-name">Your Concierge</span>
-                  <span className="conc__cinbox-sub">Your whole care team together</span>
+                  <span className="conc__cinbox-top">
+                    <span className="conc__cinbox-name">Your Concierge</span>
+                    <span className="conc__cinbox-when">
+                      {roomLast ? formatRelative(roomLast.created_at) : ''}
+                      <span className="conc__cinbox-pin" title="Pinned"><Icon name="pin" size={11} /></span>
+                    </span>
+                  </span>
+                  <span className="conc__cinbox-sub">{carePreview(roomLast)}</span>
                 </span>
-                <span className="conc__cinbox-side">
-                  {(careUnread.get(careChatId) ?? 0) > 0 && (
-                    <span className="conc__cinbox-pill">{careUnread.get(careChatId)}</span>
-                  )}
-                  <span className="conc__cinbox-pin">Pinned</span>
-                </span>
+                {(careUnread.get(careChatId) ?? 0) > 0 && (
+                  <span className="conc__cinbox-pill">{careUnread.get(careChatId)}</span>
+                )}
               </button>
-              {careRoster.map((c) => {
-                const dm = dmByMember.get(c.id);
-                const n = dm ? (careUnread.get(dm) ?? 0) : 0;
+              {careVMs.map((vm) => {
+                const other = vm.members.find((m) => m.profile_id !== me);
+                const n = careUnread.get(vm.id) ?? 0;
                 return (
-                  <button className="conc__cinbox-row" key={c.id} onClick={() => void openCareDm(c.id)}>
+                  <button className="conc__cinbox-row" key={vm.id} onClick={() => setCareOpen(vm.id)}>
                     <span className="conc__cinbox-ava"
-                      style={c.avatarUrl ? undefined : { background: colorFor(c.id) }} aria-hidden>
-                      {c.avatarUrl ? <img src={c.avatarUrl} alt="" /> : monogramFor(c.name)}
+                      style={other?.avatarUrl ? undefined : { background: colorFor(other?.profile_id ?? vm.id) }} aria-hidden>
+                      {other?.avatarUrl ? <img src={other.avatarUrl} alt="" /> : monogramFor(vm.title)}
                     </span>
                     <span className="conc__cinbox-text">
-                      <span className="conc__cinbox-name">{c.name}</span>
-                      <span className="conc__cinbox-sub">Direct — just the two of you</span>
+                      <span className="conc__cinbox-top">
+                        <span className="conc__cinbox-name">{vm.title}</span>
+                        <span className="conc__cinbox-when">{vm.last ? formatRelative(vm.last.created_at) : ''}</span>
+                      </span>
+                      <span className="conc__cinbox-sub">{carePreview(vm.last, vm.members)}</span>
                     </span>
-                    {n > 0 && <span className="conc__cinbox-side"><span className="conc__cinbox-pill">{n}</span></span>}
+                    {n > 0 && <span className="conc__cinbox-pill">{n}</span>}
                   </button>
                 );
               })}
+              {careVMs.length === 0 && (
+                <p className="conc__cinbox-hint">
+                  Message a care team member and the conversation gathers here, under your Concierge.
+                </p>
+              )}
             </div>
           )}
         </>
