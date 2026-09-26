@@ -1654,3 +1654,34 @@
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--ink-muted); text-align: center;
 }
+
+/* THE CARE INBOX (founder 2026-09-26): the own-board Chat tab — the whole
+   Concierge room pinned first, a direct line to each caregiver below. */
+.conc__cinbox { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); }
+.conc__cinbox-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone); cursor: pointer; font-family: inherit;
+}
+.conc__cinbox-row:hover { background: var(--bone-warm); }
+.conc__cinbox-row--pinned { background: var(--peach-tint); border-color: var(--peach); }
+.conc__cinbox-ava {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; color: #fff;
+}
+.conc__cinbox-ava img { width: 100%; height: 100%; object-fit: cover; }
+.conc__cinbox-ava--room { background: var(--peach); color: #fff; }
+.conc__cinbox-text { display: flex; flex-direction: column; min-width: 0; }
+.conc__cinbox-name { font-size: 14px; color: var(--ink); }
+.conc__cinbox-sub { font-size: 11px; color: var(--ink-muted); }
+.conc__cinbox-side { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.conc__cinbox-pin {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--peach-deep);
+}
+.conc__cinbox-pill {
+  min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  background: var(--peach); color: #fff; font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
