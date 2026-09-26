@@ -10,6 +10,7 @@ import { possessive } from '../lib/names';
 import { supabase } from '../lib/supabase';
 import {
   loadConciergeAccess, ensureDirectChat, monogramFor, colorFor, uploadChatMedia, formatRelative,
+  loadUnreadCounts,
   type MediaType, type Attachment,
 } from '../lib/chatApi';
 import {
@@ -1060,6 +1061,52 @@ export default function Concierge() {
   const careAnchor = useRef<HTMLDivElement>(null);
   const [careTop, setCareTop] = useState(0);
 
+  // THE CARE INBOX (founder 2026-09-26: "do the care team in total as a
+  // pinned chat at the top, but … individual chats with care team members
+  // are all pulled in as well"): on the OWN board the Chat tab is a small
+  // inbox — the whole-team Concierge room pinned first, then a direct line
+  // to each caregiver. Any row opens inline in the same panel
+  // (ChatConversation is the one shared conversation component). Client
+  // view keeps the room direct — a caregiver arrives to talk to the team.
+  const [careOpen, setCareOpen] = useState<string | null>(null);
+  const [careRoster, setCareRoster] = useState<OnCallCaregiver[]>([]);
+  const [dmByMember, setDmByMember] = useState<Map<string, string>>(new Map());
+  const [careUnread, setCareUnread] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (activeTab !== 'chat' || isClientView || !me) return;
+    let active = true;
+    (async () => {
+      const [roster, counts, dms] = await Promise.all([
+        loadOnCallRoster(me).catch(() => [] as OnCallCaregiver[]),
+        loadUnreadCounts(),
+        supabase.from('chats').select('id, direct_key').eq('kind', 'direct'),
+      ]);
+      if (!active) return;
+      setCareRoster(roster);
+      setCareUnread(counts);
+      // My existing DMs, keyed to caregivers — a 1:1 direct_key carries both
+      // member ids, and RLS only shows chats I'm in.
+      const map = new Map<string, string>();
+      for (const c of ((dms.data as { id: string; direct_key: string | null }[] | null) ?? [])) {
+        for (const r of roster) if (c.direct_key?.includes(r.id)) map.set(r.id, c.id);
+      }
+      setDmByMember(map);
+    })();
+    return () => { active = false; };
+  }, [activeTab, isClientView, me]);
+  // Arriving with ?ask= means a specific entry rides into the ROOM — open it.
+  useEffect(() => {
+    if (activeTab !== 'chat') { setCareOpen(null); return; }
+    if (!isClientView && searchParams.get('ask') && careChatId) setCareOpen(careChatId);
+  }, [activeTab, isClientView, careChatId, searchParams]);
+  async function openCareDm(memberId: string) {
+    const known = dmByMember.get(memberId);
+    if (known) { setCareOpen(known); return; }
+    const id = await ensureDirectChat(memberId);
+    setDmByMember((m) => new Map(m).set(memberId, id));
+    setCareOpen(id);
+  }
+
   // WOW/KOC care-post board for whoever we're viewing (RLS scopes to care-team reads).
   const [wowPosts, setWowPosts] = useState<CarePostRow[]>([]);
   const [kocPosts, setKocPosts] = useState<CarePostRow[]>([]);
@@ -1147,7 +1194,7 @@ export default function Concierge() {
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName]);
+  }, [activeTab, showSearch, careReady, careAllowed, careChatId, clientName, careOpen]);
 
   // Load the subject's WOW posts (unfiltered → feeds the radar) + the KOC
   // posts inside the scoped window (a day, a week, or a whole month).
@@ -1984,10 +2031,50 @@ export default function Concierge() {
             </div>
           )}
 
-          {careReady && careAllowed && careChatId && (
+          {careReady && careAllowed && careChatId && (isClientView || careOpen) && (
             <div className="conc__care" style={{ top: careTop }}>
-              <ChatConversation chatId={careChatId} me={me} showIntro={false} onInfo={() => handleTabClick('team')}
-                careAsk={careAsk} onCareAskDone={clearAsk} />
+              <ChatConversation chatId={isClientView ? careChatId : careOpen!} me={me} showIntro={false}
+                onInfo={() => handleTabClick('team')}
+                onBack={isClientView ? undefined : () => setCareOpen(null)}
+                onRead={(id) => setCareUnread((m) => { const n = new Map(m); n.set(id, 0); return n; })}
+                careAsk={isClientView || careOpen === careChatId ? careAsk : null} onCareAskDone={clearAsk} />
+            </div>
+          )}
+
+          {careReady && careAllowed && careChatId && !isClientView && !careOpen && (
+            <div className="conc__cinbox">
+              <button className="conc__cinbox-row conc__cinbox-row--pinned" onClick={() => setCareOpen(careChatId)}>
+                <span className="conc__cinbox-ava conc__cinbox-ava--room" aria-hidden>
+                  <Icon name="heart-line" size={17} />
+                </span>
+                <span className="conc__cinbox-text">
+                  <span className="conc__cinbox-name">Your Concierge</span>
+                  <span className="conc__cinbox-sub">Your whole care team together</span>
+                </span>
+                <span className="conc__cinbox-side">
+                  {(careUnread.get(careChatId) ?? 0) > 0 && (
+                    <span className="conc__cinbox-pill">{careUnread.get(careChatId)}</span>
+                  )}
+                  <span className="conc__cinbox-pin">Pinned</span>
+                </span>
+              </button>
+              {careRoster.map((c) => {
+                const dm = dmByMember.get(c.id);
+                const n = dm ? (careUnread.get(dm) ?? 0) : 0;
+                return (
+                  <button className="conc__cinbox-row" key={c.id} onClick={() => void openCareDm(c.id)}>
+                    <span className="conc__cinbox-ava"
+                      style={c.avatarUrl ? undefined : { background: colorFor(c.id) }} aria-hidden>
+                      {c.avatarUrl ? <img src={c.avatarUrl} alt="" /> : monogramFor(c.name)}
+                    </span>
+                    <span className="conc__cinbox-text">
+                      <span className="conc__cinbox-name">{c.name}</span>
+                      <span className="conc__cinbox-sub">Direct — just the two of you</span>
+                    </span>
+                    {n > 0 && <span className="conc__cinbox-side"><span className="conc__cinbox-pill">{n}</span></span>}
+                  </button>
+                );
+              })}
             </div>
           )}
         </>

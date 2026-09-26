@@ -90,3 +90,29 @@
 @media (min-width: 1024px) {
   .cg { max-width: 640px; margin: 0 auto; }
 }
+
+/* ─── Provider tabs (founder 2026-09-26: the dashboard mirrors the
+   Concierge board's own tabs — WOW · KOC · Chat · Client List) ────── */
+.cg__tabs {
+  display: flex; gap: var(--s-5); padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--bone-edge-soft); margin-bottom: var(--s-2);
+}
+.cg__tab {
+  background: transparent; border: 0; cursor: pointer; font-family: inherit;
+  font-size: 12px; font-weight: 300; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-muted); padding: 10px 0 12px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.cg__tab.is-active { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
+
+.cg__row-side { display: inline-flex; align-items: center; gap: var(--s-2); }
+.cg__pill {
+  min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  background: var(--peach); color: #fff; font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* The one band rule (wowScoreBand) — any surface showing a WOW score joins it. */
+.cg__score { font-weight: 600; }
+.cg__score.is-high { color: var(--green-deep); }
+.cg__score.is-mid { color: var(--peach-deep); }
+.cg__score.is-low { color: var(--red-deep); }
