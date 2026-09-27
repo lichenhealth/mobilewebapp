@@ -37,7 +37,10 @@ export default function Caregiver() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [clients, setClients] = useState<CareClient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<CgTab>('wow');
+  // Client List is the LANDING tab (founder 2026-09-27: "This should
+  // default to 'Client List' when you toggle to provider view") — the
+  // other tabs are lenses on that list once you're here.
+  const [tab, setTab] = useState<CgTab>('clients');
   const [stats, setStats] = useState<Map<string, ClientStats>>(new Map());
   const [statsReady, setStatsReady] = useState(false);
   const [unread, setUnread] = useState<Map<string, number>>(new Map());
