@@ -6,6 +6,9 @@
 .adminc__title--section { margin: var(--s-5) 0 var(--s-3); }
 /* The prepared-text door is an anchor (sms:) wearing the button class. */
 a.adminc__btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+/* Member search, open by default (founder 2026-09-27): input + Search on one line. */
+.adminc__searchrow { display: flex; gap: var(--s-2); }
+.adminc__searchrow .adminc__gift-email { flex: 1; min-width: 0; }
 .adminc__sub { font-size: var(--t-sm); color: var(--ink-soft); margin-top: var(--s-1); }
 .adminc__muted { color: var(--ink-faint); padding: var(--s-4); }
 .adminc__empty { color: var(--ink-soft); padding: var(--s-4) 0; }
