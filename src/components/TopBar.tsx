@@ -203,6 +203,15 @@ export default function TopBar({
           <button
             className="top-bar__icon"
             onClick={() => {
+              // A client's board backs out to the PROVIDER LIST, one tap
+              // (founder 2026-09-27: "I can toggle between the tabs on her
+              // profile, so I don't need the back button to remember
+              // everything I've already done… and walk me back thru") —
+              // never a history walk through every tab visited there.
+              if (pathname.startsWith('/concierge/client/')) {
+                navigate('/caregiver');
+                return;
+              }
               // A REAL back button (founder 2026-08-15: opening Maps from
               // Melanie's page and pressing back dumped you on Home). React
               // Router stamps an index on each in-app entry — anything above

@@ -1042,7 +1042,7 @@ export default function Concierge() {
   // the first pass's phone-link / desktop-dropdown split).
   const [isProvider, setIsProvider] = useState(false);
   useEffect(() => {
-    if (!me || isClientView) return;
+    if (!me) return;
     let live = true;
     void supabase.from('care_team_members').select('id', { count: 'exact', head: true })
       .eq('caregiver_id', me).eq('status', 'active')
@@ -1381,11 +1381,24 @@ export default function Concierge() {
 
   return (
     <div className="conc">
-      {/* THE DASHBOARD SWITCH is a DROPDOWN at the upper right now (founder
-          2026-09-26, third pass — her markup circled the corner above the
-          title: "a drop down to the upper right for My Concierge versus
-          Provider View"). Own board only, provider members only. */}
-      {!isClientView && isProvider && (
+      {/* THE DASHBOARD SWITCH is a DROPDOWN at the upper right (founder
+          2026-09-26 markup: "a drop down to the upper right for My Concierge
+          versus Provider View"), and it PERSISTS on a client's board
+          (founder 2026-09-27, fourth pass — the standalone "Client view"
+          tag is retired, the dropdown says it instead). */}
+      {isClientView ? (
+        <div className="conc__dashdrop">
+          <select className="conc__vselect" value="client" aria-label="Dashboard"
+            onChange={(e) => {
+              if (e.target.value === 'me') navigate('/concierge');
+              if (e.target.value === 'provider') navigate('/caregiver');
+            }}>
+            <option value="client">Client View</option>
+            <option value="provider">Provider View</option>
+            <option value="me">My Concierge</option>
+          </select>
+        </div>
+      ) : isProvider ? (
         <div className="conc__dashdrop">
           <select className="conc__vselect" value="me" aria-label="Dashboard"
             onChange={(e) => { if (e.target.value === 'provider') navigate('/caregiver'); }}>
@@ -1393,13 +1406,12 @@ export default function Concierge() {
             <option value="provider">Provider View</option>
           </select>
         </div>
-      )}
+      ) : null}
 
       <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
         <h1 className="conc__title">
           {isClientView ? (clientName ?? 'Client') : 'Concierge'}
         </h1>
-        {isClientView && <span className="conc__client-tag">Client view</span>}
       </header>
 
       {/* Consent is mutual, and mutually visible (founder 2026-08-17): the
