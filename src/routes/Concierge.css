@@ -31,18 +31,6 @@
   font-size: var(--t-lg);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.conc__client-tag {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--peach);
-  border: 1px solid var(--peach);
-  border-radius: var(--r-full);
-  padding: 3px 8px;
-  white-space: nowrap;
-}
-
 /* The mutual-consent disclosure (founder 2026-08-17): a caregiver is told
    plainly when their client works without AI at the Concierge level. */
 .conc__ai-note {
