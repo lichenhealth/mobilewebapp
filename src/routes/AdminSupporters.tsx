@@ -75,8 +75,12 @@ export default function AdminSupporters() {
 
   // Find a member (founder 2026-08-11): search ANY member by name/email —
   // not just current supporters — and act on their membership right there.
-  const [findOpen, setFindOpen] = useState(false);
+  // The box sits OPEN by default (founder 2026-09-27, third pass: "default
+  // have the search box open, versus a drop down, for consistency"): the
+  // type-ahead auto-populates as you type, and Search pulls up the top
+  // match's details directly.
   const [findQ, setFindQ] = useState('');
+  const [findMsg, setFindMsg] = useState('');
   const [found, setFound] = useState<FoundMember[]>([]);
   const [stewardOn, setStewardOn] = useState(false);
   const [stewardBusy, setStewardBusy] = useState(false);
@@ -90,6 +94,27 @@ export default function AdminSupporters() {
     }, 250);
     return () => window.clearTimeout(t);
   }, [findQ, picked]);
+
+  /** Opening a member's toolbox — one door for the type-ahead rows and the
+   *  Search button alike, so the defaults can never drift apart. */
+  const pickMember = (m: FoundMember) => {
+    setPicked(m); setStewardOn(!!m.help_steward); setPMsg(''); setFindMsg('');
+    setPTier(m.tier === 'community' ? 'community' : 'concierge');
+    setPMonths(m.source === 'gift' && m.current_period_end === null ? null : 12);
+  };
+
+  /** The Search button: look up now (no debounce) and pull up the top
+   *  match's details ("or you can press 'search' to pull up the member
+   *  details" — the visible type-ahead rows make taking the top honest). */
+  async function searchNow() {
+    const q = findQ.trim();
+    if (q.length < 2) return;
+    const { data } = await supabase.rpc('admin_search_members', { p_q: q });
+    const hits = ((data as FoundMember[] | null) ?? []);
+    setFound(hits);
+    if (hits.length) pickMember(hits[0]);
+    else setFindMsg(`No member matches “${q}”.`);
+  }
 
   // Re-look-up the picked member after an action so the panel reflects the
   // new state immediately.
@@ -455,26 +480,33 @@ export default function AdminSupporters() {
           "font is the same size for each"). */}
       <h2 className="adminc__title adminc__title--section">Manage an existing member</h2>
 
-      {/* Find a member (founder 2026-08-11): a door that opens a search bar,
-          then the whole membership toolbox on whoever you pick — override a
-          Stripe sub with a gift, upgrade/extend/revoke a gift, or revoke &
-          cancel entirely. */}
-      <button className="adminc__btn" onClick={() => { setFindOpen((o) => !o); setPicked(null); setFindQ(''); setPMsg(''); }}>
-        {findOpen ? 'Close member search' : 'Search members by name or email…'}
-      </button>
-      {findOpen && (
-        <div className="adminc__gift">
+      {/* Find a member (founder 2026-08-11; box OPEN by default since
+          2026-09-27 — "for consistency" with the invite box above): the
+          search bar leads, the type-ahead auto-populates, Search pulls up
+          the top match — then the whole membership toolbox on whoever you
+          pick: override a Stripe sub with a gift, upgrade/extend/revoke a
+          gift, or revoke & cancel entirely. */}
+      <div className="adminc__gift">
           {!picked && (
             <>
-              <input
-                className="adminc__gift-email"
-                placeholder="Name or email…"
-                value={findQ}
-                autoFocus
-                onChange={(e) => setFindQ(e.target.value)}
-              />
+              <div className="adminc__searchrow">
+                <input
+                  className="adminc__gift-email"
+                  placeholder="Search members by name or email…"
+                  autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  value={findQ}
+                  onChange={(e) => { setFindQ(e.target.value); setFindMsg(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void searchNow(); }}
+                />
+                <button type="button" className="adminc__btn adminc__btn--approve"
+                  disabled={findQ.trim().length < 2}
+                  onClick={() => void searchNow()}>
+                  Search
+                </button>
+              </div>
+              {findMsg && <p className="adminc__muted">{findMsg}</p>}
               {found.map((m) => (
-                <button key={m.profile_id} className="adminc__btn" onClick={() => { setPicked(m); setStewardOn(!!m.help_steward); setPMsg(''); setPTier((m.tier === 'community' ? 'community' : 'concierge')); setPMonths(m.source === 'gift' && m.current_period_end === null ? null : 12); }}>
+                <button key={m.profile_id} className="adminc__btn" onClick={() => pickMember(m)}>
                   {m.full_name || m.email} — {m.tier ? `${m.tier} · ${m.source} · ${m.status}` : 'no membership'}
                 </button>
               ))}
@@ -573,8 +605,7 @@ export default function AdminSupporters() {
               {pMsg && <p className="adminc__msg">{pMsg}</p>}
             </>
           )}
-        </div>
-      )}
+      </div>
 
       <DonationsDesk />
       <RoutingDesk />
