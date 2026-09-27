@@ -1382,31 +1382,23 @@ export default function Concierge() {
   return (
     <div className="conc">
       {/* THE DASHBOARD SWITCH is a DROPDOWN at the upper right (founder
-          2026-09-26 markup: "a drop down to the upper right for My Concierge
-          versus Provider View"), and it PERSISTS on a client's board
-          (founder 2026-09-27, fourth pass — the standalone "Client view"
-          tag is retired, the dropdown says it instead). */}
-      {isClientView ? (
+          2026-09-26 markup), persisting on a client's board where it STAYS
+          reading Provider View (founder 2026-09-27: "let's not have it
+          switch to 'client view' but just stay as provider view, as we know
+          we're just toggled in to a specific client"). Two options, always. */}
+      {(isClientView || isProvider) && (
         <div className="conc__dashdrop">
-          <select className="conc__vselect" value="client" aria-label="Dashboard"
+          <select className="conc__dash-select" value={isClientView ? 'provider' : 'me'}
+            aria-label="Dashboard"
             onChange={(e) => {
               if (e.target.value === 'me') navigate('/concierge');
               if (e.target.value === 'provider') navigate('/caregiver');
             }}>
-            <option value="client">Client View</option>
-            <option value="provider">Provider View</option>
-            <option value="me">My Concierge</option>
-          </select>
-        </div>
-      ) : isProvider ? (
-        <div className="conc__dashdrop">
-          <select className="conc__vselect" value="me" aria-label="Dashboard"
-            onChange={(e) => { if (e.target.value === 'provider') navigate('/caregiver'); }}>
             <option value="me">My Concierge</option>
             <option value="provider">Provider View</option>
           </select>
         </div>
-      ) : null}
+      )}
 
       <header className={'conc__head' + (isClientView ? ' conc__head--client' : '')}>
         <h1 className="conc__title">
