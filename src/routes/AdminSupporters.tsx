@@ -61,8 +61,11 @@ export default function AdminSupporters() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState('');
-  const [tier, setTier] = useState<Tier>('community');
-  const [months, setMonths] = useState<number | null>(12);
+  // 3 months of Concierge is the auto-default (founder 2026-09-27: "Gift
+  // Membership with 3 months free auto-default" — the same welcome every
+  // new member gets); the chips and stepper below update it.
+  const [tier, setTier] = useState<Tier>('concierge');
+  const [months, setMonths] = useState<number | null>(3);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -127,15 +130,25 @@ export default function AdminSupporters() {
       .then(({ data }) => setMyName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user]);
 
-  /** INVITE TO LICHEN / GIFT ACCESS (founder 2026-09-27): the email leads.
-   *  Once it reads as an address we look it up — a MEMBER gets the gift
-   *  options straight away; anyone else gets an Invite | Gift toggle
-   *  (Invite = a plain invitation; Gift = the invitation carries a
-   *  membership, parked in membership_gifts and redeemed at signup). */
+  /** INVITE TO LICHEN (founder 2026-09-27, second pass — her markup): the
+   *  contact leads, PHONE OR EMAIL (the Invite.tsx grammar — a phone invite
+   *  is a minted token texted from the admin's own Messages; gifts stay
+   *  keyed to email). An email is looked up — a MEMBER gets the gift
+   *  options straight away; anyone else gets an Invite | Gift membership
+   *  radio with GIFT MEMBERSHIP · 3 MONTHS pre-selected ("have the radio
+   *  button on Gift Membership with 3 months free auto-default"), togglable
+   *  to a plain invitation or different gift terms. */
   const cleanEmail = email.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF\s]/g, '').toLowerCase();
   const emailOk = /^[^@]+@[^@]+\.[^@]+$/.test(cleanEmail);
+  // The forgiving phone read (Invite.tsx, founder 2026-09-22): invisibles
+  // already stripped above; no letters and 7–16 digits reads as a phone.
+  const phoneDigits = cleanEmail.replace(/\D/g, '');
+  const phoneOk = !emailOk && phoneDigits.length >= 7 && phoneDigits.length <= 16 && !/[a-z@]/.test(cleanEmail);
   const [lookup, setLookup] = useState<{ email: string; member: boolean; name: string | null } | null>(null);
-  const [mode, setMode] = useState<'invite' | 'gift'>('invite');
+  const [mode, setMode] = useState<'invite' | 'gift'>('gift');
+  // A prepared phone invitation — one token per phone, texted from the
+  // admin's own Messages (no SMS provider, deliberately — the Invite.tsx rule).
+  const [text, setText] = useState<{ phone: string; href: string; message: string } | null>(null);
   useEffect(() => {
     if (!emailOk) { setLookup(null); return; }
     let live = true;
@@ -149,7 +162,28 @@ export default function AdminSupporters() {
   const looked = lookup && lookup.email === cleanEmail ? lookup : null;
   const giving = !!looked && (looked.member || mode === 'gift');
 
+  /** A phone invitation: mint the token (invitee_phone recorded, so the
+   *  ledger names the number), open the admin's own Messages with the
+   *  tokened invitation filled in — the Invite.tsx one-tap feel. */
+  async function sendPhone() {
+    if (!user || !phoneOk) return;
+    setBusy(true); setMsg(''); setError('');
+    const stored = cleanEmail.replace(/[^\d+]/g, '');
+    const { data, error: te } = await supabase.from('invite_tokens')
+      .insert({ created_by: user.id, invitee_phone: stored })
+      .select('token').maybeSingle();
+    setBusy(false);
+    if (te) { setError(te.message); return; }
+    const tok = (data as { token: string } | null)?.token;
+    const message = `${myName || 'A friend'} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup${tok ? `?invite=${tok}` : ''}`;
+    const href = `sms:${stored}?&body=${encodeURIComponent(message)}`;
+    setText({ phone: email.trim(), href, message });
+    setMsg('Their text is ready below — tap it to send from your Messages.');
+    window.location.href = href;
+  }
+
   async function send() {
+    if (phoneOk) { void sendPhone(); return; }
     if (!looked || !user) return;
     const em = looked.email;
     setBusy(true); setMsg(''); setError('');
@@ -187,7 +221,7 @@ export default function AdminSupporters() {
         ? `Invitation sent to ${em} — ${what} is waiting for them at signup.`
         : `Invitation sent to ${em}.`);
     }
-    setEmail(''); setMode('invite');
+    setEmail(''); setMode('gift');
     load();
   }
 
@@ -315,47 +349,50 @@ export default function AdminSupporters() {
   return (
     <div className="adminc">
       <header className="adminc__head">
-        <h1 className="adminc__title">Invite to Lichen / Gift access</h1>
-        <p className="adminc__sub">
-          Invite someone to Lichen by email — with or without a gifted membership — or gift access to someone already here.
-        </p>
+        {/* One heading, no extra copy (founder 2026-09-27, her markup:
+            "/ Gift access" struck, the sub-paragraph struck). */}
+        <h1 className="adminc__title">Invite to Lichen</h1>
       </header>
 
       {error && <p className="adminc__error">{error}</p>}
 
-      {/* Invite to Lichen / Gift access (founder 2026-09-27): email first;
-          the lookup decides what's offered. */}
+      {/* Invite to Lichen (founder 2026-09-27): phone or email first; the
+          lookup decides what's offered. */}
       <div className="adminc__gift">
         <input
           className="adminc__gift-email"
-          type="email"
-          placeholder="Their email"
-          autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          type="text"
+          placeholder="Their phone or email"
+          autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
           value={email}
-          onChange={(e) => { setEmail(e.target.value); setMsg(''); setError(''); }}
+          onChange={(e) => { setEmail(e.target.value); setMsg(''); setError(''); setText(null); }}
         />
         {emailOk && !looked && <p className="adminc__muted">Checking…</p>}
+        {phoneOk && (
+          <p className="adminc__sub">
+            We&rsquo;ll open your Messages with the tokened invitation ready to send — free, straight
+            from your phone. To attach a gifted membership, invite by email — gifts are keyed to an
+            email address.
+          </p>
+        )}
         {looked?.member && (
           <p className="adminc__sub">
             <strong>{looked.name || looked.email}</strong> is already on Lichen 🌿 — gift them access below.
           </p>
         )}
         {looked && !looked.member && (
-          <>
-            <p className="adminc__sub">Not on Lichen yet — invite them, or invite them with a gifted membership.</p>
-            <div className="adminc__gift-tiers" role="radiogroup" aria-label="Invite or gift">
-              <button type="button" role="radio" aria-checked={mode === 'invite'}
-                className={'adminc__tier-btn' + (mode === 'invite' ? ' is-on' : '')}
-                onClick={() => setMode('invite')}>
-                Invite
-              </button>
-              <button type="button" role="radio" aria-checked={mode === 'gift'}
-                className={'adminc__tier-btn' + (mode === 'gift' ? ' is-on' : '')}
-                onClick={() => setMode('gift')}>
-                Gift
-              </button>
-            </div>
-          </>
+          <div className="adminc__gift-tiers" role="radiogroup" aria-label="Invite or gift a membership">
+            <button type="button" role="radio" aria-checked={mode === 'invite'}
+              className={'adminc__tier-btn' + (mode === 'invite' ? ' is-on' : '')}
+              onClick={() => setMode('invite')}>
+              Invite
+            </button>
+            <button type="button" role="radio" aria-checked={mode === 'gift'}
+              className={'adminc__tier-btn' + (mode === 'gift' ? ' is-on' : '')}
+              onClick={() => setMode('gift')}>
+              Gift membership
+            </button>
+          </div>
         )}
         {giving && (
           <>
@@ -391,16 +428,32 @@ export default function AdminSupporters() {
             </div>
           </>
         )}
-        <button className="adminc__btn adminc__btn--approve" onClick={send} disabled={busy || !looked}>
+        <button className="adminc__btn adminc__btn--approve" onClick={send} disabled={busy || (!looked && !phoneOk)}>
           {busy ? '…'
+            : phoneOk ? 'Prepare the text'
             : looked?.member ? 'Gift access'
             : giving ? 'Invite with this gift'
             : 'Send invitation'}
         </button>
+        {text && (
+          <div className="adminc__gift-tiers">
+            <a className="adminc__btn adminc__btn--approve" href={text.href}>Text {text.phone} ›</a>
+            <button type="button" className="adminc__btn"
+              onClick={() => {
+                navigator.clipboard.writeText(text.message)
+                  .then(() => setMsg('Copied — paste it into a text. The link carries their invitation.'))
+                  .catch(() => setError('Couldn’t copy automatically — long-press the message to copy it.'));
+              }}>
+              Copy the message
+            </button>
+          </div>
+        )}
       </div>
       {msg && <p className="adminc__msg">{msg}</p>}
 
-      <h2 className="adminc__subhead">Manage an existing member</h2>
+      {/* A PEER heading, same size as the first (founder 2026-09-27:
+          "font is the same size for each"). */}
+      <h2 className="adminc__title adminc__title--section">Manage an existing member</h2>
 
       {/* Find a member (founder 2026-08-11): a door that opens a search bar,
           then the whole membership toolbox on whoever you pick — override a

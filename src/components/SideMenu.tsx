@@ -291,8 +291,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                   </button>
                 </li>
                 <li>
+                  {/* Not bare "Invite to Lichen" — the member menu above
+                      already has that item (→ /invite); this desk also
+                      manages existing members' gifts. */}
                   <button className="side-menu__sub-item" onClick={() => go('/admin/supporters')}>
-                    Invite to Lichen / Gift access
+                    Invite &amp; manage members
                   </button>
                 </li>
                 <li>

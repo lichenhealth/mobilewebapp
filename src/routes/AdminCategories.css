@@ -1,6 +1,11 @@
 .adminc { max-width: 640px; margin: 0 auto; padding: var(--s-4) var(--s-3) var(--s-6); }
 .adminc__head { margin-bottom: var(--s-4); }
 .adminc__title { font-family: var(--font-display); font-size: var(--t-2xl); color: var(--ink); }
+/* A peer heading further down the page — SAME size as the first (founder
+   2026-09-27: "font is the same size for each"), with its own breath above. */
+.adminc__title--section { margin: var(--s-5) 0 var(--s-3); }
+/* The prepared-text door is an anchor (sms:) wearing the button class. */
+a.adminc__btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .adminc__sub { font-size: var(--t-sm); color: var(--ink-soft); margin-top: var(--s-1); }
 .adminc__muted { color: var(--ink-faint); padding: var(--s-4); }
 .adminc__empty { color: var(--ink-soft); padding: var(--s-4) 0; }
