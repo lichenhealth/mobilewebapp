@@ -292,7 +292,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 </li>
                 <li>
                   <button className="side-menu__sub-item" onClick={() => go('/admin/supporters')}>
-                    Memberships &amp; gifts
+                    Invite to Lichen / Gift access
                   </button>
                 </li>
                 <li>

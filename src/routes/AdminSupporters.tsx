@@ -127,18 +127,67 @@ export default function AdminSupporters() {
       .then(({ data }) => setMyName((data as { full_name: string | null } | null)?.full_name ?? ''));
   }, [user]);
 
-  async function gift() {
-    const em = email.trim();
-    if (!em) return;
+  /** INVITE TO LICHEN / GIFT ACCESS (founder 2026-09-27): the email leads.
+   *  Once it reads as an address we look it up — a MEMBER gets the gift
+   *  options straight away; anyone else gets an Invite | Gift toggle
+   *  (Invite = a plain invitation; Gift = the invitation carries a
+   *  membership, parked in membership_gifts and redeemed at signup). */
+  const cleanEmail = email.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF\s]/g, '').toLowerCase();
+  const emailOk = /^[^@]+@[^@]+\.[^@]+$/.test(cleanEmail);
+  const [lookup, setLookup] = useState<{ email: string; member: boolean; name: string | null } | null>(null);
+  const [mode, setMode] = useState<'invite' | 'gift'>('invite');
+  useEffect(() => {
+    if (!emailOk) { setLookup(null); return; }
+    let live = true;
+    const t = window.setTimeout(async () => {
+      const { data } = await supabase.rpc('find_member_by_email', { p_email: cleanEmail });
+      const hit = ((data as { id: string; full_name: string | null }[] | null) ?? [])[0];
+      if (live) setLookup({ email: cleanEmail, member: !!hit, name: hit?.full_name ?? null });
+    }, 350);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [cleanEmail, emailOk]);
+  const looked = lookup && lookup.email === cleanEmail ? lookup : null;
+  const giving = !!looked && (looked.member || mode === 'gift');
+
+  async function send() {
+    if (!looked || !user) return;
+    const em = looked.email;
     setBusy(true); setMsg(''); setError('');
-    const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier, p_months: months });
-    setBusy(false);
-    if (e) { setError(e.message); return; }
-    void supabase.functions.invoke('send-gift-notice', {
-      body: { email: em, inviterName: myName, tier, months },
-    }).catch(console.warn);
-    setMsg(`Gifted ${months ? spanText(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label} to ${em}.`);
-    setEmail('');
+    const what = `${months ? spanText(months) + ' of ' : ''}${TIERS.find((t) => t.id === tier)?.label}`;
+    if (looked.member) {
+      const { error: e } = await supabase.rpc('gift_subscription', { p_email: em, p_tier: tier, p_months: months });
+      setBusy(false);
+      if (e) { setError(e.message); return; }
+      void supabase.functions.invoke('send-gift-notice', {
+        body: { email: em, inviterName: myName, tier, months },
+      }).catch(console.warn);
+      setMsg(`Gifted ${what} to ${looked.name || em}.`);
+    } else {
+      if (giving) {
+        // One pending gift per email (partial unique index) — replace any older one.
+        await supabase.from('membership_gifts').delete().eq('invitee_email', em).eq('status', 'pending');
+        const { error: mg } = await supabase.from('membership_gifts')
+          .insert({ inviter_id: user.id, invitee_email: em, tier, months });
+        if (mg) { setBusy(false); setError(mg.message); return; }
+      }
+      const { error: se } = await supabase.functions.invoke('send-invite', {
+        body: giving
+          ? { email: em, inviterName: myName, giftTier: tier, giftMonths: months ?? undefined }
+          : { email: em, inviterName: myName },
+      });
+      setBusy(false);
+      if (se) {
+        setError(giving
+          ? `The gift is reserved for ${em}, but the invitation email didn’t send. Try again in a moment.`
+          : `Couldn’t send the invitation to ${em} just now. Try again in a moment.`);
+        load();
+        return;
+      }
+      setMsg(giving
+        ? `Invitation sent to ${em} — ${what} is waiting for them at signup.`
+        : `Invitation sent to ${em}.`);
+    }
+    setEmail(''); setMode('invite');
     load();
   }
 
@@ -266,20 +315,99 @@ export default function AdminSupporters() {
   return (
     <div className="adminc">
       <header className="adminc__head">
-        <h1 className="adminc__title">Gift access</h1>
+        <h1 className="adminc__title">Invite to Lichen / Gift access</h1>
         <p className="adminc__sub">
-          Comp a beta member into a tier. No charge now — you can convert gifts to paid when beta ends.
+          Invite someone to Lichen by email — with or without a gifted membership — or gift access to someone already here.
         </p>
       </header>
 
       {error && <p className="adminc__error">{error}</p>}
+
+      {/* Invite to Lichen / Gift access (founder 2026-09-27): email first;
+          the lookup decides what's offered. */}
+      <div className="adminc__gift">
+        <input
+          className="adminc__gift-email"
+          type="email"
+          placeholder="Their email"
+          autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); setMsg(''); setError(''); }}
+        />
+        {emailOk && !looked && <p className="adminc__muted">Checking…</p>}
+        {looked?.member && (
+          <p className="adminc__sub">
+            <strong>{looked.name || looked.email}</strong> is already on Lichen 🌿 — gift them access below.
+          </p>
+        )}
+        {looked && !looked.member && (
+          <>
+            <p className="adminc__sub">Not on Lichen yet — invite them, or invite them with a gifted membership.</p>
+            <div className="adminc__gift-tiers" role="radiogroup" aria-label="Invite or gift">
+              <button type="button" role="radio" aria-checked={mode === 'invite'}
+                className={'adminc__tier-btn' + (mode === 'invite' ? ' is-on' : '')}
+                onClick={() => setMode('invite')}>
+                Invite
+              </button>
+              <button type="button" role="radio" aria-checked={mode === 'gift'}
+                className={'adminc__tier-btn' + (mode === 'gift' ? ' is-on' : '')}
+                onClick={() => setMode('gift')}>
+                Gift
+              </button>
+            </div>
+          </>
+        )}
+        {giving && (
+          <>
+            <div className="adminc__gift-tiers">
+              {TIERS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={'adminc__tier-btn' + (tier === t.id ? ' is-on' : '')}
+                  onClick={() => setTier(t.id)}
+                >
+                  {t.label} <span className="adminc__tier-price">{t.price}</span>
+                </button>
+              ))}
+            </div>
+            <div className="adminc__gift-tiers">
+              <div className={'adminc__gift-stepper' + (months === null ? ' is-off' : '')}>
+                <button type="button" aria-label="Less time"
+                  disabled={months === null || months <= 1}
+                  onClick={() => setMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
+                <span>{months === null ? '∞' : spanText(months)}</span>
+                <button type="button" aria-label="More time"
+                  disabled={months === null || months >= 24}
+                  onClick={() => setMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
+              </div>
+              <button
+                type="button"
+                className={'adminc__tier-btn' + (months === null ? ' is-on' : '')}
+                onClick={() => setMonths(months === null ? 12 : null)}
+              >
+                No end date
+              </button>
+            </div>
+          </>
+        )}
+        <button className="adminc__btn adminc__btn--approve" onClick={send} disabled={busy || !looked}>
+          {busy ? '…'
+            : looked?.member ? 'Gift access'
+            : giving ? 'Invite with this gift'
+            : 'Send invitation'}
+        </button>
+      </div>
+      {msg && <p className="adminc__msg">{msg}</p>}
+
+      <h2 className="adminc__subhead">Manage an existing member</h2>
 
       {/* Find a member (founder 2026-08-11): a door that opens a search bar,
           then the whole membership toolbox on whoever you pick — override a
           Stripe sub with a gift, upgrade/extend/revoke a gift, or revoke &
           cancel entirely. */}
       <button className="adminc__btn" onClick={() => { setFindOpen((o) => !o); setPicked(null); setFindQ(''); setPMsg(''); }}>
-        {findOpen ? 'Close member search' : 'Find a member…'}
+        {findOpen ? 'Close member search' : 'Search members by name or email…'}
       </button>
       {findOpen && (
         <div className="adminc__gift">
@@ -394,50 +522,6 @@ export default function AdminSupporters() {
           )}
         </div>
       )}
-
-      <div className="adminc__gift">
-        <input
-          className="adminc__gift-email"
-          type="email"
-          placeholder="Member's email"
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); setMsg(''); }}
-        />
-        <div className="adminc__gift-tiers">
-          {TIERS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={'adminc__tier-btn' + (tier === t.id ? ' is-on' : '')}
-              onClick={() => setTier(t.id)}
-            >
-              {t.label} <span className="adminc__tier-price">{t.price}</span>
-            </button>
-          ))}
-        </div>
-        <div className="adminc__gift-tiers">
-          <div className={'adminc__gift-stepper' + (months === null ? ' is-off' : '')}>
-            <button type="button" aria-label="Less time"
-              disabled={months === null || months <= 1}
-              onClick={() => setMonths((m) => Math.max(1, (m ?? 12) - 1))}>−</button>
-            <span>{months === null ? '∞' : spanText(months)}</span>
-            <button type="button" aria-label="More time"
-              disabled={months === null || months >= 24}
-              onClick={() => setMonths((m) => Math.min(24, (m ?? 0) + 1))}>+</button>
-          </div>
-          <button
-            type="button"
-            className={'adminc__tier-btn' + (months === null ? ' is-on' : '')}
-            onClick={() => setMonths(months === null ? 12 : null)}
-          >
-            No end date
-          </button>
-        </div>
-        <button className="adminc__btn adminc__btn--approve" onClick={gift} disabled={busy || !email.trim()}>
-          {busy ? '…' : 'Gift access'}
-        </button>
-      </div>
-      {msg && <p className="adminc__msg">{msg}</p>}
 
       <DonationsDesk />
       <RoutingDesk />
