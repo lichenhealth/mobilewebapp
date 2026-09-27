@@ -1687,7 +1687,7 @@ export default function Profile() {
             </button>
             <button className="prof__admin-row" onClick={() => navigate('/admin/supporters')}>
               <Icon name="member-heart" size={18} />
-              <span>Memberships &amp; gifts</span>
+              <span>Invite to Lichen / Gift access</span>
               <span className="prof__admin-go" aria-hidden>→</span>
             </button>
           </div>
