@@ -28,7 +28,7 @@ export default function ChatThread() {
         if (c?.kind === 'care_team') {
           setCareDest(c.patient_id && c.patient_id !== user.id
             ? `/concierge/client/${c.patient_id}/chat`
-            : '/concierge/chat');
+            : '/concierge/chat?room=1');
         } else {
           setCareDest(null);
         }
