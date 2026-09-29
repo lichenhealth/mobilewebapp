@@ -544,10 +544,26 @@ export default function Invite() {
           {isAdmin ? 'Invitations across Lichen' : 'Your invitations'}
           {invites.length > 0 && (
             <span className="invite__tally">
-              {(['invited', 'opened', 'joined', 'declined'] as const)
-                .map((s) => `${invites.filter((i) => inviteStatus(i) === s).length} ${s}`)
-                .filter((t) => !t.startsWith('0 declined'))
-                .join(' · ')}
+              {/* The tally leads with the TOTAL and drops empty buckets
+                  (founder 2026-09-29: "these numbers seem wrong" — the old
+                  per-status counts were mutually EXCLUSIVE, so "10 invited ·
+                  0 opened · 7 joined" read as a funnel where 7 joined
+                  without opening; "invited" only ever meant "nothing has
+                  happened yet"). "Opened" here = opened but not yet joined —
+                  a live signal, shown only when someone's in that state. */}
+              {(() => {
+                const n = (s: ReturnType<typeof inviteStatus>) =>
+                  invites.filter((i) => inviteStatus(i) === s).length;
+                const joined = n('joined'), opened = n('opened'), declined = n('declined');
+                const unanswered = invites.length - joined - opened - declined;
+                return [
+                  `${invites.length} sent`,
+                  joined > 0 && `${joined} joined`,
+                  opened > 0 && `${opened} opened`,
+                  unanswered > 0 && `${unanswered} unanswered`,
+                  declined > 0 && `${declined} declined`,
+                ].filter(Boolean).join(' · ');
+              })()}
             </span>
           )}
         </h2>
