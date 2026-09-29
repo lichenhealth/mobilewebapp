@@ -1077,6 +1077,7 @@ export default function Concierge() {
   const [careVMs, setCareVMs] = useState<ChatVM[]>([]);
   const [roomLast, setRoomLast] = useState<MessageRow | null>(null);
   const [careUnread, setCareUnread] = useState<Map<string, number>>(new Map());
+  const [careListLoaded, setCareListLoaded] = useState(false);
   useEffect(() => {
     if (activeTab !== 'chat' || isClientView || !me) return;
     let active = true;
@@ -1092,6 +1093,7 @@ export default function Concierge() {
           : Promise.resolve(null),
       ]);
       if (!active) return;
+      setCareListLoaded(true);
       setCareRoster(roster);
       setCareUnread(counts);
       const team = new Set(roster.map((r) => r.id));
@@ -1107,11 +1109,6 @@ export default function Concierge() {
     })();
     return () => { active = false; };
   }, [activeTab, isClientView, me, careChatId]);
-  // Arriving with ?ask= means a specific entry rides into the ROOM — open it.
-  useEffect(() => {
-    if (activeTab !== 'chat') { setCareOpen(null); return; }
-    if (!isClientView && searchParams.get('ask') && careChatId) setCareOpen(careChatId);
-  }, [activeTab, isClientView, careChatId, searchParams]);
   // SEARCH IS A SUBSET TOO (same message: "when you search within the
   // concierge chat, you only get results within the care team"): message
   // hits are filtered to the care-scoped chat ids — the room + the team
@@ -1125,10 +1122,23 @@ export default function Concierge() {
     let live = true;
     const t = window.setTimeout(async () => {
       const hits = await searchMessages(query, 60);
-      if (live) setCareHits(hits.filter((h) => careChatIds.has(h.chat_id)));
+      // Results take the panel (they render only while no chat is open).
+      if (live) { setCareHits(hits.filter((h) => careChatIds.has(h.chat_id))); setCareOpen(null); }
     }, 250);
     return () => { live = false; window.clearTimeout(t); };
   }, [query, activeTab, careChatIds]);
+  // LAND IN THE ROOM (founder 2026-09-28: a chat bell opened the inbox list
+  // — one pinned row, redundant with the room it opens). Arriving with
+  // ?ask= (an entry rides in) or ?room=1 (a chat bell, via ChatThread's
+  // care redirect) opens the ROOM; and when the list would hold only the
+  // room (no team DMs with words yet), the tab opens straight into it and
+  // the room carries no back arrow — there's nothing to go back to.
+  useEffect(() => {
+    if (activeTab !== 'chat') { setCareOpen(null); return; }
+    if (isClientView || !careChatId) return;
+    if (searchParams.get('ask') || searchParams.get('room')) { setCareOpen(careChatId); return; }
+    if (careListLoaded && careVMs.length === 0 && careHits === null) setCareOpen(careChatId);
+  }, [activeTab, isClientView, careChatId, searchParams, careListLoaded, careVMs.length, careHits === null]);
   /** "who: last words" — the inbox row's preview grammar. */
   function carePreview(msg: MessageRow | null | undefined, members?: { profile_id: string; name: string }[]): string {
     if (!msg) return 'No messages yet';
@@ -2084,7 +2094,7 @@ export default function Concierge() {
             <div className="conc__care" style={{ top: careTop }}>
               <ChatConversation chatId={isClientView ? careChatId : careOpen!} me={me} showIntro={false}
                 onInfo={() => handleTabClick('team')}
-                onBack={isClientView ? undefined : () => setCareOpen(null)}
+                onBack={isClientView || careVMs.length === 0 ? undefined : () => setCareOpen(null)}
                 onRead={(id) => setCareUnread((m) => { const n = new Map(m); n.set(id, 0); return n; })}
                 careAsk={isClientView || careOpen === careChatId ? careAsk : null} onCareAskDone={clearAsk} />
             </div>
