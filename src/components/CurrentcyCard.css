@@ -94,3 +94,23 @@
 .curc__routing-match-head { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); flex-wrap: wrap; }
 .curc__routing-match-head span { color: var(--ink-soft); }
 .curc__routing-why { font-size: 11px; color: var(--peach-deep); margin: 4px 0 0; }
+
+/* ── The operating-rate dial + the wells line (DonationsDesk, 2026-10-01) ── */
+.curc__ratectl { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); margin: 0 0 var(--s-3); }
+.curc__ratectl select {
+  padding: 6px 10px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: var(--bone-warm); font: inherit; color: var(--ink);
+}
+.curc__ratehint { font-size: var(--t-xs); color: var(--ink-faint); flex-basis: 100%; }
+.curc__wells { font-size: var(--t-sm); color: var(--ink-muted); margin: 0 0 var(--s-3); }
+
+/* The bolt as Current-cy's $ sign (founder 2026-10-01) — small variant rides
+   inline with statement amounts and prompts. */
+.curc__bolt--sm { width: 10px; height: 10px; vertical-align: -1px; }
+.curc__amt { display: inline-flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.curc__short {
+  border: 1px solid var(--peach); border-radius: var(--r-md);
+  padding: 8px 12px; font-size: var(--t-sm); color: var(--ink);
+  display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
+}
+.curc__short p { margin: 0; }

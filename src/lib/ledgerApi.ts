@@ -98,3 +98,36 @@ export const fmtCurrentNum = (n: number) =>
   `${Number.isInteger(n) ? n : n.toFixed(2)}`;
 export const fmtCurrent = (n: number) =>
   `${fmtCurrentNum(n)} Current-cy`;
+
+// ─── Money in (founder 2026-10-01) ──────────────────────────────────────────
+
+/** The admin-set operating rate on donations (5–15%). Null means the
+ *  platform_settings table isn't live yet (the money-in migration hasn't
+ *  been applied) — callers treat null as "machinery not live" and keep the
+ *  pre-rate behavior, including HIDING the load door: a payment door whose
+ *  fulfillment path isn't live must never render. */
+export async function operatingRate(): Promise<number | null> {
+  const { data, error } = await supabase.from('platform_settings')
+    .select('value').eq('key', 'operating_rate_pct').maybeSingle();
+  if (error || !data) return null;
+  const n = Number((data as { value: unknown }).value);
+  return Number.isFinite(n) ? Math.max(5, Math.min(15, Math.round(n))) : null;
+}
+
+export async function setOperatingRate(pct: number): Promise<void> {
+  const { error } = await supabase.rpc('set_operating_rate', { p_pct: pct });
+  if (error) throw error;
+}
+
+/** Start a Stripe checkout that loads the signed-in member's own wallet —
+ *  dollars in, Current minted 1:1 by the webhook once payment confirms. */
+export async function startLoadCheckout(amountDollars: number): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('load-checkout', {
+    body: { amount: amountDollars },
+  });
+  if (error || !(data as { url?: string } | null)?.url) {
+    throw new Error((error as { message?: string } | null)?.message
+      || (data as { error?: string } | null)?.error || 'Could not start checkout.');
+  }
+  window.location.href = (data as { url: string }).url;
+}

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import SiteHeader from '../components/SiteHeader';
 import { useAuth } from '../auth/AuthProvider';
+import { operatingRate } from '../lib/ledgerApi';
 import './Donate.css';
 
 const PORTAL = 'https://billing.stripe.com/p/login/9B6bJ00MU047bRidT3bII00';
@@ -23,6 +24,17 @@ const PURPOSES = [
   'Subsidize spaces and places for those who can’t afford them',
   'Lichen operations',
 ];
+
+// Purpose chip → the bucket the gift pools into (founder 2026-10-01's wells:
+// operations / community / concierge, plus general). A free-text designation
+// stays unbucketed — the desk resolves it by hand.
+const FUND_OF: Record<string, string> = {
+  [PURPOSES[0]]: 'general',
+  [PURPOSES[1]]: 'concierge',
+  [PURPOSES[2]]: 'community',
+  [PURPOSES[3]]: 'community',
+  [PURPOSES[4]]: 'operations',
+};
 
 interface DirectHit { key: string; label: string; kind: string; fill: string }
 
@@ -79,6 +91,14 @@ export default function Donate() {
   // dollar gift" door, founder 2026-10-01).
   const [flow, setFlow] = useState<'donate' | 'gift'>(params.get('flow') === 'gift' ? 'gift' : 'donate');
   const mode: 'donation' | 'sponsorship' = flow === 'gift' ? 'sponsorship' : 'donation';
+
+  // The admin-set operating share (founder 2026-10-01: a 5–15% toggle whose
+  // change rewrites this page's copy live). Null = setting not live yet —
+  // the legacy 95/5 wording stands and no rate line renders.
+  const [rate, setRate] = useState<number | null>(null);
+  useEffect(() => { void operatingRate().then(setRate); }, []);
+  const pctOn = rate === null ? 95 : 100 - rate;
+  const pctOps = rate === null ? 5 : rate;
 
   // Type-ahead for the designation: real members and groups (signed-in
   // donors only — the member list is private to members) + purpose
@@ -158,6 +178,9 @@ export default function Donate() {
           amount: Number(amount), frequency, kind: mode,
           // Custom words override the chip; gifts carry only explicit words.
           designation: designation.trim() || (flow === 'donate' ? purpose : ''),
+          // The bucket rides only when a chip chose it — custom words and
+          // personal gifts stay unbucketed for the desk.
+          fund: flow === 'donate' && !designation.trim() ? FUND_OF[purpose] : undefined,
         },
       });
       if (error || !data?.url) throw new Error(error?.message || data?.error || 'Could not start checkout.');
@@ -392,16 +415,16 @@ export default function Donate() {
           {flow === 'gift' ? (
             <span className="donate__direct-hint">
               You choose exactly who benefits — Lichen facilitates your
-              generosity as you direct it. 95% flows to them as Lichen
-              Current-cy; 5% sustains the platform. A personal gift is not a
+              generosity as you direct it. {pctOn}% flows to them as Lichen
+              Current-cy; {pctOps}% sustains the platform. A personal gift is not a
               charitable donation: you&rsquo;ll receive a gift acknowledgment
               rather than a tax receipt.
             </span>
           ) : (
             <span className="donate__direct-hint">
               Name a practitioner, group, or purpose within the Lichen network, in
-              your own words. 95% of your donation flows there as Lichen Current-cy;
-              5% sustains the operations required to provide the platform that
+              your own words. {pctOn}% of your donation flows there as Lichen Current-cy;
+              {' '}{pctOps}% sustains the operations required to provide the platform that
               makes it possible. Designations are preferences — Lichen Health
               retains full discretion and control over donated funds, as the IRS
               requires for tax-deductibility.
@@ -412,6 +435,15 @@ export default function Donate() {
         <button type="button" className="donate__submit" onClick={donate} disabled={loading}>
           {loading ? 'One moment…' : mode === 'sponsorship' ? 'Send gift' : 'Donate'}
         </button>
+        {flow === 'donate' && rate !== null && (
+          /* The founder's live dial (2026-10-01): when she changes the
+             operating rate at the admin desk, this sentence changes with it. */
+          <p className="donate__ratefine">
+            Right now, {rate}% of donation dollars go to funding the buildout of
+            the platform — so {100 - rate}% of your donation goes to whatever
+            you&rsquo;ve specified, if anything.
+          </p>
+        )}
         {msg && (
           <p className={'donate__status' + (err ? ' is-err' : '')} role="status">
             {msg}

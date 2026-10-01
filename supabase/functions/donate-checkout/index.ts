@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!STRIPE_KEY) return json({ error: 'Donations are not configured yet.' }, 500);
 
-  let body: { amount?: number; frequency?: string; designation?: string; kind?: string };
+  let body: { amount?: number; frequency?: string; designation?: string; kind?: string; fund?: string };
   try { body = await req.json(); } catch { return json({ error: 'Invalid request body.' }, 400); }
 
   // 'donation' = tax-deductible (Lichen retains discretion over funds);
@@ -85,7 +85,13 @@ Deno.serve(async (req) => {
     } catch { /* anonymous donor */ }
   }
 
-  const metadata = { kind, designation, donor_profile: donorProfile || undefined, frequency };
+  // The bucket the gift pools into (founder 2026-10-01's three wells +
+  // general) — mapped client-side from the purpose chips, recorded by the
+  // webhook. Free-text designations stay unbucketed for the desk to resolve.
+  const fund = ['operations', 'community', 'concierge', 'general'].includes(body.fund ?? '')
+    ? body.fund : undefined;
+
+  const metadata = { kind, designation, donor_profile: donorProfile || undefined, frequency, fund };
   const productName = kind === 'sponsorship' ? 'Care sponsorship — Lichen Health' : 'Donation to Lichen Health';
 
   try {

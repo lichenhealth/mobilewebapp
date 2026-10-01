@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { operatingRate, setOperatingRate } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
 interface DonationRow {
@@ -33,6 +34,16 @@ export default function DonationsDesk() {
   const [hits, setHits] = useState<MemberLite[]>([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  // The operating-rate dial (founder 2026-10-01: 5–15%; changing it rewrites
+  // the public /donate copy live). Null = money-in migration not applied yet.
+  const [rate, setRate] = useState<number | null>(null);
+  const [rateDraft, setRateDraft] = useState<number>(15);
+  const [rateBusy, setRateBusy] = useState(false);
+  // Dollars waiting per bucket + each row's frozen rate — both ride the
+  // post-migration columns, so this read is guarded and the desk renders
+  // without them until the migration lands.
+  const [wells, setWells] = useState<Record<string, number> | null>(null);
+  const [frozen, setFrozen] = useState<Map<string, number>>(new Map());
 
   const load = async () => {
     const { data, error } = await supabase.from('donations')
@@ -42,8 +53,41 @@ export default function DonationsDesk() {
     setRows((data as DonationRow[] | null) ?? []);
     const { data: fs } = await supabase.rpc('currentcy_float_summary');
     setFloat((fs as FloatSummary | null) ?? null);
+
+    const r = await operatingRate();
+    setRate(r);
+    if (r !== null) {
+      setRateDraft(r);
+      const { data: fd, error: fe } = await supabase.from('donations')
+        .select('id, fund, operating_rate_pct, amount_cents, status');
+      if (!fe && fd) {
+        const sums: Record<string, number> = {};
+        const fr = new Map<string, number>();
+        for (const d of fd as { id: string; fund: string | null; operating_rate_pct: number | null; amount_cents: number; status: string }[]) {
+          if (d.operating_rate_pct !== null) fr.set(d.id, d.operating_rate_pct);
+          if (d.status === 'received') {
+            const k = d.fund ?? 'unspecified';
+            sums[k] = (sums[k] ?? 0) + d.amount_cents;
+          }
+        }
+        setWells(sums);
+        setFrozen(fr);
+      }
+    }
   };
   useEffect(() => { void load(); }, []);
+
+  const saveRate = async () => {
+    setRateBusy(true); setNote('');
+    try {
+      await setOperatingRate(rateDraft);
+      setRate(rateDraft);
+      setNote(`Operating share set to ${rateDraft}% — the /donate page says so now.`);
+    } catch (e) {
+      setNote((e as { message?: string } | null)?.message || 'Could not set the rate.');
+    }
+    setRateBusy(false);
+  };
 
   useEffect(() => {
     const n = who.trim();
@@ -94,9 +138,41 @@ export default function DonationsDesk() {
     <div className="adminc__gift curc__mint">
       <h2 className="adminc__h2">Donations</h2>
       <p className="adminc__sub">
-        Gifts received in dollars, waiting to become Current — 95% minted to
-        the recipient the donor named, 5% kept as operating dollars.
+        Gifts received in dollars, waiting to become Current — {rate === null ? 95 : 100 - rate}% minted to
+        the recipient the donor named, {rate === null ? 5 : rate}% kept as operating dollars.
       </p>
+
+      {rate !== null && (
+        <div className="curc__ratectl">
+          <label>
+            Operating share{' '}
+            <select value={rateDraft} onChange={(e) => setRateDraft(Number(e.target.value))}>
+              {Array.from({ length: 11 }, (_, i) => i + 5).map((p) => (
+                <option key={p} value={p}>{p}%</option>
+              ))}
+            </select>
+          </label>
+          {rateDraft !== rate && (
+            <button className="btn" disabled={rateBusy} onClick={saveRate}>
+              {rateBusy ? 'Setting…' : `Set to ${rateDraft}%`}
+            </button>
+          )}
+          <span className="curc__ratehint">
+            Changes the /donate page&rsquo;s copy immediately; each gift keeps the
+            rate its donor was shown.
+          </span>
+        </div>
+      )}
+
+      {wells && (
+        <p className="curc__wells">
+          Waiting in the wells:{' '}
+          {(['concierge', 'community', 'operations', 'general', 'unspecified'] as const)
+            .filter((k) => (wells[k] ?? 0) > 0)
+            .map((k) => `${k} ${usd(wells[k])}`)
+            .join(' · ') || 'nothing yet'}
+        </p>
+      )}
 
       {float && (
         <div className="curc__float">
@@ -127,7 +203,8 @@ export default function DonationsDesk() {
               />
               {hits.map((h) => (
                 <button className="curc__hit" key={h.id} disabled={busy} onClick={() => translate(d.id, h)}>
-                  {h.full_name ?? 'Member'} — mint {usd(Math.round(d.amount_cents * 0.95))} as Current
+                  {/* Unstamped rows translate at the old 5% promise, never the dial. */}
+                  {h.full_name ?? 'Member'} — mint {usd(d.amount_cents - Math.round(d.amount_cents * (frozen.get(d.id) ?? 5) / 100))} as Current
                 </button>
               ))}
             </div>

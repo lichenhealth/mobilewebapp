@@ -26,6 +26,9 @@ const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUP
 async function sendDonationReceipt(d: {
   email: string; amountCents: number; designation: string; frequency: string; sessionId: string;
   kind: 'donation' | 'sponsorship';
+  /** The operating rate the donor was shown (5–15). Null = the setting isn't
+   *  live yet (pre-migration) — the legacy 95/5 wording stands. */
+  ratePct: number | null;
 }): Promise<void> {
   if (!RESEND_API_KEY) return;
   const usd = (d.amountCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -37,6 +40,14 @@ async function sendDonationReceipt(d: {
   const refNo = `LCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${d.sessionId.slice(-6).toUpperCase()}`;
   const sponsorship = d.kind === 'sponsorship';
   const docTitle = sponsorship ? 'Gift acknowledgment' : 'Donation receipt';
+  // The split line follows the admin-set operating rate the donor was shown
+  // at gift time (founder 2026-10-01); legacy wording when the rate isn't live.
+  const splitLine = d.ratePct === null
+    ? `95% of directed gifts flow to their named recipient as Lichen
+Current-cy; 5% sustains the operations that make the platform possible.`
+    : `${100 - d.ratePct}% of your gift flows on as Lichen Current-cy to what
+you've specified, if anything; ${d.ratePct}% funds the buildout of the
+platform that makes it possible.`;
 
   const taxText = sponsorship
     ? `This payment is a personal gift you directed to specific people —
@@ -62,8 +73,7 @@ ${d.designation ? `Directed: "${d.designation}"\n` : ''}Receipt no.: ${refNo}
 
 ${taxText}
 
-95% of directed gifts flow to their named recipient as Lichen
-Current-cy; 5% sustains the operations that make the platform possible.
+${splitLine}
 
 With gratitude,
 Lichen Health · lichen.healthcare`;
@@ -97,8 +107,7 @@ Lichen Health · lichen.healthcare`;
       Please retain this receipt for your tax records.
     </p>`}
     <p style="font-size:12px;color:#8a857c;line-height:1.6;margin:0">
-      95% of directed gifts flow to their named recipient as Lichen Current-cy;
-      5% sustains the operations that make the platform possible.
+      ${esc(splitLine.replace(/\n/g, ' '))}
     </p>
   </div></body></html>`;
 
@@ -203,13 +212,44 @@ Deno.serve(async (req) => {
       await record(event.data.object, false);
     } else if (event.type === 'checkout.session.completed') {
       // Donations land here (donate-checkout tags them kind=donation) and wait
-      // on /admin/supporters for translation into Current-cy (95/5 split).
+      // on /admin/supporters for translation into Current-cy; LOADS (founder
+      // 2026-10-01, load-checkout tags them kind=load) mint 1:1 to the member
+      // the moment payment confirms — the only point Current is ever created
+      // from a load, so every Current stays dollar-backed.
       // deno-lint-ignore no-explicit-any
       const s = event.data.object as any;
+
+      if (s.metadata?.kind === 'load' && s.payment_status === 'paid' && s.metadata?.profile) {
+        // Idempotent per session server-side; a thrown error here 500s so
+        // Stripe retries until the mint lands — a paid load is never dropped.
+        const { error } = await admin.rpc('record_currentcy_load', {
+          p_profile: s.metadata.profile,
+          p_amount_cents: s.amount_total ?? 0,
+          p_session: s.id,
+        });
+        if (error) throw new Error(`record_currentcy_load: ${error.message}`);
+      }
+
       const giveKind = s.metadata?.kind === 'sponsorship' ? 'sponsorship'
         : s.metadata?.kind === 'donation' ? 'donation' : null;
       if (giveKind && s.payment_status === 'paid') {
-        const { data: inserted } = await admin.from('donations').upsert({
+        // The operating rate is FROZEN onto the row at receipt — the rate the
+        // donor read under the Donate button is the rate their gift keeps.
+        // A failed read means the settings table isn't live yet (pre-
+        // migration): stamp nothing, legacy 95/5 behavior stands.
+        let ratePct: number | null = null;
+        try {
+          const { data: rateRow, error: rateErr } = await admin.from('platform_settings')
+            .select('value').eq('key', 'operating_rate_pct').maybeSingle();
+          if (!rateErr && rateRow) {
+            const n = Number(rateRow.value);
+            if (Number.isFinite(n)) ratePct = Math.max(5, Math.min(15, Math.round(n)));
+          }
+        } catch { /* settings not live yet */ }
+        const FUNDS = ['operations', 'community', 'concierge', 'general'];
+        const fund = FUNDS.includes(s.metadata?.fund ?? '') ? s.metadata.fund : null;
+
+        const row: Record<string, unknown> = {
           stripe_session_id: s.id,
           amount_cents: s.amount_total ?? 0,
           currency: s.currency ?? 'usd',
@@ -218,7 +258,11 @@ Deno.serve(async (req) => {
           designation: s.metadata?.designation ?? '',
           frequency: s.metadata?.frequency ?? 'one-time',
           kind: giveKind,
-        }, { onConflict: 'stripe_session_id', ignoreDuplicates: true }).select('id');
+        };
+        if (ratePct !== null) { row.operating_rate_pct = ratePct; if (fund) row.fund = fund; }
+        const { data: inserted, error: insErr } = await admin.from('donations')
+          .upsert(row, { onConflict: 'stripe_session_id', ignoreDuplicates: true }).select('id');
+        if (insErr) throw new Error(`donation insert: ${insErr.message}`);
         // Receipt rides only on FIRST insert — webhook retries never double-send.
         if ((inserted?.length ?? 0) > 0 && s.customer_details?.email) {
           await sendDonationReceipt({
@@ -228,6 +272,7 @@ Deno.serve(async (req) => {
             frequency: s.metadata?.frequency ?? 'one-time',
             sessionId: s.id,
             kind: giveKind,
+            ratePct,
           });
         }
       }

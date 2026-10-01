@@ -169,6 +169,9 @@
 .donate__status { font-size: var(--t-sm); color: var(--ink-muted); min-height: 1em; }
 .donate__status.is-err { color: var(--rust); }
 .donate__fine { font-size: var(--t-xs); color: var(--ink-faint); max-width: 46ch; line-height: var(--lh-normal); }
+/* The live operating-rate line under the Donate button (founder 2026-10-01) —
+   a shade stronger than the fine print; it's the money promise. */
+.donate__ratefine { font-size: var(--t-xs); color: var(--ink-muted); max-width: 46ch; line-height: var(--lh-normal); margin: var(--s-2) 0 0; }
 .donate__fine a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
 
 .donate__tax { font-size: var(--t-xs); color: var(--ink-faint); max-width: 60ch; line-height: var(--lh-normal); }
