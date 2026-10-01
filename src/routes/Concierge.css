@@ -1706,3 +1706,20 @@
   font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
 }
 .conc__dash-select:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
+
+/* ========== The wallet's money-in doors (founder 2026-10-01) ==========
+   "Put dollars in" on /currentcy — ghost-pill doors (the care-plan door
+   grammar) to the existing donate / give flows. */
+.curx { margin: var(--s-3) 0 var(--s-2); }
+.curx__h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-muted); font-weight: 500; margin: 0 0 var(--s-2);
+}
+.curx__doors { display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; }
+.curx__door {
+  border: 1px solid var(--peach); border-radius: var(--r-full);
+  padding: 6px 14px; font-size: 13px; font-weight: 500;
+  color: var(--peach-deep); text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.curx__door:hover { background: var(--peach-tint); }

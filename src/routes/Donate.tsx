@@ -75,7 +75,9 @@ export default function Donate() {
   // The tax-policy fork (IRS conduit rule), now front and center as two
   // columns: Donate = deductible, Lichen holds discretion; Give = the donor
   // chooses who benefits — a personal gift, honestly not deductible.
-  const [flow, setFlow] = useState<'donate' | 'gift'>('donate');
+  // ?flow=gift lands on the Give column directly (the wallet's "send a
+  // dollar gift" door, founder 2026-10-01).
+  const [flow, setFlow] = useState<'donate' | 'gift'>(params.get('flow') === 'gift' ? 'gift' : 'donate');
   const mode: 'donation' | 'sponsorship' = flow === 'gift' ? 'sponsorship' : 'donation';
 
   // Type-ahead for the designation: real members and groups (signed-in
