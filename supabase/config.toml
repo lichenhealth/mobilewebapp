@@ -41,6 +41,11 @@ verify_jwt = false
 [functions.donate-checkout]
 verify_jwt = false
 
+# Loads a member's own Current-cy wallet — signed-in only, so the JWT is
+# verified (unlike donate-checkout, whose donors may be signed out).
+[functions.load-checkout]
+verify_jwt = true
+
 [functions.join-request]
 verify_jwt = false
 
