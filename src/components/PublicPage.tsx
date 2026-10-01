@@ -167,6 +167,11 @@ export interface PublicPageProps {
    *  acting as a page, so you can manage it easily if there is a hero image").
    *  Everything else a viewer sees belongs below, in beforeContent. */
   aboveHero?: React.ReactNode;
+  /** Rendered INSIDE the hero, between the identity block (name, pronouns,
+   *  headline, location) and the cover photo — where the member page's own
+   *  view toggle lives (founder 2026-10-01, second pass: "close, but i'd
+   *  like it here", her line landing under the location line). */
+  belowIdentity?: React.ReactNode;
   /** Your relationship with this entity — weave, recommend, join. Rendered
    *  INSIDE the hero, under the nav and above the cover image, so it can't be
    *  pushed below a tall photo (founder 2026-08-07: "icons with text, as they
@@ -1076,6 +1081,7 @@ export default function PublicPage(props: PublicPageProps) {
             <button className="ppage__cta" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
           ))}
         </div>
+        {props.belowIdentity}
         {navInHero && navNode}
         {ed ? (
           <div className={'ppage__ecover' + (coverSrc ? '' : ' is-empty')}>
