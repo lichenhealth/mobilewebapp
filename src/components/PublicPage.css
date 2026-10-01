@@ -244,7 +244,9 @@
   font-size: 14.5px;
 }
 .ppage__offer:last-child { border-bottom: none; }
-.ppage__offer-name { color: var(--ink); font-weight: 600; }
+/* Regular weight, not bold (founder 2026-10-01: "make the services
+   regular text") — the row is a list entry, not a heading. */
+.ppage__offer-name { color: var(--ink); font-weight: 400; }
 .ppage__offer-terms { color: var(--ink-soft); text-align: right; }
 .ppage__note { margin: 8px 0 0; font-size: 14px; color: var(--ink-soft); line-height: 1.55; }
 .ppage__note strong {
