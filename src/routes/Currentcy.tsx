@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import CurrentcyCard from '../components/CurrentcyCard';
 import AssistantDoor from '../components/AssistantDoor';
 import './Concierge.css';
@@ -20,6 +21,22 @@ export default function Currentcy() {
       <div className="cedit__doors">
         <AssistantDoor section="currentcy" label="Your money coach — what moved, and where you could earn more" />
       </div>
+      {/* Money in (founder 2026-10-01: "donate directly into the platform
+          thru their profiles") — DOORS to the existing consented flows.
+          Loading your own account (dollars → Current you spend) is designed
+          but awaits the founder's call on the money semantics; no dead door
+          for it, per the platform door rule. */}
+      <section className="curx">
+        <h2 className="curx__h2">Put dollars in</h2>
+        <div className="curx__doors">
+          <Link className="curx__door" to="/donate">
+            Donate — generally, or aimed at care &amp; community subsidies ›
+          </Link>
+          <Link className="curx__door" to="/donate?flow=gift">
+            Send a dollar gift to someone ›
+          </Link>
+        </div>
+      </section>
       <CurrentcyCard />
     </div>
   );
