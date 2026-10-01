@@ -55,6 +55,28 @@ the WeavePitch template.
   registered-agent address, never the founder's home.
 - **The float rule** (inviolable): never mint more Current-cy than donation
   dollars actually held. `currentcy_float_summary()` is the gauge.
+  **RE-AFFIRMED AND GENERALIZED (founder 2026-10-01):** "Current-cy should
+  only be possible to send within the network if it is backed by a real
+  dollar within the network. So we don't have a fake current-cy." — every
+  Current in circulation is backed by a dollar actually held, whatever door
+  the dollar came in through (donation, member account load, member gift).
+  Enforcement stays at MINT (send only moves existing Current); any new
+  money-in flow mints only after Stripe confirms the dollars landed.
+- **Banking (founder 2026-10-01):** a $10K donation arrived; the founder is
+  opening a NEW BANK ACCOUNT and moving it + other Lichen revenue there, so
+  that **Daniela can keep her clinical Lichen revenue separate**. (Likely
+  Mark's pledged $10K from the 2026-09-11 subsidy decisions — program-
+  restricted, 5% operating — confirm with the founder before recording it
+  as such or minting against it.) ⚠ PENDING: account opened, transfer done.
+- **Money-in flows under Current-cy (founder 2026-10-01, design in flight):**
+  the founder wants members to put dollars in through their own profiles —
+  (1) LOAD your account (buy Current to exchange on the platform),
+  (2) send a specific dollar GIFT to someone (minted to them as Current),
+  (3) DONATE with general-or-narrowed designation (the /donate purposes,
+  reachable from the wallet). Doctrine questions (operating share per flow,
+  deductibility, refundability of loads, the fintech/money-transmission
+  review before load+cash-out coexist) are with the founder — nothing
+  built yet beyond the existing /donate flow.
 - **Current-cy** = DB ledger + $1 peg, NO blockchain (settled 2026-07-18,
   re-settled 07-21; do not relitigate). Three channels: dollars IN (minting
   encodes value attribution), Current INSIDE (append-only ledger), dollars

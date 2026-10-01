@@ -40,6 +40,12 @@ export default function Onboarding() {
   // creates the link at claim time). Under 13 can't proceed without one.
   const [heldBy, setHeldBy] = useState<string | null>(null);
   const [caps, setCaps] = useState<string[]>([]);
+  // Something to offer right away? (founder 2026-10-01: Concierge already
+  // asks what people can give — onboarding asks too, and what they name
+  // goes straight into Marketplace.) The words ride into Compose as a
+  // prefill; the composer's own flow shapes the terms (gift, trade, lend,
+  // Current-cy…), so onboarding never mints a post itself.
+  const [offer, setOffer] = useState('');
   const [spaces, setSpaces] = useState<DraftSpace[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceCats, setServiceCats] = useState<string[]>([]);
@@ -123,6 +129,14 @@ export default function Onboarding() {
     };
   }
 
+  /** Where entering Lichen lands: Home, or Marketplace's composer carrying
+   *  the offer they just described (both doors honor typed words — dropping
+   *  them because someone pressed "later" would be rude). */
+  function landing() {
+    const text = offer.trim();
+    return text ? `/compose?area=marketplace&body=${encodeURIComponent(text)}` : '/home';
+  }
+
   function toggleCap(id: string) {
     setCaps((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   }
@@ -177,7 +191,7 @@ export default function Onboarding() {
         .from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
       if (onbErr) throw onbErr;
       markOnboarded();
-      navigate('/home', { replace: true });
+      navigate(landing(), { replace: true });
     } catch (e) {
       const msg = e && typeof e === 'object' && 'message' in e
         ? String((e as { message: unknown }).message)
@@ -196,7 +210,7 @@ export default function Onboarding() {
     setSaving(true);
     await supabase.from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
     markOnboarded();
-    navigate('/home', { replace: true });
+    navigate(landing(), { replace: true });
   }
 
   if (loading || !user) {
@@ -344,6 +358,23 @@ export default function Onboarding() {
               />
             </div>
           )}
+        </section>
+
+        <section className="onb__section">
+          <h2 className="onb__h2">Have something to offer right away?</h2>
+          <p className="onb__lead">
+            Lichen runs on what members bring — goods, services, skills, time.
+            Describe one thing you could offer now, and when you enter Lichen
+            we&rsquo;ll take you straight to Marketplace to post it. You choose
+            the terms there — a gift, a trade, a loan, or for Current-cy.
+          </p>
+          <textarea
+            className="onb__input onb__offer"
+            rows={3}
+            value={offer}
+            onChange={(e) => setOffer(e.target.value)}
+            placeholder="e.g. “Weekly riding lessons for beginners” or “A box of garden starts every spring”"
+          />
         </section>
 
         {SPACE_SECTIONS.map((sec) => {
