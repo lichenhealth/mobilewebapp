@@ -45,7 +45,8 @@ the WeavePitch template.
 - **Donations**: min-5% operating share per gift, donor may direct a larger
   share to operations or give generally (founder 2026-08-28/09-01); the
   remainder funds subsidies. Historical code: `translate_donation` minted
-  95% as Current-cy — ⚠ code lags the new policy (see subsidy section).
+  95% as Current-cy — RESOLVED 2026-10-01: the rate is the admin dial now
+  (5–15%, frozen per gift at receipt; see the money-in entry below).
   Sponsorships (donor picks the recipient, the "Give" flow) are the
   non-deductible conduit carve-out, separate from donations.
 - **No home address on the open web** (2026-09-08): the /donate check card
@@ -68,15 +69,16 @@ the WeavePitch template.
   Mark's pledged $10K from the 2026-09-11 subsidy decisions — program-
   restricted, 5% operating — confirm with the founder before recording it
   as such or minting against it.) ⚠ PENDING: account opened, transfer done.
-- **Money-in flows under Current-cy (founder 2026-10-01 — ANSWERED same day,
-  BUILT; ⚠ PENDING server activation, see CLAUDE.md's MONEY IN entry):**
+- **Money-in flows under Current-cy (founder 2026-10-01 — ANSWERED, BUILT and
+  ACTIVATED the same day on her "go ahead"; see CLAUDE.md's MONEY IN entry):**
   (1) **Operating share is an admin dial, 5–15%** (her call: "a toggle
   between 5-15%… when I change it on my end as the admin, it will change
   the copy that people see") — `platform_settings.operating_rate_pct`,
   control in DonationsDesk, live copy under /donate's button, the rate a
   donor READ frozen onto their donation row at receipt. The 2026-08/09
-  "code lags the policy" note RESOLVES when the migration lands — the
-  rate is a stored parameter now, exactly as SUBSIDY_MECHANICS.md asked.
+  "code lags the policy" note is RESOLVED (live 2026-10-01) — the rate is
+  a stored parameter, exactly as SUBSIDY_MECHANICS.md asked; an unstamped
+  legacy row translates at the old 5%, erring toward the donor.
   (2) **Loads** — "your Current-cy is like a checking account": members
   load dollars 1:1 into their own wallet (load-checkout → webhook mints
   on payment, idempotent). A load is a PURCHASE of spending power: no

@@ -203,7 +203,8 @@ export default function DonationsDesk() {
               />
               {hits.map((h) => (
                 <button className="curc__hit" key={h.id} disabled={busy} onClick={() => translate(d.id, h)}>
-                  {h.full_name ?? 'Member'} — mint {usd(d.amount_cents - Math.round(d.amount_cents * (frozen.get(d.id) ?? rate ?? 5) / 100))} as Current
+                  {/* Unstamped rows translate at the old 5% promise, never the dial. */}
+                  {h.full_name ?? 'Member'} — mint {usd(d.amount_cents - Math.round(d.amount_cents * (frozen.get(d.id) ?? 5) / 100))} as Current
                 </button>
               ))}
             </div>

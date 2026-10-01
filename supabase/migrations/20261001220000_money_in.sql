@@ -152,9 +152,10 @@ begin
     raise exception 'Unknown recipient kind.';
   end if;
 
-  -- The rate the donor was shown at gift time wins; older rows (pre-column)
-  -- fall back to the current setting.
-  v_rate := coalesce(d.operating_rate_pct, public.operating_rate_pct());
+  -- The rate the donor was shown at gift time wins. An UNSTAMPED row (a
+  -- legacy donation, or a webhook whose settings read hiccuped) falls back
+  -- to 5 — the old 95/5 promise, erring toward the donor, never the dial.
+  v_rate := coalesce(d.operating_rate_pct, 5);
   v_central := round(d.amount_cents * v_rate / 100.0)::integer;
   v_grant := round((d.amount_cents - v_central) / 100.0, 2);
   if v_grant <= 0 then raise exception 'Donation too small to translate.'; end if;
