@@ -340,7 +340,11 @@ input, textarea, select { font: inherit; color: inherit; }
   border-radius: 9px; background: var(--peach); color: #fff;
   font-size: 11px; font-weight: 700; line-height: 1;
 }
-.view-toggle-row { display: flex; align-items: center; gap: 10px; margin: var(--s-2) 0 var(--s-3); }
+/* Wraps so a hint beside the toggle drops UNDER it when the column is
+   tight — at 390px it squeezed "Public View" into "PUB…" in the member
+   page's top band (found 2026-10-01, moving the toggle above the fold). */
+.view-toggle-row { display: flex; align-items: center; gap: 6px 10px; margin: var(--s-2) 0 var(--s-3); flex-wrap: wrap; }
+.view-toggle-row .view-toggle { flex-shrink: 0; }
 
 .view-toggle-row--center { justify-content: center; flex-wrap: wrap; text-align: center; }
 

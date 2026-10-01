@@ -232,40 +232,45 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   // ── The member-only pieces (founder 2026-08-05). These ride the template
   //    when you're signed in and simply aren't passed when you're not, which
   //    is the whole "omit the internal flags on the public web" idea. ──
+  /* One three-way toggle everywhere (founder 2026-08-11): Admin manages,
+     Lichen View is the internal experience, Public View is the website
+     layer (?preview=1 renders the open-web template). ABOVE THE FOLD since
+     2026-10-01 (founder: "move this up above the fold for lichen view +
+     public view") — it rides PublicPage's aboveHero top band, the same slot
+     a space's adminBar already uses ("the top band is yours, the masthead
+     is theirs"), instead of trailing the cover photo. */
+  const viewToggleBar = isSelf && !embedded ? (
+    <div className="view-toggle-row">
+      <span className="view-toggle" role="group" aria-label="Views of you">
+        <button
+          className="view-toggle__side view-toggle__side--admin"
+          onClick={() => navigate('/profile')}
+        >
+          Admin
+        </button>
+        <button
+          className={'view-toggle__side' + (!previewing ? ' is-on' : '')}
+          onClick={() => setParams({})}
+        >
+          Lichen View
+        </button>
+        <button
+          className={'view-toggle__side' + (previewing ? ' is-on' : '')}
+          onClick={() => setParams({ preview: '1' })}
+        >
+          Public View
+        </button>
+      </span>
+      <span className="mprof__selfhint">
+        {previewing
+          ? 'Your public website — what the open web sees.'
+          : 'How other members see you.'}
+      </span>
+    </div>
+  ) : null;
+
   const identityExtras = (
     <>
-      {isSelf && !embedded && (
-        /* One three-way toggle everywhere (founder 2026-08-11): Admin
-           manages, Lichen View is the internal experience, Public View is
-           the website layer (?preview=1 renders the open-web template). */
-        <div className="view-toggle-row">
-          <span className="view-toggle" role="group" aria-label="Views of you">
-            <button
-              className="view-toggle__side view-toggle__side--admin"
-              onClick={() => navigate('/profile')}
-            >
-              Admin
-            </button>
-            <button
-              className={'view-toggle__side' + (!previewing ? ' is-on' : '')}
-              onClick={() => setParams({})}
-            >
-              Lichen View
-            </button>
-            <button
-              className={'view-toggle__side' + (previewing ? ' is-on' : '')}
-              onClick={() => setParams({ preview: '1' })}
-            >
-              Public View
-            </button>
-          </span>
-          <span className="mprof__selfhint">
-            {previewing
-              ? 'Your public website — what the open web sees.'
-              : 'How other members see you.'}
-          </span>
-        </div>
-      )}
       {/* Identity chips are Lichen-View furniture (founder 2026-08-26): the
           vocabulary exists because the platform uses it, so the open web
           doesn't wear the bubbles — and preview must show what guests
@@ -459,6 +464,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
            src/lib/siteView.ts). */
         signedIn={!!me && !previewing && !embedded}
         feed={memberFeed}
+        aboveHero={viewToggleBar ?? undefined}
         beforeContent={me ? identityExtras : undefined}
       />
       </>
@@ -470,6 +476,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   // is the About tab now.
   return (
     <div className="prof">
+      {viewToggleBar}
       <div className="prof__head">
         <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
         <h1 className="prof__name">{name}</h1>
