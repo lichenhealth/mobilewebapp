@@ -235,12 +235,13 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   /* One three-way toggle everywhere (founder 2026-08-11): Admin manages,
      Lichen View is the internal experience, Public View is the website
      layer (?preview=1 renders the open-web template). ABOVE THE FOLD since
-     2026-10-01 (founder: "move this up above the fold for lichen view +
-     public view") — it rides PublicPage's aboveHero top band, the same slot
-     a space's adminBar already uses ("the top band is yours, the masthead
-     is theirs"), instead of trailing the cover photo. */
+     2026-10-01, and IN THE MASTHEAD since the founder's second pass the
+     same day ("close, but i'd like it here" — her line landing under the
+     location line): it rides PublicPage's belowIdentity slot, centered
+     between the identity block and the cover photo, instead of trailing
+     the cover or sitting in the top band. */
   const viewToggleBar = isSelf && !embedded ? (
-    <div className="view-toggle-row">
+    <div className="view-toggle-row view-toggle-row--center">
       <span className="view-toggle" role="group" aria-label="Views of you">
         <button
           className="view-toggle__side view-toggle__side--admin"
@@ -464,7 +465,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
            src/lib/siteView.ts). */
         signedIn={!!me && !previewing && !embedded}
         feed={memberFeed}
-        aboveHero={viewToggleBar ?? undefined}
+        belowIdentity={viewToggleBar ?? undefined}
         beforeContent={me ? identityExtras : undefined}
       />
       </>

@@ -325,6 +325,10 @@
 }
 .ppage__utility .mprof__actions { margin-top: 0; justify-content: flex-start; }
 .ppage__utility .view-toggle-row { margin: 0; }
+/* The member page's own view toggle, centered in the masthead between the
+   identity block and the cover photo (founder 2026-10-01, second pass:
+   "close, but i'd like it here" — under the location line). */
+.ppage__hero > .view-toggle-row { margin: var(--s-2) 0 0; }
 
 /* Home teases and routes (founder 2026-08-11): the root shows a taste,
    the branch holds the whole thing. */
