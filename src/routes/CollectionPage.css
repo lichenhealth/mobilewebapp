@@ -1,5 +1,9 @@
 /* A collection — private shelf folder or published playlist/anthology */
 .colp { padding: var(--s-4); max-width: 720px; margin: 0 auto; }
+/* The page's own back (founder 2026-10-02: a folder was backless — not a
+   section route, so no TopBar arrow). Compound selector per the standing
+   specificity rule; base .cmp__back rules live in Compose.css. */
+.cmp__back.colp__back { margin-bottom: var(--s-3); }
 .colp__head { margin-bottom: var(--s-3); }
 .colp__crumb {
   display: flex; align-items: center; gap: 6px;
