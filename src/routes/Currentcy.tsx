@@ -4,6 +4,7 @@ import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
 import BudgetCard from '../components/BudgetCard';
 import './Concierge.css';
+import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive's shape)
 
 /** The wallet's own screen (founder 2026-09-13: "your wallet just lives in
  *  your profile… it should be a left nav on desktop and a bottom nav on
@@ -20,13 +21,17 @@ export default function Currentcy() {
 
   return (
     <div className="cedit">
-      <header className="cedit__head cedit__head--noback">
-        <h1 className="cedit__title">Current-cy</h1>
+      {/* Drive's header grammar (founder 2026-10-02: "have the current-cy tab
+          do the same, with the explanation of what it is in the middle…and
+          with no gray line") — centered title + centered explanation via the
+          same .myc__head classes Drive wears, no sticky bar, no hairline. */}
+      <header className="myc__head">
+        <h1 className="myc__title">Your Current-cy</h1>
+        <p className="myc__sub">
+          Your wallet — like a checking account: earn Current-cy, or load
+          dollars in to use on the platform.
+        </p>
       </header>
-      <p className="means__pagelead">
-        Your wallet — like a checking account: earn Current-cy, or load dollars
-        in to use on the platform.
-      </p>
       {justLoaded && (
         <p className="curx__loaded">
           Payment received — your Current lands here in a moment. Pull back in

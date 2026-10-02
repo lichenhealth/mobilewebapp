@@ -347,8 +347,35 @@ export default function CollectionPage() {
   }
   const suggPostOf = (pid: string | null) => suggPosts.find((p) => p.id === pid);
 
+  // THE WAY OUT (founder 2026-10-02: "no back button once you're in a folder
+  // … so you get stuck"): /collections/:id is NOT a section route, so the
+  // TopBar draws no arrow above it — the one-back rule says the page carries
+  // its own chip, worded where it can be. Your own folder's home is Drive;
+  // anything else (a space's shelf, someone's published collection) gets the
+  // plain history back, PostPage's shape.
+  const ownFolder = !!me && !!meta && meta.owner_id === me && !meta.space_id;
+  const back = () => {
+    if (ownFolder) { navigate('/drive'); return; }
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/home');
+  };
+  const backChip = me && (
+    <button className="cmp__back colp__back" onClick={back}>
+      <Icon name="arrow-left" size={14} /> {ownFolder ? 'Back to Drive' : 'Back'}
+    </button>
+  );
+
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
-  if (!meta) return <div className="colp"><p className="colp__muted">This page isn&rsquo;t available.</p></div>;
+  if (!meta) {
+    return (
+      <div className="colp">
+        <button className="cmp__back colp__back" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/home'); }}>
+          <Icon name="arrow-left" size={14} /> Back
+        </button>
+        <p className="colp__muted">This page isn&rsquo;t available.</p>
+      </div>
+    );
+  }
   // Courses are OFFLINE while they're made better (founder 2026-08-25) —
   // the /courses room shows Coming Soon, and a course reached by any other
   // door (a feed door-post, a cohort's Course door, Drive) says the same.
@@ -395,6 +422,7 @@ export default function CollectionPage() {
     <>
     {!me && <SiteHeader />}
     <div className="colp">
+      {backChip}
       {/* ONE TOP ROW (founder 2026-08-15): the view toggle sits where Profile
           and a space put theirs — top left, in BOTH views, so Admin is a
           place you switch to rather than a pill buried under the content —

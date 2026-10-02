@@ -157,12 +157,9 @@ export default function Saved() {
   return (
     <div className="myc">
       <header className="myc__head">
-        {/* No glyph here: the top bar's section mark is already the Drive
-            cloud, and Drive is the one section whose crumb repeated it
-            (My-celium's crumb uses sparkle, not the mycelium mark). */}
-        <p className="myc__crumb">
-          <span>Drive</span>
-        </p>
+        {/* No crumb at all (founder 2026-10-02: "We don't need to say 'Drive'
+            above My Drive") — the top bar's section mark already names the
+            room, and the title says the rest. */}
         <h1 className="myc__title">Your Drive</h1>
         <p className="myc__sub">
           What you&rsquo;ve saved and what you&rsquo;ve created — organized for
