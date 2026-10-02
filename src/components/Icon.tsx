@@ -505,16 +505,19 @@ const ICONS: Record<IconName, IconEntry> = {
     strokeWidth: 1.25,
     content: <><path d="M12 3v18M16.5 7.5C16.5 5.84 14.49 4.5 12 4.5S7.5 5.84 7.5 7.5s2.01 3 4.5 3 4.5 1.34 4.5 3-2.01 3-4.5 3-4.5-1.34-4.5-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
-  // Current-cy's mark: the BOLT inside a coin circle (founder 2026-10-02,
-  // "let's have it be a thunderbolt versus dollar sign" — the bolt is
-  // Current-cy's $ sign platform-wide; the coin circle stays per her
-  // 2026-09-13 "a circle around Current-cy" — the wallet is a thing you
-  // open). The glyph is CurrentcyCard's Bolt scaled 0.72 about center, so
-  // the mark and the amounts wear the identical shape.
+  // Current-cy's mark: the bare BOLT (founder 2026-10-02, "let's have it be
+  // a thunderbolt versus dollar sign", then same day "we don't need the
+  // second ring around the lightning" — inside TopBar's own ring the coin
+  // circle was a circle in a circle, the user-multiple shape retired
+  // 2026-08-31). Same path as CurrentcyCard's Bolt, so the mark and the
+  // amounts wear the identical shape. ViewBox framed to the artwork
+  // (bolt bbox 7.68–16.32 × 5.52–18.48, center exactly 12,12 — a straight-
+  // line polygon, so the bounds are the literal coordinates); strokeWidth
+  // retuned for the tighter frame to keep the line weight.
   'currentcy': {
-    viewBox: '0 0 24 24',
-    strokeWidth: 1.5,
-    content: <><circle cx="12" cy="12" r="10.5" stroke="currentColor" fill="none"/><path d="M13.08 5.52 7.68 13.08h3.46L10.92 18.48 16.32 10.92h-3.46L13.08 5.52Z" stroke="currentColor" strokeLinejoin="round" fill="none"/></>,
+    viewBox: '4.8 4.8 14.4 14.4',
+    strokeWidth: 0.9,
+    content: <><path d="M13.08 5.52 7.68 13.08h3.46L10.92 18.48 16.32 10.92h-3.46L13.08 5.52Z" stroke="currentColor" strokeLinejoin="round" fill="none"/></>,
   },
   'leaf': {
     viewBox: '0.43 1.49 24 24',

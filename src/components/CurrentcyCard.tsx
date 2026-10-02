@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { formatDateShort } from '../lib/conciergeApi';
 import {
   LedgerEntry, EntityType, balanceOf, statementOf, sendCurrentcy, fmtCurrentNum,
-  operatingRate, startLoadCheckout,
+  operatingRate, startLoadCheckout, numericAmount,
 } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
@@ -140,7 +140,7 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
               <input
                 className="curc__input curc__amount" placeholder="Amount"
                 inputMode="decimal" value={amount}
-                onChange={(e) => { setAmount(e.target.value); setShort(null); }}
+                onChange={(e) => { setAmount(numericAmount(e.target.value)); setShort(null); }}
               />
               <input
                 className="curc__input" placeholder="For… (optional)"

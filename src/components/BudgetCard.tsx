@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { myBalance, fmtCurrentNum } from '../lib/ledgerApi';
+import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
   BudgetItem, BudgetCadence, BudgetDirection,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
@@ -210,7 +210,7 @@ export default function BudgetCard() {
           onChange={(e) => setLabel(e.target.value)} />
         <input className="budg__input budg__input--amt"
           placeholder={dir === 'in' ? '$ asked (empty = freely)' : '$ amount'} inputMode="decimal"
-          value={amount} onChange={(e) => setAmount(e.target.value)} />
+          value={amount} onChange={(e) => setAmount(numericAmount(e.target.value))} />
         <div className="budg__chips">
           {(['out', 'in'] as const).map((d) => (
             <button key={d} className={'budg__chip' + (dir === d ? ' is-on' : '')} onClick={() => setDir(d)}>
