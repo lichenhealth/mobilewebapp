@@ -288,19 +288,29 @@ export default function BudgetCard() {
             </button>
           ))}
         </div>
+        {/* One time sits LAST with its date BESIDE it (founder 2026-10-02
+            markup: "move 1x over here, so when you click it, the date is
+            next to it") — the chip and date share one inline-flex unit, so
+            at phone width the PAIR wraps together and the date never lands
+            on a row away from the chip that summoned it. */}
         <div className="budg__chips">
-          {(['once', 'monthly', 'yearly'] as const).map((c) => (
+          {(['monthly', 'yearly'] as const).map((c) => (
             <button key={c} className={'budg__chip' + (cad === c ? ' is-on' : '')} onClick={() => setCad(c)}>
-              {c === 'once' ? 'One time' : c === 'monthly' ? 'Monthly' : 'Yearly'}
+              {c === 'monthly' ? 'Monthly' : 'Yearly'}
             </button>
           ))}
-          {cad === 'once' && (
-            <input
-              className="budg__input budg__input--date" type="date" value={onDate}
-              aria-label="When?"
-              onChange={(e) => setOnDate(e.target.value)}
-            />
-          )}
+          <span className="budg__once">
+            <button className={'budg__chip' + (cad === 'once' ? ' is-on' : '')} onClick={() => setCad('once')}>
+              One time
+            </button>
+            {cad === 'once' && (
+              <input
+                className="budg__input budg__input--date" type="date" value={onDate}
+                aria-label="When?"
+                onChange={(e) => setOnDate(e.target.value)}
+              />
+            )}
+          </span>
         </div>
         {err && <p className="budg__err">{err}</p>}
         <button className="btn" disabled={busy} onClick={() => void add()}>
