@@ -42,7 +42,7 @@ export default function MoneyInDoors() {
       <div className="curx__doors">
         {loadsLive && (
           <button className="curx__door curx__door--btn" onClick={() => { setLoadOpen((o) => !o); setLoadErr(''); }}>
-            Load Current-cy — dollars into your wallet ›
+            Load Current-cy ›
           </button>
         )}
         {loadsLive && loadOpen && (
@@ -62,8 +62,11 @@ export default function MoneyInDoors() {
             </p>
           </div>
         )}
+        {/* Short labels (founder 2026-10-02: "remove the extra text in the
+            load current-cy and Donate buttons") — the doors say the act;
+            /donate itself explains the aiming. */}
         <Link className="curx__door" to="/donate">
-          Donate — generally, or aimed at care &amp; community subsidies ›
+          Donate ›
         </Link>
         {!loadsLive && (
           <Link className="curx__door" to="/donate?flow=gift">

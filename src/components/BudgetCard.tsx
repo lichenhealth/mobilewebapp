@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
-  BudgetItem, BudgetCadence, BudgetDirection,
+  BudgetItem, BudgetBucket, BudgetCadence,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
 } from '../lib/budgetApi';
 import { Bolt } from './CurrentcyCard';
@@ -11,20 +11,21 @@ import './BudgetCard.css';
 
 /** BUDGET (founder 2026-10-02: "like a bank account, but also like
  *  budgeting software… balance, energy in and energy out for each month or
- *  year"; second pass same hour: "energy needed and energy provided maybe?
- *  …some stuff you'll want current-cy for, other stuff you'll be donating
- *  because you can"). Private to the member, planning only — nothing here
- *  ever moves a Current. Three readings:
- *  - the period's REAL energy in / out, summed from the ledger itself;
- *  - ENERGY NEEDED: regular lines (the mortgage — monthly or yearly,
- *    normalized to the chosen period) and the one-time procure list, whose
- *    platform items pull their price LIVE from the listing, totalled
- *    against the balance;
- *  - ENERGY PROVIDED: the ways you give into the network — a line can ask
- *    Current (planned income) or carry ⚡0, offered freely.
- *  A manual need wears an "Ask the network" door into Compose — posting it
- *  as an In-search-of is what plugs it into the existing gift/ISO matcher
- *  (a budget list is private; a public ask is a deliberate act). */
+ *  year"). FOUR SECTIONS since the same day's second pass (founder:
+ *  "change energy needed to Expenses and Energy provided to Income and
+ *  have two more sections, one for excess stuff you have to give… no need
+ *  for reciprocal compensation, and one for 'need' — since melanie isn't
+ *  making enough money, she doesn't get acupuncture she needs… that
+ *  wouldn't be an expense because she doesn't have the funds"):
+ *  - EXPENSES: what life asks and you pay — regular lines normalized to
+ *    the period + the one-time procure list totalled against the balance;
+ *  - INCOME: what you provide expecting Current back;
+ *  - OFFERED FREELY: given to the network, no reciprocal compensation;
+ *  - NEEDS: what you need but can't fund — each wears "Ask the network",
+ *    which is what plugs it into the existing gift/ISO matcher (a budget
+ *    list is private; a public ask is a deliberate act).
+ *  Plus the period's REAL in/out summed from the ledger itself. Private to
+ *  the member, planning only — nothing here ever moves a Current. */
 export default function BudgetCard() {
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -37,8 +38,11 @@ export default function BudgetCard() {
 
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [dir, setDir] = useState<BudgetDirection>('out');
+  const [bucket, setBucket] = useState<BudgetBucket>('expense');
   const [cad, setCad] = useState<BudgetCadence>('monthly');
+  // A one-time line may carry its date (founder 2026-10-02: "so it gets
+  // nested into that month and that year") — defaults to today.
+  const [onDate, setOnDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -63,12 +67,27 @@ export default function BudgetCard() {
 
   if (!me || items === null) return null;
 
-  // Her grammar, not accounting's: NEEDED is what life asks of you (out),
-  // PROVIDED is what you give into the network (in — for Current or freely).
-  const needed = items.filter((i) => i.direction === 'out');
-  const neededRegular = needed.filter((i) => i.cadence !== 'once');
-  const procure = needed.filter((i) => i.cadence === 'once');
-  const provided = items.filter((i) => i.direction === 'in');
+  // A DATED one-time line belongs to the Month/Year holding its date;
+  // undated one-time lines (legacy + bolt-added listings) are standing and
+  // show in every view. Lines dated outside the current period step out of
+  // the lists and totals, counted honestly below.
+  const today = new Date();
+  const inPeriod = (i: BudgetItem) => {
+    if (i.cadence !== 'once' || !i.on_date) return true;
+    const d = new Date(i.on_date + 'T00:00');
+    return view === 'month'
+      ? d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()
+      : d.getFullYear() === today.getFullYear();
+  };
+  const visible = items.filter(inPeriod);
+  const hiddenOnce = items.length - visible.length;
+
+  const expenses = visible.filter((i) => i.bucket === 'expense');
+  const expensesRegular = expenses.filter((i) => i.cadence !== 'once');
+  const procure = expenses.filter((i) => i.cadence === 'once');
+  const income = visible.filter((i) => i.bucket === 'income');
+  const gifts = visible.filter((i) => i.bucket === 'gift');
+  const needs = visible.filter((i) => i.bucket === 'need');
 
   const cents = (i: BudgetItem) => i.post_id ? (i.postPriceCents ?? null) : i.amount_cents;
   /** A recurring line's amount in the CHOSEN period's terms. */
@@ -78,26 +97,35 @@ export default function BudgetCard() {
     if (view === 'month') return i.cadence === 'monthly' ? c : c / 12;
     return i.cadence === 'monthly' ? c * 12 : c;
   };
-  const neededPeriod = neededRegular.reduce((s, i) => s + perPeriod(i), 0);
-  const providedPeriod = provided.filter((i) => i.cadence !== 'once').reduce((s, i) => s + perPeriod(i), 0);
-  const gifted = provided.filter((i) => (cents(i) ?? 0) === 0).length;
+  const expensesPeriod = expensesRegular.reduce((s, i) => s + perPeriod(i), 0);
+  const incomePeriod = income.filter((i) => i.cadence !== 'once').reduce((s, i) => s + perPeriod(i), 0);
   const procureTotal = procure.reduce((s, i) => s + (cents(i) ?? 0), 0);
   const unpriced = procure.filter((i) => i.post_id && !i.postGone && i.postPriceCents == null).length;
   const gap = balance === null ? null : procureTotal / 100 - balance;
+  // A need may carry what it would cost (⚡0 = no number yet — unlike a
+  // gift, where 0 MEANS freely; the bucket disambiguates the same storage).
+  const needsPriced = needs.filter((i) => (cents(i) ?? 0) > 0);
+  const needsTotal = needsPriced.reduce((s, i) => s + (cents(i) ?? 0), 0);
+  const needsUnpriced = needs.length - needsPriced.length;
 
   const amt = (c: number) => <><Bolt small />{fmtCurrentNum(Math.round(c) / 100)}</>;
 
   const add = async () => {
     const n = Number(amount);
-    // A provided line may carry ⚡0 — "donating because you can".
-    const zeroOk = dir === 'in' && amount.trim() === '';
-    if (!label.trim()) { setErr('Name the line — "Mortgage", "Riding lessons", "Apples"…'); return; }
-    if (!zeroOk && (!Number.isFinite(n) || n < 0)) { setErr('Enter an amount — or leave it empty on a provided line to offer it freely.'); return; }
+    // Gifts never need a number; a need may not know its cost yet.
+    const emptyOk = (bucket === 'gift' || bucket === 'need') && amount.trim() === '';
+    if (!label.trim()) { setErr('Name the line — "Mortgage", "Acupuncture", "Apples"…'); return; }
+    if (!emptyOk && (!Number.isFinite(n) || n < 0 || amount.trim() === '')) {
+      setErr(bucket === 'expense' ? 'Enter what it costs.'
+        : bucket === 'income' ? 'Enter the Current you’re asking — or file it under Offered freely.'
+        : 'Enter an amount, or leave it empty.');
+      return;
+    }
     setBusy(true); setErr('');
     try {
       await addBudgetManual(me, {
-        label: label.trim(), amountCents: zeroOk ? 0 : Math.round(n * 100),
-        direction: dir, cadence: cad,
+        label: label.trim(), amountCents: emptyOk ? 0 : Math.round(n * 100),
+        bucket, cadence: cad, onDate: cad === 'once' ? onDate : null,
       });
       setLabel(''); setAmount('');
       await load();
@@ -112,40 +140,53 @@ export default function BudgetCard() {
     await removeBudgetItem(id).catch(() => load());
   };
 
-  const row = (i: BudgetItem, normalized: boolean) => (
-    <div className="budg__row" key={i.id}>
-      {i.post_id && !i.postGone ? (
-        <Link className="budg__name link-cue" to={`/posts/${i.post_id}`}>{i.postTitle}</Link>
-      ) : i.postGone ? (
-        <span className="budg__name budg__name--gone">A listing that's no longer available</span>
-      ) : (
-        <span className="budg__name">{i.label}</span>
-      )}
-      <span className="budg__tags">
-        {i.cadence !== 'once' && <em>{i.cadence === 'monthly' ? (view === 'month' ? '/mo' : '×12') : (view === 'month' ? '/12' : '/yr')}</em>}
-        {i.direction === 'in' && (cents(i) ?? 0) === 0 && <em className="budg__gift-tag">offered freely</em>}
-        {i.post_id && !i.postGone && i.postPriceCents == null && <em>no price listed</em>}
-      </span>
-      {!(i.direction === 'in' && (cents(i) ?? 0) === 0) && (
-        <span className="budg__amt">{amt(normalized ? perPeriod(i) : (cents(i) ?? 0))}</span>
-      )}
-      {!i.post_id && i.direction === 'out' && i.cadence === 'once' && (
-        <button
-          className="budg__ask"
-          title="Post it as an In-search-of — the network's gift matcher watches open asks"
-          onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}&body=${encodeURIComponent('In search of: ' + (i.label ?? ''))}`)}
-        >Ask the network ›</button>
-      )}
-      {!i.post_id && i.direction === 'in' && (
-        <button
-          className="budg__ask"
-          title="List it in Marketplace — as a gift, a trade, or for Current-cy"
-          onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}`)}
-        >List it ›</button>
-      )}
-      <button className="budg__x" aria-label="Remove" onClick={() => void remove(i.id)}>×</button>
-    </div>
-  );
+  const row = (i: BudgetItem, normalized: boolean) => {
+    const noNumber = i.bucket === 'gift' || ((cents(i) ?? 0) === 0 && i.bucket === 'need');
+    return (
+      <div className="budg__row" key={i.id}>
+        {i.post_id && !i.postGone ? (
+          <Link className="budg__name link-cue" to={`/posts/${i.post_id}`}>{i.postTitle}</Link>
+        ) : i.postGone ? (
+          <span className="budg__name budg__name--gone">A listing that's no longer available</span>
+        ) : (
+          <span className="budg__name">{i.label}</span>
+        )}
+        <span className="budg__tags">
+          {i.cadence !== 'once' && <em>{i.cadence === 'monthly' ? (view === 'month' ? '/mo' : '×12') : (view === 'month' ? '/12' : '/yr')}</em>}
+          {i.cadence === 'once' && i.on_date && (
+            <em>{new Date(i.on_date + 'T00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</em>
+          )}
+          {i.bucket === 'need' && noNumber && <em>cost unknown</em>}
+          {i.post_id && !i.postGone && i.postPriceCents == null && <em>no price listed</em>}
+        </span>
+        {!noNumber && (
+          <span className="budg__amt">{amt(normalized ? perPeriod(i) : (cents(i) ?? 0))}</span>
+        )}
+        {!i.post_id && (i.bucket === 'need' || (i.bucket === 'expense' && i.cadence === 'once')) && (
+          <button
+            className="budg__ask"
+            title="Post it as an In-search-of — the network's gift matcher watches open asks"
+            onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}&body=${encodeURIComponent('In search of: ' + (i.label ?? ''))}`)}
+          >Ask the network ›</button>
+        )}
+        {!i.post_id && (i.bucket === 'income' || i.bucket === 'gift') && (
+          <button
+            className="budg__ask"
+            title="List it in Marketplace — as a gift, a trade, or for Current-cy"
+            onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}${i.bucket === 'gift' ? '&entrust=1' : ''}`)}
+          >List it ›</button>
+        )}
+        <button className="budg__x" aria-label="Remove" onClick={() => void remove(i.id)}>×</button>
+      </div>
+    );
+  };
+
+  const BUCKETS: { id: BudgetBucket; label: string }[] = [
+    { id: 'expense', label: 'Expense' },
+    { id: 'income', label: 'Income' },
+    { id: 'gift', label: 'Offered freely' },
+    { id: 'need', label: 'Need' },
+  ];
 
   return (
     <section className="budg">
@@ -166,12 +207,12 @@ export default function BudgetCard() {
         </p>
       )}
 
-      {needed.length > 0 && (
+      {expenses.length > 0 && (
         <div className="budg__group">
-          <h3 className="budg__h3">Energy needed</h3>
-          {neededRegular.map((i) => row(i, true))}
-          {neededRegular.length > 0 && (
-            <p className="budg__total">Regular lines, this {view}: {amt(neededPeriod)}</p>
+          <h3 className="budg__h3">Expenses</h3>
+          {expensesRegular.map((i) => row(i, true))}
+          {expensesRegular.length > 0 && (
+            <p className="budg__total">Regular lines, this {view}: {amt(expensesPeriod)}</p>
           )}
           {procure.map((i) => row(i, false))}
           {procure.length > 0 && (
@@ -186,13 +227,32 @@ export default function BudgetCard() {
         </div>
       )}
 
-      {provided.length > 0 && (
+      {income.length > 0 && (
         <div className="budg__group">
-          <h3 className="budg__h3">Energy provided</h3>
-          {provided.map((i) => row(i, i.cadence !== 'once'))}
+          <h3 className="budg__h3">Income</h3>
+          {income.map((i) => row(i, i.cadence !== 'once'))}
+          <p className="budg__total">Asking Current, this {view}: {amt(incomePeriod)}</p>
+        </div>
+      )}
+
+      {gifts.length > 0 && (
+        <div className="budg__group">
+          <h3 className="budg__h3">Offered freely</h3>
+          {gifts.map((i) => row(i, false))}
           <p className="budg__total">
-            Asking Current, this {view}: {amt(providedPeriod)}
-            {gifted > 0 && <em> · {gifted} offered freely</em>}
+            {gifts.length === 1 ? 'One offering' : `${gifts.length} offerings`} into the
+            network, no compensation asked.
+          </p>
+        </div>
+      )}
+
+      {needs.length > 0 && (
+        <div className="budg__group">
+          <h3 className="budg__h3">Needs</h3>
+          {needs.map((i) => row(i, false))}
+          <p className="budg__total">
+            {needsPriced.length > 0 && <>Meeting the priced needs would take {amt(needsTotal)}{needsUnpriced > 0 && <em> · {needsUnpriced} without a number yet</em>}. </>}
+            The network can help — each line has an Ask door.
           </p>
         </div>
       )}
@@ -200,28 +260,47 @@ export default function BudgetCard() {
       {items.length === 0 && (
         <p className="budg__empty">
           Nothing budgeted yet. Add a listing from its page (the bolt beside
-          Save), or add a line here — the mortgage, firewood for winter, the
-          lessons you give, the apples you share. On or off Lichen.
+          Save), or add a line here — the mortgage as an expense, the lessons
+          you give as income, the apples you share offered freely, the care
+          you can&rsquo;t yet afford as a need.
+        </p>
+      )}
+
+      {hiddenOnce > 0 && (
+        <p className="budg__total">
+          {hiddenOnce === 1 ? 'One one-time line sits' : `${hiddenOnce} one-time lines sit`} in
+          {view === 'month' ? ' other months' : ' other years'} — switch the view to see
+          {hiddenOnce === 1 ? ' it' : ' them'}.
         </p>
       )}
 
       <div className="budg__addform">
-        <input className="budg__input" placeholder="What is it? e.g. Mortgage, or Riding lessons" value={label}
+        <input className="budg__input" placeholder="What is it? e.g. Mortgage, or Acupuncture" value={label}
           onChange={(e) => setLabel(e.target.value)} />
         <input className="budg__input budg__input--amt"
-          placeholder={dir === 'in' ? '$ asked (empty = freely)' : '$ amount'} inputMode="decimal"
+          placeholder={bucket === 'gift' ? 'no $ needed' : bucket === 'need' ? '$ if known' : '$ amount'}
+          inputMode="decimal"
           value={amount} onChange={(e) => setAmount(numericAmount(e.target.value))} />
         <div className="budg__chips">
-          {(['out', 'in'] as const).map((d) => (
-            <button key={d} className={'budg__chip' + (dir === d ? ' is-on' : '')} onClick={() => setDir(d)}>
-              {d === 'out' ? 'Energy needed' : 'Energy provided'}
+          {BUCKETS.map((b) => (
+            <button key={b.id} className={'budg__chip' + (bucket === b.id ? ' is-on' : '')} onClick={() => setBucket(b.id)}>
+              {b.label}
             </button>
           ))}
+        </div>
+        <div className="budg__chips">
           {(['once', 'monthly', 'yearly'] as const).map((c) => (
             <button key={c} className={'budg__chip' + (cad === c ? ' is-on' : '')} onClick={() => setCad(c)}>
               {c === 'once' ? 'One time' : c === 'monthly' ? 'Monthly' : 'Yearly'}
             </button>
           ))}
+          {cad === 'once' && (
+            <input
+              className="budg__input budg__input--date" type="date" value={onDate}
+              aria-label="When?"
+              onChange={(e) => setOnDate(e.target.value)}
+            />
+          )}
         </div>
         {err && <p className="budg__err">{err}</p>}
         <button className="btn" disabled={busy} onClick={() => void add()}>

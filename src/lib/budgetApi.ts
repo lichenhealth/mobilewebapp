@@ -10,6 +10,16 @@ import { supabase } from './supabase';
 
 export type BudgetDirection = 'in' | 'out';
 export type BudgetCadence = 'once' | 'monthly' | 'yearly';
+/** Four buckets (founder 2026-10-02, superseding the energy vocabulary):
+ *  expense — what life asks of you and you pay (incl. the procure list);
+ *  income — what you provide expecting Current back; gift — offered freely,
+ *  no reciprocal compensation; need — what you need but can't fund (the
+ *  acupuncture case: not an expense, because the funds aren't there — its
+ *  door is "Ask the network", the gift/ISO matcher). `direction` stays
+ *  underneath (expense/need out, income/gift in). */
+export type BudgetBucket = 'expense' | 'income' | 'gift' | 'need';
+export const bucketDirection = (b: BudgetBucket): BudgetDirection =>
+  b === 'income' || b === 'gift' ? 'in' : 'out';
 
 export interface BudgetItem {
   id: string;
@@ -17,7 +27,12 @@ export interface BudgetItem {
   label: string | null;
   amount_cents: number | null;
   direction: BudgetDirection;
+  bucket: BudgetBucket;
   cadence: BudgetCadence;
+  /** One-time lines may carry a date — the Month/Year view nests them into
+   *  that month and year (founder 2026-10-02); null = standing (shows in
+   *  every view — legacy rows and bolt-added listings). */
+  on_date: string | null;
   created_at: string;
   /** Resolved for post-linked rows at render. */
   postTitle?: string;
@@ -36,7 +51,7 @@ export function priceCents(text: string | undefined | null): number | null {
 
 export async function listBudget(me: string): Promise<BudgetItem[]> {
   const { data, error } = await supabase.from('budget_items')
-    .select('id, post_id, label, amount_cents, direction, cadence, created_at')
+    .select('id, post_id, label, amount_cents, direction, bucket, cadence, on_date, created_at')
     .eq('profile_id', me)
     .order('created_at', { ascending: false });
   if (error) { console.warn('listBudget:', error.message); return []; }
@@ -81,11 +96,13 @@ export async function removeBudgetPost(me: string, postId: string): Promise<void
 }
 
 export async function addBudgetManual(me: string, item: {
-  label: string; amountCents: number; direction: BudgetDirection; cadence: BudgetCadence;
+  label: string; amountCents: number; bucket: BudgetBucket; cadence: BudgetCadence;
+  onDate?: string | null;
 }): Promise<void> {
   const { error } = await supabase.from('budget_items').insert({
     profile_id: me, label: item.label, amount_cents: item.amountCents,
-    direction: item.direction, cadence: item.cadence,
+    bucket: item.bucket, direction: bucketDirection(item.bucket), cadence: item.cadence,
+    on_date: item.cadence === 'once' ? (item.onDate || null) : null,
   });
   if (error) throw error;
 }
