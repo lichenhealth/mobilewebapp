@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { operatingRate, startLoadCheckout } from '../lib/ledgerApi';
+import { operatingRate, startLoadCheckout, numericAmount } from '../lib/ledgerApi';
 import './MoneyInDoors.css';
 
 /** The wallet's money-in doors (founder 2026-10-01: "donate directly into
@@ -49,7 +49,7 @@ export default function MoneyInDoors() {
           <div className="curx__loadrow">
             <input
               className="curx__loadamt" placeholder="$ amount" inputMode="decimal"
-              value={loadAmt} onChange={(e) => setLoadAmt(e.target.value)}
+              value={loadAmt} onChange={(e) => setLoadAmt(numericAmount(e.target.value))}
             />
             <button className="btn btn-primary" disabled={loadBusy} onClick={startLoad}>
               {loadBusy ? 'One moment…' : 'Load it →'}

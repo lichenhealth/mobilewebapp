@@ -99,6 +99,19 @@ export const fmtCurrentNum = (n: number) =>
 export const fmtCurrent = (n: number) =>
   `${fmtCurrentNum(n)} Current-cy`;
 
+/** Keep an amount FIELD numeric as it's typed (founder 2026-10-02: "you can
+ *  only enter in a number with budget, not words") — digits and one decimal
+ *  point, two decimal places; everything else (letters, $, commas — pasted
+ *  "$1,200.50" included) is dropped on the way in. Worn by every amount
+ *  input in the wallet family: Budget's line amount, the Load amount, the
+ *  Send amount. */
+export const numericAmount = (raw: string): string => {
+  const s = raw.replace(/[^0-9.]/g, '');
+  const i = s.indexOf('.');
+  if (i === -1) return s;
+  return s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '').slice(0, 2);
+};
+
 // ─── Money in (founder 2026-10-01) ──────────────────────────────────────────
 
 /** The admin-set operating rate on donations (5–15%). Null means the
