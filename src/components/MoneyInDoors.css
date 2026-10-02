@@ -1,0 +1,29 @@
+/* The wallet's money-in doors (founder 2026-10-01) — ghost-pill doors in
+   the care-plan door grammar. Moved here from Concierge.css 2026-10-02 when
+   the doors became a shared component (wallet page + Profile drawer). */
+.curx { margin: var(--s-3) 0 var(--s-2); }
+.curx__h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-muted); font-weight: 500; margin: 0 0 var(--s-2);
+}
+.curx__doors { display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; }
+.curx__door {
+  border: 1px solid var(--peach); border-radius: var(--r-full);
+  padding: 6px 14px; font-size: 13px; font-weight: 500;
+  color: var(--peach-deep); text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.curx__door:hover { background: var(--peach-tint); }
+.curx__door--btn { background: none; font: inherit; font-size: 13px; cursor: pointer; }
+.curx__loadrow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); width: 100%; }
+.curx__loadamt {
+  max-width: 120px; padding: 10px 12px; border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); background: var(--bone-warm); font: inherit; color: var(--ink);
+}
+.curx__loaderr { flex-basis: 100%; font-size: var(--t-sm); color: var(--red-deep, #a4442f); margin: 0; }
+.curx__loadfine { flex-basis: 100%; font-size: var(--t-xs); color: var(--ink-faint); margin: 0; max-width: 46ch; }
+.curx__loaded {
+  font-size: var(--t-sm); color: var(--green-deep, #3e5c3a);
+  border: 1px solid var(--green, #9db88f); border-radius: var(--r-md);
+  padding: 8px 12px; margin: 0 0 var(--s-3);
+}

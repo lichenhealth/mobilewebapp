@@ -505,12 +505,16 @@ const ICONS: Record<IconName, IconEntry> = {
     strokeWidth: 1.25,
     content: <><path d="M12 3v18M16.5 7.5C16.5 5.84 14.49 4.5 12 4.5S7.5 5.84 7.5 7.5s2.01 3 4.5 3 4.5 1.34 4.5 3-2.01 3-4.5 3-4.5-1.34-4.5-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
-  // Current-cy's mark: the dollar inside a coin circle (founder 2026-09-13,
-  // "a circle around Current-cy") — the wallet is a thing you open.
+  // Current-cy's mark: the BOLT inside a coin circle (founder 2026-10-02,
+  // "let's have it be a thunderbolt versus dollar sign" — the bolt is
+  // Current-cy's $ sign platform-wide; the coin circle stays per her
+  // 2026-09-13 "a circle around Current-cy" — the wallet is a thing you
+  // open). The glyph is CurrentcyCard's Bolt scaled 0.72 about center, so
+  // the mark and the amounts wear the identical shape.
   'currentcy': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.5,
-    content: <><circle cx="12" cy="12" r="10.5" stroke="currentColor" fill="none"/><path d="M12 6v12M15 9c0-1.1-1.34-2-3-2s-3 .9-3 2 1.34 2 3 2 3 .9 3 2-1.34 2-3 2-3-.9-3-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
+    content: <><circle cx="12" cy="12" r="10.5" stroke="currentColor" fill="none"/><path d="M13.08 5.52 7.68 13.08h3.46L10.92 18.48 16.32 10.92h-3.46L13.08 5.52Z" stroke="currentColor" strokeLinejoin="round" fill="none"/></>,
   },
   'leaf': {
     viewBox: '0.43 1.49 24 24',
