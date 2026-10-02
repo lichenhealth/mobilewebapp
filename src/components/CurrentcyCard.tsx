@@ -12,8 +12,9 @@ interface MemberLite { id: string; full_name: string | null }
 
 /** The lightning bolt is Current-cy's $ sign (founder 2026-10-01: "we should
  *  have the lightning bolt symbol as our $") — a real icon, never the emoji,
- *  so it keeps the brand's line weight. */
-function Bolt({ small = false }: { small?: boolean }) {
+ *  so it keeps the brand's line weight. Exported: BudgetCard's amounts wear
+ *  the identical shape. */
+export function Bolt({ small = false }: { small?: boolean }) {
   return (
     <svg className={'curc__bolt' + (small ? ' curc__bolt--sm' : '')} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M13.5 3 6 13.5h4.8L10.5 21 18 10.5h-4.8L13.5 3Z"
