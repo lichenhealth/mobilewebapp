@@ -58,8 +58,12 @@
   font-size: var(--t-sm); color: var(--ink);
 }
 .budg__input--amt { flex: 0 1 150px; }
-/* The one-time date sits with the cadence chips, chip-height. */
-.budg__input--date { flex: 0 0 auto; padding: 4px 10px; font-size: 12.5px; }
+/* One time + its date are ONE WRAPPING UNIT (founder 2026-10-02 markup:
+   "when you click it, the date is next to it") — at phone width the pair
+   moves to its own line together; the date never strands a row away from
+   the chip that summoned it. */
+.budg__once { display: inline-flex; align-items: center; gap: 6px; }
+.budg__input--date { flex: 0 0 auto; padding: 4px 8px; font-size: 12px; }
 .budg__chips { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
 .budg__chip {
   background: none; border: 1px solid var(--bone-edge); border-radius: var(--r-full);
