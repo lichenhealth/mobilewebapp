@@ -51,7 +51,7 @@ export default function RoutingDesk() {
   const [matches, setMatches] = useState<Record<string, Match[]>>({});
   // In-kind donation offers, keyed by post id — accepting passes title to
   // Lichen and triggers the acknowledgment email.
-  const [inkind, setInkind] = useState<Record<string, { id: string }>>({});
+  const [inkind, setInkind] = useState<Record<string, { id: string; kind: string }>>({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
@@ -98,11 +98,11 @@ export default function RoutingDesk() {
 
       // In-kind offers waiting for acceptance (quietly absent pre-migration).
       const { data: ik } = await supabase.from('inkind_donations')
-        .select('id, post_id').eq('status', 'offered');
+        .select('id, post_id, kind').eq('status', 'offered');
       if (!live) return;
-      const ikMap: Record<string, { id: string }> = {};
-      for (const row of (ik as { id: string; post_id: string | null }[] | null) ?? []) {
-        if (row.post_id) ikMap[row.post_id] = { id: row.id };
+      const ikMap: Record<string, { id: string; kind: string }> = {};
+      for (const row of (ik as { id: string; post_id: string | null; kind: string }[] | null) ?? []) {
+        if (row.post_id) ikMap[row.post_id] = { id: row.id, kind: row.kind ?? 'goods' };
       }
       setInkind(ikMap);
     })();
@@ -165,7 +165,9 @@ export default function RoutingDesk() {
           )}
           {inkind[o.id] && (
             <p className="curc__donation-kind">
-              Offered as a donation to Lichen — accepting passes title and emails the receipt
+              {inkind[o.id].kind === 'services'
+                ? 'Offered as donated services to Lichen — accepting emails the services acknowledgment (time isn\u2019t deductible; their out-of-pocket costs may be)'
+                : 'Offered as donated goods to Lichen — accepting passes title and emails the receipt'}
             </p>
           )}
           <div className="curc__routing-acts">

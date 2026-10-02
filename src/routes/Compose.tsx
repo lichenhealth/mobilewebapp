@@ -127,7 +127,15 @@ export default function Compose() {
   // In-kind DONATION: title passes to Lichen (the Goodwill move) — that's
   // what makes a tax acknowledgment legal. Offered under Lichen*; a steward
   // accepts on the routing desk, and the receipt email follows.
+  // GOODS or SERVICES (founder 2026-10-02: "give away services (like free
+  // therapy) or goods… a receipt, kinda like goodwill?") — the tax truth
+  // splits: goods are deductible at the donor's own fair-market value, while
+  // the IRS NEVER deducts the value of time or services — only the donor's
+  // out-of-pocket costs of providing them, for which the receipt describing
+  // the services is exactly the written acknowledgment the IRS requires
+  // ($250+). The copy below never promises a services deduction.
   const [inkind, setInkind] = useState(false);
+  const [inkindKind, setInkindKind] = useState<'goods' | 'services'>('goods');
   const [slideLow, setSlideLow] = useState('');
   const [slideHigh, setSlideHigh] = useState('');
   // ?title=/?body= prefill words carried in from another surface (the task
@@ -711,11 +719,16 @@ export default function Compose() {
         // In-kind donation offer: record it for the routing desk + the
         // donor's private My-giving dashboard. Fire-and-forget — the post
         // never fails over the record; pre-migration this quietly no-ops.
-        if (isMarket && evMode === 'lichen' && inkind && created?.id && user) {
+        // ⚠ Gate on modes, not evMode — evMode only tracks EVENT mode picks,
+        // so the old evMode check meant a ticked box never filed a row
+        // (found 2026-10-02; no live rows were affected).
+        if (isMarket && modes.has('lichen') && inkind && created?.id && user) {
           void supabase.from('inkind_donations').insert({
             donor_profile_id: user.id,
             post_id: created.id,
-            description: title.trim() || body.trim().slice(0, 140) || 'Donated item',
+            kind: inkindKind,
+            description: title.trim() || body.trim().slice(0, 140)
+              || (inkindKind === 'services' ? 'Donated services' : 'Donated item'),
           }).then(() => {}, () => {});
         }
         // Visual style, stage 1: marketplace listings with a photo get style
@@ -1162,8 +1175,38 @@ export default function Compose() {
                     </p>
                     <label className="cmp__sliding" title="Ownership passes to Lichen Health, a 501(c)(3) — once a steward accepts, your donation acknowledgment is emailed for your tax records">
                       <input type="checkbox" checked={inkind} onChange={(e) => setInkind(e.target.checked)} />
-                      {' '}Donate it to Lichen — tax-deductible; a donation receipt follows when accepted
+                      {' '}Donate it to Lichen — your donation receipt follows when a steward accepts
                     </label>
+                    {inkind && (
+                      <div className="cmp__inkind-kind">
+                        <div className="cmp__inkind-pick">
+                          <label className="cmp__sliding">
+                            <input type="radio" name="inkind-kind" checked={inkindKind === 'goods'}
+                              onChange={() => setInkindKind('goods')} /> Goods
+                          </label>
+                          <label className="cmp__sliding">
+                            <input type="radio" name="inkind-kind" checked={inkindKind === 'services'}
+                              onChange={() => setInkindKind('services')} /> Services
+                          </label>
+                        </div>
+                        {inkindKind === 'goods' ? (
+                          <p className="cmp__hint-ev">
+                            Donated goods are tax-deductible. Like Goodwill&rsquo;s, the
+                            receipt describes what you gave without pricing it — fair
+                            market value is yours to determine for your records.
+                          </p>
+                        ) : (
+                          <p className="cmp__hint-ev">
+                            An honest note: the IRS doesn&rsquo;t allow a deduction for the
+                            value of your time. What may be deductible are your
+                            out-of-pocket costs of providing donated services —
+                            supplies, travel, space rented just for these sessions —
+                            and the receipt describing your donated services is the
+                            written acknowledgment the IRS asks for to claim them.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

@@ -67,6 +67,26 @@ the WeavePitch template.
   letter is deliberately NON-VALUING, as the IRS requires; ≥$500 means the
   donor files Form 8283, ≥$5k needs an appraisal — their side, not ours).
   ⚠ Naming the specific recipient flips it to a conduit → not deductible.
+- **Donated SERVICES — the honest line (founder 2026-10-02: "give away
+  services (like free therapy) or goods… a receipt, kinda like goodwill?"
+  — SHIPPED in the marketplace flow the same day; Eva to confirm nuances):**
+  the IRS NEVER allows a deduction for the value of donated time or
+  services (Pub 526) — no platform design can change that, and no Lichen
+  copy may ever promise it. What a service donor CAN deduct: unreimbursed
+  out-of-pocket costs of providing the donated services (supplies, travel,
+  space rented specifically for the donated sessions) — and for $250+ of
+  such expenses the IRS requires a WRITTEN ACKNOWLEDGMENT from the charity
+  describing the services, which is exactly what Lichen's donated-services
+  acknowledgment is (the `inkind-receipt` services branch). So the
+  "Goodwill-style receipt" for services has a real legal job — it
+  acknowledges the services, never values the time. **The founder's
+  therapy-office case**: if the office is her regular practice space
+  already written off as a business expense, there's no second deduction
+  for the donated hours (the rent is deducted once, as business rent); an
+  INCREMENTAL cost — a room rented just to deliver the donated sessions —
+  plausibly qualifies as an out-of-pocket charitable expense, with the
+  Lichen acknowledgment as its paper trail. Donor keeps their own cost
+  records; we never compute or state amounts.
 - **The float rule** (inviolable): never mint more Current-cy than donation
   dollars actually held. `currentcy_float_summary()` is the gauge.
   **RE-AFFIRMED AND GENERALIZED (founder 2026-10-01):** "Current-cy should
