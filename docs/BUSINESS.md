@@ -119,6 +119,19 @@ the WeavePitch template.
   so). ⚠ The fintech-attorney consult (money transmission / stored value)
   is STILL FLAGGED before the cash-out door opens; loads are spendable-
   not-refundable platform credit until that conversation says otherwise.
+  **Bank loads work and are SLOW** (found live 2026-10-02 — the founder's
+  own $50 from Chase): Stripe offers ACH/bank debit in checkout on its
+  own; bank money clears in ~2–4 business days and the webhook mints on
+  the late confirmation (`async_payment_succeeded`, handled since
+  2026-10-02 — before that a bank load was charged but never minted; the
+  founder's $50 is the first, pending, and mints automatically on
+  clearing — CHECK IT LANDED). Bank fees are far cheaper than card
+  (0.8% capped $5 vs 2.9%+30¢) — the better rail for large loads.
+  **CASH-OUT ASKED 2026-10-02** ("Now I want to cash out my current-cy to
+  dollars"): answered with the standing flag — proposed safe v1 is a
+  request door + admin-approved manual payout (burn + founder pays by
+  hand, W-9/1099 tally), automatic payouts (Stripe Connect) only after
+  the attorney consult. Awaiting her go; nothing built yet.
   (3) **Gifts come FROM Current-cy** ("a gift can be made from current-cy"):
   the wallet's Send + a load-the-shortfall prompt replace the dollar-gift
   door once loads are live; ⚡ (the bolt icon) is Current-cy's $ sign.

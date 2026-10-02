@@ -5,6 +5,7 @@ import { formatDateShort } from '../lib/conciergeApi';
 import {
   LedgerEntry, EntityType, balanceOf, statementOf, sendCurrentcy, fmtCurrentNum,
   operatingRate, startLoadCheckout, numericAmount,
+  PendingLoad, listPendingLoads, expectedBy,
 } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
@@ -42,6 +43,9 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
 
   const [balance, setBalance] = useState<number | null>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  // Bank loads in transit — the Venmo-style pending rows (founder
+  // 2026-10-02). Own wallet only: a space never loads.
+  const [pending, setPending] = useState<PendingLoad[]>([]);
   const [sendOpen, setSendOpen] = useState(false);
   const [who, setWho] = useState('');
   const [pick, setPick] = useState<MemberLite | null>(null);
@@ -55,11 +59,28 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
   // load money") — own wallet only, and only once loads are live.
   const [short, setShort] = useState<number | null>(null);
   const [shortBusy, setShortBusy] = useState(false);
+  // The pending-balance detail note (founder 2026-10-02: "the asterisk
+  // explaining more detail with the green notification, but you can 'x' it
+  // out") — dismissal is per pending-set, per device: a NEW pending load
+  // brings the note back, the asterisk reopens it any time.
+  const pendings = pending.filter((p) => p.status === 'pending');
+  const pendSum = pendings.reduce((s2, p) => s2 + p.amount_cents, 0);
+  const pendKey = pendings.map((p) => p.id).sort().join(',');
+  const [noteDismissed, setNoteDismissed] = useState(false);
+  useEffect(() => {
+    try { setNoteDismissed(localStorage.getItem('lichen.pendnote') === pendKey); }
+    catch { setNoteDismissed(false); }
+  }, [pendKey]);
 
   const load = async () => {
-    const [b, s] = await Promise.all([balanceOf(partyType, me), statementOf(partyType, me, 12)]);
+    const own = partyType === 'profile' && me === user?.id;
+    const [b, s, p] = await Promise.all([
+      balanceOf(partyType, me), statementOf(partyType, me, 12),
+      own ? listPendingLoads(me) : Promise.resolve([]),
+    ]);
     setBalance(b);
     setEntries(s);
+    setPending(p);
   };
   useEffect(() => { if (me) void load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [me, partyType]);
 
@@ -111,11 +132,48 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
           <span className="curc__bal">
             <Bolt />
             {fmtCurrentNum(balance)} Current-cy
+            {pendSum > 0 && (
+              <button
+                className="curc__pendtag"
+                title="Money on its way — tap for details"
+                onClick={() => { try { localStorage.removeItem('lichen.pendnote'); } catch { /* fine */ } setNoteDismissed(false); }}
+              >
+                <Bolt small />{fmtCurrentNum(pendSum / 100)} pending<span className="curc__pendstar">*</span>
+              </button>
+            )}
           </span>
           <button className="btn curc__sendbtn" onClick={() => { setSendOpen((s) => !s); setError(''); }}>
             {sendOpen ? 'Close' : 'Send'}
           </button>
         </div>
+
+        {pendSum > 0 && !noteDismissed && (
+          <div className="curc__pendnote">
+            <div className="curc__pendnote-body">
+              {pendings.map((p) => (
+                <p key={p.id}>
+                  <Bolt small />{fmtCurrentNum(p.amount_cents / 100)} is on its
+                  way from your bank — estimated arrival {expectedBy(p.created_at)}.
+                </p>
+              ))}
+              <p className="curc__pendnote-fine">
+                Pending money isn&rsquo;t spendable yet — your Current appears
+                the moment it clears, and you&rsquo;ll get a bell.
+              </p>
+            </div>
+            <button
+              className="curc__pendnote-x" aria-label="Dismiss"
+              onClick={() => { try { localStorage.setItem('lichen.pendnote', pendKey); } catch { /* fine */ } setNoteDismissed(true); }}
+            >×</button>
+          </div>
+        )}
+        {pending.filter((p) => p.status === 'failed').map((p) => (
+          <p className="curc__pendingrow curc__pendingrow--failed" key={p.id}>
+            A <Bolt small />{fmtCurrentNum(p.amount_cents / 100)} bank transfer
+            didn&rsquo;t go through — nothing was taken from your wallet. Try
+            again, or load by card.
+          </p>
+        ))}
 
         {sendOpen && (
           <div className="curc__send">

@@ -229,15 +229,52 @@ Deno.serve(async (req) => {
       // deno-lint-ignore no-explicit-any
       const s = event.data.object as any;
 
-      if (s.metadata?.kind === 'load' && s.payment_status === 'paid' && s.metadata?.profile) {
-        // Idempotent per session server-side; a thrown error here 500s so
-        // Stripe retries until the mint lands — a paid load is never dropped.
-        const { error } = await admin.rpc('record_currentcy_load', {
-          p_profile: s.metadata.profile,
-          p_amount_cents: s.amount_total ?? 0,
-          p_session: s.id,
-        });
-        if (error) throw new Error(`record_currentcy_load: ${error.message}`);
+      if (s.metadata?.kind === 'load' && s.metadata?.profile) {
+        if (s.payment_status === 'paid') {
+          // Idempotent per session server-side; a thrown error here 500s so
+          // Stripe retries until the mint lands — a paid load is never dropped.
+          const { error } = await admin.rpc('record_currentcy_load', {
+            p_profile: s.metadata.profile,
+            p_amount_cents: s.amount_total ?? 0,
+            p_session: s.id,
+          });
+          if (error) throw new Error(`record_currentcy_load: ${error.message}`);
+          // Flip the Venmo-style pending row to landed — best-effort, the
+          // mint above is the truth and never waits on display bookkeeping.
+          try {
+            const upd = await admin.from('pending_loads')
+              .update({ status: 'landed', resolved_at: new Date().toISOString() })
+              .eq('stripe_session_id', s.id).eq('status', 'pending').select('id');
+            if (!upd.error && (upd.data?.length ?? 0) === 0) {
+              // Fallback by profile+amount: covers rows recorded before
+              // session ids were kept (the founder's backfilled $50).
+              const { data: cand } = await admin.from('pending_loads').select('id')
+                .eq('profile_id', s.metadata.profile)
+                .eq('amount_cents', s.amount_total ?? 0)
+                .eq('status', 'pending')
+                .order('created_at').limit(1);
+              if (cand?.length) {
+                await admin.from('pending_loads')
+                  .update({ status: 'landed', resolved_at: new Date().toISOString() })
+                  .eq('id', cand[0].id);
+              }
+            }
+          } catch (e) { console.error('pending_loads landed flip:', e); }
+        } else {
+          // A BANK payment completing checkout: money in transit (founder
+          // 2026-10-02, "listed as a pending input… kinda like venmo").
+          // Nothing mints until async_payment_succeeded — this row is the
+          // wallet's honest display of the in-between. Best-effort: a
+          // failure here must not 500 (nothing is lost; the mint path has
+          // its own retries).
+          try {
+            await admin.from('pending_loads').upsert({
+              profile_id: s.metadata.profile,
+              stripe_session_id: s.id,
+              amount_cents: s.amount_total ?? 0,
+            }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+          } catch (e) { console.error('pending_loads insert:', e); }
+        }
       }
 
       const giveKind = s.metadata?.kind === 'sponsorship' ? 'sponsorship'
@@ -285,6 +322,16 @@ Deno.serve(async (req) => {
             ratePct,
           });
         }
+      }
+    } else if (event.type === 'checkout.session.async_payment_failed') {
+      // The bank returned the debit — the pending row says so plainly and
+      // nothing was ever minted, so there is nothing to undo.
+      // deno-lint-ignore no-explicit-any
+      const s = event.data.object as any;
+      if (s.metadata?.kind === 'load') {
+        await admin.from('pending_loads')
+          .update({ status: 'failed', resolved_at: new Date().toISOString() })
+          .eq('stripe_session_id', s.id).eq('status', 'pending');
       }
     }
   } catch (err) {

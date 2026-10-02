@@ -114,3 +114,39 @@
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
 }
 .curc__short p { margin: 0; }
+
+/* Bank loads in transit — the Venmo-style pending rows (founder 2026-10-02:
+   "listed as a pending input, kinda like a checking account - with an
+   estimated arrival time"). Dashed: money on the way, not yet real. */
+.curc__pendingrow {
+  margin: 8px 0 0; padding: 8px 12px; font-size: 13px; color: var(--ink-soft);
+  background: var(--bone-warm); border: 1px dashed var(--bone-edge);
+  border-radius: 10px;
+}
+.curc__pendingrow--failed { color: var(--red-deep, #a4442f); }
+
+/* The pending balance rides the balance row (founder 2026-10-02 markup:
+   "the actual pending balance in the currentcy window, with the asterisk
+   explaining more detail with the green notification, but you can x it
+   out"). The tag reopens the note; the note dismisses per pending-set. */
+.curc__pendtag {
+  background: none; border: none; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: 10px; font-size: 14px; font-weight: 400; color: var(--ink-soft);
+}
+.curc__pendstar { color: var(--peach-deep); font-weight: 600; }
+.curc__pendnote {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 8px 0 0; padding: 8px 12px;
+  font-size: 13px; color: var(--green-deep, #3e5c3a);
+  border: 1px solid var(--green, #9db88f); border-radius: var(--r-md);
+}
+.curc__pendnote-body { flex: 1; min-width: 0; }
+.curc__pendnote-body p { margin: 0 0 4px; }
+.curc__pendnote-body p:last-child { margin-bottom: 0; }
+.curc__pendnote-body svg { vertical-align: -2px; }
+.curc__pendnote-fine { font-size: 12px; opacity: 0.85; }
+.curc__pendnote-x {
+  background: none; border: none; cursor: pointer; flex-shrink: 0;
+  font-size: 16px; line-height: 1; color: var(--green-deep, #3e5c3a); padding: 0 2px;
+}

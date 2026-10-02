@@ -114,6 +114,23 @@ export async function removeBudgetItem(id: string): Promise<void> {
 
 export interface LedgerFlows { inAmt: number; outAmt: number }
 
+/** The member's own live Marketplace listings as lowercase text — the
+ *  smart List door's source (founder 2026-10-02: "if you've already listed
+ *  your service or goods on marketplace it says nothing, but has a 'list on
+ *  marketplace' if you haven't yet"). Deterministic word matching, the
+ *  smartSearch idiom — no AI call, the card must be instant. */
+export async function listMyMarketplaceTexts(me: string): Promise<string[]> {
+  const { data, error } = await supabase.from('posts')
+    .select('title, body')
+    .eq('author_id', me)
+    .contains('service_areas', ['marketplace'])
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) { console.warn('listMyMarketplaceTexts:', error.message); return []; }
+  return ((data ?? []) as { title: string | null; body: string | null }[])
+    .map((p) => `${p.title ?? ''} ${p.body ?? ''}`.toLowerCase());
+}
+
 /** Real energy in / out for the member since `fromISO` — summed from the
  *  ledger itself, so the budget can never disagree with the statement. */
 export async function ledgerFlows(me: string, fromISO: string): Promise<LedgerFlows> {

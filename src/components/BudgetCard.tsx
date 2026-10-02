@@ -5,6 +5,7 @@ import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
   BudgetItem, BudgetBucket, BudgetCadence,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
+  listMyMarketplaceTexts,
 } from '../lib/budgetApi';
 import { Bolt } from './CurrentcyCard';
 import './BudgetCard.css';
@@ -35,6 +36,9 @@ export default function BudgetCard() {
   const [items, setItems] = useState<BudgetItem[] | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [flows, setFlows] = useState<{ inAmt: number; outAmt: number } | null>(null);
+  // The member's own live Marketplace listings — the smart List door
+  // (founder 2026-10-02: already listed → say nothing; not yet → the door).
+  const [myListings, setMyListings] = useState<string[]>([]);
 
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
@@ -57,8 +61,10 @@ export default function BudgetCard() {
     : String(new Date().getFullYear());
 
   const load = async () => {
-    const [its, bal] = await Promise.all([listBudget(me), myBalance(me)]);
-    setItems(its); setBalance(bal);
+    const [its, bal, texts] = await Promise.all([
+      listBudget(me), myBalance(me), listMyMarketplaceTexts(me),
+    ]);
+    setItems(its); setBalance(bal); setMyListings(texts);
   };
   useEffect(() => { if (me) void load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [me]);
   useEffect(() => {
@@ -109,6 +115,17 @@ export default function BudgetCard() {
   const needsUnpriced = needs.length - needsPriced.length;
 
   const amt = (c: number) => <><Bolt small />{fmtCurrentNum(Math.round(c) / 100)}</>;
+
+  // Already on Marketplace? Every meaningful word of the line's label found
+  // in one of the member's own listings (deterministic, the smartSearch
+  // idiom). Matched -> the door says NOTHING; unmatched -> "List on
+  // Marketplace" (founder 2026-10-02, circling the redundant door beside
+  // her already-listed Therapy line).
+  const alreadyListed = (label: string | null) => {
+    const words = (label ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    if (!words.length) return false;
+    return myListings.some((t) => words.every((w) => t.includes(w)));
+  };
 
   const add = async () => {
     const n = Number(amount);
@@ -169,12 +186,12 @@ export default function BudgetCard() {
             onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}&body=${encodeURIComponent('In search of: ' + (i.label ?? ''))}`)}
           >Ask the network ›</button>
         )}
-        {!i.post_id && (i.bucket === 'income' || i.bucket === 'gift') && (
+        {!i.post_id && (i.bucket === 'income' || i.bucket === 'gift') && !alreadyListed(i.label) && (
           <button
             className="budg__ask"
             title="List it in Marketplace — as a gift, a trade, or for Current-cy"
             onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}${i.bucket === 'gift' ? '&entrust=1' : ''}`)}
-          >List it ›</button>
+          >List on Marketplace ›</button>
         )}
         <button className="budg__x" aria-label="Remove" onClick={() => void remove(i.id)}>×</button>
       </div>

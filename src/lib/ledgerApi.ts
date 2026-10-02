@@ -99,6 +99,44 @@ export const fmtCurrentNum = (n: number) =>
 export const fmtCurrent = (n: number) =>
   `${fmtCurrentNum(n)} Current-cy`;
 
+// ─── Pending loads (founder 2026-10-02: "listed as a pending input, kinda
+// like a checking account - with an estimated arrival time - kinda like
+// venmo") — bank-transfer loads in transit, written by the stripe-webhook
+// when a bank checkout completes, flipped to landed when the Current mints
+// or failed if the bank returns the debit. Display-only; owner-read RLS.
+export interface PendingLoad {
+  id: string;
+  amount_cents: number;
+  status: 'pending' | 'landed' | 'failed';
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** Open pendings + recently-failed (last 14 days — the member should hear
+ *  a bounce, not wonder forever). Landed rows step out: the Current itself
+ *  is on the statement. */
+export async function listPendingLoads(me: string): Promise<PendingLoad[]> {
+  const since = new Date(Date.now() - 14 * 86400000).toISOString();
+  const { data, error } = await supabase.from('pending_loads')
+    .select('id, amount_cents, status, created_at, resolved_at')
+    .eq('profile_id', me)
+    .or(`status.eq.pending,and(status.eq.failed,resolved_at.gte.${since})`)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('listPendingLoads:', error.message); return []; }
+  return (data as PendingLoad[] | null) ?? [];
+}
+
+/** Venmo-style estimate: ACH clears in ~4 business days. */
+export function expectedBy(createdISO: string): string {
+  const d = new Date(createdISO);
+  let added = 0;
+  while (added < 4) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+  }
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 /** Keep an amount FIELD numeric as it's typed (founder 2026-10-02: "you can
  *  only enter in a number with budget, not words") — digits and one decimal
  *  point, two decimal places; everything else (letters, $, commas — pasted
