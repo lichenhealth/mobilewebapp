@@ -27,9 +27,12 @@ export default function Currentcy() {
           same .myc__head classes Drive wears, no sticky bar, no hairline. */}
       <header className="myc__head">
         <h1 className="myc__title">Your Current-cy</h1>
+        {/* Founder 2026-10-02: "reflect that it is a bank account, a
+            budgeting tool and a brokerage for the exchange of goods and
+            services in a new economy." */}
         <p className="myc__sub">
-          Your wallet — like a checking account: earn Current-cy, or load
-          dollars in to use on the platform.
+          Your bank account, your budgeting tool, and your brokerage for the
+          exchange of goods and services in a new economy.
         </p>
       </header>
       {justLoaded && (
