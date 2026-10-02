@@ -132,6 +132,21 @@ the WeavePitch template.
   request door + admin-approved manual payout (burn + founder pays by
   hand, W-9/1099 tally), automatic payouts (Stripe Connect) only after
   the attorney consult. Awaiting her go; nothing built yet.
+  **Her follow-up tax design, with one caution** (same day: "email folks
+  income documentation when they take currentcy earned ON lichen and
+  export it into dollars, as that's when the IRS cares… if it stays
+  within the platform, it isn't income to declare"): documentation-at-
+  export is the right PAPERWORK moment either way, and withdrawing
+  LOADED dollars is not income at all (your own money back). But the
+  "on-platform Current isn't income" half is a POSITION, not settled
+  law — the IRS taxes organized barter-credit systems when credits are
+  EARNED, not when cashed out (barter exchanges file 1099-B on the
+  credit). Whether Current-cy reads as a barter exchange is exactly the
+  fintech/tax-pro question. ⚠ Member-facing copy may say "cashing out
+  may be taxable; here's your documentation" but must NEVER promise
+  "Current kept on-platform isn't taxable" until Eva/the attorney sign
+  off. Loaded-vs-earned Current also needs an accounting rule before
+  payouts are labeled (a refund of a load ≠ income).
   (3) **Gifts come FROM Current-cy** ("a gift can be made from current-cy"):
   the wallet's Send + a load-the-shortfall prompt replace the dollar-gift
   door once loads are live; ⚡ (the bolt icon) is Current-cy's $ sign.
