@@ -23,6 +23,7 @@ import Avatar from '../components/Avatar';
 import { Icon } from '../components/Icon';
 import HomeLocationSection from '../components/HomeLocationSection';
 import CurrentcyCard from '../components/CurrentcyCard';
+import MoneyInDoors from '../components/MoneyInDoors';
 import { uploadAvatar } from '../lib/avatarApi';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { currentPushState, enablePush, disablePush, type PushState } from '../lib/webPush';
@@ -1376,6 +1377,10 @@ export default function Profile() {
       </CollapsibleSection>
 
       <CollapsibleSection id="currentcy" title="Current-cy" open={openSections.has('currentcy')} onToggle={() => toggleSection('currentcy')}>
+        {/* The same money-in doors the wallet page wears (founder 2026-10-02,
+            after refreshing Profile and not finding them) — one shared
+            component, so the two surfaces can't drift. */}
+        <MoneyInDoors />
         <CurrentcyCard />
       </CollapsibleSection>
 
@@ -1581,7 +1586,10 @@ export default function Profile() {
             /* Each element of your presence is a drawer with a count and a +
                (founder 2026-09-07) — the + opens the drawer, where the
                create form already lives. */
-            meta={mine.length === 0 ? 'none yet' : `${mine.length} ${mine.length === 1 ? sec.one : sec.one + 's'}`}
+            meta={mine.length === 0 ? 'none yet'
+              /* "community" pluralizes to "communities", never "communitys"
+                 (founder's screenshot, 2026-10-02) */
+              : `${mine.length} ${mine.length === 1 ? sec.one : sec.one.replace(/y$/, 'ie') + 's'}`}
             action={{ label: '+', onClick: () => setOpenSections((s) => new Set(s).add(sec.kind)) }}
             open={openSections.has(sec.kind)} onToggle={() => toggleSection(sec.kind)}>
             {mine.length === 0 && <p className="prof__empty">None yet.</p>}
@@ -1628,14 +1636,17 @@ export default function Profile() {
         );
       })}
 
-      {/* OFF THE NETWORK — spaces this member took offline (super admin only
-          sees their own; founder 2026-08-17). Two doors per row: put it back
-          online, or delete for good. Shown only when there's something held —
-          an empty section would be a drawer with nothing in it. */}
+      {/* TAKEN OFFLINE — spaces this member took offline (super admin only
+          sees their own; founder 2026-08-17; renamed from "Off the network"
+          2026-10-02 — the shelf wears the same words as the backstage door
+          that puts things on it, "Take this group offline"). Two doors per
+          row: put it back online, or delete for good. Shown only when
+          there's something held — an empty section would be a drawer with
+          nothing in it. */}
       {offlineSpaces.length > 0 && (
-        <CollapsibleSection id="offline" title="Off the network" open={openSections.has('offline')} onToggle={() => toggleSection('offline')}>
+        <CollapsibleSection id="offline" title="Taken offline" open={openSections.has('offline')} onToggle={() => toggleSection('offline')}>
           <p className="prof__care-lead">
-            Held with everything intact and invisible to everyone, including their members, until you put them back.
+            Held with everything intact and invisible to everyone, including their members, until you put them back online.
           </p>
           <div className="prof__spaces">
             {offlineSpaces.map((s) => (

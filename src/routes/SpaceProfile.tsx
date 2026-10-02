@@ -3110,8 +3110,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       {roomsSection}
 
       {/* Two doors at the foot, the super admin's alone (founder 2026-08-17):
-          TAKE OFFLINE — off the network, held intact, put back online any time
-          from Profile → Off the network; and DELETE — permanent, immediate.
+          TAKE OFFLINE — hidden from everyone, held intact, put back online any
+          time from Profile → Taken offline; and DELETE — permanent, immediate.
           Plain buttons, not accordion sections: there is never more to say
           than the act itself. Each confirm opens in place; the server's
           refusal (treasury Current, a stewarded member, an open trade), when
@@ -3131,9 +3131,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             <div className={'sprof__confirm' + (retireMode === 'offline' ? ' sprof__confirm--soft' : '')}>
               <span className="sprof__confirm-text">
                 {retireMode === 'offline' ? (
-                  <>Take <em>&ldquo;{space.name}&rdquo;</em> off the network? It disappears from Lichen
+                  <>Take <em>&ldquo;{space.name}&rdquo;</em> offline? It disappears from Lichen
                     for everyone, members included — chat, events, posts and all — but nothing is lost.
-                    You can put it back online any time from your Profile.</>
+                    It waits under &ldquo;Taken offline&rdquo; in your Profile, where you can put it
+                    back online any time.</>
                 ) : (
                   <>Delete <em>&ldquo;{space.name}&rdquo;</em> for good? Its members, chat, events,
                     bookable areas, collections and everything it posted in its own voice go with it
