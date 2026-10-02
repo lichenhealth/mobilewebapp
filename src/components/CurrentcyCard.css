@@ -114,3 +114,13 @@
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
 }
 .curc__short p { margin: 0; }
+
+/* Bank loads in transit — the Venmo-style pending rows (founder 2026-10-02:
+   "listed as a pending input, kinda like a checking account - with an
+   estimated arrival time"). Dashed: money on the way, not yet real. */
+.curc__pendingrow {
+  margin: 8px 0 0; padding: 8px 12px; font-size: 13px; color: var(--ink-soft);
+  background: var(--bone-warm); border: 1px dashed var(--bone-edge);
+  border-radius: 10px;
+}
+.curc__pendingrow--failed { color: var(--red-deep, #a4442f); }

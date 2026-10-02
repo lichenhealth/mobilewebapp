@@ -5,6 +5,7 @@ import { formatDateShort } from '../lib/conciergeApi';
 import {
   LedgerEntry, EntityType, balanceOf, statementOf, sendCurrentcy, fmtCurrentNum,
   operatingRate, startLoadCheckout, numericAmount,
+  PendingLoad, listPendingLoads, expectedBy,
 } from '../lib/ledgerApi';
 import './CurrentcyCard.css';
 
@@ -42,6 +43,9 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
 
   const [balance, setBalance] = useState<number | null>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  // Bank loads in transit — the Venmo-style pending rows (founder
+  // 2026-10-02). Own wallet only: a space never loads.
+  const [pending, setPending] = useState<PendingLoad[]>([]);
   const [sendOpen, setSendOpen] = useState(false);
   const [who, setWho] = useState('');
   const [pick, setPick] = useState<MemberLite | null>(null);
@@ -57,9 +61,14 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
   const [shortBusy, setShortBusy] = useState(false);
 
   const load = async () => {
-    const [b, s] = await Promise.all([balanceOf(partyType, me), statementOf(partyType, me, 12)]);
+    const own = partyType === 'profile' && me === user?.id;
+    const [b, s, p] = await Promise.all([
+      balanceOf(partyType, me), statementOf(partyType, me, 12),
+      own ? listPendingLoads(me) : Promise.resolve([]),
+    ]);
     setBalance(b);
     setEntries(s);
+    setPending(p);
   };
   useEffect(() => { if (me) void load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [me, partyType]);
 
@@ -116,6 +125,19 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
             {sendOpen ? 'Close' : 'Send'}
           </button>
         </div>
+
+        {pending.map((p) => p.status === 'pending' ? (
+          <p className="curc__pendingrow" key={p.id}>
+            Pending: <Bolt small />{fmtCurrentNum(p.amount_cents / 100)} on its
+            way from your bank — estimated arrival {expectedBy(p.created_at)}
+          </p>
+        ) : (
+          <p className="curc__pendingrow curc__pendingrow--failed" key={p.id}>
+            A <Bolt small />{fmtCurrentNum(p.amount_cents / 100)} bank transfer
+            didn&rsquo;t go through — nothing was taken from your wallet. Try
+            again, or load by card.
+          </p>
+        ))}
 
         {sendOpen && (
           <div className="curc__send">
