@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { loadTrustWeb, loadTrustEdgesFor, trustPathTo, namesFor } from '../lib/trustPath';
 import { ensureDirectChat } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
+import { listBudgetPostIds, addBudgetPost, removeBudgetPost } from '../lib/budgetApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import {
@@ -55,6 +56,7 @@ export default function PostPage() {
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
+  const [myBudget, setMyBudget] = useState<Set<string>>(new Set());
   const [overlay, setOverlay] = useState<MyceliumSignals | undefined>(undefined);
 
   useEffect(() => {
@@ -88,12 +90,13 @@ export default function PostPage() {
       if (p?.linked_event_id) { navigate(`/events/${p.id}`, { replace: true }); return; }
       setPost(p);
       if (p && me) {
-        const [{ web, vouched: myc }, recs, saves] = await Promise.all([
-          loadMyWeb(), loadMyRecommendations(), loadMySaved(),
+        const [{ web, vouched: myc }, recs, saves, budg] = await Promise.all([
+          loadMyWeb(), loadMyRecommendations(), loadMySaved(), listBudgetPostIds(me),
         ]);
         const ov = await loadEndorsements([p], myc);
         if (!live) return;
         setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves);
+        setMyBudget(budg);
         setOverlay(ov[p.id]);
       }
       setReady(true);
@@ -128,6 +131,7 @@ export default function PostPage() {
 
   const p = post;
   const saved = mySaves.has('post:' + p.id);
+  const budgeted = myBudget.has(p.id);
   const recommended = myRecs.has('post:' + p.id);
   const areas = postAreas(p).filter((a) => AREA_HOME[a]);
   const isMarket = postAreas(p).includes('marketplace') && !p.linked_event_id;
@@ -206,6 +210,22 @@ export default function PostPage() {
               }}
             >
               <Icon name="drive" size={16} />
+            </button>
+            <button
+              className={'postp__act' + (budgeted ? ' is-on' : '')}
+              aria-label={budgeted ? 'Remove from your budget' : 'Add to your budget'}
+              title={budgeted ? 'Remove from your budget' : 'Add to your budget — its price rides along live'}
+              onClick={() => {
+                const next = !budgeted;
+                setMyBudget((cur) => {
+                  const n = new Set(cur);
+                  if (next) n.add(p.id); else n.delete(p.id);
+                  return n;
+                });
+                void (next ? addBudgetPost(me!, p.id) : removeBudgetPost(me!, p.id)).catch(console.error);
+              }}
+            >
+              <Icon name="currentcy" size={16} />
             </button>
           </div>
         )}

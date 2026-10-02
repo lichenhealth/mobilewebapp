@@ -54,6 +54,19 @@ the WeavePitch template.
   visible text plus an "Email us" mailto, and donors are sent the current
   address by reply. Any future printed mailing address must be a PO box or
   registered-agent address, never the founder's home.
+- **The apples question (founder 2026-10-02: "can someone give apples to
+  someone in need on the platform and mark the fair market value of those
+  apples as a charitable gift?")** — answered from standing doctrine, Eva
+  to confirm the nuances: a gift DIRECTLY to another person is never a
+  charitable deduction (same IRS logic as the sponsorship/conduit rule —
+  individuals aren't charities). The deductible route already exists:
+  donate the apples IN-KIND TO LICHEN (`inkind_donations`, or a Lichen*
+  entrusted listing routed by the desk) — Lichen, holding discretion,
+  distributes to the charitable class ("those in need", never a named
+  person), and the donor substantiates FMV themselves (our acknowledgment
+  letter is deliberately NON-VALUING, as the IRS requires; ≥$500 means the
+  donor files Form 8283, ≥$5k needs an appraisal — their side, not ours).
+  ⚠ Naming the specific recipient flips it to a conduit → not deductible.
 - **The float rule** (inviolable): never mint more Current-cy than donation
   dollars actually held. `currentcy_float_summary()` is the gauge.
   **RE-AFFIRMED AND GENERALIZED (founder 2026-10-01):** "Current-cy should

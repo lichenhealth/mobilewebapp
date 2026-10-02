@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import CurrentcyCard from '../components/CurrentcyCard';
 import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
+import BudgetCard from '../components/BudgetCard';
 import './Concierge.css';
 
 /** The wallet's own screen (founder 2026-09-13: "your wallet just lives in
@@ -37,6 +38,9 @@ export default function Currentcy() {
       </div>
       <MoneyInDoors />
       <CurrentcyCard />
+      {/* Budget (founder 2026-10-02) — wallet page only for now; Profile's
+          drawer stays the compact card, deliberately. */}
+      <BudgetCard />
     </div>
   );
 }
