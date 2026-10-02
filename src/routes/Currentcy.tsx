@@ -35,10 +35,15 @@ export default function Currentcy() {
           exchange of goods and services in a new economy.
         </p>
       </header>
+      {/* Honest about BOTH speeds (founder 2026-10-02 loaded $50 from her
+          bank and the old "lands in a moment… pull back in" read as broken):
+          card = instant, bank = days. The webhook mints the moment Stripe
+          confirms the money, whichever path it took. */}
       {justLoaded && (
         <p className="curx__loaded">
-          Payment received — your Current lands here in a moment. Pull back in
-          if it hasn&rsquo;t appeared yet.
+          Payment started. A card load lands here in a moment — a bank
+          transfer takes a few business days to clear. Your Current appears
+          the moment the money does.
         </p>
       )}
       <div className="cedit__doors">

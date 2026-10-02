@@ -210,12 +210,22 @@ Deno.serve(async (req) => {
       await record(event.data.object, true);
     } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
       await record(event.data.object, false);
-    } else if (event.type === 'checkout.session.completed') {
+    } else if (event.type === 'checkout.session.completed'
+            || event.type === 'checkout.session.async_payment_succeeded') {
       // Donations land here (donate-checkout tags them kind=donation) and wait
       // on /admin/supporters for translation into Current-cy; LOADS (founder
       // 2026-10-01, load-checkout tags them kind=load) mint 1:1 to the member
       // the moment payment confirms — the only point Current is ever created
       // from a load, so every Current stays dollar-backed.
+      // ⚠ BANK PAYMENTS ARE ASYNC (found live 2026-10-02 — the founder's own
+      // $50 Chase load): an ACH/bank debit fires `completed` with
+      // payment_status 'unpaid' (the paid guards below correctly do nothing —
+      // never mint before funds land, the float rule), and the money confirms
+      // DAYS later via `async_payment_succeeded`, which this handler used to
+      // drop — charged at the bank, never minted. Both events now run the
+      // same block: the paid guards + per-session idempotency (loads via
+      // currentcy_loads' unique key, donations via the session upsert +
+      // first-insert-only receipt) make double delivery harmless.
       // deno-lint-ignore no-explicit-any
       const s = event.data.object as any;
 

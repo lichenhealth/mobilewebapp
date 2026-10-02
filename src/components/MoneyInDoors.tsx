@@ -56,9 +56,10 @@ export default function MoneyInDoors() {
             </button>
             {loadErr && <p className="curx__loaderr">{loadErr}</p>}
             <p className="curx__loadfine">
-              $1 becomes 1 Current, usable across the platform. A load is a
-              purchase of spending power, not a donation — it isn&rsquo;t
-              tax-deductible.
+              $1 becomes 1 Current, usable across the platform. Pay by card
+              for instant Current, or from your bank account — bank transfers
+              take a few business days to clear. A load is a purchase of
+              spending power, not a donation — it isn&rsquo;t tax-deductible.
             </p>
           </div>
         )}
