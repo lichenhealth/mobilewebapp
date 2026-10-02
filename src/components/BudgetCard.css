@@ -58,6 +58,8 @@
   font-size: var(--t-sm); color: var(--ink);
 }
 .budg__input--amt { flex: 0 1 150px; }
+/* The one-time date sits with the cadence chips, chip-height. */
+.budg__input--date { flex: 0 0 auto; padding: 4px 10px; font-size: 12.5px; }
 .budg__chips { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
 .budg__chip {
   background: none; border: 1px solid var(--bone-edge); border-radius: var(--r-full);
