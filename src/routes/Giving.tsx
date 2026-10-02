@@ -17,7 +17,7 @@ interface MoneyRow {
   kind: string; status: string; created_at: string; stripe_session_id: string;
 }
 interface InkindRow {
-  id: string; description: string; status: string;
+  id: string; description: string; kind: string; status: string;
   accepted_at: string | null; created_at: string;
 }
 
@@ -48,7 +48,7 @@ export default function Giving() {
           .eq('donor_profile_id', user.id)
           .order('created_at', { ascending: false }).limit(100),
         supabase.from('inkind_donations')
-          .select('id, description, status, accepted_at, created_at')
+          .select('id, description, kind, status, accepted_at, created_at')
           .eq('donor_profile_id', user.id)
           .order('created_at', { ascending: false }).limit(100),
       ]);
@@ -90,7 +90,7 @@ export default function Giving() {
       <div className="giving__total">
         <strong>{usd(deductibleCents)}</strong> tax-deductible donations in {year}
         {acceptedInkind.length > 0 && (
-          <span> · {acceptedInkind.length} donated {acceptedInkind.length === 1 ? 'item' : 'items'} (value yours to determine)</span>
+          <span> · {acceptedInkind.length} in-kind {acceptedInkind.length === 1 ? 'donation' : 'donations'} (goods valued by you; services&rsquo; time isn&rsquo;t deductible)</span>
         )}
       </div>
 
@@ -117,22 +117,27 @@ export default function Giving() {
       </section>
 
       <section className="donate__give">
-        <h2 className="donate__give-title">Donated goods</h2>
+        <h2 className="donate__give-title">Donated goods &amp; services</h2>
         {inkind.length === 0 && (
           <p className="donate__give-sub">
             Nothing yet — list a gift, choose &ldquo;Let Lichen route this,&rdquo;
-            and &ldquo;Donate it to Lichen&rdquo; to give goods with a receipt.
+            and &ldquo;Donate it to Lichen&rdquo; to give goods or services with
+            a receipt.
           </p>
         )}
         {inkind.map((r) => (
           <div className="giving__row" key={r.id}>
             <div className="giving__row-head">
               <strong>{r.description}</strong>
+              <span className="giving__kind">{r.kind === 'services' ? 'Services' : 'Goods'}</span>
               <em>{new Date(r.created_at).toLocaleDateString()}</em>
             </div>
             <p className="giving__ref">
               {r.status === 'accepted'
-                ? `Accepted ${r.accepted_at ? new Date(r.accepted_at).toLocaleDateString() : ''} · Receipt ${ikRefNo(r)} · value is yours to determine`
+                ? `Accepted ${r.accepted_at ? new Date(r.accepted_at).toLocaleDateString() : ''} · Receipt ${ikRefNo(r)} · ${
+                    r.kind === 'services'
+                      ? 'time isn\u2019t deductible — your out-of-pocket costs may be'
+                      : 'value is yours to determine'}`
                 : r.status === 'declined' ? 'Not accepted'
                 : 'Offered — awaiting steward acceptance'}
             </p>
@@ -143,7 +148,10 @@ export default function Giving() {
       <p className="donate__tax">
         Keep these records with your tax documents. Lichen never assigns a
         value to donated goods — fair market value is the donor&rsquo;s to
-        determine. This page isn&rsquo;t tax advice.
+        determine. The value of donated time or services isn&rsquo;t
+        deductible under IRS rules; your out-of-pocket costs of providing
+        them may be, and the services acknowledgment is the written record
+        the IRS asks for. This page isn&rsquo;t tax advice.
       </p>
     </div>
   );

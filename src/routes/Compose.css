@@ -147,6 +147,13 @@
 .cmp__lichen-hint { margin: 2px 0 0; }
 .cmp__lichen-hint a { color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
 
+/* In-kind donation: goods | services declaration (founder 2026-10-02) —
+   indented under its checkbox; the hint carries the honest tax line. */
+.cmp__inkind-kind { margin: 2px 0 4px 22px; }
+.cmp__inkind-pick { display: flex; gap: var(--s-4); }
+.cmp__inkind-pick .cmp__sliding { margin: 0 0 6px; }
+.cmp__inkind-kind .cmp__hint-ev { margin: 0; max-width: 52ch; }
+
 /* ── The choice point: Social vs Actionable (founder + Melanie 2026-07-27) ── */
 .cmp__faces { display: flex; gap: 10px; margin-bottom: var(--s-3); }
 .cmp__face {

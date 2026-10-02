@@ -1,10 +1,17 @@
 // Supabase Edge Function: inkind-receipt
 //
-// Sends the NONCASH DONATION ACKNOWLEDGMENT for an accepted in-kind donation
-// (the Goodwill-style receipt — legal because title passed to Lichen).
+// Sends the acknowledgment for an accepted in-kind donation. Two kinds
+// (founder 2026-10-02 — "goods and services… a receipt, kinda like goodwill?"):
+//   GOODS → NONCASH DONATION ACKNOWLEDGMENT (the Goodwill-style receipt —
+//   legal because title passed to Lichen). Per IRS rules it DESCRIBES the
+//   property and never states a value — valuation is the donor's.
+//   SERVICES → DONATED SERVICES ACKNOWLEDGMENT. The value of time/services
+//   is NEVER deductible (IRS Pub 526) and this says so plainly; what the
+//   letter legally does is describe the services, which is the written
+//   acknowledgment the IRS requires for the donor to deduct their own
+//   unreimbursed out-of-pocket costs of $250+ incurred providing them.
 // Called by an ADMIN from the routing desk right after accept_inkind_donation;
-// admin status is re-verified server-side. Per IRS rules the acknowledgment
-// DESCRIBES the property and never states a value — valuation is the donor's.
+// admin status is re-verified server-side.
 // Idempotent: refuses to send twice (receipt_sent_at gate).
 //
 // Secrets: RESEND_API_KEY (project-wide). verify_jwt stays ON.
@@ -45,7 +52,7 @@ Deno.serve(async (req) => {
   if (!me?.is_admin) return json({ error: 'Admins only' }, 403);
 
   const { data: d } = await admin.from('inkind_donations')
-    .select('id, description, status, accepted_at, receipt_sent_at, donor_profile_id')
+    .select('id, description, kind, status, accepted_at, receipt_sent_at, donor_profile_id')
     .eq('id', body.id).single();
   if (!d) return json({ error: 'No such donation' }, 404);
   if (d.status !== 'accepted') return json({ error: 'Not accepted yet' }, 400);
@@ -61,8 +68,31 @@ Deno.serve(async (req) => {
   });
   const refNo = `LCH-IK-${(d.accepted_at ?? '').slice(0, 10).replace(/-/g, '')}-${d.id.slice(0, 6).toUpperCase()}`;
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const services = d.kind === 'services';
 
-  const text =
+  const text = services ?
+`Thank you for your donation to Lichen Health.
+
+DONATED SERVICES ACKNOWLEDGMENT
+Date accepted: ${date}
+Donated services: ${d.description}
+Receipt no.: ${refNo}
+
+Lichen Health is a registered 501(c)(3) nonprofit organization,
+EIN 73-1683375. No goods or services were provided in exchange for
+this contribution.
+
+Under IRS rules, the value of donated time or services is not
+tax-deductible. Unreimbursed out-of-pocket expenses you incur in
+providing these services — supplies, travel, and similar costs —
+may be deductible; this acknowledgment describes the services you
+provided, which the IRS requires for claiming such expenses of $250
+or more. Keep your own records of those costs.
+
+Please retain this acknowledgment for your tax records.
+
+With gratitude,
+Lichen Health · lichen.healthcare` :
 `Thank you for your donation to Lichen Health.
 
 NONCASH DONATION ACKNOWLEDGMENT
@@ -81,24 +111,39 @@ Please retain this acknowledgment for your tax records.
 With gratitude,
 Lichen Health · lichen.healthcare`;
 
+  const eyebrow = services ? 'Donated services acknowledgment' : 'Noncash donation acknowledgment';
+  const lede = services
+    ? 'Thank you — your donated services are now part of the commons, routed where they&rsquo;re needed most.'
+    : 'Thank you — your donated property is now part of the commons, routed where it&rsquo;s needed most.';
+  const fine = services
+    ? `Lichen Health is a registered 501(c)(3) nonprofit organization, EIN 73-1683375.
+      <strong>No goods or services were provided in exchange for this contribution.</strong>
+      Under IRS rules, the value of donated time or services is not tax-deductible.
+      Unreimbursed out-of-pocket expenses you incur in providing these services —
+      supplies, travel, and similar costs — may be deductible; this acknowledgment
+      describes the services you provided, which the IRS requires for claiming such
+      expenses of $250 or more. Keep your own records of those costs, and retain
+      this acknowledgment for your tax records.`
+    : `Lichen Health is a registered 501(c)(3) nonprofit organization, EIN 73-1683375.
+      <strong>No goods or services were provided in exchange for this contribution.</strong>
+      Lichen Health has not assigned a value to the donated property — determining fair
+      market value is the donor&rsquo;s responsibility. For noncash donations over $500,
+      see IRS Form 8283. Please retain this acknowledgment for your tax records.`;
+
   const html = `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:560px;margin:0 auto;padding:32px 24px">
     <img src="https://lichen.healthcare/icons/icon-192.png" width="56" height="56" alt="Lichen"
       style="display:block;border-radius:12px;margin:0 0 10px" />
     <p style="font-size:22px;font-weight:600;margin:0 0 4px">Lichen</p>
-    <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a857c;margin:0 0 20px">Noncash donation acknowledgment</p>
-    <p style="font-size:16px;line-height:1.6;margin:0 0 20px">Thank you — your donated property is now part of the commons, routed where it&rsquo;s needed most.</p>
+    <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a857c;margin:0 0 20px">${eyebrow}</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 20px">${lede}</p>
     <table style="font-size:14px;line-height:1.8;margin:0 0 20px">
       <tr><td style="color:#8a857c;padding-right:16px">Date accepted</td><td>${date}</td></tr>
-      <tr><td style="color:#8a857c;padding-right:16px">Property</td><td>${esc(d.description)}</td></tr>
+      <tr><td style="color:#8a857c;padding-right:16px">${services ? 'Services' : 'Property'}</td><td>${esc(d.description)}</td></tr>
       <tr><td style="color:#8a857c;padding-right:16px">Receipt no.</td><td>${refNo}</td></tr>
     </table>
     <p style="font-size:12px;color:#6b665e;line-height:1.6;margin:0 0 16px">
-      Lichen Health is a registered 501(c)(3) nonprofit organization, EIN 73-1683375.
-      <strong>No goods or services were provided in exchange for this contribution.</strong>
-      Lichen Health has not assigned a value to the donated property — determining fair
-      market value is the donor&rsquo;s responsibility. For noncash donations over $500,
-      see IRS Form 8283. Please retain this acknowledgment for your tax records.
+      ${fine}
     </p>
   </div></body></html>`;
 
