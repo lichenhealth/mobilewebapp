@@ -97,6 +97,11 @@ export async function saveFinancialPosition(
   if (error) throw error;
 }
 
+/** The CARE COORDINATOR's profile — Galyn, until the role is hired (the
+ *  financial-coordinator doctrine). One source, the CLAUDE_PROFILE_ID
+ *  pattern: the intake's "work on this live" door books time with them. */
+export const CARE_COORDINATOR_PROFILE_ID = '1c01a063-5b05-41bb-ad61-916d7e454dbf';
+
 /** Creating a financial health profile asks the network for a coordinator
  *  (founder 2026-08-20). Bells platform admins, who then OFFER care the
  *  ordinary consensual way — nothing joins a care team by itself. Called

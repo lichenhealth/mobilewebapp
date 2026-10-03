@@ -21,6 +21,12 @@ export interface BookingType {
   audience: 'everyone' | 'mycelium' | 'public' | 'space';
   /** When audience='space': only members of this space see and book it. */
   audience_space_id?: string | null;
+  /** Calendly-parity scheduling rules (founder 2026-10-03). Minimum notice:
+   *  a slot can't start sooner than this many minutes from now (server
+   *  enforces it too, via the booking_notice_window trigger). */
+  min_notice_min: number;
+  /** How far out people may book, in days — null = no limit. */
+  max_days_out: number | null;
   active: boolean;
 }
 
@@ -44,7 +50,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -99,7 +105,8 @@ export async function listOpenSessions(me: string): Promise<OpenSession[]> {
 interface BoardWindow { weekday: number; start_min: number; end_min: number; valid_from: string | null; valid_to: string | null }
 interface BoardBusy { start_date: string; end_date: string; all_day: boolean; start_min: number | null; end_min: number | null; recurrence: Recurrence | null }
 export interface BookingBoard {
-  type: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'> & { provider_id: string };
+  type: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>
+    & { provider_id: string; min_notice_min?: number | null; max_days_out?: number | null };
   windows: BoardWindow[];
   busy: BoardBusy[];
 }
@@ -112,14 +119,23 @@ export async function loadBookingBoard(typeId: string, from: string, to: string)
 
 /** Open slot starts (minutes) for one day: inside a declared window, clear of
  *  every busy span (recurrence expanded with the calendar's own engine),
- *  buffered, and not in the past. Slots step by the session length. */
+ *  buffered, past the type's minimum notice, and inside its booking window.
+ *  Slots step by the session length. ⚠ The notice is a real datetime compare
+ *  (slot's local midnight + minutes vs now + notice) — the old today-only
+ *  minute compare let a 24h notice leak through at midnight. */
 export function slotsForDay(board: BookingBoard, iso: string, now = new Date()): number[] {
   const d = new Date(iso + 'T00:00:00');
   const weekday = (d.getDay() + 6) % 7; // 0=Mon … 6=Sun, matching availability
   const { duration_min: dur, buffer_min: buf } = board.type;
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const minStart = iso === todayIso ? now.getHours() * 60 + now.getMinutes() + 60 : 0;
   if (iso < todayIso) return [];
+  const maxOut = board.type.max_days_out ?? null;
+  if (maxOut != null) {
+    const limit = new Date(now); limit.setDate(limit.getDate() + maxOut);
+    const limitIso = `${limit.getFullYear()}-${String(limit.getMonth() + 1).padStart(2, '0')}-${String(limit.getDate()).padStart(2, '0')}`;
+    if (iso > limitIso) return [];
+  }
+  const cutoffMs = now.getTime() + (board.type.min_notice_min ?? 60) * 60000;
 
   const busyToday = board.busy.filter((b) =>
     occursOn({ start_date: b.start_date, end_date: b.end_date, recurrence: b.recurrence } as Parameters<typeof occursOn>[0], iso));
@@ -132,7 +148,7 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
     if (w.valid_from && w.valid_from > iso) continue;
     if (w.valid_to && w.valid_to < iso) continue;
     for (let t = w.start_min; t + dur <= w.end_min; t += dur) {
-      if (t < minStart) continue;
+      if (d.getTime() + t * 60000 < cutoffMs) continue;
       if (!blocked(t, t + dur)) out.push(t);
     }
   }
