@@ -124,12 +124,26 @@ export default function Compose() {
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
-  // Total vs per hour (founder 2026-10-02: "price here should be total or
-  // per hour, since therapy is per hour"). Checked, the stored price string
-  // itself says "… per hour" so every surface that renders details.price
-  // speaks the unit for free; details.priceUnit='hour' is the structured
-  // twin. Unchecked = total, the unlabeled legacy meaning.
-  const [perHour, setPerHour] = useState(false);
+  // Total vs PER-unit (founder 2026-10-02, two passes: "price here should
+  // be total or per hour" → "have per be a drop down: hour… but also, day,
+  // week, month, etc… you can enter in days, too - like hours"): a per
+  // dropdown (hour/day/week/month/session/per…) + an optional COUNT so
+  // "per 3 days" works like hours, + a free per-… word for anything else.
+  // The stored price string itself ends "… per <unit>" so every surface
+  // that renders details.price speaks the unit for free;
+  // details.priceUnit holds the phrase as the structured twin. The empty
+  // selection = total, the unlabeled legacy meaning.
+  const [unitSel, setUnitSel] = useState('');   // '' | hour|day|week|month|session | other
+  const [unitQty, setUnitQty] = useState('');   // optional count for time units ("3" → per 3 days)
+  const [unitText, setUnitText] = useState(''); // the per-… free word (e.g. class, acre)
+  const effPriceUnit = (): string => {
+    if (!unitSel) return '';
+    if (unitSel === 'other') {
+      return unitText.trim().toLowerCase().replace(/[^a-z0-9 -]/g, '').slice(0, 24).trim();
+    }
+    const n = parseInt(unitQty, 10);
+    return n >= 2 ? `${n} ${unitSel}s` : unitSel;
+  };
   // In-kind DONATION: title passes to Lichen (the Goodwill move) — that's
   // what makes a tax acknowledgment legal. Offered under Lichen*; a steward
   // accepts on the routing desk, and the receipt email follows.
@@ -348,11 +362,19 @@ export default function Compose() {
       if (typeof d.bookingUrl === 'string') setBookingUrl(d.bookingUrl);
       if (typeof d.trade === 'string') setTradeFor(d.trade);
       if (typeof d.price === 'string') {
-        // "… per hour" round-trips into the unit checkbox; the bare price
-        // goes back into its field (the sliding round-trip's pattern).
-        const hourly = / per hour$/.test(d.price);
-        if (hourly) setPerHour(true);
-        const bare = d.price.replace(/ per hour$/, '');
+        // "… per <unit>" round-trips into the per dropdown (+ count or
+        // free word); the bare price goes back into its field (the sliding
+        // round-trip's pattern).
+        const um = d.price.match(/ per ([a-z0-9][a-z0-9 -]{0,23})$/i);
+        if (um) {
+          const phrase = um[1].toLowerCase().trim();
+          const qm = phrase.match(/^(\d+)\s+(hour|day|week|month|session)s?$/);
+          const single = phrase.match(/^(hour|day|week|month|session)$/);
+          if (qm) { setUnitSel(qm[2]); setUnitQty(qm[1]); }
+          else if (single) { setUnitSel(single[1]); }
+          else { setUnitSel('other'); setUnitText(phrase); }
+        }
+        const bare = d.price.replace(/ per [a-z0-9][a-z0-9 -]{0,23}$/i, '');
         // "Sliding scale $20–$60" round-trips back into the two fields.
         const m = bare.match(/^Sliding scale (.*)–(.*)$/);
         if (d.sliding === true && m) {
@@ -582,18 +604,20 @@ export default function Compose() {
         : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
       if (face === 'actionable') {
         if (hasMode('paid')) {
-          // The unit rides IN the price text ("$45 per hour") so older
-          // surfaces say it without new wiring; skip the append when the
-          // member already typed it themselves.
-          const unit = perHour ? ' per hour' : '';
+          // The unit rides IN the price text ("$45 per hour", "$500 per 3
+          // days") so older surfaces say it without new wiring; skip the
+          // append when the member already typed a per-something themselves.
+          const unit = effPriceUnit();
+          const suffix = unit ? ` per ${unit}` : '';
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
-            details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${unit}`;
+            details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${suffix}`;
             details.sliding = true;
           } else if (price.trim()) {
             const p = price.trim();
-            details.price = perHour && !/per hour|\/\s*hr\b|hourly/i.test(p) ? `${p} per hour` : p;
+            details.price = unit && !/(\bper\s+[\w -]+|\/\s*hrs?\b|hourly|daily|weekly|monthly)\s*$/i.test(p)
+              ? `${p} per ${unit}` : p;
           }
-          if (perHour && details.price) details.priceUnit = 'hour';
+          if (unit && details.price) details.priceUnit = unit;
           if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (hasMode('trade') && tradeFor.trim()) details.trade = tradeFor.trim();
@@ -1111,10 +1135,11 @@ export default function Compose() {
               }
               if (m === 'trade') return tradeFor.trim() ? `for ${tradeFor.trim()}` : 'open to offers';
               if (m === 'paid') {
-                const unit = perHour ? ' per hour' : '';
-                if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${unit}`;
+                const unit = effPriceUnit();
+                const suffix = unit ? ` per ${unit}` : '';
+                if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${suffix}`;
                 if (!price.trim()) return 'price to discuss';
-                return /per hour|\/\s*hr\b|hourly/i.test(price) ? price.trim() : price.trim() + unit;
+                return /\bper\s+[\w -]+\s*$/i.test(price) ? price.trim() : price.trim() + suffix;
               }
               return modeNotes[m]?.trim()
                 || (m === 'rent' ? 'rate to discuss' : m === 'borrow' ? 'timing to arrange'
@@ -1172,11 +1197,38 @@ export default function Compose() {
                                   onChange={(e) => setSlideHigh(e.target.value)} placeholder="to $" />
                               </>
                             )}
+                            {/* per [unit ▾] + optional count ("per 3 days"),
+                                then sliding AFTER the per (founder 2026-10-02,
+                                three passes in one sitting). */}
+                            <select
+                              className="cmp__term-unit" value={unitSel} aria-label="Price unit"
+                              onChange={(e) => setUnitSel(e.target.value)}
+                            >
+                              <option value="">total</option>
+                              <option value="hour">per hour</option>
+                              <option value="day">per day</option>
+                              <option value="week">per week</option>
+                              <option value="month">per month</option>
+                              <option value="session">per session</option>
+                              <option value="other">per …</option>
+                            </select>
+                            {unitSel !== '' && unitSel !== 'other' && (
+                              <input
+                                className="cmp__term-input cmp__term-qty" inputMode="numeric"
+                                value={unitQty} placeholder="1" aria-label="How many"
+                                title="How many — e.g. 3 makes it per 3 days"
+                                onChange={(e) => setUnitQty(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                              />
+                            )}
+                            {unitSel === 'other' && (
+                              <input
+                                className="cmp__term-input cmp__term-unittext" value={unitText}
+                                placeholder="what? e.g. class" aria-label="Per what"
+                                onChange={(e) => setUnitText(e.target.value)}
+                              />
+                            )}
                             <label className="cmp__term-slide">
                               <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> sliding
-                            </label>
-                            <label className="cmp__term-slide" title="Unchecked, the price reads as a total — check it for services priced by the hour">
-                              <input type="checkbox" checked={perHour} onChange={(e) => setPerHour(e.target.checked)} /> per hour
                             </label>
                           </span>
                         )}
