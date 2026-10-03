@@ -19,7 +19,9 @@ import ShareRulesEditor from '../components/ShareRulesEditor';
 import TaskShareRules from '../components/TaskShareRules';
 import { loadMyPhone } from '../lib/conciergeApi';
 import {
-  BookingType, listMyBookingTypes, saveBookingType, deleteBookingType,
+  BookingType, listMyBookingTypes, saveBookingType, deleteBookingType, slugify,
+  TypeHourRow, TypeCondition, listTypeHours, saveTypeHours,
+  listTypeConditions, saveTypeConditions, searchConditionTargets,
 } from '../lib/bookingApi';
 import './Concierge.css';
 import './Calendar.css';
@@ -83,6 +85,17 @@ export default function CalendarSettings() {
   // your vanity handle: lichen.health/book/<handle>.
   const [myHandle, setMyHandle] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Which type's vanity link was just copied (founder 2026-10-03).
+  const [copiedType, setCopiedType] = useState('');
+  // A type's OWN hours + its place/people rules (founder 2026-10-03:
+  // "an event itself can have hour rules… place rules, people rules").
+  const [bkHours, setBkHours] = useState<TypeHourRow[]>([]);
+  const [bkConds, setBkConds] = useState<TypeCondition[]>([]);
+  const [condQ, setCondQ] = useState('');
+  const [condHits, setCondHits] = useState<TypeCondition[]>([]);
+  const [chDay, setChDay] = useState(0);
+  const [chStart, setChStart] = useState(540);
+  const [chEnd, setChEnd] = useState(1020);
   // The provider's own spaces — the audience picker for space-scoped types.
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
@@ -258,12 +271,39 @@ export default function CalendarSettings() {
                 {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ''}
               </span>
-              <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit(bt); setBkOpen(true); }}>Edit</button>
+              {/* The vanity link (founder 2026-10-03, the Calendly shape):
+                  this session's own sendable address. */}
+              {bt.slug && myHandle && (
+                <span className="cset__bkrow-vanity">
+                  <code>lichen.health/book/{myHandle}/{bt.slug}</code>
+                  <button
+                    className="cedit__add cedit__add--sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}/${bt.slug}`);
+                      setCopiedType(bt.id);
+                      window.setTimeout(() => setCopiedType(''), 2000);
+                    }}
+                  >
+                    {copiedType === bt.id ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </span>
+              )}
+              {bt.slug && !myHandle && (
+                <span className="cset__bkrow-vanity cset__bkrow-vanity--muted">
+                  Its direct link needs an address first — set yours in Profile → Public page.
+                </span>
+              )}
+              <button className="cedit__add cedit__add--sm" onClick={() => {
+                setBkEdit(bt); setBkOpen(true);
+                setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
+                void listTypeHours(bt.id).then(setBkHours);
+                void listTypeConditions(bt.id).then(setBkConds);
+              }}>Edit</button>
               <button
                 className="cedit__remove"
                 aria-label={bt.active ? 'Pause' : 'Resume'}
                 title={bt.active ? 'Pause bookings' : 'Resume bookings'}
-                onClick={() => act(() => saveBookingType(me, { ...bt, active: !bt.active }))}
+                onClick={() => act(async () => { await saveBookingType(me, { ...bt, active: !bt.active }); })}
               >
                 <Icon name={bt.active ? 'close' : 'plus'} size={13} />
               </button>
@@ -300,7 +340,11 @@ export default function CalendarSettings() {
           )}
 
           {!bkOpen ? (
-            <button className="cedit__add cedit__add--sm" onClick={() => { setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true }); setBkOpen(true); }}>
+            <button className="cedit__add cedit__add--sm" onClick={() => {
+              setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
+              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
+              setBkOpen(true);
+            }}>
               <Icon name="plus" size={12} /> New session type
             </button>
           ) : (
@@ -371,6 +415,90 @@ export default function CalendarSettings() {
                   <option key={n} value={n}>Group — up to {n} people</option>
                 ))}
               </select>
+              {/* An event's HOUR RULES (founder 2026-10-03: "it can be work,
+                  social, or on call if you have that; or custom and you can
+                  set hours for that event type"). */}
+              <select className="cset__select" value={bkEdit.hours_kind ?? 'work'}
+                onChange={(e) => setBkEdit((c) => ({ ...c, hours_kind: e.target.value as BookingType['hours_kind'] }))} aria-label="Books from which hours">
+                <option value="work">Books from your work hours</option>
+                <option value="social">Books from your social hours</option>
+                {(isCaregiver || bkEdit.hours_kind === 'on_call') && <option value="on_call">Books from your on-call hours</option>}
+                <option value="custom">Has its own hours</option>
+              </select>
+              {(bkEdit.hours_kind === 'custom') && (
+                <div className="cset__typehours">
+                  {bkHours.map((h, i) => (
+                    <div className="cset__typehour" key={i}>
+                      <span>{WEEKDAYS_FULL[h.weekday]} {minToLabel(h.start_min)} – {minToLabel(h.end_min)}</span>
+                      <button className="cedit__remove" aria-label="Remove these hours"
+                        onClick={() => setBkHours((rows) => rows.filter((_, j) => j !== i))}>
+                        <Icon name="close" size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="cset__typehour-add">
+                    <select className="cset__select" value={chDay} onChange={(e) => setChDay(Number(e.target.value))} aria-label="Day">
+                      {WEEKDAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                    <TimeField value={chStart} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+                    <span className="rec__lbl">to</span>
+                    <TimeField value={chEnd} onChange={setChEnd} min={chStart} ariaLabel="Until" />
+                    <button className="cedit__add cedit__add--sm"
+                      onClick={() => setBkHours((rows) => [...rows, { weekday: chDay, start_min: chStart, end_min: chEnd }])}>
+                      <Icon name="plus" size={12} /> Add
+                    </button>
+                  </div>
+                  {bkHours.length === 0 && (
+                    <p className="cedit__hint">No hours yet — this session can&rsquo;t be booked until it has some.</p>
+                  )}
+                </div>
+              )}
+              {/* PLACE & PEOPLE RULES (founder 2026-10-03: "9-5pm Monday-
+                  Wednesday if 'this place' or 'this person' is also
+                  available or isn't available"). A person's times reach a
+                  booking page only as anonymous shapes, and only as far as
+                  YOUR OWN calendar standing with them already sees. */}
+              <div className="cset__rules">
+                {bkConds.map((c, i) => (
+                  <div className="cset__typehour" key={i}>
+                    <span>{c.label ?? 'Someone'}</span>
+                    <select className="cset__select" value={c.require} aria-label="Rule"
+                      onChange={(e) => setBkConds((rows) => rows.map((r, j) => j === i ? { ...r, require: e.target.value as TypeCondition['require'] } : r))}>
+                      <option value="available">must be available</option>
+                      <option value="unavailable">must NOT be available</option>
+                    </select>
+                    <button className="cedit__remove" aria-label="Remove this rule"
+                      onClick={() => setBkConds((rows) => rows.filter((_, j) => j !== i))}>
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                ))}
+                <input
+                  className="cedit__input cset__grow"
+                  placeholder="Rule: only when a person or bookable area is free? Search…"
+                  value={condQ}
+                  onChange={(e) => {
+                    const v = e.target.value; setCondQ(v);
+                    void searchConditionTargets(v).then((hits) => setCondHits(
+                      hits.filter((h) => !bkConds.some((c) => c.target_id === h.target_id))));
+                  }}
+                />
+                {condQ.trim().length >= 2 && condHits.map((h) => (
+                  <button className="cedit__add cedit__add--sm" key={h.target_id}
+                    onClick={() => { setBkConds((rows) => [...rows, h]); setCondQ(''); setCondHits([]); }}>
+                    <Icon name="plus" size={12} /> {h.label}
+                  </button>
+                ))}
+              </div>
+              {/* The vanity link name (founder 2026-10-03): an IDENTIFIER
+                  field, so it declines autocorrect (the standing rule). */}
+              <input
+                className="cedit__input cset__grow"
+                placeholder="Link name for a direct URL (e.g. care-coordination) — optional"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                value={bkEdit.slug ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, slug: e.target.value }))}
+              />
               <textarea
                 className="cedit__input cset__questions"
                 value={(bkEdit.questions ?? []).join('\n')}
@@ -400,11 +528,25 @@ export default function CalendarSettings() {
                 disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && !bkEdit.audience_space_id)}
                 onClick={() => act(async () => {
                   const qs = (bkEdit.questions ?? []).map((s) => s.trim()).filter(Boolean);
-                  await saveBookingType(me, {
-                    ...bkEdit, title: (bkEdit.title ?? '').trim(),
-                    questions: qs.length ? qs : null,
-                  } as Partial<BookingType> & { title: string });
-                  setBkOpen(false); setBkEdit({});
+                  let typeId: string;
+                  try {
+                    typeId = await saveBookingType(me, {
+                      ...bkEdit, title: (bkEdit.title ?? '').trim(),
+                      questions: qs.length ? qs : null,
+                      slug: slugify(bkEdit.slug ?? '') || null,
+                      hours_kind: bkEdit.hours_kind ?? 'work',
+                    } as Partial<BookingType> & { title: string });
+                  } catch (e) {
+                    const msg = (e as { message?: string } | null)?.message ?? '';
+                    throw msg.includes('booking_types_slug_per_profile')
+                      ? new Error('That link name is already on another of your sessions — pick a different one.')
+                      : e;
+                  }
+                  // Its own hours live with it; switching away from custom
+                  // clears the leftovers so nothing books from ghost hours.
+                  await saveTypeHours(me, typeId, (bkEdit.hours_kind === 'custom') ? bkHours : []);
+                  await saveTypeConditions(typeId, bkConds);
+                  setBkOpen(false); setBkEdit({}); setBkHours([]); setBkConds([]);
                 })}
               >
                 <Icon name="plus" size={12} /> Save

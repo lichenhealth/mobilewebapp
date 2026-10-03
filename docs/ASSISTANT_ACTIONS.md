@@ -116,22 +116,39 @@ Read-only: nothing here writes.
 ## Rung 2 of the ladder: calendar settings (2026-08-19)
 
 The same flag, the same doctrine, a second room. In the member's CALENDAR
-thread (and only there), `assistant_can_edit` arms five tools in
-`assistant-feed`: `my_calendar_setup` (read — always first),
-`add_hours` / `remove_hours` (work | social | on_call weekly windows;
-on_call REFUSES server-side unless the sender is an active caregiver —
-the same rule the Calendar-settings UI enforces), `add_booking_type`
+thread (and only there), `assistant_can_edit` arms six tools in
+`assistant-feed`: `my_calendar_setup` (read — always first; since
+2026-10-03 it also reports each type's vanity link, scheduling rules and
+whether the member has a handle), `add_hours` / `remove_hours`
+(work | social | on_call weekly windows; on_call REFUSES server-side
+unless the sender is an active caregiver — the same rule the
+Calendar-settings UI enforces), `add_booking_type`
 (title/duration/price-words/approval/audience everyone|mycelium|public —
-never space, which needs an id and a confirm step), and
-`set_booking_type_active` (off/on by exact title; DELETING a type stays
-by-hand — it takes booking history with it). Every write is scoped to the
-trigger's sender; no tool takes a target. The model is told the
-default-nothing doctrine out loud: no work hours means not bookable, and
-creating a session type without hours must be reported as such.
+never space, which needs an id and a confirm step; since 2026-10-03 also
+description, location, buffer, `link_name` [the vanity URL — the result
+hands back the full lichen.health/book/handle/name address to report, or
+says plainly a handle is missing], minimum notice, booking window, daily
+cap, group capacity, intake questions, and `books_from` + `custom_hours`
+[which hours pool the session draws from — work, social, on-call (active
+caregivers only, server-refused otherwise), or its OWN weekly windows;
+re-stating custom never wipes hours, only explicit custom_hours replaces
+them] — the full Calendly-parity surface; place/people rules ("only when
+X is available") stay editor-only for now, so point members to Calendar
+settings for those), `update_booking_type` (change any of those on an existing type
+by its exact title; 0 clears the window/cap, an empty link_name removes
+the link, `new_title` renames), and `set_booking_type_active` (off/on by
+exact title; DELETING a type stays by-hand — it takes booking history
+with it). Every write is scoped to the trigger's sender; no tool takes a
+target, and an update's target must be one of the sender's OWN types.
+The model is told the default-nothing doctrine out loud: no work hours
+means not bookable, and creating a session type without hours must be
+reported as such.
 
 Verified end-to-end 2026-08-19: one conversational ask produced the
 social window + session type, correctly, with the no-work-hours caveat
-in the report.
+in the report. Re-verified 2026-10-03 with the extended fields: one ask
+created a typed, linked, capped session and the reply carried its
+vanity URL.
 
 
 ## Custom page tabs (2026-08-20)

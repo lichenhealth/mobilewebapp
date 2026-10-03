@@ -8,7 +8,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
-  slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
+  resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
   type PublicBookingPage, type BookingBoard,
 } from '../lib/bookingApi';
 import './Bookings.css';
@@ -22,7 +22,12 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  imported calendars, and held bookings). Guests book with a name and an
  *  email; the emailed token link is theirs to view or cancel. */
 export default function BookPublic() {
-  const { param: handle = '' } = useParams();
+  // /book/<handle> = the whole public page; /book/<handle>/<link-name> = a
+  // VANITY LINK straight to one session type (founder 2026-10-03, the
+  // Calendly shape). The slug locks the page onto that type; a SIGNED-IN
+  // member is handed to the member slot picker instead, which also lets a
+  // vanity link work for everyone/mycelium-audience types they may see.
+  const { param: handle = '', slug = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -46,14 +51,31 @@ export default function BookPublic() {
 
   useEffect(() => {
     let live = true;
-    void publicBookingPage(handle).then((p) => {
+    void publicBookingPage(handle).then(async (p) => {
       if (!live) return;
+      if (slug) {
+        // Vanity link: the slug names ONE type. Signed in → the member
+        // picker (their account on the booking, and non-public audiences
+        // they may see resolve too). Guest → this page locked to it.
+        const pubHit = p?.types.find((t) => (t.slug ?? '') === slug.toLowerCase()) ?? null;
+        if (user || !pubHit) {
+          const id = await resolveBookingVanity(handle, slug);
+          if (!live) return;
+          if (id && user) { navigate(`/book/${id}`, { replace: true }); return; }
+          if (!id && !pubHit) { setPage(null); setReady(true); return; }  // honest miss
+        }
+        setPage(p);
+        if (pubHit) setTypeId(pubHit.id);
+        setReady(true);
+        return;
+      }
       setPage(p);
       if (p && p.types.length === 1) setTypeId(p.types[0].id);
       setReady(true);
     });
     return () => { live = false; };
-  }, [handle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handle, slug, user?.id]);
 
   useEffect(() => {
     if (!typeId) { setBoard(null); return; }
@@ -154,7 +176,7 @@ export default function BookPublic() {
 
       {error && <p className="bkg__error">{error}</p>}
 
-      {page.types.length > 1 && (
+      {page.types.length > 1 && !slug && (
         <div className="bkpub__types">
           {page.types.map((t) => (
             <button

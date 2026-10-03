@@ -233,7 +233,7 @@ const CALENDAR_TOOLS = [
   },
   {
     name: 'add_booking_type',
-    description: 'Create a bookable session type on their profile. Open slots come from their WORK hours minus their calendar, so if the setup read shows no work hours, say so — a session type with no hours can never be booked. price is words, not billing ("$90", "Free", "sliding $20–60"). audience: everyone = any Lichen member, mycelium = their web only, public = the open web via their booking link.',
+    description: 'Create a bookable session type on their profile. Open slots come from their WORK hours minus their calendar, so if the setup read shows no work hours, say so — a session type with no hours can never be booked. price is words, not billing ("$90", "Free", "sliding $20–60"). audience: everyone = any Lichen member, mycelium = their web only, public = the open web via their booking link. link_name gives it a sendable vanity URL (lichen.health/book/<their handle>/<link_name>) — offer one, and report the full URL from the result. The scheduling knobs (notice, booking window, daily cap, group capacity, intake questions) all have sensible defaults — set them when asked or clearly implied, never pile on unprompted.',
     input_schema: {
       type: 'object',
       properties: {
@@ -242,8 +242,46 @@ const CALENDAR_TOOLS = [
         price: { type: 'string' },
         approval: { type: 'string', enum: ['request', 'instant'], description: 'request = they approve each booking; instant = it books straight in.' },
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
+        description: { type: 'string', description: 'A sentence or two shown on the booking page.' },
+        location: { type: 'string', description: 'Where it happens ("Online — Zoom", an address).' },
+        buffer_min: { type: 'number', description: 'Breathing room in minutes held before and after each booking (0–120). Default 0.' },
+        link_name: { type: 'string', description: 'The vanity link name — lowercase words-with-dashes (it is sanitized). Makes lichen.health/book/<handle>/<link_name> open this session directly; needs their profile handle to be sendable (the setup read says whether they have one).' },
+        min_notice_min: { type: 'number', description: 'Minimum notice in MINUTES (24 hours = 1440). Default 60.' },
+        max_days_out: { type: 'number', description: 'How far ahead people may book, in days (1–365). 0 = no limit (the default).' },
+        max_per_day: { type: 'number', description: 'At most N sessions of this type per day (1–48). 0 = no cap (the default).' },
+        capacity: { type: 'number', description: '1 = one person per slot (default). More = a GROUP session: that many people share each slot and one calendar event, slots say "N left".' },
+        questions: { type: 'array', items: { type: 'string' }, description: 'Up to 5 questions people must answer when booking; answers land on the request for them to read.' },
+        books_from: { type: 'string', enum: ['work', 'social', 'on_call', 'custom'], description: 'Which hours pool this session draws its open slots from. Default work. on_call only if the setup read says they are an active caregiver. custom = the session has its OWN weekly hours — pass them in custom_hours.' },
+        custom_hours: { type: 'array', items: { type: 'object', properties: { weekday: { type: 'number' }, start_min: { type: 'number' }, end_min: { type: 'number' } }, required: ['weekday', 'start_min', 'end_min'] }, description: 'The session\'s own weekly windows when books_from=custom (weekday 0=Monday … 6=Sunday; minutes since midnight). Replaces any it had. Place/people rules ("only when X is available") are set in Calendar settings — point them there.' },
       },
       required: ['title', 'duration_min', 'approval', 'audience'],
+    },
+  },
+  {
+    name: 'update_booking_type',
+    description: 'Change one of their existing session types, named by its EXACT title from the setup read. Only the fields you pass change. 0 clears max_days_out / max_per_day; an empty link_name removes the vanity link; an empty questions array removes the questions. Use new_title to rename.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The exact current title from my_calendar_setup.' },
+        new_title: { type: 'string' },
+        duration_min: { type: 'number' },
+        price: { type: 'string' },
+        approval: { type: 'string', enum: ['request', 'instant'] },
+        audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
+        description: { type: 'string' },
+        location: { type: 'string' },
+        buffer_min: { type: 'number' },
+        link_name: { type: 'string' },
+        min_notice_min: { type: 'number' },
+        max_days_out: { type: 'number' },
+        max_per_day: { type: 'number' },
+        capacity: { type: 'number' },
+        questions: { type: 'array', items: { type: 'string' } },
+        books_from: { type: 'string', enum: ['work', 'social', 'on_call', 'custom'] },
+        custom_hours: { type: 'array', items: { type: 'object', properties: { weekday: { type: 'number' }, start_min: { type: 'number' }, end_min: { type: 'number' } }, required: ['weekday', 'start_min', 'end_min'] } },
+      },
+      required: ['title'],
     },
   },
   {
@@ -1027,20 +1065,33 @@ Deno.serve(async (req) => {
     const kindOut = (k: string) => k === 'available' ? 'work' : k;
 
     if (name === 'my_calendar_setup') {
-      const [hours, types, care] = await Promise.all([
-        (await sb(`availability_windows?profile_id=eq.${profile_id}&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
-        (await sb(`booking_types?profile_id=eq.${profile_id}&select=title,duration_min,price,approval,audience,active&order=created_at`)).json(),
+      const [hours, types, care, prof] = await Promise.all([
+        (await sb(`availability_windows?profile_id=eq.${profile_id}&booking_type_id=is.null&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind&order=created_at`)).json(),
         (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
+        (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json(),
       ]);
       const hs = (Array.isArray(hours) ? hours : []) as { weekday: number; start_min: number; end_min: number; kind: string }[];
+      const handle = (Array.isArray(prof) ? prof[0]?.handle : null) as string | null;
       return {
         ok: true,
         hours: hs.length
           ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
           : 'none set — they are not bookable and never counted available',
-        booking_types: (Array.isArray(types) ? types : []).map((t: { title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean }) =>
-          `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}${t.active ? '' : ', OFF'})`),
+        booking_types: (Array.isArray(types) ? types : []).map((t: { title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null }) =>
+          `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}`
+          + `${t.hours_kind && t.hours_kind !== 'work' ? `, books from ${t.hours_kind === 'custom' ? 'its OWN hours' : t.hours_kind.replace('_', '-') + ' hours'}` : ''}`
+          + `${(t.capacity ?? 1) > 1 ? `, group of up to ${t.capacity}` : ''}`
+          + `${t.min_notice_min != null && t.min_notice_min !== 60 ? `, ${t.min_notice_min >= 60 ? (t.min_notice_min / 60) + 'h' : t.min_notice_min + 'min'} notice` : ''}`
+          + `${t.max_days_out != null ? `, bookable ${t.max_days_out} days out` : ''}`
+          + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
+          + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
+          + `${t.slug ? (handle ? `, link lichen.health/book/${handle}/${t.slug}` : `, link name "${t.slug}" (needs a handle to be sendable)`) : ''}`
+          + `${t.active ? '' : ', OFF'})`),
         is_active_caregiver: Array.isArray(care) && care.length > 0,
+        vanity_links: handle
+          ? `Their handle is "${handle}" — a session with a link_name is reachable at lichen.health/book/${handle}/<link_name>.`
+          : 'They have NO profile handle yet, so vanity links cannot be sent — a handle is set in Profile → Public page.',
       };
     }
 
@@ -1080,6 +1131,67 @@ Deno.serve(async (req) => {
       return { ok: true, change: `removed ${n} ${kind} window${n === 1 ? '' : 's'} on ${DAYS[weekday]}` };
     }
 
+    // The optional scheduling knobs, one normalizer for create AND update
+    // (founder 2026-10-03, the Calendly-parity fields + vanity link).
+    // 0 clears max_days_out/max_per_day; '' clears link_name; [] clears
+    // questions. Values are clamped to the DB's own CHECK ranges so the
+    // model gets a plain sentence back, never a constraint name.
+    const normTypeFields = (inp: Record<string, unknown>): { out: Record<string, unknown>; errs: string[] } => {
+      const out: Record<string, unknown> = {}; const errs: string[] = [];
+      if (inp.description !== undefined) out.description = String(inp.description).trim().slice(0, 600);
+      if (inp.location !== undefined) out.location = String(inp.location).trim().slice(0, 200);
+      if (inp.price !== undefined) out.price = String(inp.price).trim().slice(0, 80) || null;
+      if (inp.buffer_min !== undefined) { const n = Number(inp.buffer_min); if (n >= 0 && n <= 120) out.buffer_min = n; else errs.push('buffer_min must be 0–120'); }
+      if (inp.min_notice_min !== undefined) { const n = Number(inp.min_notice_min); if (n >= 0 && n <= 20160) out.min_notice_min = n; else errs.push('min_notice_min must be 0–20160 (minutes; 24h = 1440)'); }
+      if (inp.max_days_out !== undefined) { const n = Number(inp.max_days_out); if (n === 0) out.max_days_out = null; else if (n >= 1 && n <= 365) out.max_days_out = n; else errs.push('max_days_out must be 1–365, or 0 for no limit'); }
+      if (inp.max_per_day !== undefined) { const n = Number(inp.max_per_day); if (n === 0) out.max_per_day = null; else if (n >= 1 && n <= 48) out.max_per_day = n; else errs.push('max_per_day must be 1–48, or 0 for no cap'); }
+      if (inp.capacity !== undefined) { const n = Number(inp.capacity); if (n >= 1 && n <= 200) out.capacity = n; else errs.push('capacity must be 1–200'); }
+      if (inp.questions !== undefined) {
+        const qs = (Array.isArray(inp.questions) ? inp.questions : []).map((q) => String(q).trim().slice(0, 200)).filter(Boolean).slice(0, 5);
+        out.questions = qs.length ? qs : null;
+      }
+      if (inp.link_name !== undefined) {
+        const s = String(inp.link_name).toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48).replace(/-+$/g, '');
+        out.slug = s || null;
+      }
+      if (inp.books_from !== undefined) {
+        const k = String(inp.books_from);
+        if (['work', 'social', 'on_call', 'custom'].includes(k)) out.hours_kind = k;
+        else errs.push('books_from must be work|social|on_call|custom');
+      }
+      return { out, errs };
+    };
+    // The session's OWN weekly windows (books_from=custom) — replace wholesale.
+    const writeCustomHours = async (typeId: string, raw: unknown): Promise<string | null> => {
+      const rows = (Array.isArray(raw) ? raw : [])
+        .map((r) => ({ weekday: Number((r as Record<string, unknown>)?.weekday), start_min: Number((r as Record<string, unknown>)?.start_min), end_min: Number((r as Record<string, unknown>)?.end_min) }))
+        .filter((r) => r.weekday >= 0 && r.weekday <= 6 && r.start_min >= 0 && r.end_min > r.start_min && r.end_min <= 1440)
+        .slice(0, 28);
+      await sb(`availability_windows?booking_type_id=eq.${typeId}&profile_id=eq.${profile_id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!rows.length) return 'custom hours came back empty — the session has NO hours and cannot be booked until some are added. Say so.';
+      const r = await sb('availability_windows', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify(rows.map((x) => ({ profile_id, booking_type_id: typeId, kind: 'custom', ...x }))),
+      });
+      return r.ok ? null : 'the custom hours failed to save — the session exists but has no hours yet.';
+    };
+    // books_from=on_call is a care-team duty, same gate as add_hours.
+    const onCallRefused = async (hoursKind: unknown): Promise<string | null> => {
+      if (hoursKind !== 'on_call') return null;
+      const care = await (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json();
+      return (Array.isArray(care) && care.length) ? null
+        : 'books_from=on_call is a care-team duty — they are not an active caregiver, so this session cannot draw from on-call hours. Offer work, social, or custom instead.';
+    };
+    const slugTaken = (text: string) => text.includes('booking_types_slug_per_profile');
+    const vanityLine = async (slug: unknown): Promise<string | undefined> => {
+      if (!slug) return undefined;
+      const prof = await (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json();
+      const handle = Array.isArray(prof) ? prof[0]?.handle : null;
+      return handle
+        ? `Its direct link: https://lichen.health/book/${handle}/${slug} — give it to them to send around.`
+        : `The link name "${slug}" is saved, but they have no profile handle yet — the URL only exists once they set one in Profile → Public page. Say so.`;
+    };
+
     if (name === 'add_booking_type') {
       const title = String(input.title ?? '').trim().slice(0, 80);
       const duration = Number(input.duration_min);
@@ -1090,15 +1202,75 @@ Deno.serve(async (req) => {
       if (!['request', 'instant'].includes(approval) || !['everyone', 'mycelium', 'public'].includes(audience)) {
         return { ok: false, error: 'approval must be request|instant; audience everyone|mycelium|public.' };
       }
+      const { out: extra, errs } = normTypeFields(input);
+      if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
+      const ocErr = await onCallRefused(extra.hours_kind);
+      if (ocErr) return { ok: false, error: ocErr };
       const r = await sb('booking_types', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ profile_id, title, duration_min: duration, price: String(input.price ?? '').trim() || null, approval, audience, active: true }),
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ profile_id, title, duration_min: duration, approval, audience, active: true, ...extra }),
       });
-      if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 140)}` };
-      const hours = await (await sb(`availability_windows?profile_id=eq.${profile_id}&kind=eq.available&select=id&limit=1`)).json();
+      if (!r.ok) {
+        const text = await r.text();
+        return { ok: false, error: slugTaken(text) ? `The link name is already on another of their sessions — pick a different link_name.` : `The database refused: ${text.slice(0, 140)}` };
+      }
+      const created = (await r.json())?.[0];
+      let hoursNote: string | null | undefined;
+      if (extra.hours_kind === 'custom') {
+        hoursNote = await writeCustomHours(created.id, input.custom_hours);
+      } else {
+        const pool = extra.hours_kind === 'social' ? 'social' : extra.hours_kind === 'on_call' ? 'on_call' : 'available';
+        const hours = await (await sb(`availability_windows?profile_id=eq.${profile_id}&kind=eq.${pool}&booking_type_id=is.null&select=id&limit=1`)).json();
+        hoursNote = (Array.isArray(hours) && hours.length) ? null
+          : `They have NO ${pool === 'available' ? 'work' : pool.replace('_', '-')} hours — nothing is bookable until they add some. Say so.`;
+      }
       return {
         ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience})`,
-        note: (Array.isArray(hours) && hours.length) ? undefined : 'They have NO work hours — nothing is bookable until they add some. Say so.',
+        vanity: await vanityLine(extra.slug),
+        note: hoursNote ?? undefined,
+      };
+    }
+
+    if (name === 'update_booking_type') {
+      const title = String(input.title ?? '').trim();
+      const rows = await (await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}&select=id&limit=1`)).json();
+      if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: `No session type titled "${title}" — read my_calendar_setup and use the exact title.` };
+      const { out: patch, errs } = normTypeFields(input);
+      if (input.new_title !== undefined) { const nt = String(input.new_title).trim().slice(0, 80); if (nt) patch.title = nt; }
+      if (input.duration_min !== undefined) { const n = Number(input.duration_min); if (n >= 15 && n <= 480) patch.duration_min = n; else errs.push('duration_min must be 15–480'); }
+      if (input.approval !== undefined) { const a = String(input.approval); if (['request', 'instant'].includes(a)) patch.approval = a; else errs.push('approval must be request|instant'); }
+      if (input.audience !== undefined) { const a = String(input.audience); if (['everyone', 'mycelium', 'public'].includes(a)) patch.audience = a; else errs.push('audience must be everyone|mycelium|public'); }
+      if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
+      if (!Object.keys(patch).length && input.custom_hours === undefined) {
+        return { ok: false, error: 'Nothing to change — pass at least one field.' };
+      }
+      const ocErr = await onCallRefused(patch.hours_kind);
+      if (ocErr) return { ok: false, error: ocErr };
+      if (Object.keys(patch).length) {
+        const r = await sb(`booking_types?id=eq.${rows[0].id}&profile_id=eq.${profile_id}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+        });
+        if (!r.ok) {
+          const text = await r.text();
+          return { ok: false, error: slugTaken(text) ? `That link name is already on another of their sessions — pick a different link_name.` : `The update failed: ${text.slice(0, 140)}` };
+        }
+      }
+      // Only EXPLICIT custom_hours replace the windows — re-stating
+      // books_from=custom must never wipe hours the member already set.
+      let hoursNote: string | null = null;
+      if (input.custom_hours !== undefined) {
+        hoursNote = await writeCustomHours(rows[0].id, input.custom_hours);
+      } else if (patch.hours_kind === 'custom') {
+        const have = await (await sb(`availability_windows?booking_type_id=eq.${rows[0].id}&select=id&limit=1`)).json();
+        if (!Array.isArray(have) || !have.length) {
+          hoursNote = 'the session now books from its own hours but has NONE yet — pass custom_hours or it cannot be booked. Say so.';
+        }
+      }
+      return {
+        ok: true,
+        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : [])].join(', ')}`,
+        vanity: await vanityLine(patch.slug),
+        note: hoursNote ?? undefined,
       };
     }
 

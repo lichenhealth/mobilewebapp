@@ -261,6 +261,9 @@ export async function loadMyAvailability(me: string): Promise<AvailabilityWindow
     .from('availability_windows')
     .select('id, profile_id, weekday, start_min, end_min, kind, valid_from, valid_to')
     .eq('profile_id', me)
+    // A booking type's OWN hours (kind='custom', founder 2026-10-03) are
+    // the event's, not the member's — they live in the type editor only.
+    .is('booking_type_id', null)
     .order('weekday').order('start_min');
   if (error) console.warn('loadMyAvailability:', error.message);
   return (data as AvailabilityWindow[] | null) ?? [];

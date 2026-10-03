@@ -36,6 +36,16 @@ export interface BookingType {
   /** Questions asked at booking (array of strings); answers land on the
    *  booking row for the provider to read. */
   questions: string[] | null;
+  /** The vanity link name (founder 2026-10-03, the Calendly shape):
+   *  lichen.health/book/<handle>/<slug> → straight to this type. Lowercase
+   *  kebab, unique per member, null = no vanity link. */
+  slug: string | null;
+  /** Which hours pool this type books from (founder 2026-10-03: "an event
+   *  itself can have hour rules"): work (the default — yesterday's
+   *  behavior), social, on_call, or custom = its own weekly windows
+   *  (availability_windows rows bound by booking_type_id, never counted as
+   *  the member's general availability). */
+  hours_kind: 'work' | 'social' | 'on_call' | 'custom';
   active: boolean;
 }
 
@@ -61,7 +71,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -81,17 +91,95 @@ export async function listBookableTypes(profileId: string): Promise<BookingType[
 export async function saveBookingType(
   me: string,
   t: Partial<BookingType> & { title: string },
-): Promise<void> {
+): Promise<string> {
   const row = { ...t, profile_id: me };
-  const { error } = t.id
-    ? await supabase.from('booking_types').update(row).eq('id', t.id).eq('profile_id', me)
-    : await supabase.from('booking_types').insert(row);
+  if (t.id) {
+    const { error } = await supabase.from('booking_types').update(row).eq('id', t.id).eq('profile_id', me);
+    if (error) throw error;
+    return t.id;
+  }
+  const { data, error } = await supabase.from('booking_types').insert(row).select('id').single();
   if (error) throw error;
+  return (data as { id: string }).id;
 }
 
 export async function deleteBookingType(me: string, id: string): Promise<void> {
   const { error } = await supabase.from('booking_types').delete().eq('id', id).eq('profile_id', me);
   if (error) throw error;
+}
+
+// ── A type's OWN hours + its place/people rules (founder 2026-10-03) ─────────
+
+export interface TypeHourRow { weekday: number; start_min: number; end_min: number }
+
+export async function listTypeHours(typeId: string): Promise<TypeHourRow[]> {
+  const { data, error } = await supabase.from('availability_windows')
+    .select('weekday, start_min, end_min')
+    .eq('booking_type_id', typeId).order('weekday').order('start_min');
+  if (error) { console.warn('listTypeHours:', error.message); return []; }
+  return (data as TypeHourRow[] | null) ?? [];
+}
+
+/** Replace a type's custom windows wholesale — the editor's one save. */
+export async function saveTypeHours(me: string, typeId: string, rows: TypeHourRow[]): Promise<void> {
+  const del = await supabase.from('availability_windows')
+    .delete().eq('booking_type_id', typeId).eq('profile_id', me);
+  if (del.error) throw del.error;
+  if (!rows.length) return;
+  const { error } = await supabase.from('availability_windows').insert(
+    rows.map((r) => ({ profile_id: me, booking_type_id: typeId, kind: 'custom', ...r })));
+  if (error) throw error;
+}
+
+export interface TypeCondition {
+  target_type: 'profile' | 'resource';
+  target_id: string;
+  require: 'available' | 'unavailable';
+  /** Display only — resolved at load/pick time, never stored. */
+  label?: string;
+}
+
+export async function listTypeConditions(typeId: string): Promise<TypeCondition[]> {
+  const { data, error } = await supabase.from('booking_type_conditions')
+    .select('target_type, target_id, require').eq('type_id', typeId).order('created_at');
+  if (error) { console.warn('listTypeConditions:', error.message); return []; }
+  const rows = (data as TypeCondition[] | null) ?? [];
+  const pids = rows.filter((r) => r.target_type === 'profile').map((r) => r.target_id);
+  const rids = rows.filter((r) => r.target_type === 'resource').map((r) => r.target_id);
+  const [profs, ress] = await Promise.all([
+    pids.length ? supabase.from('profiles').select('id, full_name').in('id', pids) : Promise.resolve({ data: [] }),
+    rids.length ? supabase.from('resources').select('id, name').in('id', rids) : Promise.resolve({ data: [] }),
+  ]);
+  const names = new Map<string, string>();
+  for (const p of (profs.data as { id: string; full_name: string | null }[] | null) ?? []) names.set(p.id, p.full_name ?? 'A member');
+  for (const r of (ress.data as { id: string; name: string }[] | null) ?? []) names.set(r.id, r.name);
+  return rows.map((r) => ({ ...r, label: names.get(r.target_id) ?? 'Someone' }));
+}
+
+export async function saveTypeConditions(typeId: string, conds: TypeCondition[]): Promise<void> {
+  const del = await supabase.from('booking_type_conditions').delete().eq('type_id', typeId);
+  if (del.error) throw del.error;
+  if (!conds.length) return;
+  const { error } = await supabase.from('booking_type_conditions').insert(
+    conds.map((c) => ({ type_id: typeId, target_type: c.target_type, target_id: c.target_id, require: c.require })));
+  if (error) throw error;
+}
+
+/** Search people (findable) + bookable areas & things for a rule's target. */
+export async function searchConditionTargets(q: string): Promise<TypeCondition[]> {
+  const needle = q.trim();
+  if (needle.length < 2) return [];
+  const [profs, ress] = await Promise.all([
+    supabase.from('profiles').select('id, full_name')
+      .eq('findable', true).eq('kind', 'person').ilike('full_name', `%${needle}%`).limit(5),
+    supabase.from('resources').select('id, name').ilike('name', `%${needle}%`).limit(5),
+  ]);
+  return [
+    ...(((profs.data as { id: string; full_name: string | null }[] | null) ?? [])
+      .map((p) => ({ target_type: 'profile' as const, target_id: p.id, require: 'available' as const, label: p.full_name ?? 'A member' }))),
+    ...(((ress.data as { id: string; name: string }[] | null) ?? [])
+      .map((r) => ({ target_type: 'resource' as const, target_id: r.id, require: 'available' as const, label: `${r.name} (bookable area/thing)` }))),
+  ];
 }
 
 export interface OpenSession extends BookingType {
@@ -115,6 +203,11 @@ export async function listOpenSessions(me: string): Promise<OpenSession[]> {
 
 interface BoardWindow { weekday: number; start_min: number; end_min: number; valid_from: string | null; valid_to: string | null }
 interface BoardBusy { start_date: string; end_date: string; all_day: boolean; start_min: number | null; end_min: number | null; recurrence: Recurrence | null }
+/** A place/people rule's raw materials (founder 2026-10-03): anonymous
+ *  time-shapes only — no names, no titles. readable=false means the
+ *  provider's own standing can't see that person; the picker skips it,
+ *  exactly as the server does. */
+export interface BoardCondition { require: 'available' | 'unavailable'; readable: boolean; windows: BoardWindow[]; busy: BoardBusy[] }
 export interface BookingBoard {
   type: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>
     & {
@@ -125,6 +218,7 @@ export interface BookingBoard {
     };
   windows: BoardWindow[];
   busy: BoardBusy[];
+  conditions?: BoardCondition[];
   /** Held sessions per date for this type (distinct start times) — the
    *  daily cap's raw material. */
   day_counts?: Record<string, number>;
@@ -172,6 +266,24 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
   const blocked = (s: number, e: number) => busyToday.some((b) =>
     b.all_day || ((b.start_min ?? 0) < e + buf && (b.end_min ?? 1440) + buf > s));
 
+  // Place/people rules (founder 2026-10-03): each readable condition's
+  // target counts as available when the slot sits inside their declared
+  // hours (if they declared any) AND clear of their busy; 'unavailable'
+  // is the inverse. Same math as the server's _target_available, with
+  // recurrence expanded here — the engine lives client-side by doctrine.
+  const conds = (board.conditions ?? []).filter((c) => c.readable !== false);
+  const condBusyToday = conds.map((c) => c.busy.filter((b) =>
+    occursOn({ start_date: b.start_date, end_date: b.end_date, recurrence: b.recurrence } as Parameters<typeof occursOn>[0], iso)));
+  const condOK = (s: number, e: number) => conds.every((c, i) => {
+    const inWin = c.windows.length === 0 || c.windows.some((w) =>
+      w.weekday === weekday && w.start_min <= s && w.end_min >= e
+      && (!w.valid_from || w.valid_from <= iso) && (!w.valid_to || w.valid_to >= iso));
+    const busyHit = condBusyToday[i].some((b) =>
+      b.all_day || ((b.start_min ?? 0) < e && (b.end_min ?? 1440) > s));
+    const avail = inWin && !busyHit;
+    return c.require === 'available' ? avail : !avail;
+  });
+
   const out: number[] = [];
   for (const w of board.windows) {
     if (w.weekday !== weekday) continue;
@@ -181,6 +293,7 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
       if (d.getTime() + t * 60000 < cutoffMs) continue;
       if (dayFull && capacity > 1 && !heldStarts.has(t)) continue;
       if (capacity > 1 && seatsLeft(board, iso, t) <= 0) continue;
+      if (!condOK(t, t + dur)) continue;
       if (!blocked(t, t + dur)) out.push(t);
     }
   }
@@ -304,7 +417,25 @@ export async function cancelBooking(bookingId: string): Promise<void> {
 
 export interface PublicBookingPage {
   provider: { id: string; full_name: string | null; avatar_url: string | null; headline: string | null; timezone: string | null };
-  types: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>[];
+  types: (Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>
+    & { slug?: string | null })[];
+}
+
+/** The vanity link's one sanitizer — shared by the editor and anywhere a
+ *  link name is read from typing: lowercase kebab, 48 chars, no edge dashes. */
+export function slugify(raw: string): string {
+  return raw.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 48).replace(/-+$/g, '');
+}
+
+/** handle + link name → type id (null = nothing answers there). Anonymous
+ *  callers resolve public types only; signed-in, whatever they may see. */
+export async function resolveBookingVanity(handle: string, slug: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('resolve_booking_vanity', {
+    p_handle: handle, p_slug: slug.toLowerCase(),
+  });
+  if (error) { console.warn('resolve_booking_vanity:', error.message); return null; }
+  return (data as string | null) ?? null;
 }
 
 export async function publicBookingPage(handle: string): Promise<PublicBookingPage | null> {
