@@ -230,20 +230,29 @@
 }
 .cmp__term.is-set .cmp__term-mode { background: var(--peach); color: #fff; border-color: var(--peach); }
 .cmp__term-paid { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+/* The PRICE never gets smooshed (founder 2026-10-02: "the dollar is
+   smooshed - you can make the per box smaller to make it fit"): the price
+   field keeps a readable floor and the per-select below stays compact. */
+.cmp__term-paid > .cmp__term-input { flex: 1 1 72px; min-width: 72px; }
 .cmp__term-slide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
 /* The per-unit dropdown (founder 2026-10-02). A styled select draws its OWN
-   chevron — the conc__dash-select rule: native arrows read wonky per device. */
+   chevron — the conc__dash-select rule: native arrows read wonky per device.
+   Kept SMALL so the price box beside it never starves: tight padding, and a
+   width cap with ellipsis (a select sizes to its WIDEST option otherwise —
+   "per session" was deciding how much room "$50" got). */
 .cmp__term-unit {
   appearance: none; -webkit-appearance: none;
   border: 1px solid var(--bone-edge); border-radius: 10px;
   background: var(--bone-warm)
     url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b6257' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    no-repeat right 9px center;
-  padding: 9px 26px 9px 10px; font-family: inherit; font-size: 12.5px;
+    no-repeat right 7px center;
+  padding: 9px 21px 9px 8px; font-family: inherit; font-size: 12px;
   color: var(--ink); cursor: pointer;
+  flex: 0 1 auto; max-width: 104px; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* The optional count — "3" turns per day into per 3 days. */
-.cmp__term-input.cmp__term-qty { flex: 0 0 46px; min-width: 46px; text-align: center; padding: 9px 6px; }
+.cmp__term-paid > .cmp__term-input.cmp__term-qty { flex: 0 0 40px; min-width: 40px; text-align: center; padding: 9px 4px; }
 /* The per-… free word (class, acre, cord of wood). */
 .cmp__term-input.cmp__term-unittext { flex: 0 1 130px; min-width: 100px; }
 .cmp__term-editmark { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-faint); }
