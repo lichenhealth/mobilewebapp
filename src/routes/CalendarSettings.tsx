@@ -15,6 +15,7 @@ import {
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
 import CalImportGuide from '../components/CalImportGuide';
+import AssistantDoor from '../components/AssistantDoor';
 import ShareRulesEditor from '../components/ShareRulesEditor';
 import TaskShareRules from '../components/TaskShareRules';
 import { loadMyPhone } from '../lib/conciergeApi';
@@ -189,7 +190,11 @@ export default function CalendarSettings() {
     <div className="cedit">
       <header className="cedit__head cedit__head--noback">
                 <h1 className="cedit__title">Calendar settings</h1>
-        <span />
+        {/* The brain lives HERE too (founder 2026-10-03: "tell the Ai
+            assistant your work and social hours and it can manage your
+            cal for you, like a human secretary") — the calendar thread's
+            tools already set hours and build session types by voice. */}
+        <AssistantDoor section="calendar" label="Tell your assistant your hours — it manages your calendar" />
       </header>
 
       {error && <p className="cedit__error">{error}</p>}
@@ -209,6 +214,8 @@ export default function CalendarSettings() {
             </>}
             {' '}Anything booked takes you out of work and social hours automatically —
             people can still message you, they just know not to expect you.
+            {' '}Or just tell your assistant (the brain above) &ldquo;work 9&ndash;5 weekdays,
+            social Sunday afternoons&rdquo; — it sets all of this for you.
           </p>
           {windows.map((w) => (
             <div className="cset__row" key={w.id}>

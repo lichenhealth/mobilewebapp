@@ -42,6 +42,10 @@ export interface EventRow {
    *  "overlay your care plan… just like a google cal") — read-only here,
    *  edited on the Concierge board. */
   carePlan?: boolean;
+  /** A TIMED TASK placed at its hour on the grid (founder 2026-10-03:
+   *  "add tasks to calendar either as a list at the top of the day; or,
+   *  at a specific time") — untimed tasks keep the top-of-day lane. */
+  task?: boolean;
 }
 
 const EVENT_COLS =
