@@ -323,14 +323,30 @@ export default function Calendar() {
         });
       }
     }
-    setEvents([...byId.values()]);
     // Reminders ride only on YOUR calendar chip; a graceful [] before the
     // migration runs (listReminders warns and returns empty).
     if (selectedCals.includes('me')) {
       const rems = await listReminders(me);
       setReminders(rems);
       setRemDone(await listDone(me, rems, from, to));
+      // A TIMED task lands ON the grid at its hour (founder 2026-10-03:
+      // "add tasks to calendar either as a list at the top of the day;
+      // or, at a specific time") — the care-plan overlay shape; untimed
+      // tasks keep the top-of-day lane, and the To-Do + Schedule views
+      // keep their tickable rows.
+      for (const r of rems) {
+        if (r.at_min == null) continue;
+        byId.set('rem:' + r.id, {
+          id: 'rem:' + r.id, creator_id: '', owner_profile_id: r.profile_id, owner_space_id: null,
+          title: r.title, description: '', location: '', lat: null, lng: null,
+          start_date: r.start_date, end_date: r.end_date ?? r.start_date, all_day: false,
+          start_min: r.at_min, end_min: Math.min(1439, r.at_min + 30),
+          recurrence: r.recurrence ?? null, created_at: '',
+          external: true, task: true, tint: colorFor('tasks'),
+        });
+      }
     } else { setReminders([]); setRemDone(new Map()); }
+    setEvents([...byId.values()]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, from, to, selectedCals.join(',')]);
@@ -540,7 +556,10 @@ export default function Calendar() {
     void setDone(me, r.id, iso, !done, r.done_mode ?? 'shared').catch(console.error);
   };
   const anyOn = (iso: string) => events.filter((e) => occursOn(e, iso));
-  const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || remsOn(d).length > 0);
+  // Timed tasks live ON the grid now (founder 2026-10-03) — the top-of-day
+  // lane is for the untimed ones; Schedule keeps every task tickable.
+  const laneRemsOn = (iso: string) => remsOn(iso).filter((r) => r.at_min == null);
+  const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || laneRemsOn(d).length > 0);
 
   async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
   async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
@@ -985,7 +1004,7 @@ export default function Calendar() {
             <span className="calp__gutter-head" />
             {days.map((iso) => (
               <div className="calp__allday-col" key={iso}>
-                {remsOn(iso).map((r) => {
+                {laneRemsOn(iso).map((r) => {
                   const done = remDone.has(remKey(r, iso));
                   return (
                     <div
@@ -1031,7 +1050,9 @@ export default function Calendar() {
       ) : view === 'schedule' ? (
         <div className="calp__sched">
           {days.map((iso) => {
-            const evs = anyOn(iso).sort((a, b) =>
+            // Schedule keeps tasks as TICKABLE reminder rows — drop their
+            // grid twins so nothing shows twice.
+            const evs = anyOn(iso).filter((e) => !e.task).sort((a, b) =>
               (a.all_day === b.all_day ? (a.start_min ?? 0) - (b.start_min ?? 0) : a.all_day ? -1 : 1));
             const ovs = overlays.flatMap((o) =>
               (overlayRows[o.id] ?? []).filter((r) => occursOn(r, iso)).map((r) => ({ o, r })));
@@ -1248,7 +1269,26 @@ export default function Calendar() {
                 </button>
               </>
             )}
-            {selected.external && !selected.carePlan && (
+            {selected.task && (
+              <>
+                <p className="calp__sheet-ext">One of your to-dos, at its time.</p>
+                {selected.owner_profile_id === me && (
+                  <button
+                    className="calp__sheet-extlink"
+                    onClick={() => navigate(`/calendar/new?reminder=${selected.id.slice(4)}`)}
+                  >
+                    <Icon name="arrow-right" size={13} /> Edit this task
+                  </button>
+                )}
+                <button
+                  className="calp__sheet-extlink"
+                  onClick={() => { setSelected(null); setView('todo'); }}
+                >
+                  <Icon name="arrow-right" size={13} /> Open your to-dos
+                </button>
+              </>
+            )}
+            {selected.external && !selected.carePlan && !selected.task && (
               <>
                 <p className="calp__sheet-ext">Imported from your external calendar — edit it there; Lichen re-syncs on its own.</p>
                 {/* A door back to where it actually lives (founder 2026-08-14).
