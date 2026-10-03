@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { formatDateShort } from '../lib/conciergeApi';
@@ -158,7 +159,8 @@ export default function CurrentcyCard({ partyType = 'profile', partyId }: Curren
               ))}
               <p className="curc__pendnote-fine">
                 Pending money isn&rsquo;t spendable yet — your Current appears
-                the moment it clears, and you&rsquo;ll get a bell.
+                the moment it clears, and you&rsquo;ll get a bell.{' '}
+                <Link className="link-cue" to="/currentcy/how">How money moves</Link>
               </p>
             </div>
             <button

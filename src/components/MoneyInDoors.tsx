@@ -59,7 +59,8 @@ export default function MoneyInDoors() {
               $1 becomes 1 Current, usable across the platform. Pay by card
               for instant Current, or from your bank account — bank transfers
               take a few business days to clear. A load is a purchase of
-              spending power, not a donation — it isn&rsquo;t tax-deductible.
+              spending power, not a donation — it isn&rsquo;t tax-deductible.{' '}
+              <Link className="link-cue" to="/currentcy/how">How money moves &amp; typical wait times</Link>
             </p>
           </div>
         )}

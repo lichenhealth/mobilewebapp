@@ -22,8 +22,6 @@
 }
 .curx__loaderr { flex-basis: 100%; font-size: var(--t-sm); color: var(--red-deep, #a4442f); margin: 0; }
 .curx__loadfine { flex-basis: 100%; font-size: var(--t-xs); color: var(--ink-faint); margin: 0; max-width: 46ch; }
-.curx__loaded {
-  font-size: var(--t-sm); color: var(--green-deep, #3e5c3a);
-  border: 1px solid var(--green, #9db88f); border-radius: var(--r-md);
-  padding: 8px 12px; margin: 0 0 var(--s-3);
-}
+/* .curx__loaded (the ?loaded=1 banner) retired 2026-10-02 — founder: "This
+   is redundant" next to the card's own green pending note. The green-note
+   grammar lives on as CurrentcyCard's .curc__pendnote. */
