@@ -27,6 +27,15 @@ export interface BookingType {
   min_notice_min: number;
   /** How far out people may book, in days — null = no limit. */
   max_days_out: number | null;
+  /** At most N sessions of this type per day (distinct start times, so a
+   *  group seat joining an existing session never counts). null = no cap. */
+  max_per_day: number | null;
+  /** Group sessions (founder 2026-10-03): how many people share one slot.
+   *  1 = classic 1:1. Seats at the same slot share ONE calendar event. */
+  capacity: number;
+  /** Questions asked at booking (array of strings); answers land on the
+   *  booking row for the provider to read. */
+  questions: string[] | null;
   active: boolean;
 }
 
@@ -40,6 +49,8 @@ export interface BookingRow {
   end_min: number;
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
   note: string;
+  /** The booker's answers to the type's questions, [{q, a}]. */
+  answers?: { q: string; a: string }[] | null;
   /** Guest bookings (the public link): no member behind them — a name, an
    *  email, and an unguessable token that is their whole authorization. */
   guest_name?: string | null;
@@ -50,7 +61,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -106,9 +117,19 @@ interface BoardWindow { weekday: number; start_min: number; end_min: number; val
 interface BoardBusy { start_date: string; end_date: string; all_day: boolean; start_min: number | null; end_min: number | null; recurrence: Recurrence | null }
 export interface BookingBoard {
   type: Pick<BookingType, 'id' | 'title' | 'description' | 'duration_min' | 'buffer_min' | 'price' | 'location' | 'approval'>
-    & { provider_id: string; min_notice_min?: number | null; max_days_out?: number | null };
+    & {
+      provider_id: string; min_notice_min?: number | null; max_days_out?: number | null;
+      max_per_day?: number | null; capacity?: number | null; questions?: string[] | null;
+      /** The provider's IANA timezone — slots are THEIR wall time. */
+      provider_tz?: string | null;
+    };
   windows: BoardWindow[];
   busy: BoardBusy[];
+  /** Held sessions per date for this type (distinct start times) — the
+   *  daily cap's raw material. */
+  day_counts?: Record<string, number>;
+  /** Seats held per (date, start) for this type — group fullness. */
+  seat_counts?: { on_date: string; start_min: number; n: number }[];
 }
 
 export async function loadBookingBoard(typeId: string, from: string, to: string): Promise<BookingBoard | null> {
@@ -135,6 +156,15 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
     const limitIso = `${limit.getFullYear()}-${String(limit.getMonth() + 1).padStart(2, '0')}-${String(limit.getDate()).padStart(2, '0')}`;
     if (iso > limitIso) return [];
   }
+  // Daily cap: a day that already holds its max sessions offers nothing —
+  // except, for a group type, the slots already running with seats left
+  // (joining isn't a new session; the server counts the same way).
+  const cap = board.type.max_per_day ?? null;
+  const capacity = board.type.capacity ?? 1;
+  const dayFull = cap != null && (board.day_counts?.[iso] ?? 0) >= cap;
+  const heldStarts = new Set(
+    (board.seat_counts ?? []).filter((s) => s.on_date === iso).map((s) => s.start_min));
+  if (dayFull && capacity <= 1) return [];
   const cutoffMs = now.getTime() + (board.type.min_notice_min ?? 60) * 60000;
 
   const busyToday = board.busy.filter((b) =>
@@ -149,10 +179,66 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
     if (w.valid_to && w.valid_to < iso) continue;
     for (let t = w.start_min; t + dur <= w.end_min; t += dur) {
       if (d.getTime() + t * 60000 < cutoffMs) continue;
+      if (dayFull && capacity > 1 && !heldStarts.has(t)) continue;
+      if (capacity > 1 && seatsLeft(board, iso, t) <= 0) continue;
       if (!blocked(t, t + dur)) out.push(t);
     }
   }
   return [...new Set(out)].sort((a, b) => a - b);
+}
+
+/** Seats still open at one group slot (capacity minus held seats); a 1:1
+ *  type always answers 1 — the conflict check is its fullness. */
+export function seatsLeft(board: BookingBoard, iso: string, startMin: number): number {
+  const capacity = board.type.capacity ?? 1;
+  if (capacity <= 1) return 1;
+  const held = (board.seat_counts ?? [])
+    .find((s) => s.on_date === iso && s.start_min === startMin)?.n ?? 0;
+  return Math.max(0, capacity - held);
+}
+
+// ─── Viewer-timezone display (the public link's logged follow-up, built
+//     2026-10-03). Slot minutes are the PROVIDER's wall time by doctrine —
+//     only LABELS convert; everything sent to the server stays provider-
+//     local. The two-pass offset correction handles DST honestly. ──────────
+
+export function viewerZone(): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''; } catch { return ''; }
+}
+
+/** The absolute instant of a provider-local slot, or null when the zone is
+ *  unknown/invalid (callers then show provider time with the honest label). */
+export function slotInstant(iso: string, min: number, providerTz: string | null | undefined): Date | null {
+  if (!providerTz) return null;
+  try {
+    const target = Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10), Math.floor(min / 60), min % 60);
+    let guess = target;
+    for (let i = 0; i < 2; i++) {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: providerTz, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date(guess));
+      const get = (t: string) => +(parts.find((p) => p.type === t)?.value ?? '0');
+      const asIf = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+      guess += target - asIf;
+    }
+    return new Date(guess);
+  } catch { return null; }
+}
+
+/** A slot's label in the VIEWER's own clock, with how many days the viewer-
+ *  local date shifts from the provider-local one (a 9am Denver slot is the
+ *  same evening in London, the next morning in Tokyo). null = can't convert. */
+export function viewerSlotLabel(
+  iso: string, min: number, providerTz: string | null | undefined,
+): { label: string; dayShift: number } | null {
+  const at = slotInstant(iso, min, providerTz);
+  if (!at) return null;
+  const label = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    .toLowerCase().replace(' ', '').replace(':00', '');
+  const localIso = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+  const dayShift = Math.round((new Date(localIso + 'T00:00:00').getTime() - new Date(iso + 'T00:00:00').getTime()) / 86400000);
+  return { label, dayShift };
 }
 
 /** Nobody is bookable by default (founder 2026-08-14): no declared hours means
@@ -177,11 +263,27 @@ export async function nudgeAvailability(provider: string, sessionTitle: string):
 
 // ─── Booking lifecycle (SECURITY DEFINER RPCs do the real work) ──────────────
 
-export async function createBooking(typeId: string, date: string, startMin: number, note: string): Promise<void> {
+export async function createBooking(
+  typeId: string, date: string, startMin: number, note: string,
+  answers?: { q: string; a: string }[],
+): Promise<void> {
   const { error } = await supabase.rpc('create_booking', {
     p_type: typeId, p_date: date, p_start: startMin, p_note: note,
+    p_answers: answers?.length ? answers : null,
   });
   if (error) throw error;
+}
+
+/** Move a live booking to a new open slot — either party; everything a
+ *  fresh booking checks is re-checked server-side and the calendar event
+ *  moves too. Returns the guest token when the PROVIDER moved a guest's
+ *  booking, so the caller can send the state-derived mail. */
+export async function rescheduleBooking(bookingId: string, date: string, startMin: number): Promise<string | null> {
+  const { data, error } = await supabase.rpc('reschedule_booking', {
+    p_booking: bookingId, p_date: date, p_start: startMin,
+  });
+  if (error) throw error;
+  return (data as string | null) ?? null;
 }
 
 export async function respondBooking(bookingId: string, accept: boolean): Promise<void> {
@@ -220,19 +322,28 @@ export async function publicBookingBoard(typeId: string, from: string, to: strin
 export async function guestCreateBooking(
   typeId: string, date: string, startMin: number,
   name: string, email: string, note: string,
+  answers?: { q: string; a: string }[],
 ): Promise<string> {
   const { data, error } = await supabase.rpc('guest_create_booking', {
     p_type: typeId, p_date: date, p_start: startMin,
     p_name: name, p_email: email, p_note: note,
+    p_answers: answers?.length ? answers : null,
   });
   if (error) throw error;
   return data as string;
 }
 
+export async function guestRescheduleBooking(token: string, date: string, startMin: number): Promise<void> {
+  const { error } = await supabase.rpc('guest_reschedule_booking', {
+    p_token: token, p_date: date, p_start: startMin,
+  });
+  if (error) throw error;
+}
+
 export interface GuestBookingView {
   guest_name: string; status: string; on_date: string; start_min: number; end_min: number;
   note: string; type_title: string; type_location: string; duration_min: number;
-  provider_name: string;
+  provider_name: string; type_id: string; capacity: number;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
@@ -253,7 +364,7 @@ export function sendBookingMail(token: string): void {
 }
 
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, guest_name, guest_email, guest_token, ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, ' +
   'type:booking_types(title, price, location), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';

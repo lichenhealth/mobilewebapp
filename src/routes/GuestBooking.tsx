@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { LichenMark } from '../components/LichenMark';
-import { loadGuestBooking, guestCancelBooking, sendBookingMail, type GuestBookingView } from '../lib/bookingApi';
+import {
+  loadGuestBooking, guestCancelBooking, guestRescheduleBooking, sendBookingMail,
+  publicBookingBoard, slotsForDay, type GuestBookingView, type BookingBoard,
+} from '../lib/bookingApi';
+import { addDays, todayISO } from '../lib/conciergeApi';
 import { icsDataUri, googleCalUrl } from '../lib/ics';
 import './GuestEvent.css';
 import './Bookings.css';
@@ -27,6 +31,30 @@ export default function GuestBooking() {
   const [row, setRow] = useState<GuestBookingView | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Reschedule in place (founder 2026-10-03, the Calendly audit's #1 gap):
+  // the token link is the key here too — pick a new open slot, the server
+  // re-validates everything a fresh booking would.
+  const [moving, setMoving] = useState(false);
+  const [board, setBoard] = useState<BookingBoard | null>(null);
+  const [moveErr, setMoveErr] = useState('');
+
+  useEffect(() => {
+    if (!moving || !row?.type_id || board) return;
+    let live = true;
+    const from = todayISO();
+    void publicBookingBoard(row.type_id, from, addDays(from, 29))
+      .then((b) => { if (live) setBoard(b); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moving, row?.type_id]);
+
+  const moveDays = useMemo(() => {
+    if (!board) return [];
+    const from = todayISO();
+    return Array.from({ length: 14 }, (_, i) => addDays(from, i))
+      .map((iso) => ({ iso, slots: slotsForDay(board, iso) }))
+      .filter((d) => d.slots.length > 0);
+  }, [board]);
 
   useEffect(() => {
     let live = true;
@@ -77,6 +105,9 @@ export default function GuestBooking() {
 
       {(row.status === 'pending' || row.status === 'confirmed') && (
         <div className="bkg__doneactions">
+          <button className="btn bkg__btn" onClick={() => { setMoveErr(''); setMoving((v) => !v); }}>
+            {moving ? 'Never mind — keep this time' : 'Pick a new time'}
+          </button>
           <button
             className="btn bkg__btn"
             disabled={busy}
@@ -92,6 +123,48 @@ export default function GuestBooking() {
             {busy ? 'One moment…' : 'Cancel this booking'}
           </button>
         </div>
+      )}
+
+      {moving && (row.status === 'pending' || row.status === 'confirmed') && (
+        <section className="bkg__sec">
+          {moveErr && <p className="bkg__error">{moveErr}</p>}
+          {!board && <p className="gev__muted">Loading open times…</p>}
+          {board && moveDays.length === 0 && (
+            <p className="gev__muted">No open times in the next two weeks — check back soon, or cancel and rebook later.</p>
+          )}
+          {moveDays.map(({ iso, slots }) => {
+            const [yy, mm, dd] = iso.split('-').map(Number);
+            const dt = new Date(Date.UTC(yy, mm - 1, dd));
+            return (
+              <section className="bkg__day" key={iso}>
+                <h2 className="bkg__h2">{WEEKDAY[dt.getUTCDay()]} · {MONTHS[mm - 1]} {dd}</h2>
+                <div className="bkg__slots">
+                  {slots.map((s) => (
+                    <button
+                      key={s}
+                      className="bkg__slot"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true); setMoveErr('');
+                        try {
+                          await guestRescheduleBooking(token, iso, s);
+                          sendBookingMail(token);
+                          const fresh = await loadGuestBooking(token);
+                          if (fresh) setRow(fresh);
+                          setMoving(false); setBoard(null);
+                        } catch (e) {
+                          setMoveErr((e as { message?: string } | null)?.message || 'Something went wrong.');
+                        } finally { setBusy(false); }
+                      }}
+                    >
+                      {minLabel(s)}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </section>
       )}
 
       <footer className="gev__join">

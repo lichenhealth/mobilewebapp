@@ -263,6 +263,8 @@
 .cset__kind.is-oncall { color: var(--peach-deep); border-color: var(--peach); }
 .cset__add { display: flex; align-items: center; gap: 6px; }
 .cset__add--wrap { flex-wrap: wrap; }
+/* Booking questions (founder 2026-10-03): one per line, full form width. */
+.cset__questions { flex: 1 1 100%; min-height: 56px; resize: vertical; font: inherit; font-size: 13px; }
 /* Phones: the controls row is wider than the screen — the Add button was
    clipping off the edge. It drops to its own full-width line instead. */
 @media (max-width: 520px) {

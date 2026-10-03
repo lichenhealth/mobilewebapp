@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
@@ -7,6 +7,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, nudgeAvailability,
+  rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, viewerSlotLabel,
 } from '../lib/bookingApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import './Bookings.css';
@@ -23,14 +24,20 @@ export default function BookSession() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
+  // ?reschedule=<booking id> — the same picker MOVES a live booking instead
+  // of creating one (founder 2026-10-03, the Calendly audit's #1 gap).
+  const [params] = useSearchParams();
+  const rescheduleId = params.get('reschedule');
 
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [providerName, setProviderName] = useState('');
   const [ready, setReady] = useState(false);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
   const [note, setNote] = useState('');
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [mineTime, setMineTime] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<'requested' | 'booked' | null>(null);
+  const [done, setDone] = useState<'requested' | 'booked' | 'moved' | null>(null);
   const [error, setError] = useState('');
 
   const from = todayISO();
@@ -61,6 +68,22 @@ export default function BookSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
+  // Provider-local minutes are the stored truth; only LABELS convert when
+  // the viewer's clock runs elsewhere (founder 2026-10-03 — the public
+  // link's logged timezone follow-up, applied to the member picker too).
+  const ptz = board?.type.provider_tz ?? null;
+  const vz = viewerZone();
+  const foreign = !!(ptz && vz && ptz !== vz);
+  const slotLabel = (iso: string, s: number): string => {
+    if (!foreign || !mineTime) return minToLabel(s);
+    const v = viewerSlotLabel(iso, s, ptz);
+    if (!v) return minToLabel(s);
+    return v.label + (v.dayShift === 1 ? ' (+1d)' : v.dayShift === -1 ? ' (−1d)' : '');
+  };
+  const questions = (board?.type.questions ?? []).filter(Boolean);
+  const capacity = board?.type.capacity ?? 1;
+  const unanswered = !rescheduleId && questions.some((_, i) => !(answers[i] ?? '').trim());
+
   if (!ready) return <div className="bkg"><p className="bkg__muted">Loading…</p></div>;
   if (!board) {
     return (
@@ -78,12 +101,14 @@ export default function BookSession() {
         <header className="bkg__head">
           <p className="eyebrow">{done === 'booked' ? 'Booked' : 'Requested'}</p>
           <h1 className="bkg__title display-italic">
-            {done === 'booked' ? 'It’s on both calendars.' : 'Request sent.'}
+            {done === 'moved' ? 'Moved.' : done === 'booked' ? 'It’s on both calendars.' : 'Request sent.'}
           </h1>
           <p className="bkg__sub">
-            {done === 'booked'
-              ? `${t.title} with ${providerName || 'your practitioner'} is confirmed.`
-              : `${providerName || 'They'} will accept or decline — you’ll get a bell either way.`}
+            {done === 'moved'
+              ? `${t.title} has its new time — everyone on it has been told.`
+              : done === 'booked'
+                ? `${t.title} with ${providerName || 'your practitioner'} is confirmed.`
+                : `${providerName || 'They'} will accept or decline — you’ll get a bell either way.`}
           </p>
         </header>
         <div className="bkg__doneactions">
@@ -101,14 +126,25 @@ export default function BookSession() {
         {/* The practitioner's name is a door to their profile (founder
             2026-08-05) — you should be able to read who you're booking. */}
         <p className="eyebrow">
-          Book{providerName && <> · <Link className="bkg__who" to={`/members/${t.provider_id}`}>{providerName}</Link></>}
+          {rescheduleId ? 'Pick a new time' : 'Book'}{providerName && <> · <Link className="bkg__who" to={`/members/${t.provider_id}`}>{providerName}</Link></>}
         </p>
         <h1 className="bkg__title display-italic">{t.title}</h1>
         <p className="bkg__sub">
           {t.duration_min} min{t.price ? ` · ${t.price}` : ''}{t.location ? ` · ${t.location}` : ''}
+          {capacity > 1 ? ` · group session, up to ${capacity} people` : ''}
           {t.approval === 'request' ? ' · requests are confirmed by hand' : ' · books instantly'}
         </p>
-        {t.description && <p className="bkg__desc">{t.description}</p>}
+        {foreign && (
+          <p className="bkpub__tz">
+            {mineTime
+              ? `Times are shown in your time zone (${vz}).`
+              : `Times are shown in ${providerName ? `${providerName.split(' ')[0]}’s` : 'their'} time zone (${ptz}).`}{' '}
+            <button className="bkg__tzflip" onClick={() => setMineTime((v) => !v)}>
+              Show in {mineTime ? (providerName ? `${providerName.split(' ')[0]}’s` : 'their') : 'your'} time
+            </button>
+          </p>
+        )}
+        {t.description && !rescheduleId && <p className="bkg__desc">{t.description}</p>}
       </header>
 
       {error && <p className="bkg__error">{error}</p>}
@@ -162,7 +198,8 @@ export default function BookSession() {
                 className={'bkg__slot' + (pick?.iso === iso && pick.start === s ? ' is-on' : '')}
                 onClick={() => setPick({ iso, start: s })}
               >
-                {minToLabel(s)}
+                {slotLabel(iso, s)}
+                {capacity > 1 && <em className="bkg__seats"> · {seatsLeft(board, iso, s)} left</em>}
               </button>
             ))}
           </div>
@@ -174,29 +211,60 @@ export default function BookSession() {
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + t.duration_min)}
+            {foreign && (() => {
+              const v = viewerSlotLabel(pick.iso, pick.start, ptz);
+              const ve = viewerSlotLabel(pick.iso, pick.start + t.duration_min, ptz);
+              return v && ve ? ` (${v.label} – ${ve.label} your time)` : '';
+            })()}
           </p>
-          <textarea
-            className="bkg__note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Anything they should know? (optional)"
-          />
+          {!rescheduleId && questions.map((q, i) => (
+            <label className="bkg__q" key={i}>
+              <span>{q}</span>
+              <textarea
+                className="bkg__note"
+                value={answers[i] ?? ''}
+                onChange={(e) => setAnswers((a) => ({ ...a, [i]: e.target.value }))}
+              />
+            </label>
+          ))}
+          {!rescheduleId && (
+            <textarea
+              className="bkg__note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Anything they should know? (optional)"
+            />
+          )}
           <button
             className="btn btn-primary bkg__btn"
-            disabled={busy}
+            disabled={busy || unanswered}
             onClick={async () => {
               setBusy(true); setError('');
               try {
-                await createBooking(t.id, pick.iso, pick.start, note.trim());
-                setDone(t.approval === 'instant' ? 'booked' : 'requested');
+                if (rescheduleId) {
+                  // Provider moving a guest's booking gets the token back
+                  // so the state-derived mail reaches the guest too.
+                  const tok = await rescheduleBooking(rescheduleId, pick.iso, pick.start);
+                  if (tok) sendBookingMail(tok);
+                  setDone('moved');
+                } else {
+                  await createBooking(
+                    t.id, pick.iso, pick.start, note.trim(),
+                    questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
+                  );
+                  setDone(t.approval === 'instant' ? 'booked' : 'requested');
+                }
               } catch (e) {
                 setError((e as { message?: string } | null)?.message || 'Something went wrong.');
                 setBusy(false);
               }
             }}
           >
-            {busy ? 'One moment…' : t.approval === 'instant' ? 'Book it' : 'Request this time'}
+            {busy ? 'One moment…'
+              : rescheduleId ? 'Move it to this time'
+                : t.approval === 'instant' ? 'Book it' : 'Request this time'}
           </button>
+          {unanswered && <p className="bkg__muted">A quick answer to each question above and you&rsquo;re set.</p>}
         </div>
       )}
     </div>

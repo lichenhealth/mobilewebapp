@@ -70,6 +70,12 @@ export default function Bookings() {
   const upcoming = asProvider.filter((b) => b.status === 'confirmed' && b.on_date >= today);
   const mine = asBooker.filter((b) => (b.status === 'pending' || b.status === 'confirmed') && b.on_date >= today);
 
+  // The booker's intake answers, shown wherever the note shows (founder
+  // 2026-10-03 — the Calendly audit's questions piece).
+  const answerLines = (b: BookingRow) => (b.answers ?? []).map((x, i) => (
+    <span className="bkg__row-note" key={i}><strong>{x.q}</strong> — {x.a}</span>
+  ));
+
   return (
     <div className="bkg">
       <button className="cmp__back" onClick={() => navigate('/calendar')}>
@@ -132,6 +138,7 @@ export default function Bookings() {
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
+                {answerLines(b)}
                 {b.note && <span className="bkg__row-note">&ldquo;{b.note}&rdquo;</span>}
               </div>
               <div className="bkg__row-actions">
@@ -151,7 +158,11 @@ export default function Bookings() {
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
+                {answerLines(b)}
               </div>
+              <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
+                Reschedule
+              </button>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
                 void confirmDialog({ message: 'Cancel this session? They\u2019ll be notified.', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>
@@ -172,6 +183,9 @@ export default function Bookings() {
                 </span>
                 <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
               </div>
+              <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
+                Reschedule
+              </button>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
                 void confirmDialog({ message: 'Cancel this session?', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>

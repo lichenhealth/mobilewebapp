@@ -8,7 +8,8 @@ import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
-  slotsForDay, type PublicBookingPage, type BookingBoard,
+  slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
+  type PublicBookingPage, type BookingBoard,
 } from '../lib/bookingApi';
 import './Bookings.css';
 import './GuestEvent.css';
@@ -33,6 +34,8 @@ export default function BookPublic() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [mineTime, setMineTime] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [doneToken, setDoneToken] = useState<string | null>(null);
@@ -81,7 +84,25 @@ export default function BookPublic() {
 
   const provider = page.provider;
   const providerName = provider.full_name ?? 'A Lichen member';
+  const first = providerName.split(' ')[0];
   const activeType = page.types.find((t) => t.id === typeId) ?? null;
+
+  // The logged timezone follow-up, built (founder 2026-10-03): slots are the
+  // PROVIDER's wall time by doctrine; a visitor on another clock reads them
+  // in their own by default, with the honest note and a flip. Stored minutes
+  // never convert — only labels.
+  const ptz = provider.timezone ?? null;
+  const vz = viewerZone();
+  const foreign = !!(ptz && vz && ptz !== vz);
+  const slotLabel = (iso: string, s: number): string => {
+    if (!foreign || !mineTime) return minToLabel(s);
+    const v = viewerSlotLabel(iso, s, ptz);
+    if (!v) return minToLabel(s);
+    return v.label + (v.dayShift === 1 ? ' (+1d)' : v.dayShift === -1 ? ' (−1d)' : '');
+  };
+  const questions = (board?.type.questions ?? []).filter(Boolean);
+  const capacity = board?.type.capacity ?? 1;
+  const unanswered = questions.some((_, i) => !(answers[i] ?? '').trim());
 
   if (doneToken) {
     return (
@@ -116,8 +137,18 @@ export default function BookPublic() {
         <h1 className="bkg__title display-italic">Book time with {providerName}</h1>
         {provider.headline && <p className="bkg__sub">{provider.headline}</p>}
         <p className="bkpub__tz">
-          Times are in {providerName.split(' ')[0]}&rsquo;s local time
-          {provider.timezone ? ` (${provider.timezone})` : ''}.
+          {foreign
+            ? (mineTime
+              ? `Times are shown in your time zone (${vz}).`
+              : `Times are shown in ${first}’s time zone (${ptz}).`)
+            : `Times are in ${first}’s local time${ptz ? ` (${ptz})` : ''}.`}
+          {foreign && (
+            <>{' '}
+              <button className="bkg__tzflip" onClick={() => setMineTime((v) => !v)}>
+                Show in {mineTime ? `${first}’s` : 'your'} time
+              </button>
+            </>
+          )}
         </p>
       </header>
 
@@ -153,7 +184,8 @@ export default function BookPublic() {
                 className={'bkg__slot' + (pick?.iso === iso && pick.start === s ? ' is-on' : '')}
                 onClick={() => setPick({ iso, start: s })}
               >
-                {minToLabel(s)}
+                {slotLabel(iso, s)}
+                {capacity > 1 && board && <em className="bkg__seats"> · {seatsLeft(board, iso, s)} left</em>}
               </button>
             ))}
           </div>
@@ -165,21 +197,39 @@ export default function BookPublic() {
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + activeType.duration_min)}
+            {foreign && (() => {
+              const v = viewerSlotLabel(pick.iso, pick.start, ptz);
+              const ve = viewerSlotLabel(pick.iso, pick.start + activeType.duration_min, ptz);
+              return v && ve ? ` (${v.label} – ${ve.label} your time)` : '';
+            })()}
           </p>
           <input className="bkg__note bkpub__field" value={name}
             onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           <input className="bkg__note bkpub__field" type="email" value={email}
             onChange={(e) => setEmail(e.target.value)} placeholder="Your email — the confirmation lands here" />
+          {questions.map((q, i) => (
+            <label className="bkg__q" key={i}>
+              <span>{q}</span>
+              <textarea
+                className="bkg__note"
+                value={answers[i] ?? ''}
+                onChange={(e) => setAnswers((a) => ({ ...a, [i]: e.target.value }))}
+              />
+            </label>
+          ))}
           <textarea className="bkg__note" value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={`Anything ${providerName.split(' ')[0]} should know? (optional)`} />
+            placeholder={`Anything ${first} should know? (optional)`} />
           <button
             className="btn btn-primary bkg__btn"
-            disabled={busy || !name.trim() || !/\S+@\S+\.\S+/.test(email)}
+            disabled={busy || !name.trim() || !/\S+@\S+\.\S+/.test(email) || unanswered}
             onClick={async () => {
               setBusy(true); setError('');
               try {
-                const token = await guestCreateBooking(typeId!, pick.iso, pick.start, name.trim(), email.trim(), note.trim());
+                const token = await guestCreateBooking(
+                  typeId!, pick.iso, pick.start, name.trim(), email.trim(), note.trim(),
+                  questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
+                );
                 sendBookingMail(token);
                 setDoneStatus(activeType.approval === 'instant' ? 'confirmed' : 'pending');
                 setDoneToken(token);
