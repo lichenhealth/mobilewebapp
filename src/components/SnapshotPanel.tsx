@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from './Icon';
-import { speechRecognition } from '../lib/dictation';
+import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
 import {
   requestSnapshot, applySnapshot,
   type SnapshotProposal, type SnapshotListing,
@@ -57,20 +57,22 @@ export default function SnapshotPanel({ back, onDone, openInitially = false }: {
   // recognition in an installed web app hangs the page — the iPhone
   // keyboard's own mic covers dictation there.
   const SR = speechRecognition();
+  const dictation = useRef<DictationSession | null>(null);
   function dictate() {
-    if (!SR || listening) return;
-    const rec = new SR();
-    rec.lang = navigator.language || 'en-US';
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      const said = e.results[e.results.length - 1][0].transcript;
-      setText((t) => (t ? `${t} ${said}` : said));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    setListening(true);
-    // A refused start must never strand the button lit.
-    try { rec.start(); } catch { setListening(false); }
+    if (!SR) return;
+    // Second tap while live = stop (dictation.onEnd clears the light).
+    if (listening) { dictation.current?.stop(); return; }
+    // The phrase REPLACES everything after this base — duplicate engine
+    // deliveries re-set the same text instead of appending it again
+    // (src/lib/dictation.ts has the whole story).
+    const base = text.trim() ? text.replace(/\s+$/, '') + ' ' : '';
+    const s = startDictation({
+      onPhrase: (phrase) => setText(base + phrase),
+      onEnd: () => { setListening(false); dictation.current = null; },
+    });
+    // A refused start returns null — never strand the button lit.
+    dictation.current = s;
+    setListening(!!s);
   }
 
   async function run() {
