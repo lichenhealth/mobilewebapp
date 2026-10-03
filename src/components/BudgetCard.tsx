@@ -5,7 +5,7 @@ import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
   BudgetItem, BudgetBucket, BudgetCadence,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
-  listMyMarketplaceTexts,
+  listMyMarketplaceTexts, passiveIncome,
 } from '../lib/budgetApi';
 import { Bolt } from './CurrentcyCard';
 import './BudgetCard.css';
@@ -186,7 +186,12 @@ export default function BudgetCard() {
             onClick={() => navigate(`/compose?area=marketplace&title=${encodeURIComponent(i.label ?? '')}&body=${encodeURIComponent('In search of: ' + (i.label ?? ''))}`)}
           >Ask the network ›</button>
         )}
-        {!i.post_id && (i.bucket === 'income' || i.bucket === 'gift') && !alreadyListed(i.label) && (
+        {/* Money that's WORKING (investment return, pension, a salary) is
+            not an offering — no door (founder 2026-10-02: "living off of my
+            investment assets… isn't something I want to list. Versus my
+            therapy practice is"). */}
+        {!i.post_id && (i.bucket === 'income' || i.bucket === 'gift')
+          && !alreadyListed(i.label) && !passiveIncome(i.label) && (
           <button
             className="budg__ask"
             title="List it in Marketplace — as a gift, a trade, or for Current-cy"

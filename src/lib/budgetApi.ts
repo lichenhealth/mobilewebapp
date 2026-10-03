@@ -114,6 +114,27 @@ export async function removeBudgetItem(id: string): Promise<void> {
 
 export interface LedgerFlows { inAmt: number; outAmt: number }
 
+/** Income that is MONEY WORKING, not an offering — the List-on-Marketplace
+ *  door stays silent for it (founder 2026-10-02: "I am living off of my
+ *  investment assets right now… Can the platform be smart enough to know
+ *  that isn't something I want to list on Marketplace? Versus my therapy
+ *  practice is?"). Deterministic vocabulary, the smartSearch idiom — no AI
+ *  call, the budget is private and the card must be instant. Word-bounded
+ *  stems so "livestock" never reads as "stock" and "Kira" never as "IRA".
+ *  Deliberately NOT here: rent/rental — renting things out IS a
+ *  marketplace mode on Lichen. */
+const PASSIVE_INCOME_RE = new RegExp(
+  '\\b(invest\\w*|dividends?|interest|capital gains?|stocks?|bonds?|equit(y|ies)|'
+  + 'crypto\\w*|bitcoin|401k|403b|ira|roth|pension\\w*|retirement|'
+  + 'social security|ssdi|ssi|annuit\\w*|royalt\\w*|inherit\\w*|alimony|'
+  + 'child support|settlements?|unemployment|disability|benefits?|'
+  + 'salar(y|ies)|wages?|paychecks?|payroll|trust fund|savings|'
+  + 'refunds?|rebates?|tax return)\\b',
+);
+export function passiveIncome(label: string | null | undefined): boolean {
+  return PASSIVE_INCOME_RE.test((label ?? '').toLowerCase());
+}
+
 /** The member's own live Marketplace listings as lowercase text — the
  *  smart List door's source (founder 2026-10-02: "if you've already listed
  *  your service or goods on marketplace it says nothing, but has a 'list on
