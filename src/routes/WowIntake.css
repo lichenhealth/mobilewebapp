@@ -112,6 +112,17 @@
 /* The assessment's overall reading — the average of its saved scores
    (founder 2026-09-22: "an overall score at the top"). */
 .wintake__overall { margin: 0; font-size: 13px; color: var(--ink-muted); }
+/* The live-session door (founder 2026-10-02) — a quiet standing pill under
+   the progress row; only as wide as its words, centered in the column. */
+.wintake__livedoor {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+  width: fit-content; max-width: 100%; margin: 2px auto var(--s-3);
+  border: 1px solid var(--peach); border-radius: var(--r-full);
+  background: none; padding: 7px 14px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; color: var(--ink-soft); text-align: center;
+}
+.wintake__livedoor strong { color: var(--peach-deep); font-weight: 600; white-space: nowrap; }
+.wintake__livedoor:hover { background: var(--peach-tint); }
 .wintake__overall strong {
   font-size: 19px; font-weight: 600; color: var(--green-deep); margin-right: 2px;
 }

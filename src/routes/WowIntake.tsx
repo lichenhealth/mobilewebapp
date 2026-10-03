@@ -10,8 +10,10 @@ import {
 } from '../lib/conciergeApi';
 import {
   getFinancialPosition, saveFinancialPosition, requestFinancialCoordinator,
+  CARE_COORDINATOR_PROFILE_ID,
   SUBSIDY_NEEDS, type SubsidyNeed, type FinancialPosition,
 } from '../lib/meansApi';
+import { listBookableTypes } from '../lib/bookingApi';
 import './WowIntake.css';
 
 /** THE GUIDED INTAKE (founder 2026-09-11, onboarding the first Concierge
@@ -644,6 +646,33 @@ export default function WowIntake() {
           <strong>{overall}</strong> overall — the average of your {assessScores.length} scored
           thread{assessScores.length > 1 ? 's' : ''} so far
         </p>
+      )}
+      {/* The live-session door (founder 2026-10-02: "Would you rather work
+          with your care coordinator on this live?") — books time through
+          Lichen's OWN bookings, never an outside scheduler. The pop-up
+          pattern: the intake never navigates, the draft flushes first.
+          ⚠ /book/<uuid> is a booking TYPE id (BookSession), not a profile —
+          so the window opens blank (keeping the click's popup permission)
+          and lands on the coordinator's one session type when exactly one
+          is visible, else on their member page, where Book + Message live. */}
+      {ready && (
+        <button
+          type="button" className="wintake__livedoor"
+          onClick={() => {
+            writeDraft();
+            const w = window.open('', 'lichen-live', 'popup=yes,width=560,height=800');
+            void (async () => {
+              const types = await listBookableTypes(CARE_COORDINATOR_PROFILE_ID).catch(() => []);
+              const path = types.length === 1
+                ? `/book/${types[0].id}`
+                : `/members/${CARE_COORDINATOR_PROFILE_ID}`;
+              if (w) w.location.href = path; else navigate(path);
+            })();
+          }}
+        >
+          Would you rather work with your care coordinator on this live?{' '}
+          <strong>Book a time ›</strong>
+        </button>
       )}
 
       {!ready && <p className="wintake__muted">Loading…</p>}

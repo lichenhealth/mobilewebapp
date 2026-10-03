@@ -332,6 +332,28 @@ export default function CalendarSettings() {
                 <option value="request">I approve each request</option>
                 <option value="instant">Book instantly</option>
               </select>
+              {/* Calendly-parity scheduling rules (founder 2026-10-03): how
+                  close to now a slot may start, and how far out the book
+                  opens. Enforced client-side in slotsForDay AND server-side
+                  by the booking_notice_window trigger. */}
+              <select className="cset__select" value={bkEdit.min_notice_min ?? 60}
+                onChange={(e) => setBkEdit((c) => ({ ...c, min_notice_min: Number(e.target.value) }))} aria-label="Minimum notice">
+                <option value={0}>No minimum notice</option>
+                <option value={60}>At least 1 hour&rsquo;s notice</option>
+                <option value={240}>At least 4 hours&rsquo; notice</option>
+                <option value={720}>At least 12 hours&rsquo; notice</option>
+                <option value={1440}>At least 24 hours&rsquo; notice</option>
+                <option value={2880}>At least 48 hours&rsquo; notice</option>
+              </select>
+              <select className="cset__select" value={bkEdit.max_days_out ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, max_days_out: e.target.value ? Number(e.target.value) : null }))} aria-label="How far out people can book">
+                <option value="">Bookable any time ahead</option>
+                <option value={7}>Up to 1 week out</option>
+                <option value={14}>Up to 2 weeks out</option>
+                <option value={28}>Up to 4 weeks out</option>
+                <option value={56}>Up to 8 weeks out</option>
+                <option value={84}>Up to 12 weeks out</option>
+              </select>
               <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="public">Anyone — even outside Lichen, via your link</option>
