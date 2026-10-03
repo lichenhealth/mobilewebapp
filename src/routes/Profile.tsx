@@ -452,6 +452,10 @@ export default function Profile() {
   // resolves the same as a space's, via SpaceByHandle's fallback lookup.
   const [handle, setHandleState] = useState('');
   const [savedHandle, setSavedHandle] = useState('');
+  // The publish switch, as last saved — so flipping it (or typing a new
+  // address) counts as a pending change even though neither lives in the
+  // page draft (they go live with the publish itself, not with content).
+  const [savedPublicPage, setSavedPublicPage] = useState(false);
   useEffect(() => {
     if (!user) return;
     void supabase.from('profiles').select('contact, public_page, page, handle').eq('id', user.id).maybeSingle()
@@ -465,6 +469,9 @@ export default function Profile() {
           // exposes nothing. An explicit earlier choice always wins.
           const untouched = !r.public_page && !r.handle && (!r.page || Object.keys(r.page).length === 0);
           setContact(r.contact ?? {}); setPublicPage(untouched ? true : !!r.public_page); setPageMeta(r.page ?? {});
+          // The untouched pre-check is presentation, not a pending change —
+          // track "saved" as what the form SHOWS so a fresh section opens calm.
+          setSavedPublicPage(untouched ? true : !!r.public_page);
           setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
           const live: PageDraft = { page: r.page ?? {}, contact: r.contact ?? {} };
           liveBase.current = normalize(live);
@@ -518,6 +525,7 @@ export default function Profile() {
       setWebMsg(e.code === '23505' ? 'That address is taken — try another.' : e.message);
     } else {
       setSavedHandle(h);
+      setSavedPublicPage(publicPage);
       liveBase.current = normalize({ page: pageMeta, contact });
       await clearDraft('profile', user.id);
       setDraftPending(false);
@@ -525,6 +533,12 @@ export default function Profile() {
       setWebMsg('Published.');
     }
   }
+  // "Is there anything here Publish hasn't seen?" — page-content drafts PLUS
+  // the two settings that live outside the draft (address, publish switch).
+  // Typing only an address used to register nowhere: the foot said
+  // "Everything here is live" while the typed handle sat unsaved (founder
+  // 2026-10-03: "I don't see a save button… is there no save button?").
+  const webPending = draftPending || handle.trim() !== savedHandle || publicPage !== savedPublicPage;
   /** Crossing to build-with-Claude carries your manual work (founder
    *  2026-08-21: "import and remember anything you've entered in the manual
    *  build"). Persists ONLY the page content — never public_page or handle,
@@ -952,6 +966,18 @@ export default function Profile() {
               Letters, numbers and dashes only. Leave it blank and your page lives at{' '}
               <code>/members/{user?.id?.slice(0, 8)}…</code> instead.
             </p>
+            {/* Say right HERE whether the address is saved — the Publish bar
+                is a long scroll away and an unsaved handle used to look
+                identical to a saved one (founder 2026-10-03). */}
+            {handle.trim() !== savedHandle ? (
+              <p className="prof__hint prof__hint--claim">
+                Not saved yet — press <strong>Publish</strong> in the bar at the foot of your screen to claim it.
+              </p>
+            ) : savedHandle ? (
+              <p className="prof__hint prof__hint--live">
+                Yours ✓ — your page and booking links answer at lichen.health/{savedHandle}.
+              </p>
+            ) : null}
           </div>
 
           <p className="prof__privacy-sub">Your page</p>
@@ -1045,9 +1071,15 @@ export default function Profile() {
             onContact={(next: ContactInfo) => setContact(next)}
           />
 
-          <div className="prof__save-row">
+          {/* STICKY (founder 2026-10-03: "I don't see a save button as I
+              scroll down… let's make it clearer"): this section is the
+              longest form in the app — handle, story, actions, the whole
+              tabs editor — and its one Publish button lived below all of
+              it. The bar now rides the bottom of the screen while the
+              section is open, so the way to save is always in view. */}
+          <div className="prof__save-row prof__save-row--pub">
             <button className="btn btn-primary" onClick={() => void saveWebPage()}>
-              {draftPending ? 'Publish changes' : 'Publish'}
+              {webPending ? 'Publish changes' : 'Publish'}
             </button>
             {draftPending && user && (
               <button
@@ -1083,8 +1115,8 @@ export default function Profile() {
             {webMsg && <span className="prof__msg">{webMsg}</span>}
             {!webMsg && (
               <span className="prof__msg prof__draft-state">
-                {draftPending
-                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — your live page still shows what you published last.`
+                {webPending
+                  ? `Unpublished changes${draftMsg ? ` · ${draftMsg.toLowerCase()}` : ''} — Publish makes them live.`
                   : 'Everything here is live.'}
               </span>
             )}

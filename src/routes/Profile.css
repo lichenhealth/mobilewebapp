@@ -84,6 +84,32 @@
 .prof__save-row { display: flex; align-items: center; gap: var(--s-3); }
 .prof__msg { font-size: var(--t-sm); color: var(--moss); }
 
+/* The public-page section's Publish bar FOLLOWS the screen (founder
+   2026-10-03: the section is the app's longest form and its one save
+   button sat below the whole tabs editor — "I don't see a save button").
+   Sticky against the app scroller (#root); on phones it clears the fixed
+   bottom nav, at >=1024px the nav is gone so it hugs the foot. Floating-
+   card styling so the gap under it reads deliberate, not broken. */
+.prof__save-row--pub {
+  position: sticky;
+  bottom: calc(var(--nav-h) + var(--safe-bot) + var(--s-3));
+  z-index: 6;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  background: var(--bone);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(42, 51, 56, 0.12);
+}
+@media (min-width: 1024px) {
+  .prof__save-row--pub { bottom: var(--s-4); }
+}
+
+/* The handle field says its own saved-state in place — the bar is far away. */
+.prof__hint--claim { color: var(--peach-deep); }
+.prof__hint--live { color: var(--moss); }
+
 .prof__caps { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .prof__cap {
   padding: 8px 16px; border-radius: 999px; font-size: var(--t-sm); font-weight: 600;
