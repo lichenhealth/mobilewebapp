@@ -36,7 +36,7 @@ const minToLabel = (m: number) => {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
-    const { token } = await req.json().catch(() => ({}));
+    const { token, kind } = await req.json().catch(() => ({}));
     if (!token || typeof token !== 'string') return json({ error: 'No token' }, 400);
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
@@ -70,7 +70,18 @@ Deno.serve(async (req) => {
         lead: `This booking has been cancelled. Their live availability is at the link below if you'd like another time.`,
       },
     };
-    const c = CONTENT[row.status];
+    // kind='reminder' (tick_booking_reminders via pg_net, 2026-10-03): the
+    // day-before nudge for a CONFIRMED session — still wholly derived from
+    // the row's current state, so a replayed or forged call can only
+    // restate the truth.
+    const c = kind === 'reminder'
+      ? (row.status === 'confirmed'
+        ? {
+          subject: `Coming up — ${t.title} with ${provider}`,
+          lead: `A friendly reminder: your session with ${provider} is coming up. The link below is where you view, reschedule, or cancel.`,
+        }
+        : null)
+      : CONTENT[row.status];
     if (!c) return json({ ok: false, error: 'Unmailable status' }, 400);
 
     const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}\n\n${link}`;

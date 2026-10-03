@@ -760,12 +760,6 @@ export default function AssistantBrief() {
   // (founder 2026-08-22), not the section's.
   const feedThread = spaceParam ? `space:${spaceParam}` : threadForSection(section);
 
-  function talkToClaude() {
-    // Land in the room this work belongs to (founder 2026-08-11), so the
-    // work logs where it lives instead of in one flat feed.
-    navigate(`/assistant/feed?thread=${feedThread}`);
-  }
-
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
    *  what you just read without hunting for a door. It really lands in the
    *  member's Claude feed (founder, 2026-08-09 — chat felt redundant with a
@@ -895,10 +889,12 @@ export default function AssistantBrief() {
 
       {section === 'profile' && !buildIntent && buildCard}
 
-      <div className="abrief__acts">
-        <button className="btn" onClick={() => talkToClaude()}>Open your feed</button>
-        <button className="btn" onClick={() => navigate('/search')}>Search instead</button>
-      </div>
+      {/* The "Open your feed" / "Search instead" pills were RETIRED here
+          (founder 2026-10-03: "seems non contextual because I'm in my
+          calendar's AI assistant… there's a search button on the preceding
+          screen") — the ← Back chip returns to the section, whose own
+          search circle is one tap away, and the composer below already
+          lands in the right feed thread. */}
 
       {/* Always-there composer — answer the brief in place (founder
           2026-08-05), lands in the feed (founder 2026-08-09). A door can

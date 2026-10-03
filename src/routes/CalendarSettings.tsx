@@ -354,6 +354,33 @@ export default function CalendarSettings() {
                 <option value={56}>Up to 8 weeks out</option>
                 <option value={84}>Up to 12 weeks out</option>
               </select>
+              {/* Daily cap + group capacity (founder 2026-10-03, the
+                  Calendly audit). Cap counts sessions, not seats — joining
+                  a group slot already on the books is never a new one. */}
+              <select className="cset__select" value={bkEdit.max_per_day ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, max_per_day: e.target.value ? Number(e.target.value) : null }))} aria-label="Daily limit">
+                <option value="">No daily limit</option>
+                {[1, 2, 3, 4, 6].map((n) => (
+                  <option key={n} value={n}>At most {n} {n === 1 ? 'session' : 'sessions'} a day</option>
+                ))}
+              </select>
+              <select className="cset__select" value={bkEdit.capacity ?? 1}
+                onChange={(e) => setBkEdit((c) => ({ ...c, capacity: Number(e.target.value) }))} aria-label="Group size">
+                <option value={1}>One person per slot (1:1)</option>
+                {[2, 4, 6, 8, 10, 12, 20].map((n) => (
+                  <option key={n} value={n}>Group — up to {n} people</option>
+                ))}
+              </select>
+              <textarea
+                className="cedit__input cset__questions"
+                value={(bkEdit.questions ?? []).join('\n')}
+                onChange={(e) => setBkEdit((c) => ({
+                  ...c,
+                  questions: e.target.value.split('\n').map((l) => l.slice(0, 200)).slice(0, 5),
+                }))}
+                placeholder={'Questions to ask when someone books — one per line, up to five.\ne.g. What would you like to focus on?'}
+                rows={2}
+              />
               <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="public">Anyone — even outside Lichen, via your link</option>
@@ -372,7 +399,11 @@ export default function CalendarSettings() {
                 className="cedit__add cedit__add--sm"
                 disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && !bkEdit.audience_space_id)}
                 onClick={() => act(async () => {
-                  await saveBookingType(me, { ...bkEdit, title: (bkEdit.title ?? '').trim() } as Partial<BookingType> & { title: string });
+                  const qs = (bkEdit.questions ?? []).map((s) => s.trim()).filter(Boolean);
+                  await saveBookingType(me, {
+                    ...bkEdit, title: (bkEdit.title ?? '').trim(),
+                    questions: qs.length ? qs : null,
+                  } as Partial<BookingType> & { title: string });
                   setBkOpen(false); setBkEdit({});
                 })}
               >

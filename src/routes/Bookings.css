@@ -97,3 +97,15 @@
 .bkpub__field { min-height: 0; height: 42px; resize: none; }
 .bkpub__fine { font-size: 11.5px; color: var(--ink-faint); text-align: center; margin: 8px 0 0; }
 .bkpub__signin { border: none; background: none; color: var(--peach-deep); cursor: pointer; font: inherit; font-size: 11.5px; text-decoration: underline; }
+
+/* Calendly parity (founder 2026-10-03): timezone flip, group seats,
+   intake questions. */
+.bkg__tzflip {
+  border: none; background: none; padding: 0; font: inherit; font-size: 12px;
+  color: var(--peach-deep); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.bkg__seats { font-style: normal; font-size: 10.5px; color: var(--ink-faint); }
+.bkg__slot.is-on .bkg__seats { color: inherit; }
+.bkg__q { display: flex; flex-direction: column; gap: 4px; }
+.bkg__q > span { font-size: 12.5px; color: var(--ink-soft); }
