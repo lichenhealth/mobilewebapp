@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
-import { speechRecognition } from '../lib/dictation';
+import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
 import './AssistantComposer.css';
 
 /** The text box every surface that talks to Claude sends through — the
@@ -37,21 +37,23 @@ export default function AssistantComposer({
   // this is null — starting recognition in an installed web app hangs the
   // page, and the iPhone keyboard's own mic covers dictation anyway.
   const SR = speechRecognition();
+  const dictation = useRef<DictationSession | null>(null);
   function dictate() {
-    if (!SR || listening) return;
-    const rec = new SR();
-    rec.lang = navigator.language || 'en-US';
-    rec.interimResults = false;
-    rec.onresult = (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      const said = e.results[e.results.length - 1][0].transcript;
-      setAsk((a) => (a ? `${a} ${said}` : said));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    setListening(true);
-    // A refused start (mic permission, engine state) must never strand the
-    // button lit — reset instead of freezing the affordance.
-    try { rec.start(); } catch { setListening(false); }
+    if (!SR) return;
+    // Second tap while live = stop (dictation.onEnd clears the light).
+    if (listening) { dictation.current?.stop(); return; }
+    // The phrase REPLACES everything after this base — duplicate engine
+    // deliveries re-set the same text instead of appending it again
+    // (src/lib/dictation.ts has the whole story).
+    const base = ask.trim() ? ask.replace(/\s+$/, '') + ' ' : '';
+    const s = startDictation({
+      onPhrase: (phrase) => setAsk(base + phrase),
+      onEnd: () => { setListening(false); dictation.current = null; },
+    });
+    // A refused start (mic permission, engine state) returns null — never
+    // strand the button lit.
+    dictation.current = s;
+    setListening(!!s);
   }
 
   async function addFiles(files: File[]) {
