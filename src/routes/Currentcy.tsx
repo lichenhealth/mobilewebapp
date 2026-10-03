@@ -1,4 +1,3 @@
-import { useSearchParams } from 'react-router-dom';
 import CurrentcyCard from '../components/CurrentcyCard';
 import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
@@ -16,9 +15,6 @@ import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive
  *  load money into it" (founder 2026-10-01): the money-in doors are the
  *  shared MoneyInDoors component, which Profile's drawer mounts too. */
 export default function Currentcy() {
-  const [params] = useSearchParams();
-  const justLoaded = params.get('loaded') === '1';
-
   return (
     <div className="cedit">
       {/* Drive's header grammar (founder 2026-10-02: "have the current-cy tab
@@ -35,17 +31,10 @@ export default function Currentcy() {
           exchange of goods and services in a new economy.
         </p>
       </header>
-      {/* Honest about BOTH speeds (founder 2026-10-02 loaded $50 from her
-          bank and the old "lands in a moment… pull back in" read as broken):
-          card = instant, bank = days. The webhook mints the moment Stripe
-          confirms the money, whichever path it took. */}
-      {justLoaded && (
-        <p className="curx__loaded">
-          Payment started. A card load lands here in a moment — a bank
-          transfer takes a few business days to clear. Your Current appears
-          the moment the money does.
-        </p>
-      )}
+      {/* The old ?loaded=1 banner is GONE (founder 2026-10-02: "This is
+          redundant, so let's get rid of the top bit") — the card's own green
+          pending note carries a bank load, and /currentcy/how is the
+          click-through that explains every speed. */}
       <div className="cedit__doors">
         <AssistantDoor section="currentcy" label="Your money coach — what moved, and where you could earn more" />
       </div>

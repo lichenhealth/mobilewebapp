@@ -1,0 +1,35 @@
+/* How money moves — the wallet's explainer page (founder 2026-10-02). */
+.curhow { padding-bottom: var(--s-8); }
+
+/* The worded back chip — the .cmp__back shape, local copy so this page
+   doesn't import Compose.css. Only as wide as its words (the 2026-08-31
+   platform rule): fit-content + flex-start. */
+.curhow__back {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: fit-content; align-self: flex-start; justify-self: start;
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  background: var(--bone-warm); color: var(--ink-soft);
+  font: inherit; font-size: 13px; padding: 6px 14px; cursor: pointer;
+  margin: var(--s-2) 0 var(--s-2);
+}
+.curhow__back:hover { background: var(--bone); }
+
+.curhow__sec { margin: 0 0 var(--s-5); max-width: 560px; margin-inline: auto; }
+.curhow__h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-muted); font-weight: 500; margin: 0 0 var(--s-2);
+  border-bottom: 1px solid var(--bone-edge); padding-bottom: 6px;
+}
+.curhow__item { margin: 0 0 var(--s-3); }
+.curhow__item h3 { font-size: var(--t-base); font-weight: 600; margin: 0 0 4px; color: var(--ink); }
+.curhow__item p { font-size: var(--t-sm); color: var(--ink-soft); margin: 0; line-height: 1.55; }
+.curhow__item em { font-style: normal; color: var(--green-deep, #3e5c3a); font-weight: 500; }
+
+.curhow__times { list-style: none; margin: 0; padding: 0; }
+.curhow__times li {
+  display: flex; justify-content: space-between; gap: var(--s-3);
+  font-size: var(--t-sm); color: var(--ink-soft);
+  padding: 8px 0; border-bottom: 1px solid var(--bone-edge);
+}
+.curhow__times li:last-child { border-bottom: 0; }
+.curhow__times li span:last-child { color: var(--ink); font-weight: 500; text-align: right; }
