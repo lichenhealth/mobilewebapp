@@ -229,8 +229,23 @@
   color: var(--ink-soft); cursor: pointer; text-align: left;
 }
 .cmp__term.is-set .cmp__term-mode { background: var(--peach); color: #fff; border-color: var(--peach); }
-.cmp__term-paid { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cmp__term-paid { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
 .cmp__term-slide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+/* The per-unit dropdown (founder 2026-10-02). A styled select draws its OWN
+   chevron — the conc__dash-select rule: native arrows read wonky per device. */
+.cmp__term-unit {
+  appearance: none; -webkit-appearance: none;
+  border: 1px solid var(--bone-edge); border-radius: 10px;
+  background: var(--bone-warm)
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b6257' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  padding: 9px 26px 9px 10px; font-family: inherit; font-size: 12.5px;
+  color: var(--ink); cursor: pointer;
+}
+/* The optional count — "3" turns per day into per 3 days. */
+.cmp__term-input.cmp__term-qty { flex: 0 0 46px; min-width: 46px; text-align: center; padding: 9px 6px; }
+/* The per-… free word (class, acre, cord of wood). */
+.cmp__term-input.cmp__term-unittext { flex: 0 1 130px; min-width: 100px; }
 .cmp__term-editmark { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-faint); }
 
 /* ── Listing details (Figma 286-4961) ───────────────────────────────────── */
