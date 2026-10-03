@@ -348,8 +348,11 @@ export default function App() {
           <Route path="/bookings"        element={<Bookings />} />
                     {/* /book/<uuid> = a member's slot picker; /book/<handle> = the
               PUBLIC booking page (founder 2026-08-14, the Calendly
-              replacement). One path, disambiguated by shape. */}
+              replacement). One path, disambiguated by shape.
+              /book/<handle>/<link-name> = a VANITY link straight to one
+              session type (founder 2026-10-03) — BookPublic reads the slug. */}
           <Route path="/book/:param" element={<BookGate />} />
+          <Route path="/book/:param/:slug" element={<BookPublic />} />
           <Route path="/b/:token" element={<GuestBooking />} />
           <Route path="/mycelium/:type"  element={<Mycelium />} />
 
