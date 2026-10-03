@@ -124,6 +124,12 @@ export default function Compose() {
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
+  // Total vs per hour (founder 2026-10-02: "price here should be total or
+  // per hour, since therapy is per hour"). Checked, the stored price string
+  // itself says "… per hour" so every surface that renders details.price
+  // speaks the unit for free; details.priceUnit='hour' is the structured
+  // twin. Unchecked = total, the unlabeled legacy meaning.
+  const [perHour, setPerHour] = useState(false);
   // In-kind DONATION: title passes to Lichen (the Goodwill move) — that's
   // what makes a tax acknowledgment legal. Offered under Lichen*; a steward
   // accepts on the routing desk, and the receipt email follows.
@@ -342,14 +348,19 @@ export default function Compose() {
       if (typeof d.bookingUrl === 'string') setBookingUrl(d.bookingUrl);
       if (typeof d.trade === 'string') setTradeFor(d.trade);
       if (typeof d.price === 'string') {
+        // "… per hour" round-trips into the unit checkbox; the bare price
+        // goes back into its field (the sliding round-trip's pattern).
+        const hourly = / per hour$/.test(d.price);
+        if (hourly) setPerHour(true);
+        const bare = d.price.replace(/ per hour$/, '');
         // "Sliding scale $20–$60" round-trips back into the two fields.
-        const m = d.price.match(/^Sliding scale (.*)–(.*)$/);
+        const m = bare.match(/^Sliding scale (.*)–(.*)$/);
         if (d.sliding === true && m) {
           setSliding(true);
           setSlideLow(m[1] === '?' ? '' : m[1]);
           setSlideHigh(m[2] === '?' ? '' : m[2]);
         } else {
-          setPrice(d.price);
+          setPrice(bare);
         }
       }
       if (Array.isArray(d.media)) setMedia(d.media as Attached[]);
@@ -571,12 +582,18 @@ export default function Compose() {
         : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
       if (face === 'actionable') {
         if (hasMode('paid')) {
+          // The unit rides IN the price text ("$45 per hour") so older
+          // surfaces say it without new wiring; skip the append when the
+          // member already typed it themselves.
+          const unit = perHour ? ' per hour' : '';
           if (sliding && (slideLow.trim() || slideHigh.trim())) {
-            details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
+            details.price = `Sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${unit}`;
             details.sliding = true;
           } else if (price.trim()) {
-            details.price = price.trim();
+            const p = price.trim();
+            details.price = perHour && !/per hour|\/\s*hr\b|hourly/i.test(p) ? `${p} per hour` : p;
           }
+          if (perHour && details.price) details.priceUnit = 'hour';
           if (isEvent && bookingUrl.trim()) details.bookingUrl = bookingUrl.trim();
         }
         if (hasMode('trade') && tradeFor.trim()) details.trade = tradeFor.trim();
@@ -1094,8 +1111,10 @@ export default function Compose() {
               }
               if (m === 'trade') return tradeFor.trim() ? `for ${tradeFor.trim()}` : 'open to offers';
               if (m === 'paid') {
-                if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}`;
-                return price.trim() || 'price to discuss';
+                const unit = perHour ? ' per hour' : '';
+                if (sliding) return `sliding scale ${slideLow.trim() || '?'}–${slideHigh.trim() || '?'}${unit}`;
+                if (!price.trim()) return 'price to discuss';
+                return /per hour|\/\s*hr\b|hourly/i.test(price) ? price.trim() : price.trim() + unit;
               }
               return modeNotes[m]?.trim()
                 || (m === 'rent' ? 'rate to discuss' : m === 'borrow' ? 'timing to arrange'
@@ -1155,6 +1174,9 @@ export default function Compose() {
                             )}
                             <label className="cmp__term-slide">
                               <input type="checkbox" checked={sliding} onChange={(e) => setSliding(e.target.checked)} /> sliding
+                            </label>
+                            <label className="cmp__term-slide" title="Unchecked, the price reads as a total — check it for services priced by the hour">
+                              <input type="checkbox" checked={perHour} onChange={(e) => setPerHour(e.target.checked)} /> per hour
                             </label>
                           </span>
                         )}
