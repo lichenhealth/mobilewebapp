@@ -155,6 +155,58 @@
 .afeed__thread--space { padding: 0; overflow: visible; border-width: 2px; }
 .afeed__thread--space > :first-child { border-radius: 50%; overflow: hidden; }
 
+/* THE CONVERSATION LIST (founder 2026-10-05: the email grammar — a thread
+   opens on its conversations, newest first, each titled by its own first
+   words; tapping one opens just that exchange). The row anatomy is the
+   chat inbox's: title · "who: last words" · relative time · unread pill. */
+.afeed__convos { display: flex; flex-direction: column; gap: 8px; margin-bottom: var(--s-4); }
+.afeed__convo {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 14px; cursor: pointer; font-family: inherit;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg, 14px);
+  transition: border-color var(--d-fast) var(--ease-out);
+}
+.afeed__convo:hover { border-color: var(--ink-muted); }
+.afeed__convo-main { flex: 1; min-width: 0; }
+.afeed__convo-title {
+  margin: 0; font-size: 15px; font-weight: 500; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.afeed__convo-snippet {
+  margin: 2px 0 0; font-size: 13px; color: var(--ink-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.afeed__convo-side {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
+}
+.afeed__convo-when { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
+.afeed__convo-pill {
+  min-width: 17px; height: 17px; padding: 0 5px;
+  background: var(--peach); color: var(--bone-warm);
+  border-radius: var(--r-full); font-style: normal;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* The ⊕ door into a fresh exchange — a ghost pill, only as wide as its
+   words (the back-chip rule). */
+.afeed__convo-newbtn {
+  width: fit-content; align-self: flex-start; justify-self: start;
+  padding: 8px 14px; cursor: pointer; font-family: inherit; font-size: 13.5px;
+  background: var(--bone); color: var(--ink);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+}
+.afeed__convo-newbtn:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
+/* "← All Marketplace conversations" — worded, so it names where it goes. */
+.afeed__convoback {
+  width: fit-content; align-self: flex-start; justify-self: start;
+  margin-bottom: var(--s-3); padding: 7px 13px;
+  cursor: pointer; font-family: inherit; font-size: 13px;
+  background: var(--bone); color: var(--ink-soft);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+}
+.afeed__convoback:hover { border-color: var(--ink-muted); color: var(--ink); }
+
 /* Snapshot, hosted inside the profile thread rather than a page of its own —
    a composed card in the thread's own rhythm (founder 2026-08-20: the bare
    version read as floating text with wonky margins). */

@@ -15,6 +15,12 @@ export interface FeedPostRow {
   body: string;
   source_post_id: string | null;
   thread: string;
+  /** Which CONVERSATION inside the thread this entry belongs to (founder
+   *  2026-10-05: a thread is a newest-first list of conversations now, the
+   *  email grammar). Minted client-side on a fresh conversation's first
+   *  send; replies echo the trigger's; history was backfilled by time gap.
+   *  Null = a space build thread's continuous stream (deliberate). */
+  convo_id: string | null;
   created_at: string;
   attachments: FeedAttachment[] | null;
 }
@@ -154,7 +160,7 @@ export function threadForSection(section?: string | null): string {
 export async function loadAssistantFeed(profileId: string, thread?: string): Promise<FeedPostRow[]> {
   let q = supabase
     .from('assistant_feed_posts')
-    .select('id, author, body, source_post_id, thread, created_at, attachments')
+    .select('id, author, body, source_post_id, thread, convo_id, created_at, attachments')
     .eq('profile_id', profileId);
   if (thread) q = q.eq('thread', thread);
   const { data, error } = await q.order('created_at', { ascending: true });
@@ -228,16 +234,34 @@ export async function markThreadRead(thread: string): Promise<void> {
  *  handler's id-dedup makes the echo harmless when it does arrive. */
 export async function postToAssistantFeed(
   body: string, sourcePostId?: string, thread = 'general', images?: string[],
+  /** The conversation to continue. Omit to START a fresh conversation (an
+   *  id is minted — the default for every door that opens a new exchange:
+   *  brief composers, Share to Claude, search escalations). Pass null
+   *  explicitly for a space build thread's continuous stream. */
+  convoId?: string | null,
 ): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
+  const convo = convoId === undefined ? crypto.randomUUID() : convoId;
   const { data, error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,
-    source_post_id: sourcePostId ?? null, thread,
+    source_post_id: sourcePostId ?? null, thread, convo_id: convo,
     attachments: images?.length ? images.map((url) => ({ type: 'photo', url })) : null,
-  }).select('id, author, body, source_post_id, thread, created_at, attachments').single();
+  }).select('id, author, body, source_post_id, thread, convo_id, created_at, attachments').single();
   if (error) throw error;
   return data as FeedPostRow;
+}
+
+/** The thread's read cursor, for the conversation list's unread pills —
+ *  a conversation is "unread" when it holds Claude entries newer than the
+ *  later of this and your own last message in it. */
+export async function loadThreadCursor(thread: string): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { data } = await supabase.from('assistant_thread_reads')
+    .select('read_at').eq('profile_id', user.id).eq('thread', thread).maybeSingle();
+  const row = data as { read_at: string } | null;
+  return row ? new Date(row.read_at).getTime() : 0;
 }
 
 /** What Claude is working from, when it works on your page — a receipt of its
