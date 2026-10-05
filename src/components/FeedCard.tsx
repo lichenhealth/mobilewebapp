@@ -234,8 +234,11 @@ export default function FeedCard({
           </button>
         ) : avatarEl}
         <div className="feed-card__head-text">
+          {/* No link-cue on a TITLE (founder 2026-10-05: "on most platforms
+              we assume that titles are clickable") — the cue stays for
+              inline text-that-navigates (handles, author names). */}
           {onOpen && !expanded ? (
-            <button className="feed-card__title feed-card__title--btn link-cue" onClick={onOpen}>{title}</button>
+            <button className="feed-card__title feed-card__title--btn" onClick={onOpen}>{title}</button>
           ) : (
             <h3 className="feed-card__title">{title}</h3>
           )}

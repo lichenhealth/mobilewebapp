@@ -26,6 +26,23 @@ export interface OfferingMeta {
   protectedNote?: string;
   /** Hero image for the course room and the shelf (founder 2026-07-28). */
   coverUrl?: string;
+  /** LIVE SESSIONS (founder 2026-10-05: "integrate calendar into the
+   *  duration section… put it on cal as cal invites if it's not self
+   *  paced"): real dates for a Live/Mixed offering. The course page shows
+   *  the schedule and each VIEWER adds sessions to their own calendar
+   *  deliberately (the care-plan Add-to-calendar shape — nothing lands on
+   *  anyone's calendar by itself). `time` is "HH:MM"; absent = all-day. */
+  sessions?: { date: string; time?: string; durationMin?: number; title?: string }[];
+  /** WHO IT'S FOR (founder 2026-10-05): a declared audience — all of
+   *  Lichen, the leader's web, one community/group, or named IDENTITIES
+   *  (stored as NAMES, the identity_tags doctrine) — beside the free-text
+   *  profile (forWhom). A declaration for the catalog and the course page,
+   *  not a lock: `is_public` stays the read gate. */
+  audience?: {
+    kind: 'lichen' | 'mycelium' | 'space' | 'identities';
+    spaceId?: string; spaceName?: string; spaceKind?: string;
+    identities?: string[];
+  };
   /** Protected teaching (founder 2026-08-05, the lineage-teacher promise):
    *  downloads off, recordings watermarked with each viewer's name, and the
    *  course never read by any assistant. Shown to students as a standing
