@@ -267,6 +267,44 @@ export default function CollectionPage() {
   const firstUnfinished = useMemo(() => posts.find((p) => !done.has(p.id)) ?? posts[0], [posts, done]);
   const pct = posts.length ? Math.round((done.size / posts.length) * 100) : 0;
 
+  // ── THE PLAYER (founder 2026-10-05, the courses-UI rebuild — what
+  // Teachable/Kajabi/Thinkific converge on): at desktop widths a structured
+  // offering reads curriculum-left / lesson-right, the open lesson in an
+  // embedded pane (?embed=1 — the proven page-beside-conversation idiom;
+  // App.tsx stands the chrome down), with "Complete and continue" as the
+  // one advance gesture. Phones keep the syllabus → full-page walk.
+  // The media query is WATCHED, never sampled once (ChatThread's rule).
+  const [wide, setWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1100px)');
+    const on = () => setWide(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const [sel, setSel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!structured || sel || posts.length === 0) return;
+    setSel((firstUnfinished ?? posts[0]).id);
+  }, [structured, sel, posts, firstUnfinished]);
+  const playerMode = structured && !managing && wide && posts.length > 0;
+  const selPost = playerMode ? posts.find((p) => p.id === sel) ?? null : null;
+  const embedPath = (p: FeedPost) => {
+    const base = postOpenPath(p);
+    return base + (base.includes('?') ? '&' : '?') + 'embed=1';
+  };
+  // Another unfinished lesson besides the one on screen — forward first,
+  // then wrapping back to anything skipped.
+  const nextUnfinished = selPost
+    ? posts.slice(posts.indexOf(selPost) + 1).find((p) => !done.has(p.id))
+      ?? posts.find((p) => !done.has(p.id) && p.id !== selPost.id)
+    : undefined;
+  function completeAndContinue() {
+    if (!selPost) return;
+    if (!done.has(selPost.id)) toggleLesson(selPost.id);
+    if (nextUnfinished) setSel(nextUnfinished.id);
+  }
+
   async function act(fn: () => Promise<void>) {
     setBusy(true); setError('');
     try { await fn(); } catch (e) { setError((e as Error)?.message || 'Something went wrong.'); }
@@ -285,6 +323,8 @@ export default function CollectionPage() {
   async function startOrContinue() {
     if (!firstUnfinished) return;
     if (!enrolled) { await enroll(id); setEnrolled(true); }
+    // In the player the next lesson opens in the pane right here.
+    if (playerMode) { setSel(firstUnfinished.id); return; }
     navigate(postOpenPath(firstUnfinished));
   }
 
@@ -421,7 +461,9 @@ export default function CollectionPage() {
   return (
     <>
     {!me && <SiteHeader />}
-    <div className="colp">
+    {/* colp--player widens the 720px column so the lesson pane gets real
+        room (the .prof is-space precedent — a modifier, never the base). */}
+    <div className={'colp' + (playerMode ? ' colp--player' : '')}>
       {backChip}
       {/* ONE TOP ROW (founder 2026-08-15): the view toggle sits where Profile
           and a space put theirs — top left, in BOTH views, so Admin is a
@@ -444,7 +486,14 @@ export default function CollectionPage() {
           {structured && !managing && me && posts.length > 0 && (
             <div className="colp__learn">
               {enrolled && (
-                <span className="colp__progress-label">{done.size}/{posts.length}</span>
+                /* The Kajabi-style progress block, in miniature: a real bar,
+                   not just the count (founder 2026-10-05, the courses-UI
+                   rebuild). */
+                <span className="colp__progress colp__progress--head" role="img"
+                  aria-label={`${done.size} of ${posts.length} complete`}>
+                  <span className="colp__progress-bar"><span style={{ width: `${pct}%` }} /></span>
+                  <span className="colp__progress-label">{done.size}/{posts.length}</span>
+                </span>
               )}
               <button className="btn btn-primary colp__start" onClick={() => void act(startOrContinue)} disabled={busy}>
                 {!enrolled ? (meta.kind === 'course' ? 'Start course' : 'Start') : pct === 100 ? 'Revisit' : 'Continue'}
@@ -1020,13 +1069,15 @@ export default function CollectionPage() {
         </section>
       )}
 
-      <section className="colp__list">
+      <section className={'colp__list' + (playerMode ? ' colp__list--player' : '')}>
         {posts.length === 0 && (
           <p className="colp__muted">
             {structured ? `No ${itemWord(meta.kind)}s yet` : 'Nothing here yet'}
             {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}
           </p>
         )}
+        {/* display: contents outside the player, the left column inside it. */}
+        <div className="colp__curriculum">
         {/* SYLLABUS (founder 2026-08-15): a course reads as a path you walk,
             not a stack of cards — modules in order, each lesson a row you
             check off, the next one marked so the platform is always pointing
@@ -1053,7 +1104,8 @@ export default function CollectionPage() {
                   const isNext = !isDone && firstUnfinished?.id === p.id;
                   return (
                     <li key={p.id}
-                      className={'colp__sylrow' + (isDone ? ' is-done' : '') + (isNext ? ' is-next' : '')}>
+                      className={'colp__sylrow' + (isDone ? ' is-done' : '') + (isNext ? ' is-next' : '')
+                        + (playerMode && sel === p.id ? ' is-sel' : '')}>
                       {me && !managing ? (
                         <button className="colp__tick" onClick={() => toggleLesson(p.id)}
                           aria-pressed={isDone} aria-label={isDone ? 'Mark not done' : 'Mark done'}>
@@ -1067,7 +1119,10 @@ export default function CollectionPage() {
                       {/* The way IN sits left with the tick (founder
                           2026-08-15), which frees the right of the row for
                           your own notes on this piece. */}
-                      <button className="colp__sylopen" onClick={() => navigate(postOpenPath(p))}>
+                      {/* In the player a row opens its lesson in the pane
+                          beside the curriculum; phones walk to the page. */}
+                      <button className="colp__sylopen"
+                        onClick={() => (playerMode ? setSel(p.id) : navigate(postOpenPath(p)))}>
                         <Icon name="chevron-right" size={13} />
                         <span className="colp__syl-n">{gi + 1}</span>
                         <span className="colp__syl-title">{p.title || p.body.slice(0, 72)}</span>
@@ -1172,6 +1227,32 @@ export default function CollectionPage() {
               onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
             />
         ))}
+        </div>
+        {/* THE LESSON PANE — the open lesson beside the curriculum. The key
+            remounts the frame per lesson; a src change alone would push the
+            iframe's navigation into this page's history stack. */}
+        {playerMode && selPost && (
+          <aside className="colp__pane">
+            <div className="colp__pane-head">
+              <span className="colp__pane-title">{selPost.title || selPost.body.slice(0, 72)}</span>
+              <button className="colp__pane-full" onClick={() => navigate(postOpenPath(selPost))}>
+                Full page ↗
+              </button>
+            </div>
+            <iframe key={selPost.id} className="colp__pane-frame"
+              title={selPost.title || 'Lesson'} src={embedPath(selPost)} />
+            {me && (
+              /* The one advance gesture the course platforms converge on. */
+              <button className="btn btn-primary colp__pane-next"
+                onClick={completeAndContinue}
+                disabled={done.has(selPost.id) && !nextUnfinished}>
+                {!done.has(selPost.id)
+                  ? (nextUnfinished ? 'Complete and continue' : 'Complete')
+                  : (nextUnfinished ? 'Continue' : 'Completed ✓')}
+              </button>
+            )}
+          </aside>
+        )}
       </section>
     </div>
     </>

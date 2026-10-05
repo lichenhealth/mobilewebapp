@@ -67,6 +67,7 @@ import Membership from './routes/Membership';
 import Compose from './routes/Compose';
 import SmartSearch from './routes/SmartSearch';
 import AreaFeed from './routes/AreaFeed';
+import Courses from './routes/Courses';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
@@ -418,11 +419,7 @@ export default function App() {
             ? <ComingSoon icon="graduation-cap" title="Courses." line="Trainings, workshops and apprenticeships are being tended before they open — taught by people your web can vouch for. Check back soon." />
             : <>
               <AdminGateNote />
-              <AreaFeed area="courses" icon="graduation-cap" crumb="Courses"
-                title="Lichen" italic="Courses."
-                sub="Trainings, workshops, apprenticeships — taught by people your web can vouch for."
-                addLabel="Teach" emptyHint="Be the first — tap Teach and offer a course or training."
-                mediaLenses structuredKind="course" browse />
+              <Courses />
             </>
           } />
           <Route path="/library"  element={!isAdmin

@@ -382,3 +382,57 @@
   font-size: 11px; color: var(--ink-soft); text-decoration: none;
 }
 .colp__note-drive:hover { color: var(--peach); }
+
+/* ── THE PLAYER (2026-10-05, the courses-UI rebuild) ──────────────────────
+   At ≥1100px a structured offering reads curriculum-left / lesson-right
+   (the Teachable/Kajabi shape, in Lichen's grammar): the syllabus column
+   keeps every affordance it already had, the open lesson renders beside it
+   in an ?embed=1 frame, and "Complete and continue" advances. Below 1100px
+   nothing here applies — the wrapper is display: contents, so the phone
+   layout is byte-for-byte what it was. */
+.colp__curriculum { display: contents; }
+.colp__progress--head { flex: 0 1 auto; min-width: 0; }
+.colp__progress--head .colp__progress-bar { width: 88px; flex: none; height: 5px; }
+
+@media (min-width: 1100px) {
+  /* The 720px reading column is right for a syllabus alone; beside a
+     lesson pane it starves the lesson. Player mode opens the column up. */
+  .colp--player { max-width: 1160px; }
+  .colp__list--player {
+    display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    gap: var(--s-5); align-items: start;
+  }
+  .colp__list--player .colp__curriculum {
+    display: flex; flex-direction: column; gap: var(--s-6, 28px); min-width: 0;
+  }
+  .colp__list--player .colp__sylrow.is-sel {
+    background: var(--peach-tint, var(--bone-warm)); border-radius: var(--r-md);
+  }
+  .colp__pane {
+    position: sticky; top: calc(var(--top-h) + var(--s-4));
+    display: flex; flex-direction: column; gap: var(--s-3);
+    background: var(--card, #fff); border: 1px solid var(--bone-edge);
+    border-radius: 14px; padding: var(--s-3);
+    height: calc(100vh - var(--top-h) - var(--s-7));
+    min-height: 480px;
+  }
+  .colp__pane-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--s-3);
+  }
+  .colp__pane-title {
+    font-weight: 600; font-size: 15px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .colp__pane-full {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-muted); flex-shrink: 0;
+  }
+  .colp__pane-full:hover { color: var(--ink); }
+  .colp__pane-frame {
+    flex: 1; min-height: 0; width: 100%; display: block;
+    border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff;
+  }
+  .colp__pane-next { align-self: flex-end; }
+}

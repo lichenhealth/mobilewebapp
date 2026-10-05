@@ -175,6 +175,32 @@ export async function loadProgress(collectionId: string): Promise<{ enrolled: bo
   return { enrolled: !!enr.data, done };
 }
 
+/** The learner's own shelf for the Courses catalog (2026-10-05, the
+ *  Canvas-dashboard piece of the courses rebuild): every course/path I'm
+ *  enrolled in, with how far along I am — one batched read per table,
+ *  never a query per course. */
+export interface EnrolledCourse { meta: CollectionRow; total: number; done: number }
+export async function listMyEnrolledCourses(): Promise<EnrolledCourse[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: enr } = await supabase.from('collection_enrollments')
+    .select('collection_id').eq('profile_id', user.id);
+  const ids = ((enr as { collection_id: string }[] | null) ?? []).map((r) => r.collection_id);
+  if (!ids.length) return [];
+  const [rows, prog] = await Promise.all([
+    queryCollections((select) =>
+      supabase.from('collections').select(select).in('id', ids).in('kind', ['course', 'path'])),
+    supabase.from('collection_progress').select('collection_id')
+      .eq('profile_id', user.id).in('collection_id', ids),
+  ]);
+  const doneBy = new Map<string, number>();
+  (((prog.data as { collection_id: string }[] | null) ?? [])).forEach((r) =>
+    doneBy.set(r.collection_id, (doneBy.get(r.collection_id) ?? 0) + 1));
+  return rows.map(shape).map((meta) => ({
+    meta, total: meta.item_count, done: Math.min(doneBy.get(meta.id) ?? 0, meta.item_count),
+  }));
+}
+
 /** Start a course/path (idempotent). */
 export async function enroll(collectionId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
