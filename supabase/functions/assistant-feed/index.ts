@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
   const ident = Array.isArray(idents) ? idents[0] : null;
   if (!ident) return json({ ok: true, skipped: 'no-identity' });
 
-  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread,attachments`)).json();
+  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread,convo_id,attachments`)).json();
   const trigger = Array.isArray(posts) ? posts[0] : null;
   // Pasted photos (founder 2026-08-22) — a photo with no words is still a
   // real message ("what do you think of this one?" is often implied).
@@ -442,7 +442,7 @@ Deno.serve(async (req) => {
     const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${trigger.thread ?? 'general'}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
     if (Array.isArray(last) && last[0]?.body === note) return json({ ok: true, skipped: 'consent-off' });
     await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-      profile_id, author: 'claude', thread: trigger.thread ?? 'general', body: note,
+      profile_id, author: 'claude', thread: trigger.thread ?? 'general', convo_id: trigger.convo_id ?? null, body: note,
     }) });
     return json({ ok: true, skipped: 'consent-off' });
   }
@@ -453,7 +453,7 @@ Deno.serve(async (req) => {
   const used = Number(capRes.headers.get('content-range')?.split('/')[1] ?? '0');
   if (used >= DAILY_CAP) {
     await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-      profile_id, author: 'claude', thread: trigger.thread ?? 'general',
+      profile_id, author: 'claude', thread: trigger.thread ?? 'general', convo_id: trigger.convo_id ?? null,
       body: 'I’ve reached today’s limit with you — a small guardrail while the mycelium is young. Let’s pick this up tomorrow. 🌱',
     }) });
     return json({ ok: true, skipped: 'cap' });
@@ -473,7 +473,15 @@ Deno.serve(async (req) => {
   // into a care conversation. General is the exception: it's the thread for
   // whatever isn't one subject, so it gets a short glance at the others.
   const thread = trigger.thread ?? 'general';
-  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}&select=id,author,body,source_post_id,attachments&order=created_at.desc&limit=20`)).json();
+  // CONVERSATIONS (founder 2026-10-05, the email grammar): a personal
+  // thread is a list of conversations now, and the model reads THE ONE the
+  // member is in — so "change that" means what they're looking at, not
+  // whatever the thread's last 20 rows happened to be. A space build
+  // thread stays one continuous working session (convo null → thread
+  // scope), and the reply always lands back in the trigger's conversation.
+  const convoId = (!spaceId && typeof trigger.convo_id === 'string' && trigger.convo_id) || null;
+  const convoFilter = convoId ? `&convo_id=eq.${convoId}` : '';
+  const feed = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${thread}${convoFilter}&select=id,author,body,source_post_id,attachments&order=created_at.desc&limit=20`)).json();
   const rows = (Array.isArray(feed) ? feed : []).reverse()
     .filter((p: { body?: string; attachments?: unknown[] }) => p.body?.trim() || (Array.isArray(p.attachments) && p.attachments.length));
 
@@ -601,7 +609,7 @@ Deno.serve(async (req) => {
       const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${encodeURIComponent(thread)}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
       if (!(Array.isArray(last) && last[0]?.body === note)) {
         await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-          profile_id, author: 'claude', thread, body: note,
+          profile_id, author: 'claude', thread, convo_id: trigger.convo_id ?? null, body: note,
         }) });
       }
       return json({ ok: true, skipped: 'space-gone' });
@@ -615,7 +623,7 @@ Deno.serve(async (req) => {
       const last = await (await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&thread=eq.${encodeURIComponent(thread)}&author=eq.claude&select=body&order=created_at.desc&limit=1`)).json();
       if (!(Array.isArray(last) && last[0]?.body === note)) {
         await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-          profile_id, author: 'claude', thread, body: note,
+          profile_id, author: 'claude', thread, convo_id: trigger.convo_id ?? null, body: note,
         }) });
       }
       return json({ ok: true, skipped: 'space-ai-off' });
@@ -1743,7 +1751,7 @@ Deno.serve(async (req) => {
       rounds: round, input_tokens: inputTokens, output_tokens: outputTokens,
     }));
     await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-      profile_id, author: 'claude', thread,
+      profile_id, author: 'claude', thread, convo_id: trigger.convo_id ?? null,
       body: 'I hit a snag putting an answer together and lost it — that’s on my side, not yours. Say it once more and I’ll take another run at it.',
     }) });
     if (inputTokens || outputTokens) {
@@ -1760,7 +1768,7 @@ Deno.serve(async (req) => {
   // marker, the LAST tab touched — the smart Preview lands there.
   const lastEdit = pageEdits[pageEdits.length - 1];
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-    profile_id, author: 'claude', body: reply, thread,
+    profile_id, author: 'claude', body: reply, thread, convo_id: trigger.convo_id ?? null,
     ...(lastEdit ? {
       attachments: [{
         type: 'page_edit',

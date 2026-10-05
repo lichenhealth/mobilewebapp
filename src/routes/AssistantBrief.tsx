@@ -768,8 +768,12 @@ export default function AssistantBrief() {
    *  the reply. */
   async function sendToClaude(text: string) {
     if (!me) return;
-    await postToAssistantFeed(text, undefined, feedThread);
-    navigate(`/assistant/feed?thread=${feedThread}`);
+    // A brief's ask starts a FRESH conversation (the email grammar, founder
+    // 2026-10-05) — and lands you inside it, not on the thread's list. A
+    // space's build thread stays one continuous stream (convo null).
+    const row = await postToAssistantFeed(text, undefined, feedThread, undefined,
+      spaceParam ? null : undefined);
+    navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
 
   // The build door on the profile brief (founder 2026-08-17: Build with

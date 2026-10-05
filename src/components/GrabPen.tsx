@@ -94,9 +94,12 @@ export default function GrabPen({ thread, uploaderId }: {
       const blob: Blob = await new Promise((res, rej) =>
         cnv.toBlob((b) => (b ? res(b) : rej(new Error('no blob'))), 'image/png'));
       const url = await uploadPageImage(uploaderId, new File([blob], 'markup.png', { type: 'image/png' }));
+      // A space build thread is one continuous stream (convo null); a
+      // personal thread's grab starts its own conversation (the default).
       await postToAssistantFeed(
         note.trim() || 'A marked-up grab of the page — the pen shows what I mean.',
         undefined, thread, [url],
+        thread.startsWith('space:') ? null : undefined,
       );
       setSent(true);
     } catch {

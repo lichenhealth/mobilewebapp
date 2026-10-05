@@ -9,7 +9,7 @@ import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
-  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead,
+  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursor,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, loadSectionPresence,
   ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
@@ -18,6 +18,7 @@ import { possessive } from '../lib/names';
 import { readDraft, publishDraft } from '../lib/pageDrafts';
 import SnapshotPanel from '../components/SnapshotPanel';
 import BuildModeSplit from '../components/BuildModeSplit';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import './AssistantFeed.css';
 
@@ -50,6 +51,16 @@ export default function AssistantFeed() {
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
+  // CONVERSATIONS, THE EMAIL GRAMMAR (founder 2026-10-05: "it feels weird
+  // to be dropped midway between two chat bubbles… dropped at a
+  // chronological order (maybe most recent to oldest, like email) of only
+  // chats that pertain to Marketplace"). A personal thread is a LIST of
+  // conversations now, newest first; opening one shows just that exchange.
+  // ?convo= carries the open conversation ('new' = a fresh one, composer
+  // ready); no param + several conversations = the list. Space build
+  // threads deliberately keep the continuous working-session stream.
+  const convoParam = params.get('convo');
+  const personal = !spaceId;
   // BUILDER MODE (founder 2026-08-31, third pass: even with the page beside
   // the chat, the six personal thread icons and the generic Claude header
   // made this read as "the Lichen profile build"). Arriving through a page
@@ -165,43 +176,43 @@ export default function AssistantFeed() {
 
   const [posts, setPosts] = useState<FeedPostRow[]>([]);
   const [loading, setLoading] = useState(true);
-  // THE THREAD OPENS AT ITS NEWEST WORDS (founder 2026-09-09: "it doesn't
-  // take me to the latest chat, so I have to scroll down"). On open/thread
-  // switch: an instant snap to the foot (newest entry + composer both in
-  // view). On a new entry arriving: follow it — but only when the reader is
-  // already near the foot or the newest entry is their own send, so someone
-  // scrolled up reading history is never yanked.
+  // THE CONVERSATION OPENS AT ITS NEWEST WORDS (founder 2026-09-09; the
+  // effect itself lives below, after viewEntries exists). On open/switch:
+  // an instant snap to the foot. On a new entry arriving: follow it — but
+  // only when the reader is already near the foot or the newest entry is
+  // their own send, so someone scrolled up reading history is never
+  // yanked. The LIST never scrolls — newest sits at the top, email's way.
   const feedEndRef = useRef<HTMLDivElement | null>(null);
   const feedSeen = useRef(0);
-  useEffect(() => { feedSeen.current = 0; }, [thread]);
-  useEffect(() => {
-    if (loading || posts.length === 0) return;
-    const first = feedSeen.current === 0;
-    const grew = posts.length > feedSeen.current;
-    feedSeen.current = posts.length;
-    if (!first && !grew) return;
-    const end = feedEndRef.current;
-    if (!end) return;
-    const nearFoot = end.getBoundingClientRect().top - window.innerHeight < 600;
-    const lastIsMine = posts[posts.length - 1]?.author === 'member';
-    if (first) end.scrollIntoView({ block: 'end' });
-    else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
-  }, [loading, posts, thread]);
   const [sourcePosts, setSourcePosts] = useState<Map<string, FeedPost>>(new Map());
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
   const [avatars, setAvatars] = useState<{ me?: string | null; claude?: string | null }>({});
+  // The thread's read cursor as of load — the conversation list's pills
+  // measure against THIS, frozen, so opening one conversation doesn't
+  // silently clear the others' pills (the cursor itself still bumps).
+  const [cursorAt, setCursorAt] = useState(0);
+  const [seenConvos, setSeenConvos] = useState<Set<string>>(new Set());
+  // Auto-opens are STATE, not URL (no history step for a decision the
+  // member didn't make): one conversation → straight in; none → a fresh
+  // one; several → the list, which is the whole point.
+  const [autoConvo, setAutoConvo] = useState<string | null>(null);
+  useEffect(() => { setAutoConvo(null); setSeenConvos(new Set()); }, [thread]);
+  const openConvo = personal ? (convoParam ?? autoConvo) : null;
+  const openConvoRef = useRef<string | null>(null);
+  useEffect(() => { openConvoRef.current = openConvo; }, [openConvo]);
 
   const load = async () => {
     if (!me) return;
     const rows = await loadAssistantFeed(me, thread);
     setPosts(rows);
+    if (personal) setCursorAt(await loadThreadCursor(thread).catch(() => 0));
     setLoading(false);
-    // Opening a thread IS seeing it: bump its read cursor, then compute the
-    // rail's badges — which now mean "replies you haven't been back for",
-    // never a lifetime tally (founder 2026-10-05: the old counts read as
-    // stale notifications that opened onto old history).
-    await markThreadRead(thread).catch(() => {});
+    // A personal thread's cursor bumps when a CONVERSATION opens (the
+    // effect below) — arriving on the list leaves the pills telling the
+    // truth. A space build thread is one continuous exchange, so opening
+    // it still counts as seeing it.
+    if (!personal) await markThreadRead(thread).catch(() => {});
     void loadThreadBadges(me).then(setCounts);
     const sourceIds = [...new Set(rows.map((r) => r.source_post_id).filter((id): id is string => !!id))];
     if (sourceIds.length) {
@@ -211,14 +222,92 @@ export default function AssistantFeed() {
   };
   useEffect(() => { setLoading(true); void load(); }, [me, thread]);
 
+  // CONVERSATIONS, derived (personal threads): group by convo_id, newest
+  // activity first. Entries from an old client with no convo land in one
+  // 'loose' bucket rather than vanishing.
+  const convos = useMemo(() => {
+    if (!personal) return [];
+    const by = new Map<string, FeedPostRow[]>();
+    posts.forEach((p) => {
+      const k = p.convo_id ?? 'loose';
+      const arr = by.get(k);
+      if (arr) arr.push(p); else by.set(k, [p]);
+    });
+    return [...by.entries()].map(([id, entries]) => {
+      const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
+      const title = (firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
+        || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post');
+      return { id, entries, title, last: entries[entries.length - 1] };
+    }).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
+  }, [personal, posts]);
+
+  // Opened or arrived: pick the right first view once the rows are in.
+  // A door's errand (?ask= prefill, ?build=1) opens a conversation ONCE —
+  // consumed, so "← All conversations" afterwards really shows the list.
+  const doorUsed = useRef('');
+  useEffect(() => {
+    if (!personal || loading || convoParam || autoConvo) return;
+    if ((params.get('ask') || params.get('build') === '1') && doorUsed.current !== thread) {
+      doorUsed.current = thread;
+      setAutoConvo(params.get('ask') ? 'new' : (convos[0]?.id ?? 'new'));
+      return;
+    }
+    if (convos.length === 0) setAutoConvo('new');
+    else if (convos.length === 1) setAutoConvo(convos[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personal, loading, convoParam, autoConvo, convos.length, thread]);
+
+  // Opening a conversation IS seeing it: bump the thread cursor, refresh
+  // the rail badges, and remember this one as seen so its own pill drops
+  // while the frozen cursorAt keeps the other pills honest.
+  useEffect(() => {
+    if (!personal || loading || !openConvo || openConvo === 'new' || !me) return;
+    setSeenConvos((cur) => (cur.has(openConvo) ? cur : new Set(cur).add(openConvo)));
+    void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personal, loading, openConvo, me, thread]);
+
+  const listMode = personal && !openConvo && !loading;
+  const viewEntries = useMemo(() => {
+    if (!personal) return posts;
+    if (!openConvo) return [];
+    if (openConvo === 'new') return [];
+    return posts.filter((p) => (p.convo_id ?? 'loose') === openConvo);
+  }, [personal, posts, openConvo]);
+  const convoUnread = (c: { id: string; entries: FeedPostRow[] }): number => {
+    if (seenConvos.has(c.id)) return 0;
+    const lastMine = Math.max(0, ...c.entries.filter((e) => e.author === 'member').map((e) => +new Date(e.created_at)));
+    const floor = cursorAt > 0
+      ? Math.max(cursorAt, lastMine)
+      : Math.max(lastMine, Date.now() - 7 * 86_400_000);
+    return c.entries.filter((e) => e.author === 'claude' && +new Date(e.created_at) > floor).length;
+  };
+
+  useEffect(() => { feedSeen.current = 0; }, [thread, openConvo]);
+  useEffect(() => {
+    if (loading || listMode || viewEntries.length === 0) return;
+    const first = feedSeen.current === 0;
+    const grew = viewEntries.length > feedSeen.current;
+    feedSeen.current = viewEntries.length;
+    if (!first && !grew) return;
+    const end = feedEndRef.current;
+    if (!end) return;
+    const nearFoot = end.getBoundingClientRect().top - window.innerHeight < 600;
+    const lastIsMine = viewEntries[viewEntries.length - 1]?.author === 'member';
+    if (first) end.scrollIntoView({ block: 'end' });
+    else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [loading, listMode, viewEntries, thread, openConvo]);
+
   // THE DRAFT'S STATE, FOR THE BUTTONS (founder 2026-08-31): a Claude reply
   // that edited a page carries a page_edit marker, and the newest such reply
   // wears Preview + Publish. Whether a draft still EXISTS decides which —
   // published (or discarded) elsewhere, the buttons say "see it live"
   // instead of offering to publish nothing.
   const lastPageEdit = (() => {
-    for (let i = posts.length - 1; i >= 0; i--) {
-      const p = posts[i];
+    // Scans the entries ON SCREEN — in a conversation view, buttons never
+    // hang on a reply the member isn't looking at.
+    for (let i = viewEntries.length - 1; i >= 0; i--) {
+      const p = viewEntries[i];
       if (p.author !== 'claude') continue;
       const mark = (p.attachments ?? []).find((a) => a.type === 'page_edit');
       if (mark && mark.type === 'page_edit') return { postId: p.id, mark };
@@ -295,9 +384,15 @@ export default function AssistantFeed() {
             void loadThreadBadges(me).then(setCounts);
             return;
           }
-          // Landing in the thread that's on screen: you're seeing it, so the
-          // cursor follows and no badge ever claims it later.
-          void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
+          // Landing in the CONVERSATION on screen: you're seeing it, so the
+          // cursor follows and no badge ever claims it later. Landing in
+          // another conversation of this thread — list or elsewhere — the
+          // pill is exactly what should speak.
+          const seeing = !spaceId
+            ? openConvoRef.current !== null && openConvoRef.current === (row.convo_id ?? 'loose')
+            : true;
+          if (seeing) void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
+          else void loadThreadBadges(me).then(setCounts);
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
           // Claude has just spoken in a page-building thread (yours or a
           // space's) — reload the frame beside the conversation so you SEE
@@ -311,8 +406,15 @@ export default function AssistantFeed() {
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return needle ? posts.filter((p) => p.body.toLowerCase().includes(needle)) : posts;
-  }, [q, posts]);
+    return needle ? viewEntries.filter((p) => p.body.toLowerCase().includes(needle)) : viewEntries;
+  }, [q, viewEntries]);
+  // The list searches CONVERSATIONS — title or any words inside.
+  const visibleConvos = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return convos;
+    return convos.filter((c) => c.title.toLowerCase().includes(needle)
+      || c.entries.some((e) => e.body.toLowerCase().includes(needle)));
+  }, [q, convos]);
 
   // THE THINKING WHEEL (founder 2026-08-22: "is he still thinking or is
   // there a bug?"). Derived, not tracked: if the thread's newest entry is
@@ -323,7 +425,7 @@ export default function AssistantFeed() {
   const THINKING_MS = 90_000;          // replies land well inside this
   const STALE_NOTE_MS = 60 * 60_000;   // older than an hour is just history
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const lastPost = posts[posts.length - 1];
+  const lastPost = viewEntries[viewEntries.length - 1];
   const lastIsMine = !!lastPost && lastPost.author === 'member';
   const lastAge = lastIsMine ? nowTick - new Date(lastPost.created_at).getTime() : Infinity;
   const thinking = lastIsMine && lastAge < THINKING_MS;
@@ -332,7 +434,7 @@ export default function AssistantFeed() {
     if (!lastIsMine || lastAge >= STALE_NOTE_MS) return;
     const t = setInterval(() => setNowTick(Date.now()), 3000);
     return () => clearInterval(t);
-  }, [lastIsMine, lastAge >= STALE_NOTE_MS, posts.length]);
+  }, [lastIsMine, lastAge >= STALE_NOTE_MS, viewEntries.length]);
 
   async function send(text: string, images?: string[]) {
     // YOUR OWN MESSAGE NEVER RIDES THE WEBSOCKET (founder 2026-10-05: "I
@@ -341,8 +443,21 @@ export default function AssistantFeed() {
     // nothing). Append the stored row directly; the realtime handler's
     // id-dedup makes its later echo a no-op. Claude's reply still arrives
     // by realtime, with the honest reply-lost note as its backstop.
-    const row = await postToAssistantFeed(text, undefined, thread, images);
+    //
+    // CONVERSATIONS: continuing the open one carries its id; a fresh one
+    // ('new', or a legacy loose bucket) mints — and the URL then names the
+    // real conversation (replace, not push: becoming real isn't a step).
+    // Space build threads stay one continuous stream (convo null).
+    const continuing = personal && openConvo && openConvo !== 'new' && openConvo !== 'loose'
+      ? openConvo : undefined;
+    const row = await postToAssistantFeed(text, undefined, thread, images,
+      personal ? continuing : null);
     setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
+    if (personal && row.convo_id && convoParam !== row.convo_id) {
+      const next = new URLSearchParams(params);
+      next.set('convo', row.convo_id);
+      setParams(next, { replace: true });
+    }
   }
 
   return (
@@ -423,8 +538,14 @@ export default function AssistantFeed() {
           open" — with its message tally at the upper right, TopBar-badge
           style. A section with nothing in it yet reads GRAY until it's set
           up; General is always lit, it's the front door. */}
+      {/* The rail SAYS it scrolls now (founder 2026-10-05, circling the
+          eighth icon cut at the phone's edge: "have the same scroll prompt
+          as homepage, so people know to toggle") — ScrollHintRow in hide
+          mode, the icon-circle grammar: no half-cut icon, a chevron BUTTON
+          marking each direction that has more. ⚠ Run scripts/check-rows.mjs
+          after touching this row. */}
       {!builderMode && (
-      <div className="afeed__threads h-scroll">
+      <ScrollHintRow className="afeed__threads h-scroll" ariaLabel="Assistant threads">
         {ASSISTANT_THREADS.map((t) => {
           const off = setup ? !setup[t.id] : false;
           return (
@@ -441,6 +562,7 @@ export default function AssistantFeed() {
                 // returns to the thread you left, words intact.
                 const next = new URLSearchParams(params);
                 next.set('thread', t.id);
+                next.delete('convo');   // a fresh thread opens on ITS view
                 setParams(next);
               }}
             >
@@ -459,12 +581,13 @@ export default function AssistantFeed() {
             {/* Its thread is the one on screen — no badge on what you're reading. */}
           </button>
         )}
-      </div>
+      </ScrollHintRow>
       )}
 
       {/* Building your presence happens HERE, in the profile thread, rather
-          than off in a screen of its own (founder 2026-08-11). */}
-      {thread === 'profile' && (
+          than off in a screen of its own (founder 2026-08-11). The working
+          panels belong to a CONVERSATION — the list stays a clean list. */}
+      {thread === 'profile' && !listMode && (
         <>
           <div className="afeed__split">
             <button
@@ -648,11 +771,66 @@ export default function AssistantFeed() {
         </>
       )}
 
+      {/* THE LIST OF CONVERSATIONS (founder 2026-10-05: the email grammar —
+          "a chronological order, most recent to oldest, of only chats that
+          pertain to Marketplace"). Each row is one exchange, titled by its
+          own first words — the self-organizing part she liked, kept. */}
+      {listMode && (
+        <div className="afeed__convos">
+          <button className="afeed__convo-newbtn" onClick={() => {
+            const next = new URLSearchParams(params);
+            next.set('convo', 'new');
+            setParams(next);
+          }}>
+            ⊕ New conversation
+          </button>
+          {loading && <p className="afeed__muted">Loading…</p>}
+          {!loading && visibleConvos.length === 0 && q.trim() !== '' && (
+            <p className="afeed__muted">No conversations match &ldquo;{q}&rdquo;.</p>
+          )}
+          {visibleConvos.map((c) => {
+            const unread = convoUnread(c);
+            return (
+              <button className="afeed__convo" key={c.id} onClick={() => {
+                const next = new URLSearchParams(params);
+                next.set('convo', c.id);
+                setParams(next);
+              }}>
+                <div className="afeed__convo-main">
+                  <p className="afeed__convo-title">{c.title}</p>
+                  <p className="afeed__convo-snippet">
+                    {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
+                      + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
+                  </p>
+                </div>
+                <div className="afeed__convo-side">
+                  <span className="afeed__convo-when">{timeAgo(c.last.created_at)}</span>
+                  {unread > 0 && <em className="afeed__convo-pill">{unread}</em>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* The way back to the list — only when there IS a list behind you. */}
+      {!listMode && personal && openConvo && convos.length > 1 && (
+        <button className="afeed__convoback" onClick={() => {
+          const next = new URLSearchParams(params);
+          next.delete('convo');
+          setParams(next);
+          setAutoConvo(null);
+        }}>
+          ← All {threadLabel(thread)} conversations
+        </button>
+      )}
+
       {/* The conversation stays put while the page shows above it — that's
           the point: ask here, watch it change there. (This carried a `hidden`
           attribute that never did anything, since .afeed__list's own
           `display: flex` beats the UA stylesheet's [hidden]. Seeing both is
           what's wanted, so the intent is now stated rather than mis-stated.) */}
+      {!listMode && (
       <div className="afeed__list">
         {loading && <p className="afeed__muted">Loading…</p>}
         {/* The greeting knows the section (founder 2026-08-31): an empty
@@ -667,7 +845,10 @@ export default function AssistantFeed() {
               : 'Nothing here yet — say hello below, or share a post into this feed from anywhere on Lichen.';
           return <p className="afeed__muted">{line}</p>;
         })()}
-        {!loading && visible.length === 0 && posts.length > 0 && (
+        {!loading && openConvo === 'new' && posts.length > 0 && (
+          <p className="afeed__muted">A fresh conversation — say what&rsquo;s next.</p>
+        )}
+        {!loading && q.trim() !== '' && visible.length === 0 && viewEntries.length > 0 && (
           <p className="afeed__muted">No matches for &ldquo;{q}&rdquo;.</p>
         )}
         {visible.map((p) => {
@@ -811,12 +992,15 @@ export default function AssistantFeed() {
           <div className="afeed__arm">{armOffer}</div>
         )}
       </div>
+      )}
 
       {/* A door can arrive with its errand via ?ask= (the same prefill
           AssistantBrief carries): it lands unsent, so "write my home summary"
           can become "…and keep it under 100 words, mention the pasture"
           before it goes. Keyed so a new ?ask always lands even if the
-          composer is already mounted. */}
+          composer is already mounted. The list carries no composer — a new
+          exchange starts through its own ⊕ door, email's way. */}
+      {!listMode && !(personal && loading) && (
       <AssistantComposer
         key={params.get('ask') ?? 'blank'}
         onSend={send}
@@ -824,6 +1008,7 @@ export default function AssistantFeed() {
         placeholder="Say something…"
         uploaderId={me || undefined}
       />
+      )}
       <div ref={feedEndRef} aria-hidden="true" />
     </div>
   );
