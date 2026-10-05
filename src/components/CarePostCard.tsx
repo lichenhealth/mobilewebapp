@@ -141,9 +141,11 @@ export default function CarePostCard({
       <article className="cpost cpost--plan">
         <header className="cpost__planhead">
           <span className="cpost__plantit">
+            {/* Titles shed the cue (founder 2026-10-05) — a title is assumed
+                clickable; author names below keep theirs. */}
             {post.title?.trim() && (
               kindInfo ? (
-                <button className="cpost__ktitle link-cue" onClick={() => navigate(kindInfo.link.url)}>
+                <button className="cpost__ktitle" onClick={() => navigate(kindInfo.link.url)}>
                   {post.title}
                 </button>
               ) : (

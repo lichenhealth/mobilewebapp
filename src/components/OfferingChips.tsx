@@ -10,6 +10,16 @@ export default function OfferingChips({ meta, lessonCount, itemWord = 'lesson' }
   if (meta.length) chips.push({ key: 'length', label: meta.length });
   else if (lessonCount != null) chips.push({ key: 'length', label: `${lessonCount} ${itemWord}${lessonCount === 1 ? '' : 's'}` });
   if (meta.price) chips.push({ key: 'price', label: meta.price });
+  // The declared audience (founder 2026-10-05) leads; the free-text
+  // profile (forWhom) still shows beside it — different information.
+  if (meta.audience) {
+    const a = meta.audience;
+    const label = a.kind === 'lichen' ? 'For all of Lichen'
+      : a.kind === 'mycelium' ? 'For their My-celium'
+      : a.kind === 'space' ? (a.spaceName ? `For ${a.spaceName}` : '')
+      : a.identities?.length ? `For ${a.identities.join(', ')}` : '';
+    if (label) chips.push({ key: 'aud', label });
+  }
   if (meta.forWhom) chips.push({ key: 'for', label: `For ${meta.forWhom}` });
   if (chips.length === 0) return null;
   return (

@@ -19,8 +19,11 @@ import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
 import {
   myDutiesIn, holdsDuty, createSpaceWithLocation, loadSpaceChatId, loadSpaceMembers,
-  listCohorts, createCohort, type CohortRow,
+  listCohorts, createCohort, listMyMemberSpaces, type CohortRow, type MappableSpace,
 } from '../lib/spacesApi';
+import CategoryPicker, { type Category } from '../components/CategoryPicker';
+import { createReminder } from '../lib/remindersApi';
+import { supabase } from '../lib/supabase';
 import {
   loadCollection, updateCollection, deleteCollection, removeFromCollection, reorderItems,
   addToCollection, loadProgress, enroll, setLessonDone,
@@ -305,6 +308,90 @@ export default function CollectionPage() {
     if (nextUnfinished) setSel(nextUnfinished.id);
   }
 
+  // ── SESSIONS + AUDIENCE (founder 2026-10-05: "integrate calendar into the
+  // duration section… cal invites if it's not self paced. Then have an
+  // audience section… Lichen, Mycelium, Communities, Groups, or identities…
+  // a custom field… auto pull in identities as you type… recommend the
+  // person suggest new identities"). The identity vocabulary feeds the
+  // audience picker AND the typed-profile auto-pull; a member's spaces feed
+  // the community/group picker.
+  const [idCats, setIdCats] = useState<Category[]>([]);
+  useEffect(() => {
+    if (!managing || !structured) return;
+    let live = true;
+    void supabase.from('categories').select('*').eq('domain', 'identity').order('sort')
+      .then(({ data }) => { if (live) setIdCats((data as Category[] | null) ?? []); });
+    return () => { live = false; };
+  }, [managing, structured]);
+  const [mySpaces, setMySpaces] = useState<MappableSpace[]>([]);
+  useEffect(() => {
+    if (!managing || !structured || !me) return;
+    void listMyMemberSpaces(me).then(setMySpaces).catch(() => {});
+  }, [managing, structured, me]);
+  const aud = form.audience;
+  // The picker speaks category IDS; storage speaks NAMES (the identity_tags
+  // doctrine) — map at the boundary, both ways.
+  const audIdentityIds = useMemo(() => {
+    const names = new Set((aud?.identities ?? []).map((n) => n.toLowerCase()));
+    return idCats.filter((c) => names.has(c.name.toLowerCase())).map((c) => c.id);
+  }, [aud, idCats]);
+  const setAudienceIdentities = (ids: string[]) => {
+    const names = ids.map((id) => idCats.find((c) => c.id === id)?.name)
+      .filter((n): n is string => !!n);
+    setForm((f) => ({ ...f, audience: { kind: 'identities', identities: names } }));
+  };
+  // AUTO-PULL: identities the typed profile names, not yet attached —
+  // deterministic word-bounded matching (the smartSearch idiom, no AI call).
+  const detectedIdents = useMemo(() => {
+    const text = form.forWhom ?? '';
+    if (!text.trim() || idCats.length === 0) return [];
+    const have = new Set((form.audience?.identities ?? []).map((n) => n.toLowerCase()));
+    return idCats.filter((c) => {
+      if (have.has(c.name.toLowerCase())) return false;
+      const esc = c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${esc}s?\\b`, 'i').test(text);
+    }).slice(0, 4);
+  }, [form.forWhom, form.audience, idCats]);
+  const sessions = form.sessions ?? [];
+  const setSessions = (next: NonNullable<OfferingMeta['sessions']>) =>
+    setForm((f) => ({ ...f, sessions: next.length ? next : undefined }));
+  const durLabel = (m: number) => (m < 60 ? `${m} min` : m === 60 ? '1 hour' : m % 60 === 0 ? `${m / 60} hours` : `${m / 60} hours`);
+  // The viewer putting a session on THEIR calendar — the care-plan
+  // Add-to-calendar shape: a private reminder, one deliberate tap each.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [sessOnCal, setSessOnCal] = useState<Set<number>>(new Set());
+  const sessLabel = (s: NonNullable<OfferingMeta['sessions']>[number]) => {
+    const d = new Date(s.date + 'T12:00:00');
+    const day = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!s.time) return day;
+    const [h, m] = s.time.split(':').map(Number);
+    const t0 = new Date(d); t0.setHours(h, m, 0, 0);
+    let lbl = `${day} · ${t0.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    if (s.durationMin) {
+      const t1 = new Date(t0.getTime() + s.durationMin * 60000);
+      lbl += ` – ${t1.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    return lbl;
+  };
+  async function addSessionToCal(i: number) {
+    const s = (meta?.details.sessions ?? [])[i];
+    if (!me || !s || !meta) return;
+    const [h, mm] = (s.time ?? '0:0').split(':').map(Number);
+    try {
+      await createReminder(me, {
+        title: `${meta.name}${s.title ? ` — ${s.title}` : s.time ? '' : ' session'}`,
+        date: s.date, atMin: s.time ? h * 60 + mm : null, leadMin: 0, recurrence: null,
+      });
+      setSessOnCal((cur) => new Set(cur).add(i));
+    } catch (e) { console.error(e); }
+  }
+  async function addAllSessions() {
+    const list = meta?.details.sessions ?? [];
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].date >= todayIso && !sessOnCal.has(i)) await addSessionToCal(i);
+    }
+  }
+
   async function act(fn: () => Promise<void>) {
     setBusy(true); setError('');
     try { await fn(); } catch (e) { setError((e as Error)?.message || 'Something went wrong.'); }
@@ -542,6 +629,37 @@ export default function CollectionPage() {
             )}
           </div>
         )}
+        {/* THE SCHEDULE (founder 2026-10-05): a Live/Mixed offering's real
+            dates, each with its own Add-to-calendar — the care-plan shape:
+            the viewer's private reminder, one deliberate tap, never pushed. */}
+        {structured && !managing && (meta.details.sessions?.length ?? 0) > 0 && (
+          <div className="colp__sched">
+            <span className="colp__sched-h">
+              {meta.details.format === 'Mixed' ? 'Live sessions' : 'Sessions'}
+            </span>
+            {(meta.details.sessions ?? []).map((s, i) => {
+              const past = s.date < todayIso;
+              return (
+                <div key={i} className={'colp__sched-row' + (past ? ' is-past' : '')}>
+                  <span className="colp__sched-when">{sessLabel(s)}</span>
+                  {s.title && <span className="colp__sched-title">{s.title}</span>}
+                  {me && !past && (
+                    <button type="button" className="colp__sched-add" disabled={sessOnCal.has(i)}
+                      onClick={() => void addSessionToCal(i)}>
+                      {sessOnCal.has(i) ? 'On your calendar ✓' : 'Add to calendar ›'}
+                    </button>
+                  )}
+                  {past && <span className="colp__sched-past">past</span>}
+                </div>
+              );
+            })}
+            {me && (meta.details.sessions ?? []).filter((s) => s.date >= todayIso).length > 1 && (
+              <button type="button" className="colp__sched-all" onClick={() => void addAllSessions()}>
+                Add all to your calendar
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {error && <p className="colp__error">{error}</p>}
@@ -705,8 +823,122 @@ export default function CollectionPage() {
                 </div>
                 <input className="prof__input" value={form.length ?? ''} placeholder={`Length (e.g. 6 weeks, 4 ${itemWord(meta.kind)}s)`}
                   onChange={(e) => setForm((f) => ({ ...f, length: e.target.value || undefined }))} />
-                <input className="prof__input" value={form.forWhom ?? ''} placeholder="Who it's for (e.g. new practitioners)"
+                {/* THE CALENDAR LIVES IN THE DURATION SECTION (founder
+                    2026-10-05): a Live or Mixed offering carries real dates;
+                    self-paced needs none, so the block only shows then. */}
+                {form.format && form.format !== 'Self-paced' && (
+                  <>
+                    <span className="colp__meta-label">Sessions — on the calendar</span>
+                    {sessions.map((s, i) => (
+                      <div key={i} className="colp__sessrow">
+                        <input type="date" className="prof__input" value={s.date} aria-label="Session date"
+                          onChange={(e) => setSessions(sessions.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
+                        <input type="time" className="prof__input" value={s.time ?? ''} aria-label="Session time"
+                          onChange={(e) => setSessions(sessions.map((x, j) => (j === i ? { ...x, time: e.target.value || undefined } : x)))} />
+                        <select className="prof__input colp__sessdur" value={String(s.durationMin ?? 60)} aria-label="Session length"
+                          onChange={(e) => setSessions(sessions.map((x, j) => (j === i ? { ...x, durationMin: Number(e.target.value) } : x)))}>
+                          {[30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{durLabel(m)}</option>)}
+                        </select>
+                        <button type="button" className="colp__sessx" aria-label="Remove session"
+                          onClick={() => setSessions(sessions.filter((_, j) => j !== i))}>&times;</button>
+                      </div>
+                    ))}
+                    <button className="btn colp__btn" type="button"
+                      onClick={() => {
+                        // A new session lands a week after the last — the
+                        // weekly-course cadence, editable either way.
+                        const last = sessions[sessions.length - 1];
+                        const d = last ? new Date(last.date + 'T12:00:00') : new Date();
+                        if (last) d.setDate(d.getDate() + 7);
+                        setSessions([...sessions, {
+                          date: d.toISOString().slice(0, 10),
+                          time: last?.time, durationMin: last?.durationMin ?? 60,
+                        }]);
+                      }}>+ Add a session</button>
+                    <p className="colp__addhint">
+                      Live dates for this {kindWord(meta.kind).toLowerCase()}. They show on the page,
+                      where anyone can put them on their own Lichen calendar with a tap —
+                      invitations people accept, never pushed.
+                    </p>
+                  </>
+                )}
+                {/* THE AUDIENCE (founder 2026-10-05): Lichen · My-celium · a
+                    community · a group · identities — a declaration of who
+                    it's for, worn by the catalog card and the page.
+                    Publishing stays what controls who can open it. */}
+                <span className="colp__meta-label">Audience</span>
+                <div className="colp__chips">
+                  {([
+                    { k: 'lichen' as const, label: 'All of Lichen' },
+                    { k: 'mycelium' as const, label: 'My My-celium' },
+                    { k: 'community' as const, label: 'A community' },
+                    { k: 'group' as const, label: 'A group' },
+                    { k: 'identities' as const, label: 'Identities' },
+                  ]).map(({ k, label }) => {
+                    const on = k === 'community' || k === 'group'
+                      ? aud?.kind === 'space' && aud.spaceKind === k
+                      : aud?.kind === k;
+                    return (
+                      <button key={k} type="button" className={'colp__chip' + (on ? ' is-on' : '')}
+                        onClick={() => setForm((f) => {
+                          if (on) return { ...f, audience: undefined };
+                          if (k === 'lichen' || k === 'mycelium') return { ...f, audience: { kind: k } };
+                          if (k === 'identities') return { ...f, audience: { kind: 'identities', identities: f.audience?.identities ?? [] } };
+                          return { ...f, audience: { kind: 'space', spaceKind: k } };
+                        })}>{label}</button>
+                    );
+                  })}
+                </div>
+                {aud?.kind === 'space' && (
+                  <select className="prof__input" value={aud.spaceId ?? ''} aria-label="Which one"
+                    onChange={(e) => {
+                      const sp = mySpaces.find((s) => s.id === e.target.value);
+                      setForm((f) => ({ ...f, audience: sp
+                        ? { kind: 'space', spaceId: sp.id, spaceName: sp.name, spaceKind: sp.kind }
+                        : { kind: 'space', spaceKind: f.audience?.spaceKind } }));
+                    }}>
+                    <option value="">— pick a {aud.spaceKind ?? 'community or group'} you&rsquo;re in —</option>
+                    {mySpaces
+                      .filter((s) => (aud.spaceKind ? s.kind === aud.spaceKind : s.kind === 'community' || s.kind === 'group'))
+                      .map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                )}
+                {aud?.kind === 'identities' && (
+                  <>
+                    <CategoryPicker domain="identity" categories={idCats}
+                      selected={audIdentityIds} onChange={setAudienceIdentities}
+                      userId={me || undefined} />
+                    <p className="colp__addhint">
+                      Don&rsquo;t see theirs? Type it in the picker — you can suggest a new
+                      identity to Lichen right there, and the stewards decide.
+                    </p>
+                  </>
+                )}
+                <input className="prof__input" value={form.forWhom ?? ''}
+                  placeholder="Describe who it's for in your own words (e.g. new practitioners)"
                   onChange={(e) => setForm((f) => ({ ...f, forWhom: e.target.value || undefined }))} />
+                {/* AUTO-PULL (founder 2026-10-05): the typed profile names an
+                    identity Lichen already carries → one tap attaches it. */}
+                {detectedIdents.length > 0 && (!aud || aud.kind === 'identities') && (
+                  <div className="colp__chips colp__identoffer">
+                    {detectedIdents.map((c) => (
+                      <button key={c.id} type="button" className="colp__chip"
+                        onClick={() => setForm((f) => ({ ...f, audience: {
+                          kind: 'identities',
+                          identities: [...(f.audience?.identities ?? []), c.name],
+                        } }))}>
+                        + {c.name} — an identity on Lichen
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!!form.forWhom?.trim() && detectedIdents.length === 0 && aud?.kind !== 'identities' && (
+                  <p className="colp__addhint">
+                    Naming a kind of person Lichen doesn&rsquo;t carry as an identity yet?
+                    Pick <strong>Identities</strong> above and suggest it — new identities
+                    go to the stewards for a yes.
+                  </p>
+                )}
                 {meta.kind === 'course' && (
                   <>
                     <span className="colp__meta-label">Modules</span>
