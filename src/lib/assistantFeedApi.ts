@@ -147,16 +147,58 @@ export async function loadAssistantFeed(profileId: string, thread?: string): Pro
   return (data as FeedPostRow[] | null) ?? [];
 }
 
-/** Which threads this member has actually used — so the rail can lead with
- *  the live ones rather than showing six empty doors. */
-export async function loadThreadCounts(profileId: string): Promise<Record<string, number>> {
-  const { data } = await supabase
-    .from('assistant_feed_posts').select('thread').eq('profile_id', profileId);
-  const counts: Record<string, number> = {};
-  ((data as { thread: string }[] | null) ?? []).forEach((r) => {
-    counts[r.thread] = (counts[r.thread] ?? 0) + 1;
+/** UNSEEN REPLIES per thread (founder 2026-10-05: the rail's old tallies
+ *  were LIFETIME entry counts wearing the notification-badge grammar —
+ *  "old/stale notifications" that never cleared, promising news and opening
+ *  onto history). A badge now means exactly one thing: Claude said something
+ *  in that thread that you haven't been back for. Unseen = Claude entries
+ *  newer than the LATER of your read cursor and your own last message there
+ *  — the member-entry arm self-seeds threads from before the cursor table
+ *  existed, so nothing badges retroactively. Opening a thread clears it via
+ *  markThreadRead (the chat last_read_at pattern). */
+export async function loadThreadBadges(profileId: string): Promise<Record<string, number>> {
+  const [rowsRes, readsRes] = await Promise.all([
+    supabase.from('assistant_feed_posts')
+      .select('thread, author, created_at').eq('profile_id', profileId),
+    supabase.from('assistant_thread_reads')
+      .select('thread, read_at').eq('profile_id', profileId),
+  ]);
+  const reads = new Map(
+    (((readsRes.data as { thread: string; read_at: string }[] | null) ?? []))
+      .map((r) => [r.thread, new Date(r.read_at).getTime()]));
+  const rows = (rowsRes.data as { thread: string; author: string; created_at: string }[] | null) ?? [];
+  const lastMine = new Map<string, number>();
+  rows.forEach((r) => {
+    if (r.author !== 'member') return;
+    const t = new Date(r.created_at).getTime();
+    if (t > (lastMine.get(r.thread) ?? 0)) lastMine.set(r.thread, t);
   });
-  return counts;
+  // No cursor yet (history from before the table existed): only a RECENT
+  // unanswered reply counts as news — a weeks-old last word is history, and
+  // badging it would be the exact stale feeling this replaces. With a
+  // cursor, the count is exact and persists like a chat pill should.
+  const seededFloor = Date.now() - 7 * 86_400_000;
+  const badges: Record<string, number> = {};
+  rows.forEach((r) => {
+    if (r.author !== 'claude') return;
+    const cursor = reads.get(r.thread);
+    const seenUpTo = cursor !== undefined
+      ? Math.max(cursor, lastMine.get(r.thread) ?? 0)
+      : Math.max(lastMine.get(r.thread) ?? 0, seededFloor);
+    if (new Date(r.created_at).getTime() > seenUpTo) {
+      badges[r.thread] = (badges[r.thread] ?? 0) + 1;
+    }
+  });
+  return badges;
+}
+
+/** You've seen this thread up to now — opening it (and staying on it while
+ *  a reply lands) bumps the cursor so its badge never lies. */
+export async function markThreadRead(thread: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('assistant_thread_reads')
+    .upsert({ profile_id: user.id, thread, read_at: new Date().toISOString() });
 }
 
 /** Post into a thread of your own feed — the assistant_on_feed_post trigger

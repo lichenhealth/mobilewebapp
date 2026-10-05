@@ -9,8 +9,8 @@ import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
-  loadAssistantFeed, postToAssistantFeed, loadThreadCounts, loadProfileContext,
-  loadSpaceContext, spaceIdOfThread, loadSectionPresence,
+  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead,
+  loadProfileContext, loadSpaceContext, spaceIdOfThread, loadSectionPresence,
   ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
 import type { IconName } from '../components/Icon';
@@ -194,10 +194,15 @@ export default function AssistantFeed() {
 
   const load = async () => {
     if (!me) return;
-    void loadThreadCounts(me).then(setCounts);
     const rows = await loadAssistantFeed(me, thread);
     setPosts(rows);
     setLoading(false);
+    // Opening a thread IS seeing it: bump its read cursor, then compute the
+    // rail's badges — which now mean "replies you haven't been back for",
+    // never a lifetime tally (founder 2026-10-05: the old counts read as
+    // stale notifications that opened onto old history).
+    await markThreadRead(thread).catch(() => {});
+    void loadThreadBadges(me).then(setCounts);
     const sourceIds = [...new Set(rows.map((r) => r.source_post_id).filter((id): id is string => !!id))];
     if (sourceIds.length) {
       const sp = await loadPostsByIds(sourceIds);
@@ -284,8 +289,15 @@ export default function AssistantFeed() {
         { event: 'INSERT', schema: 'public', table: 'assistant_feed_posts', filter: `profile_id=eq.${me}` },
         (payload) => {
           const row = payload.new as FeedPostRow;
-          void loadThreadCounts(me).then(setCounts);
-          if ((row.thread ?? 'general') !== thread) return;   // another thread's business
+          if ((row.thread ?? 'general') !== thread) {
+            // Another thread's business — a fresh reply there is exactly
+            // what the rail's badge is FOR now.
+            void loadThreadBadges(me).then(setCounts);
+            return;
+          }
+          // Landing in the thread that's on screen: you're seeing it, so the
+          // cursor follows and no badge ever claims it later.
+          void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
           // Claude has just spoken in a page-building thread (yours or a
           // space's) — reload the frame beside the conversation so you SEE
@@ -417,13 +429,19 @@ export default function AssistantFeed() {
               title={`${t.label} — ${t.blurb}`}
               aria-label={t.label}
               onClick={() => {
+                // A PUSH, never a replace (founder 2026-10-05: replace
+                // destroyed the history entry holding the thread you were
+                // just conversing in, so Back landed before the assistant
+                // entirely and the conversation read as deleted). Back now
+                // returns to the thread you left, words intact.
                 const next = new URLSearchParams(params);
                 next.set('thread', t.id);
-                setParams(next, { replace: true });
+                setParams(next);
               }}
             >
               <Icon name={t.icon as IconName} size={20} />
-              {counts[t.id] ? <em>{counts[t.id]}</em> : null}
+              {/* No badge on the thread that's on screen — you're reading it. */}
+              {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
             </button>
           );
         })}
@@ -433,7 +451,7 @@ export default function AssistantFeed() {
         {spaceId && (
           <button className="afeed__thread afeed__thread--space is-on" title={`Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
             <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
-            {counts[thread] ? <em>{counts[thread]}</em> : null}
+            {/* Its thread is the one on screen — no badge on what you're reading. */}
           </button>
         )}
       </div>
