@@ -54,22 +54,11 @@ export function ScrollHintRow({ className, role, ariaLabel, gutter, fade, childr
     const overflowR = el.scrollWidth - el.scrollLeft - el.clientWidth > 8;
     const overflowL = el.scrollLeft > 8;
 
-    // The pinned chevron needs ~18px of clear floor — if the nearest whole
-    // icon crowds the edge, it steps aside too. (Fade mode: the gradient IS
-    // the clear floor, so nothing needs to step aside.)
-    const visible = () => kids.filter((k) => eligible(k) && k.style.visibility !== 'hidden'
-      && k.getBoundingClientRect().left >= rect.left - 1
-      && k.getBoundingClientRect().right <= rect.right + 1);
-    if (overflowR && !fade) {
-      const vis = visible();
-      const last = vis[vis.length - 1];
-      if (last && rect.right - last.getBoundingClientRect().right < 18) last.style.visibility = 'hidden';
-    }
-    if (overflowL && !fade) {
-      const vis = visible();
-      const first = vis[0];
-      if (first && first.getBoundingClientRect().left - rect.left < 18) first.style.visibility = 'hidden';
-    }
+    // The old "clear floor" rule — hiding the nearest WHOLE icon when it sat
+    // within 18px of the edge so the chevron had room — is RETIRED (founder
+    // 2026-10-05, circling the one-icon hole it left: "there's room for 1
+    // more icon"). A whole icon always shows; the chevron wears a narrow
+    // bone taper instead, so it stays legible if an icon edge comes close.
 
     // Vertical center: the icons' circle line (first hidden child if any,
     // else the first eligible child).
@@ -102,14 +91,25 @@ export function ScrollHintRow({ className, role, ariaLabel, gutter, fade, childr
     return () => { el.removeEventListener('scroll', update); ro.disconnect(); };
   }, []);
 
+  // THE ARROW IS A BUTTON NOW (founder 2026-10-05: with a mouse there was
+  // no way to move the row — "you should also be able to click the arrow to
+  // create movement"): a tap scrolls most of a row-width in that direction;
+  // the scroll listener re-runs update(), so hides and hints follow along.
+  const nudge = (dir: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(el.clientWidth - 72, 120), behavior: 'smooth' });
+  };
   const ghost = (h: HintBox, side: 'l' | 'r') => (
-    <span
+    <button
+      type="button"
       className={'scrollrow__hint scrollrow__hint--' + side + (fade ? ' scrollrow__hint--fade' : '')}
       style={{ top: h.top, height: h.size }}
-      aria-hidden="true"
+      aria-label={side === 'r' ? 'Scroll for more' : 'Scroll back'}
+      onClick={() => nudge(side === 'r' ? 1 : -1)}
     >
       <Icon name="chevron-right" size={16} />
-    </span>
+    </button>
   );
 
   return (

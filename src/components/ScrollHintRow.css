@@ -1,6 +1,9 @@
 /* ScrollHintRow — overflow prompt per the Figma icon-row: a bare peach
    chevron pinned at the CONTENT edge (the same line tab text aligns to),
-   never a circle, never a button. Cut icons hide until scrolled whole. */
+   never a circle. Cut icons hide until scrolled whole. Since 2026-10-05
+   (founder: "you should also be able to click the arrow to create
+   movement") the chevron IS a button — visually bare, but it scrolls the
+   row on tap, because a mouse has no other way to move it. */
 .scrollrow { position: relative; min-width: 0; --srow-gutter: 0px; }
 
 /* Side margins that HOLD: a row's own padding scrolls away with the
@@ -13,7 +16,19 @@
   display: inline-flex;
   align-items: center;
   color: var(--peach);
-  pointer-events: none;
+  /* A real button in bare clothes: tappable, never circled. */
+  background: none; border: 0; padding: 0; margin: 0;
+  cursor: pointer; min-width: 28px;
+}
+.scrollrow__hint:hover { color: var(--peach-deep); }
+/* Hide mode wears a NARROW bone taper so the chevron stays legible when a
+   whole icon ends near the edge (the 18px step-aside that used to hide
+   that icon is retired — founder 2026-10-05: "room for 1 more icon"). */
+.scrollrow__hint--r:not(.scrollrow__hint--fade) {
+  background: linear-gradient(to right, transparent, var(--bone) 45%);
+}
+.scrollrow__hint--l:not(.scrollrow__hint--fade) {
+  background: linear-gradient(to left, transparent, var(--bone) 45%);
 }
 .scrollrow__hint svg { width: 16px; height: 16px; }
 .scrollrow__hint--r { right: var(--srow-gutter); justify-content: flex-end; }
