@@ -162,3 +162,53 @@ writes appears in the manual editor's same Write fields (PageTabsEditor,
 which also gained a "Blank tab" option), and both render on the public
 page like any template tab. Verified round-trip: a hand-made tab
 rewritten by Claude by title, a Claude-made tab editable by hand.
+
+## Rung 2½ of the ladder: courses (2026-10-05)
+
+The same flag, the same doctrine, a third room — and the day the founder
+made the SHARED-STATE rule standing policy: "anything that is typed to
+the Ai assistant that creates action within a section … generate those
+actions taken in the manual build, as if they'd already been taken. Both
+systems need to speak to each other and work from a common draft."
+Courses was built to that rule from birth: in the member's COURSES
+thread (and only there), `assistant_can_edit` arms three tools in
+`assistant-feed` that write the SAME `collections` rows + `details`
+jsonb the Teach builder (Course Builder) edits — so "create Lichen 101,
+module 1 is X, module 2 is Y" said in conversation opens in the builder
+with those modules already loaded, and anything changed in the builder
+reads back with `my_courses`.
+
+- `my_courses` (read — always first): names, published state, the
+  offering meta, modules with lesson counts, sessions, audience.
+- `create_course`: name + optional description / level / format
+  (Live | Self-paced | Mixed) / length / price-words / for_whom /
+  module TITLES (each becomes a named empty group ready for lessons) /
+  sessions / audience. Always lands UNPUBLISHED — publishing is the
+  member's own act from the course page, and the model is told never to
+  claim a course is live. A duplicate name refuses toward update_course.
+- `update_course`: by the member's OWN course's exact name (the
+  update_booking_type pattern). Only passed fields change; `modules`
+  replaces the title list wholesale but a kept title KEEPS its lessons
+  (ids carried over case-insensitively), and a dropped module that held
+  lessons comes back as a note — the lessons fall to the ungrouped list,
+  never deleted. An empty `sessions` array clears the schedule.
+
+Boundaries: LESSONS (the actual content pieces) are never authored here
+— the builder and Compose own that, and the tools say so. An
+`identities` audience validates every name against the governed identity
+vocabulary and refuses unknowns toward the suggest-an-identity door; a
+community/group audience stays builder-only (it needs the
+exactly-one-match space-picking design). Publishing/unpublishing is not
+a tool. Non-admin members get the honest Coming-soon note — building now
+is getting ready for the room's opening.
+
+Verified end-to-end 2026-10-05 in the cloud harness (live edge
+function, real trigger): "Create a course called Harness Test 101.
+Module 1 is Alpha Weave, module 2 is Beta Weave. It is self-paced, for
+alpha testers" produced the `collections` row exactly as the builder
+writes it ({format: 'Self-paced', forWhom, modules as named empty
+groups}, unpublished), and a second ask replaced the module list — the
+reply correctly noted the dropped module held no lessons. The same ship
+fixed the vanished-message bug (see CLAUDE.md): the member's own send
+is appended from the insert's returned row, verified rendering with
+realtime entirely dead.

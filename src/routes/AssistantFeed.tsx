@@ -335,9 +335,14 @@ export default function AssistantFeed() {
   }, [lastIsMine, lastAge >= STALE_NOTE_MS, posts.length]);
 
   async function send(text: string, images?: string[]) {
-    // The realtime subscription above picks up both this insert and
-    // Claude's reply — no need to refetch.
-    await postToAssistantFeed(text, undefined, thread, images);
+    // YOUR OWN MESSAGE NEVER RIDES THE WEBSOCKET (founder 2026-10-05: "I
+    // just typed to you and it disappeared" — the insert succeeded, but the
+    // screen waited for the realtime echo, and a dropped socket showed
+    // nothing). Append the stored row directly; the realtime handler's
+    // id-dedup makes its later echo a no-op. Claude's reply still arrives
+    // by realtime, with the honest reply-lost note as its backstop.
+    const row = await postToAssistantFeed(text, undefined, thread, images);
+    setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
   }
 
   return (

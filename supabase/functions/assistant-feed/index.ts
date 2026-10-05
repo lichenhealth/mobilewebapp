@@ -295,6 +295,67 @@ const CALENDAR_TOOLS = [
   },
 ];
 
+// COURSE TOOLS (founder 2026-10-05: "I'm wanting the course builder to
+// interact intelligently with the Ai assistant, just like it does for
+// Calendar and Page builder" — and the standing rule declared the same day:
+// anything typed to the assistant that creates action within a section
+// lands in the SAME state the manual builder edits, as if taken there).
+// These write the very `collections` rows + `details` jsonb the Teach
+// builder (Course Builder, CollectionPage ?manage=1) reads — so "Lichen 101
+// with three modules" said here opens in the builder with those modules
+// already loaded. Same doctrine as every other toolset: armed only in the
+// COURSES thread, behind the member's hand-that-writes flag, every write
+// scoped to the sender, no tool takes a target, update matches the member's
+// OWN course by its exact name.
+const COURSE_TOOLS = [
+  {
+    name: 'my_courses',
+    description: 'Read their own courses — names, modules (with lesson counts), sessions, audience, published state. Always call this FIRST before creating or changing anything, and use it to confirm what you did.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'create_course',
+    description: 'Create a course for them. It lands UNPUBLISHED in their Course Builder (Courses → their course → Admin view) with everything you pass already loaded — modules included, as empty named groups they fill with lessons. Lessons themselves (the actual content pieces) are added from the builder or Compose, never here. Publishing is a deliberate act from the course page — never claim a course is public. format: Live, Self-paced, or Mixed; sessions only make sense for Live/Mixed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The course name.' },
+        description: { type: 'string', description: 'A paragraph on what the course is.' },
+        level: { type: 'string', description: 'Intro, Deepening, Advanced — or their own word.' },
+        format: { type: 'string', enum: ['Live', 'Self-paced', 'Mixed'] },
+        length: { type: 'string', description: 'In their words: "6 weeks", "4 lessons".' },
+        price: { type: 'string', description: 'Words, not billing: "Free", "$120", "sliding $40–120".' },
+        for_whom: { type: 'string', description: 'Who it is for, in their words ("alpha testers", "new practitioners").' },
+        modules: { type: 'array', items: { type: 'string' }, description: 'Module titles IN ORDER — each becomes a named group in the builder, ready for lessons.' },
+        sessions: { type: 'array', items: { type: 'object', properties: { date: { type: 'string', description: 'YYYY-MM-DD' }, time: { type: 'string', description: 'HH:MM, 24h. Omit for all-day.' }, duration_min: { type: 'number' }, title: { type: 'string' } }, required: ['date'] }, description: 'Scheduled sessions (Live/Mixed only) — shown on the course page where any viewer can add them to their own calendar.' },
+        audience: { type: 'object', properties: { kind: { type: 'string', enum: ['lichen', 'mycelium', 'identities'] }, identities: { type: 'array', items: { type: 'string' }, description: 'Identity NAMES from Lichen\'s vocabulary, when kind=identities.' } }, required: ['kind'], description: 'Who it is aimed at — a declaration shown on the card, not an access lock. A community/group audience is set in the builder (it needs picking the exact space).' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'update_course',
+    description: 'Change one of their own courses, named by its EXACT name from my_courses. Only the fields you pass change. modules REPLACES the module list wholesale — modules keeping the same title keep their lessons, a dropped module\'s lessons fall back to the ungrouped list (say so if that happens). An empty sessions array clears the schedule. Publishing/unpublishing stays on the course page, not here.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The exact current name from my_courses.' },
+        new_name: { type: 'string' },
+        description: { type: 'string', description: 'Empty string clears it.' },
+        level: { type: 'string' },
+        format: { type: 'string', enum: ['Live', 'Self-paced', 'Mixed'] },
+        length: { type: 'string' },
+        price: { type: 'string' },
+        for_whom: { type: 'string' },
+        modules: { type: 'array', items: { type: 'string' } },
+        sessions: { type: 'array', items: { type: 'object', properties: { date: { type: 'string' }, time: { type: 'string' }, duration_min: { type: 'number' }, title: { type: 'string' } }, required: ['date'] } },
+        audience: { type: 'object', properties: { kind: { type: 'string', enum: ['lichen', 'mycelium', 'identities'] }, identities: { type: 'array', items: { type: 'string' } } }, required: ['kind'] },
+      },
+      required: ['name'],
+    },
+  },
+];
+
 // SPACE PAGE TOOLS (rung 2, founder 2026-08-22) — the space-side twins of the
 // profile tools, armed only in a space's build thread (`space:<id>`), only
 // for a steward of that space, only while the space's own assistant switch is
@@ -605,16 +666,22 @@ Deno.serve(async (req) => {
   // quietly rewriting their page from the wrong room.
   let canEdit = false;
   let canCalendar = false;
+  let canCourses = false;
   let canSpaceEdit = false;
   let handThatWrites = false;
+  let isPlatformAdmin = false;
   {
-    const me = await (await sb(`profiles?id=eq.${profile_id}&select=assistant_can_edit`)).json();
+    const me = await (await sb(`profiles?id=eq.${profile_id}&select=assistant_can_edit,is_admin`)).json();
     const flag = !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
     handThatWrites = flag;
+    isPlatformAdmin = !!(Array.isArray(me) ? me[0]?.is_admin : false);
     canEdit = thread === 'profile' && flag;
     // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
     // hand-that-writes flag arms CALENDAR tools in the calendar thread.
     canCalendar = thread === 'calendar' && flag;
+    // COURSES (founder 2026-10-05): same flag, the courses thread — tools
+    // write the same collections rows the Teach builder edits.
+    canCourses = thread === 'courses' && flag;
     // Rung 2 (founder 2026-08-22): the same flag arms SPACE page tools in a
     // space's build thread — but only for a steward of the space, and only
     // while the space's own assistant switch is on (checked above; an off
@@ -729,6 +796,19 @@ Deno.serve(async (req) => {
   let actRule = '';
   if (canAct) {
     actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Anything bigger a hand could do (sending Current-cy, booking someone, joining anything) is not yours — say who or where does it.';
+  }
+
+  let coursesRule = '';
+  if (canCourses) {
+    coursesRule = '\n\nYOU CAN ACTUALLY CREATE AND CHANGE THEIR COURSES. They have turned on "Let Claude edit my page directly", which arms your course tools here. How to hold it:'
+      + '\n- Read my_courses FIRST, act, then report plainly what you made or changed.'
+      + '\n- YOUR TOOLS AND THE COURSE BUILDER ARE THE SAME COURSE, not two systems: everything you set here — name, modules, sessions, audience — is already loaded when they open the Course Builder, and everything they change there you read back with my_courses. Say so when they ask how the two relate.'
+      + '\n- When they describe a course in conversation ("Module 1 is X, module 2 is Y"), create it with those modules — that is exactly what the tool is for. Modules arrive as named, empty groups; the LESSONS (actual content) are added from the builder or Compose, and you say so.'
+      + '\n- A new course is UNPUBLISHED. Publishing is their own deliberate act from the course page — never claim a course is live or visible to others.'
+      + '\n- An identities audience takes names from Lichen\'s identity vocabulary; if a name is not in it, the tool refuses and they can suggest the identity (the Identities directory\'s Suggest button, or the builder\'s identity picker carries the same door).'
+      + (isPlatformAdmin
+        ? ''
+        : '\n- Honest note: the Courses room is being made better and is open soon — members see a "Coming soon" curtain there today. Building now means everything is ready the day it opens; say that plainly rather than walking them to the room.');
   }
 
   let calendarRule = '';
@@ -1286,6 +1366,187 @@ Deno.serve(async (req) => {
       return { ok: true, change: `${active ? 'switched on' : 'switched off'} the session "${title}"` };
     }
 
+    // ── Course tools (founder 2026-10-05) — sender-scoped, no targets.
+    // They write the SAME collections rows + details jsonb the Teach
+    // builder edits (the shared-state rule): a course described here opens
+    // in the builder with its modules already loaded.
+    const normCourseMeta = async (inp: Record<string, unknown>): Promise<{ out: Record<string, unknown>; errs: string[] }> => {
+      const out: Record<string, unknown> = {}; const errs: string[] = [];
+      if (inp.level !== undefined) out.level = String(inp.level).trim().slice(0, 40) || undefined;
+      if (inp.format !== undefined) {
+        const f = String(inp.format);
+        if (['Live', 'Self-paced', 'Mixed'].includes(f)) out.format = f;
+        else errs.push('format must be Live, Self-paced, or Mixed');
+      }
+      if (inp.length !== undefined) out.length = String(inp.length).trim().slice(0, 60) || undefined;
+      if (inp.price !== undefined) out.price = String(inp.price).trim().slice(0, 80) || undefined;
+      if (inp.for_whom !== undefined) out.forWhom = String(inp.for_whom).trim().slice(0, 160) || undefined;
+      if (inp.sessions !== undefined) {
+        const rows = (Array.isArray(inp.sessions) ? inp.sessions : []).slice(0, 52).map((s) => {
+          const r = s as Record<string, unknown>;
+          const date = String(r.date ?? '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errs.push(`a session date must be YYYY-MM-DD (got "${date}")`); return null; }
+          const time = String(r.time ?? '').trim();
+          if (time && !/^\d{2}:\d{2}$/.test(time)) { errs.push(`a session time must be HH:MM, 24h (got "${time}")`); return null; }
+          const dur = r.duration_min === undefined ? null : Number(r.duration_min);
+          if (dur !== null && !(dur >= 15 && dur <= 480)) { errs.push('a session duration_min must be 15–480'); return null; }
+          return {
+            date, ...(time ? { time } : {}), ...(dur !== null ? { durationMin: dur } : {}),
+            ...(String(r.title ?? '').trim() ? { title: String(r.title).trim().slice(0, 80) } : {}),
+          };
+        }).filter(Boolean);
+        out.sessions = rows.length ? rows : undefined;   // [] clears
+        (out as { _sessionsSet?: boolean })._sessionsSet = true;
+      }
+      if (inp.audience !== undefined) {
+        const a = inp.audience as Record<string, unknown> | null;
+        const kind = String(a?.kind ?? '');
+        if (!['lichen', 'mycelium', 'identities'].includes(kind)) {
+          errs.push('audience.kind must be lichen, mycelium, or identities (a community/group audience is picked in the builder)');
+        } else if (kind === 'identities') {
+          const names = [...new Set((Array.isArray(a?.identities) ? a!.identities : []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 8);
+          if (!names.length) { errs.push('an identities audience needs at least one identity name'); }
+          else {
+            // Names must exist in the governed identity vocabulary — an
+            // unknown one is an invitation to SUGGEST it, never to invent.
+            const vocab = await (await sb(`categories?domain=eq.identity&select=name`)).json();
+            const known = new Set(((Array.isArray(vocab) ? vocab : []) as { name: string }[]).map((c) => c.name.toLowerCase()));
+            const canonical = new Map(((Array.isArray(vocab) ? vocab : []) as { name: string }[]).map((c) => [c.name.toLowerCase(), c.name]));
+            const missing = names.filter((n) => !known.has(n.toLowerCase()));
+            if (missing.length) {
+              errs.push(`not in Lichen's identity vocabulary: ${missing.join(', ')} — they can suggest ${missing.length === 1 ? 'it' : 'these'} from the Identities directory, and use the audience once approved`);
+            } else {
+              out.audience = { kind: 'identities', identities: names.map((n) => canonical.get(n.toLowerCase())!) };
+            }
+          }
+        } else {
+          out.audience = { kind };
+        }
+      }
+      return { out, errs };
+    };
+    const courseByName = async (nameRaw: string): Promise<{ row?: { id: string; name: string; description: string | null; is_public: boolean; kind: string; details: Record<string, unknown> }; error?: string }> => {
+      const nm = nameRaw.trim();
+      if (!nm) return { error: 'Which course? Give its exact name from my_courses.' };
+      const rows = await (await sb(`collections?owner_id=eq.${profile_id}&kind=in.(course,path)&name=eq.${encodeURIComponent(nm)}&select=id,name,description,is_public,kind,details&limit=2`)).json();
+      if (!Array.isArray(rows) || rows.length === 0) return { error: `They have no course named "${nm}" — read my_courses and use the exact name.` };
+      if (rows.length > 1) return { error: `They have more than one course named "${nm}" — this needs the builder, where each is its own card.` };
+      return { row: rows[0] };
+    };
+
+    if (name === 'my_courses') {
+      const rows = await (await sb(`collections?owner_id=eq.${profile_id}&kind=in.(course,path)&select=id,name,kind,is_public,description,details&order=created_at`)).json();
+      const list = (Array.isArray(rows) ? rows : []) as { id: string; name: string; kind: string; is_public: boolean; description: string | null; details: Record<string, unknown> | null }[];
+      if (!list.length) return { ok: true, courses: 'none yet — they have not created a course or ordered collection' };
+      const counts = await (await sb(`collection_items?collection_id=in.(${list.map((c) => c.id).join(',')})&select=collection_id`)).json();
+      const lessonCount = new Map<string, number>();
+      for (const it of (Array.isArray(counts) ? counts : []) as { collection_id: string }[]) {
+        lessonCount.set(it.collection_id, (lessonCount.get(it.collection_id) ?? 0) + 1);
+      }
+      return {
+        ok: true,
+        courses: list.map((c) => {
+          const d = (c.details ?? {}) as { level?: string; format?: string; length?: string; price?: string; forWhom?: string; modules?: { title: string; ids?: string[] }[]; sessions?: { date: string; time?: string; title?: string }[]; audience?: { kind?: string; spaceName?: string; identities?: string[] } };
+          const mods = Array.isArray(d.modules) ? d.modules : [];
+          const sess = Array.isArray(d.sessions) ? d.sessions : [];
+          const aud = d.audience?.kind === 'identities' ? `for ${d.audience.identities?.join(', ')}`
+            : d.audience?.kind === 'space' ? `for ${d.audience.spaceName ?? 'one space'}`
+            : d.audience?.kind === 'mycelium' ? 'for their My-celium'
+            : d.audience?.kind === 'lichen' ? 'for all of Lichen' : '';
+          return `"${c.name}" (${c.kind === 'path' ? 'ordered collection' : 'course'}, ${c.is_public ? 'PUBLISHED' : 'unpublished'}`
+            + `${d.level ? `, ${d.level}` : ''}${d.format ? `, ${d.format}` : ''}${d.length ? `, ${d.length}` : ''}${d.price ? `, ${d.price}` : ''}`
+            + `${d.forWhom ? `, for: ${d.forWhom}` : ''}${aud ? `, ${aud}` : ''}`
+            + `; ${lessonCount.get(c.id) ?? 0} lesson${(lessonCount.get(c.id) ?? 0) === 1 ? '' : 's'}`
+            + `${mods.length ? `; modules: ${mods.map((m) => `${m.title} (${m.ids?.length ?? 0})`).join(' · ')}` : '; no modules yet'}`
+            + `${sess.length ? `; ${sess.length} session${sess.length === 1 ? '' : 's'} (first ${sess[0].date}${sess[0].time ? ' ' + sess[0].time : ''})` : ''})`;
+        }),
+      };
+    }
+
+    if (name === 'create_course') {
+      const nm = String(input.name ?? '').trim().slice(0, 80);
+      if (!nm) return { ok: false, error: 'A course needs a name.' };
+      const dup = await (await sb(`collections?owner_id=eq.${profile_id}&kind=in.(course,path)&name=eq.${encodeURIComponent(nm)}&select=id&limit=1`)).json();
+      if (Array.isArray(dup) && dup.length) return { ok: false, error: `They already have a course named "${nm}" — update_course changes it, or pick another name.` };
+      const { out: meta, errs } = await normCourseMeta(input);
+      if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
+      delete (meta as { _sessionsSet?: boolean })._sessionsSet;
+      const modules = [...new Set((Array.isArray(input.modules) ? input.modules : []).map((m) => String(m).trim().slice(0, 80)).filter(Boolean))]
+        .slice(0, 24).map((title) => ({ title, ids: [] as string[] }));
+      const details: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(meta)) if (v !== undefined) details[k] = v;
+      if (modules.length) details.modules = modules;
+      const r = await sb('collections', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          owner_id: profile_id, name: nm, kind: 'course', is_public: false,
+          ...(String(input.description ?? '').trim() ? { description: String(input.description).trim().slice(0, 2000) } : {}),
+          details,
+        }),
+      });
+      if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 140)}` };
+      const created = (await r.json())?.[0];
+      return {
+        ok: true, course_id: created?.id,
+        change: `created the course "${nm}"${modules.length ? ` with ${modules.length} module${modules.length === 1 ? '' : 's'} (${modules.map((m) => m.title).join(' · ')})` : ''} — unpublished, loaded and waiting in their Course Builder`,
+        note: 'Lessons are added from the builder or Compose; publishing is their own act from the course page.',
+      };
+    }
+
+    if (name === 'update_course') {
+      const found = await courseByName(String(input.name ?? ''));
+      if (!found.row) return { ok: false, error: found.error };
+      const course = found.row;
+      const { out: meta, errs } = await normCourseMeta(input);
+      if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
+      const sessionsSet = !!(meta as { _sessionsSet?: boolean })._sessionsSet;
+      delete (meta as { _sessionsSet?: boolean })._sessionsSet;
+      const details = { ...(course.details ?? {}) } as Record<string, unknown>;
+      const changed: string[] = [];
+      for (const [k, v] of Object.entries(meta)) {
+        if (k === 'sessions') continue;
+        if (v === undefined) continue;
+        details[k] = v; changed.push(k === 'forWhom' ? 'who it is for' : k);
+      }
+      if (sessionsSet) {
+        if (meta.sessions) { details.sessions = meta.sessions; changed.push('sessions'); }
+        else { delete details.sessions; changed.push('sessions cleared'); }
+      }
+      let moduleNote: string | undefined;
+      if (input.modules !== undefined) {
+        // Wholesale replacement of TITLES — but a kept title keeps its
+        // lessons (ids carried over, matched case-insensitively), so a
+        // rename-free reorder never orphans anyone's content.
+        const old = (Array.isArray(details.modules) ? details.modules : []) as { title: string; ids?: string[] }[];
+        const byTitle = new Map(old.map((m) => [m.title.toLowerCase(), m.ids ?? []]));
+        const titles = [...new Set((Array.isArray(input.modules) ? input.modules : []).map((m) => String(m).trim().slice(0, 80)).filter(Boolean))].slice(0, 24);
+        const next = titles.map((title) => ({ title, ids: byTitle.get(title.toLowerCase()) ?? [] }));
+        const dropped = old.filter((m) => !titles.some((t) => t.toLowerCase() === m.title.toLowerCase()) && (m.ids?.length ?? 0) > 0);
+        if (next.length) details.modules = next; else delete details.modules;
+        changed.push('modules');
+        if (dropped.length) moduleNote = `Dropped module${dropped.length === 1 ? '' : 's'} ${dropped.map((m) => `"${m.title}"`).join(', ')} held lessons — those lessons are now ungrouped in the builder, not deleted. Say so.`;
+      }
+      const patch: Record<string, unknown> = { details };
+      if (input.new_name !== undefined) {
+        const nn = String(input.new_name).trim().slice(0, 80);
+        if (nn) { patch.name = nn; changed.push('name'); }
+      }
+      if (input.description !== undefined) {
+        patch.description = String(input.description).trim().slice(0, 2000) || null;
+        changed.push('description');
+      }
+      if (!changed.length) return { ok: false, error: 'Nothing to change — pass at least one field.' };
+      const r = await sb(`collections?id=eq.${course.id}&owner_id=eq.${profile_id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+      });
+      if (!r.ok) return { ok: false, error: `The update failed: ${(await r.text()).slice(0, 140)}` };
+      return {
+        ok: true,
+        change: `updated the course "${course.name}": ${changed.join(', ')}`,
+        note: moduleNote,
+      };
+    }
+
     // ── The small hands (founder 2026-09-13) ─────────────────────────────
     if (name === 'save_post_to_drive') {
       // The only savable target is the post THE MEMBER shared into this
@@ -1406,13 +1667,13 @@ Deno.serve(async (req) => {
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar || canSpaceEdit || canAct) ? 1600 : 1200,
+        max_tokens: (canEdit || canCalendar || canCourses || canSpaceEdit || canAct) ? 1600 : 1200,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,
@@ -1424,7 +1685,7 @@ Deno.serve(async (req) => {
         ...{ tools: [READ_WEBSITE_TOOL, FILE_DEV_REPORT_TOOL,
                      ...((canEdit || canSpaceEdit) ? [SAVE_WEB_IMAGE_TOOL] : []),
                      ...(canAct ? ACT_TOOLS : []),
-                     ...(canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : [])],
+                     ...(canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : canCourses ? COURSE_TOOLS : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
     });

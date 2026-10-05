@@ -61,6 +61,16 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
     emptyAsk: 'No Events yet. Describe the Event(s) you want to create and I’ll generate them for you!',
     welcome: 'Welcome back to Events. Tell me about the next gathering and I’ll help you shape it.',
   },
+  // COURSES (founder 2026-10-05: "I'm wanting the course builder to interact
+  // intelligently with the Ai assistant, just like it does for Calendar and
+  // Page builder") — describe a course in conversation and it lands in the
+  // SAME collections row the Teach builder edits, modules pre-loaded.
+  {
+    id: 'courses', label: 'Courses', icon: 'graduation-cap',
+    blurb: 'Teaching: your courses, their modules and sessions.',
+    emptyAsk: 'No courses yet. Describe the course you want to teach — name, modules, who it’s for — and I’ll set it up so the Course Builder opens with it ready.',
+    welcome: 'Welcome back to Courses. Tell me what to change on a course — or describe a new one — and it lands in your Course Builder.',
+  },
   {
     id: 'calendar', label: 'Calendar', icon: 'calendar',
     blurb: 'Time, bookings, who can see what.',
@@ -94,7 +104,7 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
     const { count } = await q;
     return (count ?? 0) > 0;
   };
-  const [prof, market, events, avail, remind, care, ledger] = await Promise.all([
+  const [prof, market, events, avail, remind, care, ledger, teach] = await Promise.all([
     supabase.from('profiles').select('headline, bio, page').eq('id', me).maybeSingle(),
     any(supabase.from('posts').select('id', { count: 'exact', head: true })
       .eq('author_id', me).contains('service_areas', ['marketplace'])),
@@ -108,6 +118,8 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
       .or(`patient_id.eq.${me},caregiver_id.eq.${me}`)),
     any(supabase.from('ledger_entries').select('id', { count: 'exact', head: true })
       .or(`and(from_type.eq.profile,from_id.eq.${me}),and(to_type.eq.profile,to_id.eq.${me})`)),
+    any(supabase.from('collections').select('id', { count: 'exact', head: true })
+      .eq('owner_id', me).in('kind', ['course', 'path'])),
   ]);
   const p = (prof.data ?? null) as { headline: string | null; bio: string | null; page: Record<string, unknown> | null } | null;
   const pageBegun = !!(p && (p.headline || p.bio || (p.page && Object.keys(p.page).length > 0)));
@@ -120,6 +132,9 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
     concierge: care,
     // Lit once any Current has ever moved for them — a wallet with history.
     currentcy: ledger,
+    // Lit once they TEACH something — a course or ordered collection of
+    // their own (enrolling elsewhere is participation, not setup).
+    courses: teach,
   };
 }
 
@@ -204,18 +219,25 @@ export async function markThreadRead(thread: string): Promise<void> {
 /** Post into a thread of your own feed — the assistant_on_feed_post trigger
  *  answers in the same thread. `images` are already-uploaded URLs (pasted
  *  photos, founder 2026-08-22); they ride the existing attachments column
- *  in chat's {type:'photo', url} shape. */
+ *  in chat's {type:'photo', url} shape.
+ *
+ *  RETURNS THE INSERTED ROW (founder 2026-10-05: "I just typed to you and
+ *  it disappeared"): the feed used to rely on the realtime echo alone to
+ *  show your own message, so a dropped websocket made a safely-stored send
+ *  vanish from the screen. The caller appends this row itself; the realtime
+ *  handler's id-dedup makes the echo harmless when it does arrive. */
 export async function postToAssistantFeed(
   body: string, sourcePostId?: string, thread = 'general', images?: string[],
-): Promise<void> {
+): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
-  const { error } = await supabase.from('assistant_feed_posts').insert({
+  const { data, error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,
     source_post_id: sourcePostId ?? null, thread,
     attachments: images?.length ? images.map((url) => ({ type: 'photo', url })) : null,
-  });
+  }).select('id, author, body, source_post_id, thread, created_at, attachments').single();
   if (error) throw error;
+  return data as FeedPostRow;
 }
 
 /** What Claude is working from, when it works on your page — a receipt of its
