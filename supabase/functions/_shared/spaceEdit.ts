@@ -308,6 +308,20 @@ export const SPACE_PAGE_TOOLS = [
     },
   },
   {
+    name: 'set_space_page_published',
+    description:
+      'Switch the space\'s public page ON or OFF for the open web (founder 2026-10-06: "change anything '
+      + 'about the profile, e.g. private, public… simply by prompting"). published=false makes the page '
+      + 'private — guests and search engines get nothing at its address; inside Lichen nothing changes. '
+      + 'published=true puts the LIVE page back on the web at once (an unpublished draft stays a draft). '
+      + 'This is the same switch the builder\'s publish settings carry — say plainly which way you flipped it.',
+    input_schema: {
+      type: 'object',
+      properties: { published: { type: 'boolean' } },
+      required: ['published'],
+    },
+  },
+  {
     name: 'set_space_cover_style',
     description:
       "How the page's home cover is treated: \"photo\" shows the cover image, \"tint\" washes it in "
@@ -777,6 +791,30 @@ export async function runSpacePageTool(
     if (!touched) return { ok: false, error: 'Nothing to change — pass hide_from_search, show_feed, or both.' };
     await patchSpace({ page });
     return { ok: true, previous, change: `changed what ${spaceName}'s page shows the open web` };
+  }
+
+  // The public/private switch is a COLUMN, not page content — it writes
+  // live (the description pattern): flipping visibility is the act itself,
+  // there is no draft state for "the page answers to the web or it doesn't".
+  if (name === 'set_space_page_published') {
+    const published = input.published as unknown;
+    if (typeof published !== 'boolean') return { ok: false, error: 'Pass published: true or false.' };
+    const cur = await (await sb(`spaces?id=eq.${spaceId}&select=public_page`)).json();
+    const previous = !!(Array.isArray(cur) ? cur[0]?.public_page : false);
+    if (previous === published) {
+      return { ok: true, change: `confirmed ${spaceName}'s page was already ${published ? 'public' : 'private'} (no change needed)` };
+    }
+    const r = await sb(`spaces?id=eq.${spaceId}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ public_page: published }),
+    });
+    if (!r.ok) return { ok: false, error: `The switch did not take: ${(await r.text()).slice(0, 120)}` };
+    return {
+      ok: true, previous,
+      change: published
+        ? `made ${spaceName}'s public page LIVE to the open web`
+        : `took ${spaceName}'s public page PRIVATE — the open web gets nothing at its address now`,
+    };
   }
 
   if (name === 'set_space_cover_style') {

@@ -123,6 +123,16 @@ const EDIT_TOOLS = [
     },
   },
   {
+    name: 'set_page_published',
+    description:
+      'Switch their public page ON or OFF for the open web (founder 2026-10-06: "change anything about the profile, e.g. private, public… simply by prompting"). published=false makes it private — guests and search engines get nothing at their address; inside Lichen nothing changes. published=true puts the LIVE page back on the web at once (an unpublished draft stays a draft). Say plainly which way you flipped it, and that it is the same switch as the builder\'s publish checkbox.',
+    input_schema: {
+      type: 'object',
+      properties: { published: { type: 'boolean' } },
+      required: ['published'],
+    },
+  },
+  {
     name: 'add_categories',
     description: 'Add to what they offer, by category id from the list in your instructions. Adding a service category declares them a service provider, and a goods category a goods provider — that follows automatically, do not describe it as a separate step.',
     input_schema: {
@@ -977,6 +987,31 @@ Deno.serve(async (req) => {
         ok: true, previous,
         change: previous ? `rewrote their ${label}` : `wrote their ${label} (it was empty)`,
         note: previous ? 'Tell them what it said before, so they can ask for it back.' : undefined,
+      };
+    }
+
+    // The public/private switch is a COLUMN, not page content — a live
+    // write (the space twin's pattern): there is no draft state for "the
+    // page answers to the web or it doesn't".
+    if (name === 'set_page_published') {
+      const published = input.published as unknown;
+      if (typeof published !== 'boolean') return { ok: false, error: 'Pass published: true or false.' };
+      const cur = await (await sb(`profiles?id=eq.${profile_id}&select=public_page,handle`)).json();
+      const row = Array.isArray(cur) ? cur[0] : null;
+      const previous = !!row?.public_page;
+      if (previous === published) {
+        return { ok: true, change: `confirmed their page was already ${published ? 'public' : 'private'} (no change needed)` };
+      }
+      const r = await sb(`profiles?id=eq.${profile_id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ public_page: published }),
+      });
+      if (!r.ok) return { ok: false, error: `The switch did not take: ${(await r.text()).slice(0, 120)}` };
+      return {
+        ok: true, previous,
+        change: published
+          ? `made their public page LIVE to the open web${row?.handle ? ` at lichen.health/${row.handle}` : ''}`
+          : 'took their public page PRIVATE — the open web gets nothing at their address now',
       };
     }
 

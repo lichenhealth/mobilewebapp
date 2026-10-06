@@ -31,6 +31,7 @@ import {
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
 import { possessive } from '../lib/names';
+import AssistantDoor from '../components/AssistantDoor';
 import { loadPostsByIds, loadAuthorFeed, postAreas, spaceHasEvents, type FeedPost } from '../lib/postsApi';
 import {
   listSpaceResources, createResource, deleteResource, resourceBusy,
@@ -225,6 +226,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Public-page facts (founder 2026-07-28): a space's profile IS its website.
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(true);
+  // Whether THIS session's steward touched the publish switch — an
+  // untouched save leaves the column alone (the assistant can flip it by
+  // conversation now, founder 2026-10-06; stale form state must not clobber).
+  const publicPageTouched = useRef(false);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [handle, setHandle] = useState('');
   // Privacy toggles mirroring Profile's own (founder 2026-08-10 profile-
@@ -951,11 +956,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         }
       }
       // Public-page facts ride the same Save (harmless if the columns are new).
+      // ⚠ The publish SWITCH rides only when the steward touched it this
+      // session (founder 2026-10-06, with set_space_page_published): the
+      // assistant can flip public_page live by conversation now, and an
+      // untouched form's stale value must never silently flip it back.
       const { error: spaceErr } = await supabase.from('spaces')
         .update({
           handle: handle.trim() || null,
           contact: Object.keys(contact).length ? contact : null,
-          public_page: publicPage,
+          ...(publicPageTouched.current ? { public_page: publicPage } : {}),
           // Only ever WRITE a page, never null one out: this form didn't touch
           // `page` before today, and a mis-seeded save would wipe a built page
           // (Countryman Stables lives in this column).
@@ -1560,22 +1569,49 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       {noticeBanners}
 
       {adminTools && (<>
+        {/* THE BRAIN LIVES IN ADMIN TOO (founder 2026-10-06: "when I go to
+            my Ai assistant… you can go to the brain, so let's have the brain
+            here in admin, so you can change anything about the profile…
+            simply by prompting"). Same door the space's public face wears —
+            the briefing, whose composer lands in this space's build thread,
+            where the page/publish tools are armed. */}
         {!buildView && (
-          <div className="sprof__doors">
-            {/* ONE DOOR — the website workbench (founder 2026-09-07,
-                superseding the two-door design: the Lichen profile "builds
-                itself", so its identity fields live in the Profile drawer
-                below; only the public site still needs a full screen). */}
-            <button className="sprof__door" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
-              <strong>Public Profile Builder</strong>
-              <em>The website the open web sees — laid out as the page itself. Click anything to edit it.</em>
-              {/* The reassurance for stepping out mid-edit (founder
-                  2026-09-06): the draft is kept, and the door says so. */}
-              {draftPending && (
-                <em className="sprof__door-draft">Draft in progress — saved, but not live until you publish.</em>
-              )}
-            </button>
+          <div className="sprof__brainrow">
+            <AssistantDoor
+              section={ASSISTANT_SECTION[space.kind]}
+              scope={`space=${space.id}`}
+              size={38}
+              label={`Ask Claude to change any of this — ${possessive(space.name)} page, what's public, the words`}
+            />
+            <span className="sprof__brainrow-hint">
+              Or just ask — the brain changes any of this by conversation.
+            </span>
           </div>
+        )}
+        {/* THE BUILDER IS A DRAWER LIKE ALL THE OTHERS (founder 2026-10-06:
+            "public profile builder should be a drop down, just like all the
+            others" — one accordion, one grammar). Opening it holds the
+            description + draft state; the workbench itself stays the full
+            screen it deliberately is (asked and answered 2026-09-06). */}
+        {!buildView && (
+          <CollapsibleSection
+            id="publicbuilder" title="Public Profile Builder"
+            meta={draftPending ? 'draft in progress — not live yet' : 'the website the open web sees'}
+            open={openSections.has('publicbuilder')} onToggle={() => toggleSection('publicbuilder')}
+          >
+            <p className="prof__care-lead">
+              The website the open web sees — laid out as the page itself.
+              Click anything to edit it.
+            </p>
+            {/* The reassurance for stepping out mid-edit (founder
+                2026-09-06): the draft is kept, and the drawer says so. */}
+            {draftPending && (
+              <p className="sprof__door-draft">Draft in progress — saved, but not live until you publish.</p>
+            )}
+            <button className="btn btn-primary" onClick={() => setSearchParams({ manage: '1', build: 'public' })}>
+              Open the builder
+            </button>
+          </CollapsibleSection>
         )}
 
         {/* PROFILE IS A DRAWER, NOT A BUILDER (founder 2026-09-07: "the
@@ -1874,7 +1910,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               to be a tab that you select, not a default part of the page
               builder"). */}
           <label className="sprof__duty">
-            <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
+            <input type="checkbox" checked={publicPage} onChange={(e) => { publicPageTouched.current = true; setPublicPage(e.target.checked); }} />
             <span>
               Serve this page to the open web
               <em>Anyone can see the identity, story, contact and hours above — no account needed.
