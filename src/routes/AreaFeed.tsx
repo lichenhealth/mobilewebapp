@@ -47,7 +47,7 @@ const EMPTY_NOUN: Record<string, string> = {
   art: 'art', food: 'food', travel: 'trips',
 };
 
-export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, collections, structuredKind, browse, browseStyle = 'tiles' }: {
+export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLabel, emptyHint, mediaLenses, travelLenses, collections, structuredKind, browse, browseStyle = 'tiles' }: {
   area: ServiceArea;
   icon: IconName;
   crumb: string;
@@ -58,6 +58,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   emptyHint: string;
   /** Read/Look/Listen/Watch circles (Library, Courses) — derived per post. */
   mediaLenses?: boolean;
+  // Rides | Stays lenses for Travel (founder 2026-10-06) — same signal
+  // grammar as the media lenses; untagged posts show while both are on.
+  travelLenses?: boolean;
   /** Published collections strip (Library): playlists & anthologies. */
   collections?: boolean;
   /** Structured offerings shelf + create chooser: 'course' (Courses) or 'path' (Library). */
@@ -105,6 +108,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [showSearch, setShowSearch] = useState(false);
   // All lenses start ON (founder): everything shows; deselect to narrow.
   const [media, setMedia] = useState<PostMedium[]>(MEDIA_LENSES.map((m) => m.medium));
+  const [travelKinds, setTravelKinds] = useState<('ride' | 'stay')[]>(['ride', 'stay']);
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
@@ -179,6 +183,14 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const filtered = useMemo(() => {
     let list = posts;
     if (mediaLenses) list = list.filter((p) => media.includes(postMedium(p)));
+    if (travelLenses && travelKinds.length < 2) {
+      // One lens off = a real narrowing; a post that never declared a kind
+      // only shows while both are on (the whole-shelf view).
+      list = list.filter((p) => {
+        const k = (p.details as { travelKind?: unknown } | null)?.travelKind;
+        return (k === 'ride' || k === 'stay') && travelKinds.includes(k);
+      });
+    }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter((p) =>
@@ -188,10 +200,12 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         || (p.author_space?.name ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [posts, media, query]);
+  }, [posts, media, travelLenses, travelKinds, query]);
 
   const toggleMedium = (m: PostMedium) =>
     setMedia((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
+  const toggleTravelKind = (k: 'ride' | 'stay') =>
+    setTravelKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
 
   // One rule for every feed's chat door (founder 2026-08-17): a post in a
   // space's voice opens the conversation WITH that space, answered by the
@@ -294,6 +308,25 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
                 >
                   <Icon name={m.icon} size={16} />
                   {m.label}{on ? ' ✓' : ''}
+                </button>
+              );
+            })}
+          </>
+        )}
+        {travelLenses && (
+          <>
+            <div className="mkt__action-spacer" />
+            {([['ride', 'Rides', 'plane'], ['stay', 'Stays', 'home']] as const).map(([k, label, ic]) => {
+              const on = travelKinds.includes(k);
+              return (
+                <button
+                  key={k}
+                  className={'mkt__lens' + (on ? ' is-on' : '')}
+                  onClick={() => toggleTravelKind(k)}
+                  aria-pressed={on}
+                >
+                  <Icon name={ic} size={16} />
+                  {label}{on ? ' ✓' : ''}
                 </button>
               );
             })}
@@ -430,6 +463,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <p className="mkt__empty-sub">
             {posts.length === 0 ? emptyHint
               : mediaLenses && media.length === 0 ? 'All lenses are off — tap one to see that kind of piece.'
+              : travelLenses && travelKinds.length < 2 ? 'Nothing under that lens yet — turn the other back on to see the whole shelf.'
               : 'Try a different search or turn a lens back on.'}
           </p>
         </div>

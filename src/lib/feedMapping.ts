@@ -129,9 +129,25 @@ export function postToCard(
     : rawPrice;
   // Entrusted gifts say so: the giver handed allocation to the mycelium.
   const entrusted = rawModes.includes('gift') && p.details?.allocation === 'lichen';
-  const offerLine = mode
+  // TRAVEL FACTS LEAD (founder 2026-10-06): a ride says its route before its
+  // terms — "Ride · Conifer → Santa Fe · Truck · 3 seats · Trade"; a stay
+  // says its roof — "Stay · sleeps 6 · Trade".
+  const travelBits: string[] = [];
+  if (postAreas(p).includes('travel')) {
+    const td = (p.details ?? {}) as { travelKind?: unknown; routeFrom?: unknown; routeTo?: unknown; vehicle?: unknown; seats?: unknown; sleeps?: unknown };
+    if (td.travelKind === 'ride') travelBits.push('Ride');
+    if (td.travelKind === 'stay') travelBits.push('Stay');
+    const rf = typeof td.routeFrom === 'string' ? td.routeFrom : '';
+    const rt = typeof td.routeTo === 'string' ? td.routeTo : '';
+    if (rf || rt) travelBits.push([rf, rt].filter(Boolean).join(' → '));
+    if (typeof td.vehicle === 'string' && td.vehicle) travelBits.push(td.vehicle);
+    if (typeof td.seats === 'number') travelBits.push(`${td.seats} seats`);
+    if (typeof td.sleeps === 'number') travelBits.push(`sleeps ${td.sleeps}`);
+  }
+  const baseOffer = mode
     ? (price ? `${mode} · ${price}` : entrusted ? `${mode} · Lichen routes` : mode)
     : undefined;
+  const offerLine = [travelBits.join(' · '), baseOffer].filter(Boolean).join(' · ') || undefined;
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;
