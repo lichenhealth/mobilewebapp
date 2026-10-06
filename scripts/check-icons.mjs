@@ -63,7 +63,7 @@ const html = `<html><body>${icons.map((ic, i) => {
 const tmp = path.join(root, 'node_modules', '.icons-check.html');
 fs.writeFileSync(tmp, html);
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.ICONS_CHROMIUM || undefined, args: ['--no-sandbox'] });
 const page = await browser.newPage();
 await page.goto('file://' + tmp);
 const measured = await page.evaluate((n) => {

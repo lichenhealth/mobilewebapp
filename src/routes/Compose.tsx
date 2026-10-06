@@ -118,7 +118,7 @@ export default function Compose() {
   // condition — route, vehicle and seats for a ride; sleeps for a stay.
   // The TERMS stay the universal modes (gift/trade/rent/Current-cy), which
   // is what makes "an apt in SF for a villa in France" just a Trade.
-  const [travelKind, setTravelKind] = useState<'' | 'ride' | 'stay'>('');
+  const [travelKind, setTravelKind] = useState<'' | 'ride' | 'flight' | 'stay'>('');
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
   const [vehicle, setVehicle] = useState('');
@@ -358,7 +358,7 @@ export default function Compose() {
       if (d.deliverRadiusMi != null) setDeliverRadius(String(d.deliverRadiusMi));
       if (typeof d.paymentPlan === 'string') setPaymentPlan(d.paymentPlan);
       if (Array.isArray(d.categories)) { setCatTags(d.categories as string[]); }
-      if (d.travelKind === 'ride' || d.travelKind === 'stay') setTravelKind(d.travelKind);
+      if (d.travelKind === 'ride' || d.travelKind === 'flight' || d.travelKind === 'stay') setTravelKind(d.travelKind);
       if (typeof d.routeFrom === 'string') setRouteFrom(d.routeFrom);
       if (typeof d.routeTo === 'string') setRouteTo(d.routeTo);
       if (typeof d.vehicle === 'string') setVehicle(d.vehicle);
@@ -692,7 +692,7 @@ export default function Compose() {
             if (routeTo.trim()) details.routeTo = routeTo.trim();
             if (vehicle) details.vehicle = vehicle;
             const nSeats = Number(seats);
-            if (travelKind === 'ride' && Number.isFinite(nSeats) && nSeats > 0) details.seats = nSeats;
+            if ((travelKind === 'ride' || travelKind === 'flight') && Number.isFinite(nSeats) && nSeats > 0) details.seats = nSeats;
             const nSleeps = Number(sleeps);
             if (travelKind === 'stay' && Number.isFinite(nSleeps) && nSleeps > 0) details.sleeps = nSleeps;
           }
@@ -1350,12 +1350,17 @@ export default function Compose() {
                 says its roof. Terms stay the shared modes above. */}
             <label className="cmp__label">Travel <span className="cmp__label-soft">(the facts that help someone say yes)</span></label>
             <div className="cmp__chips">
+              {/* Rides and flights split (founder 2026-10-06: "Travel should
+                  have rides, flights, stays") — ground and air are different
+                  asks; the vehicle list follows the chip. */}
               <button className={'cmp__chip' + (travelKind === 'ride' ? ' is-on' : '')}
-                onClick={() => setTravelKind((k) => k === 'ride' ? '' : 'ride')}>Ride / transport</button>
+                onClick={() => { setTravelKind((k) => k === 'ride' ? '' : 'ride'); setVehicle((v) => v === 'Plane' || v === 'Helicopter' ? '' : v); }}>Ride / transport</button>
+              <button className={'cmp__chip' + (travelKind === 'flight' ? ' is-on' : '')}
+                onClick={() => { setTravelKind((k) => k === 'flight' ? '' : 'flight'); setVehicle((v) => v === 'Plane' || v === 'Helicopter' ? v : ''); }}>Flight</button>
               <button className={'cmp__chip' + (travelKind === 'stay' ? ' is-on' : '')}
                 onClick={() => setTravelKind((k) => k === 'stay' ? '' : 'stay')}>Stay / place</button>
             </div>
-            {travelKind === 'ride' && (<>
+            {(travelKind === 'ride' || travelKind === 'flight') && (<>
               <div className="cmp__row">
                 <input className="cmp__input" value={routeFrom} onChange={(e) => setRouteFrom(e.target.value)}
                   placeholder={modes.has('iso') ? 'Leaving from…' : 'From (e.g. Conifer, CO)'} />
@@ -1364,7 +1369,7 @@ export default function Compose() {
                   placeholder={modes.has('iso') ? 'Headed to…' : 'To (e.g. Santa Fe, NM)'} />
               </div>
               <div className="cmp__chips">
-                {['Car', 'Truck', 'Van', 'RV', 'Boat', 'Plane', 'Helicopter'].map((v) => (
+                {(travelKind === 'flight' ? ['Plane', 'Helicopter'] : ['Car', 'Truck', 'Van', 'RV', 'Boat']).map((v) => (
                   <button key={v} className={'cmp__chip' + (vehicle === v ? ' is-on' : '')}
                     onClick={() => setVehicle((cur) => cur === v ? '' : v)}>{v}</button>
                 ))}
