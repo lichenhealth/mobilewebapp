@@ -28,7 +28,7 @@ const BASE = process.argv[2] ?? 'http://localhost:4191';
 const SESS_FILE = process.argv[3]
   ?? process.env.LICHEN_TEST_SESSION
   ?? '/tmp/claude-0/-home-user-mobilewebapp/a0406c70-dda9-5e1a-9075-4445d12a7bb7/scratchpad/test-session.json';
-const PAGES = ['/home', '/market', '/mycelium', '/assistant/feed'];
+const PAGES = ['/home', '/market', '/mycelium', '/assistant/feed', '/maps'];
 const WIDTHS = [];
 for (let w = 340; w <= 1440; w += 20) WIDTHS.push(w);
 const GAP_MAX = 64;

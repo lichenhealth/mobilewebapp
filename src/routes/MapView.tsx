@@ -397,10 +397,10 @@ export default function MapView() {
                 className={'mapv__layer' + (on ? ' is-on' : '')}
                 onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
                 aria-pressed={on}
+                aria-label={l.label}
+                title={l.label}
               >
-                <Icon name={l.icon} size={14} />
-                {l.label}
-                {on && <Icon name="check" size={12} />}
+                <Icon name={l.icon} size={16} />
               </button>
             );
           })}

@@ -16,6 +16,9 @@ import ChatConversation from '../components/ChatConversation';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
+  // Search opens on press (founder 2026-10-06, "when you press search, it
+  // opens a search tab") — the standing full-width bar is gone.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [chats, setChats] = useState<ChatVM[]>([]);
   const [unread, setUnread] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -112,7 +115,6 @@ export default function Chat() {
               <span className="display-italic">Messages</span>
             </h1>
           </div>
-          <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
           {/* A space doesn't start DMs — conversations come to it. */}
           {!asSpace && <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -122,6 +124,23 @@ export default function Chat() {
         </div>
       </header>
 
+      {/* AI BRAIN CONSISTENCY (founder 2026-10-06: "The search and brain
+          should be top, left in chat") — the platform's doors grammar:
+          search circle opens the search field, the brain opens Chat's
+          briefing (or asks to turn itself back on). */}
+      <div className="chat__tools">
+        <button
+          className={'chat__tool-circle' + (searchOpen ? ' is-on' : '')}
+          onClick={() => setSearchOpen((o) => { if (o) setQuery(''); return !o; })}
+          aria-label="Search messages and people"
+          aria-expanded={searchOpen}
+        >
+          <Icon name="search" size={15} />
+        </button>
+        <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
+      </div>
+
+      {searchOpen && (
       <div className="chat__search">
         <Icon name="search" size={16} />
         <input
@@ -129,6 +148,7 @@ export default function Chat() {
           placeholder="Search messages and people"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          autoFocus
         />
         {query && (
           <button className="chat__search-clear" onClick={() => setQuery('')} aria-label="Clear">
@@ -136,6 +156,7 @@ export default function Chat() {
           </button>
         )}
       </div>
+      )}
 
       <div className="chat__list">
         {(loading || !actingReady) && <div className="chat__empty"><p>Loading your chats…</p></div>}

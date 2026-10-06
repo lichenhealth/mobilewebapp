@@ -437,3 +437,16 @@ img.conv-row__group-bub { object-fit: cover; }
   font-family: var(--font-mono); font-size: var(--t-2xs, 10px);
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
 }
+
+/* Doors top-left (founder 2026-10-06, AI brain consistency): search + brain
+   circles in Home's order; the search field opens on press. */
+.chat__tools { display: flex; align-items: center; gap: 10px; margin: 2px 0 var(--s-4); }
+.chat__tool-circle {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft); cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.chat__tool-circle:hover { border-color: var(--peach); color: var(--ink); }
+.chat__tool-circle.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
