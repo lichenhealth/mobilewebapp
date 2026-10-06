@@ -36,6 +36,7 @@ const KOC_BAND_START = 6;   // 6am
 const KOC_BAND_END = 22;    // up to 10pm
 const KOC_HOUR_H = 44;      // px per hour in the week columns
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { careConsent } from '../lib/assistantConsentApi';
 import './Concierge.css';
 
@@ -1021,6 +1022,8 @@ export default function Concierge() {
   // Self view (no patientId): the member's own Concierge. The "subject" is whose
   // care data we show.
   const isClientView = !!patientId;
+  // The hat matters here (founder 2026-10-06) — see the acting-as gate below.
+  const { actor, setActor, ready: actingReady } = useActing();
   const subjectId = patientId ?? me;
 
   // The Concierge brain is the member's REAL concierge-level AI consent now
@@ -1389,6 +1392,35 @@ export default function Concierge() {
     );
   }
 
+  // WHOSE BOARD IS THIS (founder 2026-10-06: signed in as Countryman
+  // Stables, "my WOW is up. It should show Countryman Stables. I'll
+  // remember to toggle back to me if I mean to go to my concierge"): a
+  // space's own Concierge is deliberately not built yet (care machinery
+  // assumes a person), so wearing a hat here shows an honest notice —
+  // never YOUR personal care board under an entity's name.
+  if (actingReady && actor.type !== 'self' && !isClientView) {
+    return (
+      <div className="conc">
+        <header className="conc__head conc__head--client">
+          <h1 className="conc__title">{actor.name}</h1>
+        </header>
+        <div className="conc__care-gate">
+          <Icon name="concierge" size={22} />
+          <h3 className="conc__care-gate-title">No Concierge for {actor.name} yet</h3>
+          <p className="conc__care-gate-sub">
+            {actor.type === 'space'
+              ? `A ${actor.kind}’s own care team is on the way — it isn’t built yet.`
+              : 'A stewarded member’s own care team is on the way — it isn’t built yet.'}
+            {' '}Your personal Concierge lives under your own name.
+          </p>
+          <button className="btn btn-primary" onClick={() => setActor({ type: 'self' })}>
+            Continue as yourself
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="conc">
       {/* THE DASHBOARD SWITCH is a DROPDOWN at the upper right (founder
@@ -1429,41 +1461,16 @@ export default function Concierge() {
         </p>
       )}
 
-      {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
-      <nav className="conc__tabs">
-        <button
-          className={'conc__tab' + (activeTab === 'wow' ? ' is-active' : '')}
-          onClick={() => handleTabClick('wow')}
-        >
-          WOW
-        </button>
-        <button
-          className={'conc__tab' + (activeTab === 'koc' ? ' is-active' : '')}
-          onClick={() => handleTabClick('koc')}
-        >
-          KOC
-        </button>
-        <button
-          className={'conc__tab' + (activeTab === 'chat' ? ' is-active' : '')}
-          onClick={() => handleTabClick('chat')}
-        >
-          Chat
-        </button>
-        <button
-          className={'conc__tab' + (activeTab === 'urgent' ? ' is-active' : '')}
-          onClick={() => handleTabClick('urgent')}
-        >
-          Urgent Care
-        </button>
-        <button
-          className={'conc__tab' + (activeTab === 'team' ? ' is-active' : '')}
-          onClick={() => handleTabClick('team')}
-        >
-          Care Team
-        </button>
-      </nav>
-
-      {/* Tool row (search · AI brain · scope · pagination) */}
+      {/* Tool row (search · + · AI brain · scope · pagination) — ABOVE the
+          tabs since 2026-10-06 (founder: "should the brain and search be
+          above the toggles" — the platform's icons-above-toggles grammar,
+          2026-08-14, finally applied here). The + stays for consistency and
+          is TAB-AWARE (founder, same hour: "the plus is redundant, i
+          suppose, but let's keep it for consistency, and you can then plus
+          into the actual WOW as well, same goes for KOC"): WOW → the wow
+          composer, KOC → the plan composer at the board's anchor, Care
+          Team → the invite box; Chat and Urgent have nothing to add, so
+          no + pretends otherwise. */}
       {/* The Care Team tab sheds the board chrome (founder 2026-09-15: "the
           WOW and KOC nav shouldn't persist") and carries ONE door instead —
           a + that opens Admin with the invite box focused. */}
@@ -1490,6 +1497,18 @@ export default function Concierge() {
         >
           <Icon name="search" size={14} />
         </button>
+        {canAuthor && (activeTab === 'wow' || activeTab === 'koc') && (
+          <button
+            className="conc__tool-circle"
+            onClick={() => navigate(activeTab === 'wow'
+              ? `${basePath}/wow/edit`
+              : `${basePath}/koc/edit${scope === 'Day' ? `?date=${anchor}` : ''}`)}
+            aria-label={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
+            title={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        )}
         {/* THE BRAIN IS A DOOR HERE TOO (founder 2026-10-06: "Concierge
             doesn't actually go anywhere with the brain… It should go to your
             concierge brain"): the shared AssistantDoor — on, it opens the
@@ -1548,6 +1567,41 @@ export default function Concierge() {
           )}
         </div>
       )}
+
+
+      {/* 4 tabs: WOW / KOC / Chat / Urgent Care */}
+      <nav className="conc__tabs">
+        <button
+          className={'conc__tab' + (activeTab === 'wow' ? ' is-active' : '')}
+          onClick={() => handleTabClick('wow')}
+        >
+          WOW
+        </button>
+        <button
+          className={'conc__tab' + (activeTab === 'koc' ? ' is-active' : '')}
+          onClick={() => handleTabClick('koc')}
+        >
+          KOC
+        </button>
+        <button
+          className={'conc__tab' + (activeTab === 'chat' ? ' is-active' : '')}
+          onClick={() => handleTabClick('chat')}
+        >
+          Chat
+        </button>
+        <button
+          className={'conc__tab' + (activeTab === 'urgent' ? ' is-active' : '')}
+          onClick={() => handleTabClick('urgent')}
+        >
+          Urgent Care
+        </button>
+        <button
+          className={'conc__tab' + (activeTab === 'team' ? ' is-active' : '')}
+          onClick={() => handleTabClick('team')}
+        >
+          Care Team
+        </button>
+      </nav>
 
       {/* Active tab content */}
       {activeTab === 'wow' && (() => {

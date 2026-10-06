@@ -669,6 +669,10 @@
 
 .urgent__avatar {
   width: 48px; height: 48px;
+  /* A circle, whatever squeezes (founder 2026-10-06: "they're ovals" —
+     the care-team rows' long names + action buttons compressed the
+     avatar's width inside the flex row). */
+  flex-shrink: 0;
   border-radius: var(--r-full);
   display: inline-flex;
   align-items: center;
