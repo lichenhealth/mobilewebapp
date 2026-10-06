@@ -230,3 +230,21 @@ untouched-save rule), so a conversation-made flip survives a later
 publish of unrelated page work. Deliberately NOT tools: the Privacy
 flags (findable, assistant_readable, content defaults) — switches about
 what the assistant itself may read are not the assistant's to flip.
+
+## General can act (2026-10-06)
+
+Founder, after pasting a space's pricing letter into her General thread
+and being refused: "ai assistant is saying it doesn't have page editing
+access, but it should." The General thread arms the member's own page
+tools (same flag, same consents — it is the anything-at-all room), and
+for a STEWARDED space's page it arms `select_space` + the space page
+toolset. `select_space` is target resolution, not consent granting: the
+name resolves against the sender's own stewarded spaces ONLY
+(exactly-one-match; ambiguous or unknown names refuse with the real
+list), and the full consent stack is re-checked server-side at
+selection — stewardship, the space's assistant switch, the member's
+per-space choice, aliveness. The selection lasts one exchange; every
+space write then lands in THAT space's page draft with the usual
+read-first / report-every-change rules, and the reply's Preview/Publish
+buttons point at the selected space. Section threads keep routing page
+work to its own room; only General stopped refusing.
