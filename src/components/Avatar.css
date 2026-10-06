@@ -15,7 +15,7 @@
   line-height: 0;
 }
 .avatar__mark--pulse { background: var(--peach); color: #fff; }
-.avatar__mark--chip  { background: var(--bone-deep); color: var(--ink-soft); }
+.avatar__mark--chip  { background: var(--bone-deep); color: var(--peach-deep); }
 /* A steward's face on a space (founder 2026-08-18): in FRONT, lower right,
    half the logo, overhanging its edge by a quarter of itself, and ringed in
    PEACH — the nod to the human connection behind the space. The wrap keeps
