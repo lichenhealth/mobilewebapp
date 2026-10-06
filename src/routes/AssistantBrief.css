@@ -3,8 +3,10 @@
 .abrief__avatar-wrap { position: relative; display: inline-block; }
 .abrief__avatar {
   width: 76px; height: 76px; border-radius: 50%;
-  background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  color: var(--ink-soft);
+  /* Beige ground, peach linework (founder 2026-10-06, second pass:
+     "outline of circle and brain should be peach, not gray"). */
+  background: var(--bone-deep); border: 1px solid var(--peach);
+  color: var(--peach-deep);
   display: inline-flex; align-items: center; justify-content: center;
 }
 /* The silicon badge, top-right — same element language as About's C/Si
@@ -79,7 +81,7 @@
 .abrief__run-row { display: flex; align-items: flex-end; gap: 8px; }
 .abrief__run-ava {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-  background: #fff; border: 1px solid var(--bone-edge); color: var(--ink-soft);
+  background: var(--bone-deep); border: 1px solid var(--peach); color: var(--peach-deep);
   display: inline-flex; align-items: center; justify-content: center;
   margin-bottom: 2px;
 }
