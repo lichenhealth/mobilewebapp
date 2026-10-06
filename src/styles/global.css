@@ -396,8 +396,8 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
    cards don't flood orange and peach keeps meaning engagement; full-peach
    text stays reserved for buttons/pills/active states. Whole-surface doors
    (tiles, rows, icon circles) already read as openable and skip it. The
-   assistant's rooms already speak this shape in silicon blue (.abrief__ref);
-   this is the platform-side twin. */
+   assistant's rooms speak the SAME peach grammar now (.abrief__ref) — the
+   silicon blue was retired in-app 2026-10-06. */
 .link-cue {
   text-decoration: underline;
   text-decoration-color: var(--peach);

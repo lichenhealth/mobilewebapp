@@ -24,7 +24,7 @@
   color: var(--ink-muted); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.afeed__search-btn:hover, .afeed__search-btn.is-on { border-color: var(--blue); color: var(--blue-deep); }
+.afeed__search-btn:hover, .afeed__search-btn.is-on { border-color: var(--peach); color: var(--peach-deep); }
 
 .afeed__search {
   display: flex; align-items: center; gap: var(--s-2);
@@ -84,12 +84,13 @@
   border-bottom-left-radius: 6px;
   padding: 8px 12px;
 }
-/* The thinking wheel (founder 2026-08-22): three silicon-blue dots
-   breathing while Claude composes; honest text when a reply is lost. */
+/* The thinking wheel (founder 2026-08-22): three dots breathing while
+   Claude composes; honest text when a reply is lost. Peach since 2026-10-06
+   (the silicon blue is retired in-app). */
 .afeed__thinking { display: inline-flex; gap: 5px; margin: 4px 0 0; }
 .afeed__thinking span {
   width: 7px; height: 7px; border-radius: 50%;
-  background: var(--blue); opacity: 0.35;
+  background: var(--peach); opacity: 0.35;
   animation: afeed-think 1.2s ease-in-out infinite;
 }
 .afeed__thinking span:nth-child(2) { animation-delay: 0.2s; }
@@ -118,7 +119,7 @@
   background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
   font-size: 12px; color: var(--ink-soft); text-align: left; cursor: pointer;
 }
-.afeed__ref:hover { border-color: var(--blue); }
+.afeed__ref:hover { border-color: var(--peach); }
 
 /* The threads — the assistant mirrors the platform, so work stays where it
    belongs (founder 2026-08-11). Since 2026-08-31 each thread is its
@@ -415,5 +416,5 @@
    "YOUR LICHEN PARTNER" line. */
 .afeed__eyebrow {
   margin: 1px 0 0; font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue-deep, var(--blue));
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--peach-deep);
 }

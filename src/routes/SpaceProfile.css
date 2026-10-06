@@ -193,7 +193,7 @@
 .sprof__managebadge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; margin-left: 8px; padding: 0 5px;
-  border-radius: 9px; background: var(--blue); color: #fff;
+  border-radius: 9px; background: var(--peach); color: #fff;
   font-size: 11px; font-weight: 700; line-height: 1;
 }
 
@@ -428,7 +428,7 @@
 .sprof__stage--mobilew .ppage__sec--split { display: block; }
 .sprof__stage--mobilew .ppage__sec--split .ppage__split-img { margin-top: var(--s-4); }
 /* The draft reassurance on the backstage door. */
-.sprof__door-draft { display: block; color: var(--blue, #4a6b8a); font-style: normal; font-size: 12px; margin-top: 4px; }
+.sprof__door-draft { display: block; color: var(--peach-deep); font-style: normal; font-size: 12px; margin-top: 4px; }
 
 /* The width toggle only where the alternative is real — a phone is already
    the mobile view (founder 2026-09-07). */

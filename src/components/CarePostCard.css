@@ -114,10 +114,11 @@
 .cpost__ask:hover { border-color: var(--peach); }
 
 /* Recommended vs prescribed on the byline (founder 2026-09-14): a quiet
-   delineation, not a badge — prescribed is part of the plan and leans on
-   the stewardship blue; recommended stays muted. */
+   delineation, not a badge — prescribed is part of the plan so it leans
+   darker (the stewardship blue is retired in-app, 2026-10-06); recommended
+   stays muted. */
 .cpost__intent { font-style: normal; font-size: 11px; color: var(--ink-muted); }
-.cpost__intent--prescribed { color: var(--blue-deep); }
+.cpost__intent--prescribed { color: var(--ink-soft); font-weight: 500; }
 
 /* The author's name is a door to their profile (founder 2026-09-21 —
    the link-cue rule; the peach thread comes from the shared .link-cue). */
@@ -145,7 +146,7 @@ button.cpost__ktitle { cursor: pointer; }
   width: 18px; height: 18px; font-size: 9px; font-style: normal;
 }
 .cpost__bywhat { font-style: normal; color: var(--ink-muted); }
-.cpost__bywhat--prescribed { color: var(--blue-deep); }
+.cpost__bywhat--prescribed { color: var(--ink-soft); font-weight: 500; }
 .cpost__kicon {
   flex-shrink: 0; color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;

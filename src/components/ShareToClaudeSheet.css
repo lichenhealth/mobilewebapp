@@ -23,5 +23,5 @@
   background: var(--bone); padding: 10px 12px; resize: vertical;
   font: inherit; font-size: 14px; color: var(--ink);
 }
-.sharesheet__note:focus { outline: none; border-color: var(--blue); }
+.sharesheet__note:focus { outline: none; border-color: var(--peach); }
 .sharesheet__send { align-self: flex-end; }

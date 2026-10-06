@@ -238,10 +238,10 @@ button.about__team-row:hover .about__team-name { color: var(--peach-deep, var(--
   padding: var(--s-4); background: var(--bone-warm);
   border: 2px solid var(--peach); border-radius: var(--r-lg);
 }
-.about__quad-cell--si { border-color: var(--blue); }
+.about__quad-cell--si { border-color: var(--bone-deep); }
 .about__quad-el { position: absolute; top: 8px; right: 12px; font-family: var(--font-display); font-size: 15px; }
 .about__quad-el--c { color: var(--peach-deep); }
-.about__quad-el--si { color: var(--blue); }
+.about__quad-el--si { color: var(--ink-muted); }
 .about__quad-cell h3 { font-family: var(--font-display); font-size: 18px; font-weight: 400; margin: 0; }
 .about__sec .about__quad-cell p, .about__quad-cell p { font-size: 13px; line-height: 1.55; color: var(--ink-muted); margin: 0; flex: 1; font-weight: 300; }
 .about__quad-link { font-size: 12.5px; color: var(--peach-deep); text-decoration: underline; text-underline-offset: 2px; }
@@ -255,16 +255,16 @@ button.about__team-row:hover .about__team-name { color: var(--peach-deep, var(--
   position: relative; text-align: center; padding: var(--s-2);
 }
 .about__elem--c { border: 2px solid var(--peach); }
-.about__elem--si { border: 2px solid var(--blue); }
+.about__elem--si { border: 2px solid var(--bone-deep); }
 .about__elem-num { position: absolute; top: 8px; left: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); }
 .about__elem-sym { font-family: var(--font-display); font-size: clamp(36px, 7vw, 52px); line-height: 1; color: var(--ink); }
 .about__elem-name { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-top: 4px; }
 .about__elem-mass { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
 .about__elem-role { font-size: 12.5px; font-style: italic; color: var(--ink-muted); margin-top: 4px; }
 .about__bond { display: flex; flex-direction: column; gap: 6px; }
-.about__bond span { width: clamp(24px, 5vw, 44px); height: 2px; background: linear-gradient(90deg, var(--peach) 50%, var(--blue) 50%); }
+.about__bond span { width: clamp(24px, 5vw, 44px); height: 2px; background: linear-gradient(90deg, var(--peach) 50%, var(--bone-deep) 50%); }
 .about__sec p.about__elem-cap { text-align: center; font-size: 12.5px; font-style: italic; color: var(--ink-muted); margin-top: var(--s-3); }
 /* Element marks on the team card — same vocabulary as the tiles above it. */
 .about__team-el { font-family: var(--font-display); font-size: 14px; }
 .about__team-el--c { color: var(--peach-deep, var(--peach)); }
-.about__team-el--si { color: var(--blue, #7FA8C9); }
+.about__team-el--si { color: var(--ink-muted); }
