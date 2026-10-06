@@ -38,13 +38,31 @@ export type LocationInfo =
   | { type: 'link'; url: string }
   | { type: 'address'; mapsUrl: string };
 
+// The ONE list of video services Lichen recognizes (booking video links,
+// event locations). send-booking-mail keeps a copy for its Join button —
+// keep the two in step.
 const VIDEO_HOSTS: [RegExp, string][] = [
-  [/(^|\.)zoom\.us$/, 'Zoom'],
+  [/(^|\.)zoom\.(us|com)$/, 'Zoom'],
   [/^meet\.google\.com$/, 'Google Meet'],
-  [/(^|\.)teams\.microsoft\.com$/, 'Microsoft Teams'],
+  [/(^|\.)teams\.(microsoft|live)\.com$/, 'Microsoft Teams'],
   [/(^|\.)whereby\.com$/, 'Whereby'],
   [/(^|\.)webex\.com$/, 'Webex'],
+  [/^meet\.jit\.si$/, 'Jitsi'],
+  [/^facetime\.apple\.com$/, 'FaceTime'],
+  [/(^|\.)gotomeet(ing)?\.(com|me)$/, 'GoTo Meeting'],
+  [/(^|\.)doxy\.me$/, 'Doxy.me'],
+  [/(^|\.)skype\.com$/, 'Skype'],
 ];
+
+/** The service name for a video link ("Zoom", "Google Meet"…), or null when
+ *  the host isn't a known video service. */
+export function videoServiceOf(url: string): string | null {
+  try {
+    const host = new URL(hrefFor(url.trim())).hostname.replace(/^www\./, '').toLowerCase();
+    for (const [re, service] of VIDEO_HOSTS) if (re.test(host)) return service;
+  } catch { /* not a URL */ }
+  return null;
+}
 
 export function locationInfo(loc: string): LocationInfo | null {
   const t = loc.trim();
