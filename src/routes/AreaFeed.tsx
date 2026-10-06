@@ -108,7 +108,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const [showSearch, setShowSearch] = useState(false);
   // All lenses start ON (founder): everything shows; deselect to narrow.
   const [media, setMedia] = useState<PostMedium[]>(MEDIA_LENSES.map((m) => m.medium));
-  const [travelKinds, setTravelKinds] = useState<('ride' | 'stay')[]>(['ride', 'stay']);
+  const [travelKinds, setTravelKinds] = useState<('ride' | 'flight' | 'stay')[]>(['ride', 'flight', 'stay']);
   const [publicCols, setPublicCols] = useState<CollectionRow[]>([]);
   const [structuredCols, setStructuredCols] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState('');
@@ -183,12 +183,16 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
   const filtered = useMemo(() => {
     let list = posts;
     if (mediaLenses) list = list.filter((p) => media.includes(postMedium(p)));
-    if (travelLenses && travelKinds.length < 2) {
+    if (travelLenses && travelKinds.length < 3) {
       // One lens off = a real narrowing; a post that never declared a kind
-      // only shows while both are on (the whole-shelf view).
+      // only shows while all three are on (the whole-shelf view). A legacy
+      // ride whose vehicle is a Plane/Helicopter reads as a flight — the
+      // kinds split 2026-10-06 and older posts never chose.
       list = list.filter((p) => {
-        const k = (p.details as { travelKind?: unknown } | null)?.travelKind;
-        return (k === 'ride' || k === 'stay') && travelKinds.includes(k);
+        const d = (p.details ?? {}) as { travelKind?: unknown; vehicle?: unknown };
+        let k = d.travelKind;
+        if (k === 'ride' && (d.vehicle === 'Plane' || d.vehicle === 'Helicopter')) k = 'flight';
+        return (k === 'ride' || k === 'flight' || k === 'stay') && travelKinds.includes(k);
       });
     }
     if (query.trim()) {
@@ -204,7 +208,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
 
   const toggleMedium = (m: PostMedium) =>
     setMedia((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
-  const toggleTravelKind = (k: 'ride' | 'stay') =>
+  const toggleTravelKind = (k: 'ride' | 'flight' | 'stay') =>
     setTravelKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
 
   // One rule for every feed's chat door (founder 2026-08-17): a post in a
@@ -316,7 +320,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         {travelLenses && (
           <>
             <div className="mkt__action-spacer" />
-            {([['ride', 'Rides', 'plane'], ['stay', 'Stays', 'home']] as const).map(([k, label, ic]) => {
+            {/* Rides wear the CAR, flights the plane (founder 2026-10-06:
+                "rides should have a car"). */}
+            {([['ride', 'Rides', 'car'], ['flight', 'Flights', 'plane'], ['stay', 'Stays', 'home']] as const).map(([k, label, ic]) => {
               const on = travelKinds.includes(k);
               return (
                 <button
@@ -463,7 +469,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
           <p className="mkt__empty-sub">
             {posts.length === 0 ? emptyHint
               : mediaLenses && media.length === 0 ? 'All lenses are off — tap one to see that kind of piece.'
-              : travelLenses && travelKinds.length < 2 ? 'Nothing under that lens yet — turn the other back on to see the whole shelf.'
+              : travelLenses && travelKinds.length < 3 ? 'Nothing under that lens yet — turn the others back on to see the whole shelf.'
               : 'Try a different search or turn a lens back on.'}
           </p>
         </div>

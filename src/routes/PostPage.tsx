@@ -153,7 +153,7 @@ export default function PostPage() {
   const when = [d.availFrom, d.availTo].filter(Boolean) as string[];
   const route = [d.routeFrom, d.routeTo].filter((x) => typeof x === 'string' && x) as string[];
   const facts: { label: string; value: string }[] = [
-    { label: 'Kind', value: d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'stay' ? 'Stay / place' : '' },
+    { label: 'Kind', value: d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'flight' ? 'Flight' : d.travelKind === 'stay' ? 'Stay / place' : '' },
     { label: 'Route', value: route.join(' → ') },
     { label: 'Vehicle', value: typeof d.vehicle === 'string' ? d.vehicle : '' },
     { label: 'Seats', value: typeof d.seats === 'number' ? String(d.seats) : '' },

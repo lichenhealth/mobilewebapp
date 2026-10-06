@@ -136,6 +136,7 @@ export function postToCard(
   if (postAreas(p).includes('travel')) {
     const td = (p.details ?? {}) as { travelKind?: unknown; routeFrom?: unknown; routeTo?: unknown; vehicle?: unknown; seats?: unknown; sleeps?: unknown };
     if (td.travelKind === 'ride') travelBits.push('Ride');
+    if (td.travelKind === 'flight') travelBits.push('Flight');
     if (td.travelKind === 'stay') travelBits.push('Stay');
     const rf = typeof td.routeFrom === 'string' ? td.routeFrom : '';
     const rt = typeof td.routeTo === 'string' ? td.routeTo : '';
