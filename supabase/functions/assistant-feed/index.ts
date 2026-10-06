@@ -373,6 +373,24 @@ const COURSE_TOOLS = [
 // from the THREAD, never from the model — no tool takes a target.
 const SPACE_EDIT_TOOLS = [PLACE_PHOTO_TOOL, ...SPACE_PAGE_TOOLS];
 
+// THE GENERAL THREAD CAN ACT ON A STEWARDED SPACE (founder 2026-10-06, after
+// pasting a space's pricing letter into General and being told no: "it
+// should" have access). The no-invented-targets rule holds through NAME
+// RESOLUTION against a server-side candidate set: select_space matches only
+// the spaces the SENDER stewards, exactly-one-match (the task composer's
+// rule), and re-checks the full consent stack at selection — stewardship,
+// the space's own assistant switch, the member's per-space choice. The
+// model can never reach a space outside that list, whatever it is told.
+const SELECT_SPACE_TOOL = {
+  name: 'select_space',
+  description: 'GENERAL thread only: name which of the member\'s OWN stewarded spaces the page work is about, BEFORE using any set_space_* tool here. The name resolves against the spaces they steward — nothing else is ever reachable — and every consent is re-checked at selection. An ambiguous or unknown name is refused with their real list. Selecting is not editing; say plainly which space you are now working on.',
+  input_schema: {
+    type: 'object',
+    properties: { space_name: { type: 'string', description: 'The space\'s name, as the member said it.' } },
+    required: ['space_name'],
+  },
+};
+
 // SMALL HANDS ACROSS THEIR LIFE (founder 2026-09-13: the mycelium reader
 // "saves documents, current-cy, adds to cal, etc for the person"). The two
 // SAFE acts ship first — a Drive save and a task — both private-to-them
@@ -513,14 +531,22 @@ Deno.serve(async (req) => {
   // participate in the first and also run the second. This reads only her
   // OWN memberships; nobody else's standing is fetched.
   let standing = '';
+  // The spaces this member STEWARDS, as server-side facts (founder
+  // 2026-10-06: the General thread can edit a stewarded space's page —
+  // select_space resolves a NAME against this list and nothing else, so
+  // the model can never pick a space they don't steward).
+  let stewardSpaces: { id: string; name: string }[] = [];
   {
     const mem = await (await sb(
-      `space_members?profile_id=eq.${profile_id}&select=role,duties,spaces(name,kind)&limit=60`,
+      `space_members?profile_id=eq.${profile_id}&select=role,duties,spaces(id,name,kind)&limit=60`,
     )).json();
     const rows = (Array.isArray(mem) ? mem : []) as {
-      role: string; duties: string[] | null; spaces: { name: string; kind: string } | null;
+      role: string; duties: string[] | null; spaces: { id: string; name: string; kind: string } | null;
     }[];
     const steward = rows.filter((r) => r.role === 'admin' || r.role === 'super_admin');
+    stewardSpaces = steward
+      .map((r) => (r.spaces ? { id: r.spaces.id, name: r.spaces.name } : null))
+      .filter((s): s is { id: string; name: string } => !!s);
     const member = rows.filter((r) => r.role === 'member');
     const name = (r: typeof rows[number]) => {
       const s = r.spaces;
@@ -693,7 +719,13 @@ Deno.serve(async (req) => {
     const flag = !!(Array.isArray(me) ? me[0]?.assistant_can_edit : false);
     handThatWrites = flag;
     isPlatformAdmin = !!(Array.isArray(me) ? me[0]?.is_admin : false);
-    canEdit = thread === 'profile' && flag;
+    // GENERAL CAN ACT (founder 2026-10-06, after pasting pricing into her
+    // General thread and being told no: "ai assistant is saying it doesn't
+    // have page editing access, but it should"): the member's own page
+    // tools arm in General too — it is the anything-at-all room, and the
+    // consents are the same ones the profile thread checks. Section
+    // threads keep pointing page work at its room for findability.
+    canEdit = (thread === 'profile' || thread === 'general') && flag;
     // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
     // hand-that-writes flag arms CALENDAR tools in the calendar thread.
     canCalendar = thread === 'calendar' && flag;
@@ -725,6 +757,9 @@ Deno.serve(async (req) => {
       + '\n- Change only what they asked about. Leave the rest, and say so if it matters.'
       + '\n- These reach their PUBLIC page only. You cannot touch their location, care, means, another member, or a space — do not offer to.'
       + '\n- PHOTO MOVES: When they ask to move a photo between tabs (About/Services/Goods/Contact/Facilities), make one the Home cover, or shift which part of a photo shows ("push it down so the face shows" — the position tool takes 0–100 from the top), use the photo tools directly. A photo pasted into their message goes onto the page with place_uploaded_photo.'
+      + (thread === 'general' && stewardSpaces.length
+        ? `\n\nSPACE PAGES WORK FROM HERE TOO (founder 2026-10-06: General is the room that can act on anything). For a page of a space they STEWARD — ${stewardSpaces.map((s) => s.name).join('; ')} — call select_space with its name FIRST (every consent is re-checked then); after that the set_space_* tools write to THAT space's page draft, same rules as above: read get_space_page before changing, land in the draft, name every change. If select_space refuses, relay its reason plainly — never improvise access, and never say your tools are down.`
+        : '')
       + (lines.length ? `\n\nThe only category ids that exist:\n${lines.join('\n')}` : '');
   }
 
@@ -854,14 +889,21 @@ Deno.serve(async (req) => {
     return (Array.isArray(found) ? found : []) as { id: string; name: string; domain: string }[];
   };
 
-  // The space-side twins of readPage/patchMe — scoped to the THREAD's space,
-  // never a model-supplied id. Draft-first like the member pair above.
+  // The space a GENERAL-thread exchange selected via select_space — set only
+  // by that tool's own verified resolution, never from raw model input.
+  let selectedSpaceId: string | null = null;
+  let selectedSpaceName = '';
+  // The space-side twins of readPage/patchMe — scoped to the THREAD's space
+  // (or General's verified selection), never a model-supplied id.
+  // Draft-first like the member pair above.
+  const effSpaceId = () => spaceId ?? selectedSpaceId;
+  const effSpaceName = () => (spaceId ? spaceName : selectedSpaceName);
   const readSpacePage = async () => {
-    const st = await readPageState(sb, 'space', spaceId!);
+    const st = await readPageState(sb, 'space', effSpaceId()!);
     return { page: st.page, contact: st.contact };
   };
   const patchSpace = (body: Record<string, unknown>) =>
-    writePageDraft(sb, 'space', spaceId!,
+    writePageDraft(sb, 'space', effSpaceId()!,
       body as { page?: Record<string, unknown>; contact?: Record<string, string> | null });
 
   // Images the system ITSELF surfaced from a member-linked page this
@@ -904,7 +946,7 @@ Deno.serve(async (req) => {
     // re-hosted into Lichen storage, then placed. Writes, so it arms with
     // the same consent as the other page tools.
     if (name === 'save_web_image') {
-      const target = canSpaceEdit ? 'space' : canEdit ? 'me' : null;
+      const target = canSpaceEdit || selectedSpaceId ? 'space' : canEdit ? 'me' : null;
       if (!target) return { ok: false, error: 'Page tools are not armed here.' };
       const raw = String(input.url ?? '').trim();
       const section = String(input.section ?? '');
@@ -914,17 +956,17 @@ Deno.serve(async (req) => {
       const hosted = await rehostWebImage(SUPABASE_URL!, SERVICE_KEY!, profile_id, raw);
       if (!hosted.ok || !hosted.url) return { ok: false, error: hosted.error ?? 'Could not bring that image over.' };
       const placed = target === 'space'
-        ? await placeImage(sb, 'spaces', spaceId!, section, hosted.url)
+        ? await placeImage(sb, 'spaces', effSpaceId()!, section, hosted.url)
         : await placeImage(sb, 'profiles', profile_id, section, hosted.url);
       if (!placed.ok) return placed;
-      return { ok: true, change: `brought an image over from the web and ${placed.change}${target === 'space' ? ` on ${spaceName}'s page` : ''}` };
+      return { ok: true, change: `brought an image over from the web and ${placed.change}${target === 'space' ? ` on ${effSpaceName()}'s page` : ''}` };
     }
     // ── A photo pasted into THIS message, placed on the page (founder
     // 2026-08-22). photo_number resolves against the trigger's own
     // attachments — never a model-supplied URL. Writes to whichever page
     // this thread's tools are armed for.
     if (name === 'place_uploaded_photo') {
-      const target = canSpaceEdit ? 'space' : canEdit ? 'me' : null;
+      const target = canSpaceEdit || selectedSpaceId ? 'space' : canEdit ? 'me' : null;
       if (!target) return { ok: false, error: 'Page tools are not armed here.' };
       const idx = Number(input.photo_number) - 1;
       const url = triggerImages[idx];
@@ -952,9 +994,45 @@ Deno.serve(async (req) => {
     // ── Space page tools (rung 2, founder 2026-08-22) — the executor lives
     // in _shared/spaceEdit.ts, shared with claude-chat's suggestion rooms.
     // Belt and braces: the tools only arm when canSpaceEdit, but re-check.
+    // ── General's space selection (founder 2026-10-06): resolve a NAME
+    // against the sender's OWN stewarded spaces, exactly-one-match, full
+    // consent stack re-checked right here. Never reachable in other threads.
+    if (name === 'select_space') {
+      if (thread !== 'general') return { ok: false, error: 'select_space works only in the General thread — a space build thread already knows its space.' };
+      if (!handThatWrites) return { ok: false, error: 'Their "Let Claude edit my page directly" switch is off — the offer at the foot of this conversation is where they turn it on.' };
+      const want = String(input.space_name ?? '').trim().toLowerCase();
+      if (!want) return { ok: false, error: 'Which space? Give its name.' };
+      const exact = stewardSpaces.filter((s) => s.name.toLowerCase() === want);
+      const loose = exact.length ? exact : stewardSpaces.filter((s) => s.name.toLowerCase().includes(want));
+      if (loose.length === 0) {
+        return { ok: false, error: `They steward no space named "${String(input.space_name)}". Spaces they steward: ${stewardSpaces.map((s) => s.name).join('; ') || '(none)'}.` };
+      }
+      if (loose.length > 1) {
+        return { ok: false, error: `More than one of their spaces matches: ${loose.map((s) => s.name).join('; ')} — ask which one they mean.` };
+      }
+      const sp = loose[0];
+      const srows = await (await sb(`spaces?id=eq.${sp.id}&select=name,assistant_enabled,status`)).json();
+      const srow = Array.isArray(srows) ? srows[0] : null;
+      if (!srow || srow.status === 'offline') return { ok: false, error: 'That space is not reachable anymore (offline or gone).' };
+      if (srow.assistant_enabled === false) {
+        return { ok: false, error: `${sp.name} has its own assistant switch off — its stewards can change that in its Admin → Privacy. Nothing can be written for it until then.` };
+      }
+      const memq = await (await sb(`space_members?space_id=eq.${sp.id}&profile_id=eq.${profile_id}&select=role&limit=1`)).json();
+      const role = Array.isArray(memq) ? memq[0]?.role : null;
+      if (role !== 'admin' && role !== 'super_admin') return { ok: false, error: 'They do not steward that space.' };
+      if (await assistantConsentOff(profile_id, [{ type: 'space', id: sp.id }])) {
+        return { ok: false, error: `They have switched the assistant off for themselves in ${sp.name} — Profile → Privacy is where that changes.` };
+      }
+      selectedSpaceId = sp.id;
+      selectedSpaceName = (srow.name as string) ?? sp.name;
+      return { ok: true, change: `now working on ${selectedSpaceName}'s page`, note: 'The set_space_* tools write to ITS page draft for the rest of this exchange. Read get_space_page before changing anything.' };
+    }
     if (isSpacePageTool(name)) {
-      if (!spaceId || !canSpaceEdit) return { ok: false, error: 'Space tools are not armed here.' };
-      return await runSpacePageTool(sb, spaceId, spaceName, name, input);
+      if (spaceId && !canSpaceEdit) return { ok: false, error: 'Space tools are not armed here.' };
+      if (!spaceId && !selectedSpaceId) {
+        return { ok: false, error: 'Name the space first with select_space — one of their own stewarded spaces.' };
+      }
+      return await runSpacePageTool(sb, effSpaceId()!, effSpaceName(), name, input);
     }
     if (name === 'set_tagline' || name === 'set_home_summary' || name === 'set_story') {
       const key = name === 'set_tagline' ? 'tagline' : name === 'set_home_summary' ? 'homeSummary' : 'story';
@@ -1669,7 +1747,14 @@ Deno.serve(async (req) => {
   };
   const pageEdits: { subject: 'space' | 'profile'; tab: string }[] = [];
   const pageEditTab = (name: string, input: Record<string, unknown>): { subject: 'space' | 'profile'; tab: string } | null => {
-    const subjectOf = (): 'space' | 'profile' => (isSpacePageTool(name) || (canSpaceEdit && !!spaceId) ? 'space' : 'profile');
+    const subjectOf = (): 'space' | 'profile' => {
+      if (isSpacePageTool(name)) return 'space';
+      if (canSpaceEdit && spaceId) return 'space';
+      // A pasted photo / web image lands on the GENERAL-selected space when
+      // one is on the table; member-named tools always stay 'profile'.
+      if ((name === 'place_uploaded_photo' || name === 'save_web_image') && selectedSpaceId) return 'space';
+      return 'profile';
+    };
     const sec = (v: unknown, fb = 'home') => (SECTION_TABS.includes(String(v ?? '')) ? String(v) : fb);
     if (TAB_BY_TOOL[name]) return { subject: subjectOf(), tab: TAB_BY_TOOL[name] };
     switch (name) {
@@ -1728,7 +1813,9 @@ Deno.serve(async (req) => {
         ...{ tools: [READ_WEBSITE_TOOL, FILE_DEV_REPORT_TOOL,
                      ...((canEdit || canSpaceEdit) ? [SAVE_WEB_IMAGE_TOOL] : []),
                      ...(canAct ? ACT_TOOLS : []),
-                     ...(canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : canCourses ? COURSE_TOOLS : [])],
+                     ...(canEdit && thread === 'general' && stewardSpaces.length
+                       ? [...EDIT_TOOLS, SELECT_SPACE_TOOL, ...SPACE_PAGE_TOOLS]
+                       : canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : canCourses ? COURSE_TOOLS : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
     });
@@ -1808,7 +1895,7 @@ Deno.serve(async (req) => {
       attachments: [{
         type: 'page_edit',
         subject: lastEdit.subject,
-        id: lastEdit.subject === 'space' ? spaceId : profile_id,
+        id: lastEdit.subject === 'space' ? (spaceId ?? selectedSpaceId) : profile_id,
         tab: lastEdit.tab,
       }],
     } : {}),

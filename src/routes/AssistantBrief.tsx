@@ -4,7 +4,10 @@ import { supabase } from '../lib/supabase';
 import { listSpacesByKind } from '../lib/spacesApi';
 import { Icon } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
-import { threadForSection } from '../lib/assistantFeedApi';
+import {
+  threadForSection, threadLabel, loadAssistantFeed, latestConvoIn, groupConvos,
+  postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup,
+} from '../lib/assistantFeedApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -14,7 +17,7 @@ import {
 import { listPendingResourceBookings } from '../lib/resourcesApi';
 import { listReminders, remindersOn } from '../lib/remindersApi';
 import { occursOn } from '../lib/recurrence';
-import { postToAssistantFeed } from '../lib/assistantFeedApi';
+
 import { type Scope, type Section } from '../lib/sections';
 import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
@@ -768,16 +771,50 @@ export default function AssistantBrief() {
    *  the reply. */
   async function sendToClaude(text: string, images?: string[]) {
     if (!me) return;
-    // A brief's ask starts a FRESH conversation (the email grammar, founder
-    // 2026-10-05) — and lands you inside it, not on the thread's list. A
-    // space's build thread stays one continuous stream (convo null).
-    // Photos ride along (founder 2026-10-06: "allow people to upload photos
-    // to their Ai assistant… just like with you" — the feed composer always
-    // could; this inline reply was the gap).
-    const row = await postToAssistantFeed(text, undefined, feedThread, images,
-      spaceParam ? null : undefined);
+    // A send CONTINUES the thread's conversation while it is still fresh
+    // (the 6-hour self-organizing rule — founder 2026-10-06: toggling away
+    // and back must never orphan the exchange; always-minting made the
+    // history read as wiped), and starts a new one past the gap. A space's
+    // build thread stays one continuous stream (convo null). Photos ride
+    // along (founder 2026-10-06: "just like with you").
+    let convo: string | null | undefined = spaceParam ? null : undefined;
+    if (!spaceParam) {
+      const latest = await latestConvoIn(feedThread).catch(() => null);
+      if (latest?.convoId && Date.now() - latest.at < CONVO_GAP_MS) convo = latest.convoId;
+    }
+    const row = await postToAssistantFeed(text, undefined, feedThread, images, convo);
     navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
+
+  // THE HISTORY LOG ON THE BRIEF (founder 2026-10-06: "the conversation…
+  // disappears when I toggle away and back, so no history is logged" — it
+  // was stored all along, but this screen never showed a door to it; and
+  // "The general brain should cover all conversations… sub sections…
+  // only the convos that pertain"): the general brief lists EVERY thread's
+  // conversations, section-labeled; a section's brief lists its own.
+  const [briefConvos, setBriefConvos] = useState<ConvoGroup[]>([]);
+  useEffect(() => {
+    if (!me || spaceParam) { setBriefConvos([]); return; }
+    let live = true;
+    void loadAssistantFeed(me, feedThread === 'general' ? undefined : feedThread)
+      .then((rows) => {
+        if (!live) return;
+        const personalRows = feedThread === 'general'
+          ? rows.filter((r) => !r.thread.startsWith('space:'))
+          : rows;
+        setBriefConvos(groupConvos(personalRows).slice(0, 6));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [me, feedThread, spaceParam]);
+  const briefAgo = (iso: string): string => {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (mins < 60) return mins <= 1 ? 'just now' : `${mins}m ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.round(hrs / 24);
+    return days === 1 ? '1 day ago' : `${days} days ago`;
+  };
 
   // The build door on the profile brief (founder 2026-08-17: Build with
   // Claude is the brain's own page, arriving with the context that you came
@@ -915,6 +952,35 @@ export default function AssistantBrief() {
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
       />
+
+      {/* EARLIER CONVERSATIONS (founder 2026-10-06) — the history log this
+          screen was missing: the general brain lists every thread's
+          conversations, section-labeled; a section's brain lists only its
+          own. Each row opens the real exchange in the feed. Not the retired
+          generic pills — this is the member's own history, in context. */}
+      {briefConvos.length > 0 && (
+        <div className="afeed__convos abrief__convos">
+          <p className="abrief__convos-h">Earlier conversations</p>
+          {briefConvos.map((c) => (
+            <button className="afeed__convo" key={c.id}
+              onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}`)}>
+              <div className="afeed__convo-main">
+                {feedThread === 'general' && c.thread !== 'general' && (
+                  <span className="afeed__convo-tag">{threadLabel(c.thread)}</span>
+                )}
+                <p className="afeed__convo-title">{c.title}</p>
+                <p className="afeed__convo-snippet">
+                  {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
+                    + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
+                </p>
+              </div>
+              <div className="afeed__convo-side">
+                <span className="afeed__convo-when">{briefAgo(c.last.created_at)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* The "Carbon decides; silicon organizes" foot was CUT (founder
           2026-09-13) — the promise lives in the consent checkbox above. */}

@@ -264,6 +264,64 @@ export async function loadThreadCursor(thread: string): Promise<number> {
   return row ? new Date(row.read_at).getTime() : 0;
 }
 
+/** Every thread's cursor at once — the General history log shows OTHER
+ *  threads' conversations (founder 2026-10-06: "The general brain should
+ *  cover all conversations"), and each pill must measure against ITS
+ *  thread's cursor, not General's. */
+export async function loadThreadCursors(): Promise<Record<string, number>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const { data } = await supabase.from('assistant_thread_reads')
+    .select('thread, read_at').eq('profile_id', user.id);
+  const out: Record<string, number> = {};
+  (((data as { thread: string; read_at: string }[] | null) ?? []))
+    .forEach((r) => { out[r.thread] = new Date(r.read_at).getTime(); });
+  return out;
+}
+
+/** One conversation, grouped for a list row. */
+export interface ConvoGroup {
+  id: string;            // convo_id, or `loose:<thread>` for pre-id rows
+  thread: string;
+  entries: FeedPostRow[];
+  title: string;
+  last: FeedPostRow;
+}
+
+/** The self-organizing gap: entries closer together than this belong to one
+ *  exchange (the backfill's rule, and the brief composer's continue rule —
+ *  founder 2026-10-06: toggling away and back must not orphan the history). */
+export const CONVO_GAP_MS = 6 * 3600 * 1000;
+
+/** Group feed rows into conversations, newest activity first — the ONE
+ *  grouping both the feed's list and the brief's history log render. */
+export function groupConvos(rows: FeedPostRow[]): ConvoGroup[] {
+  const by = new Map<string, FeedPostRow[]>();
+  rows.forEach((p) => {
+    const k = p.convo_id ?? `loose:${p.thread}`;
+    const arr = by.get(k);
+    if (arr) arr.push(p); else by.set(k, [p]);
+  });
+  return [...by.entries()].map(([id, entries]) => {
+    const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
+    const title = (firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
+      || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post');
+    return { id, thread: entries[0].thread, entries, title, last: entries[entries.length - 1] };
+  }).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
+}
+
+/** The thread's newest entry — the brief composer continues a FRESH
+ *  conversation instead of always starting a new one. */
+export async function latestConvoIn(thread: string): Promise<{ convoId: string | null; at: number } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('assistant_feed_posts')
+    .select('convo_id, created_at').eq('profile_id', user.id).eq('thread', thread)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const row = data as { convo_id: string | null; created_at: string } | null;
+  return row ? { convoId: row.convo_id, at: new Date(row.created_at).getTime() } : null;
+}
+
 /** What Claude is working from, when it works on your page — a receipt of its
  *  OWN inputs, not a description of you (founder 2026-08-11: "show the user
  *  the context Claude already has on the subject"). Read straight from the

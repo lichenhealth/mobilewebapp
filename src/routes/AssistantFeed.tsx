@@ -9,8 +9,8 @@ import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
-  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursor,
-  loadProfileContext, loadSpaceContext, spaceIdOfThread, loadSectionPresence,
+  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
+  loadProfileContext, loadSpaceContext, spaceIdOfThread, loadSectionPresence, groupConvos,
   ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
 import type { IconName } from '../components/Icon';
@@ -188,10 +188,15 @@ export default function AssistantFeed() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
   const [avatars, setAvatars] = useState<{ me?: string | null; claude?: string | null }>({});
-  // The thread's read cursor as of load — the conversation list's pills
-  // measure against THIS, frozen, so opening one conversation doesn't
-  // silently clear the others' pills (the cursor itself still bumps).
-  const [cursorAt, setCursorAt] = useState(0);
+  // Every thread's read cursor as of load — frozen, so opening one
+  // conversation doesn't silently clear the others' pills (the cursors
+  // themselves still bump). A map because General's list spans ALL threads
+  // now (founder 2026-10-06) and each row measures against its own.
+  const [cursors, setCursors] = useState<Record<string, number>>({});
+  // General is the HISTORY LOG: every personal thread's rows ride here so
+  // its list can show every conversation, section-labeled. Other threads
+  // keep allRows === their own rows.
+  const [allRows, setAllRows] = useState<FeedPostRow[]>([]);
   const [seenConvos, setSeenConvos] = useState<Set<string>>(new Set());
   // Auto-opens are STATE, not URL (no history step for a decision the
   // member didn't make): one conversation → straight in; none → a fresh
@@ -204,9 +209,11 @@ export default function AssistantFeed() {
 
   const load = async () => {
     if (!me) return;
-    const rows = await loadAssistantFeed(me, thread);
+    const all = await loadAssistantFeed(me, thread === 'general' ? undefined : thread);
+    const rows = thread === 'general' ? all.filter((r) => r.thread === 'general') : all;
     setPosts(rows);
-    if (personal) setCursorAt(await loadThreadCursor(thread).catch(() => 0));
+    setAllRows(thread === 'general' ? all.filter((r) => !spaceIdOfThread(r.thread)) : rows);
+    if (personal) setCursors(await loadThreadCursors().catch(() => ({})));
     setLoading(false);
     // A personal thread's cursor bumps when a CONVERSATION opens (the
     // effect below) — arriving on the list leaves the pills telling the
@@ -222,24 +229,13 @@ export default function AssistantFeed() {
   };
   useEffect(() => { setLoading(true); void load(); }, [me, thread]);
 
-  // CONVERSATIONS, derived (personal threads): group by convo_id, newest
-  // activity first. Entries from an old client with no convo land in one
-  // 'loose' bucket rather than vanishing.
-  const convos = useMemo(() => {
-    if (!personal) return [];
-    const by = new Map<string, FeedPostRow[]>();
-    posts.forEach((p) => {
-      const k = p.convo_id ?? 'loose';
-      const arr = by.get(k);
-      if (arr) arr.push(p); else by.set(k, [p]);
-    });
-    return [...by.entries()].map(([id, entries]) => {
-      const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
-      const title = (firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
-        || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post');
-      return { id, entries, title, last: entries[entries.length - 1] };
-    }).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
-  }, [personal, posts]);
+  // CONVERSATIONS, derived (personal threads): one shared grouping
+  // (groupConvos). General groups over EVERY personal thread's rows — the
+  // history log (founder 2026-10-06: "The general brain should cover all
+  // conversations"); section threads carry only their own.
+  const convos = useMemo(
+    () => (personal ? groupConvos(thread === 'general' ? allRows : posts) : []),
+    [personal, thread, allRows, posts]);
 
   // Opened or arrived: pick the right first view once the rows are in.
   // A door's errand (?ask= prefill, ?build=1) opens a conversation ONCE —
@@ -253,7 +249,7 @@ export default function AssistantFeed() {
       return;
     }
     if (convos.length === 0) setAutoConvo('new');
-    else if (convos.length === 1) setAutoConvo(convos[0].id);
+    else if (convos.length === 1 && convos[0].thread === thread) setAutoConvo(convos[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personal, loading, convoParam, autoConvo, convos.length, thread]);
 
@@ -274,8 +270,9 @@ export default function AssistantFeed() {
     if (openConvo === 'new') return [];
     return posts.filter((p) => (p.convo_id ?? 'loose') === openConvo);
   }, [personal, posts, openConvo]);
-  const convoUnread = (c: { id: string; entries: FeedPostRow[] }): number => {
+  const convoUnread = (c: { id: string; thread: string; entries: FeedPostRow[] }): number => {
     if (seenConvos.has(c.id)) return 0;
+    const cursorAt = cursors[c.thread] ?? 0;
     const lastMine = Math.max(0, ...c.entries.filter((e) => e.author === 'member').map((e) => +new Date(e.created_at)));
     const floor = cursorAt > 0
       ? Math.max(cursorAt, lastMine)
@@ -379,8 +376,11 @@ export default function AssistantFeed() {
         (payload) => {
           const row = payload.new as FeedPostRow;
           if ((row.thread ?? 'general') !== thread) {
-            // Another thread's business — a fresh reply there is exactly
-            // what the rail's badge is FOR now.
+            // Another thread's business — the rail's badge speaks, and
+            // General's history log stays live (it lists every thread).
+            if (thread === 'general' && !spaceIdOfThread(row.thread)) {
+              setAllRows((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
+            }
             void loadThreadBadges(me).then(setCounts);
             return;
           }
@@ -394,6 +394,7 @@ export default function AssistantFeed() {
           if (seeing) void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
           else void loadThreadBadges(me).then(setCounts);
           setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
+          setAllRows((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
           // Claude has just spoken in a page-building thread (yours or a
           // space's) — reload the frame beside the conversation so you SEE
           // the change rather than being told about it.
@@ -453,6 +454,7 @@ export default function AssistantFeed() {
     const row = await postToAssistantFeed(text, undefined, thread, images,
       personal ? continuing : null);
     setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
+    setAllRows((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
     if (personal && row.convo_id && convoParam !== row.convo_id) {
       const next = new URLSearchParams(params);
       next.set('convo', row.convo_id);
@@ -792,11 +794,17 @@ export default function AssistantFeed() {
             const unread = convoUnread(c);
             return (
               <button className="afeed__convo" key={c.id} onClick={() => {
+                // A foreign-thread row (General's history log) opens IN its
+                // own thread — the conversation lives where it was formed.
                 const next = new URLSearchParams(params);
+                if (c.thread !== thread) next.set('thread', c.thread);
                 next.set('convo', c.id);
                 setParams(next);
               }}>
                 <div className="afeed__convo-main">
+                  {c.thread !== thread && (
+                    <span className="afeed__convo-tag">{threadLabel(c.thread)}</span>
+                  )}
                   <p className="afeed__convo-title">{c.title}</p>
                   <p className="afeed__convo-snippet">
                     {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
