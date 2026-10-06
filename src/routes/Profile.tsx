@@ -35,6 +35,7 @@ import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } fro
 import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import AssistantDoor from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
@@ -435,6 +436,9 @@ export default function Profile() {
   const view = searchParams.get('view');
   const [contact, setContact] = useState<ContactInfo>({});
   const [publicPage, setPublicPage] = useState(false);
+  // Touched = the member moved the publish switch themselves this session
+  // (the untouched-save rule, founder 2026-10-06 — see the update below).
+  const publicPageTouched = useRef(false);
   const [webMsg, setWebMsg] = useState('');
   const [pageMeta, setPageMeta] = useState<PageMeta>({});
   // DRAFT AND PUBLISH, the member's page (founder 2026-08-29). Same contract
@@ -516,7 +520,13 @@ export default function Profile() {
     const { error: e } = await supabase.from('profiles')
       .update({
         contact: Object.keys(contact).length ? contact : null,
-        public_page: publicPage,
+        // The publish switch rides only when touched this session — the
+        // assistant can flip public_page by conversation now (founder
+        // 2026-10-06), and a stale form must never flip it back. The
+        // pre-checked never-begun-page default still publishes: checking
+        // arrives pre-touched only through the member's own Publish intent
+        // when the box state differs from what loaded.
+        ...(publicPageTouched.current || publicPage !== savedPublicPage ? { public_page: publicPage } : {}),
         page: Object.keys(pageMeta).length ? pageMeta : null,
         handle: h || null,
       })
@@ -841,6 +851,21 @@ export default function Profile() {
 
       {error && <p className="prof__error">{error}</p>}
 
+      {/* THE BRAIN LIVES IN ADMIN TOO (founder 2026-10-06, the space
+          backstage's twin — the every-surface rule): the profile briefing,
+          whose composer lands in the Profile management thread where the
+          page tools are armed — change any of this by conversation. */}
+      <div className="sprof__brainrow">
+        <AssistantDoor
+          section="profile"
+          size={38}
+          label="Ask Claude to change any of this — your page, what's public, the words"
+        />
+        <span className="sprof__brainrow-hint">
+          Or just ask — the brain changes any of this by conversation.
+        </span>
+      </div>
+
       {/* YOUR LICHEN PROFILE leads (founder 2026-08-20 consolidation):
           who you are inside the network — name, story, how you show up. */}
       {/* "Profile" plainly (founder 2026-09-07: the Lichen profile "builds
@@ -930,7 +955,7 @@ export default function Profile() {
 
 
           <label className="prof__consent">
-            <input type="checkbox" checked={publicPage} onChange={(e) => setPublicPage(e.target.checked)} />
+            <input type="checkbox" checked={publicPage} onChange={(e) => { publicPageTouched.current = true; setPublicPage(e.target.checked); }} />
             <span>
               <strong>Publish my page to the open web</strong>
               <em>

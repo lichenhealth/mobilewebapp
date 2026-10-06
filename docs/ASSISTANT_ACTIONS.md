@@ -212,3 +212,21 @@ reply correctly noted the dropped module held no lessons. The same ship
 fixed the vanished-message bug (see CLAUDE.md): the member's own send
 is appended from the insert's returned row, verified rendering with
 realtime entirely dead.
+
+## The publish switch, by conversation (2026-10-06)
+
+Founder, marking up the space backstage: "let's have the brain here in
+admin, so you can change anything about the profile, e.g. private,
+public, etc and change it simply by prompting." Two twin tools:
+`set_page_published` (member, profile thread) and
+`set_space_page_published` (spaceEdit.ts — build threads AND suggestion
+rooms). Both flip the `public_page` COLUMN live — a switch, not page
+content, so it never routes through the draft; an unpublished draft
+stays a draft either way. A no-op flip answers "already public/private"
+instead of pretending to act, and the reply must say which way it went.
+The builders stopped clobbering it: their Publish writes `public_page`
+only when the person touched the checkbox that session (the
+untouched-save rule), so a conversation-made flip survives a later
+publish of unrelated page work. Deliberately NOT tools: the Privacy
+flags (findable, assistant_readable, content defaults) — switches about
+what the assistant itself may read are not the assistant's to flip.

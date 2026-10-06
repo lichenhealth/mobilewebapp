@@ -348,6 +348,14 @@
 .sprof__version-what em { display: block; font-style: normal; font-size: 11px; color: var(--ink-faint); }
 
 /* ── THE TWO BUILDERS (founder 2026-08-29: "a real website builder") ────── */
+/* The brain in admin (founder 2026-10-06): the briefing door + one quiet
+   line — change any of this by conversation. Sits above the accordion. */
+.sprof__brainrow {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px 0 12px;
+}
+.sprof__brainrow-hint { font-size: 13px; color: var(--ink-muted); }
+
 .sprof__doors { display: flex; gap: 12px; margin: 4px 0 16px; }
 .sprof__door {
   flex: 1; text-align: left; padding: 18px 16px; cursor: pointer;

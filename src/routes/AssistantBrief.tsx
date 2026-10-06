@@ -766,12 +766,15 @@ export default function AssistantBrief() {
    *  relationship that's about gathering context over time) — the same
    *  daily cap, the same answering trigger — and we land you there to read
    *  the reply. */
-  async function sendToClaude(text: string) {
+  async function sendToClaude(text: string, images?: string[]) {
     if (!me) return;
     // A brief's ask starts a FRESH conversation (the email grammar, founder
     // 2026-10-05) — and lands you inside it, not on the thread's list. A
     // space's build thread stays one continuous stream (convo null).
-    const row = await postToAssistantFeed(text, undefined, feedThread, undefined,
+    // Photos ride along (founder 2026-10-06: "allow people to upload photos
+    // to their Ai assistant… just like with you" — the feed composer always
+    // could; this inline reply was the gap).
+    const row = await postToAssistantFeed(text, undefined, feedThread, images,
       spaceParam ? null : undefined);
     navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
@@ -910,6 +913,7 @@ export default function AssistantBrief() {
         key={params.get('ask') ?? 'blank'}
         onSend={sendToClaude}
         initialText={params.get('ask') ?? undefined}
+        uploaderId={me || undefined}
       />
 
       {/* The "Carbon decides; silicon organizes" foot was CUT (founder
