@@ -112,6 +112,18 @@ export default function Compose() {
   const [aiNote, setAiNote] = useState('');
   const [allCats, setAllCats] = useState<Category[] | null>(null);
   const [catTags, setCatTags] = useState<string[]>([]);
+  // TRAVEL IS AN EXCHANGE (founder 2026-10-06: "private citizens who drive
+  // cars, trucks, airplanes and helicopters - as well as any companies"):
+  // a ride or a stay carries its physical facts the way a listing carries
+  // condition — route, vehicle and seats for a ride; sleeps for a stay.
+  // The TERMS stay the universal modes (gift/trade/rent/Current-cy), which
+  // is what makes "an apt in SF for a villa in France" just a Trade.
+  const [travelKind, setTravelKind] = useState<'' | 'ride' | 'stay'>('');
+  const [routeFrom, setRouteFrom] = useState('');
+  const [routeTo, setRouteTo] = useState('');
+  const [vehicle, setVehicle] = useState('');
+  const [seats, setSeats] = useState('');
+  const [sleeps, setSleeps] = useState('');
   useEffect(() => {
     if (!tagsOpen || allCats !== null) return;
     void supabase.from('categories').select('*').order('sort')
@@ -346,6 +358,12 @@ export default function Compose() {
       if (d.deliverRadiusMi != null) setDeliverRadius(String(d.deliverRadiusMi));
       if (typeof d.paymentPlan === 'string') setPaymentPlan(d.paymentPlan);
       if (Array.isArray(d.categories)) { setCatTags(d.categories as string[]); }
+      if (d.travelKind === 'ride' || d.travelKind === 'stay') setTravelKind(d.travelKind);
+      if (typeof d.routeFrom === 'string') setRouteFrom(d.routeFrom);
+      if (typeof d.routeTo === 'string') setRouteTo(d.routeTo);
+      if (typeof d.vehicle === 'string') setVehicle(d.vehicle);
+      if (d.seats != null) setSeats(String(d.seats));
+      if (d.sleeps != null) setSleeps(String(d.sleeps));
       if (typeof d.meetingUrl === 'string' && d.meetingUrl) { setMeetingUrl(d.meetingUrl); setOnline(true); }
       if (typeof d.online === 'boolean') setOnline(d.online);
       if (typeof d.inPerson === 'boolean') setInPerson(d.inPerson);
@@ -498,6 +516,7 @@ export default function Compose() {
   // 2026-07-26): no Type row (they're educational by nature), an Organize-into
   // picker, and — everything being an exchange — the offer block.
   const isCourse = areas.has('courses');
+  const isTravel = areas.has('travel');
   const isLibrary = areas.has('library');
   // Default a fresh course/library story to Everyone + the spaces you ADMIN
   // (founder: "when Melanie posts a course it goes to her own profile, the
@@ -665,6 +684,18 @@ export default function Compose() {
           }
           if (modes.has('paid') && paymentPlan.trim()) details.paymentPlan = paymentPlan.trim();
           if (catTags.length) details.categories = catTags;
+          // Travel facts (founder 2026-10-06): structured so the matcher,
+          // the cards, and Maps can read them — never only prose.
+          if (isTravel) {
+            if (travelKind) details.travelKind = travelKind;
+            if (routeFrom.trim()) details.routeFrom = routeFrom.trim();
+            if (routeTo.trim()) details.routeTo = routeTo.trim();
+            if (vehicle) details.vehicle = vehicle;
+            const nSeats = Number(seats);
+            if (travelKind === 'ride' && Number.isFinite(nSeats) && nSeats > 0) details.seats = nSeats;
+            const nSleeps = Number(sleeps);
+            if (travelKind === 'stay' && Number.isFinite(nSleeps) && nSleeps > 0) details.sleeps = nSleeps;
+          }
           if (modes.has('trade') && tradeFor.trim()) {
             const tags = tradeFor.split(',').map((t) => t.trim()).filter(Boolean);
             if (tags.length > 1) details.tradeTags = tags;
@@ -1312,14 +1343,65 @@ export default function Compose() {
             <input className="cmp__input" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="Open to trades for… (optional)" />
           )}
 
-          {areas.has('travel') && (
-            <p className="cmp__hint-ev">
-              Travel: a <strong>stay</strong> reads best with dates and what&rsquo;s included;
-              a <strong>ride</strong> with where you&rsquo;re leaving from, where you&rsquo;re headed,
-              and seats. Looking rather than offering? Add the <strong>ISO</strong> mode — the
-              matcher rings people going your way.
-            </p>
-          )}
+          {isTravel && !isEvent && (<>
+            {/* TRAVEL FACTS (founder 2026-10-06): the exchange between private
+                citizens who drive cars, trucks, airplanes and helicopters —
+                and the companies that join in. A ride says its route; a stay
+                says its roof. Terms stay the shared modes above. */}
+            <label className="cmp__label">Travel <span className="cmp__label-soft">(the facts that help someone say yes)</span></label>
+            <div className="cmp__chips">
+              <button className={'cmp__chip' + (travelKind === 'ride' ? ' is-on' : '')}
+                onClick={() => setTravelKind((k) => k === 'ride' ? '' : 'ride')}>Ride / transport</button>
+              <button className={'cmp__chip' + (travelKind === 'stay' ? ' is-on' : '')}
+                onClick={() => setTravelKind((k) => k === 'stay' ? '' : 'stay')}>Stay / place</button>
+            </div>
+            {travelKind === 'ride' && (<>
+              <div className="cmp__row">
+                <input className="cmp__input" value={routeFrom} onChange={(e) => setRouteFrom(e.target.value)}
+                  placeholder={modes.has('iso') ? 'Leaving from…' : 'From (e.g. Conifer, CO)'} />
+                <span className="cmp__to">→</span>
+                <input className="cmp__input" value={routeTo} onChange={(e) => setRouteTo(e.target.value)}
+                  placeholder={modes.has('iso') ? 'Headed to…' : 'To (e.g. Santa Fe, NM)'} />
+              </div>
+              <div className="cmp__chips">
+                {['Car', 'Truck', 'Van', 'RV', 'Boat', 'Plane', 'Helicopter'].map((v) => (
+                  <button key={v} className={'cmp__chip' + (vehicle === v ? ' is-on' : '')}
+                    onClick={() => setVehicle((cur) => cur === v ? '' : v)}>{v}</button>
+                ))}
+              </div>
+              <div className="cmp__row cmp__radius-row">
+                <span className="cmp__label-soft">Seats or cargo room for</span>
+                <input className="cmp__input cmp__radius-input" type="number" min={1} value={seats}
+                  onChange={(e) => setSeats(e.target.value)} placeholder="3" aria-label="Seats" />
+              </div>
+              <p className="cmp__hint-ev">
+                Cargo counts too — a refrigerated truck run, a flight with an empty seat.
+                Looking rather than offering? Add the <strong>ISO</strong> mode — the matcher
+                rings people going your way.
+              </p>
+            </>)}
+            {travelKind === 'stay' && (<>
+              <div className="cmp__row cmp__radius-row">
+                <span className="cmp__label-soft">Sleeps</span>
+                <input className="cmp__input cmp__radius-input" type="number" min={1} value={sleeps}
+                  onChange={(e) => setSleeps(e.target.value)} placeholder="4" aria-label="Sleeps" />
+              </div>
+              <p className="cmp__hint-ev">
+                Check <strong>In person</strong> below and give the town or address — a stay
+                with a pin shows on Maps. A home swap is just the <strong>Trade</strong> mode
+                (“open to trades for… a place in France”). Tag what kind of place it is
+                under Category tags — hotel, retreat center, campground…
+              </p>
+            </>)}
+            {!isMarket && (<>
+              <label className="cmp__label">When <span className="cmp__label-soft">(optional — dates offered, or dates you need)</span></label>
+              <div className="cmp__row cmp__avail-row">
+                <input className="cmp__input" type="date" value={availFrom} onChange={(e) => setAvailFrom(e.target.value)} aria-label="Available from" />
+                <span className="cmp__to">to</span>
+                <input className="cmp__input" type="date" value={availTo} onChange={(e) => setAvailTo(e.target.value)} aria-label="Available until" />
+              </div>
+            </>)}
+          </>)}
 
           {/* Listing details (Figma 286-4961) — the physical facts. Shown for
               Marketplace listings; courses/library/events don't have a
@@ -1386,6 +1468,12 @@ export default function Compose() {
                 <span className="cmp__label-soft">miles</span>
               </div>
             )}
+          </>)}
+
+          {/* Category tags serve Marketplace AND Travel (founder 2026-10-06:
+              the Places vocabulary — hotels, retreat centers, campgrounds —
+              is how search finds a stay). One toggle, every tag domain. */}
+          {(isMarket || isTravel) && !isEvent && (<>
             <button className="cmp__tags-toggle" onClick={() => setTagsOpen((o) => !o)} aria-expanded={tagsOpen}>
               Category tags {catTags.length > 0 && `· ${catTags.length}`}{' '}
               <span className="cmp__label-soft">— help search find this</span>

@@ -400,8 +400,8 @@ export default function App() {
           <Route path="/travel"   element={
             <AreaFeed area="travel" icon="plane" crumb="Travel"
               title="Lichen" italic="Travel."
-              sub="Stays, rides, and getting there together — with people your web knows."
-              addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse />
+              sub="Rides, hauls, flights and stays — exchanged between people your web knows."
+              addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
           } />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}

@@ -26,7 +26,7 @@ import ExchangePanel from '../components/ExchangePanel';
 const AREA_HOME: Partial<Record<ServiceArea, string>> = {
   marketplace: '/market', courses: '/courses', library: '/library',
   events: '/events', work: '/work', places: '/places',
-  art: '/art', food: '/food',
+  art: '/art', food: '/food', travel: '/travel',
 };
 
 /** The post's own page (Figma 286-6331/286-6469): the full read — complete
@@ -135,6 +135,10 @@ export default function PostPage() {
   const recommended = myRecs.has('post:' + p.id);
   const areas = postAreas(p).filter((a) => AREA_HOME[a]);
   const isMarket = postAreas(p).includes('marketplace') && !p.linked_event_id;
+  // TRAVEL IS AN EXCHANGE (founder 2026-10-06): a ride or a stay gets the
+  // same exchange door and facts panel a marketplace listing gets — the
+  // SF-apartment-for-French-villa trade closes here, not in a DM.
+  const isTravel = postAreas(p).includes('travel') && !p.linked_event_id;
 
   // The five fields Compose has written since 2026-07-28 with no reader.
   const d = (p.details ?? {}) as Record<string, unknown>;
@@ -147,7 +151,13 @@ export default function PostPage() {
   const listOf = (v: unknown, map: Record<string, string>) =>
     Array.isArray(v) ? (v as string[]).map((x) => map[x] ?? x).join(' · ') : '';
   const when = [d.availFrom, d.availTo].filter(Boolean) as string[];
+  const route = [d.routeFrom, d.routeTo].filter((x) => typeof x === 'string' && x) as string[];
   const facts: { label: string; value: string }[] = [
+    { label: 'Kind', value: d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'stay' ? 'Stay / place' : '' },
+    { label: 'Route', value: route.join(' → ') },
+    { label: 'Vehicle', value: typeof d.vehicle === 'string' ? d.vehicle : '' },
+    { label: 'Seats', value: typeof d.seats === 'number' ? String(d.seats) : '' },
+    { label: 'Sleeps', value: typeof d.sleeps === 'number' ? String(d.sleeps) : '' },
     { label: 'Condition', value: listOf(d.condition, CONDITION) },
     {
       label: when.length === 2 ? 'Available' : 'Available',
@@ -258,14 +268,14 @@ export default function PostPage() {
       {/* THE EXCHANGE (founder 2026-08-05). A marketplace listing finally has
           a door forward that isn't a pasted URL: ask for it, then a live strip
           showing what it's waiting on. */}
-      {isMarket && me && (
+      {(isMarket || isTravel) && me && (
         <ExchangePanel post={p} me={me} />
       )}
 
       {/* The physical facts a buyer needs to choose — condition, when, and how
           it changes hands. Compose has written these since 2026-07-28 and
           nothing has ever rendered them until now. */}
-      {isMarket && (facts.length > 0) && (
+      {(isMarket || isTravel) && (facts.length > 0) && (
         <div className="postp__facts">
           {facts.map((f) => (
             <div className="postp__fact" key={f.label}>

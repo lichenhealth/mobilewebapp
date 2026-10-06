@@ -43,11 +43,14 @@ const KIND_LABEL: Record<SpaceKind, string> = {
   place: 'Place', organization: 'Organization', community: 'Community', group: 'Group',
 };
 
-type LayerKey = 'events' | 'places' | 'orgs' | 'communities' | 'groups' | 'people';
+type LayerKey = 'events' | 'travel' | 'places' | 'orgs' | 'communities' | 'groups' | 'people';
 // Each layer wears the mark that section wears everywhere else, so a pin and
 // its filter read as the same thing (founder 2026-08-15).
 const LAYERS: { key: LayerKey; label: string; icon: IconName }[] = [
   { key: 'events', label: 'Events', icon: 'rsvp' },
+  // Travel pins (founder 2026-10-06): a stay or a ride's starting point,
+  // offered with a real address, shows where it IS — the Places interplay.
+  { key: 'travel', label: 'Travel', icon: 'plane' },
   { key: 'places', label: 'Places', icon: 'location' },
   { key: 'orgs', label: 'Orgs', icon: 'globe' },
   { key: 'communities', label: 'Communities', icon: 'user-multiple' },
@@ -56,7 +59,7 @@ const LAYERS: { key: LayerKey; label: string; icon: IconName }[] = [
 ];
 /** The pin's glyph, drawn straight from Icon.tsx so map and app never drift. */
 const LAYER_ICON: Record<LayerKey, IconName> = {
-  events: 'rsvp', places: 'location', orgs: 'globe',
+  events: 'rsvp', travel: 'plane', places: 'location', orgs: 'globe',
   communities: 'user-multiple', groups: 'groups', people: 'member-heart',
 };
 const KIND_LAYER: Record<SpaceKind, LayerKey> = {
@@ -79,10 +82,11 @@ export default function MapView() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [eventPins, setEventPins] = useState<EventPin[]>([]);
+  const [travelPins, setTravelPins] = useState<EventPin[]>([]);
   const [spacePins, setSpacePins] = useState<MappableSpace[]>([]);
   const [ready, setReady] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
-    events: true, places: true, orgs: true, communities: true, groups: true, people: true,
+    events: true, travel: true, places: true, orgs: true, communities: true, groups: true, people: true,
   });
   const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
   const [bizPins, setBizPins] = useState<BizLocationPin[]>([]);
@@ -107,12 +111,26 @@ export default function MapView() {
           return !!ev.recurrence || (ev.end_date ?? ev.start_date) >= today;
         })
         .map((p) => ({ post: p, lat: p.linked_event!.lat!, lng: p.linked_event!.lng! }));
-      if (live) { setEventPins(mappable); setSpacePins(spaces); setPeoplePins(people); setBizPins(biz); setReady(true); }
+      // Travel posts with a real pin (founder 2026-10-06): a stay's address,
+      // or where a ride leaves from — Compose geocodes details.geo whenever
+      // the member picked an In-person place.
+      const travel = feed
+        .filter((p) => postAreas(p).includes('travel') && !postAreas(p).includes('events'))
+        .filter((p) => {
+          const g = (p.details as { geo?: { lat?: unknown; lng?: unknown } } | null)?.geo;
+          return typeof g?.lat === 'number' && typeof g?.lng === 'number';
+        })
+        .map((p) => {
+          const g = (p.details as { geo: { lat: number; lng: number } }).geo;
+          return { post: p, lat: g.lat, lng: g.lng };
+        });
+      if (live) { setEventPins(mappable); setTravelPins(travel); setSpacePins(spaces); setPeoplePins(people); setBizPins(biz); setReady(true); }
     })();
     return () => { live = false; };
   }, []);
 
   const visibleEvents = useMemo(() => (layers.events ? eventPins : []), [eventPins, layers]);
+  const visibleTravel = useMemo(() => (layers.travel ? travelPins : []), [travelPins, layers]);
   // A pin on the map already means "somewhere you can go", so the Places
   // layer shows every pinned space regardless of kind (founder 2026-08-06:
   // "organizations can show up in a places search... if they have an HQ").
@@ -213,6 +231,25 @@ export default function MapView() {
       next.set(`evt:${post.id}`, marker);
     });
 
+    visibleTravel.forEach(({ post, lat, lng }) => {
+      const d = (post.details ?? {}) as { travelKind?: unknown; routeFrom?: unknown; routeTo?: unknown; location?: unknown; sleeps?: unknown };
+      const kind = d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'stay' ? 'Stay' : 'Travel';
+      const routeLine = [d.routeFrom, d.routeTo].filter((x) => typeof x === 'string' && x).join(' → ');
+      const el = makePin('mapv__pin--space', 'travel', post.title ?? 'Travel');
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: post.title || 'Travel' },
+            { cls: 'mapv__popup-when', text: typeof d.sleeps === 'number' ? `${kind} · sleeps ${d.sleeps}` : kind },
+            { cls: 'mapv__popup-loc', text: routeLine || (typeof d.location === 'string' ? d.location : '') },
+          ],
+          { label: 'Open the offer', onClick: () => navigate(`/posts/${post.id}`) },
+        ))
+        .addTo(map);
+      next.set(`trv:${post.id}`, marker);
+    });
+
     visibleSpaces.forEach((s) => {
       const el = makePin('mapv__pin--space', KIND_LAYER[s.kind], s.name);
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -275,7 +312,7 @@ export default function MapView() {
       visibleBiz.forEach((b) => bounds.extend([b.lng, b.lat]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
-  }, [visibleEvents, visibleSpaces, visiblePeople, visibleBiz, navigate]);
+  }, [visibleEvents, visibleTravel, visibleSpaces, visiblePeople, visibleBiz, navigate]);
 
   // Wait for the marker to exist (they're rebuilt whenever pins/layers
   // change), then fly once. `done` keeps a later re-render from yanking the
@@ -314,7 +351,7 @@ export default function MapView() {
     }
   }, [focusSpace, focusMember, focusEvent, spacePins, peoplePins, bizPins, eventPins, flyTo]);
 
-  const totalPins = eventPins.length + spacePins.length + peoplePins.length + bizPins.length;
+  const totalPins = eventPins.length + travelPins.length + spacePins.length + peoplePins.length + bizPins.length;
 
   return (
     <div className="mapv">
