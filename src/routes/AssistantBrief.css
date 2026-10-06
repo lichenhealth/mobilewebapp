@@ -3,8 +3,8 @@
 .abrief__avatar-wrap { position: relative; display: inline-block; }
 .abrief__avatar {
   width: 76px; height: 76px; border-radius: 50%;
-  background: transparent; border: 1px solid var(--blue);
-  color: var(--blue);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
 }
 /* The silicon badge, top-right — same element language as About's C/Si
@@ -12,14 +12,14 @@
 .abrief__el {
   position: absolute; top: -2px; right: -4px;
   min-width: 22px; height: 22px; padding: 0 5px; border-radius: var(--r-full);
-  background: var(--blue); color: #fff;
+  background: var(--peach); color: #fff;
   font-family: var(--font-mono); font-size: 10px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .abrief__title { margin: 8px 0 0; font-family: var(--font-display, inherit); font-size: 24px; }
 .abrief__scope {
   margin: 2px 0 0; font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue-deep, var(--blue));
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--peach-deep);
 }
 .abrief__sub { margin: 6px auto 0; font-size: 13px; color: var(--ink-muted); max-width: 46ch; }
 .abrief__card {
@@ -32,7 +32,7 @@
 .abrief__updated { margin: 10px 0 0; font-size: 11px; color: var(--ink-faint); }
 .abrief__refresh {
   border: 0; background: transparent; padding: 0; font: inherit; font-size: 11px;
-  color: var(--blue-deep, var(--blue)); text-decoration: underline; cursor: pointer;
+  color: var(--peach-deep); text-decoration: underline; cursor: pointer;
 }
 .abrief__acts { display: flex; gap: 10px; flex-wrap: wrap; }
 /* Standalone actions are BUBBLES, not bare text (founder 2026-09-13, the
@@ -51,21 +51,16 @@
 /* ── The composer at the foot of the brief (founder 2026-08-05) ────────
    Always there, like a real conversation: answer what you just read
    without going looking for a door. Sends into the same Claude DM. */
-/* Entities named in the brief are doors — silicon blue, because we're inside
-   the assistant's room (founder 2026-08-05). */
+/* Entities named in the brief are doors — the platform's own link-cue
+   grammar (ink text, peach underline). The old silicon blue was retired
+   in-app 2026-10-06 ("just use the beige for everything"). */
 .abrief__ref {
-  color: var(--blue-deep, var(--blue)); font-weight: 600; text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--ink); font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid var(--peach);
 }
-.abrief__ref:hover { border-bottom-color: var(--blue); }
+.abrief__ref:hover { border-bottom-color: var(--peach-deep); }
 
 /* Composer styling now lives in AssistantComposer.css (shared with the feed page). */
-
-/* Inside the assistant's own world everything wears silicon blue — the
-   consent checkbox included (founder 2026-08-05). tokens.css sets a peach
-   accent platform-wide; this is the one room that overrides it. */
-.abrief input[type="checkbox"],
-.abrief input[type="radio"] { accent-color: var(--blue); }
 
 /* The build card on the profile brief (founder 2026-08-17: Build with Claude
    is the brain's own door, arriving with the context that you came to build).
@@ -84,7 +79,7 @@
 .abrief__run-row { display: flex; align-items: flex-end; gap: 8px; }
 .abrief__run-ava {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-  background: #fff; border: 1px solid var(--blue); color: var(--blue);
+  background: #fff; border: 1px solid var(--bone-edge); color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
   margin-bottom: 2px;
 }

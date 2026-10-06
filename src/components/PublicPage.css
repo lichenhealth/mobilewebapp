@@ -46,8 +46,8 @@
 .ppage--in-app .ppage__hero { padding-top: var(--s-3); }
 .ppage--in-app .ppage__hero-body { padding-top: 0; }
 .ppage__preview {
-  margin: 0; padding: 8px var(--s-5); background: var(--blue-tint);
-  color: var(--blue-deep); font-size: 12.5px; text-align: center;
+  margin: 0; padding: 8px var(--s-5); background: var(--peach-tint);
+  color: var(--ink-soft); font-size: 12.5px; text-align: center;
 }
 .ppage__hero { position: relative; }
 /* Taller than a banner so a squarish photo keeps its subject — horse, rider

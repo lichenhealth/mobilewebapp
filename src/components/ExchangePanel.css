@@ -40,7 +40,7 @@
 
 /* Buying as a space you steward — the treasury pays, and it says so. */
 .xch__asspace {
-  margin: 0 0 8px; font-size: 12px; color: var(--blue-deep, var(--ink-soft));
+  margin: 0 0 8px; font-size: 12px; color: var(--ink-soft);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   border-radius: var(--r-md); padding: 6px 10px;
 }

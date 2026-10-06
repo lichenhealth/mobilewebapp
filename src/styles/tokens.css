@@ -33,13 +33,16 @@
   --red-deep:    #A3462F;
   --red-tint:    #F8E7E1;
 
-  --blue:        #7FA8C9;     /* stewardship / admin — the elements blue; peach = life, blue = tending the structure */
-  --blue-deep:   #5E89AD;
-  --blue-tint:   #EAF1F7;
+  /* RETIRED IN-APP (founder 2026-10-06: "get rid of the blue signifying Si
+     versus Ca. Let's just use the beige for everything") — the blue family is
+     repointed at neutrals so any straggler renders beige/ink, never blue.
+     Si-vs-Ca blue lives on ONLY on the static marketing pages. */
+  --blue:        #6B7479;     /* was #7FA8C9 */
+  --blue-deep:   #2A3338;     /* was #5E89AD */
+  --blue-tint:   #E6E2DA;     /* was #EAF1F7 */
 
   --rust:        #B8623C;     /* rare, hot emphasis */
   --berry:       #7C3F4F;
-  --sky:         #6B8A9C;
 
   --shadow-color: 18 24 28;   /* rgb of ink, for shadows */
 
