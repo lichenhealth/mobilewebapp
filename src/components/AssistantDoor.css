@@ -10,3 +10,32 @@
   position: absolute; width: 22px; height: 1.5px; background: var(--ink-faint);
   transform: rotate(-45deg); border-radius: 1px;
 }
+
+/* THE OFF-BRAIN ASKS IN PLACE (founder 2026-10-06): a grayed brain opens
+   this small card instead of a dead-end briefing — turn it on right here
+   and walk through, or keep it off. Anchors to whichever side has room. */
+.ai-door-wrap { position: relative; display: inline-flex; }
+.ai-door__pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+  width: min(250px, 78vw);
+  display: flex; flex-direction: column; gap: 10px;
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px;
+  padding: 12px 14px; box-shadow: 0 10px 28px rgba(42, 51, 56, 0.14);
+  text-align: left;
+}
+.ai-door__pop--right { left: auto; right: 0; }
+.ai-door__pop-text {
+  font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
+  letter-spacing: 0; text-transform: none; font-family: var(--font-body);
+}
+.ai-door__pop-row { display: flex; gap: 8px; }
+.ai-door__pop-on {
+  border: 0; border-radius: var(--r-full); padding: 7px 12px;
+  background: var(--peach); color: var(--ink); font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.ai-door__pop-on:hover { background: var(--peach-deep); color: #fff; }
+.ai-door__pop-no {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full); padding: 7px 12px;
+  background: none; color: var(--ink-muted); font-size: 12px; cursor: pointer;
+}

@@ -215,15 +215,22 @@
 
 /* Layer lenses — Marketplace's grammar (text + icon, a check when on), not
    filled pills, so every filter row on the platform reads the same. */
+/* LAYERS ARE ICON CIRCLES, MULTI-SELECT (founder 2026-10-06: "have these be
+   the circle icons, not words - but you can click multiple icons… dark
+   orange" — her own override of the text-lens grammar, for Maps only): each
+   layer is a circle wearing its section's mark, several can be lit at once,
+   and lit = peach-deep fill. The row keeps home's scroll grammar (hide-mode
+   ScrollHintRow, swipe or arrow-click both scroll). */
 .mapv__layer {
-  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
-  background: none; border: 0; padding: 4px 1px;
-  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--ink-muted); cursor: pointer; white-space: nowrap;
+  flex: 0 0 auto; width: 36px; height: 36px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft); cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
 }
 .mapv__layer svg { flex-shrink: 0; }
-.mapv__layer:hover { color: var(--ink); }
-.mapv__layer.is-on { color: var(--peach-deep); }
+.mapv__layer:hover { border-color: var(--peach); color: var(--ink); }
+.mapv__layer.is-on { background: var(--peach-deep); border-color: var(--peach-deep); color: var(--bone-warm); }
 
 /* Doors | lenses — the same hairline every room draws */
 .mapv__bar-divider {

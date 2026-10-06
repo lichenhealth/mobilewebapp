@@ -27,6 +27,7 @@ import {
   copyCareInvite, sendCareInviteEmail, prepareCareText, type CareLink, type CareInvite,
 } from '../lib/careTeamApi';
 import CareAddBox from '../components/CareAddBox';
+import AssistantDoor from '../components/AssistantDoor';
 import { occursOn } from '../lib/recurrence';
 
 // The plan's hour grids (founder 2026-09-24): the waking band the Day and
@@ -35,7 +36,7 @@ const KOC_BAND_START = 6;   // 6am
 const KOC_BAND_END = 22;    // up to 10pm
 const KOC_HOUR_H = 44;      // px per hour in the week columns
 import { useAuth } from '../auth/AuthProvider';
-import { consentOn, setConsent, careConsent } from '../lib/assistantConsentApi';
+import { careConsent } from '../lib/assistantConsentApi';
 import './Concierge.css';
 
 type ConciergeTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'team';
@@ -1027,7 +1028,6 @@ export default function Concierge() {
   // functions check server-side. It used to be component state: reset on
   // every mount, controlled nothing. Care is the highest-stakes room, so it
   // was the worst place for a switch to be theatre.
-  const [aiOn, setAiOn] = useState(() => consentOn('section', 'concierge'));
   // Mutual visibility (founder 2026-08-17): each side is told what the other
   // chose — silence in either direction is the failure.
   const [clientAiOff, setClientAiOff] = useState(false);
@@ -1490,20 +1490,17 @@ export default function Concierge() {
         >
           <Icon name="search" size={14} />
         </button>
-        <button
-          className={'conc__brain' + (aiOn ? ' is-on' : '')}
-          onClick={() => {
-            const next = !aiOn;
-            setAiOn(next);
-            setConsent('section', 'concierge', next);
-          }}
-          aria-pressed={aiOn}
-          title={aiOn
-            ? 'Your assistant is part of your care here \u2014 tap to switch it off. Your care team can see your choice.'
-            : 'You\u2019ve switched AI off for your care \u2014 no assistant reads or helps here, and your care team can see that. Tap to change.'}
-        >
-          <Icon name="brain" size={20} />
-        </button>
+        {/* THE BRAIN IS A DOOR HERE TOO (founder 2026-10-06: "Concierge
+            doesn't actually go anywhere with the brain… It should go to your
+            concierge brain"): the shared AssistantDoor — on, it opens the
+            concierge briefing; off, it grays and asks in place. Switching
+            OFF lives in Profile → Privacy (the consent list), where it
+            always did. */}
+        <AssistantDoor
+          section="concierge"
+          size={30}
+          label="Your assistant — part of your care here. Your care team can see when it's off."
+        />
         </>
         )}
         {activeTab === 'koc' && (
