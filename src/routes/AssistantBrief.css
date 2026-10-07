@@ -24,6 +24,26 @@
   letter-spacing: 0.06em; text-transform: uppercase; color: var(--peach-deep);
 }
 .abrief__sub { margin: 6px auto 0; font-size: 13px; color: var(--ink-muted); max-width: 46ch; }
+
+/* THE SECTION RAIL (founder 2026-10-07: "get rid of the map text, but have
+   the icons up top with the map icon selected (e.g. in peach)") — the
+   blurb's slot holds the brains as icon circles: you-are-here filled
+   peach-deep (the Maps-lens lit grammar), the rest one tap away. The rail
+   scrolls like every icon row (hide mode); inside the centered head it
+   stays a left-anchored scroll row so cut icons behave. */
+.abrief__rail { display: flex; gap: 10px; margin: 10px 0 0; padding-top: 4px; }
+.abrief__rail-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 50%; border: 1px solid var(--bone-edge);
+  background: var(--bone-warm); color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; font-family: inherit; padding: 0;
+}
+.abrief__rail-btn.is-here {
+  background: var(--peach-deep, var(--peach));
+  border-color: var(--peach-deep, var(--peach));
+  color: var(--bone-warm, #fff);
+}
 .abrief__card {
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   border-radius: var(--r-lg, 16px); padding: 18px 20px; margin-bottom: var(--s-4);

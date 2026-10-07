@@ -530,7 +530,7 @@ Deno.serve(async (req) => {
   const ident = Array.isArray(idents) ? idents[0] : null;
   if (!ident) return json({ ok: true, skipped: 'no-identity' });
 
-  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread,convo_id,attachments`)).json();
+  const posts = await (await sb(`assistant_feed_posts?id=eq.${feed_post_id}&select=body,source_post_id,thread,convo_id,attachments,sections`)).json();
   const trigger = Array.isArray(posts) ? posts[0] : null;
   // Pasted photos (founder 2026-08-22) — a photo with no words is still a
   // real message ("what do you think of this one?" is often implied).
@@ -2138,6 +2138,31 @@ Deno.serve(async (req) => {
   const MAX_TOOL_ROUNDS = 4;
   const changes: string[] = [];
 
+  // MULTI-SECTION CONVERSATIONS (founder 2026-10-07: "let's say a convo
+  // involved maps and marketplace, both icons will show up and it will
+  // populate in the Maps filtered Brain chat"): every successful tool run
+  // stamps the section it touched onto the reply row's `sections`, so a
+  // conversation's icon set — and the section-filtered lists — follow what
+  // actually HAPPENED in it, not just where it was filed. The trigger's own
+  // tags (a Maps-brain send carries ['maps']) are echoed alongside.
+  const SECTION_BY_TOOL: Record<string, string> = {
+    set_tagline: 'profile', set_home_summary: 'profile', set_story: 'profile',
+    set_contact_field: 'profile', add_categories: 'profile', remove_categories: 'profile',
+    set_page_tab: 'profile', set_page_published: 'profile', set_handle: 'profile',
+    move_section_photo: 'profile', move_photo_to_home_cover: 'profile',
+    set_section_photo_position: 'profile', place_uploaded_photo: 'profile',
+    save_web_image: 'profile', select_space: 'profile',
+    my_calendar_setup: 'calendar', add_hours: 'calendar', remove_hours: 'calendar',
+    add_booking_type: 'calendar', update_booking_type: 'calendar',
+    set_booking_type_active: 'calendar', add_task: 'calendar',
+    my_courses: 'courses', create_course: 'courses', update_course: 'courses',
+    my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
+    save_post_to_drive: 'drive',
+  };
+  const touchedSections = new Set<string>();
+  const sectionOfTool = (name: string): string | null =>
+    SECTION_BY_TOOL[name] ?? (isSpacePageTool(name) ? 'profile' : null);
+
   // WHICH TAB DID THE EDIT LAND ON (founder 2026-08-31: the chat's Preview
   // button is "smart enough that it takes you to the page/content in
   // question"). An ALLOWLIST, not a blocklist: a future tool left out just
@@ -2258,6 +2283,10 @@ Deno.serve(async (req) => {
     const results = [];
     for (const c of calls) {
       const out = await runTool(c.name ?? '', c.input ?? {} as Record<string, string & string[]>);
+      if (out.ok) {
+        const sec = sectionOfTool(c.name ?? '');
+        if (sec) touchedSections.add(sec);
+      }
       if (out.ok && out.change) {
         changes.push(out.change);
         const edit = pageEditTab(c.name ?? '', (c.input ?? {}) as Record<string, unknown>);
@@ -2323,9 +2352,18 @@ Deno.serve(async (req) => {
   if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
   if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
   for (const d of appDoors) replyAttachments.push({ type: 'app_link', ...d });
+  // The reply's section tags: the trigger's own (a Maps-brain exchange)
+  // plus what the tools touched — minus the filing thread itself, which
+  // the row already says. Personal threads only; a space thread is a
+  // stream about ONE subject and never wears tags.
+  const replySections = spaceId ? [] : [...new Set([
+    ...(Array.isArray(trigger.sections) ? trigger.sections.filter((s: unknown) => typeof s === 'string') : []),
+    ...touchedSections,
+  ])].filter((s) => s !== thread && s !== 'general');
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread, convo_id: trigger.convo_id ?? null,
     ...(replyAttachments.length ? { attachments: replyAttachments } : {}),
+    ...(replySections.length ? { sections: replySections } : {}),
   }) });
 
   // UVA seed: record the silicon contribution with its exact cost.
