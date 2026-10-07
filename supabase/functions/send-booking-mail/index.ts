@@ -102,7 +102,16 @@ Deno.serve(async (req) => {
       <p style="margin:0;font-size:16px;font-weight:600">${esc(t.title ?? 'A session')}</p>
       <p style="margin:6px 0 0;font-size:14px">${esc(when)}</p>
       ${t.location ? `<p style="margin:6px 0 0;font-size:14px;color:#6b6b66">${esc(t.location)}</p>` : ''}
-      ${meet ? `<p style="margin:14px 0 0"><a href="${esc(meet)}" style="background:#2b2b28;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:14px">${esc(meetLabel)}</a></p>` : ''}
+      ${
+        // The join link wears the SERVICE'S NAME, lit in the LICHEN blue —
+        // founder 2026-10-07: "zoom be what is shown in the invite as the
+        // link to the meeting, instead of a long, ugly URL. If its google
+        // meet, then that is lit up in blue (but the lichen blue, not the
+        // royal blue)". #5E89AD is Lichen's own blue (tokens' old
+        // --blue-deep); the raw URL never prints in the HTML. ⚠ This is an
+        // EMAIL-ONLY use: in-app the blue is retired (2026-10-06) and join
+        // links keep the peach link-cue.
+        meet ? `<p style="margin:14px 0 0;font-size:15px"><a href="${esc(meet)}" style="color:#5E89AD;font-weight:600;text-decoration:underline">${esc(meetLabel)}</a></p>` : ''}
     </div>
     <p style="margin:22px 0"><a href="${link}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">See your booking</a></p>
     <p style="font-size:12px;color:#8a8a84">No account needed — that link is yours to view or cancel the booking.</p>
