@@ -130,27 +130,47 @@ export function normalizeMeetingUrl(raw: string): { url: string | null; error?: 
   }
 }
 
-/** Your own types' video links, keyed by type id (RLS: owner only). */
-export async function listMyMeetingLinks(typeIds: string[]): Promise<Record<string, string>> {
+/** A type's meeting setting: a standing link, the unique-Zoom-per-booking
+ *  ask (founder 2026-10-07 — minted on Lichen's own Zoom at confirm), or
+ *  both (the standing link is then the fallback if minting ever fails). */
+export interface MeetingSetting { url: string | null; zoom_unique: boolean }
+
+/** Your own types' meeting settings, keyed by type id (RLS: owner only). */
+export async function listMyMeetingLinks(typeIds: string[]): Promise<Record<string, MeetingSetting>> {
   if (!typeIds.length) return {};
   const { data, error } = await supabase.from('booking_type_meetings')
-    .select('type_id, url').in('type_id', typeIds);
+    .select('type_id, url, zoom_unique').in('type_id', typeIds);
   if (error) { console.warn('listMyMeetingLinks:', error.message); return {}; }
-  const out: Record<string, string> = {};
-  for (const r of (data as { type_id: string; url: string }[] | null) ?? []) out[r.type_id] = r.url;
+  const out: Record<string, MeetingSetting> = {};
+  for (const r of (data as ({ type_id: string } & MeetingSetting)[] | null) ?? []) {
+    out[r.type_id] = { url: r.url, zoom_unique: !!r.zoom_unique };
+  }
   return out;
 }
 
-/** Set or clear a type's video link. null removes it. */
-export async function saveMeetingLink(typeId: string, url: string | null): Promise<void> {
-  if (!url) {
+/** Set or clear a type's meeting setting. No link and no unique-Zoom ask
+ *  removes the row — a row always says something. */
+export async function saveMeetingLink(typeId: string, url: string | null, zoomUnique = false): Promise<void> {
+  if (!url && !zoomUnique) {
     const { error } = await supabase.from('booking_type_meetings').delete().eq('type_id', typeId);
     if (error) throw error;
     return;
   }
   const { error } = await supabase.from('booking_type_meetings')
-    .upsert({ type_id: typeId, url, updated_at: new Date().toISOString() }, { onConflict: 'type_id' });
+    .upsert({ type_id: typeId, url, zoom_unique: zoomUnique, updated_at: new Date().toISOString() }, { onConflict: 'type_id' });
   if (error) throw error;
+}
+
+/** May this provider mint per-booking meetings on Lichen's Zoom account?
+ *  (platform_settings.zoom_providers — a short list on purpose: one Zoom
+ *  host can only run one live meeting at a time.) */
+export async function zoomMintAllowed(me: string | undefined): Promise<boolean> {
+  if (!me) return false;
+  const { data, error } = await supabase.from('platform_settings')
+    .select('value').eq('key', 'zoom_providers').maybeSingle();
+  if (error || !data) return false;
+  const v = (data as { value: unknown }).value;
+  return Array.isArray(v) && v.includes(me);
 }
 
 export async function deleteBookingType(me: string, id: string): Promise<void> {
