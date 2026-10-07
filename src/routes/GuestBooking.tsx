@@ -7,6 +7,8 @@ import {
 } from '../lib/bookingApi';
 import { addDays, todayISO } from '../lib/conciergeApi';
 import { icsDataUri, googleCalUrl } from '../lib/ics';
+import { videoServiceOf } from '../lib/linkify';
+import { Icon } from '../components/Icon';
 import './GuestEvent.css';
 import './Bookings.css';
 
@@ -64,7 +66,12 @@ export default function GuestBooking() {
 
   const cal = useMemo(() => row && ({
     title: `${row.type_title} — ${row.provider_name}`,
-    description: row.note, location: row.type_location,
+    // A confirmed session's video link takes the location slot (calendar
+    // apps render it as a tappable join link); a real place rides along in
+    // the description.
+    description: [row.note, row.meeting_url && row.type_location ? `Location: ${row.type_location}` : '']
+      .filter(Boolean).join('\n\n'),
+    location: row.meeting_url || row.type_location,
     start_date: row.on_date, end_date: row.on_date, all_day: false,
     start_min: row.start_min, end_min: row.end_min,
   }), [row]);
@@ -95,6 +102,14 @@ export default function GuestBooking() {
         </p>
         <p className="bkg__sub">{s.sub}</p>
       </header>
+
+      {row.status === 'confirmed' && row.meeting_url && (
+        <div className="bkg__doneactions">
+          <a className="btn btn-primary bkg__btn" href={row.meeting_url} target="_blank" rel="noopener noreferrer">
+            <Icon name="video" size={14} /> Join {videoServiceOf(row.meeting_url) ?? 'the video call'}
+          </a>
+        </div>
+      )}
 
       {row.status === 'confirmed' && cal && (
         <div className="bkg__doneactions">

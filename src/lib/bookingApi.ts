@@ -66,6 +66,9 @@ export interface BookingRow {
   guest_name?: string | null;
   guest_email?: string | null;
   guest_token?: string | null;
+  /** The session's video link (Zoom, Meet…) — stamped server-side when the
+   *  booking is CONFIRMED, never on a pending request. */
+  meeting_url?: string | null;
   type?: { title: string; price: string; location: string } | null;
   provider?: { full_name: string | null } | null;
   booker?: { full_name: string | null } | null;
@@ -101,6 +104,53 @@ export async function saveBookingType(
   const { data, error } = await supabase.from('booking_types').insert(row).select('id').single();
   if (error) throw error;
   return (data as { id: string }).id;
+}
+
+// ── A type's VIDEO LINK (founder 2026-10-06) ──────────────────────────────────
+// Its own owner-only table (booking_type_meetings), never a booking_types
+// column: a personal meeting room posted on a public type is a door
+// strangers can use at any hour. The link reaches people only by booking —
+// stamped onto bookings.meeting_url when a booking confirms.
+
+/** Clean a pasted video link: trims, adds https:// to a bare host, refuses
+ *  anything that isn't a single https link. '' → null (no link). */
+export function normalizeMeetingUrl(raw: string): { url: string | null; error?: string } {
+  const t = raw.trim();
+  if (!t) return { url: null };
+  const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  if (/\s/.test(withScheme)) return { url: null, error: 'Paste just the link — no spaces.' };
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== 'https:') return { url: null, error: 'The link needs to start with https://' };
+    if (!u.hostname.includes('.')) return { url: null, error: "That doesn't look like a web address." };
+    if (withScheme.length > 500) return { url: null, error: 'That link is too long.' };
+    return { url: u.toString() };
+  } catch {
+    return { url: null, error: "That doesn't look like a web address." };
+  }
+}
+
+/** Your own types' video links, keyed by type id (RLS: owner only). */
+export async function listMyMeetingLinks(typeIds: string[]): Promise<Record<string, string>> {
+  if (!typeIds.length) return {};
+  const { data, error } = await supabase.from('booking_type_meetings')
+    .select('type_id, url').in('type_id', typeIds);
+  if (error) { console.warn('listMyMeetingLinks:', error.message); return {}; }
+  const out: Record<string, string> = {};
+  for (const r of (data as { type_id: string; url: string }[] | null) ?? []) out[r.type_id] = r.url;
+  return out;
+}
+
+/** Set or clear a type's video link. null removes it. */
+export async function saveMeetingLink(typeId: string, url: string | null): Promise<void> {
+  if (!url) {
+    const { error } = await supabase.from('booking_type_meetings').delete().eq('type_id', typeId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase.from('booking_type_meetings')
+    .upsert({ type_id: typeId, url, updated_at: new Date().toISOString() }, { onConflict: 'type_id' });
+  if (error) throw error;
 }
 
 export async function deleteBookingType(me: string, id: string): Promise<void> {
@@ -379,12 +429,23 @@ export async function nudgeAvailability(provider: string, sessionTitle: string):
 export async function createBooking(
   typeId: string, date: string, startMin: number, note: string,
   answers?: { q: string; a: string }[],
-): Promise<void> {
-  const { error } = await supabase.rpc('create_booking', {
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc('create_booking', {
     p_type: typeId, p_date: date, p_start: startMin, p_note: note,
     p_answers: answers?.length ? answers : null,
   });
   if (error) throw error;
+  return (data as string | null) ?? null;
+}
+
+/** A booking's video link, readable by its two parties once confirmed
+ *  (bookings is parties-only RLS; the link is stamped at confirmation). */
+export async function bookingMeetingUrl(bookingId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('bookings')
+    .select('meeting_url, status').eq('id', bookingId).maybeSingle();
+  if (error) { console.warn('bookingMeetingUrl:', error.message); return null; }
+  const r = data as { meeting_url: string | null; status: string } | null;
+  return r?.status === 'confirmed' ? r.meeting_url : null;
 }
 
 /** Move a live booking to a new open slot — either party; everything a
@@ -475,6 +536,8 @@ export interface GuestBookingView {
   guest_name: string; status: string; on_date: string; start_min: number; end_min: number;
   note: string; type_title: string; type_location: string; duration_min: number;
   provider_name: string; type_id: string; capacity: number;
+  /** The video link — returned only while the booking is confirmed. */
+  meeting_url?: string | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
@@ -495,7 +558,7 @@ export function sendBookingMail(token: string): void {
 }
 
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, ' +
   'type:booking_types(title, price, location), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';

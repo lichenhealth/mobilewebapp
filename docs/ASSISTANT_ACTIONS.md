@@ -134,9 +134,13 @@ caregivers only, server-refused otherwise), or its OWN weekly windows;
 re-stating custom never wipes hours, only explicit custom_hours replaces
 them] — the full Calendly-parity surface; place/people rules ("only when
 X is available") stay editor-only for now, so point members to Calendar
-settings for those), `update_booking_type` (change any of those on an existing type
+settings for those; and `video_link` [2026-10-06 — Zoom/Meet/Teams/any
+https link, kept private in booking_type_meetings and shared with people
+only once their booking confirms; it must appear EXACTLY in the member's
+own words in the conversation or it's refused, the no-invented-targets
+rule for URLs]), `update_booking_type` (change any of those on an existing type
 by its exact title; 0 clears the window/cap, an empty link_name removes
-the link, `new_title` renames), and `set_booking_type_active` (off/on by
+the link, an empty video_link removes the video link, `new_title` renames), and `set_booking_type_active` (off/on by
 exact title; DELETING a type stays by-hand — it takes booking history
 with it). Every write is scoped to the trigger's sender; no tool takes a
 target, and an update's target must be one of the sender's OWN types.

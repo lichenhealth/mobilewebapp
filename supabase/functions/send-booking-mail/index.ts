@@ -9,6 +9,8 @@
 // Secrets: RESEND_API_KEY (set). From lichen.healthcare (send-only domain),
 // replies land on connect@lichen.health — the standing pattern.
 
+import { videoServiceOf } from '../_shared/videoHosts.ts';
+
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.healthcare>';
 const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
@@ -41,7 +43,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=status,on_date,start_min,end_min,note,guest_name,guest_email,booking_types(title,location,duration_min),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,booking_types(title,location,duration_min),provider:profiles!bookings_provider_id_fkey(full_name)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -84,7 +86,14 @@ Deno.serve(async (req) => {
       : CONTENT[row.status];
     if (!c) return json({ ok: false, error: 'Unmailable status' }, 400);
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}\n\n${link}`;
+    // The video link (2026-10-06): only on a CONFIRMED booking (confirmed
+    // mail + the reminder) and only an https link — it was stamped
+    // server-side at confirmation, never supplied by the caller.
+    const meet = row.status === 'confirmed' && typeof row.meeting_url === 'string'
+      && /^https:\/\/\S+$/i.test(row.meeting_url) ? row.meeting_url as string : null;
+    const meetLabel = meet ? `Join ${videoServiceOf(meet) ?? 'the video call'}` : '';
+
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -93,6 +102,7 @@ Deno.serve(async (req) => {
       <p style="margin:0;font-size:16px;font-weight:600">${esc(t.title ?? 'A session')}</p>
       <p style="margin:6px 0 0;font-size:14px">${esc(when)}</p>
       ${t.location ? `<p style="margin:6px 0 0;font-size:14px;color:#6b6b66">${esc(t.location)}</p>` : ''}
+      ${meet ? `<p style="margin:14px 0 0"><a href="${esc(meet)}" style="background:#2b2b28;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:14px">${esc(meetLabel)}</a></p>` : ''}
     </div>
     <p style="margin:22px 0"><a href="${link}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">See your booking</a></p>
     <p style="font-size:12px;color:#8a8a84">No account needed — that link is yours to view or cancel the booking.</p>

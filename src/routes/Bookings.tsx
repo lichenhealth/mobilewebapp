@@ -9,7 +9,19 @@ import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
   sendBookingMail,
 } from '../lib/bookingApi';
+import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
+
+/** A confirmed session's video door — the link is stamped server-side only
+ *  once the booking confirms, so a pending row never has one to show. */
+function JoinLink({ b }: { b: BookingRow }) {
+  if (b.status !== 'confirmed' || !b.meeting_url) return null;
+  return (
+    <a className="bkg__join link-cue" href={b.meeting_url} target="_blank" rel="noopener noreferrer">
+      <Icon name="video" size={13} /> Join {videoServiceOf(b.meeting_url) ?? 'the video call'}
+    </a>
+  );
+}
 import { useConfirm } from '../components/ConfirmDialog';
 
 /** The bookings hub: requests awaiting your answer, sessions on your books,
@@ -158,6 +170,7 @@ export default function Bookings() {
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
+                <JoinLink b={b} />
                 {answerLines(b)}
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
@@ -182,6 +195,7 @@ export default function Bookings() {
                   {b.status === 'pending' && <em className="bkg__pending"> · awaiting reply</em>}
                 </span>
                 <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
+                <JoinLink b={b} />
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
                 Reschedule
