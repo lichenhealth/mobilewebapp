@@ -979,6 +979,13 @@ export default function AssistantBrief() {
               </div>
             </button>
           ))}
+          {/* The General log is one click away from every section's brain
+              (founder 2026-10-07) — the chronological everything-view. */}
+          {feedThread !== 'general' && (
+            <button className="afeed__alllog" onClick={() => navigate('/assistant/feed?thread=general')}>
+              <span className="link-cue">See every conversation — the General log</span> ›
+            </button>
+          )}
         </div>
       )}
 

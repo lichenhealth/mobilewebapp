@@ -418,3 +418,10 @@
   margin: 1px 0 0; font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.06em; text-transform: uppercase; color: var(--peach-deep);
 }
+
+/* The General-log door under a section's conversation list (2026-10-07) */
+.afeed__alllog {
+  background: none; border: none; padding: 8px 2px; cursor: pointer;
+  font-size: 13px; color: var(--ink-soft); text-align: left;
+  font-family: inherit; width: fit-content; align-self: flex-start;
+}
