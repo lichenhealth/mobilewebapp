@@ -7,6 +7,11 @@ export interface EventForCal {
   title: string;
   description?: string;
   location?: string;
+  /** A join link for the session — rides the ICS URL property so calendar
+   *  apps keep a real door even when `location` is the pretty service name
+   *  ("Zoom") rather than the raw address (founder 2026-10-07: "zoom be
+   *  what is shown in the invite as the link… instead of a long, ugly URL"). */
+  url?: string;
   start_date: string;
   end_date: string;
   all_day: boolean;
@@ -47,6 +52,7 @@ export function icsFor(e: EventForCal): string {
     `SUMMARY:${esc(e.title)}`,
     e.description ? `DESCRIPTION:${esc(e.description)}` : '',
     e.location ? `LOCATION:${esc(e.location)}` : '',
+    e.url ? `URL:${e.url}` : '',
     'END:VEVENT', 'END:VCALENDAR',
   ].filter(Boolean).join('\r\n');
 }

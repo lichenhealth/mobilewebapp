@@ -64,17 +64,28 @@ export default function GuestBooking() {
     return () => { live = false; };
   }, [token]);
 
-  const cal = useMemo(() => row && ({
-    title: `${row.type_title} — ${row.provider_name}`,
-    // A confirmed session's video link takes the location slot (calendar
-    // apps render it as a tappable join link); a real place rides along in
-    // the description.
-    description: [row.note, row.meeting_url && row.type_location ? `Location: ${row.type_location}` : '']
-      .filter(Boolean).join('\n\n'),
-    location: row.meeting_url || row.type_location,
-    start_date: row.on_date, end_date: row.on_date, all_day: false,
-    start_min: row.start_min, end_min: row.end_min,
-  }), [row]);
+  const cal = useMemo(() => {
+    if (!row) return null;
+    // THE INVITE WEARS THE SERVICE'S NAME, never the raw address (founder
+    // 2026-10-07: "having zoom be what is shown in the invite as the link
+    // to the meeting, instead of a long, ugly URL"): LOCATION reads "Zoom" /
+    // "Google Meet", the real link rides the description's first line (still
+    // tappable in Google/Apple/Outlook) AND the ICS URL property; a real
+    // place rides along after.
+    const svc = row.meeting_url ? (videoServiceOf(row.meeting_url) ?? 'Video call') : null;
+    return {
+      title: `${row.type_title} — ${row.provider_name}`,
+      description: [
+        row.meeting_url ? `Join ${svc}:\n${row.meeting_url}` : '',
+        row.note,
+        row.meeting_url && row.type_location ? `Location: ${row.type_location}` : '',
+      ].filter(Boolean).join('\n\n'),
+      location: row.meeting_url ? svc! : row.type_location,
+      url: row.meeting_url || undefined,
+      start_date: row.on_date, end_date: row.on_date, all_day: false,
+      start_min: row.start_min, end_min: row.end_min,
+    };
+  }, [row]);
 
   if (!ready) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
   if (!row) {
