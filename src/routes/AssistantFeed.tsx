@@ -882,6 +882,20 @@ export default function AssistantFeed() {
               </button>
             );
           })}
+          {/* THE GENERAL LOG IS ONE CLICK AWAY (founder 2026-10-07: "you
+              can also click something to go to the general, chronological
+              thread"): every section's list carries the door to the
+              everything-log. */}
+          {thread !== 'general' && (
+            <button className="afeed__alllog" onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('thread', 'general');
+              next.delete('convo');
+              setParams(next);
+            }}>
+              <span className="link-cue">See every conversation — the General log</span> ›
+            </button>
+          )}
         </div>
       )}
 
@@ -1030,6 +1044,20 @@ export default function AssistantFeed() {
                     the hat and opens the space's Current-cy room; a reply
                     that hit a consent switch carries the turn-it-back-on
                     offer instead — the person taps, nothing flips itself. */}
+                {/* THE TRANSFER (founder 2026-10-07: "Claude can just
+                    transfer you to that manual section"): a reply can hand
+                    a real in-app door — one tap walks you there, never
+                    directions to follow. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'app_link' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:door:${a.path}`}>
+                      <button className="afeed__pubbtn" type="button"
+                        onClick={() => navigate(a.path)}>
+                        {a.label} →
+                      </button>
+                    </div>
+                  ))}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'space_thread' || a.type === 'space_consent' ? [a] : []))
                   .map((a) => (

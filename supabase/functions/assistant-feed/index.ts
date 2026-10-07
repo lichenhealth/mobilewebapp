@@ -322,6 +322,51 @@ const CALENDAR_TOOLS = [
 // COURSES thread, behind the member's hand-that-writes flag, every write
 // scoped to the sender, no tool takes a target, update matches the member's
 // OWN course by its exact name.
+// THE HANDLE BY CONVERSATION (founder 2026-10-07 — her own calendar thread
+// built "Care Team Onboarding" and then could only point at the handle
+// field: "I can't pop you over there myself"). An address, not page
+// content, so it writes LIVE like set_page_published. Collisions check
+// BOTH tables (the 2026-08-28 handle rule), and the no-invented-targets
+// rule holds: only a handle the member themselves typed is ever set.
+const SET_HANDLE_TOOL = {
+  name: 'set_handle',
+  description: 'Set the member\'s Lichen HANDLE — the address their public page and booking links answer at (lichen.health/<handle>, lichen.health/book/<handle>/<link-name>). Use ONLY when they have written the exact handle they want in this conversation — never invent one or pick for them; offer ideas in words and let them type their choice. Lowercase letters, numbers and dashes. Writes live immediately. If it is taken, say so plainly and ask for another — never say who holds it.',
+  input_schema: {
+    type: 'object',
+    properties: { handle: { type: 'string', description: 'The exact handle the member asked for, as they wrote it.' } },
+    required: ['handle'],
+  },
+};
+
+// THE TRANSFER (founder 2026-10-07: "Claude can just transfer you to that
+// manual section… or it can do it for you with a text command"): a reply
+// can carry a real in-app BUTTON instead of directions. The model picks
+// from this fixed table — it can never compose a path.
+const APP_DOORS: Record<string, { path: string; label: string }> = {
+  profile_settings: { path: '/profile', label: 'Open your Profile settings' },
+  public_page_builder: { path: '/profile#public-page', label: 'Open your public-page settings' },
+  calendar: { path: '/calendar', label: 'Open your Calendar' },
+  calendar_settings: { path: '/calendar/settings', label: 'Open Calendar settings' },
+  bookings: { path: '/bookings', label: 'Open your sessions' },
+  concierge: { path: '/concierge', label: 'Open your Concierge' },
+  currentcy: { path: '/currentcy', label: 'Open your Current-cy wallet' },
+  drive: { path: '/drive', label: 'Open your Drive' },
+  marketplace: { path: '/market', label: 'Open the Marketplace' },
+  events: { path: '/events', label: 'Open Events' },
+  chat: { path: '/chat', label: 'Open your messages' },
+  invite: { path: '/invite', label: 'Open Invite to Lichen' },
+  general_thread: { path: '/assistant/feed?thread=general', label: 'Open the General room' },
+};
+const SEND_APP_DOOR_TOOL = {
+  name: 'send_app_door',
+  description: 'Hand the member a BUTTON that opens a part of Lichen — it renders under your reply and walks them there in one tap. Use it whenever they would otherwise get navigation directions ("go to Profile → …"): hand the door instead. Prefer DOING the work with your own tools when you can; the door is for when they want the manual screen, or for a surface you cannot act on.',
+  input_schema: {
+    type: 'object',
+    properties: { destination: { type: 'string', enum: Object.keys(APP_DOORS), description: 'Which door to hand them.' } },
+    required: ['destination'],
+  },
+};
+
 const COURSE_TOOLS = [
   {
     name: 'my_courses',
@@ -773,7 +818,10 @@ Deno.serve(async (req) => {
     ? `\n\nYou are in this member's build thread for the space named above. Keep the work about THAT space's page and presence; their OWN page has its own Profile thread — point there for personal-page asks, one short sentence.`
     : thread === 'general'
     ? '\n\nYou are in their GENERAL thread — anything goes here, and you may draw on their other threads when it helps.'
-    : `\n\nYou are in their ${thread.toUpperCase()} thread, which keeps that work together. If what they have just asked clearly belongs to a different part of Lichen, answer briefly and say which thread it belongs in so it stays findable — one short sentence, never a lecture.`;
+    // TOOLS FOLLOW THE MEMBER (founder 2026-10-07: "Claude can just
+    // transfer you to that manual section… or it can do it for you with a
+    // text command"): a section thread is a filing room, never a wall.
+    : `\n\nYou are in their ${thread.toUpperCase()} thread — the filing room for that work. But you can ACT ON ANY PART OF THEIR LICHEN from here: your tools cover their page, handle, calendar and courses wherever the conversation leads — NEVER send someone to another thread or screen to get something done you can do right now. When they'd rather use the manual screens, hand a real door with send_app_door instead of describing a navigation path. After doing cross-section work, one short sentence may note which thread that work usually lives in, so it stays findable — never a lecture, never a precondition.`;
 
   // BUILDING WHAT DOESN'T EXIST YET (founder 2026-08-19): shape it here,
   // loop Galyn in at the help room — this thread is private by construction,
@@ -806,19 +854,20 @@ Deno.serve(async (req) => {
     isPlatformAdmin = !!row?.is_admin;
     senderName = String(row?.full_name ?? '').trim();
     senderPronouns = String(row?.pronouns ?? '').trim();
-    // GENERAL CAN ACT (founder 2026-10-06, after pasting pricing into her
-    // General thread and being told no: "ai assistant is saying it doesn't
-    // have page editing access, but it should"): the member's own page
-    // tools arm in General too — it is the anything-at-all room, and the
-    // consents are the same ones the profile thread checks. Section
-    // threads keep pointing page work at its room for findability.
-    canEdit = (thread === 'profile' || thread === 'general') && flag;
-    // Rung 1 of "Claude codes with members" (founder 2026-08-19): the same
-    // hand-that-writes flag arms CALENDAR tools in the calendar thread.
-    canCalendar = thread === 'calendar' && flag;
-    // COURSES (founder 2026-10-05): same flag, the courses thread — tools
-    // write the same collections rows the Teach builder edits.
-    canCourses = thread === 'courses' && flag;
+    // TOOLS FOLLOW THE MEMBER; THREADS ARE THE FILING (founder 2026-10-07,
+    // superseding the 2026-10-06 General-only widening after her own
+    // calendar thread hit the wall — it built her session type, then could
+    // only give DIRECTIONS to the handle field: "I can't pop you over there
+    // myself"): EVERY personal thread arms every personal toolset. Each
+    // group still honors ITS OWN section's consent de-selection (checked
+    // just below); space threads keep their scoped arms.
+    canEdit = !spaceId && flag;
+    // Rung 1 of "Claude codes with members" (founder 2026-08-19); widened
+    // 2026-10-07 to every personal thread per the rule above.
+    canCalendar = !spaceId && flag;
+    // COURSES (founder 2026-10-05): same flag — tools write the same
+    // collections rows the Teach builder edits.
+    canCourses = !spaceId && flag;
     // Rung 2 (founder 2026-08-22): the same flag arms SPACE page tools in a
     // space's build thread — but only for a steward of the space, and only
     // while the space's own assistant switch is on (checked above; an off
@@ -827,6 +876,19 @@ Deno.serve(async (req) => {
     // deliberately has no write tools at all (money never moves on a
     // model's word; the standing rule).
     canSpaceEdit = !!spaceId && !spaceRoom && flag && spaceIsAdmin && spaceAiOn;
+  }
+  // Each cross-section tool group still bows to ITS section's de-selection:
+  // "AI on for calendar but not profile" must hold from every room. One
+  // read of the member's few enabled=false rows (the consent.ts shape);
+  // a failed read fails OPEN, the standing default-on doctrine.
+  if (!spaceId && (canEdit || canCalendar || canCourses)) {
+    try {
+      const offRows = await (await sb(`assistant_consent?profile_id=eq.${profile_id}&enabled=eq.false&scope_type=eq.section&select=scope_id`)).json();
+      const off = new Set((Array.isArray(offRows) ? offRows : []).map((r: { scope_id: string }) => String(r.scope_id)));
+      if (off.has('profile')) canEdit = false;
+      if (off.has('calendar')) canCalendar = false;
+      if (off.has('courses')) canCourses = false;
+    } catch { /* fail open */ }
   }
   // The small hands (Drive save, task) ride every PERSONAL thread behind the
   // same flag — the pulse names what's happening, these let the assistant
@@ -1001,6 +1063,9 @@ Deno.serve(async (req) => {
   // and the PERSON taps. The model never flips a switch itself.
   let treasuryDoor: { id: string; name: string; kind: string } | null = null;
   let consentDoor: { id: string; name: string; kind: string; which: 'member' | 'space' } | null = null;
+  // In-app doors this reply hands over (founder 2026-10-07, the transfer):
+  // composed ONLY from the fixed APP_DOORS table, never model-written paths.
+  const appDoors: { path: string; label: string }[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -1048,6 +1113,51 @@ Deno.serve(async (req) => {
     // builders' queue. Reporter is always the trigger's member.
     if (name === 'file_dev_report') {
       return await fileDevReport(sb, profile_id, `feed:${thread}`, input as Record<string, string>);
+    }
+    // ── Hand a real in-app door (founder 2026-10-07: "Claude can just
+    // transfer you to that manual section"). The enum is the whole surface —
+    // a destination outside the table simply doesn't exist.
+    if (name === 'send_app_door') {
+      const door = APP_DOORS[String(input.destination ?? '')];
+      if (!door) return { ok: false, error: 'No such door — pick one of the listed destinations.' };
+      if (!appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+      return { ok: true, note: `A "${door.label}" button will render under your reply — tell them it's there; never also describe the navigation path.` };
+    }
+    // ── The handle, by conversation (founder 2026-10-07 — the thing her
+    // calendar thread could only point at). An ADDRESS, so it writes live;
+    // collisions check BOTH tables (the 2026-08-28 handle rule).
+    if (name === 'set_handle') {
+      const h = String(input.handle ?? '').trim().toLowerCase().replace(/^@/, '');
+      if (!/^[a-z0-9][a-z0-9-]{1,47}$/.test(h)) {
+        return { ok: false, error: 'A handle is lowercase letters, numbers and dashes (2–48 characters). Ask them to type the exact handle they want.' };
+      }
+      // The no-invented-targets rule: only a handle the member themselves
+      // wrote in this conversation is ever set.
+      const memberText = rows.filter((p: { author: string }) => p.author !== 'claude')
+        .map((p: { body?: string }) => p.body ?? '').join(' ').toLowerCase();
+      if (!memberText.includes(h)) {
+        return { ok: false, error: 'Set only a handle the member themselves typed in this conversation — offer ideas in words and let them write their choice.' };
+      }
+      const mine = await (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json();
+      if ((mine?.[0]?.handle ?? '') === h) {
+        return { ok: true, change: `confirmed their handle is already "${h}" — nothing changed`, handle: h };
+      }
+      const [pTaken, sTaken] = await Promise.all([
+        (await sb(`profiles?handle=eq.${h}&id=neq.${profile_id}&select=id&limit=1`)).json(),
+        (await sb(`spaces?handle=eq.${h}&select=id&limit=1`)).json(),
+      ]);
+      if ((Array.isArray(pTaken) && pTaken.length) || (Array.isArray(sTaken) && sTaken.length)) {
+        return { ok: false, error: `"${h}" is already taken on Lichen — say so plainly (never who holds it) and ask for another.` };
+      }
+      const r = await sb(`profiles?id=eq.${profile_id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ handle: h }),
+      });
+      if (!r.ok) return { ok: false, error: `The handle didn't save: ${(await r.text()).slice(0, 120)}` };
+      return {
+        ok: true,
+        change: `set their handle to "${h}" — their page answers at lichen.health/${h}, and any booking type with a link name is live at lichen.health/book/${h}/<link-name>`,
+        handle: h,
+      };
     }
     // ── Bring a web image onto the page (2026-08-24): only one the system
     // itself saw on a member-linked page (or whose host the member wrote),
@@ -2116,9 +2226,16 @@ Deno.serve(async (req) => {
                      ...((canEdit || canSpaceEdit) ? [SAVE_WEB_IMAGE_TOOL] : []),
                      ...(canAct ? ACT_TOOLS : []),
                      ...(thread === 'currentcy' ? [...MONEY_TOOLS, ...(stewardSpaces.length ? [OPEN_TREASURY_TOOL] : [])] : []),
-                     ...(canEdit && thread === 'general' && stewardSpaces.length
-                       ? [...EDIT_TOOLS, SELECT_SPACE_TOOL, ...SPACE_PAGE_TOOLS]
-                       : canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : canCourses ? COURSE_TOOLS : [])],
+                     // TOOLS FOLLOW THE MEMBER (founder 2026-10-07): every
+                     // personal thread carries every personal toolset —
+                     // the thread is filing, not a wall. Space threads
+                     // keep their own scoped arms.
+                     ...(canEdit ? [...EDIT_TOOLS, SET_HANDLE_TOOL] : []),
+                     ...(canEdit && stewardSpaces.length ? [SELECT_SPACE_TOOL, ...SPACE_PAGE_TOOLS] : []),
+                     ...(canSpaceEdit ? SPACE_EDIT_TOOLS : []),
+                     ...(canCalendar ? CALENDAR_TOOLS : []),
+                     ...(canCourses ? COURSE_TOOLS : []),
+                     ...(!spaceId ? [SEND_APP_DOOR_TOOL] : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
     });
@@ -2205,6 +2322,7 @@ Deno.serve(async (req) => {
   }
   if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
   if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
+  for (const d of appDoors) replyAttachments.push({ type: 'app_link', ...d });
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread, convo_id: trigger.convo_id ?? null,
     ...(replyAttachments.length ? { attachments: replyAttachments } : {}),

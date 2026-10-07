@@ -12,6 +12,10 @@ export type FeedAttachment =
    *  stewarded space's own Current-cy room — the client's button flips the
    *  member's hat and lands there. */
   | { type: 'space_thread'; room: 'currentcy'; id: string; name: string; kind: string }
+  // THE TRANSFER (founder 2026-10-07: "Claude can just transfer you"): a
+  // reply hands a real in-app door — path composed server-side from a
+  // fixed table, never model-written.
+  | { type: 'app_link'; path: string; label: string }
   /** The consent offer (same message: "would you like to switch that
    *  permission? Then link to letting them do that to turn it on") — the
    *  PERSON taps to re-enable; the model never arms anything. `which` names
