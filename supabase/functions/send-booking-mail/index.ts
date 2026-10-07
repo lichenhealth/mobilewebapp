@@ -10,6 +10,7 @@
 // replies land on connect@lichen.health — the standing pattern.
 
 import { videoServiceOf } from '../_shared/videoHosts.ts';
+import { reconcileBookingZoom, zoomConfigured } from '../_shared/zoomMeeting.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.healthcare>';
@@ -43,11 +44,21 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,booking_types(title,location,duration_min),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,booking_types(title,location,duration_min),provider:profiles!bookings_provider_id_fkey(full_name)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
     if (!row?.guest_email) return json({ ok: false }, 404);
+
+    // A unique-Zoom type mints its meeting asynchronously (the trigger's
+    // poke) — a confirmed mail sent in that same second would go out
+    // linkless. Reconcile inline first: idempotent, derived from the row,
+    // and a no-op for every type that didn't ask for unique meetings.
+    if (row.status === 'confirmed' && !row.meeting_url && zoomConfigured()) {
+      try {
+        row.meeting_url = await reconcileBookingZoom(row.id) ?? row.meeting_url;
+      } catch (e) { console.error('inline zoom reconcile:', e); }
+    }
 
     const t = row.booking_types ?? {};
     const provider = row.provider?.full_name ?? 'a Lichen member';

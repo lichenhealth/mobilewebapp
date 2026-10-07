@@ -53,3 +53,6 @@ verify_jwt = false
 # authorization, and every mail derives from DB state, never client claims.
 [functions.send-booking-mail]
 verify_jwt = false
+
+[functions.zoom-meeting]
+verify_jwt = false

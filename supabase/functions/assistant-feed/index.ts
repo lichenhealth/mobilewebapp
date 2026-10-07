@@ -263,6 +263,7 @@ const CALENDAR_TOOLS = [
         max_per_day: { type: 'number', description: 'At most N sessions of this type per day (1–48). 0 = no cap (the default).' },
         capacity: { type: 'number', description: '1 = one person per slot (default). More = a GROUP session: that many people share each slot and one calendar event, slots say "N left".' },
         questions: { type: 'array', items: { type: 'string' }, description: 'Up to 5 questions people must answer when booking; answers land on the request for them to read.' },
+        unique_zoom: { type: 'boolean', description: 'true = a FRESH Zoom meeting is created on Lichen\'s own Zoom for every confirmed booking (nobody can land in a room booked for someone else; a cancelled booking\'s room is deleted). Only available to providers the platform has opened this to — the tool refuses otherwise, and that is a capacity limit, not an outage. Any video_link they also set becomes the fallback.' },
         books_from: { type: 'string', enum: ['work', 'social', 'on_call', 'custom'], description: 'Which hours pool this session draws its open slots from. Default work. on_call only if the setup read says they are an active caregiver. custom = the session has its OWN weekly hours — pass them in custom_hours.' },
         custom_hours: { type: 'array', items: { type: 'object', properties: { weekday: { type: 'number' }, start_min: { type: 'number' }, end_min: { type: 'number' } }, required: ['weekday', 'start_min', 'end_min'] }, description: 'The session\'s own weekly windows when books_from=custom (weekday 0=Monday … 6=Sunday; minutes since midnight). Replaces any it had. Place/people rules ("only when X is available") are set in Calendar settings — point them there.' },
       },
@@ -284,6 +285,7 @@ const CALENDAR_TOOLS = [
         description: { type: 'string' },
         location: { type: 'string' },
         video_link: { type: 'string', description: 'The video call link exactly as the member wrote it; empty string removes it.' },
+        unique_zoom: { type: 'boolean', description: 'true = mint a fresh Zoom meeting per confirmed booking on Lichen\'s Zoom (where the platform has opened it to them); false = stop.' },
         buffer_min: { type: 'number' },
         link_name: { type: 'string' },
         min_notice_min: { type: 'number' },
@@ -1413,9 +1415,11 @@ Deno.serve(async (req) => {
       const handle = (Array.isArray(prof) ? prof[0]?.handle : null) as string | null;
       const typeIds = (Array.isArray(types) ? types : []).map((t: { id: string }) => t.id);
       const meets = typeIds.length
-        ? await (await sb(`booking_type_meetings?type_id=in.(${typeIds.join(',')})&select=type_id,url`)).json()
+        ? await (await sb(`booking_type_meetings?type_id=in.(${typeIds.join(',')})&select=type_id,url,zoom_unique`)).json()
         : [];
-      const meetBy = new Map<string, string>((Array.isArray(meets) ? meets : []).map((m: { type_id: string; url: string }) => [m.type_id, m.url]));
+      const meetBy = new Map<string, { url: string | null; zoom_unique: boolean }>(
+        (Array.isArray(meets) ? meets : []).map((m: { type_id: string; url: string | null; zoom_unique: boolean }) =>
+          [m.type_id, { url: m.url, zoom_unique: !!m.zoom_unique }]));
       return {
         ok: true,
         hours: hs.length
@@ -1429,7 +1433,8 @@ Deno.serve(async (req) => {
           + `${t.max_days_out != null ? `, bookable ${t.max_days_out} days out` : ''}`
           + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
           + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
-          + `${meetBy.has(t.id) ? `, ${videoServiceOf(meetBy.get(t.id)!) ?? 'video'} link set (shared only once a booking confirms)` : ''}`
+          + `${meetBy.get(t.id)?.zoom_unique ? ', unique Zoom meeting minted per booking' : ''}`
+          + `${meetBy.get(t.id)?.url ? `, ${videoServiceOf(meetBy.get(t.id)!.url!) ?? 'video'} link set (shared only once a booking confirms)` : ''}`
           + `${t.slug ? (handle ? `, link lichen.health/book/${handle}/${t.slug}` : `, link name "${t.slug}" (needs a handle to be sendable)`) : ''}`
           + `${t.active ? '' : ', OFF'})`),
         is_active_caregiver: Array.isArray(care) && care.length > 0,
@@ -1561,13 +1566,60 @@ Deno.serve(async (req) => {
       return { set: true, url: u.toString() };
     };
     const writeVideoLink = async (typeId: string, url: string | null): Promise<string | null> => {
-      const r = url
-        ? await sb('booking_type_meetings?on_conflict=type_id', {
+      let r: Response;
+      if (url) {
+        r = await sb('booking_type_meetings?on_conflict=type_id', {
           method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify({ type_id: typeId, url, updated_at: new Date().toISOString() }),
-        })
-        : await sb(`booking_type_meetings?type_id=eq.${typeId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        });
+      } else {
+        // Removing the link must not silently drop a unique-Zoom ask that
+        // shares the row (2026-10-07) — a zoom_unique row keeps standing.
+        const have = await (await sb(`booking_type_meetings?type_id=eq.${typeId}&select=zoom_unique`)).json();
+        r = have?.[0]?.zoom_unique
+          ? await sb(`booking_type_meetings?type_id=eq.${typeId}`, {
+            method: 'PATCH', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ url: null, updated_at: new Date().toISOString() }),
+          })
+          : await sb(`booking_type_meetings?type_id=eq.${typeId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      }
       return r.ok ? null : 'the video link failed to save — the rest of the session saved. Say so.';
+    };
+    // UNIQUE ZOOM PER BOOKING (founder 2026-10-07): minted on Lichen's own
+    // Zoom account, so it is gated to the providers the platform opened it
+    // to (platform_settings.zoom_providers — one Zoom host can only run one
+    // live meeting at a time). A refusal is a capacity limit, never an
+    // outage — the model is told to say so plainly.
+    const normUniqueZoom = async (inp: Record<string, unknown>): Promise<{ set: boolean; on: boolean; err?: string }> => {
+      if (inp.unique_zoom === undefined) return { set: false, on: false };
+      const on = inp.unique_zoom === true;
+      if (on) {
+        const ps = await (await sb('platform_settings?key=eq.zoom_providers&select=value')).json();
+        const v = ps?.[0]?.value;
+        if (!Array.isArray(v) || !v.includes(profile_id)) {
+          return { set: false, on: false, err: 'unique Zoom meetings run on Lichen\'s own Zoom account and are not open to this member yet — say so plainly (a capacity limit, not an outage) and suggest a video_link of their own meanwhile' };
+        }
+      }
+      return { set: true, on };
+    };
+    const writeUniqueZoom = async (typeId: string, on: boolean): Promise<string | null> => {
+      let r: Response;
+      if (on) {
+        r = await sb('booking_type_meetings?on_conflict=type_id', {
+          method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ type_id: typeId, zoom_unique: true, updated_at: new Date().toISOString() }),
+        });
+      } else {
+        const have = await (await sb(`booking_type_meetings?type_id=eq.${typeId}&select=url`)).json();
+        if (!have?.length) return null;
+        r = have[0].url
+          ? await sb(`booking_type_meetings?type_id=eq.${typeId}`, {
+            method: 'PATCH', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ zoom_unique: false, updated_at: new Date().toISOString() }),
+          })
+          : await sb(`booking_type_meetings?type_id=eq.${typeId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      }
+      return r.ok ? null : 'the unique-Zoom setting failed to save — the rest saved. Say so.';
     };
 
     if (name === 'add_booking_type') {
@@ -1583,11 +1635,14 @@ Deno.serve(async (req) => {
       const { out: extra, errs } = normTypeFields(input);
       const vl = normVideoLink(input);
       if (vl.err) errs.push(vl.err);
+      const uz = await normUniqueZoom(input);
+      if (uz.err) errs.push(uz.err);
       if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
       const ocErr = await onCallRefused(extra.hours_kind);
       if (ocErr) return { ok: false, error: ocErr };
       // A video session with no "where" says its service in public ("Zoom") —
       // the name, never the link (the manual editor's same rule).
+      if (uz.on && !extra.location) extra.location = 'Zoom';
       if (vl.url && !extra.location) extra.location = videoServiceOf(vl.url) ?? 'Online';
       const r = await sb('booking_types', {
         method: 'POST', headers: { Prefer: 'return=representation' },
@@ -1599,6 +1654,7 @@ Deno.serve(async (req) => {
       }
       const created = (await r.json())?.[0];
       const linkNote = vl.url ? await writeVideoLink(created.id, vl.url) : null;
+      const zoomNote = uz.set ? await writeUniqueZoom(created.id, uz.on) : null;
       let hoursNote: string | null | undefined;
       if (extra.hours_kind === 'custom') {
         hoursNote = await writeCustomHours(created.id, input.custom_hours);
@@ -1609,9 +1665,9 @@ Deno.serve(async (req) => {
           : `They have NO ${pool === 'available' ? 'work' : pool.replace('_', '-')} hours — nothing is bookable until they add some. Say so.`;
       }
       return {
-        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience}${vl.url && !linkNote ? `, ${videoServiceOf(vl.url) ?? 'video'} link — shared with people once their booking confirms` : ''})`,
+        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience}${vl.url && !linkNote ? `, ${videoServiceOf(vl.url) ?? 'video'} link — shared with people once their booking confirms` : ''}${uz.on && !zoomNote ? ', a unique Zoom meeting is created for each confirmed booking' : ''})`,
         vanity: await vanityLine(extra.slug),
-        note: [hoursNote, linkNote].filter(Boolean).join(' ') || undefined,
+        note: [hoursNote, linkNote, zoomNote].filter(Boolean).join(' ') || undefined,
       };
     }
 
@@ -1622,12 +1678,14 @@ Deno.serve(async (req) => {
       const { out: patch, errs } = normTypeFields(input);
       const vl = normVideoLink(input);
       if (vl.err) errs.push(vl.err);
+      const uz = await normUniqueZoom(input);
+      if (uz.err) errs.push(uz.err);
       if (input.new_title !== undefined) { const nt = String(input.new_title).trim().slice(0, 80); if (nt) patch.title = nt; }
       if (input.duration_min !== undefined) { const n = Number(input.duration_min); if (n >= 15 && n <= 480) patch.duration_min = n; else errs.push('duration_min must be 15–480'); }
       if (input.approval !== undefined) { const a = String(input.approval); if (['request', 'instant'].includes(a)) patch.approval = a; else errs.push('approval must be request|instant'); }
       if (input.audience !== undefined) { const a = String(input.audience); if (['everyone', 'mycelium', 'public'].includes(a)) patch.audience = a; else errs.push('audience must be everyone|mycelium|public'); }
       if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
-      if (!Object.keys(patch).length && input.custom_hours === undefined && !vl.set) {
+      if (!Object.keys(patch).length && input.custom_hours === undefined && !vl.set && !uz.set) {
         return { ok: false, error: 'Nothing to change — pass at least one field.' };
       }
       const ocErr = await onCallRefused(patch.hours_kind);
@@ -1642,6 +1700,7 @@ Deno.serve(async (req) => {
         }
       }
       const linkNote = vl.set ? await writeVideoLink(rows[0].id, vl.url) : null;
+      const zoomNote = uz.set ? await writeUniqueZoom(rows[0].id, uz.on) : null;
       // Only EXPLICIT custom_hours replace the windows — re-stating
       // books_from=custom must never wipe hours the member already set.
       let hoursNote: string | null = null;
@@ -1655,9 +1714,9 @@ Deno.serve(async (req) => {
       }
       return {
         ok: true,
-        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : []), ...(vl.set && !linkNote ? [vl.url ? `video link (${videoServiceOf(vl.url) ?? 'video'})` : 'removed the video link'] : [])].join(', ')}`,
+        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : []), ...(vl.set && !linkNote ? [vl.url ? `video link (${videoServiceOf(vl.url) ?? 'video'})` : 'removed the video link'] : []), ...(uz.set && !zoomNote ? [uz.on ? 'unique Zoom meeting per booking: ON' : 'unique Zoom meeting per booking: off'] : [])].join(', ')}`,
         vanity: await vanityLine(patch.slug),
-        note: [hoursNote, linkNote].filter(Boolean).join(' ') || undefined,
+        note: [hoursNote, linkNote, zoomNote].filter(Boolean).join(' ') || undefined,
       };
     }
 

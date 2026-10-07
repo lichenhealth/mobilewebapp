@@ -263,7 +263,20 @@ export default function BookSession() {
                     t.id, pick.iso, pick.start, note.trim(),
                     questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
                   );
-                  if (id && t.approval === 'instant') setJoinUrl(await bookingMeetingUrl(id));
+                  if (id && t.approval === 'instant') {
+                    // A unique-Zoom type mints its link a breath AFTER the
+                    // booking lands (2026-10-07) — try again briefly so the
+                    // booked screen catches it rather than showing nothing.
+                    const url = await bookingMeetingUrl(id);
+                    setJoinUrl(url);
+                    if (!url) {
+                      for (const wait of [2500, 5000]) {
+                        window.setTimeout(() => {
+                          void bookingMeetingUrl(id).then((u) => { if (u) setJoinUrl(u); });
+                        }, wait);
+                      }
+                    }
+                  }
                   setDone(t.approval === 'instant' ? 'booked' : 'requested');
                 }
               } catch (e) {

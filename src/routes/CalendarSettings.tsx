@@ -25,6 +25,7 @@ import {
   TypeHourRow, TypeCondition, listTypeHours, saveTypeHours,
   listTypeConditions, saveTypeConditions, searchConditionTargets,
   listMyMeetingLinks, saveMeetingLink, normalizeMeetingUrl,
+  MeetingSetting, zoomMintAllowed,
 } from '../lib/bookingApi';
 import './Concierge.css';
 import './Calendar.css';
@@ -87,8 +88,14 @@ export default function CalendarSettings() {
   // Video links live in their own owner-only table (never on the type row,
   // which others can read) — kept beside the form, not inside bkEdit, so
   // saveBookingType never tries to write a column booking_types doesn't have.
-  const [bkLinks, setBkLinks] = useState<Record<string, string>>({});
+  const [bkLinks, setBkLinks] = useState<Record<string, MeetingSetting>>({});
   const [bkLink, setBkLink] = useState('');
+  // Unique Zoom meeting per booking (founder 2026-10-07): minted on
+  // Lichen's own Zoom at confirm. Offered only to providers on the
+  // platform_settings.zoom_providers list — one Zoom host, one live
+  // meeting at a time.
+  const [bkZoom, setBkZoom] = useState(false);
+  const [zoomOk, setZoomOk] = useState(false);
   // The PUBLIC link (founder 2026-08-14, the Calendly replacement) hangs off
   // your vanity handle: lichen.health/book/<handle>.
   const [myHandle, setMyHandle] = useState<string | null>(null);
@@ -169,6 +176,7 @@ export default function CalendarSettings() {
     setExtCals(ext);
     setBkTypes(bk);
     setBkLinks(await listMyMeetingLinks(bk.map((t) => t.id)));
+    setZoomOk(await zoomMintAllowed(me));
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -285,7 +293,8 @@ export default function CalendarSettings() {
               <span className="cset__bkrow-sub">
                 {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ''}
-                {bkLinks[bt.id] ? ` · ${videoServiceOf(bkLinks[bt.id]) ?? 'video'} link` : ''}
+                {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
+                  : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
               </span>
               {/* The vanity link (founder 2026-10-03, the Calendly shape):
                   this session's own sendable address. */}
@@ -311,7 +320,8 @@ export default function CalendarSettings() {
               )}
               <button className="cedit__add cedit__add--sm" onClick={() => {
                 setBkEdit(bt); setBkOpen(true);
-                setBkLink(bkLinks[bt.id] ?? '');
+                setBkLink(bkLinks[bt.id]?.url ?? '');
+                setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
                 setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
                 void listTypeHours(bt.id).then(setBkHours);
                 void listTypeConditions(bt.id).then(setBkConds);
@@ -359,7 +369,7 @@ export default function CalendarSettings() {
           {!bkOpen ? (
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
-              setBkLink('');
+              setBkLink(''); setBkZoom(false);
               setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
               setBkOpen(true);
             }}>
@@ -411,6 +421,21 @@ export default function CalendarSettings() {
                   </p>
                 );
               })()}
+              {/* Unique Zoom meeting per booking (founder 2026-10-07: "walk
+                  me thru how to do this with zoom, yes!"): minted on
+                  Lichen's Zoom the moment a booking confirms — nobody can
+                  ever land in a room booked for someone else, and a
+                  cancelled booking's door actually closes. Offered only to
+                  providers on the zoom_providers list. */}
+              {zoomOk && (
+                <label className="cset__zoomcheck">
+                  <input type="checkbox" checked={bkZoom} onChange={(e) => setBkZoom(e.target.checked)} />
+                  <span>
+                    Create a <strong>unique Zoom meeting</strong> for each booking (on Lichen&rsquo;s Zoom).
+                    {bkLink.trim() ? ' Your link above becomes the fallback if Zoom is ever unreachable.' : ''}
+                  </span>
+                </label>
+              )}
               <select className="cset__select" value={bkEdit.approval ?? 'request'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
                 <option value="request">I approve each request</option>
@@ -573,6 +598,7 @@ export default function CalendarSettings() {
                   // A video session with no "where" says which service in
                   // public ("· Zoom") — the service name, never the link.
                   const where = (bkEdit.location ?? '').trim()
+                    || (bkZoom && zoomOk ? 'Zoom' : '')
                     || (link.url ? (videoServiceOf(link.url) ?? 'Online') : '');
                   let typeId: string;
                   try {
@@ -593,8 +619,12 @@ export default function CalendarSettings() {
                   // clears the leftovers so nothing books from ghost hours.
                   await saveTypeHours(me, typeId, (bkEdit.hours_kind === 'custom') ? bkHours : []);
                   await saveTypeConditions(typeId, bkConds);
-                  if ((link.url ?? null) !== (bkLinks[typeId] ?? null)) await saveMeetingLink(typeId, link.url);
-                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkHours([]); setBkConds([]);
+                  const wantZoom = bkZoom && zoomOk;
+                  if ((link.url ?? null) !== (bkLinks[typeId]?.url ?? null)
+                      || wantZoom !== (bkLinks[typeId]?.zoom_unique ?? false)) {
+                    await saveMeetingLink(typeId, link.url, wantZoom);
+                  }
+                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]);
                 })}
               >
                 <Icon name="plus" size={12} /> Save
@@ -606,7 +636,7 @@ export default function CalendarSettings() {
                   });
                 }}>Delete</button>
               )}
-              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); }}>
+              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); }}>
                 <Icon name="close" size={13} />
               </button>
             </div>

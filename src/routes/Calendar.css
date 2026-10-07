@@ -266,6 +266,17 @@
 /* Booking questions (founder 2026-10-03): one per line, full form width. */
 .cset__questions { flex: 1 1 100%; min-height: 56px; resize: vertical; font: inherit; font-size: 13px; }
 .cset__linkhint { flex: 1 1 100%; margin: -4px 0 0; }
+/* Unique-Zoom-per-booking opt-in (2026-10-07) */
+.cset__zoomcheck {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.cset__zoomcheck input { margin-top: 2px; accent-color: var(--peach-deep); }
 /* A session type's vanity link — its own wrapped line in the row. */
 .cset__bkrow-vanity {
   flex: 1 1 100%; display: inline-flex; align-items: center; gap: 8px;
