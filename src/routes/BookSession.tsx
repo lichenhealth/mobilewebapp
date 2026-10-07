@@ -6,10 +6,11 @@ import { supabase } from '../lib/supabase';
 import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
-  BookingBoard, loadBookingBoard, slotsForDay, createBooking, nudgeAvailability,
+  BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
   rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, viewerSlotLabel,
 } from '../lib/bookingApi';
 import { ensureDirectChat } from '../lib/chatApi';
+import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -38,6 +39,8 @@ export default function BookSession() {
   const [mineTime, setMineTime] = useState(true);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<'requested' | 'booked' | 'moved' | null>(null);
+  // An instant booking's video link, read back once the booking exists.
+  const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const from = todayISO();
@@ -111,6 +114,14 @@ export default function BookSession() {
                 : `${providerName || 'They'} will accept or decline — you’ll get a bell either way.`}
           </p>
         </header>
+        {done === 'booked' && joinUrl && (
+          <div className="bkg__doneactions">
+            <a className="btn bkg__btn" href={joinUrl} target="_blank" rel="noopener noreferrer">
+              <Icon name="video" size={14} /> {videoServiceOf(joinUrl) ?? 'Video'} link
+            </a>
+            <span className="bkg__joinnote">It&rsquo;s also on the calendar event and in your sessions.</span>
+          </div>
+        )}
         <div className="bkg__doneactions">
           <button className="btn btn-primary bkg__btn" onClick={() => navigate('/bookings')}>See your sessions</button>
           <button className="btn bkg__btn" onClick={() => navigate('/calendar')}>Calendar</button>
@@ -248,10 +259,11 @@ export default function BookSession() {
                   if (tok) sendBookingMail(tok);
                   setDone('moved');
                 } else {
-                  await createBooking(
+                  const id = await createBooking(
                     t.id, pick.iso, pick.start, note.trim(),
                     questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
                   );
+                  if (id && t.approval === 'instant') setJoinUrl(await bookingMeetingUrl(id));
                   setDone(t.approval === 'instant' ? 'booked' : 'requested');
                 }
               } catch (e) {

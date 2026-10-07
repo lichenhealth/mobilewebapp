@@ -30,6 +30,7 @@ import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage } from '../_shared/webRead.ts';
 import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
+import { videoServiceOf } from '../_shared/videoHosts.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
@@ -253,7 +254,8 @@ const CALENDAR_TOOLS = [
         approval: { type: 'string', enum: ['request', 'instant'], description: 'request = they approve each booking; instant = it books straight in.' },
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
         description: { type: 'string', description: 'A sentence or two shown on the booking page.' },
-        location: { type: 'string', description: 'Where it happens ("Online — Zoom", an address).' },
+        location: { type: 'string', description: 'Where it happens, in public words ("Online", "Zoom", an address). Never put a meeting link here — that is video_link.' },
+        video_link: { type: 'string', description: 'The video call link (Zoom, Google Meet, Teams, Webex, Whereby, Jitsi, Doxy.me, FaceTime — any https link) EXACTLY as the member wrote it in this conversation; a link they did not write is refused. Kept private: people see it only once their booking is confirmed (Bookings, the calendar event, guest emails), never on the booking page.' },
         buffer_min: { type: 'number', description: 'Breathing room in minutes held before and after each booking (0–120). Default 0.' },
         link_name: { type: 'string', description: 'The vanity link name — lowercase words-with-dashes (it is sanitized). Makes lichen.health/book/<handle>/<link_name> open this session directly; needs their profile handle to be sendable (the setup read says whether they have one).' },
         min_notice_min: { type: 'number', description: 'Minimum notice in MINUTES (24 hours = 1440). Default 60.' },
@@ -269,7 +271,7 @@ const CALENDAR_TOOLS = [
   },
   {
     name: 'update_booking_type',
-    description: 'Change one of their existing session types, named by its EXACT title from the setup read. Only the fields you pass change. 0 clears max_days_out / max_per_day; an empty link_name removes the vanity link; an empty questions array removes the questions. Use new_title to rename.',
+    description: 'Change one of their existing session types, named by its EXACT title from the setup read. Only the fields you pass change. 0 clears max_days_out / max_per_day; an empty link_name removes the vanity link; an empty video_link removes the video link; an empty questions array removes the questions. Use new_title to rename.',
     input_schema: {
       type: 'object',
       properties: {
@@ -281,6 +283,7 @@ const CALENDAR_TOOLS = [
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
         description: { type: 'string' },
         location: { type: 'string' },
+        video_link: { type: 'string', description: 'The video call link exactly as the member wrote it; empty string removes it.' },
         buffer_min: { type: 'number' },
         link_name: { type: 'string' },
         min_notice_min: { type: 'number' },
@@ -1402,18 +1405,23 @@ Deno.serve(async (req) => {
     if (name === 'my_calendar_setup') {
       const [hours, types, care, prof] = await Promise.all([
         (await sb(`availability_windows?profile_id=eq.${profile_id}&booking_type_id=is.null&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
-        (await sb(`booking_types?profile_id=eq.${profile_id}&select=title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind&order=created_at`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind&order=created_at`)).json(),
         (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
         (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json(),
       ]);
       const hs = (Array.isArray(hours) ? hours : []) as { weekday: number; start_min: number; end_min: number; kind: string }[];
       const handle = (Array.isArray(prof) ? prof[0]?.handle : null) as string | null;
+      const typeIds = (Array.isArray(types) ? types : []).map((t: { id: string }) => t.id);
+      const meets = typeIds.length
+        ? await (await sb(`booking_type_meetings?type_id=in.(${typeIds.join(',')})&select=type_id,url`)).json()
+        : [];
+      const meetBy = new Map<string, string>((Array.isArray(meets) ? meets : []).map((m: { type_id: string; url: string }) => [m.type_id, m.url]));
       return {
         ok: true,
         hours: hs.length
           ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
           : 'none set — they are not bookable and never counted available',
-        booking_types: (Array.isArray(types) ? types : []).map((t: { title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null }) =>
+        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null }) =>
           `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}`
           + `${t.hours_kind && t.hours_kind !== 'work' ? `, books from ${t.hours_kind === 'custom' ? 'its OWN hours' : t.hours_kind.replace('_', '-') + ' hours'}` : ''}`
           + `${(t.capacity ?? 1) > 1 ? `, group of up to ${t.capacity}` : ''}`
@@ -1421,6 +1429,7 @@ Deno.serve(async (req) => {
           + `${t.max_days_out != null ? `, bookable ${t.max_days_out} days out` : ''}`
           + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
           + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
+          + `${meetBy.has(t.id) ? `, ${videoServiceOf(meetBy.get(t.id)!) ?? 'video'} link set (shared only once a booking confirms)` : ''}`
           + `${t.slug ? (handle ? `, link lichen.health/book/${handle}/${t.slug}` : `, link name "${t.slug}" (needs a handle to be sendable)`) : ''}`
           + `${t.active ? '' : ', OFF'})`),
         is_active_caregiver: Array.isArray(care) && care.length > 0,
@@ -1527,6 +1536,40 @@ Deno.serve(async (req) => {
         : `The link name "${slug}" is saved, but they have no profile handle yet — the URL only exists once they set one in Profile → Public page. Say so.`;
     };
 
+    // The video link (2026-10-06): its own owner-only table, never a
+    // booking_types column (a public type would publish the room). The
+    // no-invented-targets rule for URLs: the member must have WRITTEN this
+    // exact link in the conversation — a model-composed Zoom path would
+    // send people to the wrong room.
+    const normVideoLink = (inp: Record<string, unknown>): { set: boolean; url: string | null; err?: string } => {
+      if (inp.video_link === undefined) return { set: false, url: null };
+      const raw = String(inp.video_link).trim();
+      if (!raw) return { set: true, url: null };
+      const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      let u: URL;
+      try { u = new URL(withScheme); } catch { return { set: false, url: null, err: 'video_link is not a web address' }; }
+      if (u.protocol !== 'https:' || /\s/.test(withScheme) || withScheme.length > 500) {
+        return { set: false, url: null, err: 'video_link must be a single https link' };
+      }
+      const bare = (x: string) => x.toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+      const memberText = rows
+        .filter((p: { author: string }) => p.author !== 'claude')
+        .map((p: { body?: string }) => p.body ?? '').join(' ').toLowerCase();
+      if (!memberText.includes(bare(raw))) {
+        return { set: false, url: null, err: 'that video link is not one they wrote in this conversation — ask them to paste their meeting link and use it exactly' };
+      }
+      return { set: true, url: u.toString() };
+    };
+    const writeVideoLink = async (typeId: string, url: string | null): Promise<string | null> => {
+      const r = url
+        ? await sb('booking_type_meetings?on_conflict=type_id', {
+          method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ type_id: typeId, url, updated_at: new Date().toISOString() }),
+        })
+        : await sb(`booking_type_meetings?type_id=eq.${typeId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      return r.ok ? null : 'the video link failed to save — the rest of the session saved. Say so.';
+    };
+
     if (name === 'add_booking_type') {
       const title = String(input.title ?? '').trim().slice(0, 80);
       const duration = Number(input.duration_min);
@@ -1538,9 +1581,14 @@ Deno.serve(async (req) => {
         return { ok: false, error: 'approval must be request|instant; audience everyone|mycelium|public.' };
       }
       const { out: extra, errs } = normTypeFields(input);
+      const vl = normVideoLink(input);
+      if (vl.err) errs.push(vl.err);
       if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
       const ocErr = await onCallRefused(extra.hours_kind);
       if (ocErr) return { ok: false, error: ocErr };
+      // A video session with no "where" says its service in public ("Zoom") —
+      // the name, never the link (the manual editor's same rule).
+      if (vl.url && !extra.location) extra.location = videoServiceOf(vl.url) ?? 'Online';
       const r = await sb('booking_types', {
         method: 'POST', headers: { Prefer: 'return=representation' },
         body: JSON.stringify({ profile_id, title, duration_min: duration, approval, audience, active: true, ...extra }),
@@ -1550,6 +1598,7 @@ Deno.serve(async (req) => {
         return { ok: false, error: slugTaken(text) ? `The link name is already on another of their sessions — pick a different link_name.` : `The database refused: ${text.slice(0, 140)}` };
       }
       const created = (await r.json())?.[0];
+      const linkNote = vl.url ? await writeVideoLink(created.id, vl.url) : null;
       let hoursNote: string | null | undefined;
       if (extra.hours_kind === 'custom') {
         hoursNote = await writeCustomHours(created.id, input.custom_hours);
@@ -1560,9 +1609,9 @@ Deno.serve(async (req) => {
           : `They have NO ${pool === 'available' ? 'work' : pool.replace('_', '-')} hours — nothing is bookable until they add some. Say so.`;
       }
       return {
-        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience})`,
+        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience}${vl.url && !linkNote ? `, ${videoServiceOf(vl.url) ?? 'video'} link — shared with people once their booking confirms` : ''})`,
         vanity: await vanityLine(extra.slug),
-        note: hoursNote ?? undefined,
+        note: [hoursNote, linkNote].filter(Boolean).join(' ') || undefined,
       };
     }
 
@@ -1571,12 +1620,14 @@ Deno.serve(async (req) => {
       const rows = await (await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}&select=id&limit=1`)).json();
       if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: `No session type titled "${title}" — read my_calendar_setup and use the exact title.` };
       const { out: patch, errs } = normTypeFields(input);
+      const vl = normVideoLink(input);
+      if (vl.err) errs.push(vl.err);
       if (input.new_title !== undefined) { const nt = String(input.new_title).trim().slice(0, 80); if (nt) patch.title = nt; }
       if (input.duration_min !== undefined) { const n = Number(input.duration_min); if (n >= 15 && n <= 480) patch.duration_min = n; else errs.push('duration_min must be 15–480'); }
       if (input.approval !== undefined) { const a = String(input.approval); if (['request', 'instant'].includes(a)) patch.approval = a; else errs.push('approval must be request|instant'); }
       if (input.audience !== undefined) { const a = String(input.audience); if (['everyone', 'mycelium', 'public'].includes(a)) patch.audience = a; else errs.push('audience must be everyone|mycelium|public'); }
       if (errs.length) return { ok: false, error: errs.join('; ') + '.' };
-      if (!Object.keys(patch).length && input.custom_hours === undefined) {
+      if (!Object.keys(patch).length && input.custom_hours === undefined && !vl.set) {
         return { ok: false, error: 'Nothing to change — pass at least one field.' };
       }
       const ocErr = await onCallRefused(patch.hours_kind);
@@ -1590,6 +1641,7 @@ Deno.serve(async (req) => {
           return { ok: false, error: slugTaken(text) ? `That link name is already on another of their sessions — pick a different link_name.` : `The update failed: ${text.slice(0, 140)}` };
         }
       }
+      const linkNote = vl.set ? await writeVideoLink(rows[0].id, vl.url) : null;
       // Only EXPLICIT custom_hours replace the windows — re-stating
       // books_from=custom must never wipe hours the member already set.
       let hoursNote: string | null = null;
@@ -1603,9 +1655,9 @@ Deno.serve(async (req) => {
       }
       return {
         ok: true,
-        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : [])].join(', ')}`,
+        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : []), ...(vl.set && !linkNote ? [vl.url ? `video link (${videoServiceOf(vl.url) ?? 'video'})` : 'removed the video link'] : [])].join(', ')}`,
         vanity: await vanityLine(patch.slug),
-        note: hoursNote ?? undefined,
+        note: [hoursNote, linkNote].filter(Boolean).join(' ') || undefined,
       };
     }
 

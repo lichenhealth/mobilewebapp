@@ -19,10 +19,12 @@ import AssistantDoor from '../components/AssistantDoor';
 import ShareRulesEditor from '../components/ShareRulesEditor';
 import TaskShareRules from '../components/TaskShareRules';
 import { loadMyPhone } from '../lib/conciergeApi';
+import { videoServiceOf } from '../lib/linkify';
 import {
   BookingType, listMyBookingTypes, saveBookingType, deleteBookingType, slugify,
   TypeHourRow, TypeCondition, listTypeHours, saveTypeHours,
   listTypeConditions, saveTypeConditions, searchConditionTargets,
+  listMyMeetingLinks, saveMeetingLink, normalizeMeetingUrl,
 } from '../lib/bookingApi';
 import './Concierge.css';
 import './Calendar.css';
@@ -82,6 +84,11 @@ export default function CalendarSettings() {
 
   // Bookable sessions (the Calendly layer)
   const [bkTypes, setBkTypes] = useState<BookingType[]>([]);
+  // Video links live in their own owner-only table (never on the type row,
+  // which others can read) — kept beside the form, not inside bkEdit, so
+  // saveBookingType never tries to write a column booking_types doesn't have.
+  const [bkLinks, setBkLinks] = useState<Record<string, string>>({});
+  const [bkLink, setBkLink] = useState('');
   // The PUBLIC link (founder 2026-08-14, the Calendly replacement) hangs off
   // your vanity handle: lichen.health/book/<handle>.
   const [myHandle, setMyHandle] = useState<string | null>(null);
@@ -161,6 +168,7 @@ export default function CalendarSettings() {
     setMyPhone(phone);
     setExtCals(ext);
     setBkTypes(bk);
+    setBkLinks(await listMyMeetingLinks(bk.map((t) => t.id)));
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -277,6 +285,7 @@ export default function CalendarSettings() {
               <span className="cset__bkrow-sub">
                 {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ''}
+                {bkLinks[bt.id] ? ` · ${videoServiceOf(bkLinks[bt.id]) ?? 'video'} link` : ''}
               </span>
               {/* The vanity link (founder 2026-10-03, the Calendly shape):
                   this session's own sendable address. */}
@@ -302,6 +311,7 @@ export default function CalendarSettings() {
               )}
               <button className="cedit__add cedit__add--sm" onClick={() => {
                 setBkEdit(bt); setBkOpen(true);
+                setBkLink(bkLinks[bt.id] ?? '');
                 setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
                 void listTypeHours(bt.id).then(setBkHours);
                 void listTypeConditions(bt.id).then(setBkConds);
@@ -349,6 +359,7 @@ export default function CalendarSettings() {
           {!bkOpen ? (
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
+              setBkLink('');
               setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
               setBkOpen(true);
             }}>
@@ -374,10 +385,32 @@ export default function CalendarSettings() {
               />
               <input
                 className="cedit__input cset__grow"
-                placeholder="Where (e.g. Online — Zoom, or an address)"
+                placeholder="Where (an address, or e.g. Online)"
                 value={bkEdit.location ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, location: e.target.value }))}
               />
+              {/* The video link (founder 2026-10-06): an IDENTIFIER field —
+                  declines autocorrect. Shared only with people who book. */}
+              <input
+                className="cedit__input cset__grow"
+                type="url"
+                inputMode="url"
+                placeholder="Video call link — Zoom, Google Meet, Teams… (optional)"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                value={bkLink}
+                onChange={(e) => setBkLink(e.target.value)}
+              />
+              {bkLink.trim() && (() => {
+                const n = normalizeMeetingUrl(bkLink);
+                const svc = n.url ? videoServiceOf(n.url) : null;
+                return (
+                  <p className="cedit__hint cset__linkhint">
+                    {n.error
+                      ? n.error
+                      : `${svc ? `${svc} link ✓` : 'Video link ✓'} — shown only to people once their booking is confirmed, never on your public booking page.`}
+                  </p>
+                );
+              })()}
               <select className="cset__select" value={bkEdit.approval ?? 'request'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
                 <option value="request">I approve each request</option>
@@ -535,10 +568,17 @@ export default function CalendarSettings() {
                 disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && !bkEdit.audience_space_id)}
                 onClick={() => act(async () => {
                   const qs = (bkEdit.questions ?? []).map((s) => s.trim()).filter(Boolean);
+                  const link = normalizeMeetingUrl(bkLink);
+                  if (link.error) throw new Error(link.error);
+                  // A video session with no "where" says which service in
+                  // public ("· Zoom") — the service name, never the link.
+                  const where = (bkEdit.location ?? '').trim()
+                    || (link.url ? (videoServiceOf(link.url) ?? 'Online') : '');
                   let typeId: string;
                   try {
                     typeId = await saveBookingType(me, {
                       ...bkEdit, title: (bkEdit.title ?? '').trim(),
+                      location: where,
                       questions: qs.length ? qs : null,
                       slug: slugify(bkEdit.slug ?? '') || null,
                       hours_kind: bkEdit.hours_kind ?? 'work',
@@ -553,7 +593,8 @@ export default function CalendarSettings() {
                   // clears the leftovers so nothing books from ghost hours.
                   await saveTypeHours(me, typeId, (bkEdit.hours_kind === 'custom') ? bkHours : []);
                   await saveTypeConditions(typeId, bkConds);
-                  setBkOpen(false); setBkEdit({}); setBkHours([]); setBkConds([]);
+                  if ((link.url ?? null) !== (bkLinks[typeId] ?? null)) await saveMeetingLink(typeId, link.url);
+                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkHours([]); setBkConds([]);
                 })}
               >
                 <Icon name="plus" size={12} /> Save
@@ -565,7 +606,7 @@ export default function CalendarSettings() {
                   });
                 }}>Delete</button>
               )}
-              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); }}>
+              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); }}>
                 <Icon name="close" size={13} />
               </button>
             </div>
