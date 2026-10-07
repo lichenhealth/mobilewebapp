@@ -233,7 +233,7 @@ export default function MapView() {
 
     visibleTravel.forEach(({ post, lat, lng }) => {
       const d = (post.details ?? {}) as { travelKind?: unknown; routeFrom?: unknown; routeTo?: unknown; location?: unknown; sleeps?: unknown };
-      const kind = d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'stay' ? 'Stay' : 'Travel';
+      const kind = d.travelKind === 'ride' ? 'Ride / transport' : d.travelKind === 'flight' ? 'Flight' : d.travelKind === 'stay' ? 'Stay' : 'Travel';
       const routeLine = [d.routeFrom, d.routeTo].filter((x) => typeof x === 'string' && x).join(' → ');
       const el = makePin('mapv__pin--space', 'travel', post.title ?? 'Travel');
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })

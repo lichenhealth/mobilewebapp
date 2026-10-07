@@ -7,7 +7,17 @@ import { supabase } from './supabase';
  *  smart Preview opens the page on the content in question. */
 export type FeedAttachment =
   | { type: 'photo'; url: string }
-  | { type: 'page_edit'; subject: 'space' | 'profile'; id: string; tab?: string };
+  | { type: 'page_edit'; subject: 'space' | 'profile'; id: string; tab?: string }
+  /** The treasury handoff (founder 2026-10-06): a verified door into a
+   *  stewarded space's own Current-cy room — the client's button flips the
+   *  member's hat and lands there. */
+  | { type: 'space_thread'; room: 'currentcy'; id: string; name: string; kind: string }
+  /** The consent offer (same message: "would you like to switch that
+   *  permission? Then link to letting them do that to turn it on") — the
+   *  PERSON taps to re-enable; the model never arms anything. `which` names
+   *  the switch: the member's own per-space choice, or the space's own
+   *  assistant switch (steward-flippable). */
+  | { type: 'space_consent'; room: 'currentcy'; id: string; name: string; kind: string; which: 'member' | 'space' };
 
 export interface FeedPostRow {
   id: string;
@@ -372,10 +382,22 @@ export async function loadProfileContext(me: string): Promise<ProfileContext | n
 // `space:<uuid>` in the same free-text thread column. Still the MEMBER's own
 // rows by RLS — each admin holds their own private thread about the space;
 // the shared, entity-owned thread is the per-entity AI Partner fabric, later.
-export const spaceThreadId = (spaceId: string) => `space:${spaceId}`;
+// `space:<uuid>:currentcy` is the space's own Current-cy room (founder
+// 2026-10-06: "link to the Ai assistant in countryman stable's account,
+// which it will switch you to and then drop you in their current-cy chat")
+// — the same free-text column, the same consent stack, money on the table
+// instead of the page.
+export const spaceThreadId = (spaceId: string, room?: 'currentcy') =>
+  `space:${spaceId}${room ? `:${room}` : ''}`;
+const SPACE_THREAD_RE = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?::(currentcy))?$/i;
 export function spaceIdOfThread(thread: string): string | null {
-  const m = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(thread);
+  const m = SPACE_THREAD_RE.exec(thread);
   return m ? m[1] : null;
+}
+/** Which ROOM of the space a thread is — null = the build thread. */
+export function spaceRoomOfThread(thread: string): 'currentcy' | null {
+  const m = SPACE_THREAD_RE.exec(thread);
+  return m?.[2]?.toLowerCase() === 'currentcy' ? 'currentcy' : null;
 }
 
 /** What Claude works from in a space's build thread — the space-side twin of

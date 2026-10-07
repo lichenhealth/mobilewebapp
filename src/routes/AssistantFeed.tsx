@@ -4,15 +4,17 @@ import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
-import { useActing } from '../acting/ActingProvider';
+import { useActing, type SpaceKind } from '../acting/ActingProvider';
 import { useTopIdentityFor } from '../lib/topIdentity';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
-  loadProfileContext, loadSpaceContext, spaceIdOfThread, loadSectionPresence, groupConvos,
+  loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId,
+  loadSectionPresence, groupConvos,
   ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
+import { setConsent } from '../lib/assistantConsentApi';
 import type { IconName } from '../components/Icon';
 import { possessive } from '../lib/names';
 import { readDraft, publishDraft } from '../lib/pageDrafts';
@@ -51,6 +53,10 @@ export default function AssistantFeed() {
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
   const spaceId = spaceIdOfThread(thread);
+  // Which ROOM of the space (founder 2026-10-06): null = the build thread,
+  // 'currentcy' = the space's own Current-cy room — same stream shape, no
+  // page panels, the treasury on the table server-side.
+  const spaceRoom = spaceRoomOfThread(thread);
   // CONVERSATIONS, THE EMAIL GRAMMAR (founder 2026-10-05: "it feels weird
   // to be dropped midway between two chat bubbles… dropped at a
   // chronological order (maybe most recent to oldest, like email) of only
@@ -80,12 +86,21 @@ export default function AssistantFeed() {
   // (the standing rule) so a boot-default "self" never decides. Beings stay
   // personal — a being's page is its steward's work, and build threads are
   // space-shaped server-side.
-  const { actor, ready: actingReady } = useActing();
+  const { actor, ready: actingReady, setActor } = useActing();
   useEffect(() => {
     if (!actingReady) return;
     if (thread === 'profile' && actor.type === 'space') {
       const next = new URLSearchParams(params);
       next.set('thread', `space:${actor.id}`);
+      setParams(next, { replace: true });
+    }
+    // THE CURRENT-CY THREAD FOLLOWS THE HAT TOO (founder 2026-10-06, the
+    // same rule as profile above): wearing a space's hat, the money room
+    // is the SPACE's own Current-cy room, never the person's wallet thread.
+    // Beings stay personal — a being holds no treasury room yet.
+    if (thread === 'currentcy' && actor.type === 'space') {
+      const next = new URLSearchParams(params);
+      next.set('thread', spaceThreadId(actor.id, 'currentcy'));
       setParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -340,6 +355,51 @@ export default function AssistantFeed() {
     } finally { setPubBusy(false); }
   }
 
+  // THE TREASURY DOOR (founder 2026-10-06: "link to the Ai assistant in
+  // countryman stable's account, which it will switch you to and then drop
+  // you in their current-cy chat"). The button flips the hat IN PLACE (the
+  // never-navigate-to-a-personal-page-mid-act rule) and lands in the
+  // space's own Current-cy room. The consent variant first turns the named
+  // switch back on — the PERSON taps; the server only ever offered.
+  const [doorBusy, setDoorBusy] = useState(false);
+  const [doorErr, setDoorErr] = useState('');
+  async function enterTreasury(att: Extract<NonNullable<FeedPostRow['attachments']>[number], { type: 'space_thread' | 'space_consent' }>) {
+    if (doorBusy) return;
+    setDoorBusy(true); setDoorErr('');
+    try {
+      if (att.type === 'space_consent') {
+        if (att.which === 'member') {
+          // Their own per-space switch: all-on is the absence of rows, so
+          // turning back on DELETES — awaited here, so the room's first
+          // message never races the consent it rides on.
+          const { error } = await supabase.from('assistant_consent').delete()
+            .match({ profile_id: me, scope_type: 'space', scope_id: att.id });
+          if (error) throw error;
+          setConsent('space', att.id, true);   // keep the local cache honest
+        } else {
+          // The space's own switch — steward-flippable (they are one, the
+          // server checked before offering this door).
+          const { error } = await supabase.from('spaces')
+            .update({ assistant_enabled: true }).eq('id', att.id);
+          if (error) throw error;
+        }
+      }
+      const { data } = await supabase.from('spaces').select('avatar_url').eq('id', att.id).maybeSingle();
+      setActor({
+        type: 'space', id: att.id, name: att.name,
+        kind: att.kind as SpaceKind,
+        avatarUrl: (data as { avatar_url?: string | null } | null)?.avatar_url ?? null,
+      });
+      const next = new URLSearchParams(params);
+      next.set('thread', spaceThreadId(att.id, 'currentcy'));
+      next.delete('convo'); next.delete('page'); next.delete('ask');
+      setParams(next);   // a push — stepping into the space's room IS a step
+    } catch (e) {
+      console.error(e);
+      setDoorErr('Could not open the room — try once more.');
+    } finally { setDoorBusy(false); }
+  }
+
   // ENLIVENED IN THE MOMENT (founder 2026-08-31: "once the conversation
   // generates an actual content post to the section, even if done via the
   // claude builder, it goes from gray to darker gray"): re-check section
@@ -500,6 +560,8 @@ export default function AssistantFeed() {
           <p className="afeed__sub">
             {builderMode
               ? `Build with Claude — ${possessive(sctx?.name ?? 'this space')} website changes beside the conversation.`
+              : spaceRoom === 'currentcy'
+              ? `${possessive(sctx?.name ?? 'This space')} Current-cy room — its treasury, its moves, kept with the ${sctx?.kind ?? 'space'}.`
               : spaceId
               ? `${possessive(sctx?.name ?? 'This space')} build thread — its page, its story, kept with the ${sctx?.kind ?? 'space'}.`
               : thread === 'general'
@@ -578,7 +640,7 @@ export default function AssistantFeed() {
             dynamic room, not one of the six standing ones; it wears the
             space's own face. */}
         {spaceId && (
-          <button className="afeed__thread afeed__thread--space is-on" title={`Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
+          <button className="afeed__thread afeed__thread--space is-on" title={spaceRoom === 'currentcy' ? `${possessive(sctx?.name ?? 'this space')} Current-cy room` : `Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
             <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
             {/* Its thread is the one on screen — no badge on what you're reading. */}
           </button>
@@ -683,8 +745,10 @@ export default function AssistantFeed() {
       )}
 
       {/* A SPACE'S build thread (founder 2026-08-22): the same page-beside-
-          conversation shape the profile thread has, about the space. */}
-      {spaceId && (
+          conversation shape the profile thread has, about the space. The
+          Current-cy room skips all of it — a money room has no page pane,
+          no context card, no edit tools (founder 2026-10-06). */}
+      {spaceId && !spaceRoom && (
         <>
           {/* In builder mode the split is gone (founder 2026-08-31: "too
               busy") — Preview under Claude's replies opens the page in its
@@ -846,7 +910,9 @@ export default function AssistantFeed() {
             already holding their work, it welcomes them back. */}
         {!loading && visible.length === 0 && posts.length === 0 && (() => {
           const tdef = ASSISTANT_THREADS.find((t) => t.id === thread);
-          const line = spaceId
+          const line = spaceRoom === 'currentcy'
+            ? `Nothing here yet — ask about ${possessive(sctx?.name ?? 'this space')} treasury, its moves, or how it could earn more Current.`
+            : spaceId
             ? `Nothing here yet — tell me about ${sctx?.name ?? 'this space'} and we’ll build its page together.`
             : tdef && setup
               ? (setup[thread] ? tdef.welcome : tdef.emptyAsk)
@@ -959,6 +1025,27 @@ export default function AssistantFeed() {
                     {pubErr && <span className="afeed__puberr">{pubErr}</span>}
                   </div>
                 )}
+                {/* THE TREASURY + CONSENT DOORS (founder 2026-10-06): a reply
+                    that verified a handoff carries the button that switches
+                    the hat and opens the space's Current-cy room; a reply
+                    that hit a consent switch carries the turn-it-back-on
+                    offer instead — the person taps, nothing flips itself. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'space_thread' || a.type === 'space_consent' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:${a.type}:${a.id}`}>
+                      <button className="afeed__pubbtn" type="button" disabled={doorBusy}
+                        onClick={() => void enterTreasury(a)}>
+                        {doorBusy ? 'Opening…'
+                          : a.type === 'space_consent'
+                          ? (a.which === 'member'
+                            ? `Turn AI back on for you in ${a.name} & open its Current-cy room`
+                            : `Turn ${possessive(a.name)} assistant back on & open its Current-cy room`)
+                          : `Open ${possessive(a.name)} Current-cy room →`}
+                      </button>
+                      {doorErr && <span className="afeed__puberr">{doorErr}</span>}
+                    </div>
+                  ))}
               </div>
             </div>
           );
@@ -996,7 +1083,7 @@ export default function AssistantFeed() {
             switch, and the person taps. A model that could arm its own write
             access would make the consent worthless. */}
         {!loading && visible.length > 0
-          && (spaceId ? (sctx && !sctx.canEdit) : (ctx && !ctx.canEdit)) && (
+          && (spaceId ? (!spaceRoom && sctx && !sctx.canEdit) : (ctx && !ctx.canEdit)) && (
           <div className="afeed__arm">{armOffer}</div>
         )}
       </div>

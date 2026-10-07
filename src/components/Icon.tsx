@@ -20,6 +20,7 @@ export type IconName =
   | 'brain'
   | 'chat-about'
   | 'plane'
+  | 'car'
   | 'briefcase'
   | 'building'
   | 'calendar'
@@ -474,6 +475,14 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '1 2 22 20',
     strokeWidth: 1.4,
     content: <path d="M22 14.6l-8.6-2.4V5.4c0-1.2-.6-2.2-1.4-2.2s-1.4 1-1.4 2.2v6.8L2 14.6v1.9l8.6-1.8v3.8L8.2 20v1.2l3.8-.9 3.8.9V20l-2.4-1.5v-3.8l8.6 1.8z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
+  },
+  // A ground ride (founder 2026-10-06: "rides should have a car" — the plane
+  // moved to Travel's Flights lens). Side-view body + two wheels, the set's
+  // hairline idiom.
+  'car': {
+    viewBox: '1.3 6.3 21.4 13.4',
+    strokeWidth: 1.4,
+    content: <><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 002 12v4c0 .6.4 1 1 1h2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><circle cx="7" cy="17" r="2" stroke="currentColor"/><path d="M9 17h6" stroke="currentColor" strokeLinecap="round"/><circle cx="17" cy="17" r="2" stroke="currentColor"/></>,
   },
   'chat-about': {
     viewBox: '-1 0.8 24 24',

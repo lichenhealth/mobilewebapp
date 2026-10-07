@@ -441,6 +441,29 @@ const MONEY_TOOLS = [
   },
 ];
 
+// A SPACE'S OWN CURRENT-CY ROOM (founder 2026-10-06: "if its countryman
+// stables, it can say — you're asking about countryman stables from your
+// personal account, then link to the Ai assistant in countryman stable's
+// account, which it will switch you to and then drop you in their
+// current-cy chat"). The personal money coach never shows a space's
+// numbers; this tool is the DOOR — it resolves a name against the spaces
+// the sender stewards (select_space's exactly-one-match rule), re-checks
+// the whole consent stack, and the reply then carries a button that flips
+// the member's hat and lands them in `space:<id>:currentcy`. When a
+// consent is off, the button offers to turn it back on instead — the
+// PERSON taps; the model never arms anything (founder, same message: "it
+// tells you: right now, you don't let Ai see… would you like to switch
+// that permission? Then link to letting them do that to turn it on").
+const OPEN_TREASURY_TOOL = {
+  name: 'open_space_treasury',
+  description: 'Personal Current-cy thread only: when the member asks about the money of a space they STEWARD, call this with its name. It never answers with the space\'s numbers here — it puts a button under your reply that switches them into that space\'s own Current-cy room, where its treasury is on the table. The name resolves against the spaces they steward, nothing else. If a consent switch is off, the result says which, and the button under your reply offers to turn it back on — relay that plainly; never say your tools are down.',
+  input_schema: {
+    type: 'object',
+    properties: { space_name: { type: 'string', description: 'The space\'s name, as the member said it.' } },
+    required: ['space_name'],
+  },
+};
+
 /** What a tool call did, in one plain line — the fallback report if the model
  *  writes and then says nothing (a write with no report is a bug). */
 type ToolOutcome = { ok: boolean; change?: string; [k: string]: unknown };
@@ -474,9 +497,13 @@ Deno.serve(async (req) => {
   // member's own private rows, ABOUT a space. The space id comes from the
   // thread name, never from the model, so the tools below still take no
   // target (the profile-tools rule, held).
-  const spaceThreadMatch = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+  // `space:<uuid>` is the build thread; `space:<uuid>:currentcy` is the
+  // space's own Current-cy room (founder 2026-10-06) — same consent stack,
+  // different table on the table.
+  const spaceThreadMatch = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?::(currentcy))?$/i
     .exec(trigger.thread ?? '');
   const spaceId = spaceThreadMatch ? spaceThreadMatch[1] : null;
+  const spaceRoom = spaceThreadMatch?.[2]?.toLowerCase() === 'currentcy' ? 'currentcy' as const : null;
 
   // PER-IDENTITY AI CONSENT (founder 2026-08-17). The member wrote into this
   // thread deliberately, so silence would be the failure mode: answer ONCE
@@ -687,6 +714,36 @@ Deno.serve(async (req) => {
     const mem = await (await sb(`space_members?space_id=eq.${spaceId}&profile_id=eq.${profile_id}&select=role&limit=1`)).json();
     const role = Array.isArray(mem) ? mem[0]?.role : null;
     spaceIsAdmin = role === 'admin' || role === 'super_admin';
+    if (spaceRoom === 'currentcy') {
+      // THE TREASURY ON THE TABLE (founder 2026-10-06): this room is the
+      // space's own money coach. Numbers are gathered for STEWARDS only —
+      // a treasury belongs to the people who answer for the space.
+      if (!spaceIsAdmin) {
+        spaceFrame = `\n\nTHIS IS ${spaceName.toUpperCase()}'S CURRENT-CY ROOM, but the member is NOT a steward of it — a space's treasury belongs to its stewards, so you hold NO numbers here and must not guess at any. Help them take part instead (trading with the space, its listings), and say its stewards are who to ask about its money.`;
+      } else {
+        try {
+          const [tentRes, tlistRes] = await Promise.all([
+            sb(`ledger_entries?or=(and(from_type.eq.space,from_id.eq.${spaceId}),and(to_type.eq.space,to_id.eq.${spaceId}))&select=from_type,from_id,to_type,to_id,amount,context,memo,created_at&order=created_at.desc&limit=200`),
+            sb(`posts?author_space_id=eq.${spaceId}&service_areas=cs.{marketplace}&select=title,body,details,created_at&order=created_at.desc&limit=10`),
+          ]);
+          const tents = (((await tentRes.json()) as { from_type: string | null; from_id: string | null; to_type: string | null; to_id: string | null; amount: string | number; context: string; memo: string; created_at: string }[] | null) ?? []);
+          const tbal = tents.reduce((a, e) => a
+            + (e.to_type === 'space' && e.to_id === spaceId ? Number(e.amount) : 0)
+            - (e.from_type === 'space' && e.from_id === spaceId ? Number(e.amount) : 0), 0);
+          const tlist = (((await tlistRes.json()) as { title: string | null; body: string; details: { modes?: string[]; mode?: string; aiExcluded?: boolean } | null; created_at: string }[] | null) ?? [])
+            .filter((p) => !p.details?.aiExcluded);
+          spaceFrame = `\n\nTHE TREASURY ON THE TABLE — this room is ${spaceName}'s (${sp.kind}) own Current-cy, NOT the member's personal wallet (that lives in their personal Current-cy thread):`
+            + `\n- Treasury balance: ${tbal} Current`
+            + (tents.length
+              ? `\n- Recent moves: ${tents.slice(0, 10).map((e) => `${e.amount} ${e.from_type === 'space' && e.from_id === spaceId ? 'out' : 'in'} (${e.context}${e.memo ? `, "${e.memo.slice(0, 40)}"` : ''}, ${e.created_at.slice(0, 10)})`).join('; ')}`
+              : '\n- No Current has moved through this treasury yet.')
+            + (tlist.length
+              ? `\n- Listings in the space's own voice: ${tlist.map((p) => `"${p.title ?? p.body.slice(0, 40)}" (${(p.details?.modes ?? [p.details?.mode ?? '?']).join('/')}, since ${p.created_at.slice(0, 10)})`).join('; ')}`
+              : '\n- The space has no marketplace listings in its own voice yet — authoring as the space is how its offerings earn into this treasury.')
+            + `\nThe member STEWARDS this space, which is why its numbers are on your table. Coach the treasury the way the personal money coach works: real moves, real listings, never invented demand; a space earns through sales/trades in its own voice and is paid INTO this treasury, and its admins send from it (the wallet card in its backstage). Dollar LOADS are member-only today — a space cannot load dollars itself; say so if asked. You read and coach; you can never move a single Current. Never mention any other member's or space's balance.`;
+        } catch { spaceFrame = `\n\nThis room is ${spaceName}'s own Current-cy. The treasury read failed just now — answer lighter, never invent a number.`; }
+      }
+    } else {
     const page = (sp.page ?? {}) as Record<string, unknown>;
     const contact = (sp.contact ?? {}) as Record<string, string>;
     const story = String(page.story ?? '').trim();
@@ -702,12 +759,15 @@ Deno.serve(async (req) => {
       + (spaceIsAdmin
         ? `\nThe member STEWARDS this space, so help them build and run its public presence.`
         : `\nThe member is NOT a steward of this space — its page belongs to its admins. Help them take part in it instead, and say who to ask for page changes.`);
+    }
   }
 
   // Staying in the right thread is part of the job: if what they've asked
   // plainly belongs somewhere else, say so and point, rather than doing the
   // work in the wrong place (founder 2026-08-11).
-  const threadRule = spaceId
+  const threadRule = spaceRoom === 'currentcy'
+    ? `\n\nYou are in the space's own Current-cy room named above. Keep the work about THAT space's treasury and economy; the member's personal wallet has its own Current-cy thread — point there for personal-money asks, one short sentence. Page-building for this space lives in its build thread.`
+    : spaceId
     ? `\n\nYou are in this member's build thread for the space named above. Keep the work about THAT space's page and presence; their OWN page has its own Profile thread — point there for personal-page asks, one short sentence.`
     : thread === 'general'
     ? '\n\nYou are in their GENERAL thread — anything goes here, and you may draw on their other threads when it helps.'
@@ -761,7 +821,10 @@ Deno.serve(async (req) => {
     // space's build thread — but only for a steward of the space, and only
     // while the space's own assistant switch is on (checked above; an off
     // switch never reaches here). Three consents, all required.
-    canSpaceEdit = !!spaceId && flag && spaceIsAdmin && spaceAiOn;
+    // The currentcy room never arms page tools — it is a money room, and
+    // deliberately has no write tools at all (money never moves on a
+    // model's word; the standing rule).
+    canSpaceEdit = !!spaceId && !spaceRoom && flag && spaceIsAdmin && spaceAiOn;
   }
   // The small hands (Drive save, task) ride every PERSONAL thread behind the
   // same flag — the pulse names what's happening, these let the assistant
@@ -875,6 +938,9 @@ Deno.serve(async (req) => {
           ? `\n- Open asks others posted (demand they might serve): ${asks.map((p) => `"${p.title ?? 'an ask'}"`).join('; ')}`
           : '')
         + '\nTIMESTAMPS ARE YOURS TO GIVE: my_money_activity reads their own pending bank transfers (initiated when, live Stripe status, estimated arrival), landed loads and recent moves. Use it whenever they ask when or whether money moved — answer with real dates, never "I can\'t see that" or "I can\'t remember when you initiated it".'
+        + (stewardSpaces.length
+          ? `\nTHE SPACES THEY STEWARD HAVE THEIR OWN TREASURIES, in their own rooms: ${stewardSpaces.map((s) => s.name).join('; ')}. This thread is their PERSONAL wallet — a space's numbers never show here. When they ask about a space's money ("what's in Countryman Stables' treasury?"), say plainly they're asking about that space from their personal account and call open_space_treasury with its name: a button then rides under your reply that switches them into the space's own Current-cy room. If the tool refuses because a switch is off, relay which switch and point at the turn-it-on button under your reply — their tap, their choice; never say your tools are down.`
+          : '')
         + '\nCoach from THIS, never invented demand: notice one real inefficiency or opportunity when there is one — a quiet listing a clearer mode or title might move, an open ask their offerings could serve, a skill they mention but never listed. This is participation coaching inside Lichen, NOT investment, tax, debt or legal advice — that bar from your ground rules still holds; for real financial hardship, point warmly to the Financial Health Profile in Concierge (a human coordinator gives every request a real look). Never mention anyone else\'s balance (you cannot see one), never rank members.';
     } catch { /* a failed read means a lighter reply, never a broken one */ }
   }
@@ -926,6 +992,13 @@ Deno.serve(async (req) => {
   // by that tool's own verified resolution, never from raw model input.
   let selectedSpaceId: string | null = null;
   let selectedSpaceName = '';
+  // The doors a reply can carry (founder 2026-10-06): a verified handoff
+  // into a stewarded space's Current-cy room, or — when a consent switch is
+  // off — the offer to turn it back on. Set only by open_space_treasury's
+  // own resolution against stewardSpaces; the client renders the buttons
+  // and the PERSON taps. The model never flips a switch itself.
+  let treasuryDoor: { id: string; name: string; kind: string } | null = null;
+  let consentDoor: { id: string; name: string; kind: string; which: 'member' | 'space' } | null = null;
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -1030,6 +1103,37 @@ Deno.serve(async (req) => {
     // ── General's space selection (founder 2026-10-06): resolve a NAME
     // against the sender's OWN stewarded spaces, exactly-one-match, full
     // consent stack re-checked right here. Never reachable in other threads.
+    // ── The treasury door (founder 2026-10-06): resolve a NAME against the
+    // sender's OWN stewarded spaces, re-check every consent, and hand the
+    // client a button — never the space's numbers in this thread.
+    if (name === 'open_space_treasury') {
+      if (thread !== 'currentcy') return { ok: false, error: 'open_space_treasury works only in their personal Current-cy thread.' };
+      const want = String(input.space_name ?? '').trim().toLowerCase();
+      if (!want) return { ok: false, error: 'Which space? Give its name.' };
+      const exact = stewardSpaces.filter((s) => s.name.toLowerCase() === want);
+      const loose = exact.length ? exact : stewardSpaces.filter((s) => s.name.toLowerCase().includes(want));
+      if (loose.length === 0) {
+        return { ok: false, error: `They steward no space named "${String(input.space_name)}". Spaces they steward: ${stewardSpaces.map((s) => s.name).join('; ') || '(none)'} — a space's treasury room opens only for its stewards.` };
+      }
+      if (loose.length > 1) {
+        return { ok: false, error: `More than one of their spaces matches: ${loose.map((s) => s.name).join('; ')} — ask which one they mean.` };
+      }
+      const sp = loose[0];
+      const srows = await (await sb(`spaces?id=eq.${sp.id}&select=name,kind,assistant_enabled,status`)).json();
+      const srow = Array.isArray(srows) ? srows[0] : null;
+      if (!srow || srow.status === 'offline') return { ok: false, error: 'That space is not reachable anymore (offline or gone).' };
+      const kind = String(srow.kind ?? 'space');
+      if (srow.assistant_enabled === false) {
+        consentDoor = { id: sp.id, name: sp.name, kind, which: 'space' };
+        return { ok: false, error: `${sp.name} has its own assistant switch off, so no assistant reads or writes anything for it — its treasury included. They steward it, so a button now rides under your reply that turns the switch back on and opens its Current-cy room; say that plainly and leave the choice to them. Never call this an outage.` };
+      }
+      if (await assistantConsentOff(profile_id, [{ type: 'space', id: sp.id }])) {
+        consentDoor = { id: sp.id, name: sp.name, kind, which: 'member' };
+        return { ok: false, error: `Right now they don't let any assistant work with them in ${sp.name} (their own per-space switch, Profile → Privacy). A button now rides under your reply that turns it back on and opens the room — their tap, their choice; say that plainly. Never call this an outage.` };
+      }
+      treasuryDoor = { id: sp.id, name: sp.name, kind };
+      return { ok: true, change: `offered the door into ${sp.name}'s Current-cy room`, note: `A button now rides under your reply: it switches them into acting as ${sp.name} and opens its own Current-cy room, where its treasury is on the table. Tell them that is where its numbers live — never quote a space balance from here.` };
+    }
     if (name === 'select_space') {
       if (thread !== 'general') return { ok: false, error: 'select_space works only in the General thread — a space build thread already knows its space.' };
       if (!handThatWrites) return { ok: false, error: 'Their "Let Claude edit my page directly" switch is off — the offer at the foot of this conversation is where they turn it on.' };
@@ -1934,7 +2038,7 @@ Deno.serve(async (req) => {
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar || canCourses || canSpaceEdit || canAct || thread === 'currentcy') ? 1600 : 1200,
+        max_tokens: (canEdit || canCalendar || canCourses || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 1600 : 1200,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
@@ -1952,7 +2056,7 @@ Deno.serve(async (req) => {
         ...{ tools: [READ_WEBSITE_TOOL, FILE_DEV_REPORT_TOOL,
                      ...((canEdit || canSpaceEdit) ? [SAVE_WEB_IMAGE_TOOL] : []),
                      ...(canAct ? ACT_TOOLS : []),
-                     ...(thread === 'currentcy' ? MONEY_TOOLS : []),
+                     ...(thread === 'currentcy' ? [...MONEY_TOOLS, ...(stewardSpaces.length ? [OPEN_TREASURY_TOOL] : [])] : []),
                      ...(canEdit && thread === 'general' && stewardSpaces.length
                        ? [...EDIT_TOOLS, SELECT_SPACE_TOOL, ...SPACE_PAGE_TOOLS]
                        : canEdit ? EDIT_TOOLS : canSpaceEdit ? SPACE_EDIT_TOOLS : canCalendar ? CALENDAR_TOOLS : canCourses ? COURSE_TOOLS : [])],
@@ -2027,18 +2131,24 @@ Deno.serve(async (req) => {
 
   // A reply that carried page edits wears a page_edit marker so the client
   // can hang Preview and Publish buttons on it (founder 2026-08-31). One
-  // marker, the LAST tab touched — the smart Preview lands there.
+  // marker, the LAST tab touched — the smart Preview lands there. The
+  // treasury handoff and the consent offer ride the same attachments slot
+  // (founder 2026-10-06) — the client renders their buttons; the person taps.
   const lastEdit = pageEdits[pageEdits.length - 1];
+  const replyAttachments: Record<string, unknown>[] = [];
+  if (lastEdit) {
+    replyAttachments.push({
+      type: 'page_edit',
+      subject: lastEdit.subject,
+      id: lastEdit.subject === 'space' ? (spaceId ?? selectedSpaceId) : profile_id,
+      tab: lastEdit.tab,
+    });
+  }
+  if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
+  if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread, convo_id: trigger.convo_id ?? null,
-    ...(lastEdit ? {
-      attachments: [{
-        type: 'page_edit',
-        subject: lastEdit.subject,
-        id: lastEdit.subject === 'space' ? (spaceId ?? selectedSpaceId) : profile_id,
-        tab: lastEdit.tab,
-      }],
-    } : {}),
+    ...(replyAttachments.length ? { attachments: replyAttachments } : {}),
   }) });
 
   // UVA seed: record the silicon contribution with its exact cost.
