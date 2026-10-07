@@ -37,6 +37,12 @@ export interface FeedPostRow {
   convo_id: string | null;
   created_at: string;
   attachments: FeedAttachment[] | null;
+  /** Sections this entry pertains to BEYOND its thread (founder 2026-10-07:
+   *  "conversations… can have multiple icons attached to them, just like a
+   *  post"). The client stamps the originating brief's section (a Maps-brain
+   *  exchange files into general but carries 'maps'); assistant-feed stamps
+   *  the sections its tools touched on each reply. Null = just its thread. */
+  sections: string[] | null;
 }
 
 // THREADS (founder 2026-08-11) — "since we're weaving a tapestry": the
@@ -161,6 +167,38 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
 export const threadLabel = (id: string) =>
   ASSISTANT_THREADS.find((t) => t.id === id)?.label ?? 'General';
 
+/** Non-thread sections that can tag a conversation (founder 2026-10-07:
+ *  a Maps-brain exchange wears the maps icon) — each with the mark its own
+ *  surface already wears, so the icon can never say something new. */
+const EXTRA_SECTION_ICONS: Record<string, { icon: string; label: string }> = {
+  home: { icon: 'home', label: 'Home' },
+  maps: { icon: 'maps', label: 'Maps' },
+  mycelium: { icon: 'leaf', label: 'My-celium' },
+  drive: { icon: 'drive', label: 'Drive' },
+  saved: { icon: 'drive', label: 'Drive' },
+  search: { icon: 'search', label: 'Search' },
+  chat: { icon: 'chat', label: 'Chat' },
+  library: { icon: 'book', label: 'Library' },
+  work: { icon: 'briefcase', label: 'Work' },
+  food: { icon: 'fork-spoon', label: 'Food' },
+  art: { icon: 'palette', label: 'Art' },
+  travel: { icon: 'plane', label: 'Travel' },
+  communities: { icon: 'user-multiple', label: 'Communities' },
+  groups: { icon: 'groups', label: 'Groups' },
+  organizations: { icon: 'globe', label: 'Organizations' },
+  places: { icon: 'location', label: 'Places' },
+};
+
+/** A section id → the icon its rows and rails wear. Threads first, then the
+ *  non-thread sections; sparkle is the honest unknown. */
+export const sectionIcon = (id: string): string =>
+  ASSISTANT_THREADS.find((t) => t.id === id)?.icon
+    ?? EXTRA_SECTION_ICONS[id]?.icon ?? 'sparkle';
+
+export const sectionLabel = (id: string): string =>
+  ASSISTANT_THREADS.find((t) => t.id === id)?.label
+    ?? EXTRA_SECTION_ICONS[id]?.label ?? id;
+
 /** A section key (sections.ts) → the thread its work belongs in. Anything
  *  without a thread of its own lands in general rather than inventing one. */
 export function threadForSection(section?: string | null): string {
@@ -174,7 +212,7 @@ export function threadForSection(section?: string | null): string {
 export async function loadAssistantFeed(profileId: string, thread?: string): Promise<FeedPostRow[]> {
   let q = supabase
     .from('assistant_feed_posts')
-    .select('id, author, body, source_post_id, thread, convo_id, created_at, attachments')
+    .select('id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections')
     .eq('profile_id', profileId);
   if (thread) q = q.eq('thread', thread);
   const { data, error } = await q.order('created_at', { ascending: true });
@@ -253,6 +291,11 @@ export async function postToAssistantFeed(
    *  brief composers, Share to Claude, search escalations). Pass null
    *  explicitly for a space build thread's continuous stream. */
   convoId?: string | null,
+  /** The section this exchange pertains to when it isn't the thread itself
+   *  (founder 2026-10-07): a Maps-brain send files into general wearing
+   *  ['maps'], so the Maps-filtered list can find it and its row can wear
+   *  the maps icon. */
+  sections?: string[],
 ): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
@@ -261,7 +304,8 @@ export async function postToAssistantFeed(
     profile_id: user.id, author: 'member', body,
     source_post_id: sourcePostId ?? null, thread, convo_id: convo,
     attachments: images?.length ? images.map((url) => ({ type: 'photo', url })) : null,
-  }).select('id, author, body, source_post_id, thread, convo_id, created_at, attachments').single();
+    sections: sections?.length ? sections : null,
+  }).select('id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections').single();
   if (error) throw error;
   return data as FeedPostRow;
 }
@@ -300,6 +344,10 @@ export interface ConvoGroup {
   entries: FeedPostRow[];
   title: string;
   last: FeedPostRow;
+  /** Every section this conversation pertains to — its own thread plus any
+   *  stamped tags, like a post's areas (founder 2026-10-07: "both icons
+   *  will show up and it will populate in the Maps filtered Brain chat"). */
+  sections: string[];
 }
 
 /** The self-organizing gap: entries closer together than this belong to one
@@ -320,17 +368,33 @@ export function groupConvos(rows: FeedPostRow[]): ConvoGroup[] {
     const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
     const title = (firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
       || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post');
-    return { id, thread: entries[0].thread, entries, title, last: entries[entries.length - 1] };
+    // The icon set: the filing thread (general stays unmarked — it's the
+    // log, not a subject) plus every stamped tag, in first-seen order.
+    const thread = entries[0].thread;
+    const sections: string[] = [];
+    if (thread !== 'general' && ASSISTANT_THREADS.some((t) => t.id === thread)) sections.push(thread);
+    entries.forEach((e) => (e.sections ?? []).forEach((s) => {
+      if (s !== 'general' && !sections.includes(s)) sections.push(s);
+    }));
+    return { id, thread, entries, title, last: entries[entries.length - 1], sections };
   }).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
 }
 
 /** The thread's newest entry — the brief composer continues a FRESH
  *  conversation instead of always starting a new one. */
-export async function latestConvoIn(thread: string): Promise<{ convoId: string | null; at: number } | null> {
+export async function latestConvoIn(
+  thread: string,
+  /** Only consider entries TAGGED with this section — a Maps-brain send
+   *  continues the latest maps conversation, never whatever unrelated
+   *  exchange happens to be freshest in the general thread. */
+  taggedSection?: string,
+): Promise<{ convoId: string | null; at: number } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('assistant_feed_posts')
-    .select('convo_id, created_at').eq('profile_id', user.id).eq('thread', thread)
+  let q = supabase.from('assistant_feed_posts')
+    .select('convo_id, created_at').eq('profile_id', user.id).eq('thread', thread);
+  if (taggedSection) q = q.contains('sections', [taggedSection]);
+  const { data } = await q
     .order('created_at', { ascending: false }).limit(1).maybeSingle();
   const row = data as { convo_id: string | null; created_at: string } | null;
   return row ? { convoId: row.convo_id, at: new Date(row.created_at).getTime() } : null;

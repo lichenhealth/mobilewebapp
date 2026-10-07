@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { listSpacesByKind } from '../lib/spacesApi';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
 import {
-  threadForSection, threadLabel, loadAssistantFeed, latestConvoIn, groupConvos,
+  threadForSection, loadAssistantFeed, latestConvoIn, groupConvos,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup,
+  ASSISTANT_THREADS, sectionIcon, sectionLabel,
 } from '../lib/assistantFeedApi';
+import { ScrollHintRow } from '../components/ScrollHintRow';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -762,6 +764,25 @@ export default function AssistantBrief() {
   // A space briefing's conversation belongs in that space's own thread
   // (founder 2026-08-22), not the section's.
   const feedThread = spaceParam ? `space:${spaceParam}` : threadForSection(section);
+  // A section that has no thread of its own (maps, my-celium…) files into
+  // general WEARING ITS TAG (founder 2026-10-07: "a convo involved maps and
+  // marketplace, both icons will show up and it will populate in the Maps
+  // filtered Brain chat"). 'home' IS the general brain — no tag.
+  const sectionTag = !spaceParam && section !== 'home' && threadForSection(section) !== section
+    ? section : null;
+
+  // THE SECTION RAIL's items: every brain (the thread list, general reading
+  // as the Home/whole-life brief), with a non-thread section (maps…)
+  // prepended as its own lit circle when that's where you stand.
+  const railItems = useMemo(() => {
+    const threads = ASSISTANT_THREADS.map((t) => ({
+      section: t.id === 'general' ? 'home' : t.id,
+      icon: t.icon,
+      label: t.id === 'general' ? 'General' : t.label,
+    }));
+    if (threads.some((t) => t.section === section)) return threads;
+    return [{ section, icon: sectionIcon(section), label: sectionLabel(section) }, ...threads];
+  }, [section]);
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
    *  what you just read without hunting for a door. It really lands in the
@@ -779,10 +800,13 @@ export default function AssistantBrief() {
     // along (founder 2026-10-06: "just like with you").
     let convo: string | null | undefined = spaceParam ? null : undefined;
     if (!spaceParam) {
-      const latest = await latestConvoIn(feedThread).catch(() => null);
+      // A tagged section's send continues the latest conversation TAGGED
+      // with it — never whatever unrelated exchange is freshest in general.
+      const latest = await latestConvoIn(feedThread, sectionTag ?? undefined).catch(() => null);
       if (latest?.convoId && Date.now() - latest.at < CONVO_GAP_MS) convo = latest.convoId;
     }
-    const row = await postToAssistantFeed(text, undefined, feedThread, images, convo);
+    const row = await postToAssistantFeed(
+      text, undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined);
     navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
 
@@ -796,17 +820,24 @@ export default function AssistantBrief() {
   useEffect(() => {
     if (!me || spaceParam) { setBriefConvos([]); return; }
     let live = true;
-    void loadAssistantFeed(me, feedThread === 'general' ? undefined : feedThread)
+    // Always gather the WHOLE relationship, then keep what PERTAINS
+    // (founder 2026-10-07: "earlier conversations be those related to maps
+    // only when you're dialed into maps"): a thread section keeps its own
+    // thread plus anything tagged with it; a tagged section (maps…) keeps
+    // only its tag; home — the general brain — keeps everything.
+    void loadAssistantFeed(me)
       .then((rows) => {
         if (!live) return;
-        const personalRows = feedThread === 'general'
-          ? rows.filter((r) => !r.thread.startsWith('space:'))
-          : rows;
-        setBriefConvos(groupConvos(personalRows).slice(0, 6));
+        const groups = groupConvos(rows.filter((r) => !r.thread.startsWith('space:')));
+        const pertains = (g: ConvoGroup) =>
+          section === 'home' ? true
+          : sectionTag ? g.sections.includes(sectionTag)
+          : g.thread === feedThread || g.sections.includes(section);
+        setBriefConvos(groups.filter(pertains).slice(0, 6));
       })
       .catch(() => {});
     return () => { live = false; };
-  }, [me, feedThread, spaceParam]);
+  }, [me, feedThread, spaceParam, section, sectionTag]);
   const briefAgo = (iso: string): string => {
     const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
     if (mins < 60) return mins <= 1 ? 'just now' : `${mins}m ago`;
@@ -863,13 +894,39 @@ export default function AssistantBrief() {
         {/* Name, then role — the section it's briefing on moves into the
             line below, so context survives (founder 2026-08-05). */}
         <p className="abrief__scope">Your Lichen Partner</p>
-        <p className="abrief__sub">
-          {memberId
-            ? `${briefWho ?? 'This member'}: your relationship to date, gathered before you meet.`
-            : spaceParam
-            ? `${briefWho ?? 'This space'}: what's alive here and what needs you, gathered and filtered.`
-            : `${meta.title}: what needs your attention, gathered and filtered for you.`}
-        </p>
+        {memberId || spaceParam ? (
+          <p className="abrief__sub">
+            {memberId
+              ? `${briefWho ?? 'This member'}: your relationship to date, gathered before you meet.`
+              : `${briefWho ?? 'This space'}: what's alive here and what needs you, gathered and filtered.`}
+          </p>
+        ) : (
+          /* THE SECTION RAIL (founder 2026-10-07, marking up the Maps brief:
+             "get rid of the map text, but have the icons up top with the map
+             icon selected (e.g. in peach). If you deselect it goes to the
+             chronological, all thread") — the blurb's slot holds the section
+             icons instead: where you are lit peach, the other brains one tap
+             away, and tapping the lit one steps OUT to the General log. */
+          <ScrollHintRow className="abrief__rail h-scroll" ariaLabel="Assistant sections">
+            {railItems.map((it) => (
+              <button
+                key={it.section}
+                type="button"
+                className={`abrief__rail-btn${it.section === section ? ' is-here' : ''}`}
+                aria-label={it.section === section
+                  ? `${it.label} — you're here; tap to open the General log`
+                  : `Open the ${it.label} brain`}
+                title={it.label}
+                onClick={() => {
+                  if (it.section === section) navigate('/assistant/feed?thread=general');
+                  else navigate(`/assistant?section=${it.section}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`);
+                }}
+              >
+                <Icon name={it.icon as IconName} size={19} />
+              </button>
+            ))}
+          </ScrollHintRow>
+        )}
       </div>
 
       {/* The consent switch sits ABOVE what it governs (founder 2026-08-17:
@@ -965,9 +1022,6 @@ export default function AssistantBrief() {
             <button className="afeed__convo" key={c.id}
               onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}`)}>
               <div className="afeed__convo-main">
-                {feedThread === 'general' && c.thread !== 'general' && (
-                  <span className="afeed__convo-tag">{threadLabel(c.thread)}</span>
-                )}
                 <p className="afeed__convo-title">{c.title}</p>
                 <p className="afeed__convo-snippet">
                   {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
@@ -975,13 +1029,20 @@ export default function AssistantBrief() {
                 </p>
               </div>
               <div className="afeed__convo-side">
+                {/* The convo's section marks — several at once, like a
+                    post's areas (founder 2026-10-07). */}
+                {c.sections.length > 0 && (
+                  <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
+                    {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
+                  </span>
+                )}
                 <span className="afeed__convo-when">{briefAgo(c.last.created_at)}</span>
               </div>
             </button>
           ))}
           {/* The General log is one click away from every section's brain
               (founder 2026-10-07) — the chronological everything-view. */}
-          {feedThread !== 'general' && (
+          {section !== 'home' && (
             <button className="afeed__alllog" onClick={() => navigate('/assistant/feed?thread=general')}>
               <span className="link-cue">See every conversation — the General log</span> ›
             </button>

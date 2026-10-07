@@ -12,7 +12,8 @@ import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId,
   loadSectionPresence, groupConvos,
-  ASSISTANT_THREADS, threadLabel, type FeedPostRow, type ProfileContext, type SpaceContext,
+  ASSISTANT_THREADS, threadLabel, sectionIcon, sectionLabel,
+  type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
 import { setConsent } from '../lib/assistantConsentApi';
 import type { IconName } from '../components/Icon';
@@ -224,10 +225,14 @@ export default function AssistantFeed() {
 
   const load = async () => {
     if (!me) return;
-    const all = await loadAssistantFeed(me, thread === 'general' ? undefined : thread);
-    const rows = thread === 'general' ? all.filter((r) => r.thread === 'general') : all;
+    // Every PERSONAL thread loads the whole relationship now (founder
+    // 2026-10-07): a section's list must also find conversations filed
+    // elsewhere that are TAGGED with it — a maps+marketplace exchange in
+    // general belongs in Marketplace's list too. Space threads stay scoped.
+    const all = await loadAssistantFeed(me, personal ? undefined : thread);
+    const rows = personal ? all.filter((r) => r.thread === thread) : all;
     setPosts(rows);
-    setAllRows(thread === 'general' ? all.filter((r) => !spaceIdOfThread(r.thread)) : rows);
+    setAllRows(personal ? all.filter((r) => !spaceIdOfThread(r.thread)) : rows);
     if (personal) setCursors(await loadThreadCursors().catch(() => ({})));
     setLoading(false);
     // A personal thread's cursor bumps when a CONVERSATION opens (the
@@ -248,9 +253,15 @@ export default function AssistantFeed() {
   // (groupConvos). General groups over EVERY personal thread's rows — the
   // history log (founder 2026-10-06: "The general brain should cover all
   // conversations"); section threads carry only their own.
-  const convos = useMemo(
-    () => (personal ? groupConvos(thread === 'general' ? allRows : posts) : []),
-    [personal, thread, allRows, posts]);
+  const convos = useMemo(() => {
+    if (!personal) return [];
+    const groups = groupConvos(allRows);
+    if (thread === 'general') return groups;
+    // A section's list: its own thread's conversations PLUS anything
+    // tagged with it from elsewhere (founder 2026-10-07: "it will populate
+    // in the Maps filtered Brain chat" — same rule for every section).
+    return groups.filter((g) => g.thread === thread || g.sections.includes(thread));
+  }, [personal, thread, allRows]);
 
   // Opened or arrived: pick the right first view once the rows are in.
   // A door's errand (?ask= prefill, ?build=1) opens a conversation ONCE —
@@ -866,9 +877,6 @@ export default function AssistantFeed() {
                 setParams(next);
               }}>
                 <div className="afeed__convo-main">
-                  {c.thread !== thread && (
-                    <span className="afeed__convo-tag">{threadLabel(c.thread)}</span>
-                  )}
                   <p className="afeed__convo-title">{c.title}</p>
                   <p className="afeed__convo-snippet">
                     {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
@@ -876,6 +884,13 @@ export default function AssistantFeed() {
                   </p>
                 </div>
                 <div className="afeed__convo-side">
+                  {/* Section marks, several at once — like a post's areas
+                      (founder 2026-10-07; replaces the text tag). */}
+                  {c.sections.length > 0 && (
+                    <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
+                      {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
+                    </span>
+                  )}
                   <span className="afeed__convo-when">{timeAgo(c.last.created_at)}</span>
                   {unread > 0 && <em className="afeed__convo-pill">{unread}</em>}
                 </div>
