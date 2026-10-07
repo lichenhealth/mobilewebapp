@@ -42,13 +42,18 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string, seat?: { spaceName: string; role: 'member' | 'admin' }) {
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string, seat?: { spaceName: string; role: 'member' | 'admin' }, remind = false) {
   const signup = token ? `${APP_URL}/signup?invite=${token}` : `${APP_URL}/signup`;
   // A way to say no (founder 2026-08-17): closes the invitation, tells the
   // inviter quietly, and no reminder ever follows.
   const decline = token ? `${APP_URL}/invite/decline?token=${token}` : null;
-  const subject = `${inviterName} invited you to Lichen`;
-  const intro = `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
+  // A reminder re-sends the SAME invitation, same token, gently framed
+  // (founder 2026-10-07: "invites buried in their email").
+  const subject = remind
+    ? `A gentle reminder — ${inviterName} invited you to Lichen`
+    : `${inviterName} invited you to Lichen`;
+  const intro = (remind ? 'In case it got buried: ' : '')
+    + `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
 
   const giftLabel = giftTier === 'concierge' ? 'Concierge' : giftTier === 'community' ? 'Community' : '';
   const span = giftMonths
@@ -141,11 +146,75 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string; forMinor?: boolean };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string; forMinor?: boolean; remindToken?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid request body.' }, 400);
+  }
+
+  // ── REMIND (founder 2026-10-07: "invites buried in their email") ─────────
+  // Re-sends an EXISTING invitation with its SAME token — never a second
+  // row. Only the original inviter may remind; a declined invitation is
+  // never reminded (the 2026-08-17 rule); 24h between sends.
+  if (body.remindToken) {
+    let sub: string | null = null;
+    try {
+      const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+      sub = (JSON.parse(atob(jwt.split('.')[1] ?? '')) as { sub?: string }).sub ?? null;
+    } catch { /* fallthrough */ }
+    if (!sub) return json({ error: 'Sign in to send a reminder.' }, 401);
+
+    const { data: inv } = await svc.from('invite_tokens')
+      .select('token, created_by, invitee_email, claimed_by, declined_at, created_at, reminded_at, remind_count, space_id, space_role')
+      .eq('token', String(body.remindToken)).maybeSingle();
+    const row = inv as { token: string; created_by: string; invitee_email: string | null; claimed_by: string | null; declined_at: string | null; created_at: string; reminded_at: string | null; remind_count: number | null; space_id: string | null; space_role: string | null } | null;
+    if (!row || row.created_by !== sub) return json({ error: 'That invitation isn’t yours to remind.' }, 403);
+    if (!row.invitee_email) return json({ error: 'This invitation went by text — send the reminder from your own Messages (the Text again button).' }, 400);
+    if (row.claimed_by) return json({ error: 'They already joined — nothing to remind.' }, 400);
+    if (row.declined_at) return json({ error: 'They declined this invitation — Lichen never reminds someone who said no.' }, 400);
+    const lastSend = new Date(row.reminded_at ?? row.created_at).getTime();
+    if (Date.now() - lastSend < 24 * 60 * 60 * 1000) {
+      return json({ error: 'This invitation was sent within the last day — give it a little room.' }, 429);
+    }
+
+    // The seat line, only if the space is still reachable (claim re-checks
+    // authority either way — the email just shouldn't promise a dead door).
+    let seat: { spaceName: string; role: 'member' | 'admin' } | undefined;
+    if (row.space_id) {
+      const { data: sp } = await svc.from('spaces').select('name, status').eq('id', row.space_id).maybeSingle();
+      const spRow = sp as { name?: string; status?: string | null } | null;
+      if (spRow?.name && spRow.status !== 'offline') {
+        seat = { spaceName: spRow.name, role: (row.space_role === 'admin' ? 'admin' : 'member') };
+      }
+    }
+
+    // A parked gift rides the reminder honestly — read from the SERVER's
+    // membership_gifts, never the caller's words.
+    let giftTier = ''; let giftMonths: number | null = null;
+    const { data: g } = await svc.from('membership_gifts')
+      .select('tier, months').eq('invitee_email', row.invitee_email.toLowerCase()).eq('status', 'pending').maybeSingle();
+    const gift = g as { tier?: string; months?: number } | null;
+    if (gift?.tier) { giftTier = gift.tier; giftMonths = gift.months ?? null; }
+
+    const inviterName = (body.inviterName ?? '').trim() || 'A friend on Lichen';
+    const { subject, text, html } = content(inviterName, '', giftTier, giftMonths, row.token, undefined, seat, true);
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: FROM, to: [row.invitee_email], reply_to: REPLY_TO, subject, text, html,
+        headers: { 'List-Unsubscribe': `<mailto:${REPLY_TO}?subject=unsubscribe>` },
+      }),
+    });
+    if (!res.ok) return json({ error: 'Email provider rejected the send.' }, 502);
+
+    // Stamp AFTER the send — a stamp always means a reminder went out.
+    const reminded_at = new Date().toISOString();
+    await svc.from('invite_tokens')
+      .update({ reminded_at, remind_count: (row.remind_count ?? 0) + 1 })
+      .eq('token', row.token);
+    return json({ ok: true, reminded_at });
   }
 
   const email = (body.email ?? '').trim();

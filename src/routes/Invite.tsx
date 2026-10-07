@@ -51,7 +51,7 @@ export default function Invite() {
   // The ledger: my invitations (RLS: created_by = me) + the knocks (admins).
   type InviteRow = {
     token: string; invitee_email: string | null; invitee_phone?: string | null; claimed_by: string | null;
-    opened_at: string | null; declined_at?: string | null;
+    opened_at: string | null; declined_at?: string | null; reminded_at?: string | null;
     created_at: string; created_by?: string;
     claimed_name?: string; inviter_name?: string;
     // Invite-with-a-seat (2026-09-03): the space + role riding this invite.
@@ -68,7 +68,7 @@ export default function Invite() {
     // Admins see the whole picture — every invitation, and who sent it.
     // Members see their own (RLS decides; the query is the same shape).
     let q = supabase.from('invite_tokens')
-      .select('token, invitee_email, invitee_phone, claimed_by, opened_at, declined_at, created_at, created_by, space_role, space:spaces(name)')
+      .select('token, invitee_email, invitee_phone, claimed_by, opened_at, declined_at, reminded_at, created_at, created_by, space_role, space:spaces(name)')
       .order('created_at', { ascending: false }).limit(200);
     if (!isAdmin) q = q.eq('created_by', user.id);
     const { data } = await q;
@@ -123,6 +123,43 @@ export default function Invite() {
   // "invited" pills by cross-referencing two tables — one list, one status.
   const inviteStatus = (i: InviteRow): 'joined' | 'declined' | 'opened' | 'invited' =>
     i.claimed_by ? 'joined' : i.declined_at ? 'declined' : i.opened_at ? 'opened' : 'invited';
+
+  // ── SEND A REMINDER (founder 2026-10-07: "invited people who haven't
+  // joined and have their invites buried in their email or texts") ─────────
+  // Email rows re-send through send-invite's remind branch — SAME token,
+  // never a second row; the server refuses declined/joined/within-24h (a
+  // declined address never gets a reminder, the 2026-08-17 rule). Phone
+  // rows reopen YOUR Messages with the same tokened text — texts come from
+  // the inviter's own phone by design, so the reminder does too.
+  const [remState, setRemState] = useState<Record<string, string>>({});
+  const canRemind = (i: InviteRow) =>
+    Date.now() - new Date(i.reminded_at ?? i.created_at).getTime() > 24 * 60 * 60 * 1000;
+  async function remindInvite(i: InviteRow) {
+    setRemState((c) => ({ ...c, [i.token]: 'busy' }));
+    const { data, error: e } = await supabase.functions.invoke('send-invite', {
+      body: { remindToken: i.token, inviterName: fullName || undefined },
+    });
+    let errText = '';
+    if (e) {
+      // A non-2xx invoke hides the server's words in the response body.
+      try { errText = (await (e as { context?: Response }).context?.json())?.error ?? (e as { message?: string }).message ?? ''; }
+      catch { errText = (e as { message?: string }).message ?? 'Something went wrong.'; }
+    } else if ((data as { error?: string } | null)?.error) {
+      errText = (data as { error: string }).error;
+    }
+    if (errText) { setRemState((c) => ({ ...c, [i.token]: errText })); return; }
+    const reminded = (data as { reminded_at?: string } | null)?.reminded_at ?? new Date().toISOString();
+    setInvites((cur) => cur.map((r) => (r.token === i.token ? { ...r, reminded_at: reminded } : r)));
+    setRemState((c) => ({ ...c, [i.token]: 'done' }));
+  }
+  /** The same tokened text the invitation went out with — one tap back into
+   *  Messages. The token is unclaimed (the row's status says so), so the
+   *  link still opens their invitation. */
+  const smsRemindHref = (i: InviteRow) => {
+    const msg = inviteMessage().replace(
+      'https://lichen.health/signup', `https://lichen.health/signup?invite=${i.token}`);
+    return `sms:${(i.invitee_phone ?? '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(msg)}`;
+  };
   // Handling a knock moves it off the "waiting" tally and the side-menu
   // badge (founder 2026-08-02) — the row stays visible here either way, so
   // nothing is ever truly lost, just no longer flagged as needing you.
@@ -594,6 +631,32 @@ export default function Invite() {
                     {s}
                   </span>
                   <span className="invite__row-when">{i.created_at.slice(0, 10)}</span>
+                  {/* Send a reminder (founder 2026-10-07) — only on YOUR
+                      unanswered invitations; a declined or joined row never
+                      offers one. */}
+                  {(s === 'invited' || s === 'opened') && i.created_by === user?.id
+                    && (i.invitee_email || i.invitee_phone) && (() => {
+                    const st = remState[i.token] ?? '';
+                    return (
+                      <span className="invite__remindrow">
+                        {i.reminded_at && st !== 'done' && <em>Reminded {i.reminded_at.slice(0, 10)}</em>}
+                        {st === 'done' ? (
+                          <em className="invite__remind-ok">Reminder sent ✓</em>
+                        ) : i.invitee_email ? (
+                          canRemind(i) ? (
+                            <button className="invite__remindbtn" disabled={st === 'busy'} onClick={() => void remindInvite(i)}>
+                              {st === 'busy' ? 'Sending…' : i.reminded_at ? 'Remind again ›' : 'Send a reminder ›'}
+                            </button>
+                          ) : (
+                            <em>Sent within the last day — give it a little room.</em>
+                          )
+                        ) : (
+                          <a className="invite__remindbtn" href={smsRemindHref(i)}>Text again ›</a>
+                        )}
+                        {st && !['busy', 'done'].includes(st) && <em className="invite__remind-err">{st}</em>}
+                      </span>
+                    );
+                  })()}
                 </li>
               );
             })}
