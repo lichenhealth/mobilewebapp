@@ -287,15 +287,43 @@ export default function CalendarSettings() {
             you and your people already do it.
           </p>
 
+          {/* THE SESSION CARD (founder 2026-10-07: "Make the UI for these
+              different meeting types more readable — audit calendly and
+              other similar software"): the Calendly/Cal.com event-type
+              anatomy on Lichen's paper — the TITLE owns its own line and
+              never truncates (the screenshot showed "Care T…"), the facts
+              breathe on a fine line below, and the sendable link (or the
+              honest needs-an-address note) gets the full width. */}
           {bkTypes.map((bt) => (
-            <div className={'cset__row' + (bt.active ? '' : ' cset__bkoff')} key={bt.id}>
-              <span className="cset__aud cset__extname">{bt.title}</span>
-              <span className="cset__bkrow-sub">
-                {bt.duration_min}m{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'instant' : 'by request'}
-                {bt.audience === 'mycelium' ? ' · mycelium' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ''}
+            <div className={'cset__bkcard' + (bt.active ? '' : ' cset__bkoff')} key={bt.id}>
+              <div className="cset__bkhead">
+                <span className="cset__bktitle">{bt.title}</span>
+                {!bt.active && <em className="cset__bkpaused">Paused</em>}
+                <span className="cset__bkbtns">
+                  <button className="cedit__add cedit__add--sm" onClick={() => {
+                    setBkEdit(bt); setBkOpen(true);
+                    setBkLink(bkLinks[bt.id]?.url ?? '');
+                    setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
+                    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
+                    void listTypeHours(bt.id).then(setBkHours);
+                    void listTypeConditions(bt.id).then(setBkConds);
+                  }}>Edit</button>
+                  <button
+                    className="cedit__remove"
+                    aria-label={bt.active ? 'Pause' : 'Resume'}
+                    title={bt.active ? 'Pause bookings' : 'Resume bookings'}
+                    onClick={() => act(async () => { await saveBookingType(me, { ...bt, active: !bt.active }); })}
+                  >
+                    <Icon name={bt.active ? 'close' : 'plus'} size={13} />
+                  </button>
+                </span>
+              </div>
+              <p className="cset__bkmeta">
+                {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
                 {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
                   : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
-              </span>
+              </p>
               {/* The vanity link (founder 2026-10-03, the Calendly shape):
                   this session's own sendable address. */}
               {bt.slug && myHandle && (
@@ -315,25 +343,9 @@ export default function CalendarSettings() {
               )}
               {bt.slug && !myHandle && (
                 <span className="cset__bkrow-vanity cset__bkrow-vanity--muted">
-                  Its direct link needs an address first — set yours in Profile → Public page.
+                  Its direct link needs an address first — set yours in Profile → Public page, or just ask the brain here to set your handle.
                 </span>
               )}
-              <button className="cedit__add cedit__add--sm" onClick={() => {
-                setBkEdit(bt); setBkOpen(true);
-                setBkLink(bkLinks[bt.id]?.url ?? '');
-                setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
-                setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
-                void listTypeHours(bt.id).then(setBkHours);
-                void listTypeConditions(bt.id).then(setBkConds);
-              }}>Edit</button>
-              <button
-                className="cedit__remove"
-                aria-label={bt.active ? 'Pause' : 'Resume'}
-                title={bt.active ? 'Pause bookings' : 'Resume bookings'}
-                onClick={() => act(async () => { await saveBookingType(me, { ...bt, active: !bt.active }); })}
-              >
-                <Icon name={bt.active ? 'close' : 'plus'} size={13} />
-              </button>
             </div>
           ))}
 
