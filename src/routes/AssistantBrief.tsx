@@ -5,7 +5,7 @@ import { listSpacesByKind } from '../lib/spacesApi';
 import { Icon, type IconName } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
 import {
-  threadForSection, loadAssistantFeed, latestConvoIn, groupConvos,
+  threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup,
   ASSISTANT_THREADS, sectionIcon, sectionLabel,
 } from '../lib/assistantFeedApi';
@@ -825,10 +825,12 @@ export default function AssistantBrief() {
     // only when you're dialed into maps"): a thread section keeps its own
     // thread plus anything tagged with it; a tagged section (maps…) keeps
     // only its tag; home — the general brain — keeps everything.
-    void loadAssistantFeed(me)
-      .then((rows) => {
+    void Promise.all([loadAssistantFeed(me), loadConvoNames().catch(() => ({}))])
+      .then(([rows, names]) => {
         if (!live) return;
-        const groups = groupConvos(rows.filter((r) => !r.thread.startsWith('space:')));
+        // Chosen names overlay the first-words titles here too (founder
+        // 2026-10-12: a named conversation is named everywhere).
+        const groups = groupConvos(rows.filter((r) => !r.thread.startsWith('space:')), names);
         const pertains = (g: ConvoGroup) =>
           section === 'home' ? true
           : sectionTag ? g.sections.includes(sectionTag)

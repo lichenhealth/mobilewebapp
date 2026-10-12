@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
@@ -11,7 +11,7 @@ import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId,
-  loadSectionPresence, groupConvos,
+  loadSectionPresence, groupConvos, loadConvoNames, renameConvo,
   ASSISTANT_THREADS, threadLabel, sectionIcon, sectionLabel,
   type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
@@ -223,6 +223,27 @@ export default function AssistantFeed() {
   const openConvoRef = useRef<string | null>(null);
   useEffect(() => { openConvoRef.current = openConvo; }, [openConvo]);
 
+  // THE DESKTOP SHAPE IS CLAUDE-DESKTOP'S (founder 2026-10-12: "I like how
+  // desktop claude has the nav to the left and the text of the current log
+  // in the window in front of you"): from 1100px — the paged split's own
+  // breakpoint — a personal thread wears a standing NAV column (thread
+  // circles + the conversation list) beside the open conversation, instead
+  // of the mobile walk between list and exchange. A WATCHED media query,
+  // never sampled once (ChatThread's rule).
+  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1100px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1100px)');
+    const on = () => setWide(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+
+  // CHOSEN CONVERSATION NAMES (founder 2026-10-12: "name a convo, like you
+  // can name a file") — overlay the self-organizing first-words titles.
+  const [convoNames, setConvoNames] = useState<Record<string, string>>({});
+  const [nameEdit, setNameEdit] = useState(false);
+  useEffect(() => { setNameEdit(false); }, [thread, openConvo]);
+
   const load = async () => {
     if (!me) return;
     // Every PERSONAL thread loads the whole relationship now (founder
@@ -233,7 +254,10 @@ export default function AssistantFeed() {
     const rows = personal ? all.filter((r) => r.thread === thread) : all;
     setPosts(rows);
     setAllRows(personal ? all.filter((r) => !spaceIdOfThread(r.thread)) : rows);
-    if (personal) setCursors(await loadThreadCursors().catch(() => ({})));
+    if (personal) {
+      setCursors(await loadThreadCursors().catch(() => ({})));
+      void loadConvoNames().then(setConvoNames).catch(() => {});
+    }
     setLoading(false);
     // A personal thread's cursor bumps when a CONVERSATION opens (the
     // effect below) — arriving on the list leaves the pills telling the
@@ -255,13 +279,13 @@ export default function AssistantFeed() {
   // conversations"); section threads carry only their own.
   const convos = useMemo(() => {
     if (!personal) return [];
-    const groups = groupConvos(allRows);
+    const groups = groupConvos(allRows, convoNames);
     if (thread === 'general') return groups;
     // A section's list: its own thread's conversations PLUS anything
     // tagged with it from elsewhere (founder 2026-10-07: "it will populate
     // in the Maps filtered Brain chat" — same rule for every section).
     return groups.filter((g) => g.thread === thread || g.sections.includes(thread));
-  }, [personal, thread, allRows]);
+  }, [personal, thread, allRows, convoNames]);
 
   // Opened or arrived: pick the right first view once the rows are in.
   // A door's errand (?ask= prefill, ?build=1) opens a conversation ONCE —
@@ -276,8 +300,17 @@ export default function AssistantFeed() {
     }
     if (convos.length === 0) setAutoConvo('new');
     else if (convos.length === 1 && convos[0].thread === thread) setAutoConvo(convos[0].id);
+    // The desktop nav shape never shows an empty pane (founder 2026-10-12):
+    // with the list standing beside the conversation, arriving on a thread
+    // opens its newest own exchange — the Claude-desktop behavior. Foreign
+    // rows (General's log) stay list-side doors; a thread with only those
+    // opens fresh.
+    else if (wide && !builderMode) {
+      const own = convos.find((c) => c.thread === thread);
+      setAutoConvo(own ? own.id : 'new');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personal, loading, convoParam, autoConvo, convos.length, thread]);
+  }, [personal, loading, convoParam, autoConvo, convos.length, thread, wide]);
 
   // Opening a conversation IS seeing it: bump the thread cursor, refresh
   // the rail badges, and remember this one as seen so its own pill drops
@@ -289,7 +322,14 @@ export default function AssistantFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personal, loading, openConvo, me, thread]);
 
-  const listMode = personal && !openConvo && !loading;
+  // The page-beside-conversation split (profile/space threads) and the
+  // desktop NAV shape are different dresses for the same screen — nav
+  // stands down while the page pane is up, and in builder mode.
+  const paged = showPage && (thread === 'profile' || !!spaceId);
+  const navMode = wide && personal && !builderMode && !paged;
+  // In nav mode the list STANDS BESIDE the conversation — the full-screen
+  // list view is the phone's walk, never the desktop's.
+  const listMode = personal && !openConvo && !loading && !navMode;
   const viewEntries = useMemo(() => {
     if (!personal) return posts;
     if (!openConvo) return [];
@@ -533,8 +573,163 @@ export default function AssistantFeed() {
     }
   }
 
+  // NAMING A CONVERSATION (founder 2026-10-12): the chosen name overlays the
+  // first-words title; clearing it hands the title back to the words. An
+  // unchanged derived title is never written — only a deliberate choice is.
+  async function saveName(value: string) {
+    if (!openConvo) return;
+    setNameEdit(false);
+    const t = value.trim().replace(/\s+/g, ' ').slice(0, 120);
+    const chosen = convoNames[openConvo];
+    const derived = convos.find((c) => c.id === openConvo)?.title ?? '';
+    if (t === (chosen ?? '') || (!chosen && t === derived)) return;
+    try {
+      await renameConvo(openConvo, t);
+      setConvoNames((cur) => {
+        const next = { ...cur };
+        if (t) next[openConvo] = t; else delete next[openConvo];
+        return next;
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  const startNewConvo = () => {
+    const next = new URLSearchParams(params);
+    next.set('convo', 'new');
+    setParams(next);
+  };
+  const openGeneralLog = () => {
+    const next = new URLSearchParams(params);
+    next.set('thread', 'general');
+    next.delete('convo');
+    setParams(next);
+  };
+  const openConvoRow = (c: (typeof convos)[number]) => {
+    // A foreign-thread row (General's history log) opens IN its own
+    // thread — the conversation lives where it was formed.
+    const next = new URLSearchParams(params);
+    if (c.thread !== thread) next.set('thread', c.thread);
+    next.set('convo', c.id);
+    setParams(next);
+  };
+  const convoRow = (c: (typeof convos)[number]) => {
+    const unread = convoUnread(c);
+    return (
+      <button
+        className={'afeed__convo' + (c.id === openConvo ? ' is-open' : '')}
+        key={c.id}
+        onClick={() => openConvoRow(c)}
+      >
+        <div className="afeed__convo-main">
+          <p className="afeed__convo-title">{hl(c.title)}</p>
+          <p className="afeed__convo-snippet">
+            {(() => {
+              // Searching: the row surfaces the words AROUND the hit, the
+              // match marked — iPhone-messages' grammar (founder 2026-10-12).
+              const snip = matchSnippet(c);
+              if (snip) return hl(snip);
+              return (c.last.author === 'claude' ? 'Claude: ' : 'You: ')
+                + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90);
+            })()}
+          </p>
+        </div>
+        <div className="afeed__convo-side">
+          {/* Section marks, several at once — like a post's areas
+              (founder 2026-10-07; replaces the text tag). */}
+          {c.sections.length > 0 && (
+            <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
+              {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
+            </span>
+          )}
+          <span className="afeed__convo-when">{timeAgo(c.last.created_at)}</span>
+          {unread > 0 && <em className="afeed__convo-pill">{unread}</em>}
+        </div>
+      </button>
+    );
+  };
+
+  // The thread doors render in TWO homes — the phone's horizontal rail and
+  // the desktop nav column's wrapping grid — one set of buttons, so they
+  // can never drift.
+  const threadButtons = (
+    <>
+      {ASSISTANT_THREADS.map((t) => {
+        const off = setup ? !setup[t.id] : false;
+        return (
+          <button
+            key={t.id}
+            className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
+            title={`${t.label} — ${t.blurb}`}
+            aria-label={t.label}
+            onClick={() => {
+              // A PUSH, never a replace (founder 2026-10-05: replace
+              // destroyed the history entry holding the thread you were
+              // just conversing in, so Back landed before the assistant
+              // entirely and the conversation read as deleted). Back now
+              // returns to the thread you left, words intact.
+              const next = new URLSearchParams(params);
+              next.set('thread', t.id);
+              next.delete('convo');   // a fresh thread opens on ITS view
+              setParams(next);
+            }}
+          >
+            <Icon name={t.icon as IconName} size={20} />
+            {/* No badge on the thread that's on screen — you're reading it. */}
+            {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
+          </button>
+        );
+      })}
+      {/* A space's build thread joins the rail while you're in it — a
+          dynamic room, not one of the six standing ones; it wears the
+          space's own face. */}
+      {spaceId && (
+        <button className="afeed__thread afeed__thread--space is-on" title={spaceRoom === 'currentcy' ? `${possessive(sctx?.name ?? 'this space')} Current-cy room` : `Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
+          <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
+          {/* Its thread is the one on screen — no badge on what you're reading. */}
+        </button>
+      )}
+    </>
+  );
+
+  // SEARCH DIGS INTO THE WORDS (founder 2026-10-12: "can it dig into and
+  // highlight sub text within conversations, like text message searches in
+  // iphone?"): every hit of the typed words wears a small peach mark —
+  // in list titles, in the matched snippet a row surfaces, and in the open
+  // conversation's bubbles.
+  const needle = q.trim();
+  const hl = (text: string) => {
+    if (!needle) return text;
+    const out: (string | ReactElement)[] = [];
+    const lower = text.toLowerCase(); const ln = needle.toLowerCase();
+    let i = 0; let k = 0;
+    let idx = lower.indexOf(ln);
+    while (idx >= 0) {
+      if (idx > i) out.push(text.slice(i, idx));
+      out.push(<mark className="afeed__hl" key={k++}>{text.slice(idx, idx + needle.length)}</mark>);
+      i = idx + needle.length;
+      idx = lower.indexOf(ln, i);
+    }
+    out.push(text.slice(i));
+    return out;
+  };
+  // The iPhone-messages snippet: when the match lives INSIDE a conversation,
+  // the row shows the words around the hit instead of the last message.
+  const matchSnippet = (c: (typeof convos)[number]): string | null => {
+    if (!needle) return null;
+    const ln = needle.toLowerCase();
+    for (const e of c.entries) {
+      const body = (e.body || '').replace(/\s+/g, ' ');
+      const idx = body.toLowerCase().indexOf(ln);
+      if (idx >= 0) {
+        const start = Math.max(0, idx - 28);
+        return (start > 0 ? '…' : '') + body.slice(start, idx + needle.length + 64);
+      }
+    }
+    return null;
+  };
+
   return (
-    <div className={'afeed' + (showPage && (thread === 'profile' || spaceId) ? ' afeed--paged' : '')}>
+    <div className={'afeed' + (paged ? ' afeed--paged' : '') + (navMode ? ' afeed--nav' : '')}>
       {builderMode ? (
         /* A TRUE TOGGLE, FROZEN (founder 2026-09-09: "let's have a toggle
            back to manual mode frozen in the upper bar, instead of the
@@ -613,49 +808,43 @@ export default function AssistantFeed() {
           open" — with its message tally at the upper right, TopBar-badge
           style. A section with nothing in it yet reads GRAY until it's set
           up; General is always lit, it's the front door. */}
+      {/* THE DESKTOP NAV COLUMN (founder 2026-10-12: "the nav to the left
+          and the text of the current log in the window in front of you").
+          One standing column: the thread doors as a wrapping grid, the ⊕,
+          the conversation list, the General-log door — while the open
+          conversation fills the pane beside it. Mobile keeps the walk. */}
+      {navMode && (
+        <aside className="afeed__nav" aria-label="Conversations">
+          <div className="afeed__nav-rail">{threadButtons}</div>
+          <button className="afeed__convo-newbtn" onClick={startNewConvo}>
+            ⊕ New conversation
+          </button>
+          <div className="afeed__nav-list">
+            {visibleConvos.map(convoRow)}
+            {!loading && visibleConvos.length === 0 && (
+              <p className="afeed__muted">
+                {q.trim() ? `No conversations match “${q}”.` : 'No conversations yet.'}
+              </p>
+            )}
+          </div>
+          {thread !== 'general' && (
+            <button className="afeed__alllog" onClick={openGeneralLog}>
+              <span className="link-cue">See every conversation — the General log</span> ›
+            </button>
+          )}
+        </aside>
+      )}
+
       {/* The rail SAYS it scrolls now (founder 2026-10-05, circling the
           eighth icon cut at the phone's edge: "have the same scroll prompt
           as homepage, so people know to toggle") — ScrollHintRow in hide
           mode, the icon-circle grammar: no half-cut icon, a chevron BUTTON
           marking each direction that has more. ⚠ Run scripts/check-rows.mjs
-          after touching this row. */}
-      {!builderMode && (
+          after touching this row. In nav mode the doors live in the column
+          instead — one set of buttons, two homes. */}
+      {!builderMode && !navMode && (
       <ScrollHintRow className="afeed__threads h-scroll" ariaLabel="Assistant threads">
-        {ASSISTANT_THREADS.map((t) => {
-          const off = setup ? !setup[t.id] : false;
-          return (
-            <button
-              key={t.id}
-              className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
-              title={`${t.label} — ${t.blurb}`}
-              aria-label={t.label}
-              onClick={() => {
-                // A PUSH, never a replace (founder 2026-10-05: replace
-                // destroyed the history entry holding the thread you were
-                // just conversing in, so Back landed before the assistant
-                // entirely and the conversation read as deleted). Back now
-                // returns to the thread you left, words intact.
-                const next = new URLSearchParams(params);
-                next.set('thread', t.id);
-                next.delete('convo');   // a fresh thread opens on ITS view
-                setParams(next);
-              }}
-            >
-              <Icon name={t.icon as IconName} size={20} />
-              {/* No badge on the thread that's on screen — you're reading it. */}
-              {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
-            </button>
-          );
-        })}
-        {/* A space's build thread joins the rail while you're in it — a
-            dynamic room, not one of the six standing ones; it wears the
-            space's own face. */}
-        {spaceId && (
-          <button className="afeed__thread afeed__thread--space is-on" title={spaceRoom === 'currentcy' ? `${possessive(sctx?.name ?? 'this space')} Current-cy room` : `Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
-            <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
-            {/* Its thread is the one on screen — no badge on what you're reading. */}
-          </button>
-        )}
+        {threadButtons}
       </ScrollHintRow>
       )}
 
@@ -854,68 +1043,29 @@ export default function AssistantFeed() {
           own first words — the self-organizing part she liked, kept. */}
       {listMode && (
         <div className="afeed__convos">
-          <button className="afeed__convo-newbtn" onClick={() => {
-            const next = new URLSearchParams(params);
-            next.set('convo', 'new');
-            setParams(next);
-          }}>
+          <button className="afeed__convo-newbtn" onClick={startNewConvo}>
             ⊕ New conversation
           </button>
           {loading && <p className="afeed__muted">Loading…</p>}
           {!loading && visibleConvos.length === 0 && q.trim() !== '' && (
             <p className="afeed__muted">No conversations match &ldquo;{q}&rdquo;.</p>
           )}
-          {visibleConvos.map((c) => {
-            const unread = convoUnread(c);
-            return (
-              <button className="afeed__convo" key={c.id} onClick={() => {
-                // A foreign-thread row (General's history log) opens IN its
-                // own thread — the conversation lives where it was formed.
-                const next = new URLSearchParams(params);
-                if (c.thread !== thread) next.set('thread', c.thread);
-                next.set('convo', c.id);
-                setParams(next);
-              }}>
-                <div className="afeed__convo-main">
-                  <p className="afeed__convo-title">{c.title}</p>
-                  <p className="afeed__convo-snippet">
-                    {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
-                      + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
-                  </p>
-                </div>
-                <div className="afeed__convo-side">
-                  {/* Section marks, several at once — like a post's areas
-                      (founder 2026-10-07; replaces the text tag). */}
-                  {c.sections.length > 0 && (
-                    <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
-                      {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
-                    </span>
-                  )}
-                  <span className="afeed__convo-when">{timeAgo(c.last.created_at)}</span>
-                  {unread > 0 && <em className="afeed__convo-pill">{unread}</em>}
-                </div>
-              </button>
-            );
-          })}
+          {visibleConvos.map(convoRow)}
           {/* THE GENERAL LOG IS ONE CLICK AWAY (founder 2026-10-07: "you
               can also click something to go to the general, chronological
               thread"): every section's list carries the door to the
               everything-log. */}
           {thread !== 'general' && (
-            <button className="afeed__alllog" onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set('thread', 'general');
-              next.delete('convo');
-              setParams(next);
-            }}>
+            <button className="afeed__alllog" onClick={openGeneralLog}>
               <span className="link-cue">See every conversation — the General log</span> ›
             </button>
           )}
         </div>
       )}
 
-      {/* The way back to the list — only when there IS a list behind you. */}
-      {!listMode && personal && openConvo && convos.length > 1 && (
+      {/* The way back to the list — only when there IS a list behind you,
+          and never in nav mode, where the list stands beside you. */}
+      {!listMode && !navMode && personal && openConvo && convos.length > 1 && (
         <button className="afeed__convoback" onClick={() => {
           const next = new URLSearchParams(params);
           next.delete('convo');
@@ -925,6 +1075,45 @@ export default function AssistantFeed() {
           ← All {threadLabel(thread)} conversations
         </button>
       )}
+
+      {/* THE CONVERSATION'S NAME (founder 2026-10-12: "name a convo, like
+          you can name a file? So we can organize them?"): the open exchange
+          wears its title — the chosen name, or its own first words — with a
+          quiet Rename beside it. A name is organization enough: the list
+          sorts by freshness and the sections wear their icons. */}
+      {!listMode && personal && openConvo && openConvo !== 'new' && !loading && (() => {
+        const cur = convos.find((c) => c.id === openConvo);
+        const canName = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(openConvo);
+        const title = convoNames[openConvo] ?? cur?.title ?? '';
+        if (!title && !nameEdit) return null;
+        return (
+          <div className="afeed__convohead">
+            {nameEdit ? (
+              <input
+                className="afeed__convohead-input"
+                autoFocus
+                defaultValue={title}
+                maxLength={120}
+                placeholder="Name this conversation"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void saveName((e.target as HTMLInputElement).value);
+                  if (e.key === 'Escape') setNameEdit(false);
+                }}
+                onBlur={(e) => { if (nameEdit) void saveName(e.target.value); }}
+              />
+            ) : (
+              <>
+                <h2 className="afeed__convoname" title={title}>{title}</h2>
+                {canName && (
+                  <button className="afeed__convohead-btn" onClick={() => setNameEdit(true)}>
+                    Rename
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* The conversation stays put while the page shows above it — that's
           the point: ask here, watch it change there. (This carried a `hidden`
@@ -1014,7 +1203,9 @@ export default function AssistantFeed() {
                 )}
                 {p.body && (
                   <p className="afeed__entry-text">
-                    {p.body}
+                    {/* Searching marks every hit in the bubbles too — the
+                        iPhone-messages grammar (founder 2026-10-12). */}
+                    {needle ? hl(p.body) : p.body}
                     {/* Time rides INSIDE the bubble, lower right — the chat
                         grammar (founder 2026-09-13). */}
                     <span className="afeed__entry-when">{timeAgo(p.created_at)}</span>
