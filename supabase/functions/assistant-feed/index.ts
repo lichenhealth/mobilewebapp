@@ -338,6 +338,25 @@ const SET_HANDLE_TOOL = {
   },
 };
 
+// SEARCH THE MEMBER'S OWN HISTORY (founder 2026-10-12: "a summary of
+// relevant back and forth surrounding stripe throughout the time I've been
+// on the platform and wherever stripe has come up in various convos"): a
+// READ over their own assistant_feed_posts, so the model can summarize
+// ACROSS conversations instead of being scoped to the one on screen.
+// Read-only, own rows only (the trigger's profile_id — no target to pass),
+// so it arms in every personal thread with no edit flag, the read_website
+// posture. Space threads are excluded from the read: those are the member's
+// private working streams about an entity, summarized in their own rooms.
+const SEARCH_HISTORY_TOOL = {
+  name: 'search_my_history',
+  description: 'Search this member\'s OWN conversation history with you across every personal thread; returns the matching entries with dates and threads — the raw material for "summarize everything we\'ve discussed about X." Use it whenever they ask what was said, discussed or decided about a topic across conversations, or for a summary of their history around something. Matches are plain word matches: pick 1–3 distinctive words as the query, never a whole sentence.',
+  input_schema: {
+    type: 'object',
+    properties: { query: { type: 'string', description: 'One to three distinctive words to match (e.g. "stripe", "booking link").' } },
+    required: ['query'],
+  },
+};
+
 // THE TRANSFER (founder 2026-10-07: "Claude can just transfer you to that
 // manual section… or it can do it for you with a text command"): a reply
 // can carry a real in-app BUTTON instead of directions. The model picks
@@ -1157,6 +1176,36 @@ Deno.serve(async (req) => {
         ok: true,
         change: `set their handle to "${h}" — their page answers at lichen.health/${h}, and any booking type with a link name is live at lichen.health/book/${h}/<link-name>`,
         handle: h,
+      };
+    }
+    // ── Search their own history (founder 2026-10-12): word matches over
+    // the member's OWN rows, every personal thread, oldest first — the model
+    // weaves the summary. The profile_id is the trigger's; space threads are
+    // filtered out after the read.
+    if (name === 'search_my_history') {
+      const qraw = String(input.query ?? '').trim().slice(0, 80);
+      if (!qraw) return { ok: false, error: 'Give me a word or two to search for.' };
+      const words = qraw.split(/\s+/).filter(Boolean).slice(0, 3)
+        .map((w) => w.replace(/[%_*,()"']/g, '')).filter(Boolean);
+      if (!words.length) return { ok: false, error: 'Those characters can\'t be searched — plain words work.' };
+      // Repeated ilike params AND together: every word must appear.
+      const filter = words.map((w) => `body=ilike.${encodeURIComponent('*' + w + '*')}`).join('&');
+      const r = await sb(`assistant_feed_posts?profile_id=eq.${profile_id}&${filter}`
+        + `&select=author,body,thread,created_at&order=created_at.asc&limit=150`);
+      if (!r.ok) return { ok: false, error: 'The history read failed — try once more.' };
+      const all = await r.json() as { author: string; body: string | null; thread: string; created_at: string }[];
+      const hits = (Array.isArray(all) ? all : [])
+        .filter((x) => !String(x.thread).startsWith('space:'))
+        .slice(-50);
+      if (!hits.length) {
+        return { ok: true, matches: 0, note: `Nothing in their history matches "${words.join(' ')}" — say so plainly, and suggest a different word if their ask implies there should be something.` };
+      }
+      const lines = hits.map((x) =>
+        `${String(x.created_at).slice(0, 10)} · ${x.thread} · ${x.author === 'claude' ? 'Claude' : 'They'}: `
+        + String(x.body ?? '').replace(/\s+/g, ' ').slice(0, 280));
+      return {
+        ok: true, matches: hits.length, history: lines.join('\n'),
+        note: 'Summarize the relevant back-and-forth in plain words with rough dates — what they asked, what was decided or done, where it stands now. These are their own words with you; quote lightly, never dump the list back.',
       };
     }
     // ── Bring a web image onto the page (2026-08-24): only one the system
@@ -2260,7 +2309,7 @@ Deno.serve(async (req) => {
                      ...(canSpaceEdit ? SPACE_EDIT_TOOLS : []),
                      ...(canCalendar ? CALENDAR_TOOLS : []),
                      ...(canCourses ? COURSE_TOOLS : []),
-                     ...(!spaceId ? [SEND_APP_DOOR_TOOL] : [])],
+                     ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
     });

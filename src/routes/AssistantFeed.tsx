@@ -334,7 +334,11 @@ export default function AssistantFeed() {
     if (!personal) return posts;
     if (!openConvo) return [];
     if (openConvo === 'new') return [];
-    return posts.filter((p) => (p.convo_id ?? 'loose') === openConvo);
+    // The loose fallback MUST match groupConvos' key (`loose:<thread>`) —
+    // a bare 'loose' here is how the founder clicked a row and got an EMPTY
+    // pane (2026-10-12: the dev-report announcement row had no convo_id;
+    // every proactive note mints one now, but a legacy null row still opens).
+    return posts.filter((p) => (p.convo_id ?? `loose:${p.thread}`) === openConvo);
   }, [personal, posts, openConvo]);
   const convoUnread = (c: { id: string; thread: string; entries: FeedPostRow[] }): number => {
     if (seenConvos.has(c.id)) return 0;
@@ -500,7 +504,7 @@ export default function AssistantFeed() {
           // another conversation of this thread — list or elsewhere — the
           // pill is exactly what should speak.
           const seeing = !spaceId
-            ? openConvoRef.current !== null && openConvoRef.current === (row.convo_id ?? 'loose')
+            ? openConvoRef.current !== null && openConvoRef.current === (row.convo_id ?? `loose:${row.thread}`)
             : true;
           if (seeing) void markThreadRead(thread).then(() => loadThreadBadges(me)).then(setCounts).catch(() => {});
           else void loadThreadBadges(me).then(setCounts);
@@ -516,10 +520,19 @@ export default function AssistantFeed() {
     return () => { supabase.removeChannel(channel); };
   }, [me, thread]);
 
-  const visible = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return needle ? viewEntries.filter((p) => p.body.toLowerCase().includes(needle)) : viewEntries;
-  }, [q, viewEntries]);
+  // CTRL-F IN AN OPEN CONVERSATION (founder 2026-10-12: "I love how control
+  // f allows for highlighting of words"): hits are MARKED in place and the
+  // view jumps to the first one — nothing hides, because the words AROUND a
+  // hit are the point. The LIST still filters to matching conversations.
+  const visible = viewEntries;
+  useEffect(() => {
+    if (!q.trim() || listMode) return;
+    const t = window.setTimeout(() => {
+      document.querySelector('.afeed__list .afeed__hl')
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [q, listMode, openConvo]);
   // The list searches CONVERSATIONS — title or any words inside.
   const visibleConvos = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -560,7 +573,10 @@ export default function AssistantFeed() {
     // ('new', or a legacy loose bucket) mints — and the URL then names the
     // real conversation (replace, not push: becoming real isn't a step).
     // Space build threads stay one continuous stream (convo null).
-    const continuing = personal && openConvo && openConvo !== 'new' && openConvo !== 'loose'
+    // A loose bucket (legacy null-convo rows) can't be continued — its id
+    // isn't a real uuid, and passing it would fail the insert. A send from
+    // one starts a fresh conversation instead.
+    const continuing = personal && openConvo && openConvo !== 'new' && !openConvo.startsWith('loose')
       ? openConvo : undefined;
     const row = await postToAssistantFeed(text, undefined, thread, images,
       personal ? continuing : null);
@@ -786,20 +802,45 @@ export default function AssistantFeed() {
       </header>
 
       {searchOpen && (
-        <div className="afeed__search">
-          <Icon name="search" size={14} />
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search your history with Claude…"
-          />
-          {q && (
-            <button onClick={() => setQ('')} aria-label="Clear">
-              <Icon name="close" size={13} />
+        <>
+          <div className="afeed__search">
+            <Icon name="search" size={14} />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search your history with Claude…"
+            />
+            {q && (
+              <button onClick={() => setQ('')} aria-label="Clear">
+                <Icon name="close" size={13} />
+              </button>
+            )}
+          </div>
+          {/* THE SUMMARY DOOR (founder 2026-10-12: "a summary of relevant
+              back and forth surrounding stripe throughout the time I've
+              been on the platform"): the search FINDS and MARKS; this hands
+              the same words to Claude, who reads across every conversation
+              (search_my_history) and weaves the summary — as a conversation
+              of its own, so it can be continued and named. The composer
+              arrives prefilled, unsent: the member presses go. */}
+          {personal && q.trim() && (
+            <button
+              className="afeed__sumbtn"
+              onClick={() => {
+                const topic = q.trim();
+                const next = new URLSearchParams(params);
+                next.set('convo', 'new');
+                next.set('ask', `Summarize everything we've discussed about "${topic}" — the relevant back and forth across my conversations, with rough dates and where things stand now.`);
+                setParams(next);
+                setSearchOpen(false);
+                setQ('');
+              }}
+            >
+              ✨ Ask Claude to summarize everything about &ldquo;{q.trim()}&rdquo; ›
             </button>
           )}
-        </div>
+        </>
       )}
 
       {/* The threads as SECTION DOORS (founder 2026-08-31: "replace the text
@@ -1139,9 +1180,6 @@ export default function AssistantFeed() {
         })()}
         {!loading && openConvo === 'new' && posts.length > 0 && (
           <p className="afeed__muted">A fresh conversation — say what&rsquo;s next.</p>
-        )}
-        {!loading && q.trim() !== '' && visible.length === 0 && viewEntries.length > 0 && (
-          <p className="afeed__muted">No matches for &ldquo;{q}&rdquo;.</p>
         )}
         {visible.map((p) => {
           const shared = p.source_post_id ? sourcePosts.get(p.source_post_id) : null;
