@@ -33,8 +33,11 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  overflow-x: auto;
-  scrollbar-width: none;
+  /* The layer lenses WRAP instead of scrolling (founder 2026-10-12:
+     "multiple rows for the subsection icons… instead of a scroll" — the
+     overall UI; supersedes this row's 2026-10-06 keep-the-scroll note). */
+  flex-wrap: wrap;
+  row-gap: 6px;
   padding: 2px 0;
 }
 .mapv__layers::-webkit-scrollbar { display: none; }

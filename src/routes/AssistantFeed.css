@@ -133,7 +133,9 @@
    needs a little headroom instead of clipping it. */
 /* Double-class: .h-scroll's own 12px gap beats a single class (the standing
    gotcha) — the compact rail needs its 8px to fit eight doors in the shell. */
-.afeed__threads.h-scroll { display: flex; gap: 8px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
+/* The thread rail WRAPS instead of scrolling (founder 2026-10-12: "multiple
+   rows for the subsection icons… instead of a scroll" — the overall UI). */
+.afeed__threads.h-scroll { display: flex; flex-wrap: wrap; gap: 8px; row-gap: 8px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
 /* COMPACT CIRCLES (founder 2026-10-12: "should we make these smaller, so you
    don't have to scroll?"): 34px — the tool-circle size — puts all eight
    thread doors inside the phone column (8×34 + 7×8 = 328px < the 430 shell's

@@ -4,9 +4,9 @@ import FilterRow from '../components/FilterRow';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
 import InstallPrompt from '../components/InstallPrompt';
-import { loadFeed, loadAuthorFeed, deletePost, type FeedPost } from '../lib/postsApi';
+import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
@@ -79,31 +79,36 @@ function presenceLine(present: number | null, available: number, whose: string |
   return whose ? `${whose} is out living.` : 'Your network is out living.';
 }
 
-const CATEGORY_ICONS: IconRowItem[] = [
-  { icon: 'search',         label: 'Search',      to: '/search' },
-  { icon: 'plus',           label: 'Post',        to: '/compose' },
+// THE STACKED ROWS — the brain feed's shape as the overall UI (founder
+// 2026-10-12, three passes in one sitting: "I really like this UI, Let's
+// make this the overall UI and then have multiple rows for the subsection
+// icons… instead of a scroll"): tools first on their own line, then the
+// section icons below, wrapping to as many rows as they need.
+const TOOL_ICONS: IconRowItem[] = [
+  { icon: 'search', label: 'Search', to: '/search' },
+  { icon: 'plus',   label: 'Post',   to: '/compose' },
   // Searching, posting, and thinking-with are one family (founder 2026-07-28).
-  // Same size as the magnifier and the + beside it (founder 2026-08-08) —
-  // size is reserved for "you are here" now; peach alone says "switched on".
-  { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=home',
+  { icon: 'brain',  label: 'Assistant', to: '/assistant?section=home',
     variant: 'icon-row__btn--ai' },
-  // THE SECTION YOU'RE STANDING IN, LIT (founder 2026-08-07: "add a newsfeed
-  // icon to the right... orange, signifying that's what you're on, the
-  // newspaper of that space. Then you can toggle over to marketplace, or work").
-  // The row was already a set of doors; naming the one you're already through
-  // turns it into a section switcher you can read at a glance.
-  { icon: 'newsfeed',       label: 'Feed',        to: '/home',
-    variant: 'icon-row__btn--here', divider: true },
-  { icon: 'store',          label: 'Marketplace', to: '/market' },
-  { icon: 'rsvp',           label: 'Events',      to: '/events'        },
-  { icon: 'briefcase',      label: 'Work',        to: '/work'          },
-  { icon: 'graduation-cap', label: 'Education',   to: '/courses'       },
-  { icon: 'fork-spoon',     label: 'Food',        to: '/food'          },
-  { icon: 'palette',        label: 'Creative',    to: '/art'           },
-  { icon: 'location',       label: 'Places',      to: '/places'        },
-  { icon: 'plane',          label: 'Travel',      to: '/travel'        },
-  { icon: 'book',           label: 'Library',     to: '/library'       },
-  { icon: 'member-heart',   label: 'Members',     to: '/directory'     },
+];
+// THE SECTIONS ARE FEED LENSES NOW, MULTI-SELECT (founder 2026-10-12:
+// "feed being 'all' but clicking on sub sections as filtering the feed to
+// only those subsections… allow you to select or de-select multiple. E.G.
+// feed itself means everything, but you click marketplace and feed (all)
+// gets de-selected. Then, you can also select Travel, Courses, etc, so
+// multiple are lit up" — the Maps-layer grammar, on Home's river): each
+// carries its service_area for the filter AND its room for the quiet
+// "Open «Section» ›" door that keeps the full rooms one tap away.
+export const FEED_LENSES: { icon: IconName; label: string; area: string; room: string }[] = [
+  { icon: 'store',          label: 'Marketplace', area: 'marketplace', room: '/market'  },
+  { icon: 'rsvp',           label: 'Events',      area: 'events',      room: '/events'  },
+  { icon: 'briefcase',      label: 'Work',        area: 'work',        room: '/work'    },
+  { icon: 'graduation-cap', label: 'Education',   area: 'courses',     room: '/courses' },
+  { icon: 'fork-spoon',     label: 'Food',        area: 'food',        room: '/food'    },
+  { icon: 'palette',        label: 'Creative',    area: 'art',         room: '/art'     },
+  { icon: 'location',       label: 'Places',      area: 'places',      room: '/places'  },
+  { icon: 'plane',          label: 'Travel',      area: 'travel',      room: '/travel'  },
+  { icon: 'book',           label: 'Library',     area: 'library',     room: '/library' },
 ];
 
 export default function Home() {
@@ -122,6 +127,8 @@ export default function Home() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
   const [tab, setTab] = useState('All');
+  // The lit lenses — empty = Feed/All (founder 2026-10-12, multi-select).
+  const [areaSel, setAreaSel] = useState<Set<string>>(new Set());
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
   // Provenance names: the spaces these posts were routed into.
@@ -183,12 +190,54 @@ export default function Home() {
       {/* The Member view | Admin view pair is RETIRED (founder 2026-09-26:
           "get rid of admin view altogether") — the side menu shows desk
           work inline now, no mode to flip. */}
-      <IconRow items={CATEGORY_ICONS.map((it) => (it.label === 'Assistant'
-        ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
-        : it))} />
+      <IconRow
+        className="icon-row--tools"
+        ariaLabel="Tools"
+        items={TOOL_ICONS.map((it) => (it.label === 'Assistant'
+          ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
+          : it))}
+      />
+      {/* Feed = ALL; the sections light as multi-select lenses on the river
+          (founder 2026-10-12). Members stays a DOOR — people aren't posts,
+          there's nothing of theirs to filter the feed by. */}
+      <IconRow
+        className="icon-row--lenses"
+        ariaLabel="Feed lenses"
+        items={[
+          { icon: 'newsfeed', label: 'Feed',
+            variant: areaSel.size === 0 ? 'icon-row__btn--here' : undefined },
+          ...FEED_LENSES.map((l) => ({
+            icon: l.icon, label: l.label,
+            variant: areaSel.has(l.area) ? 'icon-row__btn--here' : undefined,
+          })),
+          { icon: 'member-heart', label: 'Members', to: '/directory' },
+        ]}
+        onSelect={(label) => {
+          if (label === 'Feed') { setAreaSel(new Set()); return; }
+          const lens = FEED_LENSES.find((l) => l.label === label);
+          if (!lens) return;
+          setAreaSel((cur) => {
+            const next = new Set(cur);
+            if (next.has(lens.area)) next.delete(lens.area); else next.add(lens.area);
+            return next;
+          });
+        }}
+      />
 
       {/* The lit section owns the band beneath it. */}
       <FilterRow options={FILTERS} value={tab} onChange={setTab} />
+
+      {/* The full rooms stay one tap away while filtering (the lenses used
+          to BE the doors — never strand someone outside Marketplace). */}
+      {areaSel.size > 0 && (
+        <p className="lensdoors">
+          {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
+            <button key={l.area} className="lensdoor" onClick={() => navigate(l.room)}>
+              <span className="link-cue">Open {l.label}</span> ›
+            </button>
+          ))}
+        </p>
+      )}
 
       <section className="home__greeting">
         <h1 className="home__title">
@@ -225,7 +274,10 @@ export default function Home() {
 
 
       <section className="home__feed">
-        {posts.filter((p) => matchesTab(tab, p.content_type)).map((p) => (
+        {/* The lenses narrow by service_areas — several lit means ANY of
+            them (founder 2026-10-12); no lenses lit means the whole river. */}
+        {posts.filter((p) => matchesTab(tab, p.content_type)
+          && (areaSel.size === 0 || postAreas(p).some((a) => areaSel.has(a)))).map((p) => (
           <FeedCard
             key={p.id}
             {...postToCard(p, user?.id, spaceNames)}

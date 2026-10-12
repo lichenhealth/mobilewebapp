@@ -23,12 +23,17 @@ export interface IconRowItem {
 interface IconRowProps {
   items: IconRowItem[];
   onSelect?: (label: string) => void;
+  /** Extra class on the row — the tools/lenses split renders TWO rows
+   *  stacked (founder 2026-10-12, the brain feed's shape as the overall
+   *  UI), and each needs its own spacing. */
+  className?: string;
+  ariaLabel?: string;
 }
 
-export default function IconRow({ items, onSelect }: IconRowProps) {
+export default function IconRow({ items, onSelect, className, ariaLabel }: IconRowProps) {
   const navigate = useNavigate();
   return (
-    <ScrollHintRow className="icon-row h-scroll" role="toolbar" ariaLabel="Categories" gutter>
+    <ScrollHintRow className={'icon-row h-scroll' + (className ? ' ' + className : '')} role="toolbar" ariaLabel={ariaLabel ?? 'Categories'} gutter>
       {items.flatMap(({ icon, label, to, divider, variant, size }, i) => {
         const nodes = [];
         if (divider && i > 0) {

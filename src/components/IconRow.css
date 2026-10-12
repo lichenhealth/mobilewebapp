@@ -72,3 +72,18 @@
   color: var(--peach-deep);
 }
 .icon-row__btn--here:hover { border-color: var(--peach); color: var(--peach-deep); }
+
+/* THE STACKED ROWS (founder 2026-10-12: the brain feed's shape as the
+   overall UI — tools first, sections below): the two rows share one
+   breathing space instead of each carrying full padding. */
+.icon-row--tools.h-scroll { padding-bottom: 2px; }
+.icon-row--lenses.h-scroll { padding-top: 4px; }
+
+/* THE WAY INTO THE FULL ROOMS while lenses filter the feed (founder
+   2026-10-12 — the lenses used to BE the doors; never strand someone
+   outside Marketplace): quiet worded links under the lens rows. */
+.lensdoors { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 2px 0 6px; }
+.lensdoor {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 13.5px; color: var(--ink);
+}

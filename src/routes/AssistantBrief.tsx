@@ -920,19 +920,46 @@ export default function AssistantBrief() {
         {/* Name, then role — the section it's briefing on moves into the
             line below, so context survives (founder 2026-08-05). */}
         <p className="abrief__scope">Your Lichen Partner</p>
-        {memberId || spaceParam ? (
+        {(memberId || spaceParam) && (
           <p className="abrief__sub">
             {memberId
               ? `${briefWho ?? 'This member'}: your relationship to date, gathered before you meet.`
               : `${briefWho ?? 'This space'}: what's alive here and what needs you, gathered and filtered.`}
           </p>
-        ) : (
-          /* THE SECTION RAIL (founder 2026-10-07, marking up the Maps brief:
-             "get rid of the map text, but have the icons up top with the map
-             icon selected (e.g. in peach). If you deselect it goes to the
-             chronological, all thread") — the blurb's slot holds the section
-             icons instead: where you are lit peach, the other brains one tap
-             away, and tapping the lit one steps OUT to the General log. */
+        )}
+      </div>
+
+      {/* TOOLS ABOVE THE RAIL — the brain feed's stacked shape, now the
+          overall UI (founder 2026-10-12, arrows on the Current-cy brief:
+          "do the redesign for the Ai macro as well"): search · ⊕ first,
+          then the section icons below, wrapping instead of scrolling.
+          Member/space briefs skip the tools — a stream has no conversation
+          list to search or start. */}
+      {!memberId && !spaceParam && (
+        <>
+          <div className="abrief__tools">
+            <button
+              type="button"
+              className="abrief__rail-btn abrief__tool"
+              aria-label="Search your history with Claude"
+              title="Search"
+              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+            >
+              <Icon name="search" size={16} />
+            </button>
+            <button
+              type="button"
+              className="abrief__rail-btn abrief__tool"
+              aria-label="New conversation"
+              title="New conversation"
+              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+            >
+              <Icon name="plus" size={16} />
+            </button>
+          </div>
+          {/* THE SECTION RAIL (founder 2026-10-07: icons, where you are lit
+              peach, tapping the lit one steps OUT to the General log) —
+              wrapping to more rows instead of scrolling since 2026-10-12. */}
           <ScrollHintRow className="abrief__rail h-scroll" ariaLabel="Assistant sections">
             {railItems.map((it) => (
               <button
@@ -952,36 +979,7 @@ export default function AssistantBrief() {
               </button>
             ))}
           </ScrollHintRow>
-        )}
-      </div>
-
-      {/* Search · ⊕ on the LEFT — the brain surfaces share one tool grammar
-          (founder 2026-10-12: "seems we lost the + and search bubbles…
-          retrieve them and lay them out where you think they best belong"):
-          search opens this section's thread with the field already open;
-          ⊕ starts a fresh conversation there. Member/space briefs skip them —
-          a stream has no conversation list to search or start. */}
-      {!memberId && !spaceParam && (
-        <div className="abrief__tools">
-          <button
-            type="button"
-            className="abrief__rail-btn abrief__tool"
-            aria-label="Search your history with Claude"
-            title="Search"
-            onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
-          >
-            <Icon name="search" size={16} />
-          </button>
-          <button
-            type="button"
-            className="abrief__rail-btn abrief__tool"
-            aria-label="New conversation"
-            title="New conversation"
-            onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
-          >
-            <Icon name="plus" size={16} />
-          </button>
-        </div>
+        </>
       )}
 
       {/* The consent switch sits ABOVE what it governs (founder 2026-08-17:

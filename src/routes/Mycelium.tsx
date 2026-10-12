@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
 import FeedCard, { FeedCardProps } from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import { loadFeed, deletePost, type FeedPost } from '../lib/postsApi';
+import { loadFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
@@ -17,6 +17,7 @@ import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import IconRow, { IconRowItem } from '../components/IconRow';
+import { FEED_LENSES } from './Home';
 import { aiDoorOn } from '../components/AssistantDoor';
 import './Mycelium.css';
 import { loadSpaceNames } from '../lib/postsApi';
@@ -34,29 +35,22 @@ import { loadSpaceNames } from '../lib/postsApi';
 // appeared in My-celium at all.
 const FILTERS = ['All', 'Social', 'Actionable'];
 
-// Your web's own newspaper, then the rest of your web by section. Mirrors
-// Home's row exactly — one vocabulary, wherever you're standing.
-const MYC_ICONS: IconRowItem[] = [
-  { icon: 'search',         label: 'Search',      to: '/search' },
-  { icon: 'plus',           label: 'Post',        to: '/compose' },
-  { icon: 'brain',          label: 'Assistant',   to: '/assistant?section=mycelium',
+// Your web's own tools, then the sections as FEED LENSES — mirrors Home
+// exactly (founder 2026-10-12, one vocabulary: tools first, sections below
+// in wrapping rows, multi-select filtering the web's stream; Feed = all).
+// The "Open «Section» ›" doors carry ?web=1 so a walk into the full room
+// stays inside your web.
+const MYC_TOOLS: IconRowItem[] = [
+  { icon: 'search', label: 'Search', to: '/search' },
+  { icon: 'plus',   label: 'Post',   to: '/compose' },
+  { icon: 'brain',  label: 'Assistant', to: '/assistant?section=mycelium',
     variant: 'icon-row__btn--ai' },
-  { icon: 'newsfeed',       label: 'Feed',        to: '/mycelium',
-    variant: 'icon-row__btn--here', divider: true },
-  { icon: 'store',          label: 'Marketplace', to: '/market?web=1' },
-  { icon: 'rsvp',           label: 'Events',      to: '/events' },
-  { icon: 'briefcase',      label: 'Work',        to: '/work?web=1' },
-  { icon: 'graduation-cap', label: 'Education',   to: '/courses?web=1' },
-  { icon: 'fork-spoon',     label: 'Food',        to: '/food?web=1' },
-  { icon: 'palette',        label: 'Creative',    to: '/art?web=1' },
-  { icon: 'plane',          label: 'Travel',      to: '/travel?web=1' },
-  { icon: 'book',           label: 'Library',     to: '/library?web=1' },
-  { icon: 'member-heart',   label: 'Members',     to: '/mycelium/directory' },
 ];
 type Item = {
   key: string;
   card: FeedCardProps;
   actionable: boolean;
+  areas: string[];
 };
 
 export default function Mycelium() {
@@ -80,6 +74,8 @@ export default function Mycelium() {
   }
 
   const [tab, setTab] = useState('All');
+  // The lit lenses — empty = Feed/All (founder 2026-10-12, multi-select).
+  const [areaSel, setAreaSel] = useState<Set<string>>(new Set());
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -125,6 +121,7 @@ export default function Mycelium() {
       .map((p) => ({
         key: p.id,
         actionable: p.content_type === 'actionable',
+        areas: postAreas(p),
         card: {
           ...postToCard(p, user?.id, spaceNames),
           ...weaveProps(p, myWeb, user?.id),
@@ -151,8 +148,9 @@ export default function Mycelium() {
 
   const visible = useMemo(
     () => items.filter((it) =>
-      tab === 'All' || (tab === 'Actionable' ? it.actionable : !it.actionable)),
-    [items, tab]
+      (tab === 'All' || (tab === 'Actionable' ? it.actionable : !it.actionable))
+      && (areaSel.size === 0 || it.areas.some((a) => areaSel.has(a)))),
+    [items, tab, areaSel]
   );
 
   return (
@@ -171,18 +169,53 @@ export default function Mycelium() {
         </p>
       </header>
 
-      {/* THE SECTION SWITCHER (founder 2026-08-07: "do the same for Mycelium,
-          and have people always default to the newsfeed of any space. Then you
-          can toggle to marketplace or events within your mycelium"). The lens
-          chips are gone — narrowing by area is search's job now, and this row
-          says where you ARE instead of quietly filtering what you see. Every
-          door carries web=1, so you stay inside your web when you switch. */}
-      <IconRow items={MYC_ICONS.map((it) => (it.label === 'Assistant'
-        ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` }
-        : it))} />
+      {/* THE STACKED ROWS + FEED LENSES (founder 2026-10-12, superseding the
+          2026-08-07 section-switcher doors): tools first, then the sections
+          as multi-select lenses on the web's stream — Home's exact grammar. */}
+      <IconRow
+        className="icon-row--tools"
+        ariaLabel="Tools"
+        items={MYC_TOOLS.map((it) => (it.label === 'Assistant'
+          ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` }
+          : it))}
+      />
+      <IconRow
+        className="icon-row--lenses"
+        ariaLabel="Feed lenses"
+        items={[
+          { icon: 'newsfeed', label: 'Feed',
+            variant: areaSel.size === 0 ? 'icon-row__btn--here' : undefined },
+          ...FEED_LENSES.map((l) => ({
+            icon: l.icon, label: l.label,
+            variant: areaSel.has(l.area) ? 'icon-row__btn--here' : undefined,
+          })),
+          { icon: 'member-heart', label: 'Members', to: '/mycelium/directory' },
+        ]}
+        onSelect={(label) => {
+          if (label === 'Feed') { setAreaSel(new Set()); return; }
+          const lens = FEED_LENSES.find((l) => l.label === label);
+          if (!lens) return;
+          setAreaSel((cur) => {
+            const next = new Set(cur);
+            if (next.has(lens.area)) next.delete(lens.area); else next.add(lens.area);
+            return next;
+          });
+        }}
+      />
 
       {/* The lit section owns the band beneath it. */}
       <FilterRow options={FILTERS} value={tab} onChange={setTab} />
+
+      {/* The full rooms stay one tap away — inside your web (?web=1). */}
+      {areaSel.size > 0 && (
+        <p className="lensdoors">
+          {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
+            <button key={l.area} className="lensdoor" onClick={() => navigate(`${l.room}?web=1`)}>
+              <span className="link-cue">Open {l.label}</span> ›
+            </button>
+          ))}
+        </p>
+      )}
 
       <p className="myc__count">
         <span className="myc__count-n">{visible.length}</span>{' '}
