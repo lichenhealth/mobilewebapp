@@ -503,3 +503,15 @@
    ring stands down. */
 .afeed__search:focus-within { border-color: var(--peach); }
 .afeed__search input:focus-visible { outline: none; }
+
+/* The summary door under the search (founder 2026-10-12): the search finds
+   and marks; this hands the topic to Claude for the woven summary. */
+.afeed__sumbtn {
+  width: fit-content; align-self: flex-start;
+  margin: -4px 0 var(--s-3); padding: 7px 13px;
+  cursor: pointer; font-family: inherit; font-size: 12.5px;
+  background: var(--bone-warm); color: var(--ink-soft);
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.afeed__sumbtn:hover { border-color: var(--peach); color: var(--peach-deep); }
