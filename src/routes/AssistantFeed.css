@@ -18,6 +18,10 @@
 }
 .afeed__sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); margin-top: 2px; }
 
+/* Tools LEFT, Home's order (founder 2026-10-12: "Search… should be on the
+   left, and with a '+' for new convos next to it") — search · ⊕ as 34px
+   circles on their own row, the Marketplace/Concierge grammar. */
+.afeed__tools { display: flex; gap: 10px; margin: var(--s-2) 0; }
 .afeed__search-btn {
   width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
@@ -127,9 +131,16 @@
    holds something of the member's, with its message tally riding the upper
    right like a TopBar badge. The badge overhangs the circle, so the row
    needs a little headroom instead of clipping it. */
-.afeed__threads { display: flex; gap: 10px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
+/* Double-class: .h-scroll's own 12px gap beats a single class (the standing
+   gotcha) — the compact rail needs its 8px to fit eight doors in the shell. */
+.afeed__threads.h-scroll { display: flex; gap: 8px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
+/* COMPACT CIRCLES (founder 2026-10-12: "should we make these smaller, so you
+   don't have to scroll?"): 34px — the tool-circle size — puts all eight
+   thread doors inside the phone column (8×34 + 7×8 = 328px < the 430 shell's
+   gutters); the Mycelium nine-lens shrink, applied here. ScrollHintRow stays
+   underneath as the honest fallback for very narrow screens. */
 .afeed__thread {
-  position: relative; width: 46px; height: 46px; flex-shrink: 0;
+  position: relative; width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 50%; border: 1px solid var(--bone-edge);
   background: var(--bone-warm); color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
@@ -145,12 +156,18 @@
    here yet". */
 .afeed__thread.is-off { color: var(--ink-faint); }
 .afeed__thread em {
-  position: absolute; top: -5px; right: -5px;
-  min-width: 17px; height: 17px; padding: 0 4px;
+  position: absolute; top: -5px; right: -6px;
+  min-width: 15px; height: 15px; padding: 0 3px;
   background: var(--peach); color: var(--bone-warm);
   border-radius: var(--r-full); border: 2px solid var(--bone);
-  font-style: normal; font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  font-style: normal; font-family: var(--font-mono); font-size: 8.5px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center;
+}
+/* Below the 430 shell the row itself narrows — step the circles down to the
+   Mycelium nine-lens 30px so all eight still sit whole on small phones. */
+@media (max-width: 429px) {
+  .afeed__threads.h-scroll { gap: 6px; }
+  .afeed__thread { width: 30px; height: 30px; }
 }
 /* A space's build thread wears the space's own face in the same circle. */
 .afeed__thread--space { padding: 0; overflow: visible; border-width: 2px; }
@@ -206,13 +223,8 @@
 }
 /* The ⊕ door into a fresh exchange — a ghost pill, only as wide as its
    words (the back-chip rule). */
-.afeed__convo-newbtn {
-  width: fit-content; align-self: flex-start; justify-self: start;
-  padding: 8px 14px; cursor: pointer; font-family: inherit; font-size: 13.5px;
-  background: var(--bone); color: var(--ink);
-  border: 1px solid var(--bone-edge); border-radius: var(--r-full);
-}
-.afeed__convo-newbtn:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
+/* The ⊕ text pill retired 2026-10-12 — new conversations start from the ⊕
+   circle beside Search in the tools row (one grammar, no duplicate doors). */
 /* "← All Marketplace conversations" — worded, so it names where it goes. */
 .afeed__convoback {
   width: fit-content; align-self: flex-start; justify-self: start;
