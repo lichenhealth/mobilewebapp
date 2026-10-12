@@ -202,6 +202,17 @@ export default function AssistantFeed() {
   const feedSeen = useRef(0);
   const [sourcePosts, setSourcePosts] = useState<Map<string, FeedPost>>(new Map());
   const [searchOpen, setSearchOpen] = useState(false);
+  // A brief's search circle lands here with the field already open
+  // (?search=1 — consumed, so Back and reloads stay clean).
+  useEffect(() => {
+    if (params.get('search') === '1') {
+      setSearchOpen(true);
+      const next = new URLSearchParams(params);
+      next.delete('search');
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
   const [q, setQ] = useState('');
   const [avatars, setAvatars] = useState<{ me?: string | null; claude?: string | null }>({});
   // Every thread's read cursor as of load — frozen, so opening one

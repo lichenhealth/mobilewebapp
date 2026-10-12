@@ -1,19 +1,26 @@
 .icon-row.h-scroll {
   /* double class beats .h-scroll's 12px gap; snug icons, roomy edges */
   padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
-  gap: 3px;
+  gap: 4px;
+  row-gap: 8px;
   display: flex;
   align-items: center;
+  /* EVERY DOOR ON THE PAGE (founder 2026-10-12, circling Home's row: "the
+     same resizing of the icons, so they all fit on the page like with the Ai
+     search"): the row WRAPS instead of scrolling — fourteen doors can't fit
+     one phone line at any legible size, so the second line is the honest
+     answer. ScrollHintRow stands down by itself (nothing overflows, nothing
+     straddles, no chevron). */
+  flex-wrap: wrap;
 }
 
 /* ONE SIZE, THE WHOLE ROW (founder 2026-08-08: "these buttons are all still
-   not the same size — make them all as large as the feed button"). The row was
-   34px with a 40px lit door; now every door is 40px and PEACH alone says which
-   section you're standing in. Fewer fit a 375px screen than the old 34px
-   packing did — that's what the scroll hint is for. */
+   not the same size — make them all as large as the feed button") — the
+   levelling stands; the SIZE is 34px since 2026-10-12 (the brain rail's
+   compact circles, same founder markup as the wrap above). */
 .icon-row__btn {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -41,7 +48,7 @@
    between its doors and its lenses — one idiom for "these are two families". */
 .icon-row__divider {
   width: 1px;
-  height: 30px;
+  height: 26px;
   flex-shrink: 0;
   align-self: center;
   margin: 0 7px;          /* keeps the 16px of air the gap used to provide */
