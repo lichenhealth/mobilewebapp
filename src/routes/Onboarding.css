@@ -115,3 +115,19 @@
   font-size: var(--t-sm); line-height: 1.5; color: var(--ink-soft);
 }
 .onb__held strong { color: var(--ink); }
+
+/* THE PROVIDER FAST PATH (founder 2026-10-12) — the care ask leads the
+   page: a peach-tinted card, one row per waiting invitation, Approve right
+   there. The quick path is approve + name + Enter Lichen. */
+.onb__care {
+  background: var(--peach-tint, #f8e8dd);
+  border: 1px solid var(--peach, #e8956b);
+  border-radius: var(--r-lg, 14px);
+  padding: 16px;
+}
+.onb__care-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 0;
+}
+.onb__care-who { flex: 1; min-width: 200px; font-size: 15px; line-height: 1.45; }
+.onb__care-yes { flex-shrink: 0; }

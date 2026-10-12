@@ -16,7 +16,8 @@ import { readDraft, writeDraft, clearDraft, sameDraft, normalize, type PageDraft
 import {
   loadCareLinks, approveCare as careApprove,
   removeCare as careRemove, cancelCareInvite as careCancelInvite,
-  copyCareInvite, sendCareInviteEmail, prepareCareText, type CareStatus,
+  copyCareInvite, sendCareInviteEmail, prepareCareText, remindCareRequest, remindedRecently,
+  type CareStatus,
 } from '../lib/careTeamApi';
 import CareAddBox from '../components/CareAddBox';
 import Avatar from '../components/Avatar';
@@ -57,6 +58,7 @@ type CareRow = {
   initiated_by: string;
   patientName: string;
   caregiverName: string;
+  reminded_at: string | null;
 };
 
 const CAPS = [
@@ -168,7 +170,7 @@ export default function Profile() {
 
   const [pendingCats, setPendingCats] = useState(0);
   const [care, setCare] = useState<CareRow[]>([]);
-  const [invites, setInvites] = useState<{ id: string; email: string | null; phone: string | null; role: 'caregiver' | 'patient' }[]>([]);
+  const [invites, setInvites] = useState<{ id: string; email: string | null; phone: string | null; role: 'caregiver' | 'patient'; reminded_at: string | null }[]>([]);
   const [careMsg, setCareMsg] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -312,9 +314,16 @@ export default function Profile() {
   async function copyInvite(email: string) {
     setCareMsg(await copyCareInvite(email));
   }
-  async function sendInviteEmail(email: string, role: 'caregiver' | 'patient') {
+  async function sendInviteEmail(inviteId: string, email: string | null) {
     setCareMsg('Sending…');
-    setCareMsg(await sendCareInviteEmail(email, role, fullName));
+    setCareMsg(await sendCareInviteEmail(inviteId, fullName, email));
+    loadCare();
+  }
+  /** Nudge someone you offered to care for who hasn't answered (founder
+   *  2026-10-12) — once a day, server-guarded. */
+  async function remindOffer(id: string) {
+    setCareMsg(await remindCareRequest(id));
+    loadCare();
   }
   /** A listed phone invite's Text button — a fresh tokened text each time
    *  (tokens claim once), never a second invitation row. */
@@ -1481,6 +1490,11 @@ export default function Profile() {
                 </div>
                 <div className="prof__care-actions">
                   {incoming && <button className="prof__care-btn prof__care-btn--ok" onClick={() => approveCare(c.id)}>Approve</button>}
+                  {c.status === 'pending' && !incoming && (
+                    remindedRecently(c.reminded_at)
+                      ? <button className="prof__care-btn" disabled>Reminded ✓</button>
+                      : <button className="prof__care-btn" onClick={() => void remindOffer(c.id)}>Remind</button>
+                  )}
                   {c.status === 'active' && <button className="prof__care-btn" onClick={() => messageMember(c.patient_id)}>Message</button>}
                   <button className="prof__care-btn" onClick={() => removeCare(c.id)}>{c.status === 'active' ? 'Leave' : incoming ? 'Decline' : 'Cancel'}</button>
                 </div>
@@ -1497,7 +1511,11 @@ export default function Profile() {
             <div className="prof__care-actions">
               {i.email ? (
                 <>
-                  <button className="prof__care-btn prof__care-btn--ok" onClick={() => sendInviteEmail(i.email!, 'patient')}>Send email</button>
+                  {remindedRecently(i.reminded_at)
+                    ? <button className="prof__care-btn" disabled>Emailed ✓</button>
+                    : <button className="prof__care-btn prof__care-btn--ok" onClick={() => void sendInviteEmail(i.id, i.email)}>
+                        {i.reminded_at ? 'Remind' : 'Send email'}
+                      </button>}
                   <button className="prof__care-btn" onClick={() => copyInvite(i.email!)}>Copy</button>
                 </>
               ) : (

@@ -24,7 +24,8 @@ import {
 import { minToLabel } from '../lib/calendarApi';
 import {
   loadCareLinks, approveCare, removeCare, cancelCareInvite,
-  copyCareInvite, sendCareInviteEmail, prepareCareText, type CareLink, type CareInvite,
+  copyCareInvite, sendCareInviteEmail, prepareCareText, remindCareRequest, remindedRecently,
+  type CareLink, type CareInvite,
 } from '../lib/careTeamApi';
 import CareAddBox from '../components/CareAddBox';
 import AssistantDoor from '../components/AssistantDoor';
@@ -960,6 +961,14 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
                 <button className="btn btn-primary conc__team-btn" disabled={busy}
                   onClick={() => { void act(() => approveCare(l.id)); }}>Approve</button>
               )}
+              {/* Remind a member who hasn't answered (founder 2026-10-12) —
+                  a fresh bell through remind_care_request, once a day. */}
+              {!incoming && (
+                remindedRecently(l.reminded_at)
+                  ? <button className="btn conc__team-btn" disabled>Reminded ✓</button>
+                  : <button className="btn conc__team-btn" disabled={busy}
+                      onClick={() => { void remindCareRequest(l.id).then((m) => { setMsg(m); void load(); }); }}>Remind</button>
+              )}
               <button className="btn conc__team-btn" disabled={busy}
                 onClick={() => { void act(() => removeCare(l.id)); }}>{incoming ? 'Decline' : 'Cancel'}</button>
             </span>
@@ -980,8 +989,15 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
           <span className="conc__team-actions">
             {i.email ? (
               <>
-                <button className="btn conc__team-btn" disabled={busy}
-                  onClick={() => { void sendCareInviteEmail(i.email!, 'caregiver', myName).then(setMsg); }}>Email</button>
+                {/* One guarded door (founder 2026-10-12): first press emails
+                    the invitation, later presses send a gentle reminder,
+                    never twice in a day — the server enforces and answers. */}
+                {remindedRecently(i.reminded_at)
+                  ? <button className="btn conc__team-btn" disabled>Emailed ✓</button>
+                  : <button className="btn conc__team-btn" disabled={busy}
+                      onClick={() => { void sendCareInviteEmail(i.id, myName, i.email).then((m) => { setMsg(m); void load(); }); }}>
+                      {i.reminded_at ? 'Remind' : 'Email'}
+                    </button>}
                 <button className="btn conc__team-btn" disabled={busy}
                   onClick={() => { void copyCareInvite(i.email!).then(setMsg); }}>Copy</button>
               </>

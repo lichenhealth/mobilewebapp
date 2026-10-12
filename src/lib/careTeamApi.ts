@@ -14,6 +14,10 @@ export interface CareLink {
   initiated_by: string;
   patientName: string;
   caregiverName: string;
+  /** When the asker last nudged a pending request (founder 2026-10-12) —
+   *  null until a reminder has gone out; the button reads it for the
+   *  once-a-day label. */
+  reminded_at: string | null;
 }
 
 export interface CareInvite {
@@ -21,7 +25,14 @@ export interface CareInvite {
   email: string | null;
   phone: string | null;
   role: 'caregiver' | 'patient';
+  /** Last guarded email send (first send stamps too) — the row's button
+   *  flips Email › → Emailed today → Remind › off this. */
+  reminded_at: string | null;
 }
+
+/** Within the once-a-day reminder floor? */
+export const remindedRecently = (iso: string | null): boolean =>
+  !!iso && new Date(iso).getTime() > Date.now() - 24 * 3600 * 1000;
 
 /** THE ONE CLASSIFIER for anything typed into a care add box (founder
  *  2026-09-26: "a smart, type ahead (no copy and paste), so no errors").
@@ -62,14 +73,15 @@ export async function loadCareLinks(): Promise<{ links: CareLink[]; invites: Car
   const [careRes, invRes] = await Promise.all([
     supabase
       .from('care_team_members')
-      .select('id, patient_id, caregiver_id, status, initiated_by, patient:profiles!care_team_members_patient_id_fkey(full_name), caregiver:profiles!care_team_members_caregiver_id_fkey(full_name)'),
+      .select('id, patient_id, caregiver_id, status, initiated_by, reminded_at, patient:profiles!care_team_members_patient_id_fkey(full_name), caregiver:profiles!care_team_members_caregiver_id_fkey(full_name)'),
     supabase
       .from('care_invitations')
-      .select('id, invitee_email, invitee_phone, role')
+      .select('id, invitee_email, invitee_phone, role, reminded_at')
       .eq('status', 'pending'),
   ]);
   const raw = (careRes.data as unknown as {
     id: string; patient_id: string; caregiver_id: string; status: CareStatus; initiated_by: string;
+    reminded_at: string | null;
     patient: { full_name: string | null } | null; caregiver: { full_name: string | null } | null;
   }[]) ?? [];
   // Resolve display names server-side so members with no full_name fall back to
@@ -82,13 +94,13 @@ export async function loadCareLinks(): Promise<{ links: CareLink[]; invites: Car
   }
   const links = raw.map((r) => ({
     id: r.id, patient_id: r.patient_id, caregiver_id: r.caregiver_id,
-    status: r.status, initiated_by: r.initiated_by,
+    status: r.status, initiated_by: r.initiated_by, reminded_at: r.reminded_at,
     // || (not ??) so a blank-string name also falls through to "Member".
     patientName: nameMap.get(r.patient_id) || r.patient?.full_name || 'Member',
     caregiverName: nameMap.get(r.caregiver_id) || r.caregiver?.full_name || 'Member',
   }));
-  const invites = (((invRes.data as { id: string; invitee_email: string | null; invitee_phone: string | null; role: 'caregiver' | 'patient' }[] | null) ?? [])
-    .map((i) => ({ id: i.id, email: i.invitee_email, phone: i.invitee_phone, role: i.role })));
+  const invites = (((invRes.data as { id: string; invitee_email: string | null; invitee_phone: string | null; role: 'caregiver' | 'patient'; reminded_at: string | null }[] | null) ?? [])
+    .map((i) => ({ id: i.id, email: i.invitee_email, phone: i.invitee_phone, role: i.role, reminded_at: i.reminded_at })));
   return { links, invites };
 }
 
@@ -151,6 +163,15 @@ export async function addCareCaregiverById(caregiverId: string): Promise<{ ok: b
   return { ok: true, message: 'Request sent — pending their approval.' };
 }
 
+/** Nudge a PENDING member who hasn't answered (founder 2026-10-12): a fresh
+ *  bell through remind_care_request — only the asker, once a day, and the
+ *  server answers refusals in plain words. */
+export async function remindCareRequest(id: string): Promise<string> {
+  const { error } = await supabase.rpc('remind_care_request', { p_link: id });
+  if (error) return error.message;
+  return 'Reminded — they’ll get a fresh bell.';
+}
+
 export async function approveCare(id: string): Promise<void> {
   const { error } = await supabase.from('care_team_members').update({ status: 'active' }).eq('id', id);
   if (error) throw error;
@@ -181,15 +202,27 @@ export async function copyCareInvite(email: string): Promise<string> {
   }
 }
 
-/** Email the invite via the send-care-invite edge function (Resend). */
+/** Email the invite via the send-care-invite edge function (Resend).
+ *  THE GUARDED DOOR since 2026-10-12: the row's id, not an address — the
+ *  server reads recipient and role off the invitation itself, sends the
+ *  invitation first and a gentle reminder on later presses, refuses a
+ *  second send inside a day, and stamps reminded_at only after Resend
+ *  accepts. Refusals come back in the server's own words. */
 export async function sendCareInviteEmail(
-  email: string, role: 'caregiver' | 'patient', inviterName: string,
+  inviteId: string, inviterName: string, email?: string | null,
 ): Promise<string> {
-  const { error } = await supabase.functions.invoke('send-care-invite', {
-    body: { email, role, inviterName: inviterName || 'A Lichen member' },
+  const { data, error } = await supabase.functions.invoke('send-care-invite', {
+    body: { inviteId, inviterName: inviterName || 'A Lichen member' },
   });
-  if (error) return 'Couldn’t send automatically yet — use Copy invite to share the link.';
-  return `Invite emailed to ${email}.`;
+  if (error) {
+    const detail = await (error as { context?: Response }).context?.json?.().catch(() => null);
+    return (detail as { error?: string } | null)?.error
+      ?? 'Couldn’t send automatically yet — use Copy invite to share the link.';
+  }
+  const reminded = (data as { reminded?: boolean } | null)?.reminded;
+  return reminded
+    ? `Reminder emailed${email ? ` to ${email}` : ''}.`
+    : `Invite emailed${email ? ` to ${email}` : ''}.`;
 }
 
 export type PreparedCareText = { href: string; body: string };
