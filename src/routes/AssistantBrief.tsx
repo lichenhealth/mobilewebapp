@@ -931,6 +931,35 @@ export default function AssistantBrief() {
         )}
       </div>
 
+      {/* Search · ⊕ on the LEFT — the brain surfaces share one tool grammar
+          (founder 2026-10-12: "seems we lost the + and search bubbles…
+          retrieve them and lay them out where you think they best belong"):
+          search opens this section's thread with the field already open;
+          ⊕ starts a fresh conversation there. Member/space briefs skip them —
+          a stream has no conversation list to search or start. */}
+      {!memberId && !spaceParam && (
+        <div className="abrief__tools">
+          <button
+            type="button"
+            className="abrief__rail-btn abrief__tool"
+            aria-label="Search your history with Claude"
+            title="Search"
+            onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+          >
+            <Icon name="search" size={16} />
+          </button>
+          <button
+            type="button"
+            className="abrief__rail-btn abrief__tool"
+            aria-label="New conversation"
+            title="New conversation"
+            onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+          >
+            <Icon name="plus" size={16} />
+          </button>
+        </div>
+      )}
+
       {/* The consent switch sits ABOVE what it governs (founder 2026-08-17:
           "move the toggle up the page") — you see the door before the room. */}
       <label className="abrief__consent">

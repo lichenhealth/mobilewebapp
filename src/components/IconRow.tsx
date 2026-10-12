@@ -14,8 +14,9 @@ export interface IconRowItem {
   /** Extra class for a door that carries state — e.g. the assistant brain,
    *  peach when it's switched on for you (founder 2026-07-28). */
   variant?: string;
-  /** Override the glyph size. The row default is 22 — every door is one size
-   *  (founder 2026-08-08), so reach for this only with a real reason. */
+  /** Override the glyph size. The row default is 16 (34px circles since
+   *  2026-10-12 — every door still one size, founder 2026-08-08), so reach
+   *  for this only with a real reason. */
   size?: number;
 }
 
@@ -44,7 +45,7 @@ export default function IconRow({ items, onSelect }: IconRowProps) {
             aria-label={label}
             title={label}
           >
-            <Icon name={icon} size={size ?? 22} />
+            <Icon name={icon} size={size ?? 16} />
           </button>
         );
         return nodes;

@@ -39,6 +39,10 @@
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; font-family: inherit; padding: 0;
 }
+/* Search · ⊕, LEFT (founder 2026-10-12) — the feed's tool circles, here. */
+.abrief__tools { display: flex; gap: 10px; margin: var(--s-2) 0; }
+.abrief__tool { width: 34px; height: 34px; color: var(--ink-muted); }
+.abrief__tool:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
 .abrief__rail-btn.is-here {
   background: var(--peach-deep, var(--peach));
   border-color: var(--peach-deep, var(--peach));
