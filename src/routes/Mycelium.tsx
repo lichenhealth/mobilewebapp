@@ -107,7 +107,7 @@ export default function Mycelium() {
       const [{ web, vouched }, recs, saves] = await Promise.all([
         loadMyWeb(asSpace), loadMyRecommendations(), loadMySaved(),
       ]);
-      const ov = await loadEndorsements(feed, vouched);
+      const ov = await loadEndorsements(feed, { web, vouched });
       setMyWeb(web); setMyMyc(vouched); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);
     })();
   }, [asSpace, actingReady]);

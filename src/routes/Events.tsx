@@ -91,7 +91,7 @@ export default function Events() {
       setScopeName((data as { name: string | null } | null)?.name ?? '');
     }
     const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
-    const ov = await loadEndorsements(feed, myc);
+    const ov = await loadEndorsements(feed, { web, vouched: myc });
     const rsvps = me
       ? await loadMyRsvpStatuses(feed.map((p) => p.linked_event_id).filter((id): id is string => !!id), me)
       : new Map<string, MyRsvpStatus>();

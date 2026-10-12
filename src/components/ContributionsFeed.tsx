@@ -134,7 +134,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
     (async () => {
       const feed = await loadAuthorFeed({ profileId, spaceId });
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
-      const ov = await loadEndorsements(feed, myc);
+      const ov = await loadEndorsements(feed, { web, vouched: myc });
       if (!live) return;
       setPosts(feed); setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setReady(true);
       onLoaded?.(feed.length);

@@ -94,7 +94,7 @@ export default function CollectionPage() {
       loadCollection(id), loadProgress(id), loadMyWeb(), loadMyRecommendations(), loadMySaved(),
     ]);
     if (!col) { setMeta(null); setReady(true); return; }
-    const ov = await loadEndorsements(col.posts, myc);
+    const ov = await loadEndorsements(col.posts, { web, vouched: myc });
     let duty = false;
     if (col.meta.space_id && me) {
       const mine = await myDutiesIn(col.meta.space_id);

@@ -155,7 +155,7 @@ export default function Home() {
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([
         loadMyWeb(), loadMyRecommendations(), loadMySaved(),
       ]);
-      const ov = await loadEndorsements(feed, myc);
+      const ov = await loadEndorsements(feed, { web, vouched: myc });
       if (!live) return;
       // Set posts last so cards mount once, with engagement state already in hand.
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed);

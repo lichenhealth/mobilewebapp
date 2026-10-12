@@ -10,9 +10,10 @@ export interface MyceliumMember {
 }
 
 export interface MyceliumSignals {
-  /** Members in your mycelium who have trusted this content */
+  /** People in your web (mycelium) who trust this post's creator */
   trusted?: MyceliumMember[];
-  /** Members in your mycelium who have recommended this content */
+  /** People in your network (your web + fellow space members) who recommend
+   *  this post or its creator */
   recommended?: MyceliumMember[];
 }
 
@@ -43,11 +44,12 @@ interface Props {
 }
 
 /** Engagement footer for every post / card / listing across the app.
- *  Left: mycelium signals (shield = trusted, thumb = recommended). Peach +
- *  interactive when your network has engaged; gray + inert when not. Hover or
- *  tap a peach signal to reveal *who*.
- *  Right: your actions (Trust, Recommend, Share, Save, Chat). Unavailable
- *  actions show lighter-gray and can't be tapped. No counts — relevance over volume. */
+ *  Left: network signals (shield = your web trusts the creator, thumb = your
+ *  network recommends this). Peach + interactive when your network has
+ *  engaged; gray + inert when not. Hover or tap a peach signal to reveal
+ *  *who* — never how many (founder 2026-10-12: relevance over volume).
+ *  Right: your actions (Recommend, Share, Save, Chat). Unavailable actions
+ *  show lighter-gray and can't be tapped. */
 export default function EngagementFooter({
   mycelium,
   trusted, recommended, saved,
@@ -123,8 +125,8 @@ export default function EngagementFooter({
             onClick={(e) => { e.stopPropagation(); clickSignal('trust', hasTrust); }}
             onMouseEnter={() => hoverOpen('trust', hasTrust)}
             tabIndex={hasTrust ? 0 : -1}
-            aria-label={hasTrust ? `Trusted by ${trustedBy.length} ${trustedBy.length === 1 ? 'person' : 'people'} you trust` : 'No one you trust has trusted this yet'}
-            title={hasTrust ? 'Trusted by people you trust' : 'No trust signals from people you trust yet'}
+            aria-label={hasTrust ? `Trusted by ${trustedBy.length} ${trustedBy.length === 1 ? 'person' : 'people'} in your web` : 'No one in your web has trusted this member yet'}
+            title={hasTrust ? 'People in your web trust this member' : 'No trust signals from your web yet'}
           >
             <Icon name="shield-user" size={11} />
           </button>
@@ -138,8 +140,8 @@ export default function EngagementFooter({
             onClick={(e) => { e.stopPropagation(); clickSignal('recommend', hasRec); }}
             onMouseEnter={() => hoverOpen('recommend', hasRec)}
             tabIndex={hasRec ? 0 : -1}
-            aria-label={hasRec ? `Recommended by ${recommendedBy.length} ${recommendedBy.length === 1 ? 'person' : 'people'} you trust` : 'No one you trust has recommended this yet'}
-            title={hasRec ? 'Recommended by people you trust' : 'No recommendations from people you trust yet'}
+            aria-label={hasRec ? `Recommended by ${recommendedBy.length} ${recommendedBy.length === 1 ? 'person' : 'people'} in your network` : 'No one in your network has recommended this yet'}
+            title={hasRec ? 'People in your network recommend this' : 'No recommendations from your network yet'}
           >
             <Icon name="thumbs-up" size={11} />
           </button>
@@ -149,11 +151,12 @@ export default function EngagementFooter({
 
         {/* RIGHT: your actions */}
         <div className="engage__actions">
-          {/* TRUST MOVED UP TO THE NAME (founder 2026-08-07: "a recommend
-              button at the bottom with the share and save buttons, and a
-              little shield by the member name at the top of the post to trust
-              the person"). The footer is what you do with the CONTENT; trusting
-              is what you think of the PERSON, so it belongs beside them. */}
+          {/* NO TRUST BUTTON HERE — and none in the card header anymore
+              either (founder 2026-10-12 retired the shield by the name; the
+              2026-08-07 placement is superseded). The footer is what you do
+              with the CONTENT; trusting is what you think of the PERSON, so
+              the gesture lives on their profile's Trust door. The lower-left
+              shield SIGNAL is the architecture on cards now. */}
           <button
             className={'engage__action' + (myRec && can.recommend ? ' is-active' : '')}
             onClick={handleRec}
@@ -199,8 +202,12 @@ export default function EngagementFooter({
       {/* Inline expansion: who in your mycelium trusted / recommended */}
       {openPanel && (
         <div className="engage__panel">
+          {/* Who, never how many (founder 2026-10-12: "volume/scale are
+              false/old metrics that incentivize the wrong things"). */}
           <p className="engage__panel-label">
-            {openPanel === 'trust' ? 'Trusted' : 'Recommended'} by people you trust:
+            {openPanel === 'trust'
+              ? 'People in your web who trust this member:'
+              : 'People in your network who recommend this:'}
           </p>
           <ul className="engage__members">
             {(openPanel === 'trust' ? trustedBy : recommendedBy).map((m) => (
