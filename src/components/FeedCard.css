@@ -74,7 +74,12 @@
 }
 .feed-card__title--btn:hover { color: var(--peach-deep); }
 .feed-card__handle--btn:hover { text-decoration: underline; }
-.feed-card__handle-row { display: flex; align-items: baseline; gap: 0; min-width: 0; }
+/* The byline WRAPS AS WHOLE UNITS (founder 2026-10-12): when the row runs
+   out of room, "→ Pine Valley Grange" or the "· Thu 7/30" eyebrow drops to
+   its own line intact — the handle never gets squeezed into wrapping at
+   its hyphens, one word per line. */
+.feed-card__handle-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0; min-width: 0; }
+.feed-card__handle-row .feed-card__handle--btn { white-space: nowrap; }
 .feed-card__handle-row .feed-card__handle { margin-top: 2px; }
 .feed-card__eyebrow-link {
   background: transparent; border: 0; padding: 0; font: inherit; color: inherit;
@@ -100,15 +105,25 @@
 .feed-card__author-btn:hover .feed-card__title { color: var(--peach-deep); }
 
 .feed-card__head {
-  display: grid;
-  grid-template-columns: 40px 1fr auto;
+  /* FLEX-WRAP AT EVERY WIDTH (founder 2026-10-12: "@pine-valley-grange" and
+     "→ Pine Valley Grange" stacking one word per line on Events and Home).
+     The 2026-08-11 wrap fix lived behind @media (max-width: 480px) — but the
+     app-shell is a 430px phone column until 1024px, so at a 950px window the
+     old 40px/1fr/auto GRID still ruled and an icon-heavy actions cluster
+     squeezed the byline to a sliver (the documented shell-vs-viewport trap).
+     One layout now: the actions cluster drops to its own right-aligned line
+     only when it genuinely doesn't fit beside readable text. */
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--s-3);
   /* start, not center: the avatar stays a FIXED distance from the card's
      top-left no matter how many lines the title wraps to (founder
      2026-07-25 — centering slid it down the card on long posts). */
-  align-items: start;
+  align-items: flex-start;
   padding: var(--s-3) var(--s-4) 0;
 }
+.feed-card__avatar-btn,
+.feed-card__head > .feed-card__avatar { flex-shrink: 0; }
 /* Weave mark leads the actions cluster; hairline gap sets it apart from
    the post-level icons to its right */
 .feed-card__head-actions .weave-mark { margin-right: 2px; }
@@ -135,21 +150,11 @@
   font-variation-settings: '"opsz" 144';
 }
 
-.feed-card__head-text { min-width: 0; }
-
-/* Phones: an icon-heavy actions cluster (weave + shield + area + chat + ⋯)
-   used to squeeze the title to one word per line. Flex-wrap lets the
-   cluster drop to its own right-aligned line ONLY when it genuinely
-   doesn't fit beside a readable title — the common three-icon cards keep
-   their single row (founder 2026-08-11). Sits AFTER the min-width: 0 rule
-   above, which would otherwise win the tie and re-squeeze the title. */
-@media (max-width: 480px) {
-  .feed-card__head { display: flex; flex-wrap: wrap; }
-  .feed-card__avatar-btn,
-  .feed-card__head > .feed-card__avatar { flex-shrink: 0; }
-  .feed-card__head-text { flex: 1 1 0; min-width: 42%; }
-  .feed-card__head-actions { margin-left: auto; }
-}
+/* The text block never shrinks below a readable floor — under that, the
+   actions cluster wraps to its own line instead (founder 2026-08-11,
+   promoted from the phones-only media query 2026-10-12). */
+.feed-card__head-text { flex: 1 1 0; min-width: 42%; }
+.feed-card__head-actions { margin-left: auto; }
 
 .feed-card__title {
   font-size: var(--t-base);

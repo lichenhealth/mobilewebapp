@@ -4,7 +4,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { LichenMark } from '../components/LichenMark';
+import { approveCare } from '../lib/careTeamApi';
 import './Onboarding.css';
+
+/** A care-team invitation waiting on this brand-new member — the PROVIDER
+ *  fast path (founder 2026-10-12: "an onboarding flow for Providers that is
+ *  as easy and quick as possible"). */
+type CareAsk = { id: string; patientId: string; patientName: string; status: 'pending' | 'active' };
 
 type SpaceKind = 'organization' | 'community' | 'group' | 'place';
 type DraftSpace = { id: number; kind: SpaceKind; name: string };
@@ -53,6 +59,12 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const nextId = useRef(1);
+  // THE PROVIDER FAST PATH (founder 2026-10-12): a member arriving off a
+  // care invitation leads with that ask — approve it right here, add your
+  // name, and Enter Lichen lands on the client's care board instead of Home.
+  // Everything else on this page was already optional; the card says so.
+  const [careAsks, setCareAsks] = useState<CareAsk[]>([]);
+  const [careBusy, setCareBusy] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate('/signup', { replace: true });
@@ -80,6 +92,43 @@ export default function Onboarding() {
     });
     return () => { live = false; };
   }, [user]);
+
+  // Claim any care invitations addressed to this signup's email, then show
+  // what's waiting. (Phone-matched invitations can only claim once the phone
+  // saves — finish/skip re-run the claim, and the care-request bell carries
+  // those the rest of the way.)
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void (async () => {
+      await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
+      const { data } = await supabase.from('care_team_members')
+        .select('id, patient_id, status, initiated_by, patient:profiles!care_team_members_patient_id_fkey(full_name)')
+        .eq('caregiver_id', user.id).neq('initiated_by', user.id);
+      if (!live) return;
+      const rows = (data as unknown as {
+        id: string; patient_id: string; status: 'pending' | 'active';
+        patient: { full_name: string | null } | null;
+      }[] | null) ?? [];
+      setCareAsks(rows.map((r) => ({
+        id: r.id, patientId: r.patient_id,
+        patientName: r.patient?.full_name || 'A member',
+        status: r.status,
+      })));
+    })();
+    return () => { live = false; };
+  }, [user]);
+
+  async function approveAsk(ask: CareAsk) {
+    setCareBusy(true);
+    try {
+      await approveCare(ask.id);
+      setCareAsks((cur) => cur.map((a) => (a.id === ask.id ? { ...a, status: 'active' } : a)));
+    } catch {
+      setError('Couldn’t approve just now — you can also approve later from your bell.');
+    }
+    setCareBusy(false);
+  }
 
   // Prefill first/last from the name collected at signup (splittable full_name).
   useEffect(() => {
@@ -129,12 +178,18 @@ export default function Onboarding() {
     };
   }
 
-  /** Where entering Lichen lands: Home, or Marketplace's composer carrying
-   *  the offer they just described (both doors honor typed words — dropping
-   *  them because someone pressed "later" would be rude). */
+  /** Where entering Lichen lands: Marketplace's composer carrying a typed
+   *  offer (typed words always win — dropping them because someone pressed
+   *  "later" would be rude); a provider who approved a care ask lands ON
+   *  that care work — one client goes straight to their board, several to
+   *  the Provider dashboard; everyone else lands Home. */
   function landing() {
     const text = offer.trim();
-    return text ? `/compose?area=marketplace&body=${encodeURIComponent(text)}` : '/home';
+    if (text) return `/compose?area=marketplace&body=${encodeURIComponent(text)}`;
+    const active = careAsks.filter((a) => a.status === 'active');
+    if (active.length === 1) return `/concierge/client/${active[0].patientId}`;
+    if (active.length > 1) return '/caregiver';
+    return '/home';
   }
 
   function toggleCap(id: string) {
@@ -190,6 +245,9 @@ export default function Onboarding() {
       const { error: onbErr } = await supabase
         .from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
       if (onbErr) throw onbErr;
+      // The phone just saved — a phone-matched care invitation can claim now
+      // (its bell announces; the asked person approves from it).
+      await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
       markOnboarded();
       navigate(landing(), { replace: true });
     } catch (e) {
@@ -209,6 +267,7 @@ export default function Onboarding() {
     if (basicsErr) { setError(basicsErr); return; }
     setSaving(true);
     await supabase.from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
+    await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
     markOnboarded();
     navigate(landing(), { replace: true });
   }
@@ -231,6 +290,35 @@ export default function Onboarding() {
             the rest is optional, and you can change it anytime.
           </p>
         </header>
+
+        {/* THE PROVIDER FAST PATH (founder 2026-10-12): someone invited onto
+            a care team leads with that ask — approve it here, add your name
+            below, and Enter Lichen opens straight onto the care work.
+            Everything else on this page is optional, and the card says so. */}
+        {careAsks.length > 0 && (
+          <section className="onb__section onb__care">
+            <h2 className="onb__h2">You&rsquo;re invited to a care team</h2>
+            {careAsks.map((a) => (
+              <div className="onb__care-row" key={a.id}>
+                <span className="onb__care-who">
+                  <strong>{a.patientName}</strong>
+                  {a.status === 'active' ? ' — you’re on their care team ✓' : ' invited you to their care team.'}
+                </span>
+                {a.status === 'pending' && (
+                  <button type="button" className="btn btn-primary onb__care-yes"
+                    disabled={careBusy} onClick={() => void approveAsk(a)}>
+                    Approve
+                  </button>
+                )}
+              </div>
+            ))}
+            <p className="onb__lead" style={{ marginBottom: 0 }}>
+              The quick path: approve, add your name below, and press Enter
+              Lichen — you&rsquo;ll land right on their care board. Everything
+              else on this page is optional, whenever you like.
+            </p>
+          </section>
+        )}
 
         <section className="onb__section">
           <h2 className="onb__h2">First, the basics</h2>
