@@ -395,11 +395,7 @@ export function groupConvos(rows: FeedPostRow[], names?: Record<string, string>)
     const arr = by.get(k);
     if (arr) arr.push(p); else by.set(k, [p]);
   });
-  return [...by.entries()].map(([id, entries]) => {
-    const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
-    const title = names?.[id]
-      ?? ((firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
-      || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post'));
+  const groups = [...by.entries()].map(([id, entries]) => {
     // The icon set: the filing thread (general stays unmarked — it's the
     // log, not a subject) plus every stamped tag, in first-seen order.
     const thread = entries[0].thread;
@@ -408,8 +404,27 @@ export function groupConvos(rows: FeedPostRow[], names?: Record<string, string>)
     entries.forEach((e) => (e.sections ?? []).forEach((s) => {
       if (s !== 'general' && !sections.includes(s)) sections.push(s);
     }));
-    return { id, thread, entries, title, last: entries[entries.length - 1], sections };
-  }).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
+    return { id, thread, entries, title: '', last: entries[entries.length - 1], sections };
+  });
+  // UNTITLED-N FILLER NAMES (founder 2026-10-12: "Instead of a long type
+  // ahead, can we have a pre-organized filler name, kinda like untitled?…
+  // I want to urge people to organize their chats"): an unnamed
+  // conversation reads "Untitled Marketplace 3" — the first-words title is
+  // retired. Numbering is per THREAD by birth order over ALL of the
+  // thread's conversations, named ones included, so a rename never
+  // renumbers its neighbours and a new exchange simply takes the next slot.
+  const byThread = new Map<string, ConvoGroup[]>();
+  groups.forEach((g) => {
+    const arr = byThread.get(g.thread);
+    if (arr) arr.push(g); else byThread.set(g.thread, [g]);
+  });
+  byThread.forEach((list) => {
+    list.sort((a, b) => +new Date(a.entries[0].created_at) - +new Date(b.entries[0].created_at));
+    list.forEach((g, i) => {
+      g.title = names?.[g.id] ?? `Untitled ${threadLabel(g.thread)} ${i + 1}`;
+    });
+  });
+  return groups.sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
 }
 
 /** The thread's newest entry — the brief composer continues a FRESH

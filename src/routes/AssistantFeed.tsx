@@ -1170,9 +1170,9 @@ export default function AssistantFeed() {
               <input
                 className="afeed__convohead-input"
                 autoFocus
-                defaultValue={title}
+                defaultValue={convoNames[openConvo] ?? ''}
                 maxLength={120}
-                placeholder="Name this conversation"
+                placeholder={title || 'Name this conversation'}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void saveName((e.target as HTMLInputElement).value);
                   if (e.key === 'Escape') setNameEdit(false);
