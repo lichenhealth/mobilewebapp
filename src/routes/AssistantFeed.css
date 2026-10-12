@@ -191,6 +191,21 @@
   margin: 0; font-size: 15px; font-weight: 500; color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
+   easily") — a quiet worded button beside the title, always on (phones
+   have no hover), the convohead's grammar on the list. */
+.afeed__convo-titlerow { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.afeed__convo-titlerow .afeed__convo-title { flex: 1; min-width: 0; }
+.afeed__convo-rename {
+  flex-shrink: 0; background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 11.5px; color: var(--ink-faint);
+}
+.afeed__convo-rename:hover { color: var(--ink-soft); text-decoration: underline; }
+.afeed__convo-rename-input {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px;
+  color: var(--ink); background: var(--bone);
+  border: 1px solid var(--peach); border-radius: 8px; padding: 4px 8px;
+}
 .afeed__convo-snippet {
   margin: 2px 0 0; font-size: 13px; color: var(--ink-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

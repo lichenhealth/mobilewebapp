@@ -6,8 +6,8 @@ import { Icon, type IconName } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
 import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
-  postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup,
-  ASSISTANT_THREADS, sectionIcon, sectionLabel,
+  postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
+  ASSISTANT_THREADS, sectionIcon, sectionLabel, renameConvo,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { useAuth } from '../auth/AuthProvider';
@@ -816,30 +816,54 @@ export default function AssistantBrief() {
   // "The general brain should cover all conversations… sub sections…
   // only the convos that pertain"): the general brief lists EVERY thread's
   // conversations, section-labeled; a section's brief lists its own.
-  const [briefConvos, setBriefConvos] = useState<ConvoGroup[]>([]);
+  const [briefRaw, setBriefRaw] = useState<FeedPostRow[]>([]);
+  const [briefNames, setBriefNames] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!me || spaceParam) { setBriefConvos([]); return; }
+    if (!me || spaceParam) { setBriefRaw([]); return; }
     let live = true;
-    // Always gather the WHOLE relationship, then keep what PERTAINS
-    // (founder 2026-10-07: "earlier conversations be those related to maps
-    // only when you're dialed into maps"): a thread section keeps its own
-    // thread plus anything tagged with it; a tagged section (maps…) keeps
-    // only its tag; home — the general brain — keeps everything.
     void Promise.all([loadAssistantFeed(me), loadConvoNames().catch(() => ({}))])
       .then(([rows, names]) => {
         if (!live) return;
-        // Chosen names overlay the first-words titles here too (founder
-        // 2026-10-12: a named conversation is named everywhere).
-        const groups = groupConvos(rows.filter((r) => !r.thread.startsWith('space:')), names);
-        const pertains = (g: ConvoGroup) =>
-          section === 'home' ? true
-          : sectionTag ? g.sections.includes(sectionTag)
-          : g.thread === feedThread || g.sections.includes(section);
-        setBriefConvos(groups.filter(pertains).slice(0, 6));
+        setBriefRaw(rows.filter((r) => !r.thread.startsWith('space:')));
+        setBriefNames(names);
       })
       .catch(() => {});
     return () => { live = false; };
-  }, [me, feedThread, spaceParam, section, sectionTag]);
+  }, [me, spaceParam]);
+  // Always gather the WHOLE relationship, then keep what PERTAINS
+  // (founder 2026-10-07: "earlier conversations be those related to maps
+  // only when you're dialed into maps"): a thread section keeps its own
+  // thread plus anything tagged with it; a tagged section (maps…) keeps
+  // only its tag; home — the general brain — keeps everything. Chosen names
+  // overlay the Untitled titles here too (founder 2026-10-12: a named
+  // conversation is named everywhere) — derived in a memo so a rename made
+  // right here re-titles the list, and clearing one restores its slot.
+  const briefConvos = useMemo(() => {
+    if (!me || spaceParam || briefRaw.length === 0) return [];
+    const groups = groupConvos(briefRaw, briefNames);
+    const pertains = (g: ConvoGroup) =>
+      section === 'home' ? true
+      : sectionTag ? g.sections.includes(sectionTag)
+      : g.thread === feedThread || g.sections.includes(section);
+    return groups.filter(pertains).slice(0, 6);
+  }, [me, spaceParam, briefRaw, briefNames, section, sectionTag, feedThread]);
+  // RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
+  // easily, can we add that in here") — the feed list's exact grammar.
+  const [briefRename, setBriefRename] = useState<string | null>(null);
+  async function saveBriefName(convoId: string, value: string) {
+    const t = value.trim().replace(/\s+/g, ' ').slice(0, 120);
+    const chosen = briefNames[convoId];
+    const current = briefConvos.find((c) => c.id === convoId)?.title ?? '';
+    if (t === (chosen ?? '') || (!chosen && t === current)) return;
+    try {
+      await renameConvo(convoId, t);
+      setBriefNames((cur) => {
+        const next = { ...cur };
+        if (t) next[convoId] = t; else delete next[convoId];
+        return next;
+      });
+    } catch (e) { console.error(e); }
+  }
   const briefAgo = (iso: string): string => {
     const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
     if (mins < 60) return mins <= 1 ? 'just now' : `${mins}m ago`;
@@ -1049,28 +1073,62 @@ export default function AssistantBrief() {
       {briefConvos.length > 0 && (
         <div className="afeed__convos abrief__convos">
           <p className="abrief__convos-h">Earlier conversations</p>
-          {briefConvos.map((c) => (
-            <button className="afeed__convo" key={c.id}
-              onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}`)}>
-              <div className="afeed__convo-main">
-                <p className="afeed__convo-title">{c.title}</p>
-                <p className="afeed__convo-snippet">
-                  {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
-                    + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
-                </p>
+          {briefConvos.map((c) => {
+            const renaming = briefRename === c.id;
+            const nameable = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(c.id);
+            const open = () => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}`);
+            return (
+              <div className="afeed__convo" key={c.id} role="button" tabIndex={0}
+                onClick={() => { if (!renaming) open(); }}
+                onKeyDown={(e) => {
+                  if (renaming) return;
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+                }}>
+                <div className="afeed__convo-main">
+                  {renaming ? (
+                    <input
+                      className="afeed__convo-rename-input"
+                      autoFocus
+                      defaultValue={briefNames[c.id] ?? ''}
+                      maxLength={120}
+                      placeholder={c.title}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') { void saveBriefName(c.id, (e.target as HTMLInputElement).value); setBriefRename(null); }
+                        if (e.key === 'Escape') setBriefRename(null);
+                      }}
+                      onBlur={(e) => { void saveBriefName(c.id, e.target.value); setBriefRename(null); }}
+                    />
+                  ) : (
+                    <span className="afeed__convo-titlerow">
+                      <p className="afeed__convo-title">{c.title}</p>
+                      {nameable && (
+                        <button className="afeed__convo-rename"
+                          onClick={(e) => { e.stopPropagation(); setBriefRename(c.id); }}>
+                          Rename
+                        </button>
+                      )}
+                    </span>
+                  )}
+                  <p className="afeed__convo-snippet">
+                    {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
+                      + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
+                  </p>
+                </div>
+                <div className="afeed__convo-side">
+                  {/* The convo's section marks — several at once, like a
+                      post's areas (founder 2026-10-07). */}
+                  {c.sections.length > 0 && (
+                    <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
+                      {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
+                    </span>
+                  )}
+                  <span className="afeed__convo-when">{briefAgo(c.last.created_at)}</span>
+                </div>
               </div>
-              <div className="afeed__convo-side">
-                {/* The convo's section marks — several at once, like a
-                    post's areas (founder 2026-10-07). */}
-                {c.sections.length > 0 && (
-                  <span className="afeed__convo-icons" aria-label={c.sections.map(sectionLabel).join(', ')}>
-                    {c.sections.map((s) => <Icon key={s} name={sectionIcon(s) as IconName} size={13} />)}
-                  </span>
-                )}
-                <span className="afeed__convo-when">{briefAgo(c.last.created_at)}</span>
-              </div>
-            </button>
-          ))}
+            );
+          })}
           {/* The General log is one click away from every section's brain
               (founder 2026-10-07) — the chronological everything-view. */}
           {section !== 'home' && (
