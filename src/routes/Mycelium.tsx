@@ -136,10 +136,7 @@ export default function Mycelium() {
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
           saved: mySaves.has('post:' + p.id),
           onSave: (on: boolean) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); },
-          extraMenuItems: user ? [
-            { label: 'Add to collection…', onClick: () => openPicker(p.id) },
-            { label: 'Share to Claude', onClick: () => setShareTarget(p) },
-          ] : undefined,
+          onShareToClaude: user ? () => setShareTarget(p) : undefined,
           viewerIsAuthor: p.author_id === user?.id,
           onManage: p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined,
           onEdit: !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined,

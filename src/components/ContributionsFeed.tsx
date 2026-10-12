@@ -320,7 +320,6 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onRecommend={interactive ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
             saved={interactive && mySaves.has('post:' + p.id)}
             onSave={interactive ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
-            extraMenuItems={interactive && me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
             viewerIsAuthor={interactive && p.author_id === me}
             onManage={interactive && p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}

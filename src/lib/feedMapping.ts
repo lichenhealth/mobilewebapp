@@ -170,6 +170,9 @@ export function postToCard(
     title,
     handle,
     route,
+    // The bottom bar's Share needs the post's own address (founder
+    // 2026-10-12) — every surface that spreads postToCard gets it for free.
+    sharePath: postOpenPath(p),
     // Personal posts show the author's photo when they have one; space-authored
     // posts keep the monogram until spaces get their own images.
     avatar: p.author_space ? undefined : (p.author?.avatar_url ?? undefined),

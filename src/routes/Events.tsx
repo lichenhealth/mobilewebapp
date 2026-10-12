@@ -222,7 +222,6 @@ export default function Events() {
       onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
       saved={mySaves.has('post:' + p.id)}
       onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-      extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
       viewerIsAuthor={p.author_id === me}
       onManage={() => navigate(`/events/${p.id}`)}
       onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
