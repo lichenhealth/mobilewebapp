@@ -21,7 +21,13 @@
 /* Tools LEFT, Home's order (founder 2026-10-12: "Search… should be on the
    left, and with a '+' for new convos next to it") — search · ⊕ as 34px
    circles on their own row, the Marketplace/Concierge grammar. */
-.afeed__tools { display: flex; gap: 10px; margin: var(--s-2) 0; }
+/* THE SEAM under the tools (founder 2026-10-12: "a gray line underneath the
+   + search and brain… more blank space before the … icons … across the
+   platform") — the stacked surfaces' one treatment. */
+.afeed__tools {
+  display: flex; gap: 10px; margin: var(--s-2) 0 0;
+  padding-bottom: 10px; border-bottom: 1px solid var(--bone-edge);
+}
 .afeed__search-btn {
   width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
   border: 1px solid var(--bone-edge); background: var(--bone-warm);
@@ -134,8 +140,9 @@
 /* Double-class: .h-scroll's own 12px gap beats a single class (the standing
    gotcha) — the compact rail needs its 8px to fit eight doors in the shell. */
 /* The thread rail WRAPS instead of scrolling (founder 2026-10-12: "multiple
-   rows for the subsection icons… instead of a scroll" — the overall UI). */
-.afeed__threads.h-scroll { display: flex; flex-wrap: wrap; gap: 8px; row-gap: 8px; margin: var(--s-2) 0 var(--s-3); padding-top: 5px; }
+   rows for the subsection icons… instead of a scroll" — the overall UI);
+   the roomier top margin is the seam's blank-space half. */
+.afeed__threads.h-scroll { display: flex; flex-wrap: wrap; gap: 8px; row-gap: 8px; margin: 16px 0 var(--s-3); padding-top: 0; }
 /* COMPACT CIRCLES (founder 2026-10-12: "should we make these smaller, so you
    don't have to scroll?"): 34px — the tool-circle size — puts all eight
    thread doors inside the phone column (8×34 + 7×8 = 328px < the 430 shell's

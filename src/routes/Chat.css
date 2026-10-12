@@ -440,7 +440,16 @@ img.conv-row__group-bub { object-fit: cover; }
 
 /* Doors top-left (founder 2026-10-06, AI brain consistency): search + brain
    circles in Home's order; the search field opens on press. */
-.chat__tools { display: flex; align-items: center; gap: 10px; margin: 2px 0 var(--s-4); }
+/* THE SEAM under the tools (founder 2026-10-12, platform-wide: "a gray
+   line underneath the + search and brain… more blank space… so things are
+   not so crowded"). */
+.chat__tools {
+  display: flex; align-items: center; gap: 10px; margin: 2px 0 var(--s-4);
+  padding-bottom: 10px; border-bottom: 1px solid var(--bone-edge);
+}
+/* The centered section-landing head (the .myc__head grammar) replaced the
+   left-aligned title + corner + on 2026-10-12. */
+.chat__headc { margin-bottom: var(--s-2); }
 .chat__tool-circle {
   flex-shrink: 0; width: 34px; height: 34px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;

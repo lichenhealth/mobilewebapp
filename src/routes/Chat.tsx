@@ -107,27 +107,22 @@ export default function Chat() {
   return (
     <div className="chat">
       <div className="chat__list-pane">
-      <header className="chat__head">
-        <div className="chat__head-row">
-          <div>
-            <span className="eyebrow">{asSpace ? `${spaceName} · ` : 'Chat · '}{scoped.length} {scoped.length === 1 ? 'thread' : 'threads'}</span>
-            <h1 className="chat__title">
-              <span className="display-italic">Messages</span>
-            </h1>
-          </div>
-          {/* A space doesn't start DMs — conversations come to it. */}
-          {!asSpace && <button className="chat__new" onClick={() => setPicking(true)} aria-label="New message">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>}
-        </div>
+      {/* THE SECTION-LANDING HEAD, CENTERED UNDER THE MARK (founder
+          2026-10-12: "the messages detail should be under the message icon,
+          why is it to the left?" — Drive's .myc__head grammar, the same
+          centered title + explanation /currentcy adopted). */}
+      <header className="myc__head chat__headc">
+        <h1 className="myc__title"><span className="display-italic">Messages</span></h1>
+        <p className="myc__sub">
+          {asSpace ? `${spaceName} · ` : ''}{scoped.length} {scoped.length === 1 ? 'thread' : 'threads'}
+        </p>
       </header>
 
       {/* AI BRAIN CONSISTENCY (founder 2026-10-06: "The search and brain
-          should be top, left in chat") — the platform's doors grammar:
-          search circle opens the search field, the brain opens Chat's
-          briefing (or asks to turn itself back on). */}
+          should be top, left in chat") — the platform's doors grammar, and
+          since 2026-10-12 the + sits WITH them ("For consistency in chat,
+          let's have the plus be like it is everywhere else" — search · + ·
+          brain, Home's order; a space still doesn't start DMs). */}
       <div className="chat__tools">
         <button
           className={'chat__tool-circle' + (searchOpen ? ' is-on' : '')}
@@ -137,6 +132,11 @@ export default function Chat() {
         >
           <Icon name="search" size={15} />
         </button>
+        {!asSpace && (
+          <button className="chat__tool-circle" onClick={() => setPicking(true)} aria-label="New message" title="New message">
+            <Icon name="plus" size={15} />
+          </button>
+        )}
         <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
       </div>
 
