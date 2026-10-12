@@ -5,7 +5,6 @@ import ScopeBack from '../components/ScopeBack';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { useActing } from '../acting/ActingProvider';
 import { possessive } from '../lib/names';
-import { LichenMark } from '../components/LichenMark';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import type { MyceliumSignals } from '../components/EngagementFooter';
@@ -393,18 +392,11 @@ export default function Marketplace() {
         <div className="mkt__action mkt__action--door mkt__action--assistant">
           <AssistantDoor section="market" size={30} label="Your assistant — offers, seeks, and what moved" />
         </div>
-        {/* The featured door: entrust your offering to the routing — ideally
-            the algorithm does better than any of us could alone. It sits with
-            the DOORS now, not among the lenses: it composes something, it
-            doesn't narrow what you're looking at. */}
-        <button
-          className="mkt__action mkt__action--door mkt__action--lichen"
-          onClick={() => navigate(`/compose?area=marketplace&entrust=1${space ? `&space=${space}` : ''}`)}
-          aria-label="Offer something and let Lichen route it"
-          title="Offer something and let Lichen route it where it's needed most"
-        >
-          <span className="mkt__action-circle"><LichenMark size={22} label="" /></span>
-        </button>
+        {/* The Lichen★ entrust DOOR is RETIRED (founder 2026-10-12, crossing
+            it out: "Lichen shouldn't be its own tab - if you '+' a post you
+            can set distribution to be where its needed most on lichen, but
+            that isn't its own type of post"). Entrusting lives INSIDE
+            Compose's modes — the + is the one composing door. */}
       </ScrollHintRow>
 
       {/* The lens band, on its own line: the doors were eating half a phone's

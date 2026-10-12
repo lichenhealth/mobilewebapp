@@ -253,7 +253,9 @@ export default function AssistantFeed() {
   // can name a file") — overlay the self-organizing first-words titles.
   const [convoNames, setConvoNames] = useState<Record<string, string>>({});
   const [nameEdit, setNameEdit] = useState(false);
-  useEffect(() => { setNameEdit(false); }, [thread, openConvo]);
+  // Which LIST row is renaming in place (founder 2026-10-12) — one at a time.
+  const [rowRename, setRowRename] = useState<string | null>(null);
+  useEffect(() => { setNameEdit(false); setRowRename(null); }, [thread, openConvo]);
 
   const load = async () => {
     if (!me) return;
@@ -379,7 +381,17 @@ export default function AssistantFeed() {
     if (!end) return;
     const nearFoot = end.getBoundingClientRect().top - window.innerHeight < 600;
     const lastIsMine = viewEntries[viewEntries.length - 1]?.author === 'member';
-    if (first) end.scrollIntoView({ block: 'end' });
+    // A CONVERSATION OPENS AT ITS TOP (founder 2026-10-12: "it takes me
+    // below the title, somehow to the middle of the convo — can it start at
+    // the top?"): a discrete exchange reads from its title down, email's
+    // way — superseding the 2026-09-09 snap-to-newest for conversation
+    // opens. A space build thread is still a STREAM (no convo id), so it
+    // keeps the newest-words landing; new entries while you watch still
+    // follow to the foot. ⚠ The app's scroller is #root, not window.
+    if (first) {
+      if (openConvo) document.getElementById('root')?.scrollTo({ top: 0 });
+      else end.scrollIntoView({ block: 'end' });
+    }
     else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [loading, listMode, viewEntries, thread, openConvo]);
 
@@ -610,21 +622,23 @@ export default function AssistantFeed() {
   // NAMING A CONVERSATION (founder 2026-10-12): the chosen name overlays the
   // first-words title; clearing it hands the title back to the words. An
   // unchanged derived title is never written — only a deliberate choice is.
-  async function saveName(value: string) {
-    if (!openConvo) return;
-    setNameEdit(false);
+  async function writeName(convoId: string, value: string) {
     const t = value.trim().replace(/\s+/g, ' ').slice(0, 120);
-    const chosen = convoNames[openConvo];
-    const derived = convos.find((c) => c.id === openConvo)?.title ?? '';
+    const chosen = convoNames[convoId];
+    const derived = convos.find((c) => c.id === convoId)?.title ?? '';
     if (t === (chosen ?? '') || (!chosen && t === derived)) return;
     try {
-      await renameConvo(openConvo, t);
+      await renameConvo(convoId, t);
       setConvoNames((cur) => {
         const next = { ...cur };
-        if (t) next[openConvo] = t; else delete next[openConvo];
+        if (t) next[convoId] = t; else delete next[convoId];
         return next;
       });
     } catch (e) { console.error(e); }
+  }
+  async function saveName(value: string) {
+    setNameEdit(false);
+    if (openConvo) await writeName(openConvo, value);
   }
 
   const startNewConvo = () => {
@@ -648,14 +662,54 @@ export default function AssistantFeed() {
   };
   const convoRow = (c: (typeof convos)[number]) => {
     const unread = convoUnread(c);
+    // RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
+    // easily, can we add that in here"): a quiet worded button beside the
+    // title — the convohead's grammar, no mystery glyph. The row is a div
+    // so the rename button inside stays valid HTML; keyboard opens via
+    // Enter/Space on the row itself.
+    const renaming = rowRename === c.id;
+    const nameable = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(c.id);
     return (
-      <button
+      <div
         className={'afeed__convo' + (c.id === openConvo ? ' is-open' : '')}
         key={c.id}
-        onClick={() => openConvoRow(c)}
+        role="button"
+        tabIndex={0}
+        onClick={() => { if (!renaming) openConvoRow(c); }}
+        onKeyDown={(e) => {
+          if (renaming) return;
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openConvoRow(c); }
+        }}
       >
         <div className="afeed__convo-main">
-          <p className="afeed__convo-title">{hl(c.title)}</p>
+          {renaming ? (
+            <input
+              className="afeed__convo-rename-input"
+              autoFocus
+              defaultValue={convoNames[c.id] ?? ''}
+              maxLength={120}
+              placeholder={c.title}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') { void writeName(c.id, (e.target as HTMLInputElement).value); setRowRename(null); }
+                if (e.key === 'Escape') setRowRename(null);
+              }}
+              onBlur={(e) => { void writeName(c.id, e.target.value); setRowRename(null); }}
+            />
+          ) : (
+            <span className="afeed__convo-titlerow">
+              <p className="afeed__convo-title">{hl(c.title)}</p>
+              {nameable && (
+                <button
+                  className="afeed__convo-rename"
+                  onClick={(e) => { e.stopPropagation(); setRowRename(c.id); }}
+                >
+                  Rename
+                </button>
+              )}
+            </span>
+          )}
           <p className="afeed__convo-snippet">
             {(() => {
               // Searching: the row surfaces the words AROUND the hit, the
@@ -678,7 +732,7 @@ export default function AssistantFeed() {
           <span className="afeed__convo-when">{timeAgo(c.last.created_at)}</span>
           {unread > 0 && <em className="afeed__convo-pill">{unread}</em>}
         </div>
-      </button>
+      </div>
     );
   };
 
