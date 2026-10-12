@@ -689,7 +689,7 @@ export default function AssistantFeed() {
               setParams(next);
             }}
           >
-            <Icon name={t.icon as IconName} size={20} />
+            <Icon name={t.icon as IconName} size={16} />
             {/* No badge on the thread that's on screen — you're reading it. */}
             {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
           </button>
@@ -700,7 +700,7 @@ export default function AssistantFeed() {
           space's own face. */}
       {spaceId && (
         <button className="afeed__thread afeed__thread--space is-on" title={spaceRoom === 'currentcy' ? `${possessive(sctx?.name ?? 'this space')} Current-cy room` : `Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
-          <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={44} />
+          <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={30} />
           {/* Its thread is the one on screen — no badge on what you're reading. */}
         </button>
       )}
@@ -743,6 +743,72 @@ export default function AssistantFeed() {
     }
     return null;
   };
+
+  // THE TOOLS LIVE LEFT, HOME'S ORDER (founder 2026-10-12 markup: "Search
+  // feels like from a design standpoint it should be on the left, and with
+  // a '+' for new convos next to it… have the brain UI look like the main
+  // feed and sub section UI"): search · ⊕ as 34px circles leading their own
+  // row — the Marketplace/Concierge tool grammar — replacing the lone
+  // search circle that sat at the header's right. ONE set, two homes
+  // (the threadButtons rule): the phone flow and the desktop nav column.
+  const toolsRow = (
+    <div className="afeed__tools">
+      <button
+        className={'afeed__search-btn' + (searchOpen ? ' is-on' : '')}
+        onClick={() => setSearchOpen((o) => !o)}
+        aria-expanded={searchOpen}
+        aria-label="Search this feed"
+      >
+        <Icon name="search" size={16} />
+      </button>
+      {personal && (
+        <button className="afeed__search-btn" onClick={startNewConvo} aria-label="New conversation" title="New conversation">
+          <Icon name="plus" size={16} />
+        </button>
+      )}
+    </div>
+  );
+  const searchPanel = searchOpen && (
+    <>
+      <div className="afeed__search">
+        <Icon name="search" size={14} />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search your history with Claude…"
+        />
+        {q && (
+          <button onClick={() => setQ('')} aria-label="Clear">
+            <Icon name="close" size={13} />
+          </button>
+        )}
+      </div>
+      {/* THE SUMMARY DOOR (founder 2026-10-12: "a summary of relevant
+          back and forth surrounding stripe throughout the time I've
+          been on the platform"): the search FINDS and MARKS; this hands
+          the same words to Claude, who reads across every conversation
+          (search_my_history) and weaves the summary — as a conversation
+          of its own, so it can be continued and named. The composer
+          arrives prefilled, unsent: the member presses go. */}
+      {personal && q.trim() && (
+        <button
+          className="afeed__sumbtn"
+          onClick={() => {
+            const topic = q.trim();
+            const next = new URLSearchParams(params);
+            next.set('convo', 'new');
+            next.set('ask', `Summarize everything we've discussed about "${topic}" — the relevant back and forth across my conversations, with rough dates and where things stand now.`);
+            setParams(next);
+            setSearchOpen(false);
+            setQ('');
+          }}
+        >
+          ✨ Ask Claude to summarize everything about &ldquo;{q.trim()}&rdquo; ›
+        </button>
+      )}
+    </>
+  );
 
   return (
     <div className={'afeed' + (paged ? ' afeed--paged' : '') + (navMode ? ' afeed--nav' : '')}>
@@ -791,57 +857,12 @@ export default function AssistantFeed() {
               : `The ${threadLabel(thread)} thread — this is where that work stays woven together.`}
           </p>
         </div>
-        <button
-          className={'afeed__search-btn' + (searchOpen ? ' is-on' : '')}
-          onClick={() => setSearchOpen((o) => !o)}
-          aria-expanded={searchOpen}
-          aria-label="Search this feed"
-        >
-          <Icon name="search" size={16} />
-        </button>
       </header>
 
-      {searchOpen && (
-        <>
-          <div className="afeed__search">
-            <Icon name="search" size={14} />
-            <input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search your history with Claude…"
-            />
-            {q && (
-              <button onClick={() => setQ('')} aria-label="Clear">
-                <Icon name="close" size={13} />
-              </button>
-            )}
-          </div>
-          {/* THE SUMMARY DOOR (founder 2026-10-12: "a summary of relevant
-              back and forth surrounding stripe throughout the time I've
-              been on the platform"): the search FINDS and MARKS; this hands
-              the same words to Claude, who reads across every conversation
-              (search_my_history) and weaves the summary — as a conversation
-              of its own, so it can be continued and named. The composer
-              arrives prefilled, unsent: the member presses go. */}
-          {personal && q.trim() && (
-            <button
-              className="afeed__sumbtn"
-              onClick={() => {
-                const topic = q.trim();
-                const next = new URLSearchParams(params);
-                next.set('convo', 'new');
-                next.set('ask', `Summarize everything we've discussed about "${topic}" — the relevant back and forth across my conversations, with rough dates and where things stand now.`);
-                setParams(next);
-                setSearchOpen(false);
-                setQ('');
-              }}
-            >
-              ✨ Ask Claude to summarize everything about &ldquo;{q.trim()}&rdquo; ›
-            </button>
-          )}
-        </>
-      )}
+      {/* Search + ⊕, LEFT, above the rail — the section-tools grammar.
+          In nav mode they live in the column instead (one set, two homes). */}
+      {!builderMode && !navMode && toolsRow}
+      {!navMode && searchPanel}
 
       {/* The threads as SECTION DOORS (founder 2026-08-31: "replace the text
           boxes with the icons for each space"): each thread wears its
@@ -856,10 +877,9 @@ export default function AssistantFeed() {
           conversation fills the pane beside it. Mobile keeps the walk. */}
       {navMode && (
         <aside className="afeed__nav" aria-label="Conversations">
+          {toolsRow}
+          {searchPanel}
           <div className="afeed__nav-rail">{threadButtons}</div>
-          <button className="afeed__convo-newbtn" onClick={startNewConvo}>
-            ⊕ New conversation
-          </button>
           <div className="afeed__nav-list">
             {visibleConvos.map(convoRow)}
             {!loading && visibleConvos.length === 0 && (
@@ -1084,9 +1104,8 @@ export default function AssistantFeed() {
           own first words — the self-organizing part she liked, kept. */}
       {listMode && (
         <div className="afeed__convos">
-          <button className="afeed__convo-newbtn" onClick={startNewConvo}>
-            ⊕ New conversation
-          </button>
+          {/* The ⊕ lives in the tools row beside Search now (founder
+              2026-10-12) — no second new-conversation button in the list. */}
           {loading && <p className="afeed__muted">Loading…</p>}
           {!loading && visibleConvos.length === 0 && q.trim() !== '' && (
             <p className="afeed__muted">No conversations match &ldquo;{q}&rdquo;.</p>
