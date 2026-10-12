@@ -309,6 +309,13 @@ export default function AssistantFeed() {
       setAutoConvo(params.get('ask') ? 'new' : (convos[0]?.id ?? 'new'));
       return;
     }
+    // Arrived SEARCHING (the brief's search circle, ?search=1 — founder
+    // 2026-10-12: "I pressed the search button in marketplace brain and it
+    // took me to the middle of a conversation"): the auto-open stands down
+    // so the LIST shows under the open field — a search lands on something
+    // search-shaped, never inside an old exchange. The wide nav keeps its
+    // auto-open; its list stands beside the pane either way.
+    if (searchOpen && !wide) return;
     if (convos.length === 0) setAutoConvo('new');
     else if (convos.length === 1 && convos[0].thread === thread) setAutoConvo(convos[0].id);
     // The desktop nav shape never shows an empty pane (founder 2026-10-12):
@@ -321,7 +328,7 @@ export default function AssistantFeed() {
       setAutoConvo(own ? own.id : 'new');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personal, loading, convoParam, autoConvo, convos.length, thread, wide]);
+  }, [personal, loading, convoParam, autoConvo, convos.length, thread, wide, searchOpen]);
 
   // Opening a conversation IS seeing it: bump the thread cursor, refresh
   // the rail badges, and remember this one as seen so its own pill drops
