@@ -426,3 +426,80 @@
   font-size: 13px; color: var(--ink-soft); text-align: left;
   font-family: inherit; width: fit-content; align-self: flex-start;
 }
+
+/* ── THE DESKTOP NAV SHAPE (founder 2026-10-12: "I like how desktop claude
+   has the nav to the left and the text of the current log in the window in
+   front of you") — the paged grid's own direct-children idiom: the nav
+   column is ONE child spanning the rows; everything else files down the
+   conversation pane. Phones keep the list ⇄ conversation walk. */
+@media (min-width: 1100px) {
+  .afeed--nav {
+    display: grid;
+    max-width: 1100px;
+    grid-template-columns: 320px minmax(0, 1fr);
+    column-gap: var(--s-6);
+    align-content: start;
+  }
+  .afeed--nav > * { grid-column: 2; min-width: 0; }
+  .afeed--nav > .afeed__nav {
+    grid-column: 1; grid-row: 1 / span 90;
+    position: sticky; top: calc(var(--top-h) + var(--s-4));
+    align-self: start;
+    max-height: calc(100vh - var(--top-h) - var(--s-6));
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 12px;
+    padding-right: var(--s-4);
+    border-right: 1px solid var(--bone-edge);
+  }
+}
+/* Thread doors WRAP in the column — same buttons as the phone rail, a grid
+   instead of a scroll (a 320px column scrolling sideways helps nobody). */
+.afeed__nav-rail { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 5px; }
+.afeed__nav-list { display: flex; flex-direction: column; gap: 6px; }
+/* Compact rows in the column; the open one wears the lit ring. */
+.afeed__nav .afeed__convo { padding: 9px 11px; border-radius: 12px; gap: 8px; }
+.afeed__nav .afeed__convo-title { font-size: 13.5px; }
+.afeed__nav .afeed__convo-snippet { font-size: 12px; }
+.afeed__nav .afeed__convo.is-open {
+  border-color: var(--peach); background: var(--peach-tint);
+}
+
+/* THE CONVERSATION'S NAME + RENAME (founder 2026-10-12: "name a convo,
+   like you can name a file"). The title is display type — a named thing —
+   with a quiet worded button beside it, never a mystery glyph. */
+.afeed__convohead {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: var(--s-3); min-width: 0;
+}
+.afeed__convoname {
+  margin: 0; min-width: 0; flex: 0 1 auto;
+  font-family: var(--font-display); font-size: 17px; font-weight: 400;
+  color: var(--ink); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.afeed__convohead-btn {
+  flex-shrink: 0; background: none; border: 0; padding: 2px 0; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--ink-faint);
+}
+.afeed__convohead-btn:hover { color: var(--peach-deep); }
+.afeed__convohead-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink);
+  padding: 6px 10px; background: var(--bone-warm);
+  border: 1px solid var(--peach); border-radius: var(--r-md, 10px); outline: 0;
+}
+
+/* SEARCH MARKS ITS HITS (founder 2026-10-12: "dig into and highlight sub
+   text within conversations, like text message searches in iphone") — in
+   list titles, matched snippets, and the open conversation's bubbles. */
+.afeed__hl {
+  background: var(--peach); color: var(--bone-warm);
+  border-radius: 3px; padding: 0 2px;
+}
+
+/* ONE FOCUS TREATMENT FOR THE SEARCH PILL (founder 2026-10-12: "get rid of
+   that weird, orange rectangle around the search itself"): the platform's
+   peach :focus-visible ring (tokens.css) boxed the bare input INSIDE the
+   pill — a rectangle in a capsule. The PILL carries focus now; the inner
+   ring stands down. */
+.afeed__search:focus-within { border-color: var(--peach); }
+.afeed__search input:focus-visible { outline: none; }

@@ -355,9 +355,40 @@ export interface ConvoGroup {
  *  founder 2026-10-06: toggling away and back must not orphan the history). */
 export const CONVO_GAP_MS = 6 * 3600 * 1000;
 
+// NAME A CONVERSATION LIKE A FILE (founder 2026-10-12: "maybe you can name
+// a convo, like you can name a file? So we can organize them?"): chosen
+// titles live in assistant_convo_names (owner-only, migration 20261012220000).
+// A row means a CHOSEN name; absent, the self-organizing first-words title
+// stands — so clearing a name deletes the row, never stores an empty one.
+export async function loadConvoNames(): Promise<Record<string, string>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const { data } = await supabase.from('assistant_convo_names')
+    .select('convo_id, title').eq('profile_id', user.id);
+  const out: Record<string, string> = {};
+  (((data as { convo_id: string; title: string }[] | null) ?? []))
+    .forEach((r) => { out[r.convo_id] = r.title; });
+  return out;
+}
+
+export async function renameConvo(convoId: string, title: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const t = title.trim().replace(/\s+/g, ' ').slice(0, 120);
+  if (!t) {
+    await supabase.from('assistant_convo_names').delete()
+      .match({ profile_id: user.id, convo_id: convoId });
+    return;
+  }
+  const { error } = await supabase.from('assistant_convo_names')
+    .upsert({ profile_id: user.id, convo_id: convoId, title: t, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
 /** Group feed rows into conversations, newest activity first — the ONE
- *  grouping both the feed's list and the brief's history log render. */
-export function groupConvos(rows: FeedPostRow[]): ConvoGroup[] {
+ *  grouping both the feed's list and the brief's history log render.
+ *  `names` overlays the member's chosen titles (loadConvoNames). */
+export function groupConvos(rows: FeedPostRow[], names?: Record<string, string>): ConvoGroup[] {
   const by = new Map<string, FeedPostRow[]>();
   rows.forEach((p) => {
     const k = p.convo_id ?? `loose:${p.thread}`;
@@ -366,8 +397,9 @@ export function groupConvos(rows: FeedPostRow[]): ConvoGroup[] {
   });
   return [...by.entries()].map(([id, entries]) => {
     const firstMember = entries.find((e) => e.author === 'member') ?? entries[0];
-    const title = (firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
-      || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post');
+    const title = names?.[id]
+      ?? ((firstMember.body || '').trim().replace(/\s+/g, ' ').slice(0, 80)
+      || ((firstMember.attachments ?? []).some((a) => a.type === 'photo') ? 'A photo' : 'A shared post'));
     // The icon set: the filing thread (general stays unmarked — it's the
     // log, not a subject) plus every stamped tag, in first-seen order.
     const thread = entries[0].thread;
