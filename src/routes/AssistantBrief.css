@@ -34,7 +34,7 @@
 /* The rail WRAPS to more rows instead of scrolling (founder 2026-10-12:
    "multiple rows for the subsection icons… instead of a scroll" — the
    overall UI). It sits BELOW the tools now, left-aligned like the feed's. */
-.abrief__rail { display: flex; flex-wrap: wrap; gap: 10px; row-gap: 10px; margin: 2px 0 0; padding-top: 4px; }
+.abrief__rail { display: flex; flex-wrap: wrap; gap: 10px; row-gap: 10px; margin: 16px 0 0; padding-top: 0; }
 .abrief__rail-btn {
   width: 38px; height: 38px; flex-shrink: 0;
   border-radius: 50%; border: 1px solid var(--bone-edge);
@@ -43,7 +43,11 @@
   cursor: pointer; font-family: inherit; padding: 0;
 }
 /* Search · ⊕, LEFT (founder 2026-10-12) — the feed's tool circles, here. */
-.abrief__tools { display: flex; gap: 10px; margin: var(--s-2) 0; }
+/* THE SEAM under the tools (founder 2026-10-12, platform-wide). */
+.abrief__tools {
+  display: flex; gap: 10px; margin: var(--s-2) 0 0;
+  padding-bottom: 10px; border-bottom: 1px solid var(--bone-edge);
+}
 .abrief__tool { width: 34px; height: 34px; color: var(--ink-muted); }
 .abrief__tool:hover { border-color: var(--peach); color: var(--peach-deep, var(--peach)); }
 .abrief__rail-btn.is-here {

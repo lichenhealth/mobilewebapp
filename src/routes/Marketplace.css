@@ -179,9 +179,14 @@
    lens at once, which suits the all-on-by-default grammar — but on a phone it
    ran to three lines and cost MORE height than the row it replaced, which was
    the whole point. The double class beats .h-scroll's own 12px gap. */
-/* The two bands sit close: doors, then lenses. Trimmed padding keeps the pair
-   about the height of the single circle-and-caption row they replace. */
-.mkt__actions--doors.h-scroll { padding-bottom: 2px; }
+/* THE SEAM between the bands (founder 2026-10-12: "a gray line underneath
+   the + search and brain, and … more blank space … across the platform" —
+   superseding the sit-close trim): hairline under the doors, air before
+   the lenses. */
+.mkt__actions--doors.h-scroll {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bone-edge);
+}
 .mkt__lensrow.h-scroll {
   display: flex;
   align-items: center;
@@ -189,7 +194,7 @@
      is one fewer lens visible before the chevron (founder 2026-08-13: fill
      the space — five lenses should sit before the scroll on a phone). */
   gap: 6px;
-  padding: 2px 0 var(--s-2);   /* side gutters live on the ScrollHintRow wrapper */
+  padding: 14px 0 var(--s-2);   /* side gutters live on the ScrollHintRow wrapper */
   overflow-x: auto;
   scrollbar-width: none;
 }
