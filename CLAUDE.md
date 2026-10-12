@@ -17,6 +17,25 @@ lands a business-relevant decision (pricing, policy, a partner conversation,
 a deck shipped) folds it into BUSINESS.md as part of shipping. It's in the
 private repo on purpose — never copy its private facts to the public site.
 
+⚠ **CLAUDE DOES THE THIRD-PARTY CONFIG ITSELF** (founder 2026-10-12, standing
+rule, after being walked through Stripe's webhook UI: "can we set a rule that
+you always do it for me in stripe or any other software, unless you can't for
+privacy purposes?"): when a change is needed in Stripe, Supabase, Resend, Zoom
+or any other service Lichen already holds credentials for, Claude MAKES the
+change via that service's API rather than walking the founder through a
+dashboard — and reports what changed, before/after. The keys live in Supabase
+edge-function secrets, so the pattern is a SHORT-LIVED admin edge function
+(deployed → gated by a one-time nonce baked at deploy → invoked once → deleted
+and verified 404; first used 2026-10-12 to add the two `async_payment_*`
+events to the Stripe webhook endpoint — the gate can't compare the caller's
+bearer to the injected `SUPABASE_SERVICE_ROLE_KEY`, the formats differ). The
+honest limits, which are the "unless": anything requiring a NEW secret (the
+founder pastes it into Supabase secrets herself — never through chat), OAuth
+consent screens / account signups / phone verification (only she can be her),
+dashboard-only settings with no API, and anything destructive or
+money-irreversible still gets her explicit yes before it runs. Walking her
+through a UI is the fallback, not the default.
+
 ⚠ **SESSION-START PROTOCOL — check the bug bridge** (founder 2026-08-24): the
 in-app assistants file member-reported bugs into **`dev_reports`** via their
 `file_dev_report` tool (`_shared/devReport.ts`; via = which room, member's own
