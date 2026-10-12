@@ -346,21 +346,12 @@ export default function FeedCard({
             {onWeave && (
               <WeaveMark on={inWeb ?? false} onToggle={onWeave} entityName={title} size={20} />
             )}
-            {/* Trust sits with the identity, not with the content (founder
-                2026-08-07: "a little shield by the member name at the top of
-                the post to trust the person"). onWeave's absence already means
-                "your own post", so it gates this too. */}
-            {onWeave && onTrust && !authorIsSpace && (
-              <button
-                className={'feed-card__trust' + (trusted ? ' is-on' : '')}
-                onClick={(e) => { e.stopPropagation(); onTrust(!trusted); }}
-                aria-pressed={!!trusted}
-                aria-label={trusted ? `Stop trusting ${handle}` : `Trust ${handle}`}
-                title={trusted ? 'Someone you trust' : 'Trust (private)'}
-              >
-                <Icon name="shield-user" size={14} />
-              </button>
-            )}
+            {/* THE HEADER TRUST SHIELD IS RETIRED (founder 2026-10-12 markup,
+                superseding 2026-08-07's shield-by-the-name): the trust and
+                recommend ARCHITECTURE lives in the lower-left signals now —
+                they light when someone in your network trusts/recommends, and
+                hovering lists who. Trusting a PERSON stays where the person
+                is: their profile's Trust door. */}
             {areaDoors.length > 0 ? (
               <div className="feed-card__cat-icons">
                 {areaDoors.map((d) => (

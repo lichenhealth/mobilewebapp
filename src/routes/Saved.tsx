@@ -131,7 +131,7 @@ export default function Saved() {
         return tb.localeCompare(ta);
       });
       const [{ web, vouched: myc }, recs, cols] = await Promise.all([loadMyWeb(), loadMyRecommendations(), listMyCollections()]);
-      const ov = await loadEndorsements(merged, myc);
+      const ov = await loadEndorsements(merged, { web, vouched: myc });
       if (!live) return;
       setSavedAt(times);
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setCollections(cols); setOverlays(ov); setPosts(merged); setReady(true);

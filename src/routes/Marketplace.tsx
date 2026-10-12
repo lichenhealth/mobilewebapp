@@ -281,7 +281,7 @@ export default function Marketplace() {
         if (live) setScopeName((data as { name: string | null } | null)?.name ?? '');
       }
       const [{ web, vouched: myc }, recs, saves] = await Promise.all([loadMyWeb(), loadMyRecommendations(), loadMySaved()]);
-      const ov = await loadEndorsements(feed, myc);
+      const ov = await loadEndorsements(feed, { web, vouched: myc });
       if (!live) return;
       setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov); setPosts(feed); setReady(true);
     })();

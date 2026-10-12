@@ -93,7 +93,7 @@ export default function PostPage() {
         const [{ web, vouched: myc }, recs, saves, budg] = await Promise.all([
           loadMyWeb(), loadMyRecommendations(), loadMySaved(), listBudgetPostIds(me),
         ]);
-        const ov = await loadEndorsements([p], myc);
+        const ov = await loadEndorsements([p], { web, vouched: myc });
         if (!live) return;
         setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves);
         setMyBudget(budg);
