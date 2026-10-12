@@ -493,3 +493,15 @@
    rows (Courses' feed read as one long column while Art sat two abreast —
    founder 2026-08-20: formatting be consistent). They tile like any card
    now; their wrap-don't-truncate width rule is unchanged. */
+
+/* THE SHARE POPOVER (founder 2026-10-12: the bottom bar's Share is REAL
+   now) — the more-menu's paper, anchored ABOVE the engagement bar at the
+   card's right, since the bar sits at the card's foot. */
+.feed-card__engwrap { position: relative; }
+.feed-card__share-pop {
+  top: auto; bottom: calc(100% - 4px); right: var(--s-3);
+}
+.feed-card__share-note {
+  margin: 0; padding: 9px 12px; font-size: 13px; color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}

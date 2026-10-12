@@ -1438,6 +1438,7 @@ export default function CollectionPage() {
               onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
               onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
               onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
+              keepMenu
               extraMenuItems={[
                 ...(me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : []),
                 ...(canEdit ? [{

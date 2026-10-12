@@ -90,7 +90,10 @@ export interface FeedCardProps {
   onWeave?: (next: boolean) => void;
   /** Rich link previews (YouTube embed / OG card) resolved at compose time. */
   previews?: { url: string; kind: 'youtube' | 'link'; videoId?: string; title?: string; description?: string; image?: string; siteName?: string }[];
-  // ⋯ menu: author controls vs viewer controls. Renders only when a handler fits.
+  // ⋯ menu: author controls vs viewer controls. STREAM CARDS DON'T WEAR IT
+  // (founder 2026-10-12 markup: the menu's rows duplicated the bottom bar's
+  // Share and Save) — it renders only on the post's own page (`expanded`)
+  // and on curation shelves that pass `keepMenu` (Drive cards, a collection).
   /** Screen-specific rows rendered at the top of the ⋯ menu (e.g. the Saved
    *  shelf's "Add to collection…"). */
   extraMenuItems?: { label: string; hint?: string; onClick: () => void }[];
@@ -99,6 +102,15 @@ export interface FeedCardProps {
   onDelete?: () => void;    // author, non-event posts (confirmed inside)
   onManage?: () => void;    // author, event posts → the event page's tested flow
   onHide?: () => void;      // everyone else — hides it for THEM only
+  /** Curation shelves (Drive's cards view, a collection page) keep the ⋯
+   *  even unexpanded — their menus hold real curation, not dupes. */
+  keepMenu?: boolean;
+  /** The post's own path — makes the bottom bar's Share button REAL
+   *  (postToCard supplies it; the button was wired to nothing before
+   *  2026-10-12). */
+  sharePath?: string;
+  /** Share-to-Claude lives inside the Share popover now, not a ⋯ row. */
+  onShareToClaude?: () => void;
 }
 
 export default function FeedCard({
@@ -141,12 +153,44 @@ export default function FeedCard({
   onDelete,
   onManage,
   onHide,
+  keepMenu,
+  sharePath,
+  onShareToClaude,
 }: FeedCardProps) {
   const navigate = useNavigate();
   const confirmDialog = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
-  const hasMenu = !!(extraMenuItems && extraMenuItems.length)
-    || (viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide);
+  // THE STREAM CARD HAS NO ⋯ (founder 2026-10-12, marking up the walnut
+  // card: "Share and Save to drive are on the bottom, so we don't need them
+  // in the drop down"): management (Edit/Delete/Hide) lives on the post's
+  // own page — one tap away through the card — and curation shelves opt
+  // back in with keepMenu.
+  const hasMenu = (!!expanded || !!keepMenu) && (
+    !!(extraMenuItems && extraMenuItems.length)
+    || (viewerIsAuthor ? !!(onEdit || onDelete || onManage) : !!onHide));
+  // THE BOTTOM BAR IS REAL NOW (same markup — the Share and Chat buttons
+  // rendered enabled but were wired to NOTHING): Share opens a small
+  // popover (send the link, or Share to Claude where a surface offers it),
+  // Chat carries the same chat-about action the header circle used to.
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareNote, setShareNote] = useState('');
+  const shareLink = sharePath ? `${window.location.origin}${sharePath}` : null;
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  async function copyShareLink() {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareNote('Link copied ✓');
+    } catch {
+      setShareNote(shareLink);
+    }
+    window.setTimeout(() => { setShareOpen(false); setShareNote(''); }, 1200);
+  }
+  async function nativeShare() {
+    if (!shareLink) return;
+    try { await navigator.share({ title, url: shareLink }); } catch { /* dismissed */ }
+    setShareOpen(false);
+  }
   // Whole-card click-through: anywhere that isn't itself interactive opens
   // the post/event page. Inner buttons, links, and media keep their own
   // behavior via the closest() guard.
@@ -290,7 +334,14 @@ export default function FeedCard({
             </span>
           )}
         </div>
-        {(onWeave || categoryIcons.length > 0 || areaDoors.length > 0 || onMessage || hasMenu) && (
+        {/* TOP-RIGHT = IDENTITY + WHERE IT'S POSTED (founder 2026-10-12,
+            from her Figma mocks: "where something is posted is in the top,
+            right"): weave · trust · the area door(s), nothing else — the
+            chat-about circle moved to the bottom bar's Chat (it was a
+            duplicate), the ⋯ renders only on the post's own page. Fewer
+            icons means the cluster fits BESIDE the title instead of
+            dropping to a right-shoved second row. */}
+        {(onWeave || categoryIcons.length > 0 || areaDoors.length > 0 || hasMenu) && (
           <div className="feed-card__head-actions">
             {onWeave && (
               <WeaveMark on={inWeb ?? false} onToggle={onWeave} entityName={title} size={20} />
@@ -332,16 +383,6 @@ export default function FeedCard({
                   </span>
                 ))}
               </div>
-            )}
-            {onMessage && (
-              <button
-                className="feed-card__message"
-                onClick={onMessage}
-                aria-label={`Chat about "${title}"`}
-                title={`Chat about this — the post comes with you`}
-              >
-                <Icon name="chat-about" size={16} />
-              </button>
             )}
             {hasMenu && (
               <div className="feed-card__more-wrap">
@@ -453,23 +494,60 @@ export default function FeedCard({
         </div>
       )}
 
-      {/* ENGAGEMENT */}
-      <EngagementFooter
-        mycelium={mycelium}
-        trusted={trusted}
-        recommended={recommended}
-        saved={saved}
-        availability={noDownload
-          // Protected content can't be shelved or passed along — the same
-          // switch that turns downloads off closes those doors too
-          // (founder 2026-08-05). Buttons gray rather than vanish, so the
-          // boundary is legible instead of mysterious.
-          ? { ...availability, save: false, share: false }
-          : availability}
-        onTrust={onTrust}
-        onRecommend={onRecommend}
-        onSave={onSave}
-      />
+      {/* ENGAGEMENT — the bottom bar carries the ACTIONS (founder
+          2026-10-12 IA): Recommend · Share · Save · Chat, all real. */}
+      <div className="feed-card__engwrap">
+        <EngagementFooter
+          mycelium={mycelium}
+          trusted={trusted}
+          recommended={recommended}
+          saved={saved}
+          availability={{
+            ...availability,
+            // Protected content can't be shelved or passed along — the same
+            // switch that turns downloads off closes those doors too
+            // (founder 2026-08-05). Buttons gray rather than vanish, so the
+            // boundary is legible instead of mysterious.
+            share: !noDownload && availability?.share !== false && !!(shareLink || onShareToClaude),
+            save: !noDownload && availability?.save !== false,
+            chat: !!onMessage && availability?.chat !== false,
+          }}
+          onTrust={onTrust}
+          onRecommend={onRecommend}
+          onSave={onSave}
+          onShare={() => { setShareNote(''); setShareOpen((o) => !o); }}
+          onChat={onMessage}
+        />
+        {shareOpen && (
+          <>
+            <div className="feed-card__more-scrim" onClick={(e) => { e.stopPropagation(); setShareOpen(false); }} />
+            <div className="feed-card__more feed-card__share-pop" role="menu">
+              {shareNote
+                ? <p className="feed-card__share-note">{shareNote}</p>
+                : (
+                  <>
+                    {onShareToClaude && (
+                      <button role="menuitem" onClick={(e) => { e.stopPropagation(); setShareOpen(false); onShareToClaude(); }}>
+                        Share to Claude
+                        <em>Starts a conversation about this post</em>
+                      </button>
+                    )}
+                    {canNativeShare && shareLink && (
+                      <button role="menuitem" onClick={(e) => { e.stopPropagation(); void nativeShare(); }}>
+                        Send it…
+                      </button>
+                    )}
+                    {shareLink && (
+                      <button role="menuitem" onClick={(e) => { e.stopPropagation(); void copyShareLink(); }}>
+                        Copy link
+                      </button>
+                    )}
+                  </>
+                )}
+            </div>
+          </>
+        )}
+      </div>
     </article>
     </div>
   );

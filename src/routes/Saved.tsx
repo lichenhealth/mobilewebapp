@@ -490,6 +490,7 @@ export default function Saved() {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
               void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
             }}
+            keepMenu
             extraMenuItems={[{
               label: 'Add to collection…',
               hint: collections.length ? undefined : 'Create your first folder above',

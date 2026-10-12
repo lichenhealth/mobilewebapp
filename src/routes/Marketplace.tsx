@@ -548,7 +548,6 @@ export default function Marketplace() {
             onRecommend={(on) => { void setRecommend('post', p.id, on, undefined, asSpace).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-            extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
