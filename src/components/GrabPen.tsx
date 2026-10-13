@@ -28,6 +28,7 @@ export default function GrabPen({ thread, uploaderId }: {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentConvo, setSentConvo] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const strokes = useRef<{ x: number; y: number }[][]>([]);
@@ -95,12 +96,15 @@ export default function GrabPen({ thread, uploaderId }: {
         cnv.toBlob((b) => (b ? res(b) : rej(new Error('no blob'))), 'image/png'));
       const url = await uploadPageImage(uploaderId, new File([blob], 'markup.png', { type: 'image/png' }));
       // A space build thread is one continuous stream (convo null); a
-      // personal thread's grab starts its own conversation (the default).
-      await postToAssistantFeed(
+      // personal thread's grab starts its own conversation (the default) —
+      // and "Open the conversation" opens THAT exchange (founder 2026-10-13:
+      // a bare thread link now lands on the brief, not the words just sent).
+      const row = await postToAssistantFeed(
         note.trim() || 'A marked-up grab of the page — the pen shows what I mean.',
         undefined, thread, [url],
         thread.startsWith('space:') ? null : undefined,
       );
+      setSentConvo(row?.convo_id ?? null);
       setSent(true);
     } catch {
       setErr('Could not send — check your connection and try again.');
@@ -124,7 +128,7 @@ export default function GrabPen({ thread, uploaderId }: {
         {sent ? (
           <>
             <span className="grabpen__sent">Sent to your build thread ✓</span>
-            <button type="button" onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(thread)}`)}>
+            <button type="button" onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(thread)}${sentConvo ? `&convo=${encodeURIComponent(sentConvo)}` : ''}`)}>
               Open the conversation
             </button>
             <button type="button" onClick={() => { setShot(null); setSent(false); setNote(''); }}>Done</button>

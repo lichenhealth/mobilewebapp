@@ -209,7 +209,11 @@
   flex-shrink: 0; background: none; border: none; padding: 0; cursor: pointer;
   font-family: inherit; font-size: 11.5px; color: var(--ink-faint);
 }
-.afeed__convo-rename:hover { color: var(--ink-soft); text-decoration: underline; }
+/* EDIT PROMPTS HOVER PEACH (founder 2026-10-13: "hover consistency, where
+   you hover on rename and it turns peach, versus underlined and black…
+   for all such prompts to edit text") — the convohead Rename's grammar,
+   never an underline (that's the link-cue's, for text that NAVIGATES). */
+.afeed__convo-rename:hover { color: var(--peach-deep); }
 .afeed__convo-rename-input {
   width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px;
   color: var(--ink); background: var(--bone);
