@@ -101,7 +101,20 @@ the WeavePitch template.
   and revenue via lichen separately from Daniela's accounting"):** a $10K
   donation arrived; the founder is opening a NEW BANK ACCOUNT and moving it
   + other Lichen revenue there, so that **Daniela's accounting stays
-  separate**. (Likely Mark's pledged $10K from the 2026-09-11 subsidy
+  separate**. **THE BANK IS RELAY** (founder 2026-10-13, choosing it over
+  Bluevine's interest: "I like the idea of earning interest, but I suspect
+  that we will be using our funds pretty quickly on the platform, so maybe
+  relay?") — right call for fast-cycling balances; the structural win is
+  Relay's free checking SUB-ACCOUNTS (up to 20 under one login), which make
+  the money doctrines visibly true in the bank itself. Suggested starting
+  set of three: **Operating** (the 5–15% share), **Subsidy fund** (Mark's
+  program-restricted $10K), **Current-cy float** (the dollars backing minted
+  Current — the float rule, auditable at a glance). Eva gets her own
+  read-only Relay login for the books. Caveat stated and accepted context:
+  Relay is a fintech whose deposits sit at a partner FDIC-insured bank
+  (Thread Bank), not a chartered bank itself. Account opening needs the EIN,
+  formation docs, and a board resolution — confirm entity specifics with
+  Eva; the repo holds no filing paperwork. (Likely Mark's pledged $10K from the 2026-09-11 subsidy
   decisions — program-restricted, 5% operating — confirm with the founder
   before recording it as such or minting against it.) The order of
   operations, per the 2026-10-13 conversation: (1) founder opens the
