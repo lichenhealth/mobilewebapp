@@ -284,7 +284,11 @@
 .cmp__ai-note { font-size: 12.5px; color: var(--ink-muted); }
 
 /* ── Compact audiences (mockup 286-4961): chips don't scale past a handful
-     of memberships — grouped checkbox rows do. Full-row tap targets. ── */
+     of memberships — grouped checkbox rows do. Full-row tap targets.
+     The whole block folds behind a Where-shaped summary row since 2026-10-13
+     (founder: "audience is long enough now that it should be a carrot that
+     opens to a drop down") — the shut face names the current choice. ── */
+.cmp__aud-drop { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .cmp__aud-groups {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px 18px; margin: 6px 0 4px;

@@ -64,6 +64,10 @@ export default function Compose() {
     return new Set(a ? (a === 'marketplace' ? [a] : [a, 'marketplace']) : []);
   });
   const [whereOpen, setWhereOpen] = useState(false);
+  // The audience list outgrew the page (founder 2026-10-13: "audience is long
+  // enough now that it should be a carrot that opens to a drop down") — it
+  // folds behind a Where-shaped summary row whose shut face states the choice.
+  const [audOpen, setAudOpen] = useState(false);
 
   // Event details (when Where includes 'events'): the post gets a REAL
   // calendar event behind it — the RSVP container.
@@ -599,7 +603,7 @@ export default function Compose() {
 
   async function submit() {
     if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
-    if (!hasAudience) { setError('Pick at least one audience.'); return; }
+    if (!hasAudience) { setError('Pick at least one audience.'); setAudOpen(true); return; }
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
@@ -891,6 +895,23 @@ export default function Compose() {
       )}
 
       <label className="cmp__label">Audience</label>
+      <button className="cmp__input cmp__where-btn" onClick={() => setAudOpen((o) => !o)} aria-expanded={audOpen}>
+        {hasAudience ? (
+          <span className="cmp__where-sel">
+            {[
+              ...(isPublic ? ['Everyone'] : []),
+              ...(toMycelium ? ['My-celium'] : []),
+              ...mySpaces.filter((sp) => audienceSpaces.has(sp.id)).map((sp) => sp.name),
+            ].map((name) => (
+              <span key={name} className="cmp__where-tag">{name}</span>
+            ))}
+          </span>
+        ) : (
+          <span className="cmp__where-none">Nobody yet — pick an audience</span>
+        )}
+        <span className={'cmp__where-caret' + (audOpen ? ' is-open' : '')}><Icon name="chevron-right" size={14} /></span>
+      </button>
+      {audOpen && (<div className="cmp__aud-drop">
       <div className="cmp__chips">
         <button className={'cmp__chip' + (isPublic ? ' is-on' : '')} onClick={pickEveryone}>Everyone</button>
         <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')} onClick={toggleMycelium}>My-celium</button>
@@ -920,6 +941,7 @@ export default function Compose() {
             })}
         </div>
       )}
+      </div>)}
 
       {/* The choice point: a post is Social (a feed story) or Actionable
           (an exchange — it enters the Lichen Economy and rides the
