@@ -107,6 +107,9 @@ export default function AssistantFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actingReady, actor, thread]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // A thread id IS its brief's section key — general's brief is Home, the
+  // whole brain (founder 2026-10-13).
+  const sectionForThread = (t: string) => (t === 'general' ? 'home' : t);
   // Which sections hold real content (founder 2026-08-31): an icon goes gray
   // until the member has something IN that section — the AI-off gray, minus
   // the slash: "it isn't turned off, it's just not been enlivened with
@@ -213,6 +216,25 @@ export default function AssistantFeed() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+  // THE BRIEF IS THE BRAIN'S LANDING (founder 2026-10-13, the click audit:
+  // "Always a summary, then the gray line, then the list of old convos…
+  // one click from each flow"): a PLAIN arrival on a personal thread hands
+  // off to that section's brief — summary first, every conversation under
+  // the seam — so there is ONE subsection brain page, not two. The feed
+  // keeps what is really its own: open conversations (?convo=), a fresh
+  // one (convo=new), search digs (?search=1), the door errands (?ask=,
+  // ?build=1, ?page=1), space streams, and builder mode. The hat redirects
+  // (profile/currentcy → a space's room) still go first.
+  useEffect(() => {
+    if (!personal || builderMode) return;
+    if (convoParam || params.get('ask') || params.get('build') === '1' || params.get('page') === '1') return;
+    if (params.get('search') === '1' || searchOpen) return;
+    // Beings stay personal — only a SPACE hat rewrites these threads.
+    if ((thread === 'profile' || thread === 'currentcy') && (!actingReady || actor.type === 'space')) return;
+    const back = params.get('back');
+    navigate(`/assistant?section=${sectionForThread(thread)}${back ? `&back=${encodeURIComponent(back)}` : ''}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personal, builderMode, convoParam, thread, searchOpen, actingReady, actor, params]);
   const [q, setQ] = useState('');
   const [avatars, setAvatars] = useState<{ me?: string | null; claude?: string | null }>({});
   // Every thread's read cursor as of load — frozen, so opening one
@@ -646,12 +668,9 @@ export default function AssistantFeed() {
     next.set('convo', 'new');
     setParams(next);
   };
-  const openGeneralLog = () => {
-    const next = new URLSearchParams(params);
-    next.set('thread', 'general');
-    next.delete('convo');
-    setParams(next);
-  };
+  // The whole brain = the Home brief: summary + every conversation
+  // (founder 2026-10-13 — one click, never a bare log).
+  const openGeneralLog = () => navigate('/assistant?section=home');
   const openConvoRow = (c: (typeof convos)[number]) => {
     // A foreign-thread row (General's history log) opens IN its own
     // thread — the conversation lives where it was formed.
@@ -750,15 +769,11 @@ export default function AssistantFeed() {
             title={`${t.label} — ${t.blurb}`}
             aria-label={t.label}
             onClick={() => {
-              // A PUSH, never a replace (founder 2026-10-05: replace
-              // destroyed the history entry holding the thread you were
-              // just conversing in, so Back landed before the assistant
-              // entirely and the conversation read as deleted). Back now
-              // returns to the thread you left, words intact.
-              const next = new URLSearchParams(params);
-              next.set('thread', t.id);
-              next.delete('convo');   // a fresh thread opens on ITS view
-              setParams(next);
+              // Every brain door lands on that section's BRIEF now —
+              // summary, seam, conversations, one click (founder
+              // 2026-10-13). A PUSH, never a replace (2026-10-05): Back
+              // still returns to the conversation you left, words intact.
+              navigate(`/assistant?section=${sectionForThread(t.id)}`);
             }}
           >
             <Icon name={t.icon as IconName} size={16} />
@@ -1195,16 +1210,15 @@ export default function AssistantFeed() {
         </div>
       )}
 
-      {/* The way back to the list — only when there IS a list behind you,
-          and never in nav mode, where the list stands beside you. */}
-      {!listMode && !navMode && personal && openConvo && convos.length > 1 && (
-        <button className="afeed__convoback" onClick={() => {
-          const next = new URLSearchParams(params);
-          next.delete('convo');
-          setParams(next);
-          setAutoConvo(null);
-        }}>
-          ← All {threadLabel(thread)} conversations
+      {/* The way back to the BRAIN — the section's brief, summary + list,
+          one click (founder 2026-10-13); never in nav mode, where the list
+          stands beside you. */}
+      {!listMode && !navMode && personal && openConvo && (
+        <button
+          className="afeed__convoback"
+          onClick={() => navigate(`/assistant?section=${sectionForThread(thread)}`)}
+        >
+          ← {thread === 'general' ? 'Every conversation' : `All ${threadLabel(thread)} conversations`}
         </button>
       )}
 

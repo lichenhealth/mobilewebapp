@@ -138,6 +138,23 @@ export default function AssistantBrief() {
     currentcy: 'Current-cy',
   };
   const backName = BACK_NAMES[section];
+  // ONE CLICK BACK (founder 2026-10-13: "when I click back to Marketplace,
+  // it takes 2 clicks" — after rail hops, history-back replayed every hop):
+  // a section brief's ← Back goes DIRECTLY to its section's route, a named
+  // door, never navigate(-1). Unknown sections keep the history fallback.
+  const SECTION_ROUTES: Record<string, string> = {
+    home: '/home', market: '/market', events: '/events', courses: '/courses',
+    calendar: '/calendar', concierge: '/concierge', currentcy: '/currentcy',
+    chat: '/chat', maps: '/maps', saved: '/drive', profile: '/profile',
+    mycelium: '/mycelium', communities: '/communities', groups: '/groups',
+    organizations: '/organizations', places: '/places', search: '/search',
+    membership: '/membership',
+  };
+  // Only a PLAIN section brief takes the named route — a member/space/course
+  // briefing came from that entity's own page, and history is the honest way
+  // back there.
+  const backRoute = (!params.get('member') && !params.get('space') && !params.get('collection'))
+    ? SECTION_ROUTES[section] : undefined;
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
   // ?space=<id> — the briefing on one space (founder 2026-08-22): the brain
@@ -845,7 +862,10 @@ export default function AssistantBrief() {
       section === 'home' ? true
       : sectionTag ? g.sections.includes(sectionTag)
       : g.thread === feedThread || g.sections.includes(section);
-    return groups.filter(pertains).slice(0, 6);
+    // THE WHOLE LIST (founder 2026-10-13: "Always a summary, then the gray
+    // line, then the list of old convos" — the brief IS the section's brain
+    // landing now, so the six-row teaser cap is retired).
+    return groups.filter(pertains);
   }, [me, spaceParam, briefRaw, briefNames, section, sectionTag, feedThread]);
   // RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
   // easily, can we add that in here") — the feed list's exact grammar.
@@ -901,7 +921,10 @@ export default function AssistantBrief() {
           </span>
         </div>
       ) : (
-        <button className="cmp__back calp__backchip" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
+        <button
+          className="cmp__back calp__backchip"
+          onClick={() => (backTo ? navigate(backTo) : backRoute ? navigate(backRoute) : navigate(-1))}
+        >
           ← {backTo ? 'Back to manual mode' : backName ? `Back to ${backName}` : 'Back'}
         </button>
       )}
@@ -958,8 +981,14 @@ export default function AssistantBrief() {
             </button>
           </div>
           {/* THE SECTION RAIL (founder 2026-10-07: icons, where you are lit
-              peach, tapping the lit one steps OUT to the General log) —
-              wrapping to more rows instead of scrolling since 2026-10-12. */}
+              peach) — wrapping to more rows instead of scrolling since
+              2026-10-12. ONE CLICK EVERYWHERE (founder 2026-10-13, the click
+              audit: "when I toggle to the whole brain, it takes 2 clicks"):
+              every circle is one hop to that section's brain, and tapping
+              the LIT one steps up to the WHOLE brain — the Home brief, which
+              carries the summary + every conversation (the old step-out to
+              the bare feed log is retired; a log with no summary wasn't
+              "the entire brain"). On the whole brain the lit tap rests. */}
           <ScrollHintRow className="abrief__rail h-scroll" ariaLabel="Assistant sections">
             {railItems.map((it) => (
               <button
@@ -967,11 +996,13 @@ export default function AssistantBrief() {
                 type="button"
                 className={`abrief__rail-btn${it.section === section ? ' is-here' : ''}`}
                 aria-label={it.section === section
-                  ? `${it.label} — you're here; tap to open the General log`
+                  ? (section === 'home' ? `${it.label} — you're here` : `${it.label} — you're here; tap for the whole brain`)
                   : `Open the ${it.label} brain`}
                 title={it.label}
                 onClick={() => {
-                  if (it.section === section) navigate('/assistant/feed?thread=general');
+                  if (it.section === section) {
+                    if (section !== 'home') navigate(`/assistant?section=home${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`);
+                  }
                   else navigate(`/assistant?section=${it.section}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`);
                 }}
               >
@@ -1127,11 +1158,12 @@ export default function AssistantBrief() {
               </div>
             );
           })}
-          {/* The General log is one click away from every section's brain
-              (founder 2026-10-07) — the chronological everything-view. */}
+          {/* The WHOLE BRAIN is one click away from every section's brain
+              (founder 2026-10-13, the click audit) — the Home brief:
+              summary + every conversation, the same shape as here. */}
           {section !== 'home' && (
-            <button className="afeed__alllog" onClick={() => navigate('/assistant/feed?thread=general')}>
-              <span className="link-cue">See every conversation — the General log</span> ›
+            <button className="afeed__alllog" onClick={() => navigate('/assistant?section=home')}>
+              <span className="link-cue">See every conversation — the whole brain</span> ›
             </button>
           )}
         </div>
