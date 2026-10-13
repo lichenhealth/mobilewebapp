@@ -96,12 +96,28 @@ the WeavePitch template.
   the dollar came in through (donation, member account load, member gift).
   Enforcement stays at MINT (send only moves existing Current); any new
   money-in flow mints only after Stripe confirms the dollars landed.
-- **Banking (founder 2026-10-01):** a $10K donation arrived; the founder is
-  opening a NEW BANK ACCOUNT and moving it + other Lichen revenue there, so
-  that **Daniela can keep her clinical Lichen revenue separate**. (Likely
-  Mark's pledged $10K from the 2026-09-11 subsidy decisions — program-
-  restricted, 5% operating — confirm with the founder before recording it
-  as such or minting against it.) ⚠ PENDING: account opened, transfer done.
+- **Banking (founder 2026-10-01; READY TO EXECUTE 2026-10-13: "ready to
+  open up a bank account and transfer money to it so I can manage donations
+  and revenue via lichen separately from Daniela's accounting"):** a $10K
+  donation arrived; the founder is opening a NEW BANK ACCOUNT and moving it
+  + other Lichen revenue there, so that **Daniela's accounting stays
+  separate**. (Likely Mark's pledged $10K from the 2026-09-11 subsidy
+  decisions — program-restricted, 5% operating — confirm with the founder
+  before recording it as such or minting against it.) The order of
+  operations, per the 2026-10-13 conversation: (1) founder opens the
+  account at the bank — only she can be her (the standing third-party-config
+  "unless"); (2) founder adds it in the STRIPE DASHBOARD as the payout
+  destination and makes it default (Settings → Bank accounts and scheduling)
+  — bank numbers never pass through chat, so this stays hers too; Claude can
+  then VERIFY via the Stripe API which account payouts point at and report
+  before/after; (3) the initial transfer of held funds is money-irreversible
+  → founder executes, Claude reconciles after (the donations table + Stripe
+  balance vs. the new account is the check). Once live, every Stripe payout
+  (donations, loads, membership) lands in the Lichen account by default —
+  nothing in the webhook/minting code changes, payouts are downstream of
+  Stripe's balance. ⚠ PENDING: account opened, Stripe payout destination
+  switched, transfer done. Tell Eva once live — the clean cut date matters
+  for the books.
 - **Money-in flows under Current-cy (founder 2026-10-01 — ANSWERED, BUILT and
   ACTIVATED the same day on her "go ahead"; see CLAUDE.md's MONEY IN entry):**
   (1) **Operating share is an admin dial, 5–15%** (her call: "a toggle
