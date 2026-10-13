@@ -174,3 +174,8 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 .invite__remindbtn:hover { border-color: var(--peach); }
 .invite__remind-ok { color: var(--green-deep); }
 .invite__remind-err { color: var(--rust); flex-basis: 100%; }
+
+/* The arrival path (founder 2026-10-13): the inviter names what the person
+   is coming for — the chips reuse the gift-tier pill shape. */
+.invite__intent { margin-top: var(--s-4); }
+.invite__intent-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }

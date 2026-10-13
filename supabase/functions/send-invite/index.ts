@@ -42,7 +42,18 @@ const json = (body: unknown, status = 200) =>
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string, seat?: { spaceName: string; role: 'member' | 'admin' }, remind = false) {
+// INTENT-SHAPED INVITATIONS (founder 2026-10-13): practitioners and
+// concierge clients come by recommendation, so the invitation itself names
+// the path — the email says what's ready for them, the token carries it,
+// and Onboarding reads it back to shape itself.
+const INTENT_LINES: Record<string, string> = {
+  practitioner:
+    `You're invited as a care practitioner — coordinate each client's care with a care team woven around them, keep one care plan everyone can see, and open the door to subsidies for the clients who need them. Your Concierge dashboard is ready the moment you join.`,
+  client:
+    `You're invited into Lichen Concierge — a care team and a care plan woven around you. When you arrive, a gentle guided intake walks you through your Web of Wellbeing, the first step of your care.`,
+};
+
+function content(inviterName: string, note: string, giftTier: string, giftMonths: number | null, token: string | null, mission?: string, seat?: { spaceName: string; role: 'member' | 'admin' }, remind = false, intent?: string | null) {
   const signup = token ? `${APP_URL}/signup?invite=${token}` : `${APP_URL}/signup`;
   // A way to say no (founder 2026-08-17): closes the invitation, tells the
   // inviter quietly, and no reminder ever follows.
@@ -94,7 +105,11 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
         : `The moment you join, you'll also become a member of ${seat.spaceName}.`)
     : '';
 
-  const parts = [intro, missionText];
+  const intentLine = intent ? (INTENT_LINES[intent] ?? '') : '';
+
+  const parts = [intro];
+  if (intentLine) parts.push(intentLine);
+  parts.push(missionText);
   if (seatLine) parts.push(seatLine);
   if (note) parts.push(`They added a note:\n"${note}"`);
   if (giftLine) parts.push(giftLine);
@@ -109,6 +124,9 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
     ? missionText.split(/\n{2,}/).filter(Boolean).map((para) =>
         `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f">${esc(para)}</p>`).join('')
     : `<p style="font-size:15px;line-height:1.6;margin:0 0 20px;color:#4a463f"><strong>Thanks in advance</strong> for your (precious) time. The foundation of the <em>corrective</em> social network and healthcare system is built, much is still in development, and there will be bugs along the way. Come use the network as it grows — and if you feel called to help build it out, let Galyn know: members who want to give feedback are invited into the <strong>Alpha Tester group</strong>, where suggestions become features. We're grateful to be building it with you.</p>`;
+  const intentHtml = intentLine
+    ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;padding:12px 16px;background:#f6efe8;border-radius:12px;color:#2b2b28"><strong>${esc(intentLine)}</strong></p>`
+    : '';
   const seatHtml = seatLine
     ? `<p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#2b2b28"><strong>${esc(seatLine)}</strong></p>`
     : '';
@@ -126,6 +144,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
     <p style="font-size:22px;font-weight:600;margin:0 0 16px">Lichen</p>
     <p style="font-size:16px;line-height:1.5;margin:0 0 20px">${esc(intro)}</p>
+    ${intentHtml}
     ${missionHtml}
     ${seatHtml}
     ${noteHtml}
@@ -146,7 +165,7 @@ Deno.serve(async (req) => {
 
   if (!RESEND_API_KEY) return json({ error: 'Email is not configured yet (missing RESEND_API_KEY).' }, 500);
 
-  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string; forMinor?: boolean; remindToken?: string };
+  let body: { email?: string; inviterName?: string; note?: string; giftTier?: string; giftMonths?: number; mission?: string; space_id?: string; space_role?: string; forMinor?: boolean; remindToken?: string; intent?: string };
   try {
     body = await req.json();
   } catch {
@@ -166,9 +185,9 @@ Deno.serve(async (req) => {
     if (!sub) return json({ error: 'Sign in to send a reminder.' }, 401);
 
     const { data: inv } = await svc.from('invite_tokens')
-      .select('token, created_by, invitee_email, claimed_by, declined_at, created_at, reminded_at, remind_count, space_id, space_role')
+      .select('token, created_by, invitee_email, claimed_by, declined_at, created_at, reminded_at, remind_count, space_id, space_role, intent')
       .eq('token', String(body.remindToken)).maybeSingle();
-    const row = inv as { token: string; created_by: string; invitee_email: string | null; claimed_by: string | null; declined_at: string | null; created_at: string; reminded_at: string | null; remind_count: number | null; space_id: string | null; space_role: string | null } | null;
+    const row = inv as { token: string; created_by: string; invitee_email: string | null; claimed_by: string | null; declined_at: string | null; created_at: string; reminded_at: string | null; remind_count: number | null; space_id: string | null; space_role: string | null; intent: string | null } | null;
     if (!row || row.created_by !== sub) return json({ error: 'That invitation isn’t yours to remind.' }, 403);
     if (!row.invitee_email) return json({ error: 'This invitation went by text — send the reminder from your own Messages (the Text again button).' }, 400);
     if (row.claimed_by) return json({ error: 'They already joined — nothing to remind.' }, 400);
@@ -198,7 +217,7 @@ Deno.serve(async (req) => {
     if (gift?.tier) { giftTier = gift.tier; giftMonths = gift.months ?? null; }
 
     const inviterName = (body.inviterName ?? '').trim() || 'A friend on Lichen';
-    const { subject, text, html } = content(inviterName, '', giftTier, giftMonths, row.token, undefined, seat, true);
+    const { subject, text, html } = content(inviterName, '', giftTier, giftMonths, row.token, undefined, seat, true, row.intent);
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -225,6 +244,10 @@ Deno.serve(async (req) => {
   const giftTier = (body.giftTier ?? '').trim().toLowerCase();
   const giftMonths = Number.isFinite(body.giftMonths) && (body.giftMonths as number) > 0
     ? Math.round(body.giftMonths as number) : null;
+  // The arrival path (founder 2026-10-13) — validated against the three
+  // known intents; anything else rides as the generic invitation.
+  const intent = ['practitioner', 'client', 'community'].includes((body.intent ?? '').trim())
+    ? (body.intent as string).trim() : null;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return json({ error: 'A valid recipient email is required.' }, 400);
@@ -279,14 +302,14 @@ Deno.serve(async (req) => {
       // "setting this up for a young person" box used to reach only the
       // copy-link mint, never this emailed one (fixed 2026-09-21).
       const { data: tok } = await svc.from('invite_tokens')
-        .insert({ created_by: sub, invitee_email: email, ...(body.forMinor ? { for_minor: true } : {}), ...(seatCols ?? {}) })
+        .insert({ created_by: sub, invitee_email: email, ...(body.forMinor ? { for_minor: true } : {}), ...(seatCols ?? {}), ...(intent ? { intent } : {}) })
         .select('token').single();
       token = (tok as { token: string } | null)?.token ?? null;
     }
   } catch (e) { console.error('token mint:', e); }
 
   const mission = (body.mission ?? '').trim().slice(0, 2000);
-  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths, token, mission, seat);
+  const { subject, text, html } = content(inviterName, note, giftTier, giftMonths, token, mission, seat, false, intent);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
