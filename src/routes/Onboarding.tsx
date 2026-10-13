@@ -65,6 +65,14 @@ export default function Onboarding() {
   // Everything else on this page was already optional; the card says so.
   const [careAsks, setCareAsks] = useState<CareAsk[]>([]);
   const [careBusy, setCareBusy] = useState(false);
+  // INTENT-SHAPED ONBOARDING (founder 2026-10-13: "an optimized onboarding
+  // flow for practitioners… the same for those interested in community and
+  // those interested in concierge as a client"): the claimed invitation
+  // carries what this person came for, and the page shapes itself —
+  // practitioner and client arrivals fold the optional sections away and
+  // land on their work (the dashboard, the intake) instead of Home.
+  const [arrival, setArrival] = useState<'practitioner' | 'client' | 'community' | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate('/signup', { replace: true });
@@ -116,6 +124,24 @@ export default function Onboarding() {
         status: r.status,
       })));
     })();
+    return () => { live = false; };
+  }, [user]);
+
+  // Read the claimed invitation's intent. ⚠ A tokened signup's claim_invite
+  // is retried from App.tsx and can land a beat after this page mounts, so a
+  // null read retries a few times instead of deciding "generic" too early.
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    let tries = 0;
+    const read = async () => {
+      const { data } = await supabase.rpc('my_invite_intent');
+      if (!live) return;
+      const got = (data as string | null) ?? null;
+      if (got === 'practitioner' || got === 'client' || got === 'community') { setArrival(got); return; }
+      if (++tries < 4) window.setTimeout(read, 1500);
+    };
+    void read();
     return () => { live = false; };
   }, [user]);
 
@@ -189,6 +215,12 @@ export default function Onboarding() {
     const active = careAsks.filter((a) => a.status === 'active');
     if (active.length === 1) return `/concierge/client/${active[0].patientId}`;
     if (active.length > 1) return '/caregiver';
+    // The arrival path decides the first screen (founder 2026-10-13): a
+    // practitioner lands on the Provider dashboard with the add-your-first-
+    // client door; a Concierge client lands in the guided intake — the front
+    // door the subsidy policy names.
+    if (arrival === 'practitioner') return '/caregiver';
+    if (arrival === 'client') return '/concierge/intake';
     return '/home';
   }
 
@@ -278,6 +310,12 @@ export default function Onboarding() {
 
   const showServices = caps.includes('service_provider');
   const showGoods = caps.includes('goods_provider');
+  // Practitioner and client arrivals get a page that is MOSTLY the basics:
+  // the optional sections fold behind one quiet door (nothing is removed —
+  // every one of them lives in Profile afterwards anyway).
+  const practitioner = arrival === 'practitioner';
+  const clientArrival = arrival === 'client';
+  const folded = (practitioner || clientArrival) && !moreOpen;
 
   return (
     <div className="onb">
@@ -286,10 +324,38 @@ export default function Onboarding() {
           <div className="onb__logo"><LichenMark size={60} /></div>
           <h1 className="onb__title">Welcome to Lichen</h1>
           <p className="onb__sub">
-            You’re a member now. Start with the basics, then tell us how you’ll show up —
-            the rest is optional, and you can change it anytime.
+            {practitioner
+              ? 'You’re a member now. Add your name and what care you offer — your Concierge dashboard is ready on the other side.'
+              : clientArrival
+                ? 'You’re a member now. Add your name, and we’ll walk you into your care — everything else can wait.'
+                : 'You’re a member now. Start with the basics, then tell us how you’ll show up — the rest is optional, and you can change it anytime.'}
           </p>
         </header>
+
+        {/* The arrival card — says plainly what this invitation set up and
+            where Enter Lichen lands (founder 2026-10-13). A waiting care
+            invitation (below) already says the practitioner version. */}
+        {practitioner && careAsks.length === 0 && (
+          <section className="onb__section onb__care">
+            <h2 className="onb__h2">You&rsquo;re joining as a practitioner</h2>
+            <p className="onb__lead" style={{ marginBottom: 0 }}>
+              Your Concierge dashboard is ready. Add your name below, press
+              Enter Lichen, and you&rsquo;ll land where you can add your first
+              client and build a care team around them — with subsidies for
+              the clients who need them.
+            </p>
+          </section>
+        )}
+        {clientArrival && (
+          <section className="onb__section onb__care">
+            <h2 className="onb__h2">You&rsquo;re here for Concierge care</h2>
+            <p className="onb__lead" style={{ marginBottom: 0 }}>
+              Add your name below and press Enter Lichen — a gentle guided
+              intake walks you through your Web of Wellbeing, the first step
+              of your care. Your care team builds around what you share.
+            </p>
+          </section>
+        )}
 
         {/* THE PROVIDER FAST PATH (founder 2026-10-12): someone invited onto
             a care team leads with that ask — approve it here, add your name
@@ -406,8 +472,11 @@ export default function Onboarding() {
           </div>
         </section>
 
+        {/* A practitioner's services ARE their practice — that section stays
+            up front for them; a client arrival folds it with the rest. */}
+        {(!folded || practitioner) && (
         <section className="onb__section">
-          <h2 className="onb__h2">Do you offer any goods or services?</h2>
+          <h2 className="onb__h2">{practitioner ? 'What care do you offer?' : 'Do you offer any goods or services?'}</h2>
           <div className="onb__chips">
             {CAPS.map((c) => (
               <button
@@ -447,7 +516,9 @@ export default function Onboarding() {
             </div>
           )}
         </section>
+        )}
 
+        {!folded && (<>
         <section className="onb__section">
           <h2 className="onb__h2">Have something to offer right away?</h2>
           <p className="onb__lead">
@@ -499,6 +570,16 @@ export default function Onboarding() {
             </section>
           );
         })}
+        </>)}
+
+        {/* The folded door — nothing is removed, it all lives in Profile
+            afterwards too; this just keeps a shaped arrival to one screen. */}
+        {folded && (
+          <button type="button" className="onb__add onb__more" onClick={() => setMoreOpen(true)}>
+            + More ways to show up — {practitioner ? '' : 'goods & services, '}offerings,
+            organizations, communities, groups, places (all optional, all editable later)
+          </button>
+        )}
 
         {error && <p className="onb__error">{error}</p>}
 

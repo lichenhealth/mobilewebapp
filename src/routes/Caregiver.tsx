@@ -11,6 +11,8 @@ import {
   loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel, type OnCallCaregiver,
 } from '../lib/conciergeApi';
 import { loadMyAvailability, minToLabel, type AvailabilityWindow } from '../lib/calendarApi';
+import CareAddBox from '../components/CareAddBox';
+import { supabase } from '../lib/supabase';
 import './Caregiver.css';
 
 type CgTab = 'wow' | 'koc' | 'chat' | 'urgent' | 'clients';
@@ -48,6 +50,15 @@ export default function Caregiver() {
   // settings, the one editor (standing rule); this tab reads them back and
   // holds the door.
   const [myOnCall, setMyOnCall] = useState<AvailabilityWindow[]>([]);
+  // For the empty state's add-your-first-client box (the prepared care text
+  // speaks the inviter's name).
+  const [myName, setMyName] = useState('');
+
+  useEffect(() => {
+    if (!me) return;
+    void supabase.from('profiles').select('full_name').eq('id', me).maybeSingle()
+      .then(({ data }) => setMyName((data as { full_name: string | null } | null)?.full_name ?? ''));
+  }, [me]);
 
   useEffect(() => {
     if (!me) return;
@@ -184,17 +195,30 @@ export default function Caregiver() {
         </div>
       )}
 
+      {/* THE PRACTITIONER'S FIRST SCREEN (founder 2026-10-13: "concierge
+          dashboard only… subsidies for their clients and coordinate their
+          clients' care") — a new practitioner lands here with no clients, so
+          the empty state IS the add door: offer to care for someone, and the
+          moment they accept, their board appears in this list. */}
       {!loading && allowed && clients.length === 0 && (
         <div className="cg__empty">
           <Icon name="heart-line" size={20} />
           <p>No clients yet</p>
           <p className="cg__empty-sub">
-            When someone adds you to their care team (or you offer to care for them and they accept),
-            they'll appear here.
+            Add your first client below — search members by name, or invite
+            someone by email or phone. Care is consensual: they appear here
+            the moment they say yes.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/profile#care-for')}>
-            Manage who you care for
-          </button>
+          <div className="cg__empty-add">
+            <CareAddBox role="patient" me={me} myName={myName} onAdded={() => {}}
+              placeholder="A client’s name, email, or phone…" />
+          </div>
+          <p className="cg__empty-sub">
+            Pending offers wait under{' '}
+            <button type="button" className="cg__empty-link link-cue" onClick={() => navigate('/profile#care-for')}>
+              People you care for
+            </button>.
+          </p>
         </div>
       )}
 

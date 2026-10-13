@@ -131,3 +131,7 @@
 }
 .onb__care-who { flex: 1; min-width: 200px; font-size: 15px; line-height: 1.45; }
 .onb__care-yes { flex-shrink: 0; }
+
+/* The folded optional sections' door (intent-shaped arrivals, founder
+   2026-10-13) — the dashed add-row shape, allowed to wrap its longer words. */
+.onb__more { line-height: 1.45; text-align: center; white-space: normal; }

@@ -171,6 +171,10 @@ export default function AdminSupporters() {
   const phoneOk = !emailOk && phoneDigits.length >= 7 && phoneDigits.length <= 16 && !/[a-z@]/.test(cleanEmail);
   const [lookup, setLookup] = useState<{ email: string; member: boolean; name: string | null } | null>(null);
   const [mode, setMode] = useState<'invite' | 'gift'>('gift');
+  // The arrival path (founder 2026-10-13): the desk names what the person is
+  // coming for — practitioner / concierge client / community — the email says
+  // what's ready for them, and their onboarding shapes itself around it.
+  const [intent, setIntent] = useState<'community' | 'client' | 'practitioner'>('community');
   // A prepared phone invitation — one token per phone, texted from the
   // admin's own Messages (no SMS provider, deliberately — the Invite.tsx rule).
   const [text, setText] = useState<{ phone: string; href: string; message: string } | null>(null);
@@ -195,12 +199,17 @@ export default function AdminSupporters() {
     setBusy(true); setMsg(''); setError('');
     const stored = cleanEmail.replace(/[^\d+]/g, '');
     const { data, error: te } = await supabase.from('invite_tokens')
-      .insert({ created_by: user.id, invitee_phone: stored })
+      .insert({ created_by: user.id, invitee_phone: stored, ...(intent !== 'community' ? { intent } : {}) })
       .select('token').maybeSingle();
     setBusy(false);
     if (te) { setError(te.message); return; }
     const tok = (data as { token: string } | null)?.token;
-    const message = `${myName || 'A friend'} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup${tok ? `?invite=${tok}` : ''}`;
+    const link = `https://lichen.health/signup${tok ? `?invite=${tok}` : ''}`;
+    const message = intent === 'practitioner'
+      ? `${myName || 'A friend'} invited you to join Lichen as a care practitioner — coordinate each client's care with a care team around them, with subsidies for the clients who need them. Your Concierge dashboard is ready the moment you join: ${link}`
+      : intent === 'client'
+        ? `${myName || 'A friend'} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. Your first 3 months are on us. Join: ${link}`
+        : `${myName || 'A friend'} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: ${link}`;
     const href = `sms:${stored}?&body=${encodeURIComponent(message)}`;
     setText({ phone: email.trim(), href, message });
     setMsg('Their text is ready below — tap it to send from your Messages.');
@@ -231,8 +240,8 @@ export default function AdminSupporters() {
       }
       const { error: se } = await supabase.functions.invoke('send-invite', {
         body: giving
-          ? { email: em, inviterName: myName, giftTier: tier, giftMonths: months ?? undefined }
-          : { email: em, inviterName: myName },
+          ? { email: em, inviterName: myName, giftTier: tier, giftMonths: months ?? undefined, intent: intent !== 'community' ? intent : undefined }
+          : { email: em, inviterName: myName, intent: intent !== 'community' ? intent : undefined },
       });
       setBusy(false);
       if (se) {
@@ -246,7 +255,7 @@ export default function AdminSupporters() {
         ? `Invitation sent to ${em} — ${what} is waiting for them at signup.`
         : `Invitation sent to ${em}.`);
     }
-    setEmail(''); setMode('gift');
+    setEmail(''); setMode('gift'); setIntent('community');
     load();
   }
 
@@ -404,6 +413,24 @@ export default function AdminSupporters() {
           <p className="adminc__sub">
             <strong>{looked.name || looked.email}</strong> is already on Lichen 🌿 — gift them access below.
           </p>
+        )}
+        {/* The arrival path (founder 2026-10-13): practitioners and concierge
+            clients come by recommendation — the desk names the path, the
+            invitation says what's ready, onboarding shapes itself. */}
+        {(phoneOk || (looked && !looked.member)) && (
+          <div className="adminc__gift-tiers" role="radiogroup" aria-label="What are they coming for?">
+            {([
+              ['community', 'Community'],
+              ['client', 'Concierge care'],
+              ['practitioner', 'Practitioner'],
+            ] as const).map(([id, label]) => (
+              <button key={id} type="button" role="radio" aria-checked={intent === id}
+                className={'adminc__tier-btn' + (intent === id ? ' is-on' : '')}
+                onClick={() => setIntent(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
         )}
         {looked && !looked.member && (
           <div className="adminc__gift-tiers" role="radiogroup" aria-label="Invite or gift a membership">

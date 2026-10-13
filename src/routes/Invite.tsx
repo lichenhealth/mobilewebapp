@@ -186,6 +186,11 @@ export default function Invite() {
   // Setting up a young person's account (founder 2026-08-05): the token carries
   // guardianship, so you're holding it from the moment they sign in.
   const [forMinor, setForMinor] = useState(false);
+  // INTENT-SHAPED INVITATIONS (founder 2026-10-13: practitioners and
+  // concierge clients come by recommendation — the inviter names the path,
+  // the email says what's ready, the token carries it, and Onboarding shapes
+  // itself around it). Community is the default and stores nothing.
+  const [intent, setIntent] = useState<'community' | 'client' | 'practitioner'>('community');
   // Which knock the prefilled form belongs to, so it resolves on send.
   const [pendingKnock, setPendingKnock] = useState<{ id: string; email: string } | null>(null);
   // Personalising an invitation before it goes (founder 2026-08-06): the note
@@ -232,7 +237,12 @@ export default function Invite() {
 
   const inviteMessage = () => {
     const who = fullName.trim() || 'A friend';
-    const lead = `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
+    // The texted invitation names the path too (the emailed one already does).
+    const lead = intent === 'practitioner'
+      ? `${who} invited you to join Lichen as a care practitioner — coordinate each client's care with a care team around them, with subsidies for the clients who need them. Your Concierge dashboard is ready the moment you join: https://lichen.health/signup`
+      : intent === 'client'
+        ? `${who} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. Your first 3 months are on us. Join: https://lichen.health/signup`
+        : `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
     return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
   };
 
@@ -252,7 +262,7 @@ export default function Invite() {
     for (const p of phones) {
       const stored = p.replace(/[^\d+]/g, '');
       const { data } = await supabase.from('invite_tokens')
-        .insert({ created_by: user.id, invitee_phone: stored, ...(forMinor ? { for_minor: true } : {}) })
+        .insert({ created_by: user.id, invitee_phone: stored, ...(forMinor ? { for_minor: true } : {}), ...(intent !== 'community' ? { intent } : {}) })
         .select('token').maybeSingle();
       const tok = (data as { token: string } | null)?.token;
       const message = tok
@@ -269,7 +279,7 @@ export default function Invite() {
     let link = 'https://lichen.health/signup';
     if (user) {
       const { data } = await supabase.from('invite_tokens')
-        .insert({ created_by: user.id, ...(forMinor ? { for_minor: true } : {}) })
+        .insert({ created_by: user.id, ...(forMinor ? { for_minor: true } : {}), ...(intent !== 'community' ? { intent } : {}) })
         .select('token').maybeSingle();
       const tok = (data as { token: string } | null)?.token;
       if (tok) link = `https://lichen.health/signup?invite=${tok}`;
@@ -330,6 +340,7 @@ export default function Invite() {
         // Guardianship rides the emailed token too now (it used to reach
         // only the copy-link mint — the checkbox silently did nothing here).
         forMinor: forMinor || undefined,
+        intent: intent !== 'community' ? intent : undefined,
         giftTier: gifting ? giftTier : undefined,
         giftMonths: gifting ? giftMonths : undefined,
       },
@@ -454,6 +465,34 @@ export default function Invite() {
           maxLength={500}
           onChange={(e) => setNote(e.target.value)}
         />
+
+        {/* The arrival path (founder 2026-10-13): name what they're coming
+            for and the invitation says what's ready — a practitioner's
+            Concierge dashboard, a client's guided intake — and their
+            onboarding shapes itself around it. */}
+        <div className="invite__intent">
+          <p className="invite__label" style={{ marginBottom: 6 }}>What are they coming for?</p>
+          <div className="invite__intent-chips">
+            {([
+              ['community', 'Community', 'The whole network — the general welcome.'],
+              ['client', 'Concierge care', 'A care team around them — they land in the guided intake.'],
+              ['practitioner', 'Practitioner', 'They coordinate clients’ care — the Concierge dashboard leads.'],
+            ] as const).map(([id, label, hint]) => (
+              <button key={id} type="button" title={hint}
+                className={'invite__gift-tier' + (intent === id ? ' is-on' : '')}
+                onClick={() => setIntent(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="invite__hint" style={{ marginTop: 6 }}>
+            {intent === 'practitioner'
+              ? 'The invitation names the practitioner path — their dashboard for coordinating clients’ care, with subsidies for clients who need them.'
+              : intent === 'client'
+                ? 'The invitation welcomes them into Concierge — they’ll be walked through their Web of Wellbeing intake on arrival.'
+                : 'The standard welcome — care, offerings, events, places, the whole network.'}
+          </p>
+        </div>
 
         {/* Guardianship rides the invite (founder 2026-08-05). A young person
             doesn't sign themselves up — a grown-up sets the account up, and
