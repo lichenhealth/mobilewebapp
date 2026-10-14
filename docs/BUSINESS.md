@@ -143,10 +143,32 @@ the WeavePitch template.
   Bank" in Stripe IS the Relay account; Wells Fargo is gone from the list).
   The initial funds transfer from Wells Fargo was initiated the same day
   (ACH timing: 1–3 business days; push-from-WF recommended over a Relay
-  pull). ⚠ STILL PENDING: transfer lands → reconcile against the donations
-  table + Stripe balance; create the three sub-accounts (Operating ·
-  Subsidy fund · Current-cy float) + Eva's read-only login; tell Eva the
-  cut-over date — the clean cut matters for the books.
+  pull). **RECONCILIATION SNAPSHOT 2026-10-14** (DB via Management API +
+  Stripe via a nonce-gated temp edge fn, deleted + 404-verified after):
+  Stripe holds only **$5.00 available / $0 pending** — everything ever
+  collected has already been paid out, and EVERY payout to date (last
+  2026-10-08) went to the old Wells Fargo account, so the WF→Relay
+  transfer IS the whole move; nothing meaningful trails in via Stripe.
+  DB: donations table holds one $5.00 row (2026-07-21); currentcy_loads
+  $50.01 (the founder's $50 + the 1¢ activation test) — ⚡ in circulation
+  is backed by dollars now riding the WF→Relay transfer, float rule
+  intact; no pending loads. **Stripe history OUTSIDE the DB, for Eva**:
+  (1) a **$6,802.00 charge 2026-09-10 → $6,652.06 paid out 2026-09-14**
+  (net of fees, to WF) with NO donations-table row — it bypassed
+  donate-checkout (Payment-Link shape); ⚠ ASK THE FOUNDER/EVA whether
+  this is (part of) Mark's gift — if it's the program-restricted money,
+  the net $6,652.06 is what moves into the Subsidy sub-account (or gross
+  $6,802 with fees borne by operating — Eva's call); the pledged $10K may
+  instead have arrived off-Stripe (check/wire straight to WF), which this
+  reconciliation can't see. (2) Monthly **$99 + $29 subscriptions** since
+  June/July — the known marketing-site Payment-Link members outside the
+  subscriptions table. (3) Pre-platform 2024 charges ($500, $25). **The
+  first payout with a NEW destination id is the end-to-end proof Stripe→
+  Relay works** (all history shows one old destination id; the $5 balance
+  will ride the next auto payout). ⚠ STILL PENDING: WF transfer lands
+  (founder confirms the amount sent → close the loop); sub-accounts
+  (Operating · Subsidy fund · Current-cy float) + Eva's read-only login;
+  cut-over date to Eva.
 - **Money-in flows under Current-cy (founder 2026-10-01 — ANSWERED, BUILT and
   ACTIVATED the same day on her "go ahead"; see CLAUDE.md's MONEY IN entry):**
   (1) **Operating share is an admin dial, 5–15%** (her call: "a toggle
