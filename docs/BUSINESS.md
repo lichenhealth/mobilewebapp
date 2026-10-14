@@ -25,6 +25,12 @@ the WeavePitch template.
   Jan 2026) and the donation flow sends deductible tax receipts.
   ⚠ VERIFY with Eva (the accountant) before any deck states determination
   status/EIN specifics — the repo holds no filing paperwork.
+  **STATE-LEVEL FACTS CONFIRMED 2026-10-14** (CA Secretary of State
+  Certificate of Status No. 507949438, pulled for the Relay application):
+  **"Lichen Health", California Nonprofit Corporation — Public Benefit,
+  Entity No. 4613838, registered 07/03/2020, status Active.** This is the
+  state registration, not the IRS determination — the 501(c)(3) letter and
+  EIN still live with Eva.
 - "Being courted by a venture firm, but unclear if there is alignment"
   (founder's own deck outline, July 2026) — the no-investors posture is the
   story; any venture conversation is an exception the founder handles.
@@ -128,9 +134,19 @@ the WeavePitch template.
   balance vs. the new account is the check). Once live, every Stripe payout
   (donations, loads, membership) lands in the Lichen account by default —
   nothing in the webhook/minting code changes, payouts are downstream of
-  Stripe's balance. ⚠ PENDING: account opened, Stripe payout destination
-  switched, transfer done. Tell Eva once live — the clean cut date matters
-  for the books.
+  Stripe's balance. **EXECUTED 2026-10-14**: the Relay account was opened
+  and approved the same day (verified off the CA Certificate of Status;
+  Relay's full doc list wasn't needed), and the founder switched Stripe's
+  USD payout destination — Linked accounts now shows USD Default →
+  **THREAD BANK ••••5185 / routing 064209588** (Stripe names the bank by
+  routing-number lookup, and Relay accounts sit at Thread Bank, so "Thread
+  Bank" in Stripe IS the Relay account; Wells Fargo is gone from the list).
+  The initial funds transfer from Wells Fargo was initiated the same day
+  (ACH timing: 1–3 business days; push-from-WF recommended over a Relay
+  pull). ⚠ STILL PENDING: transfer lands → reconcile against the donations
+  table + Stripe balance; create the three sub-accounts (Operating ·
+  Subsidy fund · Current-cy float) + Eva's read-only login; tell Eva the
+  cut-over date — the clean cut matters for the books.
 - **Money-in flows under Current-cy (founder 2026-10-01 — ANSWERED, BUILT and
   ACTIVATED the same day on her "go ahead"; see CLAUDE.md's MONEY IN entry):**
   (1) **Operating share is an admin dial, 5–15%** (her call: "a toggle
