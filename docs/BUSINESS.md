@@ -153,16 +153,46 @@ the WeavePitch template.
   $50.01 (the founder's $50 + the 1¢ activation test) — ⚡ in circulation
   is backed by dollars now riding the WF→Relay transfer, float rule
   intact; no pending loads. **Stripe history OUTSIDE the DB, for Eva**:
-  (1) a **$6,802.00 charge 2026-09-10 → $6,652.06 paid out 2026-09-14**
-  (net of fees, to WF) with NO donations-table row — it bypassed
-  donate-checkout (Payment-Link shape); ⚠ ASK THE FOUNDER/EVA whether
-  this is (part of) Mark's gift — if it's the program-restricted money,
-  the net $6,652.06 is what moves into the Subsidy sub-account (or gross
-  $6,802 with fees borne by operating — Eva's call); the pledged $10K may
-  instead have arrived off-Stripe (check/wire straight to WF), which this
-  reconciliation can't see. (2) Monthly **$99 + $29 subscriptions** since
-  June/July — the known marketing-site Payment-Link members outside the
-  subscriptions table. (3) Pre-platform 2024 charges ($500, $25). **The
+  (1) **MARK'S GIFT, CONFIRMED BY THE FOUNDER 2026-10-14**: the
+  **$6,802.00 charge 2026-09-10 → $6,652.06 paid out 2026-09-14** (net of
+  Stripe fees, to WF) is Mark's program-restricted donation. It has NO
+  donations-table row (it bypassed donate-checkout — Payment-Link shape),
+  so the desk can't see or translate it until a row is backfilled —
+  offered to the founder, not yet done. The Subsidy sub-account gets the
+  net **$6,652.06** (or gross $6,802 with the $149.94 of fees borne by
+  operating — Eva's call). ⚠ The PLEDGE was $10K and Stripe shows $6,802
+  — the remainder either arrived off-Stripe (check/wire to WF, invisible
+  to this reconciliation) or is still to come; founder/Eva to confirm
+  against the WF statement before any deck or mint treats $10K as held.
+  (2) **THE $99 + $29 MONTHLY SUBSCRIPTIONS ARE THE FOUNDER PAYING
+  HERSELF** (confirmed 2026-10-14): both Stripe customers are Galyn's own
+  personal emails — Payment-Link self-billing from the old marketing
+  site, running since June/July, never linked to her platform account.
+  Her platform membership is ALREADY a gift row (concierge, source gift,
+  no end date) — the platform side was always right; only the orphaned
+  Stripe billing kept charging. She asked to stop paying: the two
+  subscriptions (sub_1ToodjBKK1zvOFIAF4SHBpg5 $99/mo ·
+  sub_1To7akBKK1zvOFIAfMbkTESS $29/mo) are PENDING CANCELLATION —
+  Claude's cancel call was permission-blocked as a real-world
+  transaction, so the founder cancels in the Stripe dashboard or approves
+  the retry; next bills land ~Oct 30 / Nov 2, cancel before then. Books
+  note for Eva: most non-Mark Stripe "revenue" to date is this
+  self-payment cycling, not outside income. **THE SUB-ACCOUNT TAXONOMY IS
+  THE FOUNDER'S** (2026-10-14: "use this account moving forward with 3
+  sections: operating costs, revenue and donations — put the 15% of
+  donations in operating costs manually for now"): Relay sub-accounts =
+  **Operating costs · Revenue · Donations** (superseding Claude's
+  suggested Operating/Subsidy/Float split), with the operating share
+  swept from Donations to Operating BY HAND for now — manual distribution
+  is already the doctrine. ⚠ Two sweep rules: each donation moves at ITS
+  OWN frozen rate (the rate the donor read, stamped on the row — the
+  desk's translate shows it; 15% only if the dial read 15 when they
+  gave), and MARK'S GIFT SWEEPS AT 5%, his program restriction, not the
+  dial. Advised, founder to decide: a fourth sub-account for the
+  CURRENT-CY FLOAT (dollars backing minted ⚡ are member balances, not
+  revenue or donations — only $50.01 today but the float rule wants them
+  visible as loads grow), and earmarking Mark's restricted money within
+  Donations. (3) Pre-platform 2024 charges ($500, $25). **The
   first payout with a NEW destination id is the end-to-end proof Stripe→
   Relay works** (all history shows one old destination id; the $5 balance
   will ride the next auto payout). ⚠ STILL PENDING: WF transfer lands
