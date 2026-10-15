@@ -12,6 +12,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPostsTimed, setSaved } from '../lib/savedApi';
+import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
 import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -95,6 +96,18 @@ export default function Saved() {
   const [newKind, setNewKind] = useState<'collection' | 'path'>('collection');
   const [folderAll, setFolderAll] = useState(false);
 
+  // POST DRAFTS (founder 2026-10-15: "we will also need a drafts section"):
+  // unfinished posts autosaved by Compose — a row reopens its draft, Delete
+  // confirms on the second tap. Drafts are private like everything here.
+  const [drafts, setDrafts] = useState<PostDraftRow[]>([]);
+  const [draftDel, setDraftDel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void listMyPostDrafts().then((rows) => { if (live) setDrafts(rows); });
+    return () => { live = false; };
+  }, [me]);
+
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [lens, setLens] = useState('All');
   // When each save happened — Drive's chronology sorts saves by the save.
@@ -172,6 +185,14 @@ export default function Saved() {
       .filter((c) => !q || c.name.toLowerCase().includes(q));
   }, [collections, query]);
   const folderShelf = folderAll || query ? foldersVisible : foldersVisible.slice(0, 8);
+
+  // Drafts answer the one search box too (title or body words).
+  const draftsVisible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return drafts.filter((d) => !q
+      || draftLabel(d.draft).toLowerCase().includes(q)
+      || String((d.draft as { body?: string }).body ?? '').toLowerCase().includes(q));
+  }, [drafts, query]);
 
   /** The drive time: your own pieces by creation, saves by the save. */
   const driveTime = (p: FeedPost) =>
@@ -431,6 +452,51 @@ export default function Saved() {
           />
           <button onClick={() => void makeFolder()} disabled={!newFolderName.trim()}>Create</button>
         </span>
+      )}
+
+      {/* ── DRAFTS — unfinished posts Compose autosaved (founder 2026-10-15:
+          "we will also need a drafts section"). A row reopens its draft in
+          the composer; Delete asks twice, inline. Nothing here is visible
+          to anyone else — and no assistant reads a draft, ever. ── */}
+      {me && ready && draftsVisible.length > 0 && (
+        <section className="drive__drafts">
+          <p className="drive__eyebrow">
+            Drafts
+            <span className="drive__count">{draftsVisible.length}</span>
+          </p>
+          {draftsVisible.map((d) => {
+            const dAreas = Array.isArray((d.draft as { areas?: string[] }).areas)
+              ? ((d.draft as { areas?: string[] }).areas as ServiceArea[]) : [];
+            return (
+              <div key={d.id} className="drive__row" role="button" tabIndex={0}
+                onClick={() => navigate(`/compose?draft=${d.id}`)}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/compose?draft=${d.id}`); }}>
+                <span className="drive__row-icon">
+                  <Icon name={(dAreas.length ? serviceAreaIcon(dAreas[0]) : null) ?? 'newsfeed'} size={16} />
+                </span>
+                <span className="drive__row-main">
+                  <span className="drive__row-title">{draftLabel(d.draft)}</span>
+                  <span className="drive__row-meta">Draft · saved {shortDate(d.updated_at)}</span>
+                </span>
+                <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="drive__draft-del"
+                    onClick={() => {
+                      if (draftDel !== d.id) { setDraftDel(d.id); return; }
+                      void deletePostDraft(d.id).then(() => {
+                        setDrafts((cur) => cur.filter((x) => x.id !== d.id));
+                        setDraftDel(null);
+                      });
+                    }}
+                    onBlur={() => setDraftDel((cur) => (cur === d.id ? null : cur))}
+                  >
+                    {draftDel === d.id ? 'Really delete?' : 'Delete'}
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </section>
       )}
 
       {/* ── ITEMS — compact rows by default, the old cards a tap away. ── */}

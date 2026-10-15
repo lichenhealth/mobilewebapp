@@ -128,6 +128,16 @@
 }
 
 .cmp__post { margin-top: var(--s-5); width: 100%; }
+/* SAVE AND POST (founder 2026-10-15): the deliberate save beside the post —
+   Post keeps the weight (primary, the wide one), Save sits quiet beside it. */
+.cmp__footrow { display: flex; gap: var(--s-3); margin-top: var(--s-5); }
+.cmp__footrow .cmp__post { margin-top: 0; flex: 1; width: auto; }
+.cmp__savedraft { flex: 0 0 auto; }
+.cmp__draftnote { margin-top: var(--s-2); font-size: 13px; color: var(--ink-soft); }
+.cmp__draftlink {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; color: var(--ink);
+}
 
 /* Posting-as banner */
 .cmp__acting {
