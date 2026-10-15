@@ -205,6 +205,20 @@ export default function Home() {
             return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
           return it;
         })}
+        // The full rooms stay one tap away while filtering (the lenses used
+        // to BE the doors — never strand someone outside Marketplace). They
+        // ride the TOOLS row since 2026-10-15 (founder markup: below the
+        // filter band "it looks weird having the cta down there, maybe up by
+        // the search and plus bars" — same placement at every width).
+        trailing={areaSel.size > 0 && (
+          <span className="lensdoors lensdoors--tools">
+            {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
+              <button key={l.area} className="lensdoor" onClick={() => navigate(l.room)}>
+                <span className="link-cue">Open {l.label}</span> ›
+              </button>
+            ))}
+          </span>
+        )}
       />
       {/* Feed = ALL; the sections light as multi-select lenses on the river
           (founder 2026-10-12). Members stays a DOOR — people aren't posts,
@@ -235,18 +249,6 @@ export default function Home() {
 
       {/* The lit section owns the band beneath it. */}
       <FilterRow options={FILTERS} value={tab} onChange={setTab} />
-
-      {/* The full rooms stay one tap away while filtering (the lenses used
-          to BE the doors — never strand someone outside Marketplace). */}
-      {areaSel.size > 0 && (
-        <p className="lensdoors">
-          {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
-            <button key={l.area} className="lensdoor" onClick={() => navigate(l.room)}>
-              <span className="link-cue">Open {l.label}</span> ›
-            </button>
-          ))}
-        </p>
-      )}
 
       <section className="home__greeting">
         <h1 className="home__title">
