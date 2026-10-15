@@ -53,7 +53,9 @@ const CHIP_MODES: Record<Chip, Mode[]> = {
   lend: ['lend', 'borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
 };
 const MODES: { chip: Chip; label: string; icon: IconName }[] = [
-  { chip: 'gift',       label: 'Gift',        icon: 'heart-line' },
+  // The gift manner wears the PRESENT since 2026-10-15 (founder: "the present
+  // next to the 'gift' text") — one mark per manner, lens chip and tile alike.
+  { chip: 'gift',       label: 'Gift',        icon: 'gift' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
   { chip: 'lend',       label: 'Lending',     icon: 'lend' },
@@ -64,7 +66,7 @@ const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 
 const ALL_MODES: Mode[] = ['gift', 'trade', 'rent', 'lend', 'borrow', 'sale', 'sliding', 'iso'];
 const MODE_ICON: Record<Mode, IconName> = {
-  gift: 'heart-line', trade: 'trade', rent: 'rent', lend: 'lend',
+  gift: 'gift', trade: 'trade', rent: 'rent', lend: 'lend',
   borrow: 'repeat', sale: 'dollar', sliding: 'dollar', iso: 'search',
 };
 /** Every mode a listing carries — multi-mode offers match EVERY door they
