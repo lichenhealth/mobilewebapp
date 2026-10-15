@@ -108,6 +108,24 @@
   border-radius: var(--r-full); background: var(--peach-deep); color: #fff;
   font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
 }
+/* DRAG TO RE-ARRANGE (founder 2026-10-15, second pass). pan-y keeps a tile an
+   honest part of the page's scroll until the long-press arms the drag; the
+   no-select pair stops a mouse drag from painting a text selection across the
+   composer. ⚠ overflow:hidden lives on the TILE, so the lifted look is border
+   + shadow, not a transform that would clip. */
+.cmp__attached-item--drag {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.cmp__attached-item.is-dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+  border-color: var(--peach-deep);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  z-index: 2;
+}
 
 .cmp__post { margin-top: var(--s-5); width: 100%; }
 
