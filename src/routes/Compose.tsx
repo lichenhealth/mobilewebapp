@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -620,8 +620,10 @@ export default function Compose() {
   }
 
   // Re-arrange attachments (founder 2026-10-15: "re-arrange the order of my
-  // photos, video and audio") — arrows, not drag: reliable on phones, and the
-  // first slot is the COVER cards and tiles lead with.
+  // photos, video and audio") — the first slot is the COVER cards and tiles
+  // lead with. The arrows are the quiet FALLBACK since the same day's second
+  // pass ("I would prefer to be able to drag to re-arrange"): drag is the
+  // primary gesture, below.
   function moveMedia(i: number, dir: -1 | 1) {
     setMedia((m) => {
       const j = i + dir;
@@ -631,6 +633,76 @@ export default function Compose() {
       return next;
     });
   }
+
+  // DRAG TO RE-ARRANGE (founder 2026-10-15, second pass). Pointer events, one
+  // engine for mouse and touch: a mouse drags after a 6px threshold; a finger
+  // long-presses (~220ms) then drags — movement BEFORE the timer fires means
+  // the person is scrolling, so the arm stands down (the KOC pointercancel
+  // posture). While a drag is live, the container's non-passive touchmove
+  // preventDefault keeps the page still under the finger. The dragged tile is
+  // tracked by URL, never index — tile keys are the media URLs, so the node
+  // (and its pointer capture) survives each live re-splice of the array.
+  const attachedRef = useRef<HTMLDivElement>(null);
+  const dragArm = useRef<{ x: number; y: number; url: string; touch: boolean; timer: number | null } | null>(null);
+  const dragUrlRef = useRef<string | null>(null);
+  const [dragUrl, setDragUrl] = useState<string | null>(null);
+  function beginDrag(url: string) {
+    dragUrlRef.current = url;
+    setDragUrl(url);
+  }
+  function endDrag() {
+    const arm = dragArm.current;
+    if (arm?.timer != null) window.clearTimeout(arm.timer);
+    dragArm.current = null;
+    dragUrlRef.current = null;
+    setDragUrl(null);
+  }
+  function dragPointerDown(e: ReactPointerEvent<HTMLDivElement>, url: string) {
+    if (media.length < 2) return;
+    // The ×, the arrows: their tap is theirs — never the start of a drag.
+    if ((e.target as HTMLElement).closest('button')) return;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+    const touch = e.pointerType !== 'mouse';
+    const arm: NonNullable<typeof dragArm.current> = { x: e.clientX, y: e.clientY, url, touch, timer: null };
+    if (touch) arm.timer = window.setTimeout(() => { if (dragArm.current === arm) beginDrag(url); }, 220);
+    dragArm.current = arm;
+  }
+  function dragPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const arm = dragArm.current;
+    if (!arm) return;
+    if (!dragUrlRef.current) {
+      const dist = Math.hypot(e.clientX - arm.x, e.clientY - arm.y);
+      if (arm.touch) { if (dist > 10) endDrag(); }       // scrolling, not dragging
+      else if (dist > 6) beginDrag(arm.url);
+      return;
+    }
+    // Live reorder: the tile under the pointer yields its slot.
+    const host = attachedRef.current;
+    if (!host) return;
+    const tiles = Array.from(host.querySelectorAll<HTMLElement>('.cmp__attached-item'));
+    const over = tiles.findIndex((t) => {
+      const r = t.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if (over < 0) return;
+    setMedia((m) => {
+      const from = m.findIndex((x) => x.url === dragUrlRef.current);
+      if (from < 0 || over >= m.length || over === from) return m;
+      const next = [...m];
+      const [it] = next.splice(from, 1);
+      next.splice(over, 0, it);
+      return next;
+    });
+  }
+  // Non-passive: React's onTouchMove can't preventDefault a scroll. Rebinds
+  // when the attachments strip mounts/unmounts (it only renders with media).
+  useEffect(() => {
+    const el = attachedRef.current;
+    if (!el) return;
+    const block = (e: TouchEvent) => { if (dragUrlRef.current) e.preventDefault(); };
+    el.addEventListener('touchmove', block, { passive: false });
+    return () => el.removeEventListener('touchmove', block);
+  }, [media.length]);
 
   const canPost = !!(body.trim() || title.trim() || media.length > 0);
 
@@ -1155,10 +1227,20 @@ export default function Compose() {
 
       {uploading && <p className="cmp__uploading">Uploading…</p>}
       {media.length > 0 && (
-        <div className="cmp__attached">
+        <div className="cmp__attached" ref={attachedRef}>
           {media.map((m, i) => (
-            <div key={m.url} className="cmp__attached-item">
-              {m.type === 'photo' && <img src={m.url} alt="attachment" />}
+            <div
+              key={m.url}
+              className={'cmp__attached-item'
+                + (media.length > 1 ? ' cmp__attached-item--drag' : '')
+                + (dragUrl === m.url ? ' is-dragging' : '')}
+              onPointerDown={(e) => dragPointerDown(e, m.url)}
+              onPointerMove={dragPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onDragStart={(e) => e.preventDefault()}
+            >
+              {m.type === 'photo' && <img src={m.url} alt="attachment" draggable={false} />}
               {m.type === 'video' && <video src={m.url} muted />}
               {m.type === 'audio' && <span className="cmp__attached-audio"><Icon name="mic" size={14} /> Audio clip</span>}
               <button className="cmp__attached-remove" onClick={() => removeMedia(i)} aria-label="Remove">×</button>
