@@ -92,6 +92,22 @@
   border-radius: var(--r-full); background: rgba(0,0,0,0.55); color: #fff;
   font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
 }
+/* Re-arrange attachments (founder 2026-10-15) — ‹ › at the foot of each
+   tile; the first slot wears "Cover" so the order's meaning is visible. */
+.cmp__attached-order {
+  position: absolute; bottom: 2px; right: 2px; display: flex; gap: 2px;
+}
+.cmp__attached-order button {
+  width: 20px; height: 20px; border-radius: var(--r-full);
+  background: rgba(0,0,0,0.55); color: #fff; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.cmp__attached-order button:disabled { opacity: 0.35; }
+.cmp__attached-covertag {
+  position: absolute; bottom: 2px; left: 2px; padding: 1px 6px;
+  border-radius: var(--r-full); background: var(--peach-deep); color: #fff;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+}
 
 .cmp__post { margin-top: var(--s-5); width: 100%; }
 

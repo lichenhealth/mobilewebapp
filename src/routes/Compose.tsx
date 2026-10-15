@@ -619,6 +619,19 @@ export default function Compose() {
     setMedia((m) => m.filter((_, idx) => idx !== i));
   }
 
+  // Re-arrange attachments (founder 2026-10-15: "re-arrange the order of my
+  // photos, video and audio") — arrows, not drag: reliable on phones, and the
+  // first slot is the COVER cards and tiles lead with.
+  function moveMedia(i: number, dir: -1 | 1) {
+    setMedia((m) => {
+      const j = i + dir;
+      if (j < 0 || j >= m.length) return m;
+      const next = [...m];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+
   const canPost = !!(body.trim() || title.trim() || media.length > 0);
 
   async function submit() {
@@ -1144,11 +1157,18 @@ export default function Compose() {
       {media.length > 0 && (
         <div className="cmp__attached">
           {media.map((m, i) => (
-            <div key={i} className="cmp__attached-item">
+            <div key={m.url} className="cmp__attached-item">
               {m.type === 'photo' && <img src={m.url} alt="attachment" />}
               {m.type === 'video' && <video src={m.url} muted />}
               {m.type === 'audio' && <span className="cmp__attached-audio"><Icon name="mic" size={14} /> Audio clip</span>}
               <button className="cmp__attached-remove" onClick={() => removeMedia(i)} aria-label="Remove">×</button>
+              {media.length > 1 && i === 0 && <span className="cmp__attached-covertag">Cover</span>}
+              {media.length > 1 && (
+                <div className="cmp__attached-order">
+                  <button onClick={() => moveMedia(i, -1)} disabled={i === 0} aria-label="Move earlier">‹</button>
+                  <button onClick={() => moveMedia(i, 1)} disabled={i === media.length - 1} aria-label="Move later">›</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
