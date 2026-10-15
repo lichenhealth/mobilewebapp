@@ -11,6 +11,9 @@ export type Category = {
    *  place — ignorable if you're not a healer — everyday commerce in the
    *  other. Absent pre-migration → flat list. */
   section?: 'healing' | 'everyday' | null;
+  /** Hierarchy (founder 2026-10-15: "clothing > shirts, clothing > shoes") —
+   *  a child nests under its parent in the list; null/absent = a root. */
+  parent_id?: string | null;
 };
 
 type Pending = { id: string; name: string };
@@ -111,9 +114,24 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
     () => categories.filter((c) => c.domain === domain).sort((a, b) => a.name.localeCompare(b.name)),
     [categories, domain],
   );
-  const filtered = useMemo(() => {
+  // The list is hierarchy-aware (founder 2026-10-15): roots in order, each
+  // followed by its indented children. Searching keeps families honest — a
+  // matching child surfaces WITH its parent for context, and a matching
+  // parent shows its whole tree.
+  type Row = { c: Category; child?: boolean };
+  const rows = useMemo<Row[]>(() => {
     const q = query.trim().toLowerCase();
-    return q ? pool.filter((c) => c.name.toLowerCase().includes(q)) : pool;
+    const hit = (c: Category) => c.name.toLowerCase().includes(q);
+    const kidsOf = (id: string) => pool.filter((c) => c.parent_id === id);
+    const out: Row[] = [];
+    for (const r of pool.filter((c) => !c.parent_id)) {
+      const kids = kidsOf(r.id);
+      if (!q) { out.push({ c: r }, ...kids.map((k) => ({ c: k, child: true }))); continue; }
+      const kidHits = kids.filter(hit);
+      if (hit(r)) out.push({ c: r }, ...kids.map((k) => ({ c: k, child: true })));
+      else if (kidHits.length) out.push({ c: r }, ...kidHits.map((k) => ({ c: k, child: true })));
+    }
+    return out;
   }, [pool, query]);
 
   const selectedSet = new Set(selected);
@@ -217,15 +235,15 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
             autoFocus
           />
           <div className="cat__list">
-            {filtered.length === 0 && <p className="cat__empty">No matches.</p>}
+            {rows.length === 0 && <p className="cat__empty">No matches.</p>}
             {(() => {
-              const row = (c: Category) => {
+              const row = ({ c, child }: Row) => {
                 const on = selectedSet.has(c.id);
                 return (
                   <button
                     key={c.id}
                     type="button"
-                    className={'cat__item' + (on ? ' is-on' : '')}
+                    className={'cat__item' + (on ? ' is-on' : '') + (child ? ' cat__item--child' : '')}
                     onClick={() => toggle(c.id)}
                   >
                     <span className="cat__box">{on ? '\u2713' : ''}</span>
@@ -233,9 +251,10 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
                   </button>
                 );
               };
-              const everyday = filtered.filter((c) => (c.section ?? 'everyday') !== 'healing');
-              const healing = filtered.filter((c) => c.section === 'healing');
-              if (!everyday.length || !healing.length) return filtered.map(row);
+              // Children ride their ROOT's section \u2014 the split groups families whole.
+              const everyday = rows.filter((r) => ((r.child ? pool.find((p) => p.id === r.c.parent_id) : r.c)?.section ?? 'everyday') !== 'healing');
+              const healing = rows.filter((r) => ((r.child ? pool.find((p) => p.id === r.c.parent_id) : r.c)?.section ?? 'everyday') === 'healing');
+              if (!everyday.length || !healing.length) return rows.map(row);
               return (
                 <>
                   <p className="cat__section">Commerce</p>

@@ -130,3 +130,11 @@
   border-top: 1px solid var(--bone-edge-soft);
 }
 .cat__section:first-child { border-top: 0; margin-top: 2px; }
+
+/* A child category nests under its parent (founder 2026-10-15:
+   "clothing > shirts, clothing > shoes, clothing > dresses"). */
+.cat__item--child {
+  padding-left: 26px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
