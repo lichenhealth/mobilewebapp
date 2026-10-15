@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { ScrollHintRow } from './ScrollHintRow';
@@ -28,9 +29,13 @@ interface IconRowProps {
    *  UI), and each needs its own spacing. */
   className?: string;
   ariaLabel?: string;
+  /** Rendered after the circles, on the same line (wrapping with the row) —
+   *  the lit lenses' "Open «Section» ›" doors ride the TOOLS row here
+   *  (founder 2026-10-15 markup: "maybe up by the search and plus bars"). */
+  trailing?: ReactNode;
 }
 
-export default function IconRow({ items, onSelect, className, ariaLabel }: IconRowProps) {
+export default function IconRow({ items, onSelect, className, ariaLabel, trailing }: IconRowProps) {
   const navigate = useNavigate();
   return (
     <ScrollHintRow className={'icon-row h-scroll' + (className ? ' ' + className : '')} role="toolbar" ariaLabel={ariaLabel ?? 'Categories'} gutter>
@@ -55,6 +60,7 @@ export default function IconRow({ items, onSelect, className, ariaLabel }: IconR
         );
         return nodes;
       })}
+      {trailing}
     </ScrollHintRow>
   );
 }

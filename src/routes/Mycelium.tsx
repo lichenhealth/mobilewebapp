@@ -184,6 +184,19 @@ export default function Mycelium() {
             return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
           return it;
         })}
+        // The full rooms stay one tap away — inside your web (?web=1). The
+        // doors ride the TOOLS row since 2026-10-15 (founder markup: the CTA
+        // below the filter band "looks weird... maybe up by the search and
+        // plus bars" — same placement at every width).
+        trailing={areaSel.size > 0 && (
+          <span className="lensdoors lensdoors--tools">
+            {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
+              <button key={l.area} className="lensdoor" onClick={() => navigate(`${l.room}?web=1`)}>
+                <span className="link-cue">Open {l.label}</span> ›
+              </button>
+            ))}
+          </span>
+        )}
       />
       <IconRow
         className="icon-row--lenses"
@@ -211,17 +224,6 @@ export default function Mycelium() {
 
       {/* The lit section owns the band beneath it. */}
       <FilterRow options={FILTERS} value={tab} onChange={setTab} />
-
-      {/* The full rooms stay one tap away — inside your web (?web=1). */}
-      {areaSel.size > 0 && (
-        <p className="lensdoors">
-          {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
-            <button key={l.area} className="lensdoor" onClick={() => navigate(`${l.room}?web=1`)}>
-              <span className="link-cue">Open {l.label}</span> ›
-            </button>
-          ))}
-        </p>
-      )}
 
       <p className="myc__count">
         <span className="myc__count-n">{visible.length}</span>{' '}

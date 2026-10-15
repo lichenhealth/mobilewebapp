@@ -88,8 +88,12 @@
 
 /* THE WAY INTO THE FULL ROOMS while lenses filter the feed (founder
    2026-10-12 — the lenses used to BE the doors; never strand someone
-   outside Marketplace): quiet worded links under the lens rows. */
+   outside Marketplace). Since 2026-10-15 they ride the TOOLS ROW's open
+   right side (founder markup: below the filter band the CTA "looks weird…
+   maybe up by the search and plus bars" — same placement at every width),
+   as one wrapping flex item beside the brain. */
 .lensdoors { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 2px 0 6px; }
+.lensdoors--tools { margin: 0 0 0 12px; align-items: center; min-height: 34px; }
 .lensdoor {
   background: none; border: none; padding: 0; cursor: pointer;
   font-family: inherit; font-size: 13.5px; color: var(--ink);
