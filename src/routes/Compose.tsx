@@ -1529,13 +1529,16 @@ export default function Compose() {
             {tagsOpen && (allCats === null ? (
               <p className="cmp__hint-ev">Loading categories…</p>
             ) : (
+              // userId arms the picker's own suggest-a-new-one flow (founder
+              // 2026-10-15: "suggest it straight from my post") — same admin
+              // queue, same bell-when-decided receipt.
               <div className="cmp__tags-pickers">
                 <CategoryPicker domain="good" categories={allCats} selected={catTags}
-                  onChange={setCatTags} />
+                  onChange={setCatTags} userId={user?.id} />
                 <CategoryPicker domain="service" categories={allCats} selected={catTags}
-                  onChange={setCatTags} />
+                  onChange={setCatTags} userId={user?.id} />
                 <CategoryPicker domain="place" categories={allCats} selected={catTags}
-                  onChange={setCatTags} />
+                  onChange={setCatTags} userId={user?.id} />
               </div>
             ))}
           </>)}
