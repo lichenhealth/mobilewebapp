@@ -1407,6 +1407,20 @@ export default function AssistantFeed() {
                       </button>
                     </div>
                   ))}
+                {/* A DRAFTED POST (founder 2026-10-15: "draft, post and edit
+                    posts for me"): the assistant wrote it into their drafts;
+                    this button opens it in the composer, where THEIR tap on
+                    Post is what publishes — the page-builder Publish grammar. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'post_draft' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:draft:${a.id}`}>
+                      <button className="afeed__pubbtn" type="button"
+                        onClick={() => navigate(`/compose?draft=${a.id}`)}>
+                        Review &amp; post “{a.title}” →
+                      </button>
+                    </div>
+                  ))}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'space_thread' || a.type === 'space_consent' ? [a] : []))
                   .map((a) => (

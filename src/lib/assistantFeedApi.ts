@@ -16,6 +16,10 @@ export type FeedAttachment =
   // reply hands a real in-app door — path composed server-side from a
   // fixed table, never model-written.
   | { type: 'app_link'; path: string; label: string }
+  /** A post the assistant DRAFTED on the member's word (founder 2026-10-15:
+   *  "it should be able to draft, post and edit posts for me") — the button
+   *  opens the draft in the composer, where THEIR tap on Post publishes. */
+  | { type: 'post_draft'; id: string; title: string }
   /** The consent offer (same message: "would you like to switch that
    *  permission? Then link to letting them do that to turn it on") — the
    *  PERSON taps to re-enable; the model never arms anything. `which` names
