@@ -11,6 +11,7 @@ import {
 } from '../lib/postsApi';
 import { uploadVideo, listMyReadyVideos, videoPublicUrl, type ReadyVideo } from '../lib/videoApi';
 import { setSaved } from '../lib/savedApi';
+import { savePostDraft, deletePostDraft, loadPostDraft, listMyPostDrafts } from '../lib/postDraftsApi';
 import { listMyCollections, createCollection, addToCollection, loadCollection, type CollectionRow } from '../lib/collectionsApi';
 import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
@@ -282,7 +283,9 @@ export default function Compose() {
   // OFF, and a DB trigger enforces it on every collection_items insert.
   const [weaveable, setWeaveable] = useState(true);
   useEffect(() => {
-    if (!user || editPostId) return;   // edits prefill from the post itself
+    // Edits prefill from the post itself; a reopened DRAFT is already the
+    // member's own choices, so the profile defaults stand down there too.
+    if (!user || editPostId || params.get('draft')) return;
     let live = true;
     void supabase.from('profiles')
       .select('content_ai_default, content_download_default, weaveable_default')
@@ -310,6 +313,155 @@ export default function Compose() {
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionParam, editPostId]);
+
+  // POST DRAFTS (founder 2026-10-15: "can we have posts auto save and have a
+  // save AND post button at the bottom, not just post, so we will also need
+  // a drafts section"): everything typed into a NEW post autosaves into
+  // post_drafts on the page_drafts idiom — 1.2s debounce, immediate flush on
+  // tab-hide/pagehide, an empty draft DELETES its row (gated on hadDraft so
+  // a failed read never destroys a real row), posting deletes it, and the
+  // Drive's Drafts section reopens one via ?draft=<id>. The row id is minted
+  // client-side so one compose session keeps upserting one row; edits
+  // (?post=) are out of scope — the live post holds their words. ⚠ Like
+  // wow_intake_drafts, NO assistant path may ever read post_drafts.
+  const draftParam = params.get('draft');
+  const draftIdRef = useRef<string>(draftParam ?? crypto.randomUUID());
+  const hadDraft = useRef(false);
+  const postedRef = useRef(false);        // the WowIntake `finished` lesson
+  const touchedRef = useRef(false);
+  const baselineRef = useRef<string | null>(null);
+  const hydratedRef = useRef(!draftParam);
+  const [draftNote, setDraftNote] = useState('');
+  const [draftCount, setDraftCount] = useState(0);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+
+  function draftSnapshot(): Record<string, unknown> {
+    return {
+      face, contentType, title, body,
+      areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
+      evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
+      giftTo, forIdents, modeNotes, tradeFor,
+      condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
+      deliverRadius, paymentPlan, catTags,
+      travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
+      evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
+      sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
+      inkind, inkindKind, price, location, online, inPerson, meetingUrl, locGeo,
+      media, organizeInto, resourceUrl,
+      aiReadable, quiet, downloadable, weaveable,
+    };
+  }
+  const draftEmpty = !title.trim() && !body.trim() && media.length === 0;
+
+  async function writeDraft() {
+    if (!user || editing || postedRef.current || !hydratedRef.current) return;
+    if (draftEmpty) {
+      if (hadDraft.current) {
+        await deletePostDraft(draftIdRef.current).catch(console.error);
+        hadDraft.current = false;
+      }
+      return;
+    }
+    try {
+      await savePostDraft(draftIdRef.current, user.id, draftSnapshot());
+      hadDraft.current = true;
+      setDraftSavedAt(Date.now());
+    } catch (e) { console.error('post draft:', e); }
+  }
+  const writeDraftRef = useRef<() => void>(() => {});
+  writeDraftRef.current = () => {
+    if (touchedRef.current || hadDraft.current) void writeDraft();
+  };
+
+  // Reopen a draft: hydrate every captured field, then arm the autosave.
+  useEffect(() => {
+    if (!draftParam || !user) return;
+    let live = true;
+    void loadPostDraft(draftParam).then((row) => {
+      if (!live) return;
+      if (!row) { hydratedRef.current = true; return; }
+      const d = row.draft as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+      hadDraft.current = true;
+      const s = <T,>(v: T | undefined | null, set: (x: T) => void) => { if (v !== undefined && v !== null) set(v); };
+      s(d.face, setFace); s(d.contentType, setContentType);
+      s(d.title, setTitle); s(d.body, setBody);
+      if (Array.isArray(d.areas)) setAreas(new Set(d.areas));
+      s(d.isPublic, setIsPublic); s(d.toMycelium, setToMycelium);
+      if (Array.isArray(d.audienceSpaces)) setAudienceSpaces(new Set(d.audienceSpaces));
+      s(d.evCategory, setEvCategory); s(d.evMode, setEvMode);
+      if (Array.isArray(d.modes)) setModes(new Set(d.modes));
+      if (Array.isArray(d.setTerms)) setSetTerms(new Set(d.setTerms));
+      s(d.giftTo, setGiftTo);
+      if (Array.isArray(d.forIdents)) setForIdents(d.forIdents);
+      s(d.modeNotes, setModeNotes); s(d.tradeFor, setTradeFor);
+      if (Array.isArray(d.condition)) setCondition(new Set(d.condition));
+      s(d.availFrom, setAvailFrom); s(d.availTo, setAvailTo);
+      if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment));
+      s(d.deliverRadius, setDeliverRadius); s(d.paymentPlan, setPaymentPlan);
+      if (Array.isArray(d.catTags)) setCatTags(d.catTags);
+      s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
+      s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
+      s(d.evRange, setEvRange); s(d.evAllDay, setEvAllDay);
+      s(d.evStartMin, setEvStartMin); s(d.evEndMin, setEvEndMin); s(d.bookingUrl, setBookingUrl);
+      s(d.sliding, setSliding); s(d.slideLow, setSlideLow); s(d.slideHigh, setSlideHigh);
+      s(d.unitSel, setUnitSel); s(d.unitQty, setUnitQty); s(d.unitText, setUnitText);
+      s(d.inkind, setInkind); s(d.inkindKind, setInkindKind);
+      s(d.price, setPrice); s(d.location, setLocation);
+      s(d.online, setOnline); s(d.inPerson, setInPerson); s(d.meetingUrl, setMeetingUrl);
+      s(d.locGeo, setLocGeo);
+      if (Array.isArray(d.media)) setMedia(d.media);
+      s(d.organizeInto, setOrganizeInto); s(d.resourceUrl, setResourceUrl);
+      s(d.aiReadable, setAiReadable); s(d.quiet, setQuiet);
+      s(d.downloadable, setDownloadable); s(d.weaveable, setWeaveable);
+      // Arm autosave only after the hydration renders — the baseline must be
+      // the restored state, or reopening would immediately re-write the row.
+      window.setTimeout(() => { if (live) hydratedRef.current = true; }, 60);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftParam, user?.id]);
+
+  // The debounced autosave — fires only once something actually changed from
+  // the state the page opened with (URL prefills alone never mint a row).
+  const draftSig = JSON.stringify(draftSnapshot());
+  useEffect(() => {
+    if (!user || editing || postedRef.current || !hydratedRef.current) return;
+    if (baselineRef.current === null) { baselineRef.current = draftSig; return; }
+    if (draftSig === baselineRef.current && !hadDraft.current) return;
+    touchedRef.current = true;
+    const t = window.setTimeout(() => { void writeDraft(); }, 1200);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSig, user?.id]);
+
+  // Flush straight away when the tab hides — the debounce window is exactly
+  // when toggling away used to lose the last field typed (the WOW lesson).
+  useEffect(() => {
+    const flush = () => writeDraftRef.current();
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+
+  // A fresh composer quietly says how many drafts are waiting.
+  useEffect(() => {
+    if (!user || editing || draftParam) return;
+    let live = true;
+    void listMyPostDrafts().then((rows) => {
+      if (live) setDraftCount(rows.filter((r) => r.id !== draftIdRef.current).length);
+    });
+    return () => { live = false; };
+  }, [user?.id, editing, draftParam]);
+
+  async function saveDraftNow() {
+    if (draftEmpty) { setDraftNote('Nothing to save yet — add a few words or a photo first.'); return; }
+    await writeDraft();
+    setDraftNote('Saved to your drafts ✓');
+  }
 
   const [editReady, setEditReady] = useState(!editing);
   const editLinkedEvent = useRef<string | null>(null);
@@ -945,6 +1097,11 @@ export default function Compose() {
         if (linkedEventId) await deleteEvent(linkedEventId).catch(() => {});
         throw postErr;
       }
+      // The post holds the words now — the draft's job is done. postedRef
+      // also stands the pagehide flush down, so navigating away from a
+      // successful post can't resurrect the row (the WowIntake lesson).
+      postedRef.current = true;
+      if (hadDraft.current) void deletePostDraft(draftIdRef.current).catch(console.error);
       if (isPopup) window.close();
       navigate(afterPostDestination(isEvent));
     } catch (e) {
@@ -1755,9 +1912,37 @@ export default function Compose() {
           audio-only post until it was fixed). */}
       {error && <p className="cmp__error">{error}</p>}
       {uploading && <p className="cmp__error">Uploading media… one moment.</p>}
-      <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !canPost}>
-        {busy ? (editing ? 'Saving…' : 'Posting…') : (editing ? 'Save changes' : 'Post')}
-      </button>
+      {/* SAVE AND POST (founder 2026-10-15: "a save AND post button at the
+          bottom, not just post"). Everything autosaves anyway — Save is the
+          deliberate gesture, and the receipt names where drafts live. */}
+      <div className="cmp__footrow">
+        {!editing && (
+          <button className="btn cmp__savedraft" onClick={() => void saveDraftNow()} disabled={busy}>
+            Save draft
+          </button>
+        )}
+        <button className="btn btn-primary cmp__post" onClick={submit} disabled={busy || uploading || !canPost}>
+          {busy ? (editing ? 'Saving…' : 'Posting…') : (editing ? 'Save changes' : 'Post')}
+        </button>
+      </div>
+      {!editing && (draftNote || draftSavedAt !== null) && (
+        <p className="cmp__draftnote">
+          {draftNote || 'Autosaved to your drafts ✓'}
+          {(draftNote.startsWith('Saved') || (!draftNote && draftSavedAt !== null)) && (
+            <> · <button className="cmp__draftlink" onClick={() => navigate('/drive')}>
+              <span className="link-cue">Open your drafts</span> ›
+            </button></>
+          )}
+        </p>
+      )}
+      {!editing && draftCount > 0 && (
+        <p className="cmp__draftnote">
+          {draftCount === 1 ? 'One earlier draft is waiting' : `${draftCount} earlier drafts are waiting`} in your Drive ·{' '}
+          <button className="cmp__draftlink" onClick={() => navigate('/drive')}>
+            <span className="link-cue">Open drafts</span> ›
+          </button>
+        </p>
+      )}
     </div>
   );
 }
