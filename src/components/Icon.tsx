@@ -37,6 +37,7 @@ export type IconName =
   | 'currentcy'
   | 'fork-spoon'
   | 'fingerprint'
+  | 'gift'
   | 'globe'
   | 'graduation-cap'
   | 'health'
@@ -215,6 +216,14 @@ const ICONS: Record<IconName, IconEntry> = {
       <path d="M12 12v2.8c0 2.1-.3 4.2-.9 6.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5.6 15.5c.35 1.9.95 3.7 1.75 5.4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
     </>,
+  },
+  'gift': {
+    // The PRESENT — the gift exchange-mode's mark (founder 2026-10-15: "the
+    // present next to the 'gift' text? so it is easy for people to understand
+    // what the exchange manner is"). Box + lid + ribbon + bow.
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="4.75" y="11" width="14.5" height="8.5" rx="1" /><rect x="3.5" y="7.5" width="17" height="3.5" rx="1" /><path d="M12 7.5v12" /><path d="M12 7.5C8.6 7.5 7.6 3.4 10.1 3.4c1.9 0 1.9 2.6 1.9 4.1 0-1.5 0-4.1 1.9-4.1 2.5 0 1.5 4.1-1.9 4.1Z" /></>,
   },
   'globe': {
     viewBox: '315 836 26 26',

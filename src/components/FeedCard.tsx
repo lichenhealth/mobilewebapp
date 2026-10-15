@@ -62,6 +62,10 @@ export interface FeedCardProps {
   onSave?: (active: boolean) => void;
   // Eyebrow tag (optional)
   eyebrow?: string;
+  /** The offer line with each exchange manner's glyph beside its word
+   *  (founder 2026-10-15: "the present next to the 'gift' text") — wins over
+   *  the plain string when present. */
+  eyebrowBits?: { icon?: IconName; text: string }[];
   /** The viewer's PATH to this author — "Trusted by Melanie Bright — someone
    *  you trust". Viewer-relative, never a score (founder 2026-07-28). */
   trustLine?: string;
@@ -136,7 +140,7 @@ export default function FeedCard({
   onTrust,
   onRecommend,
   onSave,
-  eyebrow, trustLine, route,
+  eyebrow, eyebrowBits, trustLine, route,
   media,
   noDownload,
   onMessage,
@@ -346,6 +350,16 @@ export default function FeedCard({
                   <button className="feed-card__eyebrow-link link-cue" onClick={() => navigate('/mycelium')}>
                     My-celium
                   </button>
+                ) : eyebrowBits && eyebrowBits.length > 0 ? (
+                  // Each manner wears its mark beside its word (founder
+                  // 2026-10-15: the present beside "Gift").
+                  eyebrowBits.map((b, i) => (
+                    <span key={i} className="feed-card__eyebit">
+                      {i > 0 && ' · '}
+                      {b.icon && <Icon name={b.icon} size={11} />}
+                      {b.text}
+                    </span>
+                  ))
                 ) : eyebrow}
               </span>
             )}

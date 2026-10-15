@@ -116,12 +116,27 @@ export function postToCard(
   // Identities lead ("Gift to Firefighters, Nurses"); free text carries what
   // the vocabulary can't.
   const giftTo = [forIdents.join(', '), giftFree].filter(Boolean).join(' · ') || undefined;
-  const labels = [...new Set(rawModes.map((m) => {
+  // Each manner wears its mark beside its word (founder 2026-10-15: "the
+  // present next to the 'gift' text? so it is easy for people to understand
+  // what the exchange manner is") — the same glyphs Marketplace's lens chips
+  // and ListingTile's corner badges speak.
+  const MODE_GLYPH: Record<string, IconName> = {
+    gift: 'gift', sale: 'dollar', sliding: 'dollar', trade: 'trade',
+    rent: 'rent', lend: 'lend', borrow: 'repeat', iso: 'search',
+  };
+  const modeBits: { icon?: IconName; text: string }[] = [];
+  const seenLabel = new Set<string>();
+  for (const m of rawModes) {
     const base = isWork ? WORK_MODE_LABEL[m] : MODE_LABEL[m];
-    return m === 'gift' && giftTo ? `${base} to ${giftTo}` : base;
-  }).filter(Boolean))];
+    if (!base) continue;
+    const text = m === 'gift' && giftTo ? `${base} to ${giftTo}` : base;
+    if (seenLabel.has(text)) continue;
+    seenLabel.add(text);
+    modeBits.push({ icon: MODE_GLYPH[m], text });
+  }
   // A non-gift offering still says who it's for ("For Veterans, Teachers").
-  if (forIdents.length && !rawModes.includes('gift')) labels.push(`For ${forIdents.join(', ')}`);
+  if (forIdents.length && !rawModes.includes('gift')) modeBits.push({ text: `For ${forIdents.join(', ')}` });
+  const labels = modeBits.map((b) => b.text);
   const mode = labels.length ? labels.join(' · ') : undefined;
   const rawPrice = typeof p.details?.price === 'string' ? (p.details.price as string) : undefined;
   const price = rawModes.includes('sliding') && rawPrice
@@ -149,6 +164,15 @@ export function postToCard(
     ? (price ? `${mode} · ${price}` : entrusted ? `${mode} · Lichen routes` : mode)
     : undefined;
   const offerLine = [travelBits.join(' · '), baseOffer].filter(Boolean).join(' · ') || undefined;
+  // The structured twin of offerLine — FeedCard renders these so each manner
+  // shows its glyph; travel facts and the price ride along unmarked.
+  const eyebrowBits = offerLine
+    ? [
+        ...travelBits.map((t) => ({ text: t })),
+        ...modeBits,
+        ...(mode && price ? [{ text: price }] : mode && entrusted ? [{ text: 'Lichen routes' }] : []),
+      ]
+    : undefined;
   const previews = Array.isArray(p.details?.previews)
     ? (p.details.previews as FeedCardProps['previews'])
     : undefined;
@@ -204,6 +228,7 @@ export function postToCard(
     // asking for something is worth seeing on your own listing.
     eyebrow: offerLine ?? (!isMine && (p.to_mycelium || p.visibility === 'mycelium')
       ? 'Mycelium' : undefined),
+    eyebrowBits,
     media,
     noDownload,
     previews,
