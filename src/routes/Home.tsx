@@ -193,9 +193,18 @@ export default function Home() {
       <IconRow
         className="icon-row--tools"
         ariaLabel="Tools"
-        items={TOOL_ICONS.map((it) => (it.label === 'Assistant'
-          ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` }
-          : it))}
+        items={TOOL_ICONS.map((it) => {
+          if (it.label === 'Assistant')
+            return { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` };
+          // The + follows the lit lenses (founder 2026-10-15: "a plus to feed
+          // should be social default, all others should be actionable and have
+          // where you came from pre-loaded") — Feed/All keeps the plain social
+          // compose; lit lenses ride along as ?area=, which Compose reads as
+          // actionable with those areas pre-ticked.
+          if (it.label === 'Post' && areaSel.size > 0)
+            return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
+          return it;
+        })}
       />
       {/* Feed = ALL; the sections light as multi-select lenses on the river
           (founder 2026-10-12). Members stays a DOOR — people aren't posts,
