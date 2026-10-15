@@ -31,6 +31,20 @@ import './Compose.css';
 type MediaType = 'photo' | 'video' | 'audio';
 type Attached = { type: MediaType; url: string; jobId?: string };
 
+// ?area= may carry SEVERAL areas now, comma-separated (founder 2026-10-15:
+// Home/My-celium's + follows the lit feed lenses — "all others should be
+// actionable and have where you came from pre-loaded"). Validated here so a
+// hand-typed URL can never tick an area that doesn't exist.
+const COMPOSE_AREAS: ServiceArea[] = [
+  'marketplace', 'courses', 'library', 'events', 'work', 'places', 'art', 'food', 'travel',
+];
+function areasFromParam(raw: string | null): ServiceArea[] {
+  return (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s): s is ServiceArea => (COMPOSE_AREAS as string[]).includes(s));
+}
+
 export default function Compose() {
   const { loading, user } = useAuth();
   const { actor } = useActing();
@@ -52,16 +66,16 @@ export default function Compose() {
   // legacy content_types survive on old posts (contentType preserves them
   // through an edit unless the member taps a face).
   const [face, setFace] = useState<'social' | 'actionable'>(() =>
-    params.get('area') ? 'actionable' : 'social');
+    areasFromParam(params.get('area')).length ? 'actionable' : 'social');
   const [contentType, setContentType] = useState<ContentType>(() =>
-    params.get('area') ? 'actionable' : 'social');
+    areasFromParam(params.get('area')).length ? 'actionable' : 'social');
   // "Where": a post can live in several areas at once.
   const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
-    const a = params.get('area') as ServiceArea | null;
+    const list = areasFromParam(params.get('area'));
     // The Marketplace is the Commons' catch-all — pre-checked wherever an
     // offer starts, but a CHECKBOX: deselect it to keep goods off the open
     // square and shelve them only in Courses/Library/etc (founder 2026-07-27).
-    return new Set(a ? (a === 'marketplace' ? [a] : [a, 'marketplace']) : []);
+    return new Set(list.length ? [...list, 'marketplace' as ServiceArea] : []);
   });
   const [whereOpen, setWhereOpen] = useState(false);
   // The audience list outgrew the page (founder 2026-10-13: "audience is long
@@ -245,7 +259,7 @@ export default function Compose() {
     if (collectionParam) return `/collections/${collectionParam}`;
     if (presetSpace) return `/spaces/${presetSpace}`;
     if (isEventPost) return '/events';
-    const a = params.get('area') as ServiceArea | null;
+    const a = areasFromParam(params.get('area'))[0] ?? null;
     return (a && AREA_HOME[a]) || '/home';
   }
   const editing = !!editPostId;
@@ -566,13 +580,19 @@ export default function Compose() {
     setUploading(false);
   }
 
-  function onFile(e: ChangeEvent<HTMLInputElement>, type: MediaType) {
-    const file = e.target.files?.[0];
+  // Photos select SEVERAL at once (founder 2026-10-15: "I want to be able to
+  // select multiple photos at once, not just one") — uploads run in turn so
+  // slow connections don't race themselves; video stays one at a time (each
+  // one is a transcode job for the worker).
+  async function onFile(e: ChangeEvent<HTMLInputElement>, type: MediaType) {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     const fallback = type === 'photo' ? 'jpg' : 'mp4';
-    const ext = (file.name.split('.').pop() || fallback).toLowerCase();
-    addMedia(file, ext, type);
+    for (const file of files) {
+      const ext = (file.name.split('.').pop() || fallback).toLowerCase();
+      await addMedia(file, ext, type);
+    }
   }
 
   async function toggleRecord() {
@@ -1117,8 +1137,8 @@ export default function Compose() {
         </div>
       )}
 
-      <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
-      <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
+      <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => void onFile(e, 'photo')} />
+      <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => void onFile(e, 'video')} />
 
       {uploading && <p className="cmp__uploading">Uploading…</p>}
       {media.length > 0 && (

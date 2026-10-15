@@ -175,9 +175,15 @@ export default function Mycelium() {
       <IconRow
         className="icon-row--tools"
         ariaLabel="Tools"
-        items={MYC_TOOLS.map((it) => (it.label === 'Assistant'
-          ? { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` }
-          : it))}
+        items={MYC_TOOLS.map((it) => {
+          if (it.label === 'Assistant')
+            return { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` };
+          // The + follows the lit lenses, Home's 2026-10-15 rule: Feed = plain
+          // social compose, lit lenses = actionable with those areas preloaded.
+          if (it.label === 'Post' && areaSel.size > 0)
+            return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
+          return it;
+        })}
       />
       <IconRow
         className="icon-row--lenses"
