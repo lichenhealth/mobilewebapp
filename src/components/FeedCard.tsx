@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
@@ -174,6 +174,28 @@ export default function FeedCard({
   // Chat carries the same chat-about action the header circle used to.
   const [shareOpen, setShareOpen] = useState(false);
   const [shareNote, setShareNote] = useState('');
+
+  // MEDIA CAROUSEL + GRID (founder 2026-10-15: "all 4 photos are posted in
+  // the post, so its long. Should we have a cutoff of 2? then it becomes a
+  // carousel, where you can scroll thru the pics in post, or click thru to
+  // have it expanded with 4 in a row"): 1–2 visual pieces stack as always;
+  // 3+ ride ONE FRAME at a time on the card (swipe or the side arrows, a
+  // quiet counter + dots), and the post page (expanded) lays the whole set
+  // out as a GRID — four across at ≥1024px, two in the phone column — whose
+  // tiles open a lightbox so the square crop never hides a photo. Audio is
+  // not visual; it stacks below either shape, as always.
+  const visualMedia = (media ?? []).filter((m) => m.type !== 'audio');
+  const audioMedia = (media ?? []).filter((m) => m.type === 'audio');
+  const mediaCarousel = !expanded && visualMedia.length >= 3;
+  const mediaGrid = expanded && visualMedia.length >= 3;
+  const [medIdx, setMedIdx] = useState(0);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const carRef = useRef<HTMLDivElement>(null);
+  function carouselTo(i: number) {
+    const el = carRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+  }
   const shareLink = sharePath ? `${window.location.origin}${sharePath}` : null;
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   async function copyShareLink() {
@@ -468,8 +490,68 @@ export default function FeedCard({
         </div>
       )}
 
-      {/* INLINE MEDIA */}
-      {media && media.length > 0 && (
+      {/* INLINE MEDIA — see the carousel/grid note by the state above. */}
+      {media && media.length > 0 && (mediaCarousel ? (
+        <div className="feed-card__media feed-card__media--carousel">
+          <div className="feed-card__carwrap">
+            <div
+              className="feed-card__carousel"
+              ref={carRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const i = Math.min(visualMedia.length - 1, Math.max(0, Math.round(el.scrollLeft / Math.max(1, el.clientWidth))));
+                if (i !== medIdx) setMedIdx(i);
+              }}
+            >
+              {visualMedia.map((m, i) => (
+                <div key={i} className="feed-card__medframe">
+                  {m.type === 'photo' ? (
+                    <img src={m.url} alt=""
+                      onContextMenu={noDownload ? (e) => e.preventDefault() : undefined} />
+                  ) : (
+                    <VideoPlayer url={m.url} jobId={m.jobId} noDownload={noDownload} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <span className="feed-card__medcount" aria-hidden>{medIdx + 1}/{visualMedia.length}</span>
+            {medIdx > 0 && (
+              <button className="feed-card__mednav feed-card__mednav--l" aria-label="Previous photo"
+                onClick={(e) => { e.stopPropagation(); carouselTo(medIdx - 1); }}>‹</button>
+            )}
+            {medIdx < visualMedia.length - 1 && (
+              <button className="feed-card__mednav feed-card__mednav--r" aria-label="Next photo"
+                onClick={(e) => { e.stopPropagation(); carouselTo(medIdx + 1); }}>›</button>
+            )}
+          </div>
+          <div className="feed-card__meddots" aria-hidden>
+            {visualMedia.map((_, i) => (
+              <span key={i} className={'feed-card__meddot' + (i === medIdx ? ' is-on' : '')} />
+            ))}
+          </div>
+          {audioMedia.map((m, i) => <audio key={'a' + i} src={m.url} controls />)}
+        </div>
+      ) : mediaGrid ? (
+        <div className="feed-card__media">
+          <div className="feed-card__medgrid" onClick={(e) => e.stopPropagation()}>
+            {visualMedia.map((m, i) =>
+              m.type === 'photo' ? (
+                <button key={i} type="button" className="feed-card__medcell"
+                  aria-label={`Photo ${i + 1} of ${visualMedia.length} — view full size`}
+                  onClick={() => setLightbox(m.url)}>
+                  <img src={m.url} alt=""
+                    onContextMenu={noDownload ? (e) => e.preventDefault() : undefined} />
+                </button>
+              ) : (
+                <div key={i} className="feed-card__medcell feed-card__medcell--video">
+                  <VideoPlayer url={m.url} jobId={m.jobId} noDownload={noDownload} />
+                </div>
+              )
+            )}
+          </div>
+          {audioMedia.map((m, i) => <audio key={'a' + i} src={m.url} controls />)}
+        </div>
+      ) : (
         <div className="feed-card__media">
           {media.map((m, i) =>
             m.type === 'photo' ? (
@@ -482,6 +564,13 @@ export default function FeedCard({
               <audio key={i} src={m.url} controls />
             )
           )}
+        </div>
+      ))}
+      {lightbox && (
+        <div className="feed-card__lightbox" role="dialog" aria-label="Photo"
+          onClick={(e) => { e.stopPropagation(); setLightbox(null); }}>
+          <img src={lightbox} alt=""
+            onContextMenu={noDownload ? (e) => e.preventDefault() : undefined} />
         </div>
       )}
 

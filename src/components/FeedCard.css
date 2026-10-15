@@ -357,6 +357,80 @@
 }
 .feed-card__media audio { width: 100%; }
 
+/* THE MEDIA CAROUSEL (founder 2026-10-15: 3+ photos made the card "long" —
+   "a cutoff of 2? then it becomes a carousel"): one frame at a time, CSS
+   scroll-snap so a finger swipes natively, side arrows for mouse hands, a
+   quiet counter + dots. The frames share a 4/3 crop so the card never
+   changes height mid-swipe. */
+.feed-card__carwrap { position: relative; }
+.feed-card__carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: var(--r-md);
+}
+.feed-card__carousel::-webkit-scrollbar { display: none; }
+.feed-card__medframe {
+  flex: 0 0 100%;
+  min-width: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.feed-card__medframe img,
+.feed-card__medframe video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 0;   /* the carousel wears the radius */
+}
+.feed-card__medcount {
+  position: absolute; top: 8px; right: 8px;
+  padding: 2px 8px; border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.feed-card__mednav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.45); color: #fff;
+  font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.feed-card__mednav--l { left: 6px; }
+.feed-card__mednav--r { right: 6px; }
+.feed-card__meddots { display: flex; justify-content: center; gap: 5px; }
+.feed-card__meddot { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--bone-edge); }
+.feed-card__meddot.is-on { background: var(--peach-deep); }
+
+/* THE EXPANDED GRID — the post page lays the whole set out ("click thru to
+   have it expanded with 4 in a row"): two across in the phone column, four
+   at ≥1024px; a tile opens the lightbox so the square crop hides nothing. */
+.feed-card__medgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-2); }
+@media (min-width: 1024px) { .feed-card__medgrid { grid-template-columns: repeat(4, 1fr); } }
+.feed-card__medcell {
+  padding: 0; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-md); overflow: hidden;
+}
+/* Outranks the expanded contain rule above — grid tiles stay square covers. */
+.feed-card--expanded .feed-card__media .feed-card__medcell img,
+.feed-card--expanded .feed-card__media .feed-card__medcell video {
+  aspect-ratio: 1 / 1; height: 100%; max-height: none; object-fit: cover;
+  border-radius: var(--r-md);
+}
+.feed-card__lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(12, 11, 9, 0.88);
+  display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.feed-card__lightbox img {
+  max-width: 94vw; max-height: 92vh; object-fit: contain;
+  border-radius: var(--r-md);
+}
+
 /* ─── Engagement footer ───────────────────────────────────────────── */
 .feed-card__foot {
   display: flex;
