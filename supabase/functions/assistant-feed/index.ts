@@ -435,6 +435,53 @@ const COURSE_TOOLS = [
   },
 ];
 
+// POST TOOLS (founder 2026-10-15: she asked the Marketplace brain for a post
+// and it pointed her at the + button — "it should be able to draft, post and
+// edit posts for me"). draft_post WRITES a post_drafts row — the same row
+// Compose autosaves — and the reply carries a Review-&-post button; the
+// MEMBER's tap on Post is what publishes (the page-builder Publish grammar:
+// the model writes, the person ships). update_post changes their OWN
+// published post by exact title. ⚠ The standing no-READ rule on drafts
+// holds: minting a draft the member just dictated is write-only — no tool
+// lists or reads existing drafts.
+const POST_TOOLS = [
+  {
+    name: 'my_posts',
+    description: 'Read their own recent posts (newest first, up to 20) — exact titles, areas, exchange manners, price, and whether one is an event. Call this FIRST before update_post and use the exact title it shows.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'draft_post',
+    description: 'Write a POST for them as a DRAFT: it lands in their drafts (Drive → Drafts) with everything you pass already loaded, and your reply carries a "Review & post" button that opens it in the composer — THEIR tap on Post is what publishes, so never claim the post is live. Shape title and body from their own words in this conversation. Not for events (RSVPs/dates need the event composer — hand the events door).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'A short headline, in their voice.' },
+        body: { type: 'string', description: 'The post body, from what they told you.' },
+        modes: { type: 'array', items: { type: 'string', enum: ['gift', 'trade', 'paid', 'lend', 'rent', 'borrow', 'iso'] }, description: 'The exchange manner(s) they named — gift, trade, paid (for sale), lend, rent, borrow, or iso (in search of). At least one; several is fine.' },
+        price: { type: 'string', description: 'Only when paid/rent: their asking price, their words ("$45", "$45 per hour", "sliding $20–60").' },
+        areas: { type: 'array', items: { type: 'string', enum: ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'] }, description: 'Where it lives. Marketplace is always included (the Commons catch-all); pass extras only when they asked.' },
+        audience: { type: 'string', enum: ['everyone', 'mycelium'], description: 'Who sees it — everyone (default) or just their My-celium.' },
+      },
+      required: ['title', 'body', 'modes'],
+    },
+  },
+  {
+    name: 'update_post',
+    description: 'Edit one of their OWN published posts, named by its EXACT title from my_posts. Only the fields you pass change; report what changed and what it said before. An empty price removes the price. Event posts are refused — those edits live on the event page so guests keep their RSVPs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The exact current title from my_posts.' },
+        new_title: { type: 'string' },
+        new_body: { type: 'string' },
+        price: { type: 'string', description: 'New price in their words; empty string removes it.' },
+      },
+      required: ['title'],
+    },
+  },
+];
+
 // SPACE PAGE TOOLS (rung 2, founder 2026-08-22) — the space-side twins of the
 // profile tools, armed only in a space's build thread (`space:<id>`), only
 // for a steward of that space, only while the space's own assistant switch is
@@ -860,6 +907,7 @@ Deno.serve(async (req) => {
   let canEdit = false;
   let canCalendar = false;
   let canCourses = false;
+  let canPosts = false;
   let canSpaceEdit = false;
   let handThatWrites = false;
   let isPlatformAdmin = false;
@@ -887,6 +935,10 @@ Deno.serve(async (req) => {
     // COURSES (founder 2026-10-05): same flag — tools write the same
     // collections rows the Teach builder edits.
     canCourses = !spaceId && flag;
+    // POSTS (founder 2026-10-15: "it should be able to draft, post and edit
+    // posts for me"): same flag — draft_post writes the same post_drafts row
+    // Compose autosaves, and the PERSON's tap on Post is what publishes.
+    canPosts = !spaceId && flag;
     // Rung 2 (founder 2026-08-22): the same flag arms SPACE page tools in a
     // space's build thread — but only for a steward of the space, and only
     // while the space's own assistant switch is on (checked above; an off
@@ -900,13 +952,14 @@ Deno.serve(async (req) => {
   // "AI on for calendar but not profile" must hold from every room. One
   // read of the member's few enabled=false rows (the consent.ts shape);
   // a failed read fails OPEN, the standing default-on doctrine.
-  if (!spaceId && (canEdit || canCalendar || canCourses)) {
+  if (!spaceId && (canEdit || canCalendar || canCourses || canPosts)) {
     try {
       const offRows = await (await sb(`assistant_consent?profile_id=eq.${profile_id}&enabled=eq.false&scope_type=eq.section&select=scope_id`)).json();
       const off = new Set((Array.isArray(offRows) ? offRows : []).map((r: { scope_id: string }) => String(r.scope_id)));
       if (off.has('profile')) canEdit = false;
       if (off.has('calendar')) canCalendar = false;
       if (off.has('courses')) canCourses = false;
+      if (off.has('marketplace')) canPosts = false;
     } catch { /* fail open */ }
   }
   // The small hands (Drive save, task) ride every PERSONAL thread behind the
@@ -1046,6 +1099,16 @@ Deno.serve(async (req) => {
         : '\n- Honest note: the Courses room is being made better and is open soon — members see a "Coming soon" curtain there today. Building now means everything is ready the day it opens; say that plainly rather than walking them to the room.');
   }
 
+  let postsRule = '';
+  if (canPosts) {
+    postsRule = '\n\nYOU CAN ACTUALLY DRAFT AND EDIT THEIR POSTS. They have turned on "Let Claude edit my page directly", which arms your post tools here. How to hold it:'
+      + '\n- When they describe something to offer or ask for, draft_post it from THEIR words — never send them to the + button to do it by hand. The draft lands in their drafts with a Review & post button under your reply; THEIR tap on Post is what publishes. Never say a drafted post is live.'
+      + '\n- Photos are added in the composer when they review — say so when the thing wants a picture.'
+      + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
+      + '\n- Events are not posts here: RSVPs and dates need the event composer — hand the events door.'
+      + '\n- You never read their drafts — a draft is theirs alone until they post it. You can only mint a new one from what they tell you.';
+  }
+
   let calendarRule = '';
   if (canCalendar) {
     calendarRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR CALENDAR SETTINGS. They have turned on "Let Claude edit my page directly", which arms your calendar tools here. How to hold it:'
@@ -1085,6 +1148,9 @@ Deno.serve(async (req) => {
   // In-app doors this reply hands over (founder 2026-10-07, the transfer):
   // composed ONLY from the fixed APP_DOORS table, never model-written paths.
   const appDoors: { path: string; label: string }[] = [];
+  // Post drafts minted this exchange — each becomes a Review-&-post button
+  // under the reply (the page_edit Preview/Publish grammar for posts).
+  const postDraftDoors: { id: string; title: string }[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -2072,6 +2138,95 @@ Deno.serve(async (req) => {
       };
     }
 
+    // ── Post tools (founder 2026-10-15: "draft, post and edit posts") ────
+    if (name === 'my_posts') {
+      const rows = await (await sb(`posts?author_id=eq.${profile_id}&author_space_id=is.null&select=id,title,body,service_areas,details,linked_event_id,created_at&order=created_at.desc&limit=20`)).json();
+      const list = (Array.isArray(rows) ? rows : []) as { title: string | null; body: string; service_areas: string[] | null; details: Record<string, unknown> | null; linked_event_id: string | null; created_at: string }[];
+      if (!list.length) return { ok: true, posts: 'none yet — they have not posted anything personally' };
+      return {
+        ok: true,
+        posts: list.map((p) => {
+          const d = (p.details ?? {}) as { modes?: unknown[]; price?: unknown };
+          const modes = Array.isArray(d.modes) ? d.modes.join('/') : '';
+          const t = p.title || (p.body.length > 50 ? p.body.slice(0, 47) + '…' : p.body);
+          return `"${t}" (${(p.service_areas ?? []).join(', ') || 'social'}${modes ? `; ${modes}` : ''}${typeof d.price === 'string' && d.price ? `; ${d.price}` : ''}${p.linked_event_id ? '; EVENT' : ''}; ${p.created_at.slice(0, 10)})`;
+        }),
+      };
+    }
+
+    if (name === 'draft_post') {
+      const title = String(input.title ?? '').trim().slice(0, 120);
+      const body = String(input.body ?? '').trim().slice(0, 5000);
+      if (!title || !body) return { ok: false, error: 'A draft needs a title and a body, in their words.' };
+      const MODE_OK = ['gift', 'trade', 'paid', 'lend', 'rent', 'borrow', 'iso'];
+      const modesIn = [...new Set((Array.isArray(input.modes) ? input.modes : []).map(String).filter((m) => MODE_OK.includes(m)))];
+      if (!modesIn.length) return { ok: false, error: 'Name at least one exchange manner from what they asked for: gift, trade, paid, lend, rent, borrow, or iso.' };
+      const AREA_OK = ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'];
+      const rawAreas = (Array.isArray(input.areas) ? input.areas : []).map(String);
+      if (rawAreas.includes('events')) return { ok: false, error: 'Events need the event composer (RSVPs, dates) — hand the events door instead of drafting here.' };
+      const areas = [...new Set(['marketplace', ...rawAreas.filter((a) => AREA_OK.includes(a))])];
+      const price = String(input.price ?? '').trim().slice(0, 60);
+      const audience = input.audience === 'mycelium' ? 'mycelium' : 'everyone';
+      // The draft row IS Compose's own autosave shape — the composer hydrates
+      // it field for field. Compose's mode vocabulary calls a gift 'free'.
+      const composeModes = modesIn.map((m) => (m === 'gift' ? 'free' : m));
+      const draft: Record<string, unknown> = {
+        face: 'actionable', contentType: 'actionable',
+        title, body, areas,
+        isPublic: audience === 'everyone', toMycelium: audience === 'mycelium', audienceSpaces: [],
+        modes: composeModes,
+        ...(price ? { price } : {}),
+        media: [],
+      };
+      const draftId = crypto.randomUUID();
+      const r = await sb('post_drafts', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ id: draftId, profile_id, draft }),
+      });
+      if (!r.ok) return { ok: false, error: `The draft would not save: ${(await r.text()).slice(0, 140)}` };
+      postDraftDoors.push({ id: draftId, title });
+      return {
+        ok: true,
+        change: `drafted the post "${title}" (${modesIn.join(', ')}${price ? `, ${price}` : ''}, to ${audience === 'mycelium' ? 'their My-celium' : 'everyone'})`,
+        note: 'A "Review & post" button rides under this reply, and the draft also waits in Drive → Drafts. THEIR tap on Post publishes — never say it is live. Photos are added in the composer.',
+      };
+    }
+
+    if (name === 'update_post') {
+      const t = String(input.title ?? '').trim();
+      if (!t) return { ok: false, error: 'Which post? Give its exact title from my_posts.' };
+      const rows = await (await sb(`posts?author_id=eq.${profile_id}&author_space_id=is.null&title=eq.${encodeURIComponent(t)}&select=id,title,body,details,linked_event_id&limit=2`)).json();
+      const list = Array.isArray(rows) ? rows : [];
+      if (!list.length) return { ok: false, error: `They have no post titled "${t}" — read my_posts and use the exact title.` };
+      if (list.length > 1) return { ok: false, error: `They have more than one post titled "${t}" — this one needs the composer, where each is its own card.` };
+      const post = list[0] as { id: string; title: string | null; body: string; details: Record<string, unknown> | null; linked_event_id: string | null };
+      if (post.linked_event_id) return { ok: false, error: 'That post is an EVENT — its edits live on the event page so guests keep their RSVPs. Hand the events door.' };
+      const patch: Record<string, unknown> = {};
+      const changed: string[] = [];
+      if (input.new_title !== undefined) {
+        const nn = String(input.new_title).trim().slice(0, 120);
+        if (nn) { patch.title = nn; changed.push(`title (was "${post.title ?? ''}")`); }
+      }
+      if (input.new_body !== undefined) {
+        const nb = String(input.new_body).trim().slice(0, 5000);
+        if (nb) { patch.body = nb; changed.push(`body (said before: "${post.body.slice(0, 120)}${post.body.length > 120 ? '…' : ''}")`); }
+      }
+      if (input.price !== undefined) {
+        const details = { ...(post.details ?? {}) } as Record<string, unknown>;
+        const prev = typeof details.price === 'string' ? details.price : '';
+        const np = String(input.price).trim().slice(0, 60);
+        if (np) details.price = np; else delete details.price;
+        patch.details = details;
+        changed.push(np ? `price (was "${prev || 'unset'}", now "${np}")` : `price removed (was "${prev || 'unset'}")`);
+      }
+      if (!changed.length) return { ok: false, error: 'Nothing to change — pass new_title, new_body, or price.' };
+      const r = await sb(`posts?id=eq.${post.id}&author_id=eq.${profile_id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+      });
+      if (!r.ok) return { ok: false, error: `The update failed: ${(await r.text()).slice(0, 140)}` };
+      return { ok: true, change: `updated their live post "${t}": ${changed.join('; ')}` };
+    }
+
     // ── The small hands (founder 2026-09-13) ─────────────────────────────
     if (name === 'save_post_to_drive') {
       // The only savable target is the post THE MEMBER shared into this
@@ -2205,6 +2360,7 @@ Deno.serve(async (req) => {
     add_booking_type: 'calendar', update_booking_type: 'calendar',
     set_booking_type_active: 'calendar', add_task: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
+    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
   };
@@ -2281,13 +2437,13 @@ Deno.serve(async (req) => {
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
         // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar || canCourses || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 1600 : 1200,
+        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 1600 : 1200,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,
@@ -2309,6 +2465,7 @@ Deno.serve(async (req) => {
                      ...(canSpaceEdit ? SPACE_EDIT_TOOLS : []),
                      ...(canCalendar ? CALENDAR_TOOLS : []),
                      ...(canCourses ? COURSE_TOOLS : []),
+                     ...(canPosts ? POST_TOOLS : []),
                      ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
@@ -2401,6 +2558,9 @@ Deno.serve(async (req) => {
   if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
   if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
   for (const d of appDoors) replyAttachments.push({ type: 'app_link', ...d });
+  // A minted post draft hangs its Review-&-post button under the reply —
+  // the person's tap in the composer is what publishes (founder 2026-10-15).
+  for (const d of postDraftDoors) replyAttachments.push({ type: 'post_draft', ...d });
   // The reply's section tags: the trigger's own (a Maps-brain exchange)
   // plus what the tools touched — minus the filing thread itself, which
   // the row already says. Personal threads only; a space thread is a
