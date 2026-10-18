@@ -283,7 +283,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               {adminExpanded && (
               <ul className="side-menu__sub-list">
                 <li>
-                  <button className="side-menu__sub-item" onClick={() => go('/invite')}>
+                  {/* Straight to the LISTS (founder 2026-10-18: landing at
+                      the top of /invite showed the composer — "deep link to
+                      the list section"): #ledger is the invited/joined list
+                      with the door right under it, the bells' #door grammar. */}
+                  <button className="side-menu__sub-item" onClick={() => go('/invite#ledger')}>
                     Knocking at the door
                     {knockCount > 0 && (
                       <span className="side-menu__deskbadge">{knockCount > 9 ? '9+' : knockCount}</span>
