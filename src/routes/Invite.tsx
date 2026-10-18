@@ -105,15 +105,16 @@ export default function Invite() {
   const droppedAtDoor = useRef(false);
   useEffect(() => {
     if (droppedAtDoor.current || !ledgerLoaded || !isAdmin) return;
-    if (!calledEmail && hash !== '#door') return;
+    if (!calledEmail && hash !== '#door' && hash !== '#ledger') return;
     // After paint AND a beat for the freshly-loaded rows to take their
     // height — a smooth scroll aimed at a still-moving target lands short.
     // ⚠ The one-shot flag is set when the scroll FIRES, not when it's armed:
     // an armed-then-cleaned-up effect (StrictMode's double pass, a dep blip)
     // would otherwise burn the shot without ever scrolling.
+    const target = hash === '#ledger' ? 'ledger' : 'door';
     const t = setTimeout(() => {
       droppedAtDoor.current = true;
-      document.getElementById('door')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 120);
     return () => clearTimeout(t);
   }, [ledgerLoaded, isAdmin, calledEmail, hash]);
@@ -615,7 +616,10 @@ export default function Invite() {
 
       {/* Who's in, who's still out — your own invitations, and (for admins)
           everyone knocking at the door. */}
-      <section className="invite__ledger">
+      {/* #ledger: the admin fold's "Knocking at the door" lands HERE — the
+          lists (invited/joined, then the door below), never the composer
+          (founder 2026-10-18: "deep link to the list section"). */}
+      <section className="invite__ledger" id="ledger">
         <h2 className="invite__h2">
           {isAdmin ? 'Invitations across Lichen' : 'Your invitations'}
           {invites.length > 0 && (
