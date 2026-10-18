@@ -72,7 +72,13 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
   margin: var(--s-4) 0 var(--s-2); font-family: var(--font-display, inherit); font-size: 18px;
 }
 .invite__tally { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--peach-deep); }
-.invite__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.invite__list { list-style: none; margin: 0 0 var(--s-4); padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* The ledger's two groups — not-yet-joined, then joined (founder 2026-10-18). */
+.invite__h3 {
+  margin: var(--s-3) 0 var(--s-2);
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted);
+}
 .invite__row {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 12px; background: var(--bone-warm);
