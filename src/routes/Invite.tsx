@@ -649,62 +649,82 @@ export default function Invite() {
         </h2>
         {invites.length === 0 ? (
           <p className="invite__muted">None yet — every invitation you send shows up here.</p>
-        ) : (
-          <ul className="invite__list">
-            {invites.map((i) => {
-              const s = inviteStatus(i);
-              return (
-                <li className="invite__row" key={i.token}>
-                  <span className="invite__row-who">
-                    {i.invitee_email ?? i.invitee_phone ?? 'a shared link'}
-                    {i.space?.name && (
-                      <em className="invite__by">
-                        {i.space_role === 'admin' ? 'admin of ' : 'joins '}{i.space.name}
-                      </em>
-                    )}
-                    {i.claimed_name && <em> — now {i.claimed_name}</em>}
-                    {isAdmin && i.inviter_name && i.created_by !== user?.id && (
-                      <em className="invite__by">invited by {i.inviter_name}</em>
-                    )}
-                  </span>
-                  {/* invited → opened (reached the signup page through
-                      their link) → joined. One list, one status per row
-                      (founder 2026-08-11). */}
-                  <span className={'invite__pill' + (s === 'joined' ? ' is-in' : s === 'opened' ? ' is-opened' : s === 'declined' ? ' is-declined' : '')}>
-                    {s}
-                  </span>
-                  <span className="invite__row-when">{i.created_at.slice(0, 10)}</span>
-                  {/* Send a reminder (founder 2026-10-07) — only on YOUR
-                      unanswered invitations; a declined or joined row never
-                      offers one. */}
-                  {(s === 'invited' || s === 'opened') && i.created_by === user?.id
-                    && (i.invitee_email || i.invitee_phone) && (() => {
-                    const st = remState[i.token] ?? '';
-                    return (
-                      <span className="invite__remindrow">
-                        {i.reminded_at && st !== 'done' && <em>Reminded {i.reminded_at.slice(0, 10)}</em>}
-                        {st === 'done' ? (
-                          <em className="invite__remind-ok">Reminder sent ✓</em>
-                        ) : i.invitee_email ? (
-                          canRemind(i) ? (
-                            <button className="invite__remindbtn" disabled={st === 'busy'} onClick={() => void remindInvite(i)}>
-                              {st === 'busy' ? 'Sending…' : i.reminded_at ? 'Remind again ›' : 'Send a reminder ›'}
-                            </button>
-                          ) : (
-                            <em>Sent within the last day — give it a little room.</em>
-                          )
+        ) : (() => {
+          // Two lists, never one mix (founder 2026-10-18: "invited but not
+          // joined together in chronological order, and joined in a separate
+          // list"). Declined rides the not-yet-joined list — they were
+          // invited and didn't join, and the pill already says which.
+          const row = (i: (typeof invites)[number]) => {
+            const s = inviteStatus(i);
+            return (
+              <li className="invite__row" key={i.token}>
+                <span className="invite__row-who">
+                  {i.invitee_email ?? i.invitee_phone ?? 'a shared link'}
+                  {i.space?.name && (
+                    <em className="invite__by">
+                      {i.space_role === 'admin' ? 'admin of ' : 'joins '}{i.space.name}
+                    </em>
+                  )}
+                  {i.claimed_name && <em> — now {i.claimed_name}</em>}
+                  {isAdmin && i.inviter_name && i.created_by !== user?.id && (
+                    <em className="invite__by">invited by {i.inviter_name}</em>
+                  )}
+                </span>
+                {/* invited → opened (reached the signup page through
+                    their link) → joined. One status per row
+                    (founder 2026-08-11). */}
+                <span className={'invite__pill' + (s === 'joined' ? ' is-in' : s === 'opened' ? ' is-opened' : s === 'declined' ? ' is-declined' : '')}>
+                  {s}
+                </span>
+                <span className="invite__row-when">{i.created_at.slice(0, 10)}</span>
+                {/* Send a reminder (founder 2026-10-07) — only on YOUR
+                    unanswered invitations; a declined or joined row never
+                    offers one. */}
+                {(s === 'invited' || s === 'opened') && i.created_by === user?.id
+                  && (i.invitee_email || i.invitee_phone) && (() => {
+                  const st = remState[i.token] ?? '';
+                  return (
+                    <span className="invite__remindrow">
+                      {i.reminded_at && st !== 'done' && <em>Reminded {i.reminded_at.slice(0, 10)}</em>}
+                      {st === 'done' ? (
+                        <em className="invite__remind-ok">Reminder sent ✓</em>
+                      ) : i.invitee_email ? (
+                        canRemind(i) ? (
+                          <button className="invite__remindbtn" disabled={st === 'busy'} onClick={() => void remindInvite(i)}>
+                            {st === 'busy' ? 'Sending…' : i.reminded_at ? 'Remind again ›' : 'Send a reminder ›'}
+                          </button>
                         ) : (
-                          <a className="invite__remindbtn" href={smsRemindHref(i)}>Text again ›</a>
-                        )}
-                        {st && !['busy', 'done'].includes(st) && <em className="invite__remind-err">{st}</em>}
-                      </span>
-                    );
-                  })()}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                          <em>Sent within the last day — give it a little room.</em>
+                        )
+                      ) : (
+                        <a className="invite__remindbtn" href={smsRemindHref(i)}>Text again ›</a>
+                      )}
+                      {st && !['busy', 'done'].includes(st) && <em className="invite__remind-err">{st}</em>}
+                    </span>
+                  );
+                })()}
+              </li>
+            );
+          };
+          const out = invites.filter((i) => inviteStatus(i) !== 'joined');
+          const joinedRows = invites.filter((i) => inviteStatus(i) === 'joined');
+          return (
+            <>
+              {out.length > 0 && (
+                <>
+                  <h3 className="invite__h3">Invited — not yet joined</h3>
+                  <ul className="invite__list">{out.map(row)}</ul>
+                </>
+              )}
+              {joinedRows.length > 0 && (
+                <>
+                  <h3 className="invite__h3">Joined</h3>
+                  <ul className="invite__list">{joinedRows.map(row)}</ul>
+                </>
+              )}
+            </>
+          );
+        })()}
         {isAdmin && (
           <>
             {/* "At the door" means people still waiting. Handled ones moved
