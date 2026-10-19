@@ -273,9 +273,13 @@ export async function loadMyAvailability(me: string): Promise<AvailabilityWindow
   return (data as AvailabilityWindow[] | null) ?? [];
 }
 
-export async function addAvailability(me: string, w: { weekday: number; startMin: number; endMin: number; kind: AvailabilityKind }): Promise<void> {
+export async function addAvailability(me: string, w: { weekday: number | number[]; startMin: number; endMin: number; kind: AvailabilityKind }): Promise<void> {
+  // A batch day choice (Monday – Friday, Saturday & Sunday, Every day) still
+  // stores one row PER DAY — the storage never learns about batches, so every
+  // row stays individually removable and every reader stays unchanged.
+  const days = Array.isArray(w.weekday) ? w.weekday : [w.weekday];
   const { error } = await supabase.from('availability_windows')
-    .insert({ profile_id: me, weekday: w.weekday, start_min: w.startMin, end_min: w.endMin, kind: w.kind });
+    .insert(days.map((d) => ({ profile_id: me, weekday: d, start_min: w.startMin, end_min: w.endMin, kind: w.kind })));
   if (error) throw error;
 }
 

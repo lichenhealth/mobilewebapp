@@ -77,7 +77,10 @@ export default function CalendarSettings() {
   const [error, setError] = useState('');
 
   // add-hours form
-  const [wDay, setWDay] = useState(0);
+  // wDay is a single weekday index (0=Mon … 6=Sun) OR a batch key — most
+  // people work a typical work week (founder 2026-10-19), so one Add can lay
+  // down the whole set. Storage stays one row per day either way.
+  const [wDay, setWDay] = useState<string>('weekdays');
   const [wStart, setWStart] = useState(9 * 60);
   const [wEnd, setWEnd] = useState(17 * 60);
   const [wKind, setWKind] = useState<AvailabilityKind>('available');
@@ -256,15 +259,24 @@ export default function CalendarSettings() {
               <option value="social">Social</option>
               {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
             </select>
-            <select className="cset__select" value={wDay} onChange={(e) => setWDay(Number(e.target.value))} aria-label="Weekday">
-              {WEEKDAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            <select className="cset__select" value={wDay} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
+              <option value="weekdays">Monday – Friday</option>
+              <option value="weekend">Saturday &amp; Sunday</option>
+              <option value="everyday">Every day</option>
+              {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
             </select>
             <TimeField value={wStart} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
             <span className="rec__lbl">to</span>
             <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
             <button
               className="cedit__add cedit__add--sm"
-              onClick={() => act(() => addAvailability(me, { weekday: wDay, startMin: wStart, endMin: wEnd, kind: wKind }))}
+              onClick={() => act(() => addAvailability(me, {
+                weekday: wDay === 'weekdays' ? [0, 1, 2, 3, 4]
+                  : wDay === 'weekend' ? [5, 6]
+                  : wDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
+                  : Number(wDay),
+                startMin: wStart, endMin: wEnd, kind: wKind,
+              }))}
             >
               <Icon name="plus" size={12} /> Add
             </button>

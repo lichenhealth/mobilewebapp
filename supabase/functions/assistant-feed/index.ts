@@ -217,16 +217,17 @@ const CALENDAR_TOOLS = [
   },
   {
     name: 'add_hours',
-    description: 'Add one weekly hours window. kind: "work" (bookable, meeting-findable), "social" (their web sees them as available), or "on_call" (care-team urgent coverage — ONLY offer or use this if the setup read says they are an active caregiver; for anyone else it will refuse). weekday: 0=Monday … 6=Sunday. start_min/end_min: minutes since midnight (9am=540, 5pm=1020).',
+    description: 'Add a weekly hours window — one day via weekday, or the same times across several days in ONE call via weekdays (e.g. "work 9–5 weekdays" = weekdays [0,1,2,3,4]; a weekend = [5,6]). kind: "work" (bookable, meeting-findable), "social" (their web sees them as available), or "on_call" (care-team urgent coverage — ONLY offer or use this if the setup read says they are an active caregiver; for anyone else it will refuse). Days: 0=Monday … 6=Sunday. start_min/end_min: minutes since midnight (9am=540, 5pm=1020).',
     input_schema: {
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['work', 'social', 'on_call'] },
         weekday: { type: 'number' },
+        weekdays: { type: 'array', items: { type: 'number' } },
         start_min: { type: 'number' },
         end_min: { type: 'number' },
       },
-      required: ['kind', 'weekday', 'start_min', 'end_min'],
+      required: ['kind', 'start_min', 'end_min'],
     },
   },
   {
@@ -1671,9 +1672,15 @@ Deno.serve(async (req) => {
 
     if (name === 'add_hours') {
       const kind = String(input.kind ?? '');
-      const weekday = Number(input.weekday), start = Number(input.start_min), end = Number(input.end_min);
+      const start = Number(input.start_min), end = Number(input.end_min);
+      // weekdays[] sets the same times across several days in one call
+      // (founder 2026-10-19, with the composer's Monday–Friday batch) —
+      // storage stays one row per day, same as the manual editor.
+      const days = Array.isArray(input.weekdays)
+        ? [...new Set((input.weekdays as unknown[]).map(Number))]
+        : [Number(input.weekday)];
       if (!['work', 'social', 'on_call'].includes(kind)) return { ok: false, error: 'kind must be work, social, or on_call.' };
-      if (!(weekday >= 0 && weekday <= 6)) return { ok: false, error: 'weekday must be 0 (Monday) through 6 (Sunday).' };
+      if (!days.length || days.some((d) => !(d >= 0 && d <= 6))) return { ok: false, error: 'Each day must be 0 (Monday) through 6 (Sunday) — give weekday or a weekdays list.' };
       if (!(start >= 0 && end > start && end <= 1440)) return { ok: false, error: 'Times must satisfy 0 <= start < end <= 1440 (minutes since midnight).' };
       if (kind === 'on_call') {
         const care = await (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json();
@@ -1683,10 +1690,10 @@ Deno.serve(async (req) => {
       }
       const r = await sb('availability_windows', {
         method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ profile_id, weekday, start_min: start, end_min: end, kind: kindIn(kind) }),
+        body: JSON.stringify(days.map((d) => ({ profile_id, weekday: d, start_min: start, end_min: end, kind: kindIn(kind) }))),
       });
       if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 140)}` };
-      return { ok: true, change: `added ${kind} hours: ${DAYS[weekday]} ${minLabel(start)}–${minLabel(end)}` };
+      return { ok: true, change: `added ${kind} hours: ${days.map((d) => DAYS[d]).join(', ')} ${minLabel(start)}–${minLabel(end)}` };
     }
 
     if (name === 'remove_hours') {
