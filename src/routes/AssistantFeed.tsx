@@ -256,20 +256,13 @@ export default function AssistantFeed() {
   const openConvoRef = useRef<string | null>(null);
   useEffect(() => { openConvoRef.current = openConvo; }, [openConvo]);
 
-  // THE DESKTOP SHAPE IS CLAUDE-DESKTOP'S (founder 2026-10-12: "I like how
-  // desktop claude has the nav to the left and the text of the current log
-  // in the window in front of you"): from 1100px — the paged split's own
-  // breakpoint — a personal thread wears a standing NAV column (thread
-  // circles + the conversation list) beside the open conversation, instead
-  // of the mobile walk between list and exchange. A WATCHED media query,
-  // never sampled once (ChatThread's rule).
-  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1100px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1100px)');
-    const on = () => setWide(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
+  // THE DESKTOP BRAIN IS ONE WIDE COLUMN (founder 2026-10-19: "can the chat
+  // go under the icons, like with mobile — maybe on desktop the right can be
+  // used for preview, if there is one? Or just have a wider chat, if not?",
+  // superseding the 2026-10-12 two-column nav shape): every width walks the
+  // same stacked order — tools, icon rail, then the list or the open
+  // conversation — and the column simply breathes wider from 1100px (CSS).
+  // The page PREVIEW (.afeed--paged) stays the one two-pane dress.
 
   // CHOSEN CONVERSATION NAMES (founder 2026-10-12: "name a convo, like you
   // can name a file") — overlay the self-organizing first-words titles.
@@ -337,22 +330,12 @@ export default function AssistantFeed() {
     // 2026-10-12: "I pressed the search button in marketplace brain and it
     // took me to the middle of a conversation"): the auto-open stands down
     // so the LIST shows under the open field — a search lands on something
-    // search-shaped, never inside an old exchange. The wide nav keeps its
-    // auto-open; its list stands beside the pane either way.
-    if (searchOpen && !wide) return;
+    // search-shaped, never inside an old exchange.
+    if (searchOpen) return;
     if (convos.length === 0) setAutoConvo('new');
     else if (convos.length === 1 && convos[0].thread === thread) setAutoConvo(convos[0].id);
-    // The desktop nav shape never shows an empty pane (founder 2026-10-12):
-    // with the list standing beside the conversation, arriving on a thread
-    // opens its newest own exchange — the Claude-desktop behavior. Foreign
-    // rows (General's log) stay list-side doors; a thread with only those
-    // opens fresh.
-    else if (wide && !builderMode) {
-      const own = convos.find((c) => c.thread === thread);
-      setAutoConvo(own ? own.id : 'new');
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personal, loading, convoParam, autoConvo, convos.length, thread, wide, searchOpen]);
+  }, [personal, loading, convoParam, autoConvo, convos.length, thread, searchOpen]);
 
   // Opening a conversation IS seeing it: bump the thread cursor, refresh
   // the rail badges, and remember this one as seen so its own pill drops
@@ -364,14 +347,11 @@ export default function AssistantFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personal, loading, openConvo, me, thread]);
 
-  // The page-beside-conversation split (profile/space threads) and the
-  // desktop NAV shape are different dresses for the same screen — nav
-  // stands down while the page pane is up, and in builder mode.
+  // The page-beside-conversation split (profile/space threads) is the one
+  // two-pane dress — "on desktop the right can be used for preview, if
+  // there is one" (founder 2026-10-19).
   const paged = showPage && (thread === 'profile' || !!spaceId);
-  const navMode = wide && personal && !builderMode && !paged;
-  // In nav mode the list STANDS BESIDE the conversation — the full-screen
-  // list view is the phone's walk, never the desktop's.
-  const listMode = personal && !openConvo && !loading && !navMode;
+  const listMode = personal && !openConvo && !loading;
   const viewEntries = useMemo(() => {
     if (!personal) return posts;
     if (!openConvo) return [];
@@ -898,7 +878,7 @@ export default function AssistantFeed() {
   );
 
   return (
-    <div className={'afeed' + (paged ? ' afeed--paged' : '') + (navMode ? ' afeed--nav' : '')}>
+    <div className={'afeed' + (paged ? ' afeed--paged' : '')}>
       {builderMode ? (
         /* A TRUE TOGGLE, FROZEN (founder 2026-09-09: "let's have a toggle
            back to manual mode frozen in the upper bar, instead of the
@@ -946,10 +926,9 @@ export default function AssistantFeed() {
         </div>
       </header>
 
-      {/* Search + ⊕, LEFT, above the rail — the section-tools grammar.
-          In nav mode they live in the column instead (one set, two homes). */}
-      {!builderMode && !navMode && toolsRow}
-      {!navMode && searchPanel}
+      {/* Search + ⊕, LEFT, above the rail — the section-tools grammar. */}
+      {!builderMode && toolsRow}
+      {searchPanel}
 
       {/* The threads as SECTION DOORS (founder 2026-08-31: "replace the text
           boxes with the icons for each space"): each thread wears its
@@ -957,40 +936,15 @@ export default function AssistantFeed() {
           open" — with its message tally at the upper right, TopBar-badge
           style. A section with nothing in it yet reads GRAY until it's set
           up; General is always lit, it's the front door. */}
-      {/* THE DESKTOP NAV COLUMN (founder 2026-10-12: "the nav to the left
-          and the text of the current log in the window in front of you").
-          One standing column: the thread doors as a wrapping grid, the ⊕,
-          the conversation list, the General-log door — while the open
-          conversation fills the pane beside it. Mobile keeps the walk. */}
-      {navMode && (
-        <aside className="afeed__nav" aria-label="Conversations">
-          {toolsRow}
-          {searchPanel}
-          <div className="afeed__nav-rail">{threadButtons}</div>
-          <div className="afeed__nav-list">
-            {visibleConvos.map(convoRow)}
-            {!loading && visibleConvos.length === 0 && (
-              <p className="afeed__muted">
-                {q.trim() ? `No conversations match “${q}”.` : 'No conversations yet.'}
-              </p>
-            )}
-          </div>
-          {thread !== 'general' && (
-            <button className="afeed__alllog" onClick={openGeneralLog}>
-              <span className="link-cue">See every conversation — the General log</span> ›
-            </button>
-          )}
-        </aside>
-      )}
-
       {/* The rail SAYS it scrolls now (founder 2026-10-05, circling the
           eighth icon cut at the phone's edge: "have the same scroll prompt
           as homepage, so people know to toggle") — ScrollHintRow in hide
           mode, the icon-circle grammar: no half-cut icon, a chevron BUTTON
           marking each direction that has more. ⚠ Run scripts/check-rows.mjs
-          after touching this row. In nav mode the doors live in the column
-          instead — one set of buttons, two homes. */}
-      {!builderMode && !navMode && (
+          after touching this row. Desktop stacks the SAME rail over the
+          conversation (founder 2026-10-19 — the two-column nav is retired;
+          the chat goes under the icons at every width). */}
+      {!builderMode && (
       <ScrollHintRow className="afeed__threads h-scroll" ariaLabel="Assistant threads">
         {threadButtons}
       </ScrollHintRow>
@@ -1211,9 +1165,8 @@ export default function AssistantFeed() {
       )}
 
       {/* The way back to the BRAIN — the section's brief, summary + list,
-          one click (founder 2026-10-13); never in nav mode, where the list
-          stands beside you. */}
-      {!listMode && !navMode && personal && openConvo && (
+          one click (founder 2026-10-13). */}
+      {!listMode && personal && openConvo && (
         <button
           className="afeed__convoback"
           onClick={() => navigate(`/assistant?section=${sectionForThread(thread)}`)}
