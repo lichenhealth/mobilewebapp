@@ -61,13 +61,15 @@ export default function Intro() {
     (
       <div className="intro__body" key="c1">
         <div className="intro__mark"><LichenMark size={72} /></div>
+        {/* Founder's verbatim copy (2026-10-19) — the title's trailing dash
+            flows into the lowercase body on purpose. */}
         <p className="intro__eyebrow">Welcome to Lichen</p>
-        <h1 className="intro__title">A new way of being in relationship</h1>
+        <h1 className="intro__title">A new way of being in relationship&nbsp;—</h1>
         <p className="intro__text">
-          With each other — and with the plants, animals and land we live
-          among. Here, every contribution is valued, and <strong>reciprocity</strong> is
-          the underlying principle of the whole ecosystem: what you give
-          flows back.
+          with each other and the plants, animals and land we rely on, not
+          just to survive, but to thrive. Here, every contribution is
+          valued, and <strong>reciprocity</strong> is the underlying
+          principle of the whole ecosystem.
         </p>
       </div>
     ),
