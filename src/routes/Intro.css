@@ -1,0 +1,137 @@
+/* The welcome flight (founder 2026-10-18) — a Canva-invite feel on Lichen's
+   paper: one centered card at a time, display serif headlines, peach accents,
+   dots + arrows below, Skip always in the corner. */
+
+.intro {
+  min-height: 100dvh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 18px var(--wall-gutter, 16px) 28px;
+  background: var(--bone);
+}
+
+.intro__top {
+  width: 100%; max-width: 620px;
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 32px;
+}
+.intro__wordmark {
+  font-family: var(--font-display, serif); font-size: 19px; color: var(--ink);
+}
+.intro__skip {
+  background: none; border: 0; padding: 6px 0; cursor: pointer;
+  font-size: var(--t-sm); color: var(--ink-muted);
+  text-decoration: underline; text-decoration-color: var(--peach);
+  text-underline-offset: 3px;
+}
+.intro__skip:hover { color: var(--ink); text-decoration-color: var(--peach-deep); }
+
+.intro__card {
+  width: 100%; max-width: 620px;
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  margin: 10px 0;
+}
+.intro__body {
+  background: #fff;
+  border: 1px solid var(--bone-edge);
+  border-radius: 22px;
+  box-shadow: 0 18px 44px rgba(42, 51, 56, 0.08);
+  padding: 44px 30px 40px;
+  width: 100%;
+  text-align: center;
+  animation: intro-in 320ms ease both;
+}
+@keyframes intro-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.intro__mark { display: flex; justify-content: center; margin-bottom: 14px; }
+.intro__glyph {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 58px; height: 58px; border-radius: 50%;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  color: var(--peach-deep); margin-bottom: 14px;
+}
+.intro__eyebrow {
+  margin: 0 0 10px; font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--peach-deep);
+}
+.intro__title {
+  margin: 0 0 14px; font-family: var(--font-display, serif);
+  font-size: clamp(26px, 5.4vw, 34px); line-height: 1.16; font-weight: 500;
+  color: var(--ink);
+}
+.intro__text {
+  margin: 0 auto 12px; max-width: 46ch;
+  font-size: 15.5px; line-height: 1.62; color: var(--ink-soft);
+}
+.intro__text:last-child { margin-bottom: 0; }
+
+/* Card 2 — the two halves */
+.intro__pair {
+  display: grid; grid-template-columns: 1fr; gap: 18px;
+  margin-top: 6px; text-align: left;
+}
+@media (min-width: 640px) { .intro__pair { grid-template-columns: 1fr 1fr; } }
+.intro__half {
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge); border-radius: 16px;
+  padding: 16px 16px 14px;
+}
+.intro__half-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--bone-edge);
+  color: var(--peach-deep); margin-bottom: 8px;
+}
+.intro__half-title {
+  margin: 0 0 6px; font-family: var(--font-display, serif);
+  font-size: 19px; font-weight: 500; color: var(--ink);
+}
+.intro__half .intro__text { font-size: 14.5px; margin: 0; max-width: none; }
+
+/* Card 6 — the three doors */
+.intro__ctas { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 6px; }
+.intro__cta {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  width: 100%; padding: 14px 16px; cursor: pointer;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: 16px; transition: border-color 120ms, background 120ms;
+}
+.intro__cta:hover { border-color: var(--peach-deep); background: var(--peach-tint, #fdf1ea); }
+.intro__cta-icon {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--bone-edge); color: var(--peach-deep);
+}
+.intro__cta-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.intro__cta-words strong { font-size: 15.5px; font-weight: 600; color: var(--ink); }
+.intro__cta-words em { font-style: normal; font-size: 13px; color: var(--ink-muted); }
+.intro__later {
+  background: none; border: 0; padding: 8px 0 0; cursor: pointer;
+  font-size: var(--t-sm); color: var(--ink-muted);
+  text-decoration: underline; text-decoration-color: var(--peach);
+  text-underline-offset: 3px;
+}
+.intro__later:hover { color: var(--ink); }
+
+/* Foot — arrows + dots */
+.intro__foot {
+  width: 100%; max-width: 620px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.intro__nav {
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid var(--bone-edge); color: var(--ink-soft);
+}
+.intro__nav:disabled { opacity: 0.35; cursor: default; }
+.intro__nav--next { background: var(--peach); border-color: var(--peach); color: var(--ink); }
+.intro__nav--ghost { background: none; border: 0; }
+.intro__dots { display: flex; gap: 8px; }
+.intro__dot {
+  width: 8px; height: 8px; border-radius: 50%; padding: 0; cursor: pointer;
+  background: var(--bone-deep); border: 0; transition: background 120ms, transform 120ms;
+}
+.intro__dot.is-on { background: var(--peach-deep); transform: scale(1.25); }
