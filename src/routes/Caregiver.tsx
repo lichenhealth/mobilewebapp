@@ -11,6 +11,10 @@ import {
   loadOnCallRoster, onCallNow, nextOnCall, nextOnCallLabel, type OnCallCaregiver,
 } from '../lib/conciergeApi';
 import { loadMyAvailability, minToLabel, type AvailabilityWindow } from '../lib/calendarApi';
+import {
+  loadCareLinks, approveCare, removeCare, remindCareRequest, remindedRecently,
+  sendCareInviteEmail, prepareCareText, cancelCareInvite, type CareLink, type CareInvite,
+} from '../lib/careTeamApi';
 import CareAddBox from '../components/CareAddBox';
 import { supabase } from '../lib/supabase';
 import './Caregiver.css';
@@ -53,6 +57,15 @@ export default function Caregiver() {
   // For the empty state's add-your-first-client box (the prepared care text
   // speaks the inviter's name).
   const [myName, setMyName] = useState('');
+  // THE ROSTER MANAGER (founder 2026-10-19: "pending clients with an accept
+  // or reject button… it feels like it should be in your provider dashboard"):
+  // pending links where I'M the caregiver + my outstanding client invitations
+  // render right on the Client List tab — nobody is sent to Profile to decide.
+  const [pendLinks, setPendLinks] = useState<CareLink[]>([]);
+  const [pendInvites, setPendInvites] = useState<CareInvite[]>([]);
+  const [pendBusy, setPendBusy] = useState('');
+  const [confirmId, setConfirmId] = useState('');
+  const [pendMsg, setPendMsg] = useState('');
 
   useEffect(() => {
     if (!me) return;
@@ -77,9 +90,18 @@ export default function Caregiver() {
       if (!active) return;
       setAllowed(ok);
       if (ok) {
-        const [list, counts] = await Promise.all([loadCareClients(me), loadUnreadCounts()]);
+        const [list, counts, roster] = await Promise.all([
+          loadCareClients(me), loadUnreadCounts(), loadCareLinks().catch(() => null),
+        ]);
         if (!active) return;
-        setClients(list);
+        // Alphabetical (founder 2026-10-19: "your list of clients in
+        // alphabetical order") — recency stays visible on the Chat lens's
+        // time labels, the ORDER is a roster's.
+        setClients([...list].sort((a, b) => a.name.localeCompare(b.name)));
+        if (roster) {
+          setPendLinks(roster.links.filter((l) => l.caregiver_id === me && l.status === 'pending'));
+          setPendInvites(roster.invites.filter((i) => i.role === 'patient'));
+        }
         setUnread(counts);
         setLoading(false);
         // The glance numbers, per client: their current overall WOW (self +
@@ -113,6 +135,67 @@ export default function Caregiver() {
     })();
     return () => { active = false; };
   }, [me]);
+
+  /** Re-read clients + the pending roster after any decision or add. */
+  async function refreshRoster() {
+    const [list, roster] = await Promise.all([loadCareClients(me), loadCareLinks()]);
+    setClients([...list].sort((a, b) => a.name.localeCompare(b.name)));
+    setPendLinks(roster.links.filter((l) => l.caregiver_id === me && l.status === 'pending'));
+    setPendInvites(roster.invites.filter((i) => i.role === 'patient'));
+  }
+
+  async function acceptAsk(l: CareLink) {
+    setPendBusy(l.id); setPendMsg('');
+    try {
+      await approveCare(l.id);
+      await refreshRoster();
+      setPendMsg(`${l.patientName} is your client now.`);
+    } catch { setPendMsg('That didn’t save — try again.'); }
+    setPendBusy('');
+  }
+
+  async function declineAsk(l: CareLink) {
+    if (confirmId !== l.id) { setConfirmId(l.id); return; }
+    setConfirmId(''); setPendBusy(l.id); setPendMsg('');
+    try { await removeCare(l.id); await refreshRoster(); }
+    catch { setPendMsg('That didn’t save — try again.'); }
+    setPendBusy('');
+  }
+
+  async function remindAsk(l: CareLink) {
+    setPendBusy(l.id);
+    setPendMsg(await remindCareRequest(l.id));
+    setPendLinks((rows) => rows.map((r) => (r.id === l.id ? { ...r, reminded_at: new Date().toISOString() } : r)));
+    setPendBusy('');
+  }
+
+  async function emailInvite(i: CareInvite) {
+    setPendBusy(i.id);
+    const m = await sendCareInviteEmail(i.id, myName, i.email);
+    setPendMsg(m);
+    // Stamp locally only when a send actually went out (the server stamps
+    // reminded_at only after Resend accepts — mirror that).
+    if (/emailed/i.test(m)) {
+      setPendInvites((rows) => rows.map((r) => (r.id === i.id ? { ...r, reminded_at: new Date().toISOString() } : r)));
+    }
+    setPendBusy('');
+  }
+
+  async function textInvite(i: CareInvite) {
+    if (!i.phone) return;
+    setPendBusy(i.id);
+    const t = await prepareCareText('patient', i.phone, myName);
+    setPendBusy('');
+    window.location.href = t.href;
+  }
+
+  async function cancelInvite(i: CareInvite) {
+    if (confirmId !== i.id) { setConfirmId(i.id); return; }
+    setConfirmId(''); setPendBusy(i.id); setPendMsg('');
+    try { await cancelCareInvite(i.id); await refreshRoster(); }
+    catch { setPendMsg('That didn’t save — try again.'); }
+    setPendBusy('');
+  }
 
   const TABS: { id: CgTab; label: string }[] = [
     { id: 'wow', label: 'WOW' },
@@ -219,15 +302,9 @@ export default function Caregiver() {
             the moment they say yes.
           </p>
           <div className="cg__empty-add">
-            <CareAddBox role="patient" me={me} myName={myName} onAdded={() => {}}
+            <CareAddBox role="patient" me={me} myName={myName} onAdded={() => void refreshRoster()}
               placeholder="A client’s name, email, or phone…" />
           </div>
-          <p className="cg__empty-sub">
-            Pending offers wait under{' '}
-            <button type="button" className="cg__empty-link link-cue" onClick={() => navigate('/profile#care-for')}>
-              People you care for
-            </button>.
-          </p>
         </div>
       )}
 
@@ -302,6 +379,84 @@ export default function Caregiver() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* THE ROSTER MANAGER (founder 2026-10-19: "pending clients with an
+          accept or reject button until the practitioner makes the decision…
+          it feels like it should be in your provider dashboard"): every
+          pending edge where I'm the caregiver, decided right here — asked
+          of me → Accept / Decline; my own offer → Remind; a non-member I
+          invited → Email / Text / Cancel. Care stays consensual: nothing
+          here acts for the other person. */}
+      {!loading && allowed && tab === 'clients' && (pendLinks.length > 0 || pendInvites.length > 0) && (
+        <div className="cg__pend">
+          <p className="cg__pend-h">Waiting on a yes</p>
+          {pendLinks.map((l) => {
+            const asked = l.initiated_by === l.patient_id;
+            return (
+              <div className="cg__pend-row" key={l.id}>
+                <span className="cg__avatar" style={{ background: colorFor(l.patient_id) }}>
+                  {monogramFor(l.patientName)}
+                </span>
+                <span className="cg__pend-body">
+                  <span className="cg__pend-name">{l.patientName}</span>
+                  <span className="cg__pend-sub">
+                    {asked ? 'Asked you to join their care team' : 'Waiting for them to approve your offer'}
+                  </span>
+                </span>
+                <span className="cg__pend-actions">
+                  {asked ? (
+                    <>
+                      <button className="btn btn-primary cg__pend-btn" disabled={pendBusy === l.id}
+                        onClick={() => void acceptAsk(l)}>Accept</button>
+                      <button className="cg__pend-ghost" disabled={pendBusy === l.id}
+                        onClick={() => void declineAsk(l)}>{confirmId === l.id ? 'Decline?' : 'Decline'}</button>
+                    </>
+                  ) : remindedRecently(l.reminded_at)
+                    ? <span className="cg__pend-done">Reminded ✓</span>
+                    : <button className="cg__pend-ghost" disabled={pendBusy === l.id}
+                        onClick={() => void remindAsk(l)}>Remind ›</button>}
+                </span>
+              </div>
+            );
+          })}
+          {pendInvites.map((i) => (
+            <div className="cg__pend-row" key={i.id}>
+              <span className="cg__avatar" style={{ background: colorFor(i.id) }}>
+                {monogramFor(i.email ?? i.phone ?? '?')}
+              </span>
+              <span className="cg__pend-body">
+                <span className="cg__pend-name">{i.email ?? i.phone}</span>
+                <span className="cg__pend-sub">Invited to Lichen — becomes your client when they join and say yes</span>
+              </span>
+              <span className="cg__pend-actions">
+                {i.email && (remindedRecently(i.reminded_at)
+                  ? <span className="cg__pend-done">Emailed ✓</span>
+                  : <button className="cg__pend-ghost" disabled={pendBusy === i.id}
+                      onClick={() => void emailInvite(i)}>{i.reminded_at ? 'Remind ›' : 'Email ›'}</button>)}
+                {i.phone && (
+                  <button className="cg__pend-ghost" disabled={pendBusy === i.id}
+                    onClick={() => void textInvite(i)}>Text ›</button>
+                )}
+                <button className="cg__pend-ghost" disabled={pendBusy === i.id}
+                  onClick={() => void cancelInvite(i)}>{confirmId === i.id ? 'Cancel?' : 'Cancel'}</button>
+              </span>
+            </div>
+          ))}
+          {pendMsg && <p className="cg__pend-msg">{pendMsg}</p>}
+        </div>
+      )}
+
+      {/* The add door is STANDING on the Client List tab (founder 2026-10-19:
+          "if you look up someone who's not yet a client… you can send the
+          request… in your provider dashboard") — the empty state already
+          carries one, this covers a dashboard with clients on it. */}
+      {!loading && allowed && tab === 'clients' && clients.length > 0 && (
+        <div className="cg__addblock">
+          <p className="cg__pend-h">Add a client</p>
+          <CareAddBox role="patient" me={me} myName={myName} onAdded={() => void refreshRoster()}
+            placeholder="A client’s name, email, or phone…" />
         </div>
       )}
     </div>
