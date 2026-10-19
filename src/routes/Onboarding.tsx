@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import { LichenMark } from '../components/LichenMark';
 import { approveCare } from '../lib/careTeamApi';
+import { startGuide } from '../lib/guide';
 import './Onboarding.css';
 
 /** A care-team invitation waiting on this brand-new member — the PROVIDER
@@ -226,22 +227,17 @@ export default function Onboarding() {
     const active = careAsks.filter((a) => a.status === 'active');
     if (active.length === 1) return `/concierge/client/${active[0].patientId}`;
     if (active.length > 1) return '/caregiver';
-    // CLAUDE WALKS THEM IN (founder 2026-10-18, superseding the 10-13
-    // dashboard landings for chosen paths): the welcome flight promises a
-    // guided setup, so a practitioner or community arrival lands in their
-    // own Claude conversation with the ask prefilled UNSENT — the model call
-    // is theirs to spend, and every manual screen stays one door away (the
-    // assistant hands real doors via send_app_door). A CLIENT keeps the
-    // guided intake — the front door the subsidy policy names.
-    if (arrival === 'practitioner') {
-      return '/assistant/feed?thread=general&convo=new&ask=' + encodeURIComponent(
-        'I just joined Lichen as a practitioner. Walk me through getting set up, one step at a time — what care I offer, my session types and hours, and how to add my first client.');
-    }
+    // CLAUDE WALKS THEM IN — ON THE REAL SCREENS (founder 2026-10-19,
+    // superseding the 10-18 drop-into-the-chat landing the same day she
+    // walked it: "kinda like clippy the paperclip, instead of dropping you
+    // into the Ai chat, without knowing how you got there"): a chosen path
+    // lands on its real first screen with the floating GuideCompanion
+    // stepping through the platform; every step carries an "Ask me to do
+    // it" door into the real conversation. A CLIENT keeps the guided
+    // intake — that flow IS their walkthrough.
+    if (arrival === 'practitioner') { startGuide('practitioner'); return '/caregiver'; }
     if (arrival === 'client') return '/concierge/intake';
-    if (arrival === 'community') {
-      return '/assistant/feed?thread=general&convo=new&ask=' + encodeURIComponent(
-        'I just joined Lichen for the community. Walk me through getting set up, one step at a time — my profile, finding people, and how giving and exchange work here.');
-    }
+    if (arrival === 'community') { startGuide('community'); return '/home'; }
     return '/home';
   }
 

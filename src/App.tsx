@@ -70,6 +70,7 @@ import SmartSearch from './routes/SmartSearch';
 import AreaFeed from './routes/AreaFeed';
 import Courses from './routes/Courses';
 import BottomNav from './components/BottomNav';
+import GuideCompanion from './components/GuideCompanion';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
@@ -443,6 +444,9 @@ export default function App() {
         )}
       </main>
       {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
+      {/* Claude's walkthrough companion (founder 2026-10-19) — floats over
+          the real screens while a new member's tour is active. */}
+      {!isAuth && !isGuest && !isEmbed && <GuideCompanion />}
       {/* The docked desktop rail is app chrome too — it stands down with the
           rest on a naked-site rendering (founder 2026-09-09: the builder's
           Preview showed the side nav). */}
