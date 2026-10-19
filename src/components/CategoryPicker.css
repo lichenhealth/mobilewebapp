@@ -138,3 +138,8 @@
   font-size: 13px;
   color: var(--ink-soft);
 }
+
+/* CARE AT THE TOP (founder 2026-10-19): a practitioner arrival's picker
+   leads with the healing families, lit peach — curated, never restricted. */
+.cat__section--care { color: var(--peach-deep); border-top: 0; }
+.cat__item--care { background: var(--peach-tint); border-radius: 8px; }

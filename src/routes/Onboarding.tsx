@@ -533,6 +533,7 @@ export default function Onboarding() {
                 selected={serviceCats}
                 onChange={setServiceCats}
                 userId={user.id}
+                careFirst={practitioner}
               />
             </div>
           )}
@@ -545,6 +546,7 @@ export default function Onboarding() {
                 selected={goodCats}
                 onChange={setGoodCats}
                 userId={user.id}
+                careFirst={practitioner}
               />
             </div>
           )}
