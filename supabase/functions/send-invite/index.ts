@@ -64,7 +64,7 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
     ? `A gentle reminder — ${inviterName} invited you to Lichen`
     : `${inviterName} invited you to Lichen`;
   const intro = (remind ? 'In case it got buried: ' : '')
-    + `${inviterName} thinks you'd find a place at Lichen — a community for holistic care and a more humane, conscious economy.`;
+    + `${inviterName} thinks you'd find a place at Lichen — a community focused on providing holistic healthcare and a more humane, conscious economy through which to collaborate with each other and the planet.`;
 
   const giftLabel = giftTier === 'concierge' ? 'Concierge' : giftTier === 'community' ? 'Community' : '';
   const span = giftMonths
@@ -83,10 +83,10 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   // group as the self-selected door for those who feel called to help
   // build. Kept in step with Invite.tsx's DEFAULT_MISSION.
   const DEFAULT_MISSION =
-    `Thanks in advance for your (precious) time. The foundation of the corrective social network and healthcare `
-    + `system is built, much is still in development, and there will be bugs along the way. Come use the network `
-    + `as it grows — and if you feel called to help build it out, let Galyn know: members who want to give `
-    + `feedback are invited into the Alpha Tester group, where suggestions become features. We're grateful to be `
+    `Thanks in advance for your (precious) time. While the foundation of the corrective social network and `
+    + `healthcare system is built, the platform is still in development, and there will be bugs along the way. `
+    + `If you feel called to help build it out, we are inviting alpha members to give feedback while connecting `
+    + `with other pioneers in our Alpha Tester Group, where suggestions become features. We're grateful to be `
     + `building it with you.`;
   // An admin may rewrite this paragraph before sending (founder 2026-08-06:
   // "give you the boilerplate language as a template to edit"). Empty falls
@@ -94,8 +94,16 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   const missionText = (mission ?? '').trim() || DEFAULT_MISSION;
   // Everyone gets 3 months free on signup (growth phase) — framed as a
   // co-creation window, not a trial. A specific admin gift supersedes it.
+  // ⚠ "Your Alpha membership is on us" is the founder's framing (2026-10-19)
+  // of the SAME 3-month growth gift grant_growth_gift mints — the machinery
+  // is unchanged; if alpha should be free for longer, that's a gift change,
+  // not a copy change.
   const trial = giftLine ? '' :
-    `Your first 3 months are on us. Use them to make Lichen yours — tell us what you need, help us build it out, and be part of the beginning of a better world.`;
+    `Your Alpha membership is on us. Use the time to make Lichen yours — tell us what you need to see in order `
+    + `to value the platform as a social utility that uses Community Subscriptions ($29/month) and Concierge `
+    + `Healthcare Services ($99/month) to provide subsidies to members who can't yet afford the goods and `
+    + `services they need to heal and grow in healthy relationship to their community and the planet. Help us `
+    + `build it out, and be part of the beginning of a better world.`;
 
   // Invite-with-a-seat (founder 2026-09-03): the email says plainly which
   // space and role ride this invitation — the click on it is the consent.

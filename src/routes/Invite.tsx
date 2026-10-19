@@ -9,12 +9,12 @@ import { supabase } from '../lib/supabase';
  *  no gate, one honest alpha line, and the Alpha Tester group as the
  *  self-selected door for those who feel called to help build. */
 const DEFAULT_MISSION =
-  'Thanks in advance for your (precious) time. The foundation of the corrective '
-  + 'social network and healthcare system is built, much is still in development, '
-  + 'and there will be bugs along the way. Come use the network as it grows — and '
-  + 'if you feel called to help build it out, let Galyn know: members who want to '
-  + 'give feedback are invited into the Alpha Tester group, where suggestions '
-  + "become features. We're grateful to be building it with you.";
+  'Thanks in advance for your (precious) time. While the foundation of the '
+  + 'corrective social network and healthcare system is built, the platform is '
+  + 'still in development, and there will be bugs along the way. If you feel '
+  + 'called to help build it out, we are inviting alpha members to give feedback '
+  + 'while connecting with other pioneers in our Alpha Tester Group, where '
+  + "suggestions become features. We're grateful to be building it with you.";
 import { useAuth } from '../auth/AuthProvider';
 import './Invite.css';
 

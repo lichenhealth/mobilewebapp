@@ -28,6 +28,14 @@ type Props = {
   /** Narrow toggle, floating panel — for sitting 3-across on mobile (e.g.
    *  the marketplace filter row) instead of stacking full-width. */
   compact?: boolean;
+  /** CARE AT THE TOP (founder 2026-10-19, the US-at-top country-select
+   *  pattern — "we know they selected practitioner… bring Healthcare related
+   *  goods and services to the top and highlight them in peach, then have
+   *  all the other goods and services in alphabetical order"): healing-
+   *  section families lead, peach-lit; everything else follows A→Z. Curate,
+   *  never restrict — the accountant invited as a practitioner still
+   *  declares, and search spans the whole vocabulary either way. */
+  careFirst?: boolean;
 };
 
 /* --- tiny fuzzy match so we can nudge toward an existing category --- */
@@ -58,7 +66,7 @@ function similarity(a: string, b: string): number {
   return 1 - lev(x, y) / maxLen;
 }
 
-export default function CategoryPicker({ domain, categories, selected, onChange, userId, compact }: Props) {
+export default function CategoryPicker({ domain, categories, selected, onChange, userId, compact, careFirst }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -237,13 +245,13 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
           <div className="cat__list">
             {rows.length === 0 && <p className="cat__empty">No matches.</p>}
             {(() => {
-              const row = ({ c, child }: Row) => {
+              const row = ({ c, child }: Row, care = false) => {
                 const on = selectedSet.has(c.id);
                 return (
                   <button
                     key={c.id}
                     type="button"
-                    className={'cat__item' + (on ? ' is-on' : '') + (child ? ' cat__item--child' : '')}
+                    className={'cat__item' + (on ? ' is-on' : '') + (child ? ' cat__item--child' : '') + (care ? ' cat__item--care' : '')}
                     onClick={() => toggle(c.id)}
                   >
                     <span className="cat__box">{on ? '\u2713' : ''}</span>
@@ -254,13 +262,38 @@ export default function CategoryPicker({ domain, categories, selected, onChange,
               // Children ride their ROOT's section \u2014 the split groups families whole.
               const everyday = rows.filter((r) => ((r.child ? pool.find((p) => p.id === r.c.parent_id) : r.c)?.section ?? 'everyday') !== 'healing');
               const healing = rows.filter((r) => ((r.child ? pool.find((p) => p.id === r.c.parent_id) : r.c)?.section ?? 'everyday') === 'healing');
-              if (!everyday.length || !healing.length) return rows.map(row);
+              if (careFirst) {
+                // CARE AT THE TOP (founder 2026-10-19 \u2014 the US-at-top
+                // country-select pattern): healing leads, peach-lit; the
+                // rest follows A\u2192Z by family. Search spans everything \u2014
+                // the order holds even on filtered rows.
+                const byName = (a: Row, b: Row) => a.c.name.localeCompare(b.c.name);
+                const roots = everyday.filter((r) => !r.child).sort(byName);
+                const alpha = roots.flatMap((rt) =>
+                  [rt, ...everyday.filter((r) => r.child && r.c.parent_id === rt.c.id)]);
+                // Safety: a child whose root didn't make the filtered list
+                // still renders rather than silently vanishing.
+                const seen = new Set(alpha.map((r) => r.c.id));
+                const strays = everyday.filter((r) => !seen.has(r.c.id));
+                return (
+                  <>
+                    {healing.length > 0 && <p className="cat__section cat__section--care">Care &amp; healing</p>}
+                    {healing.map((r) => row(r, true))}
+                    {(alpha.length > 0 || strays.length > 0) && (
+                      <p className="cat__section">Everything else — A to Z</p>
+                    )}
+                    {alpha.map((r) => row(r))}
+                    {strays.map((r) => row(r))}
+                  </>
+                );
+              }
+              if (!everyday.length || !healing.length) return rows.map((r) => row(r));
               return (
                 <>
                   <p className="cat__section">Commerce</p>
-                  {everyday.map(row)}
+                  {everyday.map((r) => row(r))}
                   <p className="cat__section">Healing</p>
-                  {healing.map(row)}
+                  {healing.map((r) => row(r))}
                 </>
               );
             })()}
