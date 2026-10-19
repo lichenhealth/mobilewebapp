@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { GUIDES, endGuide, onGuideChange, readGuide, setGuideStep } from '../lib/guide';
+import { markPrompt } from '../lib/promptsApi';
+import { PRESENCE_LESSONS } from './PresencePrompt';
 import './GuideCompanion.css';
 
 /* The floating Claude companion (founder 2026-10-19 — "kinda like clippy the
@@ -17,6 +19,17 @@ export default function GuideCompanion() {
   const [state, setState] = useState(readGuide);
 
   useEffect(() => onGuideChange(() => setState(readGuide())), []);
+
+  // A step that TEACHES something another prompt would pop for counts as
+  // that prompt's whole lesson (founder 2026-10-19) — the candle step stands
+  // in for all of PresencePrompt's visits, so the bubble never doubles up
+  // after the tour either.
+  useEffect(() => {
+    if (!state || !user) return;
+    if (GUIDES[state.path][state.step]?.teaches === 'presence') {
+      void markPrompt(user.id, 'presence', PRESENCE_LESSONS);
+    }
+  }, [state?.path, state?.step, user?.id]);
 
   if (!state || !user) return null;
   const steps = GUIDES[state.path];

@@ -18,6 +18,12 @@ export interface GuideStep {
   title: string;
   body: string;
   ask: string;        // the prefilled (unsent) ask behind "Ask me to do it"
+  /** This step carries a teaching another prompt would otherwise pop for —
+   *  reaching it marks that prompt fully taught (founder 2026-10-19: the
+   *  candle bubble over the tour card read as two popups at once, so the
+   *  candle is a STEP on the journey now, and PresencePrompt holds off
+   *  while a tour is live). */
+  teaches?: 'presence';
 }
 
 export const GUIDES: Record<GuidePath, GuideStep[]> = {
@@ -41,6 +47,13 @@ export const GUIDES: Record<GuidePath, GuideStep[]> = {
       ask: 'Help me fill out my profile and public page.',
     },
     {
+      route: '/profile',
+      title: 'Your candle',
+      body: 'The candle at the top is your light — lit means you’re present and open to connecting. Nothing ever shows you’re merely online, and no timestamps follow you. Tap it any time to blow it out and work quietly; tap again to relight.',
+      ask: 'Explain presence on Lichen — when should I keep my candle lit?',
+      teaches: 'presence',
+    },
+    {
       route: '/caregiver',
       title: 'That’s the loop',
       body: 'Clients in Concierge, sessions in Calendar, your story in Profile. I’m always behind the brain icon at the top of every section — ask me anything, or ask me to do it for you.',
@@ -59,6 +72,13 @@ export const GUIDES: Record<GuidePath, GuideStep[]> = {
       title: 'The Directory',
       body: 'Everyone on Lichen — people, organizations, communities, groups and places. Weave whoever resonates into your own web, your My-celium.',
       ask: 'How do I build my web of people here?',
+    },
+    {
+      route: '/directory',
+      title: 'Your candle',
+      body: 'The candle at the top is your light — lit means you’re present and open to connecting. Nothing ever shows you’re merely online, and no timestamps follow you. Tap it any time to blow it out and browse quietly; tap again to relight.',
+      ask: 'Explain presence on Lichen — when should I keep my candle lit?',
+      teaches: 'presence',
     },
     {
       route: '/market',

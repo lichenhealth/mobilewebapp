@@ -64,7 +64,16 @@ export default function Caregiver() {
     if (!me) return;
     let active = true;
     (async () => {
-      const ok = await loadConciergeAccess(me);
+      let ok = await loadConciergeAccess(me);
+      // A brand-new member's growth gift can land a beat after arrival (the
+      // App gate grants it in parallel) — one short re-check before the gate
+      // card ever shows, so nobody meets a paywall their gift already opened
+      // (founder 2026-10-19: "that weird, intermediary screen").
+      if (!ok) {
+        await new Promise((r) => setTimeout(r, 1200));
+        if (!active) return;
+        ok = await loadConciergeAccess(me);
+      }
       if (!active) return;
       setAllowed(ok);
       if (ok) {
