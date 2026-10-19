@@ -81,10 +81,14 @@ export default function Intro() {
           <div className="intro__half">
             <span className="intro__half-icon"><Icon name="user-multiple" size={22} /></span>
             <h2 className="intro__half-title">Community</h2>
+            {/* Founder's copy (2026-10-19). */}
             <p className="intro__text">
-              The living network — people, organizations, communities, groups
-              and places sharing a marketplace, events, courses and maps.
-              Exchange moves by gift, trade and Current-cy, without extraction.
+              The living network helping people, organizations, communities,
+              groups and places share goods and resources via marketplace,
+              organize experiences via events, manage schedules with
+              calendar, exchange information via feed and chat, deliver
+              wisdom courses, share art and music, and navigate our
+              expansive and breathtaking world via travel and maps.
             </p>
           </div>
           <div className="intro__half">
