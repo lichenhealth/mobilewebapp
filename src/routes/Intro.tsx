@@ -128,12 +128,14 @@ export default function Intro() {
     (
       <div className="intro__body" key="c4">
         <span className="intro__glyph"><Icon name="sparkle" size={30} /></span>
+        {/* Founder's copy (2026-10-19). */}
         <p className="intro__eyebrow">Where we are</p>
-        <h1 className="intro__title">You&rsquo;re early — that&rsquo;s the point</h1>
+        <h1 className="intro__title">We&rsquo;re at the beginning — care to join us?</h1>
         <p className="intro__text">
           We&rsquo;re inviting alpha members to help make the platform strong and
-          solid, so expect rough edges and bugs along the way — and tell us
-          when you find them.
+          solid, so expect rough edges and bugs along the way — we&rsquo;re
+          committed to fixing what&rsquo;s broken and building what is needed but
+          not yet present on the platform.
         </p>
         <p className="intro__text">
           Community and Concierge will grow exactly as fast as people are
@@ -147,11 +149,14 @@ export default function Intro() {
         <span className="intro__glyph"><Icon name="fingerprint" size={30} /></span>
         <p className="intro__eyebrow">Why you</p>
         <h1 className="intro__title">Someone saw a wayshower in you</h1>
+        {/* Founder's copy (2026-10-19). */}
         <p className="intro__text">
           You&rsquo;re here because someone felt you might be a pioneer — a person
           who wants to contribute to the peaceful unfolding of a new
-          renaissance, rather than fighting old systems with nefarious
-          motives and hoping they&rsquo;ll change.
+          renaissance, rather than fighting old systems with motives that
+          contradict the positive changes we can implement if we work
+          together to build new political, economic and social systems
+          focused on balance and reciprocity.
         </p>
       </div>
     ),
