@@ -106,19 +106,22 @@ export default function Intro() {
     ),
     (
       <div className="intro__body" key="c3">
+        {/* Founder's copy (2026-10-19). */}
         <span className="intro__glyph"><Icon name="merkaba" size={30} /></span>
-        <p className="intro__eyebrow">The posture</p>
-        <h1 className="intro__title">Build the new — don&rsquo;t fight the old</h1>
+        <p className="intro__eyebrow">Our approach</p>
+        <h1 className="intro__title">Build the new — don&rsquo;t fight the old.</h1>
         <p className="intro__text">
           We keep a bridge to the commerce and healthcare systems most of us
           still rely on. But Current-cy and the Lichen algorithm are
-          invitations to build better ways — real alternatives to walk into,
-          as people invest in them.
+          invitations to build better ways of exchanging value and caring
+          for the health and wellbeing not just of humans, but of plants,
+          animals and the land that sustains us.
         </p>
         <p className="intro__text">
           Like a martial artist, we don&rsquo;t push against something stronger
           than we are. We step out of its way, let what&rsquo;s imbalanced fall
-          under its own weight — and build what comes next.
+          under its own weight. Instead, we choose to build something
+          better — an alternative society for people to choose.
         </p>
       </div>
     ),
