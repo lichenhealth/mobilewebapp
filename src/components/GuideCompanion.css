@@ -1,0 +1,51 @@
+/* The floating Claude companion (founder 2026-10-19) — a small card riding
+   the lower right of every screen while a walkthrough is active; clears the
+   fixed bottom nav on phones. */
+
+.guide {
+  position: fixed; z-index: 60;
+  right: 14px;
+  bottom: calc(var(--nav-h, 84px) + var(--safe-bot, 0px) + 14px);
+  width: min(320px, calc(100vw - 28px));
+  background: #fff;
+  border: 1px solid var(--peach);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(42, 51, 56, 0.16);
+  padding: 14px 16px 14px;
+}
+@media (min-width: 1024px) { .guide { bottom: 20px; right: 20px; } }
+
+.guide__close {
+  position: absolute; top: 8px; right: 10px;
+  background: none; border: 0; cursor: pointer;
+  font-size: 18px; line-height: 1; color: var(--ink-muted); padding: 4px;
+}
+.guide__close:hover { color: var(--ink); }
+
+.guide__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.guide__face {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--peach-deep); background: var(--bone);
+}
+.guide__who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.guide__who strong { font-size: 14px; color: var(--ink); }
+.guide__who span {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--peach-deep);
+}
+
+.guide__title {
+  margin: 0 0 4px; font-family: var(--font-display, serif);
+  font-size: 18px; font-weight: 500; color: var(--ink);
+}
+.guide__body { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
+
+.guide__row { display: flex; align-items: center; gap: 12px; }
+.guide__next { padding: 8px 18px; }
+.guide__ask {
+  background: none; border: 0; padding: 4px 0; cursor: pointer;
+  font-size: var(--t-sm); color: var(--ink-soft);
+  text-decoration: underline; text-decoration-color: var(--peach);
+  text-underline-offset: 3px;
+}
+.guide__ask:hover { color: var(--ink); text-decoration-color: var(--peach-deep); }
