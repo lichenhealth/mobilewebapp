@@ -166,3 +166,32 @@
   background: none; border: 0; padding: 0; font: inherit; color: var(--ink);
   cursor: pointer;
 }
+
+/* ── The roster manager (founder 2026-10-19): pending decisions live ON the
+      Client List tab — Accept/Decline for asks, Remind for waiting offers,
+      Email/Text/Cancel for invitations, and a standing add box. ─────────── */
+.cg__pend { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-6); }
+.cg__pend-h {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-faint); margin: 0 0 2px;
+}
+.cg__pend-row {
+  display: flex; align-items: center; gap: var(--s-3);
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px;
+  padding: 10px 12px; flex-wrap: wrap;
+}
+.cg__pend-body { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 1px; }
+.cg__pend-name { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.cg__pend-sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); line-height: 1.4; }
+.cg__pend-actions { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.cg__pend-btn { padding: 6px 14px; font-size: 12.5px; }
+.cg__pend-ghost {
+  border: 1px solid var(--bone-edge); background: transparent; border-radius: 999px;
+  padding: 6px 12px; font-size: 12.5px; font-weight: 400; color: var(--ink-soft); cursor: pointer;
+}
+.cg__pend-ghost:hover { border-color: var(--peach); color: var(--ink); }
+.cg__pend-ghost:disabled { opacity: 0.5; cursor: default; }
+.cg__pend-done { font-size: 12.5px; color: var(--green-deep, #2F6B4F); }
+.cg__pend-msg { font-size: 12px; font-weight: 300; color: var(--ink-muted); margin: 2px 2px 0; }
+.cg__addblock { width: min(420px, 100%); margin: var(--s-6) auto var(--s-2); text-align: left; }
+.cg__addblock .cg__pend-h { margin-bottom: var(--s-2); }
