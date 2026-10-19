@@ -14,6 +14,17 @@ export default function SignUp() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const inviteToken = params.get('invite');
+
+  // THE WELCOME FLIGHT (founder 2026-10-18): a first-ever arrival walks the
+  // intro cards before the door — once per device, Skip always one tap, and
+  // the arrival params (invite token, ?from) ride along both ways.
+  useEffect(() => {
+    let seen = '';
+    try { seen = localStorage.getItem('lichen.introSeen') ?? ''; } catch { /* storage off */ }
+    if (!seen) navigate('/intro' + window.location.search, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // null = still checking; false = no/invalid token (show the knock form)
   const [inviteOk, setInviteOk] = useState<boolean | null>(inviteToken ? null : false);
   const [inviterName, setInviterName] = useState('');

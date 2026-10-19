@@ -55,6 +55,7 @@ import CurrentcyHow from './routes/CurrentcyHow';
 import SpaceProfile from './routes/SpaceProfile';
 import MemberProfile from './routes/MemberProfile';
 import SignUp from './routes/SignUp';
+import Intro from './routes/Intro';
 import InviteDecline from './routes/InviteDecline';
 import Login from './routes/Login';
 import ResetPassword from './routes/ResetPassword';
@@ -96,7 +97,7 @@ function BookGate() {
     : <BookPublic />;
 }
 
-const GATE_EXEMPT = ['/login', '/signup', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
+const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -118,7 +119,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname, search } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
-  const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding' || pathname === '/invite/decline';
+  const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/intro' || pathname === '/onboarding' || pathname === '/invite/decline';
   const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
   // A NAKED-SITE rendering — embed pane, ?preview=1, or a colour trial (one
   // shared decision, src/lib/siteView.ts — founder 2026-09-09 after the
@@ -336,6 +337,9 @@ export default function App() {
           <Route path="/login"     element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup"    element={<SignUp />} />
+          {/* The welcome flight — the card deck in front of signup
+              (founder 2026-10-18); Skip and every CTA land on /signup. */}
+          <Route path="/intro"     element={<Intro />} />
           <Route path="/invite/decline" element={<InviteDecline />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/admin/categories" element={<AdminCategories />} />

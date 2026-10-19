@@ -132,6 +132,17 @@ export default function Onboarding() {
   // null read retries a few times instead of deciding "generic" too early.
   useEffect(() => {
     if (!user) return;
+    // The welcome flight's own choice WINS over the invitation's intent
+    // (founder 2026-10-18): the last intro card asked where they want to
+    // begin, and a path someone declared by their own hand beats the
+    // inviter's guess. Skipping the intro leaves the token's intent standing.
+    try {
+      const pick = localStorage.getItem('lichen.introIntent');
+      if (pick === 'practitioner' || pick === 'client' || pick === 'community') {
+        setArrival(pick);
+        return;
+      }
+    } catch { /* storage off — fall through to the token's intent */ }
     let live = true;
     let tries = 0;
     const read = async () => {
@@ -215,12 +226,22 @@ export default function Onboarding() {
     const active = careAsks.filter((a) => a.status === 'active');
     if (active.length === 1) return `/concierge/client/${active[0].patientId}`;
     if (active.length > 1) return '/caregiver';
-    // The arrival path decides the first screen (founder 2026-10-13): a
-    // practitioner lands on the Provider dashboard with the add-your-first-
-    // client door; a Concierge client lands in the guided intake — the front
-    // door the subsidy policy names.
-    if (arrival === 'practitioner') return '/caregiver';
+    // CLAUDE WALKS THEM IN (founder 2026-10-18, superseding the 10-13
+    // dashboard landings for chosen paths): the welcome flight promises a
+    // guided setup, so a practitioner or community arrival lands in their
+    // own Claude conversation with the ask prefilled UNSENT — the model call
+    // is theirs to spend, and every manual screen stays one door away (the
+    // assistant hands real doors via send_app_door). A CLIENT keeps the
+    // guided intake — the front door the subsidy policy names.
+    if (arrival === 'practitioner') {
+      return '/assistant/feed?thread=general&convo=new&ask=' + encodeURIComponent(
+        'I just joined Lichen as a practitioner. Walk me through getting set up, one step at a time — what care I offer, my session types and hours, and how to add my first client.');
+    }
     if (arrival === 'client') return '/concierge/intake';
+    if (arrival === 'community') {
+      return '/assistant/feed?thread=general&convo=new&ask=' + encodeURIComponent(
+        'I just joined Lichen for the community. Walk me through getting set up, one step at a time — my profile, finding people, and how giving and exchange work here.');
+    }
     return '/home';
   }
 
@@ -281,6 +302,9 @@ export default function Onboarding() {
       // (its bell announces; the asked person approves from it).
       await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
       markOnboarded();
+      // The intro's path choice has done its work — don't let it shape a
+      // second account on this device.
+      try { localStorage.removeItem('lichen.introIntent'); } catch { /* ignore */ }
       navigate(landing(), { replace: true });
     } catch (e) {
       const msg = e && typeof e === 'object' && 'message' in e
@@ -301,6 +325,7 @@ export default function Onboarding() {
     await supabase.from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
     await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
     markOnboarded();
+    try { localStorage.removeItem('lichen.introIntent'); } catch { /* ignore */ }
     navigate(landing(), { replace: true });
   }
 
@@ -339,10 +364,22 @@ export default function Onboarding() {
           <section className="onb__section onb__care">
             <h2 className="onb__h2">You&rsquo;re joining as a practitioner</h2>
             <p className="onb__lead" style={{ marginBottom: 0 }}>
-              Your Concierge dashboard is ready. Add your name below, press
-              Enter Lichen, and you&rsquo;ll land where you can add your first
-              client and build a care team around them — with subsidies for
-              the clients who need them.
+              Add your name below and press Enter Lichen — Claude, Lichen&rsquo;s
+              AI partner, will walk you through setting up what you offer,
+              your session types and hours, and adding your first client.
+              Prefer to set things up yourself? Every manual control lives in
+              your Provider dashboard and Calendar settings, one tap away.
+            </p>
+          </section>
+        )}
+        {arrival === 'community' && (
+          <section className="onb__section onb__care">
+            <h2 className="onb__h2">You&rsquo;re here for the community</h2>
+            <p className="onb__lead" style={{ marginBottom: 0 }}>
+              Add your name and the basics below — then Claude, Lichen&rsquo;s AI
+              partner, will walk you through your first steps: your profile,
+              finding people, and how giving and exchange work here.
+              Everything on this page can also be done later, by hand.
             </p>
           </section>
         )}
