@@ -7,12 +7,13 @@ import {
 } from '../lib/presenceApi';
 import ConsentBubble from './ConsentBubble';
 import { loadPrompts, promptSeen, promptSeenToday, promptTimesSeen, markPrompt } from '../lib/promptsApi';
+import { readGuide } from '../lib/guide';
 
 /** How many visits the candle gets to teach itself before it goes quiet.
  *  Presence is ON by default now (founder 2026-08-13), so this prompt is the
  *  only thing that makes default-on honest rather than sneaky — it has to land
  *  a few times, and then it has to stop. */
-const PRESENCE_LESSONS = 3;
+export const PRESENCE_LESSONS = 3;
 
 /** "Do you want your light on?" (founder 2026-08-07: "whenever someone logs in
  *  or opens the desktop app, can we have them get a pop up asking them if they
@@ -60,6 +61,12 @@ export default function PresencePrompt({ anchor, onChange }: {
       setPres(p);
       await loadPrompts(user.id);
       if (!live) return;
+      // While Claude's walkthrough is live, the candle is a STEP on that
+      // journey (founder 2026-10-19: the bubble over the tour card read as
+      // two popups at once) — the tour's own candle step marks the lesson
+      // taught, and a tour closed before reaching it leaves this to teach
+      // on the next visit as before.
+      if (readGuide()) return;
       if (promptSeenToday('presence')) return;
       if (promptTimesSeen('presence') >= PRESENCE_LESSONS) return;
       setWhy('open');

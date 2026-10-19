@@ -297,6 +297,14 @@ export default function Onboarding() {
       // The phone just saved — a phone-matched care invitation can claim now
       // (its bell announces; the asked person approves from it).
       await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
+      // Make the membership REAL before the landing screen asks (founder
+      // 2026-10-19: a new practitioner's /caregiver briefly showed the
+      // "A Concierge feature" gate — the App gate grants the growth gift
+      // AFTER that screen had already read the empty subscription). Claim
+      // any parked gift first, then the once-only growth gift; both are
+      // idempotent and the App gate stays the catch-all.
+      await supabase.rpc('claim_membership_gift').then(() => {}, () => {});
+      await supabase.rpc('grant_growth_gift').then(() => {}, () => {});
       markOnboarded();
       // The intro's path choice has done its work — don't let it shape a
       // second account on this device.
@@ -320,6 +328,9 @@ export default function Onboarding() {
     setSaving(true);
     await supabase.from('profiles').update({ ...basicsPatch(), onboarded: true }).eq('id', user.id);
     await supabase.rpc('claim_care_invitations').then(() => {}, () => {});
+    // Same membership-before-landing order as finish() — see the note there.
+    await supabase.rpc('claim_membership_gift').then(() => {}, () => {});
+    await supabase.rpc('grant_growth_gift').then(() => {}, () => {});
     markOnboarded();
     try { localStorage.removeItem('lichen.introIntent'); } catch { /* ignore */ }
     navigate(landing(), { replace: true });

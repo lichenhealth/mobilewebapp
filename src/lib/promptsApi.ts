@@ -55,9 +55,12 @@ export function promptTimesSeen(topic: string): number {
   return cache?.get(topic)?.times ?? 0;
 }
 
-export async function markPrompt(me: string, topic: string): Promise<void> {
+/** `atLeast` lets one surface mark a lesson FULLY taught (the guided tour's
+ *  candle step stands in for all of PresencePrompt's lessons) — times_seen
+ *  jumps to at least that floor instead of creeping up one sighting at a time. */
+export async function markPrompt(me: string, topic: string, atLeast = 0): Promise<void> {
   const now = new Date().toISOString();
-  const times = (cache?.get(topic)?.times ?? 0) + 1;
+  const times = Math.max((cache?.get(topic)?.times ?? 0) + 1, atLeast);
   cache?.set(topic, { at: now, times });
   if (!dbOk) {
     localStorage.setItem(localKey(topic), today());
