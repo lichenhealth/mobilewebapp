@@ -740,7 +740,12 @@ export default function AssistantFeed() {
   // can never drift.
   const threadButtons = (
     <>
-      {ASSISTANT_THREADS.map((t) => {
+      {/* The STANDING rail holds the feed-shaped sections (founder
+          2026-10-21: Concierge and Current-cy have their own bottom-nav /
+          sidebar doors and section brains — their circles step off); an
+          off-rail thread still shows its OWN lit circle while you're in it,
+          so the room you're reading stays legible. */}
+      {ASSISTANT_THREADS.filter((t) => !t.offRail || t.id === thread).map((t) => {
         const off = setup ? !setup[t.id] : false;
         return (
           <button

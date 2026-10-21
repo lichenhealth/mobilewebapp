@@ -64,6 +64,14 @@ export interface AssistantThread {
   emptyAsk: string;
   /** Empty-thread greeting when the section already holds their work. */
   welcome: string;
+  /** Off the brain's STANDING rail (founder 2026-10-21: "should the brain
+   *  only cover the aspects that have feeds? You can navigate to concierge
+   *  and current-cy via the bottom with mobile and the side bar with desktop
+   *  and go to the specific AI brain from there") — the thread still exists
+   *  (consent rows, proactive notes, deep links, section brain doors all
+   *  stand), it just doesn't ride the rail; its own brief/thread prepends
+   *  itself lit, the Maps pattern. */
+  offRail?: boolean;
 }
 
 export const ASSISTANT_THREADS: AssistantThread[] = [
@@ -108,7 +116,7 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
     welcome: 'Welcome back to Calendar. Tell me what to schedule, or how your hours should change.',
   },
   {
-    id: 'concierge', label: 'Concierge', icon: 'concierge',
+    id: 'concierge', label: 'Concierge', icon: 'concierge', offRail: true,
     blurb: 'Care — yours and the people you hold.',
     emptyAsk: 'No Concierge care set up yet. Tell me what wellbeing looks like for you right now, and we’ll begin your Web of Wellbeing together.',
     welcome: 'Welcome back to Concierge. Tell me how care is going, or what needs tending.',
@@ -117,7 +125,7 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
   // relevant assistant and it can notice inefficiencies or suggest areas
   // to make more current-cy to help the person, financially").
   {
-    id: 'currentcy', label: 'Current-cy', icon: 'currentcy',
+    id: 'currentcy', label: 'Current-cy', icon: 'currentcy', offRail: true,
     blurb: 'Your wallet — a money coach for the gift-and-exchange economy.',
     emptyAsk: 'No Current has moved for you yet. Tell me what you offer — or what you need — and we’ll find your first exchange together.',
     welcome: 'Welcome back to Current-cy. Ask what moved, or where you could earn more.',

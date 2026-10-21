@@ -792,7 +792,11 @@ export default function AssistantBrief() {
   // as the Home/whole-life brief), with a non-thread section (maps…)
   // prepended as its own lit circle when that's where you stand.
   const railItems = useMemo(() => {
-    const threads = ASSISTANT_THREADS.map((t) => ({
+    // The standing rail is the feed-shaped sections (founder 2026-10-21:
+    // Concierge and Current-cy are reached through their own bottom-nav /
+    // sidebar doors and carry their brains there) — an off-rail section's
+    // own brief prepends itself lit, exactly like Maps always has.
+    const threads = ASSISTANT_THREADS.filter((t) => !t.offRail).map((t) => ({
       section: t.id === 'general' ? 'home' : t.id,
       icon: t.icon,
       label: t.id === 'general' ? 'General' : t.label,
