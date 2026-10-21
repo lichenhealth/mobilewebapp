@@ -17,6 +17,8 @@ import Directory from './routes/Directory';
 import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
+import ChatDocPage from './routes/ChatDocPage';
+import ChatRoomDrive from './routes/ChatRoomDrive';
 import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
 import Giving from './routes/Giving';
@@ -273,6 +275,11 @@ export default function App() {
           <Route path="/identities/:id" element={<IdentityPage />} />
           <Route path="/chat"      element={<Chat />} />
           <Route path="/chat/:id"  element={<ChatThread />} />
+          {/* Docs/polls/spreadsheets born in a room's composer + the room's
+              drive (founder 2026-10-21) — non-section routes, each carries
+              its own worded back chip. */}
+          <Route path="/chat/:id/drive" element={<ChatRoomDrive />} />
+          <Route path="/docs/:docId" element={<ChatDocPage />} />
           <Route path="/calendar"  element={<Calendar />} />
           <Route path="/calendar/new" element={<EventComposer />} />
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
