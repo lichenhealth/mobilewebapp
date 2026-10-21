@@ -462,7 +462,12 @@
 .msg-menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  /* Anchor to the side the message SITS on (founder 2026-10-21, the clipped
+     popover: right-anchored to a narrow left-side bubble, the 200px card
+     hung off the phone's left edge): theirs opens rightward from the
+     bubble's left edge, yours leftward from the right edge. */
+  left: 0;
+  right: auto;
   z-index: 10;
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
@@ -470,9 +475,10 @@
   box-shadow: var(--sh-pop);
   padding: var(--s-2);
   min-width: 200px;
+  max-width: min(320px, calc(100vw - 24px));
   animation: menu-rise 160ms var(--ease-out);
 }
-.msg-menu--me { right: 0; }
+.msg-menu--me { right: 0; left: auto; }
 
 @keyframes menu-rise {
   from { opacity: 0; transform: translateY(-4px) scale(0.96); }
@@ -518,6 +524,26 @@
 }
 .msg-menu__action:hover { background: var(--bone); }
 .msg-menu__action svg { color: var(--ink-muted); }
+/* Deletes read as what they are. */
+.msg-menu__action--danger { color: var(--red-deep, #b4553f); }
+.msg-menu__action--danger svg { color: var(--red-deep, #b4553f); }
+
+/* React's + door into the full picker. */
+.msg-menu__reaction--more { color: var(--ink-muted); }
+.msg-menu__reaction--more:hover { color: var(--peach-deep, var(--peach)); }
+
+/* The emoji picker INSIDE the menu card — stand its popover chrome down
+   (EmojiPicker.css anchors it above a composer by default). */
+.msg-menu__picker { width: min(316px, calc(100vw - 48px)); }
+.msg-menu__picker .emoji-pop {
+  position: static;
+  width: 100%;
+  max-height: 260px;
+  border: none;
+  box-shadow: none;
+  padding: var(--s-2);
+  animation: none;
+}
 
 /* ─── Input bar ───────────────────────────────────────────────────── */
 .thread__input-wrap {

@@ -11,7 +11,7 @@ import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
-import { loadSavedPostsTimed, setSaved } from '../lib/savedApi';
+import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } from '../lib/savedApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
 import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -108,6 +108,17 @@ export default function Saved() {
     return () => { live = false; };
   }, [me]);
 
+  // SAVED MESSAGES (founder 2026-10-21, the message menu's Save): words
+  // pulled out of rooms, kept by reference — unreadable ones say so.
+  const [savedMsgs, setSavedMsgs] = useState<SavedMessage[]>([]);
+  const [msgDel, setMsgDel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void loadSavedMessages().then((rows) => { if (live) setSavedMsgs(rows); });
+    return () => { live = false; };
+  }, [me]);
+
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [lens, setLens] = useState('All');
   // When each save happened — Drive's chronology sorts saves by the save.
@@ -193,6 +204,18 @@ export default function Saved() {
       || draftLabel(d.draft).toLowerCase().includes(q)
       || String((d.draft as { body?: string }).body ?? '').toLowerCase().includes(q));
   }, [drafts, query]);
+
+  const msgsVisible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return savedMsgs.filter((m) => !q
+      || (m.body ?? '').toLowerCase().includes(q)
+      || (m.senderName ?? '').toLowerCase().includes(q)
+      || (m.chatLabel ?? '').toLowerCase().includes(q));
+  }, [savedMsgs, query]);
+  const unsaveMessage = async (id: string) => {
+    setSavedMsgs((cur) => cur.filter((m) => m.messageId !== id));
+    await setSaved('message', id, false);
+  };
 
   /** The drive time: your own pieces by creation, saves by the save. */
   const driveTime = (p: FeedPost) =>
@@ -496,6 +519,51 @@ export default function Saved() {
               </div>
             );
           })}
+        </section>
+      )}
+
+      {/* ── MESSAGES — chat words saved through the message menu (founder
+          2026-10-21). A row opens its room; one you can no longer read
+          (a room you left, a message since deleted) says so and offers
+          only Remove. ── */}
+      {me && ready && msgsVisible.length > 0 && (
+        <section className="drive__drafts">
+          <p className="drive__eyebrow">
+            Messages
+            <span className="drive__count">{msgsVisible.length}</span>
+          </p>
+          {msgsVisible.map((m) => (
+            <div key={m.messageId} className="drive__row" role="button" tabIndex={0}
+              onClick={() => { if (m.chatId) navigate(`/chat/${m.chatId}`); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && m.chatId) navigate(`/chat/${m.chatId}`); }}>
+              <span className="drive__row-icon"><Icon name="chat" size={16} /></span>
+              <span className="drive__row-main">
+                <span className="drive__row-title">
+                  {m.chatId
+                    ? (m.body?.trim() || (m.hasMedia ? '📎 An attachment' : 'A message'))
+                    : 'A message you can no longer read'}
+                </span>
+                <span className="drive__row-meta">
+                  Saved {shortDate(m.savedAt)}
+                  {m.senderName ? ` · from ${m.senderName}` : ''}
+                  {m.chatLabel ? ` · ${m.chatLabel}` : ''}
+                </span>
+              </span>
+              <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="drive__draft-del"
+                  onClick={() => {
+                    if (msgDel !== m.messageId) { setMsgDel(m.messageId); return; }
+                    void unsaveMessage(m.messageId);
+                    setMsgDel(null);
+                  }}
+                  onBlur={() => setMsgDel((cur) => (cur === m.messageId ? null : cur))}
+                >
+                  {msgDel === m.messageId ? 'Really remove?' : 'Remove'}
+                </button>
+              </span>
+            </div>
+          ))}
         </section>
       )}
 
