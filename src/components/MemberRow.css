@@ -100,8 +100,22 @@
 .member-row__msg:active { transform: scale(0.96); }
 .member-row__msg:disabled { opacity: 0.6; }
 
-/* Phones: icons keep their tap targets, the Message label steps aside */
-@media (max-width: 480px) {
+/* The phone-width shell (founder 2026-10-21: "make the icons smaller, so
+   they all fit" + "message can just be the chat bubble icon" — a space's
+   Members tab squeezed names to a few letters under shield · weave ·
+   Message · Role · Remove). The app-shell is a 430px column all the way
+   to 1024 (the shell-vs-viewport trap — the old 480px query never fired
+   on most phones), so the compact row rules below 1024: the Message pill
+   is a bare chat-bubble circle, the signal circles step down, and the
+   name gets the room back. ≥1024 keeps the labeled Message door. */
+@media (max-width: 1023px) {
   .member-row__msg-label { display: none; }
-  .member-row__msg { padding: 7px 9px; }
+  .member-row__msg {
+    width: 32px; height: 32px; padding: 0;
+    justify-content: center; margin-left: 2px;
+  }
+  .member-row__sig,
+  .member-row .weave-mark { width: 28px; height: 28px; }
+  .member-row__sig svg { width: 14px; height: 14px; }
+  .member-row .weave-mark svg { width: 18px; height: 18px; }
 }

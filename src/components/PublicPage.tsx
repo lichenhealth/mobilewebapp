@@ -154,6 +154,10 @@ export interface PublicPageProps {
    *  2026-08-05: the kind belongs under the name, not in the top bar). */
   kindIcon?: IconName;
   avatarUrl?: string | null;
+  /** The owner's photo badge riding the masthead avatar (founder 2026-10-21:
+   *  change the picture from any view, no walk to the settings page). The
+   *  CALLER gates — only an admin/the member themselves ever passes one. */
+  avatarEdit?: React.ReactNode;
   description?: string | null; // the Lichen bio/description, used when story is empty
   location?: string | null;
   offerings?: string[];        // category names
@@ -1031,8 +1035,11 @@ export default function PublicPage(props: PublicPageProps) {
           image. The image stays put while doors switch the content below. */}
       <header className="ppage__hero">
         <div className="ppage__hero-body ppage__hero-body--top" data-edit-region="identity">
-          <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
-            size={props.signedIn ? 96 : 128} />
+          <span className="ava-edit-wrap">
+            <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
+              size={props.signedIn ? 96 : 128} />
+            {props.avatarEdit}
+          </span>
           <h1 className="ppage__name">{name}</h1>
           {props.pronouns && <p className="ppage__pronouns">{props.pronouns}</p>}
           {/* A space always names its kind — "Organization ·globe·" — the way

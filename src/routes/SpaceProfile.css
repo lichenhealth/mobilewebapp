@@ -317,6 +317,13 @@
 .sprof__knock-email { color: var(--ink-soft); font-weight: 400; }
 .sprof__memberacts { display: inline-flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .sprof__rolebtn--remove:hover { border-color: #c0564f; color: #c0564f; }
+/* The phone-width shell: tighter Role/Remove so names keep their room
+   (the MemberRow compact rules' sibling, founder 2026-10-21 — words stay,
+   a destructive door is never reduced to a glyph). */
+@media (max-width: 1023px) {
+  .sprof__memberacts { gap: 4px; }
+  .sprof__memberacts .sprof__rolebtn { padding: 7px 9px; font-size: 12px; }
+}
 
 /* Spam is the rust-colored answer at the door (2026-08-21) */
 .sprof__knock-spam { color: var(--rust); border-color: var(--rust); }

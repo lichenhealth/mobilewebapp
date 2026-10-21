@@ -25,6 +25,8 @@ import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/Pub
 import { type ContactInfo } from '../components/ContactFields';
 import { readDraft, type PageDraft } from '../lib/pageDrafts';
 import GrabPen from '../components/GrabPen';
+import { AvatarEditBadge } from '../components/AvatarEditBadge';
+import { uploadAvatar } from '../lib/avatarApi';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -40,6 +42,20 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const me = user?.id ?? '';
 
   const [member, setMember] = useState<MemberRow | null>(null);
+  // Your own photo changes right where you see it (founder 2026-10-21:
+  // "Same goes for my pic anywhere on the network").
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  async function onAvatarFile(file: File) {
+    if (!me) return;
+    setAvatarBusy(true);
+    try {
+      const url = await uploadAvatar(me, file);
+      setMember((m) => (m ? { ...m, avatar_url: url } : m));
+    } catch (e) {
+      alert((e as { message?: string } | null)?.message || 'Could not upload that photo.');
+    }
+    setAvatarBusy(false);
+  }
   const [steward, setSteward] = useState<{ name: string; to: string } | null>(null);
   const { actor } = useActing();
   // Which of their offerings I recommend (keyed 'profile:id#category').
@@ -419,6 +435,14 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
         kindLabel={member.headline ?? undefined}
         pronouns={member.pronouns}
         avatarUrl={member.avatar_url}
+        avatarEdit={isSelf && !previewing && !embedded ? (
+          <AvatarEditBadge
+            hasPhoto={!!member.avatar_url}
+            busy={avatarBusy}
+            subjectName={name}
+            onFile={(f) => void onAvatarFile(f)}
+          />
+        ) : undefined}
         description={member.bio}
         location={homeSpot?.place
           ? (homeSpot.level !== 'exact' ? areaLabel(homeSpot.place) : homeSpot.place)
@@ -479,7 +503,17 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
     <div className="prof">
       {viewToggleBar}
       <div className="prof__head">
-        <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
+        <span className="ava-edit-wrap">
+          <Avatar id={member.id} name={name} url={member.avatar_url} size={72} />
+          {isSelf && !embedded && (
+            <AvatarEditBadge
+              hasPhoto={!!member.avatar_url}
+              busy={avatarBusy}
+              subjectName={name}
+              onFile={(f) => void onAvatarFile(f)}
+            />
+          )}
+        </span>
         <h1 className="prof__name">{name}</h1>
         {isBeing && (
           <p className="mprof__being">

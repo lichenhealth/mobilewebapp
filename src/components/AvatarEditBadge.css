@@ -1,0 +1,21 @@
+/* The hero-avatar photo badge (founder 2026-10-21). Lower-right of the
+   circle, the sprof__avatar-edit shape generalized. The caller wraps the
+   avatar in .ava-edit-wrap (or any positioned box) so the badge has an
+   edge to ride. */
+.ava-edit-wrap { position: relative; display: inline-flex; }
+.ava-edit {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 26px; height: 26px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft); cursor: pointer; box-shadow: var(--sh-soft);
+}
+.ava-edit:hover { border-color: var(--peach); color: var(--ink); }
+.ava-edit:disabled { opacity: 0.6; cursor: default; }
+/* No photo yet: the + wears peach — an invitation, not just a control. */
+.ava-edit--add {
+  background: var(--peach-tint);
+  border-color: var(--peach);
+  color: var(--peach-deep, var(--peach));
+}
+.ava-edit__busy { font-size: 12px; line-height: 1; }
