@@ -9,6 +9,7 @@ import {
   DOC_KIND_LABEL, DOC_KIND_ICON, type ChatDocRow,
 } from '../lib/chatDocsApi';
 import { listSpaceRooms, type SpaceRoom } from '../lib/spacesApi';
+import { signChatMedia, type Attachment } from '../lib/chatApi';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
 import './ChatDocs.css';
 
@@ -39,6 +40,12 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
   // promptSeen() reads a cache loadPrompts() fills async — render only after
   // it has landed, or a dismissed prompt flashes back on every reload.
   const [promptsReady, setPromptsReady] = useState(false);
+  // SHARED IN THIS ROOM (founder 2026-10-21: "a hybrid of Google Drive and
+  // when you click the name of the person you're chatting with on iChat and
+  // it has all the links, photos, documents, etc you've shared in that
+  // chat") — the room's photos and links, gathered from its own messages.
+  const [photos, setPhotos] = useState<{ key: string; url: string }[]>([]);
+  const [links, setLinks] = useState<{ url: string; who: string; at: string }[]>([]);
 
   useEffect(() => {
     if (!id || !me) return;
@@ -60,6 +67,31 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
         setSpaceName(cr?.room_space?.name ?? null);
         setRoomTopic(cr?.topic ?? null);
         setDocs(rows);
+        // The iChat half: everything shared IN the room, from its messages.
+        const { data: msgs } = await supabase.from('chat_messages')
+          .select('body, attachments, created_at, sender:profiles!chat_messages_sender_id_fkey(full_name)')
+          .eq('chat_id', id).order('created_at', { ascending: false }).limit(400);
+        if (!active) return;
+        type Msg = { body: string | null; attachments: Attachment[] | null; created_at: string; sender: { full_name: string | null } | null };
+        const rowsM = (msgs as unknown as Msg[] | null) ?? [];
+        const photoPaths: string[] = [];
+        const linkRows: { url: string; who: string; at: string }[] = [];
+        const seen = new Set<string>();
+        for (const m of rowsM) {
+          for (const a of m.attachments ?? []) {
+            if (a.type === 'photo' && photoPaths.length < 24) photoPaths.push(a.url);
+          }
+          for (const u of (m.body ?? '').match(/https?:\/\/[^\s)]+/g) ?? []) {
+            if (!seen.has(u) && linkRows.length < 30) {
+              seen.add(u);
+              linkRows.push({ url: u, who: m.sender?.full_name ?? 'Someone', at: m.created_at });
+            }
+          }
+        }
+        const signed = await signChatMedia(photoPaths);
+        if (!active) return;
+        setPhotos(photoPaths.filter((p) => signed[p]).map((p) => ({ key: p, url: signed[p] })));
+        setLinks(linkRows);
       } else {
         sid = id;
         const [{ data: s }, rows] = await Promise.all([
@@ -71,6 +103,7 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
         setSpaceName((s as { name: string } | null)?.name ?? null);
         setRoomTopic(null);
         setDocs(rows);
+        setPhotos([]); setLinks([]);
       }
       if (sid) {
         const [allRooms, byChat] = await Promise.all([listSpaceRooms(sid), countSpaceDocsByChat(sid)]);
@@ -239,6 +272,40 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
           ))
       ) : (
         <div className="cdocp__list">{docs.map(itemRow)}</div>
+      )}
+
+      {/* Shared in this room — the iChat anatomy (founder 2026-10-21):
+          the photos and links that already passed through the conversation,
+          gathered where the documents live. Room view only. */}
+      {mode === 'room' && photos.length > 0 && (
+        <div className="cdocp__shared">
+          <p className="cdocp__sib-h">Photos shared here</p>
+          <div className="cdocp__photogrid">
+            {photos.map((p) => (
+              <a key={p.key} href={p.url} target="_blank" rel="noreferrer">
+                <img src={p.url} alt="" loading="lazy" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {mode === 'room' && links.length > 0 && (
+        <div className="cdocp__shared">
+          <p className="cdocp__sib-h">Links shared here</p>
+          <div className="cdocp__list">
+            {links.map((l) => (
+              <a key={l.url} className="cdocp__row cdocp__row--link" href={l.url} target="_blank" rel="noreferrer">
+                <span className="cdocp__row-icon"><Icon name="globe" size={16} /></span>
+                <span className="cdocp__row-main">
+                  <span className="cdocp__row-title">{l.url.replace(/^https?:\/\//, '')}</span>
+                  <span className="cdocp__row-meta">
+                    from {l.who} · {new Date(l.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

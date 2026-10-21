@@ -82,7 +82,7 @@ export default function ChatThread() {
 
   return (
     <div className="thread">
-      <ChatConversation chatId={id} me={user?.id ?? ''} onBack={back} />
+      <ChatConversation chatId={id} me={user?.id ?? ''} onBack={back} onMenu={() => window.dispatchEvent(new Event('lichen:open-menu'))} />
     </div>
   );
 }

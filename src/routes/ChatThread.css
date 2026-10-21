@@ -38,14 +38,17 @@
 .thread__head {
   flex: 0 0 auto;
   padding: calc(var(--safe-top) + var(--s-2)) var(--s-4) var(--s-3);
-  display: grid;
-  grid-template-columns: 36px 1fr 36px;
+  /* FLEX, not a counted grid (the composer's 2026-10-21 lesson, same day,
+     same file): the ☰ made a fourth child in a three-column grid and the
+     title wrapped off the row. The identity block takes the middle. */
+  display: flex;
   gap: var(--s-3);
   align-items: center;
   background: var(--bone);
   border-bottom: 1px solid var(--bone-edge);
   z-index: 2;
 }
+.thread__head .thread__head-id { flex: 1 1 auto; min-width: 0; }
 
 .thread__icon {
   width: 36px;
@@ -533,17 +536,35 @@
 .msg-menu__reaction--more:hover { color: var(--peach-deep, var(--peach)); }
 
 /* The emoji picker INSIDE the menu card — stand its popover chrome down
-   (EmojiPicker.css anchors it above a composer by default). */
-.msg-menu__picker { width: min(316px, calc(100vw - 48px)); }
+   (EmojiPicker.css anchors it above a composer by default). The negative
+   margins pull the picker flush to the card's edges, and its own s-3
+   padding matches the sticky search row's negative margins, so the search
+   pill and the card read as ONE width (founder 2026-10-21: "the drop down
+   … is a bit wider than the white text box that precedes it"). */
+.msg-menu__picker {
+  width: min(316px, calc(100vw - 48px));
+  margin: calc(-1 * var(--s-2));
+}
 .msg-menu__picker .emoji-pop {
   position: static;
   width: 100%;
-  max-height: 260px;
+  max-height: 280px;
   border: none;
   box-shadow: none;
-  padding: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
   animation: none;
 }
+/* The way back to the ⋯ actions, beside the search (founder 2026-10-21:
+   "a circle with a back arrow, so you can go back … if you decide you want
+   to do something else besides an emoji"). */
+.msg-menu__picker-back {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  color: var(--ink-soft); cursor: pointer; padding: 0;
+}
+.msg-menu__picker-back:hover { border-color: var(--peach); color: var(--ink); }
 
 /* ─── Input bar ───────────────────────────────────────────────────── */
 .thread__input-wrap {
@@ -624,12 +645,17 @@
 }
 
 .thread__input {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  /* FLEX, not a counted grid (founder 2026-10-21: the new ⊕ made a fifth
+     child in a four-column grid — the mic wrapped to its own line and the
+     smiley sat stretched in the 1fr slot). Flex seats however many tools a
+     room carries; the text box takes the rest, the mic rides beside it —
+     typing and dictating are the two manual doors, side by side. */
+  display: flex;
   gap: var(--s-2);
-  align-items: end;
+  align-items: flex-end;
   padding: var(--s-3) var(--s-4);
 }
+.thread__input .thread__input-text { flex: 1 1 auto; min-width: 0; }
 
 /* Attach button + its popover menu */
 .thread__attach-wrap { position: relative; }
