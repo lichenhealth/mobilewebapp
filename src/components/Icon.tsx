@@ -434,10 +434,14 @@ const ICONS: Record<IconName, IconEntry> = {
     strokeWidth: 0.81,
     content: <><path d="M108.834 469.471C108.619 469.554 108.381 469.554 108.166 469.471C106.486 468.812 105.043 467.662 104.026 466.172C103.009 464.681 102.465 462.918 102.464 461.114V458.393C102.464 458.147 102.562 457.91 102.736 457.736C102.91 457.562 103.147 457.464 103.393 457.464H113.607C113.853 457.464 114.09 457.562 114.264 457.736C114.438 457.91 114.536 458.147 114.536 458.393V461.104C114.537 462.911 113.994 464.675 112.977 466.168C111.96 467.66 110.516 468.811 108.834 469.471Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M104.634 466.964C105.466 465.715 106.887 464.893 108.5 464.893C110.113 464.893 111.534 465.715 112.366 466.964" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M108.5 463.5C109.654 463.5 110.589 462.565 110.589 461.411C110.589 460.257 109.654 459.322 108.5 459.322C107.346 459.322 106.411 460.257 106.411 461.411C106.411 462.565 107.346 463.5 108.5 463.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
+  // ViewBox tightened to the artwork 2026-10-21 (founder: "make the emoji
+  // smiley the same size as the plus") — the face filled 75% of its frame
+  // and read smaller than its row-mates; strokeWidth retuned to keep the
+  // line weight (the brain/dollar/merkaba precedent).
   'smile': {
-    viewBox: '0 0 24 24',
-    strokeWidth: 1.6,
-    content: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.6" fill="currentColor" /><circle cx="15" cy="10" r="0.6" fill="currentColor" /><path d="M8.5 14.5c.8 1.5 2 2.3 3.5 2.3s2.7-.8 3.5-2.3" /></>,
+    viewBox: '3 3 18 18',
+    strokeWidth: 1.2,
+    content: <><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.5" fill="currentColor" /><circle cx="15" cy="10" r="0.5" fill="currentColor" /><path d="M8.5 14.5c.8 1.5 2 2.3 3.5 2.3s2.7-.8 3.5-2.3" /></>,
   },
   'rsvp': {
     viewBox: '14 12 43 44',
