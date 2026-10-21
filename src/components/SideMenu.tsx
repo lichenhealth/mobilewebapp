@@ -431,7 +431,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           {/* The build this page is running — so a screenshot always says
               which build it came from (founder 2026-09-13, after a stale
               months-old window kept resurrecting long-fixed bugs). */}
-          {buildStamp() && <p className="side-menu__build">build {buildStamp()}</p>}
+          {buildStamp() && <p className="side-menu__build">version: {buildStamp()}</p>}
         </nav>
       </aside>
     </div>
