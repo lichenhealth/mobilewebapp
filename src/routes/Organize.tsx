@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
+import { ActingGate } from '../components/ActingGate';
 import { loadSavedPosts } from '../lib/savedApi';
 import type { FeedPost } from '../lib/postsApi';
 import {
@@ -20,6 +22,7 @@ export default function Organize() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
+  const { actor, ready: actingReady } = useActing();
 
   const [cols, setCols] = useState<CollectionRow[]>([]);
   const [items, setItems] = useState<Record<string, FeedPost[]>>({});
@@ -116,6 +119,12 @@ export default function Organize() {
   }
 
   if (!me) return <div className="org"><p className="org__muted">Sign in to organize your shelf.</p></div>;
+
+  // THE HAT GATE (founder 2026-10-21: Organize showed HER shelf while acting
+  // as Lichen Alpha Testers): this studio arranges YOUR saved pieces and
+  // YOUR collections — never render it under an entity's hat.
+  if (!actingReady) return null;
+  if (actor.type !== 'self') return <ActingGate what="a shelf to arrange here" icon="book" />;
 
   return (
     <div className="org">

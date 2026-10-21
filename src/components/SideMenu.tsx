@@ -6,6 +6,7 @@ import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type Adm
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
+import { navFamily } from '../lib/navFamily';
 import { supabase } from '../lib/supabase';
 import { getIdentityTags } from '../lib/meansApi';
 import './SideMenu.css';
@@ -217,9 +218,10 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     const count = p.to === '/home'
       ? totalUnread
       : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
-    // A room's/group's drive lights Drive here too (founder 2026-10-21) —
-    // the bottom nav's onSubDrive rule, same meaning on the docked rail.
-    const subDrive = p.to === '/drive' && /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname);
+    // Off-prefix screens light their family here too (founder 2026-10-21) —
+    // the bottom nav's rule, same meaning on the docked rail. One map,
+    // src/lib/navFamily.ts.
+    const family = navFamily(pathname);
     return (
       <Fragment key={p.to}>
         {/* "you" above the line, platform doors below it */}
@@ -228,9 +230,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           to={p.to}
           onClick={onClose}
           className={({ isActive }) => {
-            const lit = p.to === '/drive'
-              ? isActive || subDrive
-              : isActive && !(p.to === '/chat' && /^\/chat\/[^/]+\/drive/.test(pathname));
+            const lit = family ? p.to === family : isActive;
             return 'side-menu__primary-item' + (lit ? ' is-active' : '')
               + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '');
           }}
