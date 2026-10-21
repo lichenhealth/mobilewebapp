@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
@@ -12,6 +12,8 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } from '../lib/savedApi';
+import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
+import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
 import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -119,6 +121,56 @@ export default function Saved() {
     return () => { live = false; };
   }, [me]);
 
+  // DRIVE'S + CREATES (founder 2026-10-21: "'+' in drive having the same
+  // options as the paperclip and '+' as well as a novel post"): personal
+  // FILES (private bucket, owner-only, no assistant ever reads them) and
+  // personal DOCS/SHEETS (chat_docs with no room).
+  const [files, setFiles] = useState<DriveFileRow[]>([]);
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
+  const [pdocs, setPdocs] = useState<ChatDocRow[]>([]);
+  const [fileDel, setFileDel] = useState<string | null>(null);
+  const [fileBusy, setFileBusy] = useState(false);
+  const filePhotoRef = useRef<HTMLInputElement>(null);
+  const fileVideoRef = useRef<HTMLInputElement>(null);
+  const fileAudioRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void (async () => {
+      const [fs, ds] = await Promise.all([listDriveFiles(), listMyPersonalDocs()]);
+      if (!live) return;
+      setFiles(fs);
+      setPdocs(ds);
+      const signed = await signDriveFiles(fs.filter((f) => f.kind === 'photo').map((f) => f.path));
+      if (live) setFileUrls(signed);
+    })();
+    return () => { live = false; };
+  }, [me]);
+  const addFile = async (kind: DriveFileKind, f: File | undefined) => {
+    if (!f) return;
+    setFileBusy(true);
+    try {
+      const row = await uploadDriveFile(f, kind);
+      setFiles((cur) => [row, ...cur]);
+      if (kind === 'photo') {
+        const signed = await signDriveFiles([row.path]);
+        setFileUrls((cur) => ({ ...cur, ...signed }));
+      }
+    } catch (e) { alert((e as { message?: string } | null)?.message ?? 'Could not upload that file.'); }
+    setFileBusy(false);
+  };
+  const openFile = async (row: DriveFileRow) => {
+    const signed = await signDriveFiles([row.path]);
+    const url = signed[row.path];
+    if (url) window.open(url, '_blank', 'noopener');
+  };
+  const createDoc = async (kind: 'doc' | 'sheet') => {
+    try {
+      const d = await createPersonalDoc(kind, '');
+      navigate(`/docs/${d.id}`);
+    } catch (e) { alert((e as { message?: string } | null)?.message ?? 'Could not create it.'); }
+  };
+
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [lens, setLens] = useState('All');
   // When each save happened — Drive's chronology sorts saves by the save.
@@ -212,6 +264,16 @@ export default function Saved() {
       || (m.senderName ?? '').toLowerCase().includes(q)
       || (m.chatLabel ?? '').toLowerCase().includes(q));
   }, [savedMsgs, query]);
+  const filesVisible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return files.filter((f) => !q || (f.title ?? '').toLowerCase().includes(q));
+  }, [files, query]);
+  const pdocsVisible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return pdocs.filter((d) => !q
+      || d.title.toLowerCase().includes(q)
+      || (d.body ?? '').toLowerCase().includes(q));
+  }, [pdocs, query]);
   const unsaveMessage = async (id: string) => {
     setSavedMsgs((cur) => cur.filter((m) => m.messageId !== id));
     await setSaved('message', id, false);
@@ -373,8 +435,27 @@ export default function Saved() {
             </button>
             {addOpen && (
               <div className="saved__chooser">
+                {/* The composer's whole hand, here too (founder 2026-10-21):
+                    create-and-keep lands in YOUR Drive alone; a post goes to
+                    Lichen, with Compose's own "Skip the feed" as the
+                    feed-or-not choice at the end. */}
                 <button onClick={() => { setAddOpen(false); navigate('/compose?save=1'); }}>
-                  Post something<span>lands on your shelf too</span>
+                  Post something<span>to Lichen — showing in the feed is your call in the composer</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); void createDoc('doc'); }}>
+                  Doc<span>written here, lives in your Drive</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); void createDoc('sheet'); }}>
+                  Spreadsheet<span>a plain grid, yours alone</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); filePhotoRef.current?.click(); }}>
+                  Photo<span>upload a photo to your Drive</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); fileVideoRef.current?.click(); }}>
+                  Video<span>upload a video to your Drive</span>
+                </button>
+                <button onClick={() => { setAddOpen(false); fileAudioRef.current?.click(); }}>
+                  Audio<span>upload a recording to your Drive</span>
                 </button>
                 <button onClick={() => { setAddOpen(false); setNewKind('collection'); setNewFolderOpen(true); }}>
                   New folder<span>a private place to keep things</span>
@@ -384,6 +465,12 @@ export default function Saved() {
                 </button>
               </div>
             )}
+            <input ref={filePhotoRef} type="file" accept="image/*" hidden
+              onChange={(e) => { void addFile('photo', e.target.files?.[0]); e.target.value = ''; }} />
+            <input ref={fileVideoRef} type="file" accept="video/*" hidden
+              onChange={(e) => { void addFile('video', e.target.files?.[0]); e.target.value = ''; }} />
+            <input ref={fileAudioRef} type="file" accept="audio/*" hidden
+              onChange={(e) => { void addFile('audio', e.target.files?.[0]); e.target.value = ''; }} />
           </div>
           <AssistantDoor section="saved" size={38} label="Your assistant — what you've been keeping" />
           <span className="saved__bar-divider" aria-hidden="true" />
@@ -519,6 +606,71 @@ export default function Saved() {
               </div>
             );
           })}
+        </section>
+      )}
+
+      {/* ── FILES & DOCS — what Drive's + created or uploaded (founder
+          2026-10-21). Private by construction: a private bucket + owner-only
+          rows, nothing here is visible to anyone, and no assistant reads it.
+          A doc/sheet row opens its editor; a file opens via a fresh signed
+          URL; Delete asks twice and really deletes. ── */}
+      {me && ready && (filesVisible.length > 0 || pdocsVisible.length > 0 || fileBusy) && (
+        <section className="drive__drafts">
+          <p className="drive__eyebrow">
+            Files &amp; docs
+            <span className="drive__count">{filesVisible.length + pdocsVisible.length}</span>
+            {fileBusy && <em className="drive__uploading"> Uploading…</em>}
+          </p>
+          {pdocsVisible.map((d) => (
+            <div key={d.id} className="drive__row" role="button" tabIndex={0}
+              onClick={() => navigate(`/docs/${d.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/docs/${d.id}`); }}>
+              <span className="drive__row-icon"><Icon name={DOC_KIND_ICON[d.kind]} size={16} /></span>
+              <span className="drive__row-main">
+                <span className="drive__row-title">{d.title}</span>
+                <span className="drive__row-meta">{DOC_KIND_LABEL[d.kind]} · edited {shortDate(d.updated_at)}</span>
+              </span>
+              <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="drive__draft-del"
+                  onClick={() => {
+                    if (fileDel !== d.id) { setFileDel(d.id); return; }
+                    void deleteChatDoc(d.id).then(() => setPdocs((cur) => cur.filter((x) => x.id !== d.id)));
+                    setFileDel(null);
+                  }}
+                  onBlur={() => setFileDel((cur) => (cur === d.id ? null : cur))}
+                >
+                  {fileDel === d.id ? 'Really delete?' : 'Delete'}
+                </button>
+              </span>
+            </div>
+          ))}
+          {filesVisible.map((f) => (
+            <div key={f.id} className="drive__row" role="button" tabIndex={0}
+              onClick={() => void openFile(f)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void openFile(f); }}>
+              {f.kind === 'photo' && fileUrls[f.path]
+                ? <img className="drive__row-thumb" src={fileUrls[f.path]} alt="" loading="lazy" />
+                : <span className="drive__row-icon"><Icon name={f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image'} size={16} /></span>}
+              <span className="drive__row-main">
+                <span className="drive__row-title">{f.title ?? 'A file'}</span>
+                <span className="drive__row-meta">{f.kind[0].toUpperCase() + f.kind.slice(1)} · added {shortDate(f.created_at)}</span>
+              </span>
+              <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="drive__draft-del"
+                  onClick={() => {
+                    if (fileDel !== f.id) { setFileDel(f.id); return; }
+                    void deleteDriveFile(f).then(() => setFiles((cur) => cur.filter((x) => x.id !== f.id)));
+                    setFileDel(null);
+                  }}
+                  onBlur={() => setFileDel((cur) => (cur === f.id ? null : cur))}
+                >
+                  {fileDel === f.id ? 'Really delete?' : 'Delete'}
+                </button>
+              </span>
+            </div>
+          ))}
         </section>
       )}
 

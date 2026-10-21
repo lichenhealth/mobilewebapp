@@ -43,6 +43,9 @@ export default function ChatDocPage() {
       setTitle(d.title);
       setBody(d.body ?? '');
       setCells((d.data?.cells ?? [['', '', ''], ['', '', ''], ['', '', '']]).map((r) => [...r]));
+      // A PERSONAL doc (founder 2026-10-21, Drive's +) has no room — it
+      // lives in your Drive alone, and nothing else loads.
+      if (!d.chat_id) { setRoom(null); return; }
       const [{ data: c }, { data: m }] = await Promise.all([
         supabase.from('chats')
           .select('topic, title, room_space:spaces!chats_space_id_fkey(id, name)')
@@ -102,15 +105,27 @@ export default function ChatDocPage() {
 
   return (
     <div className="cdocp">
-      <button className="cmp__back cdocp__back" onClick={() => navigate(`/chat/${doc.chat_id}`)}>
-        <Icon name="arrow-left" size={14} /> Back to {room?.title ?? 'the room'}
-      </button>
+      {doc.chat_id ? (
+        <button className="cmp__back cdocp__back" onClick={() => navigate(`/chat/${doc.chat_id}`)}>
+          <Icon name="arrow-left" size={14} /> Back to {room?.title ?? 'the room'}
+        </button>
+      ) : (
+        <button className="cmp__back cdocp__back" onClick={() => navigate('/drive')}>
+          <Icon name="arrow-left" size={14} /> Back to Drive
+        </button>
+      )}
       <div className="cdocp__head">
         <span className="cdocp__kind"><Icon name={DOC_KIND_ICON[doc.kind]} size={14} /> {DOC_KIND_LABEL[doc.kind]}</span>
-        {!doc.ai_enabled && <DocAiMark />}
-        <button className="cdocp__drivelink" onClick={() => navigate(`/chat/${doc.chat_id}/drive`)}>
-          In {room?.title ?? 'the room'}&rsquo;s drive ›
-        </button>
+        {doc.chat_id && !doc.ai_enabled && <DocAiMark />}
+        {doc.chat_id ? (
+          <button className="cdocp__drivelink" onClick={() => navigate(`/chat/${doc.chat_id}/drive`)}>
+            In {room?.title ?? 'the room'}&rsquo;s drive ›
+          </button>
+        ) : (
+          <span className="cdocp__drivelink" style={{ textDecoration: 'none', cursor: 'default' }}>
+            Private — only you
+          </span>
+        )}
       </div>
       {doc.kind === 'poll' ? (
         <>
@@ -127,7 +142,7 @@ export default function ChatDocPage() {
           {doc.kind === 'doc' && (
             <textarea
               className="cdocp__body" value={body}
-              placeholder="Write here — everyone in the room can read and edit this."
+              placeholder={doc.chat_id ? "Write here — everyone in the room can read and edit this." : "Write here — this lives in your Drive, yours alone."}
               onChange={(e) => { setBody(e.target.value); setDirty(true); }}
             />
           )}
@@ -169,17 +184,24 @@ export default function ChatDocPage() {
         </>
       )}
       <div className="cdocp__settings">
-        <label className="thread__docpanel-ai">
-          <input type="checkbox" checked={doc.ai_enabled} onChange={(e) => void flipAi(e.target.checked)} />
-          AI may read this {DOC_KIND_LABEL[doc.kind].toLowerCase()}
-          {!doc.ai_enabled && <span className="cdocp__ai-note">— off: no assistant ever reads it</span>}
-        </label>
+        {doc.chat_id ? (
+          <label className="thread__docpanel-ai">
+            <input type="checkbox" checked={doc.ai_enabled} onChange={(e) => void flipAi(e.target.checked)} />
+            AI may read this {DOC_KIND_LABEL[doc.kind].toLowerCase()}
+            {!doc.ai_enabled && <span className="cdocp__ai-note">— off: no assistant ever reads it</span>}
+          </label>
+        ) : (
+          <span className="cdocp__ai-note">No assistant reads what lives only in your Drive.</span>
+        )}
         {confirmDel ? (
           <button className="cdocp__del is-sure" onClick={async () => {
-            try { await deleteChatDoc(doc.id); navigate(`/chat/${doc.chat_id}/drive`); }
+            try {
+              await deleteChatDoc(doc.id);
+              navigate(doc.chat_id ? `/chat/${doc.chat_id}/drive` : '/drive');
+            }
             catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t work.'); setConfirmDel(false); }
           }}>
-            Delete it for the whole room?
+            {doc.chat_id ? 'Delete it for the whole room?' : 'Delete it for good?'}
           </button>
         ) : (
           <button className="cdocp__del" onClick={() => setConfirmDel(true)}>Delete</button>

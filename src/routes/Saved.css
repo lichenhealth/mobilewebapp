@@ -186,3 +186,6 @@
   font-family: inherit; font-size: 12.5px; color: var(--ink-muted);
 }
 .drive__draft-del:hover { color: var(--red-deep, #a4402f); }
+
+/* Files & docs (founder 2026-10-21, Drive's +): the quiet uploading note. */
+.drive__uploading { font-style: normal; font-size: 11px; color: var(--ink-muted); margin-left: 8px; }
