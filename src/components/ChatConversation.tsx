@@ -13,6 +13,8 @@ import { EmojiPicker } from './EmojiPicker';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
 import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
+import DocRefCard from './ChatDocCard';
+import { createChatDoc, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
 import '../routes/ChatThread.css';
 
 interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id: string | null; party?: PartySpace; helpMemberId?: string | null;
@@ -98,6 +100,15 @@ export default function ChatConversation({
   }, [draftParam]);
   const [pending, setPending] = useState<Pending[]>([]);
   const [uploading, setUploading] = useState(false);
+  // DOCS, POLLS & SPREADSHEETS FROM THE COMPOSER (founder 2026-10-21): the
+  // paperclip menu offers the three in a space's rooms; creating one files it
+  // in THIS room's drive and sends a card into the conversation.
+  const [docPanel, setDocPanel] = useState<ChatDocKind | null>(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [docOptions, setDocOptions] = useState<string[]>(['', '']);
+  const [docAiFree, setDocAiFree] = useState(false);
+  const [docBusy, setDocBusy] = useState(false);
+  const [docMsg, setDocMsg] = useState('');
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -199,7 +210,8 @@ export default function ChatConversation({
   useEffect(() => {
     const need = new Set<string>();
     for (const m of messages) for (const a of m.attachments ?? []) {
-      if (!mediaUrls[a.url]) need.add(a.url);
+      // A docref carries a chat_docs id, not a storage path — never sign it.
+      if (a.type !== 'docref' && !mediaUrls[a.url]) need.add(a.url);
     }
     if (need.size === 0) return;
     let active = true;
@@ -269,6 +281,34 @@ export default function ChatConversation({
     }
   };
 
+  // Create a doc/poll/spreadsheet in THIS room's drive + send its card into
+  // the conversation (founder 2026-10-21). Docs and sheets open their editor
+  // right away; a poll is complete the moment it lands.
+  const createDoc = async () => {
+    if (!chat || !me || !docPanel) return;
+    const title = docTitle.trim();
+    if (!title) return;
+    const opts = docPanel === 'poll' ? docOptions.map((o) => o.trim()).filter(Boolean) : undefined;
+    if (docPanel === 'poll' && (opts?.length ?? 0) < 2) { setDocMsg('Give the poll at least two options.'); return; }
+    setDocBusy(true); setDocMsg('');
+    try {
+      const doc = await createChatDoc(me, chat.id, docPanel, title, { ai: !docAiFree, options: opts });
+      const { data } = await supabase
+        .from('chat_messages')
+        .insert({ chat_id: chat.id, sender_id: me, body: null, attachments: [{ type: 'docref', url: doc.id, kind: doc.kind }] })
+        .select(MESSAGE_COLS)
+        .single();
+      if (data) {
+        const row = data as MessageRow;
+        setMessages((cur) => (cur.some((m) => m.id === row.id) ? cur : [...cur, row]));
+      }
+      const kind = docPanel;
+      setDocPanel(null); setDocTitle(''); setDocOptions(['', '']); setDocAiFree(false);
+      if (kind !== 'poll') navigate(`/docs/${doc.id}`);
+    } catch (e) { setDocMsg(e instanceof Error ? e.message : 'That didn’t work.'); }
+    setDocBusy(false);
+  };
+
   const react = async (messageId: string, emoji: string) => {
     if (!chat || !me) return;
     const mine = (reactionsByMessage[messageId] ?? []).some((r) => r.profile_id === me && r.emoji === emoji);
@@ -302,10 +342,16 @@ export default function ChatConversation({
   const title = chat.topic && chat.roomSpace
     ? `${chat.roomSpace.name} · ${chat.topic}`
     : chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId, chat.patientId);
+  // Docs/polls/spreadsheets live in a SPACE room's drive — the composer
+  // offers them there (founder 2026-10-21); DMs and the rest stay plain chat.
+  const docable = ['organization', 'community', 'group', 'place'].includes(chat.kind);
 
   return (
     <div className="conv">
-      <ChatHeader chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo} />
+      <ChatHeader
+        chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo}
+        onDrive={docable ? () => navigate(`/chat/${chat.id}/drive`) : undefined}
+      />
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
         {runs.map((run, i) => {
@@ -361,10 +407,52 @@ export default function ChatConversation({
           <button className="thread__about-x" onClick={() => onCareAskDone?.()} aria-label="Just chat, without the entry">×</button>
         </div>
       )}
+      {docPanel && (
+        <div className="thread__docpanel">
+          <div className="thread__docpanel-head">
+            <span>New {DOC_KIND_LABEL[docPanel].toLowerCase()} — it lives in this room&rsquo;s drive</span>
+            <button className="thread__about-x" onClick={() => setDocPanel(null)} aria-label="Never mind">×</button>
+          </div>
+          <input
+            className="input" value={docTitle} maxLength={120} autoFocus
+            onChange={(e) => setDocTitle(e.target.value)}
+            placeholder={docPanel === 'poll' ? 'The question — What should we cook?'
+              : docPanel === 'sheet' ? 'Name it — Food buying list'
+              : 'Name it — Retreat notes'}
+            onKeyDown={(e) => { if (e.key === 'Enter' && docPanel !== 'poll') { e.preventDefault(); void createDoc(); } }}
+          />
+          {docPanel === 'poll' && (
+            <div className="thread__docpanel-opts">
+              {docOptions.map((o, i) => (
+                <input
+                  key={i} className="input" value={o} placeholder={`Option ${i + 1}`} maxLength={80}
+                  onChange={(e) => setDocOptions((cur) => cur.map((x, j) => (j === i ? e.target.value : x)))}
+                />
+              ))}
+              {docOptions.length < 6 && (
+                <button className="thread__docpanel-addopt" onClick={() => setDocOptions((cur) => [...cur, ''])}>
+                  + Another option
+                </button>
+              )}
+            </div>
+          )}
+          <label className="thread__docpanel-ai">
+            <input type="checkbox" checked={docAiFree} onChange={(e) => setDocAiFree(e.target.checked)} />
+            AI-free — no assistant ever reads it (it wears the gray brain)
+          </label>
+          <div className="thread__docpanel-foot">
+            <button className="btn btn-primary" disabled={docBusy || !docTitle.trim()} onClick={() => void createDoc()}>
+              {docBusy ? 'Creating…' : 'Create'}
+            </button>
+            {docMsg && <span className="thread__docpanel-msg">{docMsg}</span>}
+          </div>
+        </div>
+      )}
       <ChatInputBar
         draft={draft} setDraft={setDraft} onSend={sendMessage} inputRef={inputRef}
         pending={pending} onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}
         uploading={uploading} onAttach={addPending}
+        onCreateDoc={docable ? (k) => { setDocMsg(''); setDocPanel(k); } : undefined}
         replyTo={replyTo} replyName={replyTo ? (members[replyTo.sender_id]?.name ?? 'Member') : ''}
         onCancelReply={() => setReplyTo(null)}
       />
@@ -420,7 +508,7 @@ function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { av
   };
 }
 
-function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void }) {
+function ChatHeader({ chat, title, members, me, onBack, onInfo, onDrive }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void; onDrive?: () => void }) {
   const navigate = useNavigate();
   const profilePath = profilePathFor(chat, members, me);
   // Help is no longer DM-shaped: with two possible responders, a message
@@ -507,6 +595,11 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
           </p>
         </div>
       </div>
+      {onDrive && (
+        <button className="thread__icon" aria-label="This room's drive" title="This room's drive" onClick={onDrive}>
+          <Icon name="drive" size={18} />
+        </button>
+      )}
       {onInfo && (
         <button className="thread__icon" aria-label="Info" onClick={onInfo}>
           <Icon name="info" size={18} />
@@ -665,9 +758,15 @@ function MessageRun({
                     </span>
                   </div>
                 )}
-                {m.attachments && m.attachments.length > 0 && (
+                {(m.attachments ?? []).filter((a) => a.type === 'docref').map((a, k) => (
+                  <DocRefCard
+                    key={`doc${k}`} docId={a.url} me={me}
+                    names={Object.fromEntries(Object.values(members).map((x) => [x.profile_id, x.name]))}
+                  />
+                ))}
+                {(m.attachments ?? []).some((a) => a.type !== 'docref') && (
                   <div className="bubble__media">
-                    {m.attachments.map((a, k) => (
+                    {(m.attachments ?? []).filter((a) => a.type !== 'docref').map((a, k) => (
                       <MediaItem key={k} attachment={a} url={mediaUrls[a.url]} />
                     ))}
                   </div>
@@ -760,7 +859,7 @@ function groupReactions(rx: ReactionRow[], me: string): ReactionGroup[] {
 }
 
 function ChatInputBar({
-  draft, setDraft, onSend, inputRef, pending, onRemovePending, uploading, onAttach,
+  draft, setDraft, onSend, inputRef, pending, onRemovePending, uploading, onAttach, onCreateDoc,
   replyTo, replyName, onCancelReply,
 }: {
   draft: string;
@@ -771,6 +870,9 @@ function ChatInputBar({
   onRemovePending: (i: number) => void;
   uploading: boolean;
   onAttach: (file: Blob, ext: string, type: MediaType) => void;
+  /** Space rooms only (founder 2026-10-21): the composer's + offers Doc ·
+   *  Poll · Spreadsheet, each landing in this room's drive. */
+  onCreateDoc?: (kind: ChatDocKind) => void;
   replyTo: MessageRow | null;
   replyName: string;
   onCancelReply: () => void;
@@ -884,6 +986,14 @@ function ChatInputBar({
               <button className={recording ? 'is-recording' : ''} onClick={toggleRecord}>
                 <Icon name="mic" size={16} /> {recording ? 'Stop' : 'Audio'}
               </button>
+              {onCreateDoc && (
+                <>
+                  <span className="thread__attach-menu-rule" aria-hidden />
+                  <button onClick={() => { onCreateDoc('doc'); setAttachOpen(false); }}><Icon name="book" size={16} /> Doc</button>
+                  <button onClick={() => { onCreateDoc('poll'); setAttachOpen(false); }}><Icon name="check" size={16} /> Poll</button>
+                  <button onClick={() => { onCreateDoc('sheet'); setAttachOpen(false); }}><Icon name="grip" size={16} /> Spreadsheet</button>
+                </>
+              )}
             </div>
           )}
           <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />

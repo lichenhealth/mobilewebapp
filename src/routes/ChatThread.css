@@ -808,3 +808,29 @@
 .thread__head-help > :nth-child(1) { top: 0; left: 0; }
 .thread__head-help > :nth-child(2) { top: 8px; left: 8px; }
 .thread__head-help > :nth-child(3) { top: 16px; left: 16px; }
+
+/* ---- Docs/polls/spreadsheets from the composer (founder 2026-10-21) ---- */
+.thread__attach-menu-rule { display: block; height: 1px; background: var(--bone-edge); margin: 4px 0; }
+.thread__docpanel {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 var(--wall-gutter, 16px) 8px;
+  padding: 12px 14px; background: #fff;
+  border: 1px solid var(--bone-edge); border-radius: 12px;
+}
+.thread__docpanel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-muted);
+}
+.thread__docpanel-opts { display: flex; flex-direction: column; gap: 6px; }
+.thread__docpanel-addopt {
+  align-self: flex-start; background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--peach-deep); padding: 2px 0;
+}
+.thread__docpanel-ai {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.thread__docpanel-ai input { accent-color: var(--peach-deep); }
+.thread__docpanel-foot { display: flex; align-items: center; gap: 10px; }
+.thread__docpanel-msg { font-size: 12px; color: var(--red-deep, #b4553f); }

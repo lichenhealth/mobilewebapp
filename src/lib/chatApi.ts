@@ -23,8 +23,11 @@ export function helpPartyOrder<T extends { profile_id: string }>(members: T[], h
 export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm' | 'suggestion';
 
 export type MediaType = 'photo' | 'video' | 'audio';
-/** Stored on chat_messages.attachments — `url` is the storage PATH, signed at render time. */
-export interface Attachment { type: MediaType; url: string; }
+/** Stored on chat_messages.attachments — `url` is the storage PATH, signed at
+ *  render time. A 'docref' attachment (2026-10-21) instead carries a chat_docs
+ *  id in `url` (+ its kind): the card a doc/poll/spreadsheet created from the
+ *  composer rides into the room on. Never send a docref to media signing. */
+export interface Attachment { type: MediaType | 'docref'; url: string; kind?: 'doc' | 'poll' | 'sheet'; }
 
 export interface MemberInfo { profile_id: string; name: string; avatarUrl?: string | null; }
 export interface MessageRow {
@@ -205,8 +208,11 @@ export function messagePreview(msg: MessageRow): string {
   if (msg.body && msg.body.trim()) return msg.body;
   const a = msg.attachments;
   if (a && a.length) {
-    const t = a[0].type;
-    const label = t === 'photo' ? 'Photo' : t === 'video' ? 'Video' : 'Audio';
+    const first = a[0];
+    if (first.type === 'docref') {
+      return first.kind === 'poll' ? '📊 Poll' : first.kind === 'sheet' ? '📋 Spreadsheet' : '📄 Doc';
+    }
+    const label = first.type === 'photo' ? 'Photo' : first.type === 'video' ? 'Video' : 'Audio';
     return `📎 ${label}${a.length > 1 ? ` +${a.length - 1}` : ''}`;
   }
   return '';

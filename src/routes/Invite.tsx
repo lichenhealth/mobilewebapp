@@ -312,6 +312,13 @@ export default function Invite() {
     // but if an admin is gifting, gift the existing member directly instead.
     const { data: existing } = await supabase.rpc('find_member_by_email', { p_email: to });
     if (((existing as unknown[] | null) ?? []).length > 0) {
+      // Already a member — the knock is answered by REALITY, so the row
+      // resolves too (found live 2026-10-21: the founder pressed Send on a
+      // knocker who had signed up meanwhile, and the row sat at the door —
+      // this early return used to skip the knock-resolution step below).
+      const already = knocks.find((k) => k.email.toLowerCase() === to.toLowerCase());
+      if (already && already.status === 'new') void resolveKnock(already.id, 'invited');
+      if (pendingKnock?.email === to.toLowerCase()) setPendingKnock(null);
       if (gifting) {
         const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
         if (ge) return { ok: false, text: `${to}: ${ge.message}` };
@@ -322,7 +329,10 @@ export default function Invite() {
         }).catch(console.warn);
         return { ok: true, text: `${to} is already on Lichen 🌿 — gifted ${giftMonths ? spanText(giftMonths) + ' of ' : ''}${giftTier === 'concierge' ? 'Concierge' : 'Community'} instead.` };
       }
-      return { ok: true, text: `${to} is already on Lichen 🌿 — no invite needed.` };
+      return {
+        ok: true,
+        text: `${to} is already on Lichen 🌿 — ${already ? 'they joined on their own, so the knock is answered' : 'no invite needed'}.`,
+      };
     }
     if (gifting) {
       // Park the gift on their email; the membership gate redeems it the

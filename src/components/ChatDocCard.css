@@ -1,0 +1,52 @@
+/* Docs, polls & spreadsheets born in chat (founder 2026-10-21) — the card a
+   created item rides into the room on, the poll's live options, and the
+   gray slashed-brain decal for AI-free content. */
+
+.cdoc {
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px;
+  padding: 10px 12px; margin-top: 6px; min-width: 200px; max-width: 320px;
+  text-align: left;
+}
+.cdoc--loading { color: var(--ink-faint); font-size: 12px; }
+.cdoc__head {
+  display: flex; align-items: center; gap: 6px; color: var(--ink-muted);
+}
+.cdoc__kind {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cdoc__title { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.cdoc__open {
+  margin-top: 8px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.cdoc__open:hover { border-color: var(--peach); color: var(--peach-deep); }
+
+/* The poll, live in the card. */
+.cdoc__poll { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.cdoc__opt {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 10px; border-radius: 10px; text-align: left;
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.cdoc__opt:hover { border-color: var(--peach); }
+.cdoc__opt.is-mine { border-color: var(--peach-deep); background: var(--peach-tint); }
+.cdoc__opt-mark { color: var(--peach-deep); font-size: 11px; }
+.cdoc__opt-text { flex: 1; min-width: 0; }
+.cdoc__opt-who { font-size: 11px; color: var(--ink-muted); text-align: right; }
+.cdoc__poll-hint { margin: 2px 0 0; font-size: 10.5px; color: var(--ink-faint); }
+
+/* THE DECAL — a gray brain with a line through it (founder 2026-10-21):
+   content in a drive that no assistant ever reads. The ai-door's
+   faint+slash grammar at decal size. */
+.docai {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--bone-edge); color: var(--ink-faint); background: #fff;
+}
+.docai__slash {
+  position: absolute; width: 12px; height: 1.2px; background: var(--ink-faint);
+  transform: rotate(-45deg); border-radius: 1px;
+}
