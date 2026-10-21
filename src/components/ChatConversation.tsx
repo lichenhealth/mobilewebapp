@@ -1026,6 +1026,7 @@ function ChatInputBar({
   const chunksRef = useRef<Blob[]>([]);
   const [recording, setRecording] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   useEffect(() => {
@@ -1119,7 +1120,7 @@ function ChatInputBar({
 
       <div className="thread__input">
         <div className="thread__attach-wrap">
-          <button className="thread__input-icon" aria-label="Attach" onClick={() => { setEmojiOpen(false); setAttachOpen((o) => !o); }}>
+          <button className="thread__input-icon" aria-label="Attach" onClick={() => { setEmojiOpen(false); setDocsOpen(false); setAttachOpen((o) => !o); }}>
             <Icon name="paperclip" size={18} />
           </button>
           {attachOpen && (
@@ -1129,24 +1130,36 @@ function ChatInputBar({
               <button className={recording ? 'is-recording' : ''} onClick={toggleRecord}>
                 <Icon name="mic" size={16} /> {recording ? 'Stop' : 'Audio'}
               </button>
-              {onCreateDoc && (
-                <>
-                  <span className="thread__attach-menu-rule" aria-hidden />
-                  <button onClick={() => { onCreateDoc('doc'); setAttachOpen(false); }}><Icon name="book" size={16} /> Doc</button>
-                  <button onClick={() => { onCreateDoc('poll'); setAttachOpen(false); }}><Icon name="check" size={16} /> Poll</button>
-                  <button onClick={() => { onCreateDoc('sheet'); setAttachOpen(false); }}><Icon name="grip" size={16} /> Spreadsheet</button>
-                </>
-              )}
             </div>
           )}
           <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
           <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
         </div>
+        {/* The ⊕ is the DOCUMENT door, its own button (founder 2026-10-21:
+            "I still don't see a place to add a drive document … Maybe a plus
+            button right here" — the three options lived inside the paperclip
+            and read as missing; the paperclip keeps media). Creating one
+            lands it in this room's drive AND sends its card into the chat —
+            the share-back she described is the standing flow. */}
+        {onCreateDoc && (
+          <div className="thread__attach-wrap">
+            <button className="thread__input-icon" aria-label="Create a doc, poll, or spreadsheet" onClick={() => { setEmojiOpen(false); setAttachOpen(false); setDocsOpen((o) => !o); }}>
+              <Icon name="plus" size={18} />
+            </button>
+            {docsOpen && (
+              <div className="thread__attach-menu">
+                <button onClick={() => { onCreateDoc('doc'); setDocsOpen(false); }}><Icon name="book" size={16} /> Doc</button>
+                <button onClick={() => { onCreateDoc('poll'); setDocsOpen(false); }}><Icon name="check" size={16} /> Poll</button>
+                <button onClick={() => { onCreateDoc('sheet'); setDocsOpen(false); }}><Icon name="grip" size={16} /> Spreadsheet</button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="thread__emoji-wrap">
           <button
             className={'thread__input-icon' + (emojiOpen ? ' is-active' : '')}
             aria-label="Emoji"
-            onClick={() => { setAttachOpen(false); setEmojiOpen((o) => !o); }}
+            onClick={() => { setAttachOpen(false); setDocsOpen(false); setEmojiOpen((o) => !o); }}
           >
             <Icon name="smile" size={18} />
           </button>
