@@ -16,6 +16,15 @@
   background: var(--bone);
   z-index: 40;
 }
+/* The bottom nav shows under the composer now (founder 2026-10-21: "shouldn't
+   the bottom nav be below the compose and have chat highlighted?") — below
+   1024px, where the nav stands, the thread ends at its top edge and the nav
+   carries the safe-area padding the composer used to. ≥1024 the route
+   redirects to the split view and the nav is hidden, so nothing changes. */
+@media (max-width: 1023px) {
+  .thread { height: calc(100dvh - var(--nav-h) - var(--safe-bot)); }
+  .thread .thread__input-wrap { padding-bottom: 0; }
+}
 
 /* Reusable conversation (header + scroll + composer) — fills its parent, which
    controls the bounding box (.thread for full-screen, .conc__care in Concierge). */
