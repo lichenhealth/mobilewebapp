@@ -1,27 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from './Icon';
+import { useTopBackFor, useTopBarMounted } from '../lib/topBack';
 import './PageHead.css';
 
-/** THE NON-SECTION HEADER (founder 2026-10-21, from the room drive's "← Back
- *  to the room" chip: "drive needs to have the back button and the hamburger
- *  upper left, lets sunset back to the room and other text that does this on
- *  mobile especially … design audit the entire platform and update for
- *  consistency"): a non-section screen wears TWO icon circles upper-left —
- *  ☰ (the menu, via the same shell event the chat thread uses; hidden at
- *  ≥1024px where the docked rail stands, and for signed-out visitors, who
- *  have no menu) and ← (back). The worded chip survives ONLY where its words
- *  are load-bearing: scope escapes (ScopeBack's "← Back to Veterans" + clear
- *  filter are two distinct acts), Compose's popup-close, and a builder's
- *  mode exit. A named destination keeps its MEANING here — the caller passes
- *  it as `onBack` — only the words retire. */
+/** THE NON-SECTION BACK (founder 2026-10-21, two passes the same day: first
+ *  "lets sunset back to the room and other text that does this" — worded
+ *  chips became this component's ← circle — then, from a course page whose
+ *  arrow sat in the body: "didn't we decide to have it next to the hamburger
+ *  menu overall as a rule for the entire platform?"): a screen mounts
+ *  PageHead with its back (a NAMED destination keeps its meaning via
+ *  `onBack`), and the arrow renders beside the ☰ in the TopBar — the same
+ *  slot section screens always had — via the topBack broadcast. Only on a
+ *  TopBar-LESS screen (guest pages, full-bleed) does PageHead draw its own
+ *  circles here in the body, with ☰ via the `menu` prop. */
 export function PageHead({ onBack, fallback = '/home', menu = false }: {
   /** Where ← goes. Default: history-back, `fallback` on a cold landing. */
   onBack?: () => void;
   fallback?: string;
-  /** ☰ renders ONLY on TopBar-less screens (the room drive) — everywhere
-   *  else the TopBar above already carries the hamburger, and two ☰ on one
-   *  screen is the one-back mistake in a new hat. */
+  /** ☰ renders ONLY on TopBar-less screens — everywhere else the TopBar
+   *  carries the hamburger, and two ☰ is the one-back mistake in a new hat. */
   menu?: boolean;
 }) {
   const navigate = useNavigate();
@@ -30,6 +28,10 @@ export function PageHead({ onBack, fallback = '/home', menu = false }: {
     if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1);
     else navigate(fallback);
   });
+  useTopBackFor(back);
+  const topBarUp = useTopBarMounted();
+  // The TopBar is standing — the arrow renders up there, nothing here.
+  if (topBarUp) return null;
   return (
     <div className="pagehead">
       {menu && user && (

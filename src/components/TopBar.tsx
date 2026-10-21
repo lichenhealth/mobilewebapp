@@ -16,6 +16,7 @@ import Avatar from './Avatar';
 import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
 import { markFamily } from '../lib/navFamily';
+import { useTopBack, setTopBarMounted } from '../lib/topBack';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
 
@@ -72,6 +73,10 @@ export default function TopBar({
 }: TopBarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  // A non-section page's registered back (PageHead's broadcast) — and the
+  // standing flag that tells PageHead the arrow renders up here, not in-body.
+  const pageBack = useTopBack();
+  useEffect(() => { setTopBarMounted(true); return () => setTopBarMounted(false); }, []);
   // Off-prefix screens dress as their FAMILY (founder 2026-10-21: a room's
   // drive and /organize wear the DRIVE mark + back arrow — the prefix scan
   // would dress them as Chat / nothing). One map, src/lib/navFamily.ts.
@@ -204,12 +209,16 @@ export default function TopBar({
         >
           <Icon name="menu" size={20} />
         </button>
-        {/* Back-to-Home beside the hamburger on section screens (founder
-            2026-07-25): same circle, same size — one tap returns to Home. */}
-        {section && section.prefix !== '/profile' && (
+        {/* Back beside the hamburger (founder 2026-07-25 for section screens;
+            founder 2026-10-21 for EVERY screen that has a back: "didn't we
+            decide to have it next to the hamburger menu overall as a rule for
+            the entire platform?") — a page-registered back (PageHead's
+            broadcast, named destinations kept) wins over the generic walk. */}
+        {(pageBack || (section && section.prefix !== '/profile')) && (
           <button
             className="top-bar__icon"
             onClick={() => {
+              if (pageBack) { pageBack(); return; }
               // A client's board backs out to the PROVIDER LIST, one tap
               // (founder 2026-09-27: "I can toggle between the tabs on her
               // profile, so I don't need the back button to remember
