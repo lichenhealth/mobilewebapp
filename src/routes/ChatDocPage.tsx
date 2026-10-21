@@ -8,6 +8,7 @@ import {
   loadChatDoc, saveChatDoc, setChatDocAi, deleteChatDoc,
   DOC_KIND_LABEL, DOC_KIND_ICON, type ChatDocRow,
 } from '../lib/chatDocsApi';
+import { PageHead } from '../components/PageHead';
 import './ChatDocs.css';
 
 interface RoomInfo { title: string; spaceName: string | null; spaceId: string | null }
@@ -105,15 +106,7 @@ export default function ChatDocPage() {
 
   return (
     <div className="cdocp">
-      {doc.chat_id ? (
-        <button className="cmp__back cdocp__back" onClick={() => navigate(`/chat/${doc.chat_id}`)}>
-          <Icon name="arrow-left" size={14} /> Back to {room?.title ?? 'the room'}
-        </button>
-      ) : (
-        <button className="cmp__back cdocp__back" onClick={() => navigate('/drive')}>
-          <Icon name="arrow-left" size={14} /> Back to Drive
-        </button>
-      )}
+      <PageHead onBack={() => navigate(doc.chat_id ? `/chat/${doc.chat_id}` : '/drive')} />
       <div className="cdocp__head">
         <span className="cdocp__kind"><Icon name={DOC_KIND_ICON[doc.kind]} size={14} /> {DOC_KIND_LABEL[doc.kind]}</span>
         {doc.chat_id && !doc.ai_enabled && <DocAiMark />}

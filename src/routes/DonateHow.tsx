@@ -1,3 +1,4 @@
+import { PageHead } from '../components/PageHead';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -22,9 +23,7 @@ export default function DonateHow() {
 
   return (
     <div className="donate">
-      <button className="cmp__back" onClick={() => navigate('/donate')}>
-        <Icon name="arrow-left" size={14} /> Back to giving
-      </button>
+      <PageHead onBack={() => navigate('/donate')} />
 
       <header className="donate__head">
         <p className="eyebrow">Support Lichen</p>

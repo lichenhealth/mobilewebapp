@@ -1,3 +1,4 @@
+import { PageHead } from '../components/PageHead';
 import { useNavigate } from 'react-router-dom';
 import { Bolt } from '../components/CurrentcyCard';
 import './Mycelium.css';   // myc__ centered-header grammar (Drive's shape)
@@ -14,9 +15,7 @@ export default function CurrentcyHow() {
   const navigate = useNavigate();
   return (
     <div className="curhow">
-      <button className="curhow__back" onClick={() => navigate('/currentcy')}>
-        ← Back to Current-cy
-      </button>
+      <PageHead onBack={() => navigate('/currentcy')} />
 
       <header className="myc__head">
         <h1 className="myc__title">How money moves</h1>

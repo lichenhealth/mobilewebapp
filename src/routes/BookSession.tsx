@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
@@ -91,7 +92,7 @@ export default function BookSession() {
   if (!board) {
     return (
       <div className="bkg">
-        <button className="cmp__back" onClick={() => navigate(-1)}><Icon name="arrow-left" size={14} /> Back</button>
+        <PageHead />
         <p className="bkg__muted">This session isn&rsquo;t available.</p>
       </div>
     );
@@ -132,7 +133,7 @@ export default function BookSession() {
 
   return (
     <div className="bkg">
-      <button className="cmp__back" onClick={() => navigate(-1)}><Icon name="arrow-left" size={14} /> Back</button>
+      <PageHead />
       <header className="bkg__head">
         {/* The practitioner's name is a door to their profile (founder
             2026-08-05) — you should be able to read who you're booking. */}

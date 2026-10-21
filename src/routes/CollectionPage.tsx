@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
 import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantDoor from '../components/AssistantDoor';
@@ -487,18 +488,14 @@ export default function CollectionPage() {
     else navigate('/home');
   };
   const backChip = me && (
-    <button className="cmp__back colp__back" onClick={back}>
-      <Icon name="arrow-left" size={14} /> {ownFolder ? 'Back to Drive' : 'Back'}
-    </button>
+    <PageHead onBack={back} />
   );
 
   if (!ready) return <div className="colp"><p className="colp__muted">Loading…</p></div>;
   if (!meta) {
     return (
       <div className="colp">
-        <button className="cmp__back colp__back" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/home'); }}>
-          <Icon name="arrow-left" size={14} /> Back
-        </button>
+        <PageHead />
         <p className="colp__muted">This page isn&rsquo;t available.</p>
       </div>
     );
