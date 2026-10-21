@@ -191,3 +191,31 @@
 
 /* Files & docs (founder 2026-10-21, Drive's +): the quiet uploading note. */
 .drive__uploading { font-style: normal; font-size: 11px; color: var(--ink-muted); margin-left: 8px; }
+
+/* ── RECENTS + FOLDS (founder 2026-10-21: "folders and items be a drop down,
+   to save room. Recents is at the top … kinda like the main Google Drive
+   view"): Recent leads with 3 rows, its carrot unfolds everything in recency
+   order; every other section shuts behind its eyebrow. ── */
+.drive__recents { padding: 2px var(--s-5) 0; margin-bottom: var(--s-2); }
+.drive__foldhead {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+}
+.drive__foldhead .drive__eyebrow { margin: 0; }
+.drive__foldhead:hover .drive__eyebrow { color: var(--ink-soft); }
+.drive__foldcar {
+  display: inline-flex; color: var(--ink-faint);
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.drive__foldcar.is-open { transform: rotate(90deg); }
+/* A section head that is JUST the fold (no view toggle beside it): the
+   section already carries its own side padding (or the gutter does), so the
+   base .drive__items-head inset would double it. */
+.drive__recents .drive__items-head,
+.drive__folders .drive__items-head,
+.drive__drafts .drive__items-head { padding: 0; margin-bottom: 6px; }
+
+/* The section's icon rides the row's right edge (founder 2026-10-21:
+   "icons for the section to the right of the text … not the word spelled
+   out") — the brain convo rows' grammar. */
+.drive__row-area { flex-shrink: 0; display: inline-flex; color: var(--peach-deep); }
