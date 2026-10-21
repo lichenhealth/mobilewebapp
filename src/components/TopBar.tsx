@@ -15,6 +15,7 @@ import { clearPromptCache } from '../lib/promptsApi';
 import Avatar from './Avatar';
 import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
+import { markFamily } from '../lib/navFamily';
 import NotificationPanel from '../notifications/NotificationPanel';
 import './TopBar.css';
 
@@ -71,11 +72,12 @@ export default function TopBar({
 }: TopBarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  // A room's or group's drive wears the DRIVE mark (founder 2026-10-21:
-  // "it should look like the regular drive, just selected to the sub drive")
-  // — the prefix scan would dress it as Chat / nothing.
-  const section = /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname)
-    ? SECTION_LOGOS.find((s) => s.prefix === '/drive')
+  // Off-prefix screens dress as their FAMILY (founder 2026-10-21: a room's
+  // drive and /organize wear the DRIVE mark + back arrow — the prefix scan
+  // would dress them as Chat / nothing). One map, src/lib/navFamily.ts.
+  const fam = markFamily(pathname);
+  const section = fam
+    ? SECTION_LOGOS.find((s) => s.prefix === fam)
     : SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
 
   // WHOSE SECTION IS THIS (founder 2026-08-11): a scoped section — Countryman

@@ -23,6 +23,8 @@ import './Marketplace.css'; // mkt__action circle-icon vocabulary
 import './Saved.css';
 import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
+import { useActing } from '../acting/ActingProvider';
+import { ActingGate } from '../components/ActingGate';
 
 // DRIVE (founder 2026-08-14): "saving something is different than having it
 // in a drive." The section holds BOTH what you saved and what you created —
@@ -70,6 +72,19 @@ export default function Saved() {
   const { promptSaved, openPicker } = useCollect();
   const { user } = useAuth();
   const me = user?.id ?? '';
+  const { actor, ready: actingReady } = useActing();
+
+  // THE HAT FOLLOWS INTO DRIVE (founder 2026-10-21, the whose-screen class:
+  // "it goes to galyn's drive, even though I'm acting as Lichen Alpha
+  // Testers"): acting as a SPACE, Drive IS the space's drive — redirect to
+  // /spaces/:id/drive (which has one, since the room-docs build). A BEING
+  // has no drive, so it gets the honest gate below. Ready-gated, replace not
+  // push — a correction isn't a step.
+  useEffect(() => {
+    if (actingReady && actor.type === 'space') {
+      navigate(`/spaces/${actor.id}/drive`, { replace: true });
+    }
+  }, [actingReady, actor, navigate]);
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
@@ -402,6 +417,11 @@ export default function Saved() {
       </div>
     );
   }
+
+  // The hat gate's other half: never render YOUR drive under an entity's
+  // name. A space is being redirected by the effect above; a being gates.
+  if (!actingReady || actor.type === 'space') return null;
+  if (actor.type !== 'self') return <ActingGate what="a Drive of its own" icon="drive" />;
 
   return (
     <div className="myc">

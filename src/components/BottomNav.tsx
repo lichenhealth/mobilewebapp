@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
+import { navFamily } from '../lib/navFamily';
 import './BottomNav.css';
 
 interface NavItem {
@@ -31,10 +32,11 @@ export default function BottomNav() {
   const { pathname } = useLocation();
   const countFor = (to: string) =>
     to === '/home' ? totalUnread : (countsBySection[sectionForRoute(to) ?? ''] ?? 0);
-  // A room's or group's drive IS a drive screen (founder 2026-10-21: "the nav
-  // should exist at the bottom with drive highlighted") — NavLink's own match
-  // only knows /drive.
-  const onSubDrive = /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname);
+  // Off-prefix screens light their FAMILY (founder 2026-10-21: a room's
+  // drive, /organize — "drive highlighted … systemically build these nav
+  // rules in"). One map, src/lib/navFamily.ts; when it answers, it answers
+  // whole — prefix matches stand down so Chat doesn't stay lit on /chat/:id/drive.
+  const family = navFamily(pathname);
 
   return (
     <nav className="bottom-nav" aria-label="Primary">
@@ -46,11 +48,7 @@ export default function BottomNav() {
               <NavLink
                 to={item.to}
                 className={({ isActive }) => {
-                  // On a room's drive, DRIVE is the lit tab — Chat's own
-                  // prefix match (/chat/…) must stand down there.
-                  const lit = item.to === '/drive'
-                    ? isActive || onSubDrive
-                    : isActive && !(item.to === '/chat' && onSubDrive);
+                  const lit = family ? item.to === family : isActive;
                   return 'bottom-nav__item' + (lit ? ' is-active' : '');
                 }}
               >

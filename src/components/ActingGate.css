@@ -1,0 +1,31 @@
+/* The hat gate (founder 2026-10-21) — Concierge's 2026-10-06 care-gate card,
+   generalized for every personal-only screen. */
+.actgate {
+  margin: var(--s-5);
+  padding: var(--s-7) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  background: var(--bone-warm);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+  color: var(--ink-muted);
+}
+.actgate__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.actgate__sub {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.5;
+  max-width: 36ch;
+}
+.actgate .btn { margin-top: var(--s-2); }
