@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
@@ -241,8 +241,29 @@ export default function Saved() {
   const [query, setQuery] = useState('');
   const [addOpen, setAddOpen] = useState(false);
 
-  const toggleArea = (a: ServiceArea) =>
+  // FOLDED SECTIONS (founder 2026-10-21: "let's have folders and items be a
+  // drop down, to save room") — every section shuts behind its eyebrow,
+  // closed by default (Recents up top carries the common case), open-state
+  // remembered per device. An active SEARCH opens everything: hits never
+  // hide behind a closed fold.
+  const [folds, setFolds] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('lichen.driveFolds') ?? '{}') as Record<string, boolean>; }
+    catch { return {}; }
+  });
+  const foldOpen = (id: string) => !!query.trim() || !!folds[id];
+  const toggleFold = (id: string) => setFolds((cur) => {
+    const next = { ...cur, [id]: !cur[id] };
+    try { localStorage.setItem('lichen.driveFolds', JSON.stringify(next)); } catch { /* per-device nicety */ }
+    return next;
+  });
+  // RECENTS' carrot: 3 rows shut, everything in recency order open.
+  const [recentsAll, setRecentsAll] = useState(false);
+
+  const toggleArea = (a: ServiceArea) => {
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
+    // Picking a section is asking to SEE its items — unfold them.
+    setFolds((cur) => (cur.items ? cur : { ...cur, items: true }));
+  };
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -311,6 +332,67 @@ export default function Saved() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, savedAt, me]);
 
+  // RECENTS (founder 2026-10-21: "Recents is at the top, pulling the 3 most
+  // recent items (whether they're folders, docs, etc) … with a carrot to open
+  // all items in order of most recent - kinda like the main Google Drive
+  // view"): one recency list across every kind the Drive holds. It's a jump
+  // list — managing (delete, move, menus) stays in each kind's own section.
+  type RecentRow = {
+    t: string; key: string; icon: IconName; photo?: string | null;
+    title: string; meta: string; go: () => void;
+  };
+  const recents = useMemo<RecentRow[]>(() => {
+    const rows: RecentRow[] = [];
+    for (const c of foldersVisible) rows.push({
+      t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
+      title: c.name,
+      meta: `Folder · ${c.item_count === 1 ? '1 item' : `${c.item_count} items`}`,
+      go: () => navigate(`/collections/${c.id}`),
+    });
+    for (const p of visible) {
+      const media = Array.isArray(p.details?.media)
+        ? (p.details.media as { type: string; url: string }[]) : [];
+      rows.push({
+        t: driveTime(p), key: 'post:' + p.id,
+        icon: serviceAreaIcon(postAreas(p)[0] ?? null) ?? 'newsfeed',
+        photo: media.find((m) => m.type === 'photo')?.url ?? p.image_url,
+        title: p.title || (p.body.length > 72 ? p.body.slice(0, 69) + '…' : p.body) || 'Untitled',
+        meta: `${p.author_id === me ? 'Created' : 'Saved'} ${shortDate(driveTime(p))}`,
+        go: () => navigate(postOpenPath(p)),
+      });
+    }
+    for (const d of draftsVisible) rows.push({
+      t: d.updated_at, key: 'draft:' + d.id, icon: 'newsfeed',
+      title: draftLabel(d.draft), meta: `Draft · saved ${shortDate(d.updated_at)}`,
+      go: () => navigate(`/compose?draft=${d.id}`),
+    });
+    for (const d of pdocsVisible) rows.push({
+      t: d.updated_at, key: 'doc:' + d.id, icon: DOC_KIND_ICON[d.kind],
+      title: d.title, meta: `${DOC_KIND_LABEL[d.kind]} · edited ${shortDate(d.updated_at)}`,
+      go: () => navigate(`/docs/${d.id}`),
+    });
+    for (const f of filesVisible) rows.push({
+      t: f.created_at, key: 'file:' + f.id,
+      icon: f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image',
+      photo: f.kind === 'photo' ? fileUrls[f.path] : null,
+      title: f.title ?? 'A file',
+      meta: `${f.kind[0].toUpperCase() + f.kind.slice(1)} · added ${shortDate(f.created_at)}`,
+      go: () => void openFile(f),
+    });
+    for (const m of msgsVisible) {
+      if (!m.chatId) continue; // an unreadable stub isn't a place to jump to
+      rows.push({
+        t: m.savedAt, key: 'msg:' + m.messageId, icon: 'chat',
+        title: m.body?.trim() || (m.hasMedia ? '📎 An attachment' : 'A message'),
+        meta: `Message · saved ${shortDate(m.savedAt)}${m.senderName ? ` · from ${m.senderName}` : ''}`,
+        go: () => navigate(`/chat/${m.chatId}`),
+      });
+    }
+    rows.sort((a, b) => b.t.localeCompare(a.t));
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foldersVisible, visible, draftsVisible, pdocsVisible, filesVisible, msgsVisible, fileUrls, savedAt, me]);
+
   async function makeFolder() {
     const nm = newFolderName.trim();
     if (!nm) return;
@@ -329,6 +411,21 @@ export default function Saved() {
     try { navigate(await chatPathForPost(post)); }
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
   }
+
+  /** A section's fold head: eyebrow + count + the carrot. The whole row
+   *  toggles; a search holds every fold open (see foldOpen). */
+  const foldHead = (id: string, label: string, count: number, extra?: React.ReactNode) => (
+    <button type="button" className="drive__foldhead" aria-expanded={foldOpen(id)} onClick={() => toggleFold(id)}>
+      <span className="drive__eyebrow">
+        {label}
+        <span className="drive__count">{count}</span>
+        {extra}
+      </span>
+      <span className={'drive__foldcar' + (foldOpen(id) ? ' is-open' : '')} aria-hidden="true">
+        <Icon name="chevron-right" size={13} />
+      </span>
+    </button>
+  );
 
   /** A folder tile's icon says what the folder IS. */
   function folderIcon(c: CollectionRow): IconName {
@@ -369,9 +466,16 @@ export default function Saved() {
           <span className="drive__row-meta">
             {own ? `Created ${shortDate(t)}` : `Saved ${shortDate(t)}`}
             {!own && who ? ` · from ${who}` : ''}
-            {areaLabel ? ` · ${areaLabel}` : ''}
           </span>
         </span>
+        {/* The section rides as its ICON, right of the words (founder
+            2026-10-21: "icons for the section to the right of the text of an
+            item, not the word spelled out") — the brain's convo-row grammar. */}
+        {area && (
+          <span className="drive__row-area" title={areaLabel ?? undefined} aria-label={areaLabel ?? undefined}>
+            <Icon name={icon} size={14} />
+          </span>
+        )}
         <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
           <button className="drive__row-more" aria-label="More" aria-expanded={menuOpen}
             onClick={() => setMenuFor(menuOpen ? null : p.id)}>
@@ -496,7 +600,18 @@ export default function Saved() {
           </div>
           <AssistantDoor section="saved" size={38} label="Your assistant — what you've been keeping" />
           <span className="saved__bar-divider" aria-hidden="true" />
-          <button className="mkt__action is-active saved__feeddoor" aria-label="Drive feed" title="Your Drive feed">
+          {/* The Feed circle is the ALL lens, Home's grammar (founder
+              2026-10-21: "when I select marketplace it should deselect feed
+              and only show me marketplace items") — it lights ALONE when no
+              section is picked, any section unlights it, tapping it resets.
+              It was a decorative always-lit button before, which is why Feed
+              stayed orange beside a chosen section. */}
+          <button
+            className={'mkt__action saved__feeddoor' + (areas.length === 0 ? ' is-active' : '')}
+            aria-label="Everything" title="Everything — clear the section filter"
+            aria-pressed={areas.length === 0}
+            onClick={() => setAreas([])}
+          >
             <span className="mkt__action-circle"><Icon name="newsfeed" size={16} /></span>
           </button>
           {areasPresent.length > 1 && (
@@ -533,12 +648,51 @@ export default function Saved() {
         />
       )}
 
-      {/* ── FOLDERS — the drive's cabinets lead (founder 2026-10-06). A tile
-          names its folder, its count, and its state: a published folder is a
-          COLLECTION others can read; a course notebook says whose. ── */}
+      {/* ── RECENT — the top of the drive (founder 2026-10-21: "Recents is
+          at the top, pulling the 3 most recent items (whether they're
+          folders, docs, etc) … kinda like the main Google Drive view"):
+          the 3 freshest things of ANY kind, always open; the carrot unfolds
+          everything in recency order. Hidden while searching — the search
+          holds every section open instead. ── */}
+      {me && ready && !query.trim() && recents.length > 0 && (
+        <section className="drive__recents">
+          <div className="drive__items-head">
+            <button type="button" className="drive__foldhead" aria-expanded={recentsAll}
+              onClick={() => setRecentsAll((v) => !v)}>
+              <span className="drive__eyebrow">
+                Recent
+                <span className="drive__count">{recents.length}</span>
+              </span>
+              <span className={'drive__foldcar' + (recentsAll ? ' is-open' : '')} aria-hidden="true">
+                <Icon name="chevron-right" size={13} />
+              </span>
+            </button>
+          </div>
+          {(recentsAll ? recents : recents.slice(0, 3)).map((r) => (
+            <div key={r.key} className="drive__row" role="button" tabIndex={0} onClick={r.go}
+              onKeyDown={(e) => { if (e.key === 'Enter') r.go(); }}>
+              {r.photo
+                ? <img className="drive__row-thumb" src={r.photo} alt="" loading="lazy" />
+                : <span className="drive__row-icon"><Icon name={r.icon} size={16} /></span>}
+              <span className="drive__row-main">
+                <span className="drive__row-title">{r.title}</span>
+                <span className="drive__row-meta">{r.meta}</span>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ── FOLDERS — the drive's cabinets (founder 2026-10-06), behind a
+          fold since 2026-10-21. A tile names its folder, its count, and its
+          state: a published folder is a COLLECTION others can read; a course
+          notebook says whose. ── */}
       {me && ready && (
         <section className="drive__folders">
-          <p className="drive__eyebrow">Folders</p>
+          <div className="drive__items-head">
+            {foldHead('folders', 'Folders', foldersVisible.length)}
+          </div>
+          {foldOpen('folders') && (<>
           <div className="drive__folder-grid">
             {folderShelf.map((c) => (
               <button key={c.id} className="drive__folder" onClick={() => navigate(`/collections/${c.id}`)}>
@@ -570,6 +724,7 @@ export default function Saved() {
           {query.trim() !== '' && foldersVisible.length === 0 && (
             <p className="drive__none">No folder matches.</p>
           )}
+          </>)}
         </section>
       )}
 
@@ -592,11 +747,10 @@ export default function Saved() {
           to anyone else — and no assistant reads a draft, ever. ── */}
       {me && ready && draftsVisible.length > 0 && (
         <section className="drive__drafts">
-          <p className="drive__eyebrow">
-            Drafts
-            <span className="drive__count">{draftsVisible.length}</span>
-          </p>
-          {draftsVisible.map((d) => {
+          <div className="drive__items-head">
+            {foldHead('drafts', 'Drafts', draftsVisible.length)}
+          </div>
+          {foldOpen('drafts') && draftsVisible.map((d) => {
             const dAreas = Array.isArray((d.draft as { areas?: string[] }).areas)
               ? ((d.draft as { areas?: string[] }).areas as ServiceArea[]) : [];
             return (
@@ -638,12 +792,11 @@ export default function Saved() {
           URL; Delete asks twice and really deletes. ── */}
       {me && ready && (filesVisible.length > 0 || pdocsVisible.length > 0 || fileBusy) && (
         <section className="drive__drafts">
-          <p className="drive__eyebrow">
-            Files &amp; docs
-            <span className="drive__count">{filesVisible.length + pdocsVisible.length}</span>
-            {fileBusy && <em className="drive__uploading"> Uploading…</em>}
-          </p>
-          {pdocsVisible.map((d) => (
+          <div className="drive__items-head">
+            {foldHead('files', 'Files & docs', filesVisible.length + pdocsVisible.length,
+              fileBusy ? <em className="drive__uploading"> Uploading…</em> : undefined)}
+          </div>
+          {foldOpen('files') && pdocsVisible.map((d) => (
             <div key={d.id} className="drive__row" role="button" tabIndex={0}
               onClick={() => navigate(`/docs/${d.id}`)}
               onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/docs/${d.id}`); }}>
@@ -667,7 +820,7 @@ export default function Saved() {
               </span>
             </div>
           ))}
-          {filesVisible.map((f) => (
+          {foldOpen('files') && filesVisible.map((f) => (
             <div key={f.id} className="drive__row" role="button" tabIndex={0}
               onClick={() => void openFile(f)}
               onKeyDown={(e) => { if (e.key === 'Enter') void openFile(f); }}>
@@ -702,11 +855,10 @@ export default function Saved() {
           only Remove. ── */}
       {me && ready && msgsVisible.length > 0 && (
         <section className="drive__drafts">
-          <p className="drive__eyebrow">
-            Messages
-            <span className="drive__count">{msgsVisible.length}</span>
-          </p>
-          {msgsVisible.map((m) => (
+          <div className="drive__items-head">
+            {foldHead('messages', 'Messages', msgsVisible.length)}
+          </div>
+          {foldOpen('messages') && msgsVisible.map((m) => (
             <div key={m.messageId} className="drive__row" role="button" tabIndex={0}
               onClick={() => { if (m.chatId) navigate(`/chat/${m.chatId}`); }}
               onKeyDown={(e) => { if (e.key === 'Enter' && m.chatId) navigate(`/chat/${m.chatId}`); }}>
@@ -744,10 +896,7 @@ export default function Saved() {
       {/* ── ITEMS — compact rows by default, the old cards a tap away. ── */}
       {me && ready && posts.length > 0 && (
         <div className="drive__items-head">
-          <p className="drive__eyebrow">
-            Items
-            <span className="drive__count">{visible.length}</span>
-          </p>
+          {foldHead('items', 'Items', visible.length)}
           <span className="drive__viewtoggle" role="group" aria-label="Item view">
             <button className={view === 'rows' ? 'is-on' : ''} aria-label="Rows" title="Rows"
               onClick={() => pickView('rows')}><Icon name="queue" size={14} /></button>
@@ -765,19 +914,19 @@ export default function Saved() {
             <p>Tap the bookmark on any post to save it here — and everything you create lands here on its own.</p>
           </div>
         )}
-        {ready && posts.length > 0 && visible.length === 0 && (
+        {ready && posts.length > 0 && foldOpen('items') && visible.length === 0 && (
           <div className="myc__empty">
             <span className="display-italic">Nothing matches.</span>
             <p>Clear a filter to see the rest of your Drive.</p>
           </div>
         )}
-        {view === 'rows' && grouped.map((g) => (
+        {foldOpen('items') && view === 'rows' && grouped.map((g) => (
           <div className="drive__group" key={g.label + g.items[0]?.id}>
             <p className="drive__group-label">{g.label}</p>
             {g.items.map((p) => <DriveRow key={p.id} p={p} />)}
           </div>
         ))}
-        {view === 'cards' && visible.map((p) => (
+        {foldOpen('items') && view === 'cards' && visible.map((p) => (
           <FeedCard
             key={p.id}
             {...postToCard(p, me || undefined, spaceNames)}
