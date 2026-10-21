@@ -98,7 +98,10 @@
 
   /* ─── Layout ────────────────────────────────────────────────────── */
   --app-max: 430px;
-  --nav-h:   84px;
+  /* Must match .bottom-nav's real rendered height (measured 90px, 2026-10-21
+     — the chat thread now ends exactly at the nav's top edge, so an
+     under-reading token overlaps the composer, not just a clearance). */
+  --nav-h:   90px;
   --top-h:   110px;
   /* Compact top bar for identity pages (profile/member/space) — no big
      circle in the logo slot, so the reserved height can shrink and let the

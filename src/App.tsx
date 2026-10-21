@@ -461,7 +461,11 @@ export default function App() {
         </Routes>
         )}
       </main>
-      {!isChatThread && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
+      {/* The bottom nav rides UNDER the chat thread's composer too (founder
+          2026-10-21: "shouldn't the bottom nav be below the compose and have
+          chat highlighted?") — the thread's own height stops at the nav's
+          top edge (ChatThread.css), so the composer sits right above it. */}
+      {!isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
       {/* Claude's walkthrough companion (founder 2026-10-19) — floats over
           the real screens while a new member's tour is active. */}
       {!isAuth && !isGuest && !isEmbed && <GuideCompanion />}
