@@ -468,8 +468,12 @@ const ICONS: Record<IconName, IconEntry> = {
      lifted from Figma, so it's a clean 24 box — a folded sheet, a headline
      block and column rules, at the family's hairline weight. */
   'newsfeed': {
-    viewBox: '0 0 24 24',
-    strokeWidth: 1.4,
+    // Tightened to its artwork 2026-10-21 (founder: "Feed icon is way smaller
+    // than the others") — the drawing spanned x4–20/y5–19.5 of a 24-box, so it
+    // rendered ~2/3 the size of tight-framed siblings (the brain/dollar/
+    // merkaba disease). Stroke retuned 1.4→0.95 to keep the line weight.
+    viewBox: '4 4.25 16 16',
+    strokeWidth: 0.95,
     content: <><path d="M17.5 19.5H5.5C4.67 19.5 4 18.83 4 18V5.5C4 5.22 4.22 5 4.5 5H17C17.28 5 17.5 5.22 17.5 5.5V19.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M17.5 9H19.5C19.78 9 20 9.22 20 9.5V18C20 18.83 19.33 19.5 18.5 19.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.75 8H11V11.5H6.75V8Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M13 8H15.25M13 10.25H15.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.75 14H15.25M6.75 16.5H15.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></>,
   },
   'store': {
