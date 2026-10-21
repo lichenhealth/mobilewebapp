@@ -56,6 +56,9 @@ export interface FeedCardProps {
   authorIsSpace?: boolean;
   recommended?: boolean;
   saved?: boolean;
+  /** Budget action (expanded post page only — see EngagementFooter). */
+  budgeted?: boolean;
+  onBudget?: (active: boolean) => void;
   availability?: ActionAvailability;
   onTrust?: (active: boolean) => void;
   onRecommend?: (active: boolean) => void;
@@ -140,6 +143,8 @@ export default function FeedCard({
   onTrust,
   onRecommend,
   onSave,
+  budgeted,
+  onBudget,
   eyebrow, eyebrowBits, trustLine, route,
   media,
   noDownload,
@@ -609,6 +614,8 @@ export default function FeedCard({
           onTrust={onTrust}
           onRecommend={onRecommend}
           onSave={onSave}
+          budgeted={budgeted}
+          onBudget={onBudget}
           onShare={() => { setShareNote(''); setShareOpen((o) => !o); }}
           onChat={onMessage}
         />

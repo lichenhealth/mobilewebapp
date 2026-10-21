@@ -32,15 +32,8 @@
   color: var(--ink-soft); cursor: pointer; font-family: inherit;
 }
 .postp__door:hover { border-color: var(--peach); color: var(--ink); }
-.postp__acts { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
-.postp__act {
-  width: 32px; height: 32px; border-radius: var(--r-full);
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--bone-edge); background: var(--bone-warm);
-  color: var(--ink-muted); cursor: pointer;
-}
-.postp__act:hover { border-color: var(--peach); }
-.postp__act.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+/* The top-right action circles (.postp__acts/.postp__act) retired 2026-10-21
+   — the card's own footer carries the actions once; see PostPage.tsx. */
 
 /* Style tags — the listing's aesthetic, in the controlled vocabulary */
 .postp__style { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--s-3) var(--s-4) 0; }

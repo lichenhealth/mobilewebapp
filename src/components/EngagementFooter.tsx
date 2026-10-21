@@ -41,6 +41,14 @@ interface Props {
   onShare?: () => void;
   onSave?: (active: boolean) => void;
   onChat?: () => void;
+  /** BUDGET (founder 2026-10-21, replacing PostPage's top-right bolt circle:
+   *  "the recommend is at the bottom, so is the drive, so they don't need to
+   *  be top right?" + "is current-cy supposed to mean I purchased it?"):
+   *  a labeled bolt action — puts the listing on YOUR private Budget
+   *  planning list in Current-cy (never a purchase; buying stays the
+   *  exchange flow). Opt-in: only the expanded post page passes it. */
+  budgeted?: boolean;
+  onBudget?: (active: boolean) => void;
 }
 
 /** Engagement footer for every post / card / listing across the app.
@@ -55,10 +63,12 @@ export default function EngagementFooter({
   trusted, recommended, saved,
   availability,
   onTrust, onRecommend, onShare, onSave, onChat,
+  budgeted, onBudget,
 }: Props) {
   const [myTrust, setMyTrust] = useState(trusted ?? false);
   const [myRec, setMyRec] = useState(recommended ?? false);
   const [mySaved, setMySaved] = useState(saved ?? false);
+  const [myBudget, setMyBudget] = useState(budgeted ?? false);
 
   const [openPanel, setOpenPanel] = useState<'trust' | 'recommend' | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -187,6 +197,23 @@ export default function EngagementFooter({
             <Icon name="drive" size={13} />
             <span>Save</span>
           </button>
+          {onBudget && (
+            <button
+              className={'engage__action' + (myBudget ? ' is-active' : '')}
+              onClick={(e) => {
+                e.stopPropagation();
+                const next = !myBudget;
+                setMyBudget(next);
+                onBudget(next);
+              }}
+              title={myBudget
+                ? 'On your Budget planning list — tap to remove'
+                : 'Add to your Budget planning list in Current-cy (not a purchase)'}
+            >
+              <Icon name="currentcy" size={13} />
+              <span>Budget</span>
+            </button>
+          )}
           <button
             className="engage__action"
             onClick={(e) => { e.stopPropagation(); if (can.chat) onChat?.(); }}
