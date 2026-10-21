@@ -442,3 +442,19 @@
   font-size: 12px; color: var(--peach-deep, var(--peach)); text-decoration: none;
 }
 .sprof__site-link:hover { text-decoration: underline; }
+
+/* ---- Chat rooms (topic rooms + per-room AI consent, founder 2026-10-21) ---- */
+.sprof__room { flex-wrap: wrap; }
+.sprof__room .sprof__share-title { flex: 1 1 140px; text-align: left; }
+.sprof__room-actions { margin-left: auto; }
+.sprof__room-ai {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.sprof__room-ai input { accent-color: var(--peach-deep); }
+.btn.sprof__room-del { border-color: var(--red-deep); color: var(--red-deep); }
+.sprof__room-add {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.sprof__room-add .input { flex: 1 1 220px; min-width: 0; }

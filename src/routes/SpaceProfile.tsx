@@ -28,6 +28,7 @@ import {
   type SpaceProfileRow, type SpaceMemberRow, type SpaceKind,
   type MyRequestState, type PendingRequestRow, type SpaceDirectoryRow,
   cohortInfo,
+  listSpaceRooms, createSpaceTopicRoom, deleteSpaceTopicRoom, setRoomAssistantEnabled, type SpaceRoom,
 } from '../lib/spacesApi';
 import { supabase } from '../lib/supabase';
 import { possessive } from '../lib/names';
@@ -555,6 +556,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   }, [tab, id]);
   const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
   const adminTools = backstage;
+  // CHAT ROOMS (founder 2026-10-21: "different chat threads for different
+  // topics within the group or community" — and "each chat thread … should
+  // have Ai enabled or not options"). Loaded when the drawer first opens.
+  const [rooms, setRooms] = useState<SpaceRoom[] | null>(null);
+  const [roomTopic, setRoomTopic] = useState('');
+  const [roomAiFree, setRoomAiFree] = useState(false);
+  const [roomBusy, setRoomBusy] = useState(false);
+  const [roomMsg, setRoomMsg] = useState('');
+  const [roomConfirm, setRoomConfirm] = useState<string | null>(null);
+  useEffect(() => {
+    if (!adminTools || !openSections.has('chatrooms') || rooms !== null) return;
+    void listSpaceRooms(id).then(setRooms);
+  }, [adminTools, openSections, rooms, id]);
   // THE TWO BUILDERS (founder 2026-08-29: "two buttons… then have the rest
   // be drop downs… a real website builder"). ?build=public opens the page
   // laid out as the page itself, editable; ?build=lichen opens the in-app
@@ -2443,6 +2457,91 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </button>
             {msg && <span className="prof__msg">{msg}</span>}
           </div>
+        </CollapsibleSection>
+      )}
+
+      {adminTools && (
+        <CollapsibleSection
+          id="chatrooms" title="Chat rooms"
+          meta={rooms ? `${rooms.length} ${rooms.length === 1 ? 'room' : 'rooms'}` : 'topics, each with its own AI switch'}
+          open={openSections.has('chatrooms')} onToggle={() => toggleSection('chatrooms')}
+        >
+          <p className="prof__hint">
+            One {space?.kind ?? 'space'}, several rooms — teachings in one, potluck planning in
+            another. Every member is in every room. Each room has its own AI switch: in an
+            AI-free room, nothing said there ever reaches any assistant.
+          </p>
+          {(rooms ?? []).map((r) => (
+            <div className="sprof__req sprof__room" key={r.id}>
+              <button className="sprof__share-title" onClick={() => navigate(`/chat/${r.id}`)}>
+                {r.topic ?? 'Main room'}
+              </button>
+              <span className="sprof__req-actions sprof__room-actions">
+                <label className="sprof__room-ai">
+                  <input
+                    type="checkbox"
+                    checked={r.assistantEnabled}
+                    disabled={roomBusy}
+                    onChange={async (e) => {
+                      const on = e.target.checked;
+                      setRoomBusy(true); setRoomMsg('');
+                      try {
+                        await setRoomAssistantEnabled(r.id, on);
+                        setRooms((cur) => (cur ?? []).map((x) => (x.id === r.id ? { ...x, assistantEnabled: on } : x)));
+                      } catch (err) { setRoomMsg(err instanceof Error ? err.message : 'That didn’t save.'); }
+                      setRoomBusy(false);
+                    }}
+                  />
+                  AI on
+                </label>
+                {r.topic && (
+                  roomConfirm === r.id ? (
+                    <button className="btn sprof__invite-btn sprof__room-del" disabled={roomBusy}
+                      onClick={async () => {
+                        setRoomBusy(true); setRoomMsg('');
+                        try {
+                          await deleteSpaceTopicRoom(r.id);
+                          setRooms((cur) => (cur ?? []).filter((x) => x.id !== r.id));
+                        } catch (err) { setRoomMsg(err instanceof Error ? err.message : 'That didn’t work.'); }
+                        setRoomConfirm(null); setRoomBusy(false);
+                      }}>
+                      Delete room &amp; its messages?
+                    </button>
+                  ) : (
+                    <button className="btn sprof__invite-btn" disabled={roomBusy} onClick={() => setRoomConfirm(r.id)}>
+                      Delete
+                    </button>
+                  )
+                )}
+              </span>
+            </div>
+          ))}
+          <div className="sprof__room-add">
+            <input
+              className="input"
+              value={roomTopic}
+              onChange={(e) => setRoomTopic(e.target.value)}
+              placeholder="Name a topic — Retreat planning, Teachings…"
+              maxLength={60}
+            />
+            <label className="sprof__room-ai">
+              <input type="checkbox" checked={roomAiFree} onChange={(e) => setRoomAiFree(e.target.checked)} />
+              AI-free room — no assistant ever reads it
+            </label>
+            <button className="btn btn-primary sprof__invite-btn" disabled={roomBusy || !roomTopic.trim()}
+              onClick={async () => {
+                setRoomBusy(true); setRoomMsg('');
+                try {
+                  const chatId = await createSpaceTopicRoom(id, roomTopic.trim(), !roomAiFree);
+                  setRooms((cur) => [...(cur ?? []), { id: chatId, topic: roomTopic.trim(), assistantEnabled: !roomAiFree }]);
+                  setRoomTopic(''); setRoomAiFree(false);
+                } catch (err) { setRoomMsg(err instanceof Error ? err.message : 'That didn’t work.'); }
+                setRoomBusy(false);
+              }}>
+              Add room
+            </button>
+          </div>
+          {roomMsg && <p className="prof__msg">{roomMsg}</p>}
         </CollapsibleSection>
       )}
 

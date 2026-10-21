@@ -668,12 +668,8 @@ export default function AssistantBrief() {
         if (section === 'chat' || section === 'home') {
           const { data: unread } = await supabase.rpc('chat_unread_counts');
           const rows2 = (unread as { chat_id: string; unread: number }[] | null) ?? [];
-          const waiting = rows2.filter((r) => r.unread > 0);
-          if (waiting.length) {
-            extras.conversations_waiting = {
-              conversations: waiting.length,
-              messages: waiting.reduce((a, b) => a + b.unread, 0),
-            };
+          const waitingAll = rows2.filter((r) => r.unread > 0);
+          if (waitingAll.length) {
             // WHICH conversation, by name, on Home too (founder 2026-09-13:
             // "the message here is vague. What conversation is the assistant
             // talking about?") — the model can only name what it's given,
@@ -682,6 +678,15 @@ export default function AssistantBrief() {
             // message-content read stays Chat's own.
             const vms = await loadChatList(me).catch(() => []);
             const byId = new Map(vms.map((v) => [v.id, v]));
+            // PER-ROOM AI CONSENT (founder 2026-10-21): an AI-free room never
+            // reaches any assistant — not its name, not its unread count, and
+            // never its words below.
+            const waiting = waitingAll.filter((w) => byId.get(w.chat_id)?.assistantEnabled !== false);
+            if (waiting.length) {
+            extras.conversations_waiting = {
+              conversations: waiting.length,
+              messages: waiting.reduce((a, b) => a + b.unread, 0),
+            };
             extras.waiting_on_you = waiting.slice(0, 10).map((w) => {
               const room = byId.get(w.chat_id);
               return { room: room?.title ?? 'a conversation', unread: w.unread };
@@ -698,6 +703,8 @@ export default function AssistantBrief() {
               const msgs = await recentMessagesAcross(120).catch(() => []);
               const perRoom = new Map<string, { room: string; lines: string[]; withheld: Set<string> }>();
               for (const m of msgs) {
+                // An AI-free room's words never enter a prompt (2026-10-21).
+                if (byId.get(m.chat_id)?.assistantEnabled === false) continue;
                 const room = byId.get(m.chat_id)?.title ?? 'a conversation';
                 const slot = perRoom.get(m.chat_id) ?? { room, lines: [], withheld: new Set<string>() };
                 // Consent travels with the words: a member who switched off
@@ -719,6 +726,7 @@ export default function AssistantBrief() {
                   ? { private_participants: `${[...r.withheld].join(', ')} keep their messages private from assistants — you can see them in the app, I can't.` }
                   : {}),
               }));
+            }
             }
           }
         }

@@ -186,9 +186,47 @@ export async function loadSpaceChatId(spaceId: string): Promise<string | null> {
     .from('chats')
     .select('id')
     .eq('space_id', spaceId)
+    // The MAIN room — a space can hold topic rooms too (2026-10-21), and
+    // maybeSingle() errors on more than one row.
+    .is('topic', null)
     .maybeSingle();
   if (error) { console.warn('loadSpaceChatId:', error.message); return null; }
   return (data as { id: string } | null)?.id ?? null;
+}
+
+/** A space's chat rooms — the main room (topic null) plus any topic rooms
+ *  (founder 2026-10-21: "different chat threads for different topics within
+ *  the group or community"). Member-gated by chats RLS like everything else. */
+export interface SpaceRoom { id: string; topic: string | null; assistantEnabled: boolean }
+export async function listSpaceRooms(spaceId: string): Promise<SpaceRoom[]> {
+  const { data, error } = await supabase
+    .from('chats')
+    .select('id, topic, assistant_enabled, created_at')
+    .eq('space_id', spaceId)
+    .order('created_at', { ascending: true });
+  if (error) { console.warn('listSpaceRooms:', error.message); return []; }
+  return ((data as { id: string; topic: string | null; assistant_enabled: boolean }[] | null) ?? [])
+    .map((r) => ({ id: r.id, topic: r.topic, assistantEnabled: r.assistant_enabled }));
+}
+
+/** Admin adds a topic room; it opens holding the whole current membership. */
+export async function createSpaceTopicRoom(spaceId: string, topic: string, ai: boolean): Promise<string> {
+  const { data, error } = await supabase.rpc('create_space_topic_room', { p_space: spaceId, p_topic: topic, p_ai: ai });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Admin removes a topic room (the server refuses the main room). */
+export async function deleteSpaceTopicRoom(chatId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_space_topic_room', { p_chat: chatId });
+  if (error) throw new Error(error.message);
+}
+
+/** Admin flips one room's AI switch — false means nothing said in that room
+ *  reaches any assistant (claude-chat skips it entirely). */
+export async function setRoomAssistantEnabled(chatId: string, on: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_room_assistant_enabled', { p_chat: chatId, p_on: on });
+  if (error) throw new Error(error.message);
 }
 
 /** Admin edits the space's public profile (name/description/avatar/location). */
