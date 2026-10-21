@@ -147,6 +147,7 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
   const byRoom = useMemo(() => {
     const m = new Map<string, ChatDocRow[]>();
     for (const d of docs ?? []) {
+      if (!d.chat_id) continue;   // personal docs live in Drive, not a room
       const arr = m.get(d.chat_id) ?? [];
       arr.push(d);
       m.set(d.chat_id, arr);

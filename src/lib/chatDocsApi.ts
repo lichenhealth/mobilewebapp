@@ -13,7 +13,8 @@ export type ChatDocKind = 'doc' | 'poll' | 'sheet';
 
 export interface ChatDocRow {
   id: string;
-  chat_id: string;
+  /** Null = a PERSONAL doc — born from Drive's +, no room, owner-only. */
+  chat_id: string | null;
   space_id: string | null;
   kind: ChatDocKind;
   title: string;
@@ -128,4 +129,29 @@ export async function castVote(me: string, docId: string, optionIdx: number): Pr
 export async function retractVote(me: string, docId: string): Promise<void> {
   const { error } = await supabase.from('chat_poll_votes').delete().eq('doc_id', docId).eq('profile_id', me);
   if (error) throw new Error(error.message);
+}
+
+/** A doc or spreadsheet born in DRIVE, no room (founder 2026-10-21: Drive's
+ *  + carries the composer's creators). Owner-only by RLS; polls stay
+ *  room-born — a poll with no voters is not a poll. */
+export async function createPersonalDoc(
+  kind: 'doc' | 'sheet',
+  title: string,
+): Promise<ChatDocRow> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const data = kind === 'sheet' ? { cells: [['', '', ''], ['', '', ''], ['', '', '']] } : {};
+  const { data: row, error } = await supabase.from('chat_docs')
+    .insert({ chat_id: null, kind, title: title.trim() || (kind === 'doc' ? 'Untitled doc' : 'Untitled spreadsheet'), data, created_by: user.id })
+    .select(DOC_COLS).single();
+  if (error) throw error;
+  return row as ChatDocRow;
+}
+
+export async function listMyPersonalDocs(): Promise<ChatDocRow[]> {
+  const { data } = await supabase.from('chat_docs')
+    .select(DOC_COLS)
+    .is('chat_id', null)
+    .order('updated_at', { ascending: false });
+  return (data as ChatDocRow[] | null) ?? [];
 }
