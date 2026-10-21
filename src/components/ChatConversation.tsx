@@ -36,11 +36,14 @@ interface Pending { type: MediaType; path: string; localUrl: string; }
  *  attachments / reactions / replies. Fills its parent (give the parent a bounded
  *  height). Used by the full-screen thread route and the Concierge care tab. */
 export default function ChatConversation({
-  chatId, me, onBack, showIntro = true, onInfo, onRead, careAsk, onCareAskDone,
+  chatId, me, onBack, onMenu, showIntro = true, onInfo, onRead, careAsk, onCareAskDone,
 }: {
   chatId: string;
   me: string;
   onBack?: () => void;      // when set, the header shows a back button
+  /** Phone full-screen thread only: the ☰ beside Back (founder 2026-10-21 —
+   *  the fixed thread screen hid the TopBar and with it the menu). */
+  onMenu?: () => void;
   showIntro?: boolean;
   /** Gives the header's info circle a job (e.g. Concierge → Care Team tab). Hidden when absent. */
   onInfo?: () => void;
@@ -423,7 +426,7 @@ export default function ChatConversation({
   return (
     <div className="conv">
       <ChatHeader
-        chat={chat} title={title} members={memberList} me={me} onBack={onBack} onInfo={onInfo}
+        chat={chat} title={title} members={memberList} me={me} onBack={onBack} onMenu={onMenu} onInfo={onInfo}
         onDrive={docable ? () => navigate(`/chat/${chat.id}/drive`) : undefined}
       />
       <div className="thread__scroll" ref={scrollRef}>
@@ -591,7 +594,7 @@ function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { av
   };
 }
 
-function ChatHeader({ chat, title, members, me, onBack, onInfo, onDrive }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onInfo?: () => void; onDrive?: () => void }) {
+function ChatHeader({ chat, title, members, me, onBack, onMenu, onInfo, onDrive }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onMenu?: () => void; onInfo?: () => void; onDrive?: () => void }) {
   const navigate = useNavigate();
   const profilePath = profilePathFor(chat, members, me);
   // Help is no longer DM-shaped: with two possible responders, a message
@@ -601,6 +604,11 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo, onDrive }: { cha
   const partyView = spacePartyView(chat, members, me);
   return (
     <header className="thread__head">
+      {onMenu && (
+        <button className="thread__icon" onClick={onMenu} aria-label="Open menu">
+          <Icon name="menu" size={18} />
+        </button>
+      )}
       {onBack ? (
         <button className="thread__icon" onClick={onBack} aria-label="Back">
           <Icon name="arrow-left" size={18} />
@@ -906,7 +914,19 @@ function MessageRun({
                     // 2026-10-21: "sends me to icons where I can provide
                     // emojis") — rendered inside the menu card.
                     <div className="msg-menu__picker">
-                      <EmojiPicker onPick={(e) => { onReact(m.id, e); setPickerFor(null); setMenuFor(null); }} />
+                      <EmojiPicker
+                        onPick={(e) => { onReact(m.id, e); setPickerFor(null); setMenuFor(null); }}
+                        leading={(
+                          <button
+                            className="msg-menu__picker-back"
+                            aria-label="Back to message actions"
+                            title="Back"
+                            onClick={() => setPickerFor(null)}
+                          >
+                            <Icon name="arrow-left" size={14} />
+                          </button>
+                        )}
+                      />
                     </div>
                   ) : (
                     <>

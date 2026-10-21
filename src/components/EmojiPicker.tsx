@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import './EmojiPicker.css';
 
 /** Curated, dependency-free emoji palette — searchable since 2026-08-31
@@ -255,7 +255,12 @@ const CATEGORIES: { label: string; emoji: E[] }[] = [
 /** A small popover grid of emoji with a search box (matches on the
  *  hand-written keywords). The parent positions it (wrap it in a
  *  position:relative container) and decides when it's open. */
-export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+export function EmojiPicker({ onPick, leading }: {
+  onPick: (emoji: string) => void;
+  /** Rendered before the search field — the message menu's back-to-actions
+   *  circle (founder 2026-10-21) rides here so search just moves over. */
+  leading?: React.ReactNode;
+}) {
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase();
   const hits = useMemo(() => {
@@ -297,6 +302,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   return (
     <div className="emoji-pop">
       <div className="emoji-pop__search">
+        {leading}
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}

@@ -120,6 +120,13 @@ function ScrollToTop() {
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+  // The full-screen chat thread hides the TopBar but keeps a ☰ of its own
+  // (founder 2026-10-21) — it asks the shell to open the menu by event.
+  useEffect(() => {
+    const open = () => setMenuOpen(true);
+    window.addEventListener('lichen:open-menu', open);
+    return () => window.removeEventListener('lichen:open-menu', open);
+  }, []);
   const { pathname, search } = useLocation();
   const isChatThread = /^\/chat\/[^/]+/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/intro' || pathname === '/onboarding' || pathname === '/invite/decline';
