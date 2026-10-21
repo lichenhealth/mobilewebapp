@@ -14,21 +14,23 @@
 }
 .saved__bar-spacer { flex: 1; }
 .saved__add { position: relative; }
+/* The chat ⊕'s dress (founder 2026-10-21) — the thread__attach-menu
+   anatomy: a quiet card of icon + one word rows. */
 .saved__chooser {
   position: absolute; left: 0; top: calc(100% + 8px); z-index: 60;
-  min-width: 240px; padding: 6px;
-  background: var(--bone); border: 1px solid var(--bone-edge);
-  border-radius: var(--r-lg, 14px); box-shadow: 0 12px 32px rgba(40,30,20,.14);
+  min-width: 170px; padding: var(--s-2);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop);
 }
 .saved__chooser > button {
-  display: block; width: 100%; text-align: left; background: none; border: none;
-  cursor: pointer; padding: 10px 12px; border-radius: 10px;
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; text-align: left; background: none; border: none;
+  cursor: pointer; padding: 8px 10px; border-radius: var(--r-sm);
+  font: inherit; font-size: 13px; font-weight: 300; color: var(--ink);
+  transition: background var(--d-fast) var(--ease-out);
 }
-.saved__chooser > button:hover { background: var(--bone-warm); }
-.saved__chooser > button span {
-  display: block; font-size: 12px; font-weight: 400; color: var(--ink-soft);
-}
+.saved__chooser > button:hover { background: var(--bone); }
+.saved__chooser > button svg { color: var(--ink-muted); }
 /* The Folders dropdown retired 2026-10-06 (the drive rebuild) — folders
    stand in the open as the tile grid below. The lesson it carried stays
    general: a popover on a WRAPPING bar anchors to the bar, never its

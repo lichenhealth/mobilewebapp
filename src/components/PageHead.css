@@ -1,0 +1,15 @@
+/* The non-section header (founder 2026-10-21): ☰ + ← as icon circles upper
+   left — the TopBar/thread grammar on screens that have neither. */
+.pagehead { display: flex; align-items: center; gap: 10px; }
+.pagehead__btn {
+  width: 38px; height: 38px; border-radius: var(--r-full); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--ink);
+  color: var(--ink); cursor: pointer; padding: 0;
+}
+.pagehead__btn:hover { border-color: var(--peach); color: var(--peach-deep); }
+/* ≥1024 the docked side rail is standing — the ☰ steps out, like the
+   TopBar's own (the .top-bar__hamburger rule's sibling). */
+@media (min-width: 1024px) {
+  .pagehead__btn--menu { display: none; }
+}

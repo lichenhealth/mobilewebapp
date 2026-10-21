@@ -1,3 +1,4 @@
+import { PageHead } from '../components/PageHead';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -72,9 +73,7 @@ export default function Giving() {
 
   return (
     <div className="donate">
-      <button className="cmp__back" onClick={() => navigate('/donate')}>
-        <Icon name="arrow-left" size={14} /> Giving
-      </button>
+      <PageHead onBack={() => navigate('/donate')} />
 
       <header className="donate__head">
         <p className="eyebrow">Only you can see this</p>

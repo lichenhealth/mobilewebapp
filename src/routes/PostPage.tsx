@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
 import SiteHeader from '../components/SiteHeader';
 import FeedCard from '../components/FeedCard';
@@ -123,7 +124,7 @@ export default function PostPage() {
   if (!post) {
     return (
       <div className="postp">
-        <button className="cmp__back" onClick={back}><Icon name="arrow-left" size={14} /> Back</button>
+        <PageHead onBack={back} />
         <p className="postp__muted">This post isn&rsquo;t here anymore.</p>
       </div>
     );
@@ -179,9 +180,7 @@ export default function PostPage() {
       {/* Frozen bar: back to where you were + the areas this post lives in +
           its actions — pinned below the TopBar while the body scrolls. */}
       <div className="postp__pin">
-        <button className="cmp__back postp__back" onClick={back}>
-          <Icon name="arrow-left" size={14} /> Back
-        </button>
+        <PageHead onBack={back} />
         <div className="postp__doors">
           {areas.map((a) => (
             <button className="postp__door" key={a} onClick={() => navigate(AREA_HOME[a]!)}>

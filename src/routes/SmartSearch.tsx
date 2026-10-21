@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
 import type { SmartSearchScope } from '../components/SmartSearchCore';
 import type { ServiceArea } from '../lib/postsApi';
@@ -30,17 +31,10 @@ export default function SmartSearch() {
 
   return (
     <div className="ssrch">
-      {/* Always a way back (founder: like Compose) — real history when we
-          came from inside the app, else the door we arrived through. */}
-      <button
-        className="ssrch__back"
-        onClick={() => {
-          if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
-          else navigate(urlParams.get('from') === 'maps' ? '/maps' : '/home');
-        }}
-      >
-        <Icon name="arrow-left" size={14} /> {urlParams.get('from') === 'maps' ? 'Back to map' : 'Back'}
-      </button>
+      {/* Always a way back — ☰ + ← icon circles since 2026-10-21 (the
+          worded-chip sunset): real history when we came from inside the
+          app, else the door we arrived through. */}
+      <PageHead fallback={urlParams.get('from') === 'maps' ? '/maps' : '/home'} />
       <Suspense fallback={<p className="ssrch__status">Loading search…</p>}>
         <SmartSearchCore
           scope={scope}

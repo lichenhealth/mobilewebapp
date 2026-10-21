@@ -11,6 +11,7 @@ import {
 import { listSpaceRooms, type SpaceRoom } from '../lib/spacesApi';
 import { signChatMedia, type Attachment } from '../lib/chatApi';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
+import { PageHead } from '../components/PageHead';
 import './ChatDocs.css';
 
 /** THE DRIVE TREE (founder 2026-10-21, the Google-Drive carrot: "have the
@@ -177,16 +178,10 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
   );
 
   return (
-    <div className="cdocp">
-      {mode === 'room' ? (
-        <button className="cmp__back cdocp__back" onClick={() => navigate(`/chat/${id}`)}>
-          <Icon name="arrow-left" size={14} /> Back to the room
-        </button>
-      ) : (
-        <button className="cmp__back cdocp__back" onClick={() => navigate(`/spaces/${id}`)}>
-          <Icon name="arrow-left" size={14} /> Back to {spaceName ?? 'the group'}
-        </button>
-      )}
+    <div className={'cdocp' + (mode === 'room' ? ' cdocp--bleed' : '')}>
+      {/* ☰ + ← icon circles, the worded chip sunset (founder 2026-10-21) —
+          the ← keeps the chip's destination, only the words retire. */}
+      <PageHead menu={mode === 'room'} onBack={() => navigate(mode === 'room' ? `/chat/${id}` : `/spaces/${id}`)} />
 
       {/* The tree — where this drive sits in the group's nesting. */}
       <div className="cdocp__tree">

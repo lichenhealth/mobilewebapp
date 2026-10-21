@@ -434,34 +434,36 @@ export default function Saved() {
               <span className="mkt__action-circle"><Icon name="plus" size={16} /></span>
             </button>
             {addOpen && (
+              /* The chat ⊕'s clean dress (founder 2026-10-21: "I like how
+                 clean the '+' is in the chat, can the actual drive drop down
+                 be like this") — icon + one word per row, no subtitles; the
+                 flows themselves carry the nuance. Create-and-keep lands in
+                 YOUR Drive alone; Post goes to Lichen with Compose's own
+                 "Skip the feed" as the feed-or-not choice. */
               <div className="saved__chooser">
-                {/* The composer's whole hand, here too (founder 2026-10-21):
-                    create-and-keep lands in YOUR Drive alone; a post goes to
-                    Lichen, with Compose's own "Skip the feed" as the
-                    feed-or-not choice at the end. */}
                 <button onClick={() => { setAddOpen(false); navigate('/compose?save=1'); }}>
-                  Post something<span>to Lichen — showing in the feed is your call in the composer</span>
+                  <Icon name="newsfeed" size={16} /> Post
                 </button>
                 <button onClick={() => { setAddOpen(false); void createDoc('doc'); }}>
-                  Doc<span>written here, lives in your Drive</span>
+                  <Icon name="book" size={16} /> Doc
                 </button>
                 <button onClick={() => { setAddOpen(false); void createDoc('sheet'); }}>
-                  Spreadsheet<span>a plain grid, yours alone</span>
+                  <Icon name="grip" size={16} /> Spreadsheet
                 </button>
                 <button onClick={() => { setAddOpen(false); filePhotoRef.current?.click(); }}>
-                  Photo<span>upload a photo to your Drive</span>
+                  <Icon name="image" size={16} /> Photo
                 </button>
                 <button onClick={() => { setAddOpen(false); fileVideoRef.current?.click(); }}>
-                  Video<span>upload a video to your Drive</span>
+                  <Icon name="video" size={16} /> Video
                 </button>
                 <button onClick={() => { setAddOpen(false); fileAudioRef.current?.click(); }}>
-                  Audio<span>upload a recording to your Drive</span>
+                  <Icon name="mic" size={16} /> Audio
                 </button>
                 <button onClick={() => { setAddOpen(false); setNewKind('collection'); setNewFolderOpen(true); }}>
-                  New folder<span>a private place to keep things</span>
+                  <Icon name="drive" size={16} /> New folder
                 </button>
                 <button onClick={() => { setAddOpen(false); navigate('/organize'); }}>
-                  Organize studio<span>arrange folders &amp; collections</span>
+                  <Icon name="queue" size={16} /> Organize
                 </button>
               </div>
             )}
