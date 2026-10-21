@@ -278,7 +278,8 @@ export default function App() {
           {/* Docs/polls/spreadsheets born in a room's composer + the room's
               drive (founder 2026-10-21) — non-section routes, each carries
               its own worded back chip. */}
-          <Route path="/chat/:id/drive" element={<ChatRoomDrive />} />
+          <Route path="/chat/:id/drive" element={<ChatRoomDrive mode="room" />} />
+          <Route path="/spaces/:id/drive" element={<ChatRoomDrive mode="space" />} />
           <Route path="/docs/:docId" element={<ChatDocPage />} />
           <Route path="/calendar"  element={<Calendar />} />
           <Route path="/calendar/new" element={<EventComposer />} />

@@ -88,6 +88,17 @@ export async function listChatDocs(chatId: string): Promise<ChatDocRow[]> {
   return (data as unknown as ChatDocRow[] | null) ?? [];
 }
 
+/** EVERY item across a space's rooms — the whole-group drive view (founder
+ *  2026-10-21, the Google-Drive zoom-out; RLS scopes to rooms the viewer is in). */
+export async function listSpaceDocs(spaceId: string): Promise<ChatDocRow[]> {
+  const { data, error } = await supabase
+    .from('chat_docs').select(DOC_COLS)
+    .eq('space_id', spaceId)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('listSpaceDocs:', error.message); return []; }
+  return (data as unknown as ChatDocRow[] | null) ?? [];
+}
+
 /** How many items each of a space's rooms holds — the greater drive's
  *  folder counts (RLS scopes to rooms the viewer is in). */
 export async function countSpaceDocsByChat(spaceId: string): Promise<Map<string, number>> {

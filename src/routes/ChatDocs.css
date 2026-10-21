@@ -89,3 +89,54 @@
   margin: 0 0 4px; font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted);
 }
+
+/* ---- The drive TREE (founder 2026-10-21, the Google-Drive carrot):
+   the group's whole drive at the root, rooms nested under it, the node
+   you're standing in lit peach. ---- */
+.cdocp__tree {
+  display: flex; flex-direction: column; gap: 2px;
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px;
+  padding: 8px 10px;
+}
+.cdocp__node { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.cdocp__node--child { padding-left: 26px; }
+.cdocp__node.is-sel { background: var(--peach-tint); }
+.cdocp__node.is-sel .cdocp__node-name { color: var(--peach-deep); font-weight: 600; }
+.cdocp__node-main {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 6px 6px; color: var(--ink-soft); font-size: 13.5px;
+}
+.cdocp__node-main:hover .cdocp__node-name { color: var(--peach-deep); }
+.cdocp__node-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdocp__node-count {
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-muted);
+  background: var(--bone-warm); border: 1px solid var(--bone-edge);
+  border-radius: 999px; padding: 1px 7px;
+}
+.cdocp__carrot {
+  width: 20px; height: 20px; flex-shrink: 0; border: none; background: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); cursor: pointer; transition: transform 0.12s ease;
+}
+.cdocp__carrot.is-open { transform: rotate(90deg); }
+.cdocp__roomsec { margin-top: 6px; }
+
+/* The event offer on a topic room's drive. */
+.cdocp__evline {
+  display: inline-flex; align-items: center; gap: 7px; align-self: flex-start;
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-size: 13px; color: var(--ink);
+  text-decoration: underline; text-decoration-color: var(--peach);
+  text-underline-offset: 3px;
+}
+.cdocp__evline:hover { text-decoration-color: var(--peach-deep); }
+.cdocp__evprompt {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--peach-tint); border: 1px solid var(--peach);
+  border-radius: 12px; padding: 12px 14px;
+}
+.cdocp__evprompt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.cdocp__evprompt-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.cdocp__evprompt-sub { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
+.cdocp__evprompt-go { align-self: flex-start; margin-top: 4px; }

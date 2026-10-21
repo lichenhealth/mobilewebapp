@@ -74,6 +74,63 @@ const LOOKUP_TOOLS = [
   },
 ];
 
+/** THE ROOM'S DRIVE, read in place (founder 2026-10-21 — the food-buying
+ *  sheet in the retreat-planning room is exactly what the room's assistant
+ *  should be able to help with). No arguments: the only readable drive is
+ *  the TRIGGERING room's own, and AI-free items (`ai_enabled=false`) never
+ *  enter the result — the gray-brain promise, enforced where the data is
+ *  gathered. The room-level chats.assistant_enabled gate already ran. */
+const ROOM_DRIVE_TOOL = {
+  name: 'room_drive',
+  description: "Read THIS room's drive: the docs, polls (with votes) and spreadsheets created from this chat's composer. Use it when members ask about their shared notes, lists or polls. Items marked AI-free are never included — if something they mention isn't in the result, say it's held out of AI by its creator, never that it doesn't exist.",
+  input_schema: { type: 'object', properties: {}, required: [] },
+};
+
+async function runRoomDrive(
+  chatId: string,
+  sb: (path: string, init?: RequestInit) => Promise<Response>,
+): Promise<Record<string, unknown>> {
+  const docsRes = await sb(`chat_docs?chat_id=eq.${chatId}&ai_enabled=eq.true&select=id,kind,title,body,data,updated_at&order=created_at.desc&limit=30`);
+  const docs = (await docsRes.json()) as { id: string; kind: string; title: string; body: string | null; data: { options?: string[]; cells?: string[][] } | null; updated_at: string }[];
+  if (!Array.isArray(docs)) return { ok: false, error: 'Could not read the drive just now.' };
+  const heldRes = await sb(`chat_docs?chat_id=eq.${chatId}&ai_enabled=eq.false&select=id`, { headers: { Prefer: 'count=exact' } });
+  const held = Number(heldRes.headers.get('content-range')?.split('/')[1] ?? '0');
+  const pollIds = docs.filter((d) => d.kind === 'poll').map((d) => d.id);
+  let votes: { doc_id: string; option_idx: number; profile_id: string }[] = [];
+  const names: Record<string, string> = {};
+  if (pollIds.length) {
+    votes = (await (await sb(`chat_poll_votes?doc_id=in.(${pollIds.join(',')})&select=doc_id,option_idx,profile_id`)).json()) as typeof votes;
+    const voterIds = [...new Set(votes.map((v) => v.profile_id))];
+    if (voterIds.length) {
+      const profs = (await (await sb(`profiles?id=in.(${voterIds.join(',')})&select=id,full_name`)).json()) as { id: string; full_name: string | null }[];
+      for (const p of profs) names[p.id] = (p.full_name ?? 'A member').split(' ')[0];
+    }
+  }
+  const items = docs.map((d) => {
+    const when = d.updated_at?.slice(0, 10);
+    if (d.kind === 'poll') {
+      const opts = (d.data?.options ?? []).map((opt, idx) => {
+        const who = votes.filter((v) => v.doc_id === d.id && v.option_idx === idx).map((v) => names[v.profile_id] ?? 'someone');
+        return `${opt}: ${who.length ? who.join(', ') : 'no votes yet'}`;
+      });
+      return { kind: 'poll', title: d.title, options: opts };
+    }
+    if (d.kind === 'sheet') {
+      const rows = (d.data?.cells ?? []).slice(0, 40)
+        .map((r) => r.map((c) => c.trim()).join(' | ').trim())
+        .filter((r) => r.replace(/\|/g, '').trim() !== '');
+      return { kind: 'spreadsheet', title: d.title, updated: when, rows };
+    }
+    return { kind: 'doc', title: d.title, updated: when, body: (d.body ?? '').slice(0, 1200) || '(empty so far)' };
+  });
+  return {
+    ok: true,
+    items,
+    ...(held > 0 ? { note: `${held} more item${held === 1 ? ' is' : 's are'} AI-free — its creator keeps ${held === 1 ? 'it' : 'them'} out of every assistant's reach, so you cannot read ${held === 1 ? 'it' : 'them'}.` } : {}),
+    ...(items.length === 0 ? { note_empty: 'Nothing readable in this room’s drive yet — the ⊕ in the composer creates docs, polls and spreadsheets.' } : {}),
+  };
+}
+
 /** Run a lookup for ONE profile — the sender of the triggering message. */
 async function runLookup(
   name: string,
@@ -383,6 +440,9 @@ Deno.serve(async (req) => {
     FILE_DEV_REPORT_TOOL,
     BRING_IN_GALYN_TOOL,
     ...(isHelp ? LOOKUP_TOOLS : []),
+    // A space's rooms carry a drive now (founder 2026-10-21) — the room's
+    // assistant may read its AI-on items when asked.
+    ...(['organization', 'community', 'group', 'place'].includes(kind ?? '') ? [ROOM_DRIVE_TOOL] : []),
     ...((isSuggestion && canSpaceEdit) ? [...SPACE_PAGE_TOOLS, SAVE_WEB_IMAGE_TOOL] : []),
   ];
   let data: Record<string, unknown> | undefined;
@@ -506,6 +566,8 @@ Deno.serve(async (req) => {
           })()
         : c.name === 'file_dev_report'
         ? await fileDevReport(sb, trigger.sender_id, `chat:${kind}:${chat_id}`, (c.input ?? {}) as Record<string, string>)
+        : c.name === 'room_drive'
+        ? await runRoomDrive(chat_id, sb)
         : (c.name === 'read_website' || c.name === 'save_web_image')
         ? await runWebTool(c.name, (c.input ?? {}) as Record<string, string>)
         : isSpacePageTool(c.name ?? '')
