@@ -20,7 +20,12 @@ interface ChatInfo { id: string; kind: ChatKind; title: string | null; space_id:
   roomSpace?: { id: string; name: string; avatarUrl: string | null } | null;
   /** care_team only: whose Concierge room this is — the room is named for
    *  the person, never "Care team" (founder 2026-09-13). */
-  patientId?: string | null; }
+  patientId?: string | null;
+  /** Topic rooms (founder 2026-10-21): null = the space's main room. */
+  topic?: string | null;
+  /** Per-room AI consent: false = an AI-free room — nothing said here
+   *  reaches any assistant, and the header/intro say so plainly. */
+  assistantEnabled?: boolean; }
 interface Pending { type: MediaType; path: string; localUrl: string; }
 
 /** The full chat conversation (header + messages + composer) for one chat.
@@ -104,18 +109,21 @@ export default function ChatConversation({
     (async () => {
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
-        supabase.from('chats').select('id, kind, title, space_id, patient_id, direct_key, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
+        supabase.from('chats').select('id, kind, title, space_id, patient_id, direct_key, topic, assistant_enabled, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
         supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
       if (!cRes.data) { setMissing(true); setLoading(false); return; }
       const c = cRes.data as unknown as { id: string; kind: ChatKind; title: string | null; space_id: string | null; patient_id: string | null; direct_key: string | null;
+        topic: string | null; assistant_enabled: boolean;
         party: { id: string; name: string; avatar_url: string | null } | null;
         room_space: { id: string; name: string; avatar_url: string | null } | null };
       setChat({
         id: c.id, kind: c.kind, title: c.title, space_id: c.space_id,
         patientId: c.patient_id,
+        topic: c.topic,
+        assistantEnabled: c.assistant_enabled,
         roomSpace: c.room_space ? { id: c.room_space.id, name: c.room_space.name, avatarUrl: c.room_space.avatar_url } : null,
         party: c.party ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) } : undefined,
         // A help room is keyed 'help:<member>' — the person being helped.
@@ -290,7 +298,10 @@ export default function ChatConversation({
   }
 
   const memberList = Object.values(members);
-  const title = chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId, chat.patientId);
+  // A topic room reads "«Space» · «topic»" — whose room, then which thread.
+  const title = chat.topic && chat.roomSpace
+    ? `${chat.roomSpace.name} · ${chat.topic}`
+    : chatTitle(chat.kind, chat.title, memberList, me, chat.party, chat.helpMemberId, chat.patientId);
 
   return (
     <div className="conv">
@@ -492,7 +503,7 @@ function ChatHeader({ chat, title, members, me, onBack, onInfo }: { chat: ChatIn
                   const shown = others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '');
                   return others.length ? `${shown} & you` : 'Just you so far';
                 })()
-              : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+              : `${KIND_LABEL[chat.kind]} · ${members.length} ${members.length === 1 ? 'member' : 'members'}${chat.assistantEnabled === false ? ' · no AI' : ''}`}
           </p>
         </div>
       </div>
@@ -563,6 +574,14 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
         </p>
       ) : (
         <p className="thread__intro-desc">{partyView ? partyView.sub : isDirect ? 'Direct message' : `${KIND_LABEL[chat.kind]} chat`}</p>
+      )}
+      {/* PER-ROOM AI CONSENT (founder 2026-10-21): an AI-free room says so
+          where the conversation starts — the promise is only worth anything
+          said out loud. */}
+      {chat.assistantEnabled === false && (
+        <p className="thread__intro-hint">
+          This room is AI-free — nothing said here reaches any assistant.
+        </p>
       )}
       <p className="thread__intro-hint">
         Lichen keeps this conversation between members. No third-party tracking.

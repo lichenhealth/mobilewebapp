@@ -63,6 +63,12 @@ export interface ChatVM {
   /** help rooms: the member being helped (off the 'help:<id>' key). For a
    *  steward, rooms where this isn't them are DESK work, not their life. */
   helpMemberId?: string | null;
+  /** Topic rooms (founder 2026-10-21): null = a space's MAIN room; a word
+   *  names a second room of the same space (teachings vs potluck planning). */
+  topic?: string | null;
+  /** Per-room AI consent: false = nothing said in this room reaches any
+   *  assistant — claude-chat skips it, and assistant gathers filter it out. */
+  assistantEnabled?: boolean;
 }
 export function visitorIdOfKey(key: string | null | undefined): string | null {
   // 'space:<sid>:<visitor>[:<responder>]' (a Message chat) and
@@ -214,7 +220,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
     supabase.from('chats')
-      .select('id, kind, title, created_at, direct_key, space_id, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)')
+      .select('id, kind, title, created_at, direct_key, space_id, topic, assistant_enabled, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)')
       .not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
@@ -236,6 +242,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   }
 
   type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null; space_id: string | null;
+    topic: string | null; assistant_enabled: boolean;
     party: { id: string; name: string; avatar_url: string | null } | null;
     room_space: { id: string; name: string; avatar_url: string | null } | null };
   const vms: ChatVM[] = ((cRes.data as unknown as ChatRaw[] | null) ?? []).map((c) => {
@@ -247,7 +254,12 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
     return {
       id: c.id,
       kind: c.kind,
-      title: chatTitle(c.kind, c.title, members, me, party, helpMemberId),
+      // A topic room is named "«Space» · «topic»" — the stored title alone
+      // ("Potluck planning") says nothing about WHOSE room it is in an inbox
+      // holding many groups.
+      title: c.topic && c.room_space
+        ? `${c.room_space.name} · ${c.topic}`
+        : chatTitle(c.kind, c.title, members, me, party, helpMemberId),
       members,
       last: lastByChat.get(c.id),
       party,
@@ -258,6 +270,8 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
       roomSpaceAvatar: c.room_space?.avatar_url ?? null,
       roomSpaceName: c.room_space?.name ?? null,
       helpMemberId,
+      topic: c.topic,
+      assistantEnabled: c.assistant_enabled,
     };
   });
 

@@ -191,12 +191,22 @@ Deno.serve(async (req) => {
   const msgs = await (await sb(`chat_messages?id=eq.${message_id}&select=sender_id,body`)).json();
   const trigger = Array.isArray(msgs) ? msgs[0] : null;
   if (!trigger?.body?.trim()) return json({ ok: true, skipped: 'empty-message' });
-  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind,space_id,party_space_id,direct_key`)).json();
+  const chats = await (await sb(`chats?id=eq.${chat_id}&select=kind,space_id,party_space_id,direct_key,assistant_enabled`)).json();
   const kind = Array.isArray(chats) ? chats[0]?.kind : null;
   const chatSpaceId: string | null = Array.isArray(chats) ? chats[0]?.space_id ?? null : null;
   const partySpaceId: string | null = Array.isArray(chats) ? chats[0]?.party_space_id ?? null : null;
   const directKey: string | null = Array.isArray(chats) ? chats[0]?.direct_key ?? null : null;
   const isSuggestion = kind === 'suggestion';
+
+  // PER-ROOM AI CONSENT (founder 2026-10-21: "each chat thread … should have
+  // Ai enabled or not options" — a curanderismo group's teachings room stays
+  // AI-free while its retreat-logistics room gets help). An AI-off room is
+  // skipped ENTIRELY, before any content is read into a prompt. Silent — the
+  // room itself says it's AI-free; a reply explaining the silence would itself
+  // be the assistant reading the room.
+  if (Array.isArray(chats) && chats[0]?.assistant_enabled === false) {
+    return json({ ok: true, skipped: 'room-ai-off' });
+  }
 
   // A SPACE'S OWN AI CHOICE, enforced where it matters (founder 2026-08-17:
   // "one group may want to be in the Ai fabric of lichen while another
