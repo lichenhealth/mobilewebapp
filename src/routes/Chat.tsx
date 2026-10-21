@@ -333,8 +333,11 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
 
   // A SPACE'S OWN ROOM WEARS THE SPACE'S LOGO (founder 2026-08-25): the
   // member-face stack minus yourself is empty in a young room, which drew a
-  // blank circle — and even full, the room's identity is the space.
-  if (chat.spaceId && ['organization', 'community', 'group', 'place'].includes(chat.kind) && chat.roomSpaceAvatar) {
+  // blank circle — and even full, the room's identity is the space. Since
+  // 2026-10-21 that holds with NO photo too (founder: "get rid of 3 bubbles
+  // … just have the profile bubble for the group") — Avatar's monogram is
+  // the group's own bubble, never the member stack.
+  if (chat.spaceId && ['organization', 'community', 'group', 'place'].includes(chat.kind)) {
     return <Avatar id={chat.spaceId} name={chat.roomSpaceName ?? chat.title} url={chat.roomSpaceAvatar} size={48} className="conv-row__avatar--party" />;
   }
 

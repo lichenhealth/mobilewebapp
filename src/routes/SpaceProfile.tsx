@@ -6,6 +6,7 @@ import { domainsForHandle } from '../lib/customDomain';
 import { SURFACES, resolveSurface, readableAccent, type PageSurface } from '../lib/pageColors';
 import { brandSchemeFromLogo, uploadPageImage, imageFocusPct } from '../lib/avatarApi';
 import Avatar from '../components/Avatar';
+import { AvatarEditBadge } from '../components/AvatarEditBadge';
 import LocationField from '../components/LocationField';
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ContributionsFeed from '../components/ContributionsFeed';
@@ -1413,6 +1414,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         kindLabel={kindLabel}
         kindIcon={KIND_ICON[space.kind]}
         avatarUrl={space.avatar_url}
+        avatarEdit={isAdmin && !previewing && !trialView && !embedView ? (
+          <AvatarEditBadge
+            hasPhoto={!!space.avatar_url}
+            busy={avatarBusy}
+            subjectName={space.name}
+            onFile={(f) => void onAvatarFile(f)}
+          />
+        ) : undefined}
         description={space.description}
         location={space.location}
         contact={draftOverlay?.contact ?? contact}
@@ -1493,15 +1502,16 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               {monogramFor(space.name)}
             </span>
           )}
-          {adminTools && openSections.has('about') && (
-            <button
-              className="sprof__avatar-edit"
-              onClick={() => avatarInputRef.current?.click()}
-              disabled={avatarBusy}
-              aria-label={`Change ${space.name}'s photo`}
-            >
-              <Icon name="image" size={13} />
-            </button>
+          {/* The photo edits right here, every in-app view (founder
+              2026-10-21) — the old button was gated on a drawer id that no
+              longer exists ('about' → 'lichenprofile'), so it never showed. */}
+          {isAdmin && !embedView && !trialView && (
+            <AvatarEditBadge
+              hasPhoto={!!space.avatar_url}
+              busy={avatarBusy}
+              subjectName={space.name}
+              onFile={(f) => void onAvatarFile(f)}
+            />
           )}
           <input
             ref={avatarInputRef}
@@ -2384,6 +2394,14 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 kindLabel={kindLabel}
                 kindIcon={KIND_ICON[space.kind]}
                 avatarUrl={space.avatar_url}
+                avatarEdit={(
+                  <AvatarEditBadge
+                    hasPhoto={!!space.avatar_url}
+                    busy={avatarBusy}
+                    subjectName={space.name}
+                    onFile={(f) => void onAvatarFile(f)}
+                  />
+                )}
                 description={description}
                 location={locText}
                 contact={contact}

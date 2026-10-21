@@ -73,6 +73,16 @@ export interface ChatVM {
    *  assistant — claude-chat skips it, and assistant gathers filter it out. */
   assistantEnabled?: boolean;
 }
+/** A space's name as its initials — "Lichen Alpha Testers" → "LAT" — for
+ *  inbox rows where the full name on every topic room is overkill (founder
+ *  2026-10-21). One-word names stay themselves: a bare "C" says less than
+ *  "Countryman". */
+export function spaceAcronym(name: string): string {
+  const words = name.split(/\s+/).filter((w) => /[a-zA-Z0-9]/.test(w));
+  if (words.length < 2) return name;
+  return words.map((w) => (w.match(/[a-zA-Z0-9]/)?.[0] ?? '').toUpperCase()).join('');
+}
+
 export function visitorIdOfKey(key: string | null | undefined): string | null {
   // 'space:<sid>:<visitor>[:<responder>]' (a Message chat) and
   // 'suggest:<sid>:<visitor>' (a suggestions room) share the shape.
@@ -262,9 +272,12 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
       kind: c.kind,
       // A topic room is named "«Space» · «topic»" — the stored title alone
       // ("Potluck planning") says nothing about WHOSE room it is in an inbox
-      // holding many groups.
+      // holding many groups. In the LIST the space goes by its INITIALS
+      // (founder 2026-10-21: "writing out the entire group name every time
+      // seems like overkill, should we do an acronym LAT for Lichen Alpha
+      // Testers?") — the open room's header keeps the full name.
       title: c.topic && c.room_space
-        ? `${c.room_space.name} · ${c.topic}`
+        ? `${spaceAcronym(c.room_space.name)} · ${c.topic}`
         : chatTitle(c.kind, c.title, members, me, party, helpMemberId),
       members,
       last: lastByChat.get(c.id),
