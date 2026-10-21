@@ -11,7 +11,6 @@ import {
 import { listSpaceRooms, type SpaceRoom } from '../lib/spacesApi';
 import { signChatMedia, type Attachment } from '../lib/chatApi';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
-import { PageHead } from '../components/PageHead';
 import './ChatDocs.css';
 
 /** THE DRIVE TREE (founder 2026-10-21, the Google-Drive carrot: "have the
@@ -158,18 +157,21 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
 
   if (!me) return null;
   const title = mode === 'space'
-    ? `${spaceName ?? '…'} — drive`
-    : `${spaceName ?? '…'}${roomTopic ? ` · ${roomTopic}` : ''} — drive`;
+    ? `${spaceName ?? '…'}`
+    : `${spaceName ?? '…'}${roomTopic ? ` · ${roomTopic}` : ' · Main room'}`;
   const promptTopic = `room-event-${id}`;
   const showCreateEvent = mode === 'room' && !!roomTopic && eventHit === 'none'
     && !promptGone && promptsReady && !promptSeen(promptTopic);
 
+  // Drive's own row anatomy (founder 2026-10-21: "it should look like the
+  // regular drive") — the same classes Saved.tsx renders, so the two can't
+  // drift; .cdocp__rowbtn only resets the button chrome.
   const itemRow = (d: ChatDocRow) => (
-    <button key={d.id} className="cdocp__row" onClick={() => navigate(`/docs/${d.id}`)}>
-      <span className="cdocp__row-icon"><Icon name={DOC_KIND_ICON[d.kind]} size={16} /></span>
-      <span className="cdocp__row-main">
-        <span className="cdocp__row-title">{d.title}</span>
-        <span className="cdocp__row-meta">
+    <button key={d.id} className="drive__row cdocp__rowbtn" onClick={() => navigate(`/docs/${d.id}`)}>
+      <span className="drive__row-icon"><Icon name={DOC_KIND_ICON[d.kind]} size={18} /></span>
+      <span className="drive__row-main">
+        <span className="drive__row-title">{d.title}</span>
+        <span className="drive__row-meta">
           {DOC_KIND_LABEL[d.kind]} · updated {new Date(d.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
         </span>
       </span>
@@ -178,10 +180,19 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
   );
 
   return (
-    <div className={'cdocp' + (mode === 'room' ? ' cdocp--bleed' : '')}>
-      {/* ☰ + ← icon circles, the worded chip sunset (founder 2026-10-21) —
-          the ← keeps the chip's destination, only the words retire. */}
-      <PageHead menu={mode === 'room'} onBack={() => navigate(mode === 'room' ? `/chat/${id}` : `/spaces/${id}`)} />
+    <div className="cdocp">
+      {/* Drive's own head grammar (founder 2026-10-21: "when you go into the
+          sub drive of a group via the chat thread, it should look like the
+          regular drive, just selected to the sub drive") — the TopBar above
+          wears the drive mark and carries ☰/←, the bottom nav lights DRIVE. */}
+      <header className="myc__head">
+        <h1 className="myc__title">{title}</h1>
+        <p className="myc__sub">
+          {mode === 'space'
+            ? 'The whole group’s drive — every room’s docs, polls and spreadsheets.'
+            : `This room’s corner of ${spaceName ?? 'the group'}’s drive.`}
+        </p>
+      </header>
 
       {/* The tree — where this drive sits in the group's nesting. */}
       <div className="cdocp__tree">
@@ -213,8 +224,6 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
           );
         })}
       </div>
-
-      <h2 className="cdocp__drivetitle">{title}</h2>
 
       {/* A topic room that looks like a real gathering: point at its event,
           or offer to create one — that's what unlocks RSVPs and scheduling. */}
@@ -290,11 +299,11 @@ export default function ChatRoomDrive({ mode }: { mode: 'room' | 'space' }) {
           <p className="cdocp__sib-h">Links shared here</p>
           <div className="cdocp__list">
             {links.map((l) => (
-              <a key={l.url} className="cdocp__row cdocp__row--link" href={l.url} target="_blank" rel="noreferrer">
-                <span className="cdocp__row-icon"><Icon name="globe" size={16} /></span>
-                <span className="cdocp__row-main">
-                  <span className="cdocp__row-title">{l.url.replace(/^https?:\/\//, '')}</span>
-                  <span className="cdocp__row-meta">
+              <a key={l.url} className="drive__row cdocp__row--link" href={l.url} target="_blank" rel="noreferrer">
+                <span className="drive__row-icon"><Icon name="globe" size={18} /></span>
+                <span className="drive__row-main">
+                  <span className="drive__row-title">{l.url.replace(/^https?:\/\//, '')}</span>
+                  <span className="drive__row-meta">
                     from {l.who} · {new Date(l.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                   </span>
                 </span>

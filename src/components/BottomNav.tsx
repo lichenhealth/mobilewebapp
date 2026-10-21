@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
@@ -28,8 +28,13 @@ const ITEMS: NavItem[] = [
 
 export default function BottomNav() {
   const { countsBySection, totalUnread } = useNotifications();
+  const { pathname } = useLocation();
   const countFor = (to: string) =>
     to === '/home' ? totalUnread : (countsBySection[sectionForRoute(to) ?? ''] ?? 0);
+  // A room's or group's drive IS a drive screen (founder 2026-10-21: "the nav
+  // should exist at the bottom with drive highlighted") — NavLink's own match
+  // only knows /drive.
+  const onSubDrive = /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname);
 
   return (
     <nav className="bottom-nav" aria-label="Primary">
@@ -40,9 +45,14 @@ export default function BottomNav() {
             <li key={item.to}>
               <NavLink
                 to={item.to}
-                className={({ isActive }) =>
-                  'bottom-nav__item' + (isActive ? ' is-active' : '')
-                }
+                className={({ isActive }) => {
+                  // On a room's drive, DRIVE is the lit tab — Chat's own
+                  // prefix match (/chat/…) must stand down there.
+                  const lit = item.to === '/drive'
+                    ? isActive || onSubDrive
+                    : isActive && !(item.to === '/chat' && onSubDrive);
+                  return 'bottom-nav__item' + (lit ? ' is-active' : '');
+                }}
               >
                 <span className="bottom-nav__icon">
                   <Icon name={item.icon} size={20} />

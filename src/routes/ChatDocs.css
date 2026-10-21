@@ -1,6 +1,7 @@
 /* A room's drive + its items (founder 2026-10-21): /docs/:id and
-   /chat/:id/drive. Non-section routes, so each page carries its own worded
-   back chip (the one-back rule). */
+   /chat/:id/drive. The drive routes wear the full app chrome (TopBar with the
+   drive mark + bottom nav, founder 2026-10-21: "it should look like the
+   regular drive"); /docs/:id stays a non-section page with a PageHead ←. */
 
 .cdocp { display: flex; flex-direction: column; gap: 12px; padding: 12px 0 32px; }
 .cdocp__back { margin-bottom: 2px; }
@@ -67,23 +68,15 @@
 
 /* The drive list. */
 .cdocp__drivehead { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); }
-.cdocp__drivetitle { margin: 0; font-family: var(--font-display, serif); font-size: 20px; color: var(--ink); }
 .cdocp__drivesub { margin: 2px 0 0; font-size: 12px; color: var(--ink-muted); }
 .cdocp__list, .cdocp__siblings { display: flex; flex-direction: column; }
-.cdocp__row {
-  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  padding: 10px 2px; background: none; border: none; cursor: pointer;
-  border-bottom: 1px solid var(--bone-edge);
+/* The rows wear Drive's own .drive__row anatomy now (founder 2026-10-21:
+   "it should look like the regular drive") — this only resets the button
+   chrome a <button>/<a> brings to that div-shaped class. */
+.cdocp__rowbtn {
+  width: 100%; text-align: left; background: none; border: none;
+  font: inherit; color: inherit;
 }
-.cdocp__row:hover .cdocp__row-title { color: var(--peach-deep); }
-.cdocp__row-icon {
-  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--bone-warm); border: 1px solid var(--bone-edge); color: var(--ink-soft);
-}
-.cdocp__row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.cdocp__row-title { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cdocp__row-meta { font-size: 11.5px; color: var(--ink-muted); }
 .cdocp__siblings { margin-top: 18px; }
 .cdocp__sib-h {
   margin: 0 0 4px; font-family: var(--font-mono); font-size: 10px;
@@ -154,10 +147,3 @@
 }
 .cdocp__photogrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cdocp__row--link { text-decoration: none; }
-
-/* /chat/:id/drive rides the chat route's full-bleed opt-out (no TopBar, no
-   scroll-view gutter) — the page carries its own side air + safe-top. */
-.cdocp--bleed {
-  padding-inline: var(--wall-gutter, 16px);
-  padding-top: calc(var(--safe-top, 0px) + 14px);
-}
