@@ -82,3 +82,16 @@
   text-transform: uppercase; color: var(--ink-faint); flex-shrink: 0;
 }
 .postp__fact-value { font-size: var(--t-sm); color: var(--ink); text-align: right; }
+
+/* The action circles SPEAK (founder 2026-10-21: a tap on the lit bolt read
+   as "nothing happens" — it was silently toggling her budget): one line
+   under the pinned row names what just changed, doors to where it lives,
+   and steps away after a few seconds. */
+.postp__actnote {
+  margin: 2px 0 6px; text-align: right;
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.postp__actnote-go {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: var(--ink);
+}
