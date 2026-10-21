@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
@@ -58,6 +58,13 @@ export default function PostPage() {
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
   const [mySaves, setMySaves] = useState<Set<string>>(new Set());
   const [myBudget, setMyBudget] = useState<Set<string>>(new Set());
+  // EVERY TAP ON THE ACTION CIRCLES SPEAKS (founder 2026-10-21, tapping the
+  // lit bolt: "When I click on it, nothing happens" — it was toggling her
+  // budget silently): a short receipt under the row names what just changed
+  // and doors to where it lives, then steps away.
+  const [actNote, setActNote] = useState<{ text: string; to?: { label: string; path: string } } | null>(null);
+  const noteTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (noteTimer.current) window.clearTimeout(noteTimer.current); }, []);
   const [overlay, setOverlay] = useState<MyceliumSignals | undefined>(undefined);
 
   useEffect(() => {
@@ -134,6 +141,11 @@ export default function PostPage() {
   const saved = mySaves.has('post:' + p.id);
   const budgeted = myBudget.has(p.id);
   const recommended = myRecs.has('post:' + p.id);
+  const speak = (text: string, to?: { label: string; path: string }) => {
+    setActNote({ text, to });
+    if (noteTimer.current) window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(() => setActNote(null), 6000);
+  };
   const areas = postAreas(p).filter((a) => AREA_HOME[a]);
   const isMarket = postAreas(p).includes('marketplace') && !p.linked_event_id;
   // TRAVEL IS AN EXCHANGE (founder 2026-10-06): a ride or a stay gets the
@@ -193,6 +205,7 @@ export default function PostPage() {
             <button
               className={'postp__act' + (recommended ? ' is-on' : '')}
               aria-label={recommended ? 'Withdraw recommendation' : 'Recommend'}
+              title={recommended ? 'You recommend this — tap to withdraw' : 'Recommend to your network'}
               onClick={() => {
                 const next = !recommended;
                 setMyRecs((cur) => {
@@ -201,6 +214,7 @@ export default function PostPage() {
                   return n;
                 });
                 void setRecommend('post', p.id, next).catch(console.error);
+                speak(next ? 'Recommended ✓ — your network can see you stand behind it.' : 'Recommendation withdrawn.');
               }}
             >
               <Icon name="thumbs-up" size={16} />
@@ -208,6 +222,7 @@ export default function PostPage() {
             <button
               className={'postp__act' + (saved ? ' is-on' : '')}
               aria-label={saved ? 'Unsave' : 'Save'}
+              title={saved ? 'In your Drive — tap to remove' : 'Save to your Drive'}
               onClick={() => {
                 const next = !saved;
                 setMySaves((cur) => {
@@ -216,6 +231,8 @@ export default function PostPage() {
                   return n;
                 });
                 void setSaved('post', p.id, next).then(() => { if (next) promptSaved(p.id); }).catch(console.error);
+                speak(next ? 'Saved to your Drive ✓' : 'Removed from your Drive.',
+                  next ? { label: 'Open Drive', path: '/drive' } : undefined);
               }}
             >
               <Icon name="drive" size={16} />
@@ -232,6 +249,10 @@ export default function PostPage() {
                   return n;
                 });
                 void (next ? addBudgetPost(me!, p.id) : removeBudgetPost(me!, p.id)).catch(console.error);
+                speak(next
+                  ? 'On your Budget ✓ — its live price rides your planning list in Current-cy.'
+                  : 'Off your budget.',
+                  next ? { label: 'See your budget', path: '/currentcy' } : undefined);
               }}
             >
               <Icon name="currentcy" size={16} />
@@ -239,6 +260,19 @@ export default function PostPage() {
           </div>
         )}
       </div>
+      {actNote && (
+        <p className="postp__actnote" role="status">
+          {actNote.text}
+          {actNote.to && (
+            <>
+              {' '}
+              <button className="postp__actnote-go link-cue" onClick={() => navigate(actNote.to!.path)}>
+                {actNote.to.label} ›
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       <FeedCard
         {...postToCard(p, me || undefined, spaceNames)}
