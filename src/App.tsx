@@ -128,7 +128,10 @@ export default function App() {
     return () => window.removeEventListener('lichen:open-menu', open);
   }, []);
   const { pathname, search } = useLocation();
-  const isChatThread = /^\/chat\/[^/]+/.test(pathname);
+  // The room DRIVE is a drive screen, not a chat screen (founder 2026-10-21:
+  // "it should look like the regular drive … and the nav should exist at the
+  // bottom with drive highlighted") — it keeps the TopBar + bottom nav.
+  const isChatThread = /^\/chat\/[^/]+/.test(pathname) && !/^\/chat\/[^/]+\/drive/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/intro' || pathname === '/onboarding' || pathname === '/invite/decline';
   const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
   // A NAKED-SITE rendering — embed pane, ?preview=1, or a colour trial (one

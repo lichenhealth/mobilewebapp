@@ -71,7 +71,12 @@ export default function TopBar({
 }: TopBarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const section = SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
+  // A room's or group's drive wears the DRIVE mark (founder 2026-10-21:
+  // "it should look like the regular drive, just selected to the sub drive")
+  // — the prefix scan would dress it as Chat / nothing.
+  const section = /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname)
+    ? SECTION_LOGOS.find((s) => s.prefix === '/drive')
+    : SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
 
   // WHOSE SECTION IS THIS (founder 2026-08-11): a scoped section — Countryman
   // Stables' Marketplace, Melanie's Library — wears its owner's mark over the

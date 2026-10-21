@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
+import { useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { MyceliumMark } from './MyceliumMark';
 import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type AdminDesk } from '../lib/spacesApi';
@@ -84,6 +84,7 @@ const SECTIONS: NavSection[] = SPACE_SECTIONS.map((s) =>
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, isAdmin: platformAdmin } = useAuth();
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
@@ -216,6 +217,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     const count = p.to === '/home'
       ? totalUnread
       : (countsBySection[sectionForRoute(p.to) ?? ''] ?? 0);
+    // A room's/group's drive lights Drive here too (founder 2026-10-21) —
+    // the bottom nav's onSubDrive rule, same meaning on the docked rail.
+    const subDrive = p.to === '/drive' && /^\/(chat|spaces)\/[^/]+\/drive/.test(pathname);
     return (
       <Fragment key={p.to}>
         {/* "you" above the line, platform doors below it */}
@@ -223,10 +227,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
         <NavLink
           to={p.to}
           onClick={onClose}
-          className={({ isActive }) =>
-            'side-menu__primary-item' + (isActive ? ' is-active' : '')
-            + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '')
-          }
+          className={({ isActive }) => {
+            const lit = p.to === '/drive'
+              ? isActive || subDrive
+              : isActive && !(p.to === '/chat' && /^\/chat\/[^/]+\/drive/.test(pathname));
+            return 'side-menu__primary-item' + (lit ? ' is-active' : '')
+              + (hideOnMobile(p.to) ? ' side-menu__primary-item--dup' : '');
+          }}
         >
           {p.to === '/mycelium'
             ? <MyceliumMark size={20} label="" />
