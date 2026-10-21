@@ -283,11 +283,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               {adminExpanded && (
               <ul className="side-menu__sub-list">
                 <li>
-                  {/* Straight to the LISTS (founder 2026-10-18: landing at
-                      the top of /invite showed the composer — "deep link to
-                      the list section"): #ledger is the invited/joined list
-                      with the door right under it, the bells' #door grammar. */}
-                  <button className="side-menu__sub-item" onClick={() => go('/invite#ledger')}>
+                  {/* Straight to the DOOR itself (founder 2026-10-21: the
+                      #ledger landing "only scrolls down to the top of the 3
+                      lists" — the item SAYS knocking, so it lands on the
+                      "At the door" heading, the bells' #door grammar; the
+                      heading renders even at zero knocks, so the anchor
+                      always exists for an admin). */}
+                  <button className="side-menu__sub-item" onClick={() => go('/invite#door')}>
                     Knocking at the door
                     {knockCount > 0 && (
                       <span className="side-menu__deskbadge">{knockCount > 9 ? '9+' : knockCount}</span>

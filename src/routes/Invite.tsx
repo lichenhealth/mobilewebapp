@@ -626,9 +626,10 @@ export default function Invite() {
 
       {/* Who's in, who's still out — your own invitations, and (for admins)
           everyone knocking at the door. */}
-      {/* #ledger: the admin fold's "Knocking at the door" lands HERE — the
-          lists (invited/joined, then the door below), never the composer
-          (founder 2026-10-18: "deep link to the list section"). */}
+      {/* #ledger: a deep link to the lists as a whole, never the composer
+          (founder 2026-10-18: "deep link to the list section"). The admin
+          fold's "Knocking at the door" aims PAST it at #door since
+          2026-10-21 — the item says knocking, so it lands at the door. */}
       <section className="invite__ledger" id="ledger">
         <h2 className="invite__h2">
           {isAdmin ? 'Invitations across Lichen' : 'Your invitations'}
