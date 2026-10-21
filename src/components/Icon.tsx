@@ -65,6 +65,8 @@ export type IconName =
   | 'profile'
   | 'queue'
   | 'reply'
+  | 'copy'
+  | 'trash'
   | 'repeat'
   | 'rent'
   | 'drive'
@@ -331,6 +333,18 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 1.5 24 24',
     strokeWidth: 1.6,
     content: <><path d="M9 17 4 12l5-5M4 12h11a5 5 0 0 1 5 5v3" /></>,
+  },
+  // Two overlapping sheets — the message menu's Copy (founder 2026-10-21).
+  'copy': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="9" y="9" width="12" height="12" rx="2" fill="none" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" /></>,
+  },
+  // The can with its lid — the message menu's Delete (founder 2026-10-21).
+  'trash': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" fill="none" /></>,
   },
   'repeat': {
     viewBox: '0 0 24 24',

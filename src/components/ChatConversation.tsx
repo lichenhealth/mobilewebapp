@@ -14,6 +14,7 @@ import { loadPost, loadSpaceNames } from '../lib/postsApi';
 import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import DocRefCard from './ChatDocCard';
+import { useConfirm } from './ConfirmDialog';
 import { createChatDoc, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
 import '../routes/ChatThread.css';
 
@@ -111,6 +112,13 @@ export default function ChatConversation({
   const [docMsg, setDocMsg] = useState('');
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // THE MESSAGE MENU (founder 2026-10-21): the full emoji picker opens
+  // inside the menu for one message; hides are "delete for me"; a space
+  // admin may delete for the whole group (server-checked RPC).
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [amSpaceAdmin, setAmSpaceAdmin] = useState(false);
+  const confirmDialog = useConfirm();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -150,6 +158,21 @@ export default function ChatConversation({
       }
       setMembers(map);
       setMessages(((msgRes.data as MessageRow[] | null) ?? []));
+      // "Delete for me" is a personal curtain — load this room's hides.
+      const { data: hid } = await supabase.from('hidden_messages')
+        .select('message_id').eq('chat_id', chatId);
+      if (!active) return;
+      setHidden(new Set(((hid as { message_id: string }[] | null) ?? []).map((h) => h.message_id)));
+      // A space's own rooms carry steward moderation (delete for the group).
+      if (c.space_id && ['organization', 'community', 'group', 'place'].includes(c.kind)) {
+        const { data: sm } = await supabase.from('space_members')
+          .select('role').eq('space_id', c.space_id).eq('profile_id', me).maybeSingle();
+        if (!active) return;
+        const role = (sm as { role?: string } | null)?.role;
+        setAmSpaceAdmin(role === 'admin' || role === 'super_admin');
+      } else {
+        setAmSpaceAdmin(false);
+      }
       setReactions(await loadReactions(chatId));
       setLoading(false);
       // Being here IS reading: bump the read cursor + clear this chat's
@@ -158,7 +181,10 @@ export default function ChatConversation({
       onRead?.(chatId);
     })();
     return () => { active = false; };
-  }, [chatId]);
+    // `me` rides the admin-standing read — a cold boot can mount before auth
+    // hydrates, and an effect keyed on chatId alone would decide "not an
+    // admin" forever (the acting-as ready-gate lesson, in miniature).
+  }, [chatId, me]);
 
   // Realtime: new messages
   useEffect(() => {
@@ -173,6 +199,17 @@ export default function ChatConversation({
           setMessages((cur) => (cur.some((m) => m.id === row.id) ? cur : [...cur, row]));
           void markChatRead(chatId);   // still looking — stay caught up
           onRead?.(chatId);
+        },
+      )
+      // A deleted message leaves everyone's screen (founder 2026-10-21).
+      // ⚠ No chat_id filter: DELETE payloads carry only the primary key
+      // unless the table has REPLICA IDENTITY FULL — match by id instead.
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          const gone = (payload.old as { id?: string } | null)?.id;
+          if (gone) setMessages((cur) => cur.filter((m) => m.id !== gone));
         },
       )
       .subscribe();
@@ -225,7 +262,44 @@ export default function ChatConversation({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  const runs = useMemo(() => groupRuns(messages), [messages]);
+  const runs = useMemo(() => groupRuns(messages.filter((m) => !hidden.has(m.id))), [messages, hidden]);
+
+  // ── The message menu's hands (founder 2026-10-21) ──────────────────────
+  const copyMessage = (m: MessageRow) => {
+    void navigator.clipboard?.writeText(m.body ?? '').catch(() => {});
+  };
+  const shareMessage = (m: MessageRow) => {
+    const text = m.body ?? '';
+    if (navigator.share) void navigator.share({ text }).catch(() => {});
+    else copyMessage(m);
+  };
+  const saveMessage = async (m: MessageRow) => {
+    const { error } = await supabase.from('saved_items')
+      .insert({ profile_id: me, target_type: 'message', target_id: m.id });
+    if (error && error.code !== '23505') alert(error.message);
+  };
+  const deleteMine = async (m: MessageRow) => {
+    if (!(await confirmDialog({ message: 'Delete this message for everyone?', confirmLabel: 'Delete', danger: true }))) return false;
+    setMessages((cur) => cur.filter((x) => x.id !== m.id));
+    const { error } = await supabase.from('chat_messages').delete().eq('id', m.id);
+    if (error) alert(error.message);
+    return true;
+  };
+  const hideForMe = async (m: MessageRow) => {
+    setHidden((cur) => new Set(cur).add(m.id));
+    const { error } = await supabase.from('hidden_messages')
+      .insert({ profile_id: me, message_id: m.id, chat_id: chatId });
+    if (error && error.code !== '23505') alert(error.message);
+  };
+  const deleteForGroup = async (m: MessageRow) => {
+    if (!(await confirmDialog({ message: 'Delete this message for the whole group?', confirmLabel: 'Delete for the group', danger: true }))) return false;
+    setMessages((cur) => cur.filter((x) => x.id !== m.id));
+    const { error } = await supabase.rpc('moderate_delete_chat_message', { p_message: m.id });
+    if (error) alert(error.message);
+    return true;
+  };
+  const canModerate = amSpaceAdmin && !!chat?.space_id
+    && ['organization', 'community', 'group', 'place'].includes(chat?.kind ?? '');
   const messagesById = useMemo(() => {
     const m: Record<string, MessageRow> = {};
     for (const msg of messages) m[msg.id] = msg;
@@ -374,6 +448,15 @@ export default function ChatConversation({
                 setMenuFor={setMenuFor}
                 onReply={setReplyTo}
                 onReact={react}
+                pickerFor={pickerFor}
+                setPickerFor={setPickerFor}
+                onCopy={copyMessage}
+                onShare={shareMessage}
+                onSave={(m) => void saveMessage(m)}
+                onDeleteMine={(m) => void deleteMine(m).then((ok) => { if (ok) setMenuFor(null); })}
+                onHideForMe={(m) => { void hideForMe(m); setMenuFor(null); }}
+                onDeleteForGroup={(m) => void deleteForGroup(m).then((ok) => { if (ok) setMenuFor(null); })}
+                canModerate={canModerate}
               />
             </Fragment>
           );
@@ -701,6 +784,7 @@ function groupRuns(msgs: MessageRow[]): Run[] {
 
 function MessageRun({
   run, me, members, messagesById, reactionsByMessage, mediaUrls, menuFor, setMenuFor, onReply, onReact, helpMemberId,
+  pickerFor, setPickerFor, onCopy, onShare, onSave, onDeleteMine, onHideForMe, onDeleteForGroup, canModerate,
 }: {
   run: Run;
   me: string;
@@ -714,6 +798,18 @@ function MessageRun({
   setMenuFor: (id: string | null) => void;
   onReply: (m: MessageRow) => void;
   onReact: (messageId: string, emoji: string) => void;
+  /** The full menu (founder 2026-10-21): React opens the emoji picker in
+   *  place; Save lands the message in Drive; Delete follows the role —
+   *  yours for everyone, someone else's for you, a steward for the group. */
+  pickerFor: string | null;
+  setPickerFor: (id: string | null) => void;
+  onCopy: (m: MessageRow) => void;
+  onShare: (m: MessageRow) => void;
+  onSave: (m: MessageRow) => void;
+  onDeleteMine: (m: MessageRow) => void;
+  onHideForMe: (m: MessageRow) => void;
+  onDeleteForGroup: (m: MessageRow) => void;
+  canModerate: boolean;
 }) {
   const navigate = useNavigate();
   const isMe = run.senderId === me;
@@ -805,15 +901,62 @@ function MessageRun({
 
               {menuFor === m.id && (
                 <div className={'msg-menu' + (isMe ? ' msg-menu--me' : '')}>
-                  <div className="msg-menu__reactions">
-                    {REACTION_EMOJI.map((e) => (
-                      <button key={e} className="msg-menu__reaction" onClick={() => onReact(m.id, e)}>{e}</button>
-                    ))}
-                  </div>
-                  <div className="msg-menu__divider" />
-                  <button className="msg-menu__action" onClick={() => { onReply(m); setMenuFor(null); }}>
-                    <Icon name="reply" size={16} /> Reply
-                  </button>
+                  {pickerFor === m.id ? (
+                    // React → the real emoji picker, right here (founder
+                    // 2026-10-21: "sends me to icons where I can provide
+                    // emojis") — rendered inside the menu card.
+                    <div className="msg-menu__picker">
+                      <EmojiPicker onPick={(e) => { onReact(m.id, e); setPickerFor(null); setMenuFor(null); }} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="msg-menu__reactions">
+                        {REACTION_EMOJI.map((e) => (
+                          <button key={e} className="msg-menu__reaction" onClick={() => { onReact(m.id, e); setMenuFor(null); }}>{e}</button>
+                        ))}
+                        <button
+                          className="msg-menu__reaction msg-menu__reaction--more"
+                          aria-label="More reactions"
+                          title="More reactions"
+                          onClick={() => setPickerFor(m.id)}
+                        >
+                          <Icon name="plus" size={14} />
+                        </button>
+                      </div>
+                      <div className="msg-menu__divider" />
+                      <button className="msg-menu__action" onClick={() => { onReply(m); setMenuFor(null); }}>
+                        <Icon name="reply" size={16} /> Reply
+                      </button>
+                      <button className="msg-menu__action" onClick={() => { onShare(m); setMenuFor(null); }}>
+                        <Icon name="send" size={16} /> Share
+                      </button>
+                      {!!m.body && (
+                        <button className="msg-menu__action" onClick={() => { onCopy(m); setMenuFor(null); }}>
+                          <Icon name="copy" size={16} /> Copy
+                        </button>
+                      )}
+                      <button className="msg-menu__action" onClick={() => { onSave(m); setMenuFor(null); }}>
+                        <Icon name="drive" size={16} /> Save to Drive
+                      </button>
+                      <div className="msg-menu__divider" />
+                      {isMe ? (
+                        <button className="msg-menu__action msg-menu__action--danger" onClick={() => onDeleteMine(m)}>
+                          <Icon name="trash" size={16} /> Delete for everyone
+                        </button>
+                      ) : (
+                        <>
+                          <button className="msg-menu__action msg-menu__action--danger" onClick={() => onHideForMe(m)}>
+                            <Icon name="trash" size={16} /> Delete for me
+                          </button>
+                          {canModerate && (
+                            <button className="msg-menu__action msg-menu__action--danger" onClick={() => onDeleteForGroup(m)}>
+                              <Icon name="trash" size={16} /> Delete for the group
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
