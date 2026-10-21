@@ -200,66 +200,58 @@ export default function PostPage() {
             </button>
           ))}
         </div>
-        {me && (
-          <div className="postp__acts">
-            <button
-              className={'postp__act' + (recommended ? ' is-on' : '')}
-              aria-label={recommended ? 'Withdraw recommendation' : 'Recommend'}
-              title={recommended ? 'You recommend this — tap to withdraw' : 'Recommend to your network'}
-              onClick={() => {
-                const next = !recommended;
-                setMyRecs((cur) => {
-                  const n = new Set(cur);
-                  if (next) n.add('post:' + p.id); else n.delete('post:' + p.id);
-                  return n;
-                });
-                void setRecommend('post', p.id, next).catch(console.error);
-                speak(next ? 'Recommended ✓ — your network can see you stand behind it.' : 'Recommendation withdrawn.');
-              }}
-            >
-              <Icon name="thumbs-up" size={16} />
-            </button>
-            <button
-              className={'postp__act' + (saved ? ' is-on' : '')}
-              aria-label={saved ? 'Unsave' : 'Save'}
-              title={saved ? 'In your Drive — tap to remove' : 'Save to your Drive'}
-              onClick={() => {
-                const next = !saved;
-                setMySaves((cur) => {
-                  const n = new Set(cur);
-                  if (next) n.add('post:' + p.id); else n.delete('post:' + p.id);
-                  return n;
-                });
-                void setSaved('post', p.id, next).then(() => { if (next) promptSaved(p.id); }).catch(console.error);
-                speak(next ? 'Saved to your Drive ✓' : 'Removed from your Drive.',
-                  next ? { label: 'Open Drive', path: '/drive' } : undefined);
-              }}
-            >
-              <Icon name="drive" size={16} />
-            </button>
-            <button
-              className={'postp__act' + (budgeted ? ' is-on' : '')}
-              aria-label={budgeted ? 'Remove from your budget' : 'Add to your budget'}
-              title={budgeted ? 'Remove from your budget' : 'Add to your budget — its price rides along live'}
-              onClick={() => {
-                const next = !budgeted;
-                setMyBudget((cur) => {
-                  const n = new Set(cur);
-                  if (next) n.add(p.id); else n.delete(p.id);
-                  return n;
-                });
-                void (next ? addBudgetPost(me!, p.id) : removeBudgetPost(me!, p.id)).catch(console.error);
-                speak(next
-                  ? 'On your Budget ✓ — its live price rides your planning list in Current-cy.'
-                  : 'Off your budget.',
-                  next ? { label: 'See your budget', path: '/currentcy' } : undefined);
-              }}
-            >
-              <Icon name="currentcy" size={16} />
-            </button>
-          </div>
-        )}
+        {/* The top-right action circles RETIRED 2026-10-21 (founder: "the
+            recommend is at the bottom, so is the drive, so they don't need
+            to be top right?") — the card's own footer carries Recommend /
+            Share / Save / Budget / Chat, once. */}
       </div>
+      <FeedCard
+        {...postToCard(p, me || undefined, spaceNames)}
+        trustLine={trustLine}
+        {...weaveProps(p, myWebSet, me || undefined)}
+        expanded
+        trusted={myMyc.has('profile:' + p.author_id)}
+        recommended={recommended}
+        mycelium={overlay}
+        availability={{ trust: !!me && p.author_id !== me }}
+        onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+        onRecommend={(on) => {
+          void setRecommend('post', p.id, on).catch(console.error);
+          speak(on ? 'Recommended ✓ — your network can see you stand behind it.' : 'Recommendation withdrawn.');
+        }}
+        saved={saved}
+        onSave={(on) => {
+          void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
+          speak(on ? 'Saved to your Drive ✓' : 'Removed from your Drive.',
+            on ? { label: 'Open Drive', path: '/drive' } : undefined);
+        }}
+        budgeted={budgeted}
+        onBudget={me ? (on) => {
+          setMyBudget((cur) => {
+            const n = new Set(cur);
+            if (on) n.add(p.id); else n.delete(p.id);
+            return n;
+          });
+          void (on ? addBudgetPost(me, p.id) : removeBudgetPost(me, p.id)).catch(console.error);
+          speak(on
+            ? 'On your Budget ✓ — a planning note in Current-cy with its live price. Not a purchase.'
+            : 'Off your budget.',
+            on ? { label: 'See your budget', path: '/currentcy' } : undefined);
+        } : undefined}
+        extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
+        viewerIsAuthor={p.author_id === me}
+        onEdit={() => navigate(`/compose?post=${p.id}`)}
+        onDelete={() => { void deletePost(p.id).then(back).catch(console.error); }}
+        onHide={me ? () => { void setHidden(p.id, true).then(back).catch(console.error); } : undefined}
+        onMessage={me && p.author_id !== me ? async () => {
+          try { navigate(`/chat/${await ensureDirectChat(p.author_id)}?about=${p.id}`); } catch (e) { console.error(e); }
+        } : undefined}
+        onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
+      />
+
+      {/* The receipt for the footer's actions — names what just changed and
+          doors to where it lives, then steps away (founder 2026-10-21:
+          "When I click on it, nothing happens"). */}
       {actNote && (
         <p className="postp__actnote" role="status">
           {actNote.text}
@@ -273,30 +265,6 @@ export default function PostPage() {
           )}
         </p>
       )}
-
-      <FeedCard
-        {...postToCard(p, me || undefined, spaceNames)}
-        trustLine={trustLine}
-        {...weaveProps(p, myWebSet, me || undefined)}
-        expanded
-        trusted={myMyc.has('profile:' + p.author_id)}
-        recommended={recommended}
-        mycelium={overlay}
-        availability={{ trust: !!me && p.author_id !== me }}
-        onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
-        onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
-        saved={saved}
-        onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}
-        extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
-        viewerIsAuthor={p.author_id === me}
-        onEdit={() => navigate(`/compose?post=${p.id}`)}
-        onDelete={() => { void deletePost(p.id).then(back).catch(console.error); }}
-        onHide={me ? () => { void setHidden(p.id, true).then(back).catch(console.error); } : undefined}
-        onMessage={me && p.author_id !== me ? async () => {
-          try { navigate(`/chat/${await ensureDirectChat(p.author_id)}?about=${p.id}`); } catch (e) { console.error(e); }
-        } : undefined}
-        onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-      />
 
       {/* THE EXCHANGE (founder 2026-08-05). A marketplace listing finally has
           a door forward that isn't a pasted URL: ask for it, then a live strip
