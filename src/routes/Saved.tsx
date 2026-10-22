@@ -706,19 +706,20 @@ export default function Saved() {
         />
       )}
 
-      {/* ── RECENT — the top of the drive (founder 2026-10-21: "Recents is
-          at the top, pulling the 3 most recent items (whether they're
-          folders, docs, etc) … kinda like the main Google Drive view"):
-          the 3 freshest things of ANY kind, always open; the carrot unfolds
-          everything in recency order. Hidden while searching — the search
-          holds every section open instead. ── */}
+      {/* ── CHRONOLOGICAL — the top of the drive (founder 2026-10-21's
+          Recents, renamed + fully shut 2026-10-22: "Let's have the recents be
+          renamed Chronological and don't have 3 items auto load, e.g. have
+          the carrot up and nothing in the drop down" — a plain fold now:
+          closed shows nothing, the carrot opens EVERYTHING of every kind in
+          recency order). Hidden while searching — the search holds every
+          section open instead. ── */}
       {me && ready && !query.trim() && recents.length > 0 && (
         <section className="drive__recents">
           <div className="drive__items-head">
             <button type="button" className="drive__foldhead" aria-expanded={recentsAll}
               onClick={() => setRecentsAll((v) => !v)}>
               <span className="drive__eyebrow">
-                Recent
+                Chronological
                 <span className="drive__count">{recents.length}</span>
               </span>
               <span className={'drive__foldcar' + (recentsAll ? ' is-open' : '')} aria-hidden="true">
@@ -726,7 +727,7 @@ export default function Saved() {
               </span>
             </button>
           </div>
-          {(recentsAll ? recents : recents.slice(0, 3)).map((r) => (
+          {recentsAll && recents.map((r) => (
             <div key={r.key} className="drive__row" role="button" tabIndex={0} onClick={r.go}
               onKeyDown={(e) => { if (e.key === 'Enter') r.go(); }}>
               {r.photo
