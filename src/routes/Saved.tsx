@@ -15,7 +15,7 @@ import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } f
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
 import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
-import { listMyCollections, createCollection, type CollectionRow } from '../lib/collectionsApi';
+import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
@@ -112,6 +112,16 @@ export default function Saved() {
   // ('path' kind — Organize) that opens ready to arrange.
   const [newKind, setNewKind] = useState<'collection' | 'path'>('collection');
   const [folderAll, setFolderAll] = useState(false);
+  // FOLDER ROWS (founder 2026-10-21/22: "have Folders look like Items, one
+  // per line with all the parts of the platform represented lined up by
+  // icon" + the menu list "Share, Manage Access, Copy Share Link, Rename,
+  // Move and Delete" — Move waits on folder nesting, flagged not faked).
+  const [folderAreas, setFolderAreas] = useState<Map<string, string[]>>(new Map());
+  const [folderMenuFor, setFolderMenuFor] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const [folderDel, setFolderDel] = useState<string | null>(null);
+  const [folderNote, setFolderNote] = useState<string | null>(null);
 
   // POST DRAFTS (founder 2026-10-15: "we will also need a drafts section"):
   // unfinished posts autosaved by Compose — a row reopens its draft, Delete
@@ -315,6 +325,16 @@ export default function Saved() {
     await setSaved('message', id, false);
   };
 
+  // The sections each folder's pieces span — icons on its row.
+  useEffect(() => {
+    if (collections.length === 0) { setFolderAreas(new Map()); return; }
+    let live = true;
+    void listCollectionAreas(collections.map((c) => c.id))
+      .then((m) => { if (live) setFolderAreas(m); })
+      .catch(console.error);
+    return () => { live = false; };
+  }, [collections]);
+
   /** The drive time: your own pieces by creation, saves by the save. */
   const driveTime = (p: FeedPost) =>
     p.author_id === me ? p.created_at : (savedAt.get(p.id) ?? p.created_at);
@@ -410,6 +430,44 @@ export default function Saved() {
   async function messageAbout(post: { id: string; author_id: string; author_space_id?: string | null }) {
     try { navigate(await chatPathForPost(post)); }
     catch (e) { console.error(e); alert('Could not open the chat: ' + (e instanceof Error ? e.message : String(e))); }
+  }
+
+  /** Download a folder as a markdown file of its pieces' words — media as
+   *  links, and a piece whose author switched downloads OFF rides as its
+   *  title alone with an honest note (the noDownload promise holds in an
+   *  export exactly as it does on a card). */
+  async function downloadFolder(c: CollectionRow) {
+    try {
+      const col = await loadCollection(c.id);
+      const lines: string[] = [`# ${c.name}`, ''];
+      if (col?.meta.description) lines.push(col.meta.description, '');
+      for (const p of col?.posts ?? []) {
+        lines.push(`## ${p.title || 'Untitled'}`);
+        if (p.details?.noDownload === true) {
+          lines.push('_Its author keeps this piece download-protected — read it on Lichen:_ ' +
+            `${window.location.origin}/posts/${p.id}`, '');
+          continue;
+        }
+        lines.push(p.body || '', '');
+        const media = Array.isArray(p.details?.media) ? (p.details.media as { type: string; url: string }[]) : [];
+        for (const m of media) lines.push(`- ${m.type}: ${m.url}`);
+        if (media.length) lines.push('');
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${c.name.replace(/[^\w\s-]/g, '').trim() || 'folder'}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { console.error(e); setFolderNote('Could not build the download.'); }
+  }
+
+  async function copyFolder(c: CollectionRow) {
+    try {
+      await duplicateCollection(c.id);
+      setCollections(await listMyCollections());
+      setFolderNote(`Copied ✓ — “${c.name} copy” is yours, private.`);
+    } catch (e) { console.error(e); setFolderNote('Could not copy it.'); }
   }
 
   /** A section's fold head: eyebrow + count + the carrot. The whole row
@@ -683,39 +741,117 @@ export default function Saved() {
         </section>
       )}
 
-      {/* ── FOLDERS — the drive's cabinets (founder 2026-10-06), behind a
-          fold since 2026-10-21. A tile names its folder, its count, and its
-          state: a published folder is a COLLECTION others can read; a course
-          notebook says whose. ── */}
+      {/* ── FOLDERS — item-shaped ROWS since 2026-10-21/22 (founder: "have
+          Folders look like Items, one per line with all the parts of the
+          platform represented lined up by icon", then the ⋯ menu list:
+          "Share, Manage Access, Copy Share Link, Rename, Move and Delete" —
+          Move waits on folder nesting, a schema decision, flagged not faked;
+          Manage access opens the folder's own page, where publish lives). ── */}
       {me && ready && (
         <section className="drive__folders">
           <div className="drive__items-head">
             {foldHead('folders', 'Folders', foldersVisible.length)}
           </div>
           {foldOpen('folders') && (<>
-          <div className="drive__folder-grid">
-            {folderShelf.map((c) => (
-              <button key={c.id} className="drive__folder" onClick={() => navigate(`/collections/${c.id}`)}>
-                <span className="drive__folder-ic"><Icon name={folderIcon(c)} size={17} /></span>
-                <span className="drive__folder-body">
-                  <span className="drive__folder-name">{c.name}</span>
-                  <span className="drive__folder-meta">
-                    {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
-                    {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
-                    {c.is_public ? ' · Published' : ''}
+          <div className="drive__list drive__list--flush">
+            {folderShelf.map((c) => {
+              const fAreas = (folderAreas.get(c.id) ?? []).slice(0, 4);
+              const menuOpen = folderMenuFor === c.id;
+              const link = `${window.location.origin}/collections/${c.id}`;
+              return (
+                <div key={c.id} className="drive__row" role="button" tabIndex={0}
+                  onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
+                  <span className="drive__row-icon"><Icon name={folderIcon(c)} size={17} /></span>
+                  <span className="drive__row-main" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
+                    {renaming === c.id ? (
+                      <input
+                        className="drive__rename"
+                        autoFocus
+                        value={renameVal}
+                        onChange={(e) => setRenameVal(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const nm = renameVal.trim();
+                            setRenaming(null);
+                            if (nm && nm !== c.name) {
+                              setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, name: nm } : x)));
+                              void updateCollection(c.id, { name: nm }).catch(console.error);
+                            }
+                          }
+                          if (e.key === 'Escape') setRenaming(null);
+                        }}
+                        onBlur={() => setRenaming(null)}
+                      />
+                    ) : (
+                      <span className="drive__row-title">{c.name}</span>
+                    )}
+                    <span className="drive__row-meta">
+                      Folder · {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
+                      {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
+                      {c.is_public ? ' · Published' : ' · Private'}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
-            <button className="drive__folder drive__folder--new"
-              onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}>
-              <span className="drive__folder-ic"><Icon name="plus" size={16} /></span>
-              <span className="drive__folder-body">
-                <span className="drive__folder-name">New folder</span>
-                <span className="drive__folder-meta">private until you publish it</span>
+                  {fAreas.length > 0 && (
+                    <span className="drive__row-areaset" aria-hidden="true">
+                      {fAreas.map((a) => {
+                        const ic = serviceAreaIcon(a as ServiceArea);
+                        return ic ? <Icon key={a} name={ic} size={14} /> : null;
+                      })}
+                    </span>
+                  )}
+                  <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                    <button className="drive__row-more" aria-label="More" aria-expanded={menuOpen}
+                      onClick={() => { setFolderMenuFor(menuOpen ? null : c.id); setFolderDel(null); }}>
+                      <Icon name="more-horizontal" size={15} />
+                    </button>
+                    {menuOpen && (
+                      <span className="drive__menu" role="menu">
+                        <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>Open</button>
+                        <button onClick={() => {
+                          setFolderMenuFor(null);
+                          if (navigator.share) void navigator.share({ title: c.name, url: link }).catch(() => {});
+                          else { void navigator.clipboard?.writeText(link); setFolderNote('Link copied ✓'); }
+                          if (!c.is_public) setFolderNote('Shared — but it opens for you alone until you publish it.');
+                        }}>Share</button>
+                        <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>
+                          Manage access…
+                        </button>
+                        <button onClick={() => {
+                          setFolderMenuFor(null);
+                          void navigator.clipboard?.writeText(link);
+                          setFolderNote(c.is_public
+                            ? 'Link copied ✓'
+                            : 'Link copied ✓ — it opens for you alone until you publish the folder.');
+                        }}>Copy share link</button>
+                        <button onClick={() => { setFolderMenuFor(null); void downloadFolder(c); }}>Download</button>
+                        <button onClick={() => { setFolderMenuFor(null); void copyFolder(c); }}>Copy</button>
+                        <button onClick={() => { setRenameVal(c.name); setRenaming(c.id); setFolderMenuFor(null); }}>
+                          Rename
+                        </button>
+                        <button className="drive__menu-danger" onClick={() => {
+                          if (folderDel !== c.id) { setFolderDel(c.id); return; }
+                          setFolderMenuFor(null); setFolderDel(null);
+                          setCollections((cur) => cur.filter((x) => x.id !== c.id));
+                          void deleteCollection(c.id).catch(console.error);
+                        }}>{folderDel === c.id ? 'Really delete?' : 'Delete'}</button>
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="drive__row drive__row--new" role="button" tabIndex={0}
+              onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setNewKind('collection'); setNewFolderOpen(true); } }}>
+              <span className="drive__row-icon"><Icon name="plus" size={16} /></span>
+              <span className="drive__row-main">
+                <span className="drive__row-title">New folder</span>
+                <span className="drive__row-meta">private until you publish it</span>
               </span>
-            </button>
+            </div>
           </div>
+          {folderNote && <p className="drive__none">{folderNote}</p>}
           {!query && foldersVisible.length > 8 && (
             <button className="drive__folders-all" onClick={() => setFolderAll((v) => !v)}>
               {folderAll ? 'Fewer folders' : `All ${foldersVisible.length} folders`}

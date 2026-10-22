@@ -298,6 +298,71 @@ export async function deleteCollection(id: string): Promise<void> {
 }
 
 /** Append a post (position = current count; duplicates ignored). */
+/** The platform sections a folder's pieces span — Drive's rows wear them as
+ *  icons (founder 2026-10-21: "one might have the Events Icon and the
+ *  Marketplace Icon"). ⚠ collection_items.target_id is polymorphic with NO
+ *  FK — ids first, then a separate posts read, never an embed. */
+export async function listCollectionAreas(collectionIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (collectionIds.length === 0) return out;
+  const { data: items } = await supabase
+    .from('collection_items')
+    .select('collection_id, target_id')
+    .in('collection_id', collectionIds)
+    .eq('target_type', 'post');
+  const rows = (items as { collection_id: string; target_id: string }[] | null) ?? [];
+  if (rows.length === 0) return out;
+  const { data: posts } = await supabase
+    .from('posts')
+    .select('id, service_areas')
+    .in('id', [...new Set(rows.map((r) => r.target_id))]);
+  const areasOf = new Map(((posts as { id: string; service_areas: string[] | null }[] | null) ?? [])
+    .map((p) => [p.id, p.service_areas ?? []]));
+  for (const r of rows) {
+    const cur = out.get(r.collection_id) ?? [];
+    for (const a of areasOf.get(r.target_id) ?? []) if (!cur.includes(a)) cur.push(a);
+    out.set(r.collection_id, cur);
+  }
+  return out;
+}
+
+/** Duplicate a folder (founder 2026-10-22, the Drive folder menu's Copy):
+ *  same name + " copy", same kind/description/details, the same pieces BY
+ *  REFERENCE (the weaving doctrine — a copy never re-authors anyone's work).
+ *  Always born PRIVATE: publishing is its own deliberate act. */
+export async function duplicateCollection(id: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { data: src, error } = await supabase
+    .from('collections')
+    .select('name, description, kind, details')
+    .eq('id', id).single();
+  if (error) throw error;
+  const s = src as { name: string; description: string | null; kind: CollectionKind; details: OfferingMeta };
+  const { data: made, error: e2 } = await supabase
+    .from('collections')
+    .insert({ owner_id: user.id, name: `${s.name} copy`, description: s.description, kind: s.kind, details: s.details, is_public: false })
+    .select('id').single();
+  if (e2) throw e2;
+  const newId = (made as { id: string }).id;
+  const { data: items } = await supabase
+    .from('collection_items')
+    .select('target_type, target_id, position')
+    .eq('collection_id', id)
+    .order('position', { ascending: true });
+  const rows = (items as { target_type: string; target_id: string; position: number }[] | null) ?? [];
+  if (rows.length > 0) {
+    // One by one so a single piece whose author keeps it out of others'
+    // collections (the enforce_weaveable trigger) skips without sinking the
+    // rest — your own pieces always weave.
+    for (const r of rows) {
+      await supabase.from('collection_items')
+        .insert({ collection_id: newId, target_type: r.target_type, target_id: r.target_id, position: r.position });
+    }
+  }
+  return newId;
+}
+
 export async function addToCollection(collectionId: string, postId: string): Promise<void> {
   const { count } = await supabase
     .from('collection_items')
