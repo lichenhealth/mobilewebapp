@@ -196,7 +196,26 @@
    to save room. Recents is at the top … kinda like the main Google Drive
    view"): Recent leads with 3 rows, its carrot unfolds everything in recency
    order; every other section shuts behind its eyebrow. ── */
-.drive__recents { padding: 2px var(--s-5) 0; margin-bottom: var(--s-2); }
+/* Air above Recent (founder 2026-10-22: "move this down a bit, it is
+   crowded" — it sat tight under the All/Saved/Created lenses). */
+.drive__recents { padding: 2px var(--s-5) 0; margin: var(--s-5) 0 var(--s-2); }
+
+/* Folders as ROWS (founder 2026-10-21/22: "have Folders look like Items,
+   one per line"): the list rides inside .drive__folders, which already
+   carries the side padding — flush strips the base list inset. */
+.drive__list--flush { padding: 0; }
+.drive__row--new .drive__row-icon { border-style: dashed; }
+/* Several section icons lined up at the row's right edge. */
+.drive__row-areaset {
+  flex-shrink: 0; display: inline-flex; gap: 7px; color: var(--peach-deep);
+}
+/* The inline rename input keeps the title's seat. */
+.drive__rename {
+  font: inherit; font-size: 14px; font-weight: 500; color: var(--ink);
+  background: #fff; border: 1px solid var(--peach); border-radius: 7px;
+  padding: 2px 8px; width: 100%; max-width: 280px;
+}
+.drive__rename:focus { outline: none; }
 .drive__foldhead {
   display: flex; align-items: center; gap: 8px;
   background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
