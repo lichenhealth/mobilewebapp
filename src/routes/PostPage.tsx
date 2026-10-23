@@ -15,13 +15,15 @@ import { setHidden } from '../lib/hiddenApi';
 import {
   loadPost, deletePost, postAreas, SERVICE_AREAS, type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
-import { postToCard, weaveProps } from '../lib/feedMapping';
+import { postToCard, weaveProps, postOpenPath } from '../lib/feedMapping';
 import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
 } from '../lib/myceliumApi';
 import './PostPage.css';
 import { loadSpaceNames } from '../lib/postsApi';
 import ExchangePanel from '../components/ExchangePanel';
+import ListingTile from '../components/ListingTile';
+import { loadRelatedGifts, giftMode } from '../lib/relatedGifts';
 
 /** Where each service area lives — the frozen bar's "relevant places" doors. */
 const AREA_HOME: Partial<Record<ServiceArea, string>> = {
@@ -113,6 +115,21 @@ export default function PostPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, me]);
 
+  // MORE GIFTS FOR YOU (founder 2026-10-23): on a gift's page, other gifts
+  // the viewer qualifies for, most relevant first — deterministic ranking,
+  // see relatedGifts.ts. Loads after the post so the read never blocks it.
+  const [related, setRelated] = useState<FeedPost[]>([]);
+  useEffect(() => {
+    setRelated([]);
+    if (!post || !giftMode(post)) return;
+    let live = true;
+    void loadRelatedGifts(post, me || null)
+      .then((rows) => { if (live) setRelated(rows); })
+      .catch(console.error);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id, me]);
+
   const back = () => {
     if (window.history.length > 1) navigate(-1);
     else navigate('/home');
@@ -177,13 +194,23 @@ export default function PostPage() {
       value: when.length === 2 ? `${when[0]} – ${when[1]}` : (when[0] ?? ''),
     },
     {
-      label: 'How it changes hands',
+      // No label — the values say it themselves (founder 2026-10-23: "The
+      // gray text is redundant so let's get rid of it").
+      label: '',
       value: [listOf(d.fulfillment, FULFILMENT),
         d.deliverRadiusMi ? `within ${d.deliverRadiusMi} mi` : '']
         .filter(Boolean).join(' · '),
     },
     { label: 'Payment', value: (d.paymentPlan as string) ?? '' },
   ].filter((f) => f.value);
+  // THE TERMS LEAD (founder 2026-10-23: "the conditions should be in the
+  // post … right below the gift and then the description. Conditions of
+  // sale, gift, lend, etc should always sit before description, in case they
+  // change someone's interest"): the facts fold into the card as plain
+  // lines, between the mode line and the words.
+  const condLines = (isMarket || isTravel)
+    ? facts.map((f) => (f.label ? `${f.label}: ${f.value}` : f.value))
+    : [];
 
   return (
     <>
@@ -210,6 +237,7 @@ export default function PostPage() {
         trustLine={trustLine}
         {...weaveProps(p, myWebSet, me || undefined)}
         expanded
+        conditions={condLines.length > 0 ? condLines : undefined}
         trusted={myMyc.has('profile:' + p.author_id)}
         recommended={recommended}
         mycelium={overlay}
@@ -273,19 +301,9 @@ export default function PostPage() {
         <ExchangePanel post={p} me={me} />
       )}
 
-      {/* The physical facts a buyer needs to choose — condition, when, and how
-          it changes hands. Compose has written these since 2026-07-28 and
-          nothing has ever rendered them until now. */}
-      {(isMarket || isTravel) && (facts.length > 0) && (
-        <div className="postp__facts">
-          {facts.map((f) => (
-            <div className="postp__fact" key={f.label}>
-              <span className="postp__fact-label">{f.label}</span>
-              <span className="postp__fact-value">{f.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* The physical facts moved INTO the card (founder 2026-10-23: "the
+          conditions should be in the post, not a separate one") — see
+          condLines above; the separate labeled card is gone. */}
 
       {/* Visual style, stage 1: what the listing photo looks like, in the
           controlled vocabulary — helps a seeker feel whether it's their
@@ -297,6 +315,28 @@ export default function PostPage() {
             <span className="postp__style-tag" key={t}>{t}</span>
           ))}
         </div>
+      )}
+
+      {/* MORE GIFTS FOR YOU (founder 2026-10-23: "a gray line and then list
+          all other gift items that the person qualifies for … so they can
+          keep scrolling … in order of most relevant to least relevant"):
+          only gifts whose targeting the viewer meets, ranked by the
+          same-shirts → same-family → any-gift ladder. */}
+      {related.length > 0 && (
+        <section className="postp__moregifts">
+          <p className="postp__moregifts-lead">More gifts for you</p>
+          <div className="tile-grid">
+            {related.map((rp) => (
+              <ListingTile
+                key={rp.id}
+                post={rp}
+                offer="Gift"
+                modeIcons={['gift']}
+                onOpen={() => navigate(postOpenPath(rp))}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {/* The growth loop (founder 2026-07-29): a signed-out reader who

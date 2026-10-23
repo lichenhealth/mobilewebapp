@@ -88,6 +88,13 @@ export interface FeedCardProps {
   onOpen?: () => void;
   /** The post page's full-bleed rendering: no body clamp, full-height media. */
   expanded?: boolean;
+  /** THE TERMS LEAD (founder 2026-10-23: "the conditions should be in the
+   *  post, not a separate one … Conditions of sale, gift, lend, etc should
+   *  always sit before description, in case they change someone's
+   *  interest"): short lines rendered between the mode eyebrow and the body
+   *  — condition, availability, how it changes hands. Passed by the post's
+   *  own page; stream cards stay calm. */
+  conditions?: string[];
   /** Open the author's profile (member or space) — avatar/handle become links. */
   onAuthor?: () => void;
   /** The author entity is in the viewer's web (mycelium membership). */
@@ -152,6 +159,7 @@ export default function FeedCard({
   onBadgeAction,
   onOpen,
   expanded,
+  conditions,
   onAuthor,
   inWeb,
   onWeave,
@@ -473,6 +481,15 @@ export default function FeedCard({
           </div>
         )}
       </header>
+
+      {/* THE TERMS LEAD (founder 2026-10-23): how it changes hands, right
+          under the mode line, before the words — no gray eyebrow label, the
+          values say it themselves. */}
+      {conditions && conditions.length > 0 && (
+        <div className="feed-card__conds">
+          {conditions.map((c) => <p className="feed-card__cond" key={c}>{c}</p>)}
+        </div>
+      )}
 
       {/* BODY */}
       <div className="feed-card__body">
