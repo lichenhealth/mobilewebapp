@@ -140,8 +140,15 @@ export default function Marketplace() {
   const [searchActive, setSearchActive] = useState(false);
   // Browse (photo-first tile grid) is the default; the trust-lens card feed
   // stays one toggle away. The choice sticks per device.
+  // CARDS BY DEFAULT (founder 2026-10-23: "lets make the Marketplace posts
+  // have the same look/feel/functionality as they do in main feed when
+  // you're in marketplace … we need post architecture consistency to help
+  // people know how to share content across the network"): the feed view —
+  // the same FeedCard as Home — is the default; the tile grid stays one tap
+  // away as the organizing alternate (the Drive Rows|Cards pattern). An
+  // explicit earlier choice of 'browse' is honored.
   const [view, setView] = useState<'browse' | 'feed'>(
-    () => (localStorage.getItem('mkt-view') === 'feed' ? 'feed' : 'browse'));
+    () => (localStorage.getItem('mkt-view') === 'browse' ? 'browse' : 'feed'));
   const pickView = (v: 'browse' | 'feed') => { setView(v); localStorage.setItem('mkt-view', v); };
   // THE SAFETY LENS (founder 2026-07-28): narrow the whole market to sellers
   // your web vouches for. Empty set ("Anyone") stays the default — the lens

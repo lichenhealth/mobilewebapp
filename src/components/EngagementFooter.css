@@ -13,46 +13,59 @@
   min-height: 42px;
 }
 
-/* LEFT: mycelium signals — small peach-filled circles */
-.engage__signals {
+/* THE SIGNALS SIT BESIDE THE NAME NOW (founder 2026-10-23: "move the trust
+   and recommend icons next to the name of the person … light peach when
+   selects, not opaque") — SignalChips renders them in FeedCard's handle row,
+   LIGHT peach (tint) when the network has engaged, gray when quiet; a lit
+   chip's hover/tap opens a small popover listing WHO, never how many. The
+   footer's old left slot, solid-peach fill and divider are retired. */
+.sigchips {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  flex-shrink: 0;
+  gap: 5px;
+  position: relative;
+  margin-left: 2px;
 }
-
-.engage__signal {
+.sigchips__chip {
   width: 20px;
   height: 20px;
   border-radius: var(--r-full);
-  background: var(--peach);
-  color: var(--bone-warm);
-  border: 0;
+  border: 1px solid var(--bone-edge);
+  background: var(--bone-warm);
+  color: var(--ink-faint);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: transform var(--d-fast) var(--ease-out),
-              background var(--d-fast) var(--ease-out);
   padding: 0;
-}
-.engage__signal svg { display: block; }
-/* The shield-user icon's mass sits in the upper portion of its viewBox,
- * so a 1px downward nudge centers it visually in the peach circle. */
-.engage__signal--shield svg { transform: translateY(1px); }
-.engage__signal:hover { background: var(--peach-deep); }
-.engage__signal:active { transform: scale(0.92); }
-.engage__signal.is-open { background: var(--peach-deep); }
-
-/* Vertical separator between signals zone and actions zone.
- * Spans the full height of the footer — top to bottom — clearly delineating
- * "what your mycelium thinks" from "what you can do". */
-.engage__divider {
-  width: 1px;
-  background: var(--bone-edge);
+  cursor: default;
   flex-shrink: 0;
+  transition: background var(--d-fast) var(--ease-out);
 }
+.sigchips__chip svg { display: block; }
+.sigchips__chip.is-lit {
+  background: var(--peach-tint);
+  border-color: var(--peach);
+  color: var(--peach-deep);
+  cursor: pointer;
+}
+.sigchips__chip.is-lit:hover,
+.sigchips__chip.is-open { background: var(--peach-light, var(--peach-tint)); }
+/* The WHO popover — anchored under the chips, clamped to the phone. */
+.sigchips__pop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  min-width: 200px;
+  max-width: min(280px, calc(100vw - 48px));
+  padding: 10px 12px;
+  background: var(--bone);
+  border: 1px solid var(--peach);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 28px rgba(40, 30, 20, 0.14);
+  display: block;
+}
+.sigchips__pop .engage__panel-label { display: block; }
 
 /* RIGHT: actions */
 .engage__actions {
@@ -121,13 +134,8 @@
   color: var(--peach);
 }
 
-/* Inline expansion panel: reveals who in your mycelium trusted/recommended */
-.engage__panel {
-  padding: 10px 14px 12px;
-  background: var(--peach-tint);
-  border-top: 1px solid var(--peach);
-}
-
+/* The WHO list — shared by the sigchips popover (the old inline footer
+   panel retired with the signals' move). */
 .engage__panel-label {
   font-size: 11px;
   font-weight: 500;
@@ -184,12 +192,6 @@
   font-weight: 300;
   color: var(--ink-muted);
 }
-
-/* Empty signal — no one in your mycelium has engaged: gray + inert */
-.engage__signal.is-empty { background: var(--bone-deep); cursor: default; }
-.engage__signal.is-empty svg { color: var(--ink-muted); }
-.engage__signal.is-empty:hover { background: var(--bone-deep); }
-.engage__signal.is-empty:active { transform: none; }
 
 /* Unavailable action — content isn't meta-tracked for this action: lighter gray */
 .engage__action:disabled,

@@ -81,7 +81,11 @@ export default function MemberRow({
         <Avatar id={id} name={name} url={avatarUrl} size={44} />
         <span className="member-row__body">
           <span className="member-row__name">
-            {name}
+            {/* Its own span so the ellipsis actually fires — text sitting
+                bare in a flex container hard-clips instead of trailing off
+                (founder 2026-10-23: "before the text runs into the icons, do
+                a '…' and leave a little blank space"). */}
+            <span className="member-row__name-text">{name}</span>
             {presence === 'lit' && (
               <span className="member-row__presence member-row__presence--lit">
                 <span aria-hidden="true">🕯️</span> present

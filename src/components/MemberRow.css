@@ -31,6 +31,17 @@
 .member-row__name {
   display: flex; align-items: center; gap: 8px;
   font-size: var(--t-base); color: var(--ink); letter-spacing: -0.015em;
+  overflow: hidden; white-space: nowrap;
+  /* Air before the trailing icons — a long name trails off instead of
+     shoving into them (founder 2026-10-23: "do a '…' and leave a little
+     blank space, so it doesn't look shoved together"). */
+  padding-right: 6px;
+}
+/* The name TEXT in its own span: text-overflow only fires on a block with
+   its own overflow, never on bare text inside a flex container — which is
+   why "Melanie Bright Mentorship Group" hard-clipped with no dots. */
+.member-row__name-text {
+  min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .member-row__sub {
