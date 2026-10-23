@@ -22,8 +22,7 @@ import {
 import './PostPage.css';
 import { loadSpaceNames } from '../lib/postsApi';
 import ExchangePanel from '../components/ExchangePanel';
-import ListingTile from '../components/ListingTile';
-import { loadRelatedGifts, giftMode } from '../lib/relatedGifts';
+import { loadRelatedPosts, railArea } from '../lib/relatedPosts';
 
 /** Where each service area lives — the frozen bar's "relevant places" doors. */
 const AREA_HOME: Partial<Record<ServiceArea, string>> = {
@@ -115,17 +114,25 @@ export default function PostPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, me]);
 
-  // MORE GIFTS FOR YOU (founder 2026-10-23): on a gift's page, other gifts
-  // the viewer qualifies for, most relevant first — deterministic ranking,
-  // see relatedGifts.ts. Loads after the post so the read never blocks it.
+  // THE CLICK-THROUGH CONTINUES THE SECTION (founder 2026-10-23: "The click
+  // through shows the post you clicked thru at top, with a gray line before,
+  // then all the other marketplace posts, in relevant order") — the rest of
+  // this post's section below, ranked against it; see relatedPosts.ts.
+  // Loads after the post so the read never blocks it.
   const [related, setRelated] = useState<FeedPost[]>([]);
+  const [relOverlays, setRelOverlays] = useState<Record<string, MyceliumSignals>>({});
   useEffect(() => {
-    setRelated([]);
-    if (!post || !giftMode(post)) return;
+    setRelated([]); setRelOverlays({});
+    if (!post || !railArea(post) || post.linked_event_id) return;
     let live = true;
-    void loadRelatedGifts(post, me || null)
-      .then((rows) => { if (live) setRelated(rows); })
-      .catch(console.error);
+    void (async () => {
+      const rows = await loadRelatedPosts(post, me || null);
+      if (!live || rows.length === 0) { if (live) setRelated(rows); return; }
+      const { web, vouched } = await loadMyWeb();
+      const ov = await loadEndorsements(rows, { web, vouched });
+      if (!live) return;
+      setRelated(rows); setRelOverlays(ov);
+    })().catch(console.error);
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id, me]);
@@ -163,7 +170,6 @@ export default function PostPage() {
     if (noteTimer.current) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setActNote(null), 6000);
   };
-  const areas = postAreas(p).filter((a) => AREA_HOME[a]);
   const isMarket = postAreas(p).includes('marketplace') && !p.linked_event_id;
   // TRAVEL IS AN EXCHANGE (founder 2026-10-06): a ride or a stay gets the
   // same exchange door and facts panel a marketplace listing gets — the
@@ -220,17 +226,11 @@ export default function PostPage() {
           its actions — pinned below the TopBar while the body scrolls. */}
       <div className="postp__pin">
         <PageHead onBack={back} />
-        <div className="postp__doors">
-          {areas.map((a) => (
-            <button className="postp__door" key={a} onClick={() => navigate(AREA_HOME[a]!)}>
-              {SERVICE_AREAS.find((s) => s.value === a)?.label ?? a}
-            </button>
-          ))}
-        </div>
-        {/* The top-right action circles RETIRED 2026-10-21 (founder: "the
-            recommend is at the bottom, so is the drive, so they don't need
-            to be top right?") — the card's own footer carries Recommend /
-            Share / Save / Budget / Chat, once. */}
+        {/* The area PILLS retired 2026-10-23 (founder, crossing out
+            "Marketplace": "Instead of saying Marketplace when you click
+            through, just click thru to marketplace") — the page itself
+            continues into the section below, and the rail's heading is the
+            door. The top-right action circles retired 2026-10-21. */}
       </div>
       <FeedCard
         {...postToCard(p, me || undefined, spaceNames)}
@@ -317,25 +317,41 @@ export default function PostPage() {
         </div>
       )}
 
-      {/* MORE GIFTS FOR YOU (founder 2026-10-23: "a gray line and then list
-          all other gift items that the person qualifies for … so they can
-          keep scrolling … in order of most relevant to least relevant"):
-          only gifts whose targeting the viewer meets, ranked by the
-          same-shirts → same-family → any-gift ladder. */}
-      {related.length > 0 && (
-        <section className="postp__moregifts">
-          <p className="postp__moregifts-lead">More gifts for you</p>
-          <div className="tile-grid">
-            {related.map((rp) => (
-              <ListingTile
-                key={rp.id}
-                post={rp}
-                offer="Gift"
-                modeIcons={['gift']}
-                onOpen={() => navigate(postOpenPath(rp))}
-              />
-            ))}
-          </div>
+      {/* THE SECTION CONTINUES BELOW (founder 2026-10-23): a gray line, then
+          the rest of this post's section as the SAME cards the feed wears,
+          ranked against the opened post — identity-targeted posts only for
+          viewers who qualify. The heading is the door to the whole room. */}
+      {related.length > 0 && railArea(p) && (
+        <section className="postp__moreposts">
+          <p className="postp__moreposts-lead">
+            <button
+              className="postp__moreposts-door link-cue"
+              onClick={() => navigate(AREA_HOME[railArea(p)!] ?? '/market')}
+            >
+              More from {SERVICE_AREAS.find((s) => s.value === railArea(p))?.label ?? 'the Marketplace'}
+            </button>
+            {' ›'}
+          </p>
+          {related.map((rp) => (
+            <FeedCard
+              key={rp.id}
+              {...postToCard(rp, me || undefined, spaceNames)}
+              {...weaveProps(rp, myWebSet, me || undefined)}
+              trusted={myMyc.has('profile:' + rp.author_id)}
+              recommended={myRecs.has('post:' + rp.id)}
+              mycelium={relOverlays[rp.id]}
+              availability={{ trust: !!me && rp.author_id !== me }}
+              onRecommend={(on) => { void setRecommend('post', rp.id, on).catch(console.error); }}
+              saved={mySaves.has('post:' + rp.id)}
+              onSave={(on) => { void setSaved('post', rp.id, on).then(() => { if (on) promptSaved(rp.id); }).catch(console.error); }}
+              viewerIsAuthor={rp.author_id === me}
+              onMessage={me && rp.author_id !== me ? async () => {
+                try { navigate(`/chat/${await ensureDirectChat(rp.author_id)}?about=${rp.id}`); } catch (e) { console.error(e); }
+              } : undefined}
+              onOpen={() => navigate(postOpenPath(rp))}
+              onAuthor={() => navigate(rp.author_space_id ? `/spaces/${rp.author_space_id}` : `/members/${rp.author_id}`)}
+            />
+          ))}
         </section>
       )}
 
