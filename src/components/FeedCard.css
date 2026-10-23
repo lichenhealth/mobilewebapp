@@ -251,6 +251,23 @@
   background: transparent;   /* the ring alone says woven — no inner fill */
 }
 
+/* The terms, between the mode line and the words (founder 2026-10-23:
+   "Conditions of sale, gift, lend, etc should always sit before description,
+   in case they change someone's interest") — plain ink-soft lines, no gray
+   eyebrow label. */
+.feed-card__conds {
+  padding: 0 var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.feed-card__cond {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
 .feed-card__body {
   display: grid;
   grid-template-columns: 1fr 100px;
