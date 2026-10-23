@@ -537,14 +537,19 @@ export default function SmartSearchCore({
 
   return (
     <div className={'ssrch' + (embedded ? ' ssrch--embed' : '')}>
-      {hasScope && (
+      {/* The scope line names WHOSE search this is and carries the escape —
+          but only for member/space/people scopes. An AREA scope's oval
+          ("Searching Marketplace") was pure redundancy inside the section
+          that already wears its own mark and title (founder 2026-10-23:
+          "I don't feel like the 'searching marketplace' orange oval has a
+          point"). */}
+      {hasScope && (scopeMemberId || scopeSpaceId || scopeWho) && (
         <div className="ssrch__scope">
           <Icon name="search" size={12} />
           <span>
             Searching {scopeMemberId ? `${scopeName || 'this member'}’s contributions`
               : scopeSpaceId ? `within ${scopeName || 'this space'}`
-              : scopeWho ? 'people'
-              : SERVICE_AREAS.find((a) => a.value === scopeArea)?.label ?? scopeArea}
+              : 'people'}
           </span>
           {onClearScope && (
             <button className="ssrch__scope-x" onClick={onClearScope} aria-label="Search everywhere instead">
@@ -580,12 +585,10 @@ export default function SmartSearchCore({
         </button>
       </div>
 
-      {chips.length > 0 && (
-        <div className="ssrch__chips">
-          <span className="ssrch__chips-label">Understood:</span>
-          {chips.map((c) => <span key={c} className="ssrch__chip">{c}</span>)}
-        </div>
-      )}
+      {/* The "Understood:" chips row retired 2026-10-23 (founder: it
+          "makes no sense outside of engineering") — the sentence box's own
+          inline highlights already show every phrase that was read, and the
+          chips array lives on to word the assistant escalation. */}
 
       {panelOpen && (
         <div className="ssrch__panel">
