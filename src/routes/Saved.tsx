@@ -65,6 +65,29 @@ function shortDate(iso: string): string {
   return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** Every row's section icons, lined up PEACH at the right edge (founder
+ *  2026-10-23: "Items have the [peach] icons that identify where the thing
+ *  comes from, but folders and chronological don't. Can we add to all? And
+ *  if they have more than one section … have the little black trail off dots
+ *  for the text end earlier so you can fit multiple icons") — one renderer
+ *  for Items, Folders, Chronological and Drafts so the grammar can't drift.
+ *  flex-shrink: 0 on the set is what makes the title's ellipsis yield. */
+function AreaSet({ areas, size = 14 }: { areas: string[]; size?: number }) {
+  const list = areas.slice(0, 4) as ServiceArea[];
+  if (list.length === 0) return null;
+  const label = list
+    .map((a) => SERVICE_AREAS.find((s) => s.value === a)?.label)
+    .filter(Boolean).join(', ');
+  return (
+    <span className="drive__row-areaset" title={label || undefined} aria-label={label || undefined}>
+      {list.map((a) => {
+        const ic = serviceAreaIcon(a);
+        return ic ? <Icon key={a} name={ic} size={size} /> : null;
+      })}
+    </span>
+  );
+}
+
 /** Drive — your private repository. What you kept and what you made, newest
  *  first, under the platform's standard lenses. Nobody else can see it. */
 export default function Saved() {
@@ -359,7 +382,7 @@ export default function Saved() {
   // list — managing (delete, move, menus) stays in each kind's own section.
   type RecentRow = {
     t: string; key: string; icon: IconName; photo?: string | null;
-    title: string; meta: string; go: () => void;
+    title: string; meta: string; areas?: string[]; go: () => void;
   };
   const recents = useMemo<RecentRow[]>(() => {
     const rows: RecentRow[] = [];
@@ -367,6 +390,7 @@ export default function Saved() {
       t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
       title: c.name,
       meta: `Folder · ${c.item_count === 1 ? '1 item' : `${c.item_count} items`}`,
+      areas: folderAreas.get(c.id) ?? [],
       go: () => navigate(`/collections/${c.id}`),
     });
     for (const p of visible) {
@@ -378,12 +402,15 @@ export default function Saved() {
         photo: media.find((m) => m.type === 'photo')?.url ?? p.image_url,
         title: p.title || (p.body.length > 72 ? p.body.slice(0, 69) + '…' : p.body) || 'Untitled',
         meta: `${p.author_id === me ? 'Created' : 'Saved'} ${shortDate(driveTime(p))}`,
+        areas: postAreas(p),
         go: () => navigate(postOpenPath(p)),
       });
     }
     for (const d of draftsVisible) rows.push({
       t: d.updated_at, key: 'draft:' + d.id, icon: 'newsfeed',
       title: draftLabel(d.draft), meta: `Draft · saved ${shortDate(d.updated_at)}`,
+      areas: Array.isArray((d.draft as { areas?: string[] }).areas)
+        ? ((d.draft as { areas?: string[] }).areas as string[]) : [],
       go: () => navigate(`/compose?draft=${d.id}`),
     });
     for (const d of pdocsVisible) rows.push({
@@ -411,7 +438,7 @@ export default function Saved() {
     rows.sort((a, b) => b.t.localeCompare(a.t));
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [foldersVisible, visible, draftsVisible, pdocsVisible, filesVisible, msgsVisible, fileUrls, savedAt, me]);
+  }, [foldersVisible, visible, draftsVisible, pdocsVisible, filesVisible, msgsVisible, fileUrls, savedAt, me, folderAreas]);
 
   async function makeFolder() {
     const nm = newFolderName.trim();
@@ -499,14 +526,86 @@ export default function Saved() {
     return null;
   }
 
+  /** A folder's name — or its inline rename input while renaming. Shared by
+   *  the row shape and the large tile so Rename works in both views. */
+  function folderNameEl(c: CollectionRow, cls: string) {
+    if (renaming !== c.id) return <span className={cls}>{c.name}</span>;
+    return (
+      <input
+        className="drive__rename"
+        autoFocus
+        value={renameVal}
+        onChange={(e) => setRenameVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            const nm = renameVal.trim();
+            setRenaming(null);
+            if (nm && nm !== c.name) {
+              setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, name: nm } : x)));
+              void updateCollection(c.id, { name: nm }).catch(console.error);
+            }
+          }
+          if (e.key === 'Escape') setRenaming(null);
+        }}
+        onBlur={() => setRenaming(null)}
+      />
+    );
+  }
+
+  /** The folder ⋯ and its eight-entry menu — one definition worn by the row
+   *  AND the large tile, so the two views can't drift. */
+  function folderActs(c: CollectionRow) {
+    const link = `${window.location.origin}/collections/${c.id}`;
+    const menuOpen = folderMenuFor === c.id;
+    return (
+      <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+        <button className="drive__row-more" aria-label="More" aria-expanded={menuOpen}
+          onClick={() => { setFolderMenuFor(menuOpen ? null : c.id); setFolderDel(null); }}>
+          <Icon name="more-horizontal" size={15} />
+        </button>
+        {menuOpen && (
+          <span className="drive__menu" role="menu">
+            <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>Open</button>
+            <button onClick={() => {
+              setFolderMenuFor(null);
+              if (navigator.share) void navigator.share({ title: c.name, url: link }).catch(() => {});
+              else { void navigator.clipboard?.writeText(link); setFolderNote('Link copied ✓'); }
+              if (!c.is_public) setFolderNote('Shared — but it opens for you alone until you publish it.');
+            }}>Share</button>
+            <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>
+              Manage access…
+            </button>
+            <button onClick={() => {
+              setFolderMenuFor(null);
+              void navigator.clipboard?.writeText(link);
+              setFolderNote(c.is_public
+                ? 'Link copied ✓'
+                : 'Link copied ✓ — it opens for you alone until you publish the folder.');
+            }}>Copy share link</button>
+            <button onClick={() => { setFolderMenuFor(null); void downloadFolder(c); }}>Download</button>
+            <button onClick={() => { setFolderMenuFor(null); void copyFolder(c); }}>Copy</button>
+            <button onClick={() => { setRenameVal(c.name); setRenaming(c.id); setFolderMenuFor(null); }}>
+              Rename
+            </button>
+            <button className="drive__menu-danger" onClick={() => {
+              if (folderDel !== c.id) { setFolderDel(c.id); return; }
+              setFolderMenuFor(null); setFolderDel(null);
+              setCollections((cur) => cur.filter((x) => x.id !== c.id));
+              void deleteCollection(c.id).catch(console.error);
+            }}>{folderDel === c.id ? 'Really delete?' : 'Delete'}</button>
+          </span>
+        )}
+      </span>
+    );
+  }
+
   /** One compact drive row. */
   function DriveRow({ p }: { p: FeedPost }) {
     const media = Array.isArray(p.details?.media)
       ? (p.details.media as { type: string; url: string }[]) : [];
     const photo = media.find((m) => m.type === 'photo')?.url ?? p.image_url;
-    const area = postAreas(p)[0] ?? null;
-    const icon = serviceAreaIcon(area) ?? 'newsfeed';
-    const areaLabel = area ? (SERVICE_AREAS.find((s) => s.value === area)?.label ?? null) : null;
+    const rowAreas = postAreas(p);
+    const icon = serviceAreaIcon(rowAreas[0] ?? null) ?? 'newsfeed';
     const own = p.author_id === me;
     const t = driveTime(p);
     const title = p.title || (p.body.length > 72 ? p.body.slice(0, 69) + '…' : p.body) || 'Untitled';
@@ -526,14 +625,11 @@ export default function Saved() {
             {!own && who ? ` · from ${who}` : ''}
           </span>
         </span>
-        {/* The section rides as its ICON, right of the words (founder
+        {/* The sections ride as ICONS, right of the words (founder
             2026-10-21: "icons for the section to the right of the text of an
-            item, not the word spelled out") — the brain's convo-row grammar. */}
-        {area && (
-          <span className="drive__row-area" title={areaLabel ?? undefined} aria-label={areaLabel ?? undefined}>
-            <Icon name={icon} size={14} />
-          </span>
-        )}
+            item, not the word spelled out"; 2026-10-23: ALL of them, not
+            just the first) — the brain's convo-row grammar. */}
+        <AreaSet areas={rowAreas} />
         <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
           <button className="drive__row-more" aria-label="More" aria-expanded={menuOpen}
             onClick={() => setMenuFor(menuOpen ? null : p.id)}>
@@ -694,7 +790,22 @@ export default function Saved() {
         </div>
       )}
 
-      {me && <FilterRow options={DRIVE_LENSES} value={lens} onChange={setLens} />}
+      {/* The view toggle sits at the TOP and dictates how EVERY section
+          renders (founder 2026-10-23: "shouldn't the menu that shows view as
+          either list or post be at the top and dictate how you see all of
+          them?") — list = rows everywhere; large = cards for Items, tiles
+          for Folders (Drafts/Files/Messages have no card form and stay rows). */}
+      {me && (
+        <div className="drive__lensrow">
+          <FilterRow options={DRIVE_LENSES} value={lens} onChange={setLens} />
+          <span className="drive__viewtoggle" role="group" aria-label="View">
+            <button className={view === 'rows' ? 'is-on' : ''} aria-label="List view" title="List view"
+              onClick={() => pickView('rows')}><Icon name="queue" size={14} /></button>
+            <button className={view === 'cards' ? 'is-on' : ''} aria-label="Large view" title="Large view"
+              onClick={() => pickView('cards')}><Icon name="grip" size={14} /></button>
+          </span>
+        </div>
+      )}
 
       {showSearch && (
         <input
@@ -737,6 +848,7 @@ export default function Saved() {
                 <span className="drive__row-title">{r.title}</span>
                 <span className="drive__row-meta">{r.meta}</span>
               </span>
+              {r.areas && <AreaSet areas={r.areas} />}
             </div>
           ))}
         </section>
@@ -753,95 +865,25 @@ export default function Saved() {
           <div className="drive__items-head">
             {foldHead('folders', 'Folders', foldersVisible.length)}
           </div>
-          {foldOpen('folders') && (<>
+          {foldOpen('folders') && view === 'rows' && (
           <div className="drive__list drive__list--flush">
-            {folderShelf.map((c) => {
-              const fAreas = (folderAreas.get(c.id) ?? []).slice(0, 4);
-              const menuOpen = folderMenuFor === c.id;
-              const link = `${window.location.origin}/collections/${c.id}`;
-              return (
-                <div key={c.id} className="drive__row" role="button" tabIndex={0}
-                  onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
-                  <span className="drive__row-icon"><Icon name={folderIcon(c)} size={17} /></span>
-                  <span className="drive__row-main" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
-                    {renaming === c.id ? (
-                      <input
-                        className="drive__rename"
-                        autoFocus
-                        value={renameVal}
-                        onChange={(e) => setRenameVal(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const nm = renameVal.trim();
-                            setRenaming(null);
-                            if (nm && nm !== c.name) {
-                              setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, name: nm } : x)));
-                              void updateCollection(c.id, { name: nm }).catch(console.error);
-                            }
-                          }
-                          if (e.key === 'Escape') setRenaming(null);
-                        }}
-                        onBlur={() => setRenaming(null)}
-                      />
-                    ) : (
-                      <span className="drive__row-title">{c.name}</span>
-                    )}
-                    <span className="drive__row-meta">
-                      Folder · {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
-                      {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
-                      {c.is_public ? ' · Published' : ' · Private'}
-                    </span>
+            {folderShelf.map((c) => (
+              <div key={c.id} className="drive__row" role="button" tabIndex={0}
+                onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
+                <span className="drive__row-icon"><Icon name={folderIcon(c)} size={17} /></span>
+                <span className="drive__row-main" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
+                  {folderNameEl(c, 'drive__row-title')}
+                  <span className="drive__row-meta">
+                    Folder · {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
+                    {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
+                    {c.is_public ? ' · Published' : ' · Private'}
                   </span>
-                  {fAreas.length > 0 && (
-                    <span className="drive__row-areaset" aria-hidden="true">
-                      {fAreas.map((a) => {
-                        const ic = serviceAreaIcon(a as ServiceArea);
-                        return ic ? <Icon key={a} name={ic} size={14} /> : null;
-                      })}
-                    </span>
-                  )}
-                  <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
-                    <button className="drive__row-more" aria-label="More" aria-expanded={menuOpen}
-                      onClick={() => { setFolderMenuFor(menuOpen ? null : c.id); setFolderDel(null); }}>
-                      <Icon name="more-horizontal" size={15} />
-                    </button>
-                    {menuOpen && (
-                      <span className="drive__menu" role="menu">
-                        <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>Open</button>
-                        <button onClick={() => {
-                          setFolderMenuFor(null);
-                          if (navigator.share) void navigator.share({ title: c.name, url: link }).catch(() => {});
-                          else { void navigator.clipboard?.writeText(link); setFolderNote('Link copied ✓'); }
-                          if (!c.is_public) setFolderNote('Shared — but it opens for you alone until you publish it.');
-                        }}>Share</button>
-                        <button onClick={() => { setFolderMenuFor(null); navigate(`/collections/${c.id}`); }}>
-                          Manage access…
-                        </button>
-                        <button onClick={() => {
-                          setFolderMenuFor(null);
-                          void navigator.clipboard?.writeText(link);
-                          setFolderNote(c.is_public
-                            ? 'Link copied ✓'
-                            : 'Link copied ✓ — it opens for you alone until you publish the folder.');
-                        }}>Copy share link</button>
-                        <button onClick={() => { setFolderMenuFor(null); void downloadFolder(c); }}>Download</button>
-                        <button onClick={() => { setFolderMenuFor(null); void copyFolder(c); }}>Copy</button>
-                        <button onClick={() => { setRenameVal(c.name); setRenaming(c.id); setFolderMenuFor(null); }}>
-                          Rename
-                        </button>
-                        <button className="drive__menu-danger" onClick={() => {
-                          if (folderDel !== c.id) { setFolderDel(c.id); return; }
-                          setFolderMenuFor(null); setFolderDel(null);
-                          setCollections((cur) => cur.filter((x) => x.id !== c.id));
-                          void deleteCollection(c.id).catch(console.error);
-                        }}>{folderDel === c.id ? 'Really delete?' : 'Delete'}</button>
-                      </span>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
+                </span>
+                <AreaSet areas={folderAreas.get(c.id) ?? []} />
+                {folderActs(c)}
+              </div>
+            ))}
             <div className="drive__row drive__row--new" role="button" tabIndex={0}
               onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}
               onKeyDown={(e) => { if (e.key === 'Enter') { setNewKind('collection'); setNewFolderOpen(true); } }}>
@@ -852,6 +894,45 @@ export default function Saved() {
               </span>
             </div>
           </div>
+          )}
+          {/* LARGE VIEW (founder 2026-10-23: "design folder large view to
+              have little icons of what's in each folder, maybe?") — the
+              tile shape, each wearing its contents' section icons. */}
+          {foldOpen('folders') && view === 'cards' && (
+          <div className="drive__folder-grid">
+            {folderShelf.map((c) => (
+              <div key={c.id} className="drive__folder" role="button" tabIndex={0}
+                onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
+                <span className="drive__folder-top">
+                  <span className="drive__folder-ic"><Icon name={folderIcon(c)} size={17} /></span>
+                  {folderActs(c)}
+                </span>
+                <span className="drive__folder-body" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
+                  {folderNameEl(c, 'drive__folder-name')}
+                  <span className="drive__folder-meta">
+                    {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
+                    {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
+                    {c.is_public ? ' · Published' : ''}
+                  </span>
+                  <AreaSet areas={folderAreas.get(c.id) ?? []} size={13} />
+                </span>
+              </div>
+            ))}
+            <div className="drive__folder drive__folder--new" role="button" tabIndex={0}
+              onClick={() => { setNewKind('collection'); setNewFolderOpen(true); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setNewKind('collection'); setNewFolderOpen(true); } }}>
+              <span className="drive__folder-top">
+                <span className="drive__folder-ic"><Icon name="plus" size={16} /></span>
+              </span>
+              <span className="drive__folder-body">
+                <span className="drive__folder-name">New folder</span>
+                <span className="drive__folder-meta">private until you publish it</span>
+              </span>
+            </div>
+          </div>
+          )}
+          {foldOpen('folders') && (<>
           {folderNote && <p className="drive__none">{folderNote}</p>}
           {!query && foldersVisible.length > 8 && (
             <button className="drive__folders-all" onClick={() => setFolderAll((v) => !v)}>
@@ -901,6 +982,7 @@ export default function Saved() {
                   <span className="drive__row-title">{draftLabel(d.draft)}</span>
                   <span className="drive__row-meta">Draft · saved {shortDate(d.updated_at)}</span>
                 </span>
+                <AreaSet areas={dAreas} />
                 <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="drive__draft-del"
@@ -1030,16 +1112,11 @@ export default function Saved() {
         </section>
       )}
 
-      {/* ── ITEMS — compact rows by default, the old cards a tap away. ── */}
+      {/* ── ITEMS — compact rows in list view, full cards in large view;
+          the one toggle for all of it lives at the top now. ── */}
       {me && ready && posts.length > 0 && (
         <div className="drive__items-head">
           {foldHead('items', 'Items', visible.length)}
-          <span className="drive__viewtoggle" role="group" aria-label="Item view">
-            <button className={view === 'rows' ? 'is-on' : ''} aria-label="Rows" title="Rows"
-              onClick={() => pickView('rows')}><Icon name="queue" size={14} /></button>
-            <button className={view === 'cards' ? 'is-on' : ''} aria-label="Cards" title="Cards"
-              onClick={() => pickView('cards')}><Icon name="grip" size={14} /></button>
-          </span>
         </div>
       )}
 

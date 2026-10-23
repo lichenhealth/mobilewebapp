@@ -69,7 +69,10 @@
   background: var(--bone-deep); border-radius: var(--r-full); padding: 1px 7px;
 }
 
-/* ── Folders: the cabinets. Two abreast on phones, auto-fill wider. ── */
+/* ── Folders, LARGE VIEW (founder 2026-10-23: "design folder large view to
+   have little icons of what's in each folder") — the tile shape, back from
+   its 10-21 retirement for the top toggle's large mode. Two abreast on
+   phones, auto-fill wider. ── */
 .drive__folders { padding: 2px var(--s-5) 0; margin-bottom: var(--s-4); }
 .drive__folder-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
@@ -77,19 +80,30 @@
 @media (min-width: 700px) {
   .drive__folder-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 }
+/* STACKED tile — icon + ⋯ on top, then name / meta / content icons. A
+   row-shaped tile squeezed the name to a few letters beside four icons on a
+   two-abreast phone grid; stacking gives the name the tile's full width. */
 .drive__folder {
-  display: flex; align-items: center; gap: 9px; min-width: 0;
-  padding: 9px 11px; background: var(--bone-warm);
+  display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+  min-width: 0; padding: 11px; background: var(--bone-warm);
   border: 1px solid var(--bone-edge); border-radius: 12px;
   font: inherit; text-align: left; cursor: pointer; color: var(--ink);
 }
+.drive__folder-top { display: flex; align-items: center; justify-content: space-between; }
+/* The tile's name may take two lines; the content icons sit under the meta. */
+.drive__folder .drive__folder-name {
+  white-space: normal; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.drive__folder .drive__row-areaset { margin-top: 4px; gap: 6px; }
+.drive__folder .drive__row-more { width: 26px; height: 26px; }
 .drive__folder:hover { border-color: var(--peach); }
 .drive__folder-ic {
   flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px;
   background: var(--bone); color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
 }
-.drive__folder-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.drive__folder-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .drive__folder-name {
   font-size: 13.5px; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -205,7 +219,11 @@
    carries the side padding — flush strips the base list inset. */
 .drive__list--flush { padding: 0; }
 .drive__row--new .drive__row-icon { border-style: dashed; }
-/* Several section icons lined up at the row's right edge. */
+/* EVERY row's section icons, lined up PEACH at the right edge (founder
+   2026-10-21 "icons for the section to the right of the text", widened
+   2026-10-23 to all row kinds and all of a row's sections: "have the little
+   black trail off dots for the text end earlier so you can fit multiple
+   icons") — flex-shrink: 0 here is what makes the title's ellipsis yield. */
 .drive__row-areaset {
   flex-shrink: 0; display: inline-flex; gap: 7px; color: var(--peach-deep);
 }
@@ -234,7 +252,8 @@
 .drive__folders .drive__items-head,
 .drive__drafts .drive__items-head { padding: 0; margin-bottom: 6px; }
 
-/* The section's icon rides the row's right edge (founder 2026-10-21:
-   "icons for the section to the right of the text … not the word spelled
-   out") — the brain convo rows' grammar. */
-.drive__row-area { flex-shrink: 0; display: inline-flex; color: var(--peach-deep); }
+/* The ONE view toggle, at the top beside the All/Saved/Created lenses
+   (founder 2026-10-23: "shouldn't the menu that shows view as either list
+   or post be at the top and dictate how you see all of them?"). */
+.drive__lensrow { display: flex; align-items: center; gap: 8px; padding-right: var(--s-5); }
+.drive__lensrow .filter-row { flex: 1; min-width: 0; }
