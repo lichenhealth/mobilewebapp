@@ -58,7 +58,9 @@ const MODES: { chip: Chip; label: string; icon: IconName }[] = [
   { chip: 'gift',       label: 'Gift',        icon: 'gift' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
   { chip: 'rent',       label: 'Rent',        icon: 'rent' },
-  { chip: 'lend',       label: 'Lending',     icon: 'lend' },
+  // "Lend", not "Lending" (founder 2026-10-23: "so that words are shorter"
+  // — the lens still covers lend AND borrow, the 2026-08-13 one-coin merge).
+  { chip: 'lend',       label: 'Lend',        icon: 'lend' },
   { chip: 'sale',       label: 'For Sale',    icon: 'dollar' },
   { chip: 'iso',        label: 'ISO',         icon: 'search' },
 ];
@@ -401,27 +403,32 @@ export default function Marketplace() {
             Compose's modes — the + is the one composing door. */}
       </ScrollHintRow>
 
-      {/* The lens band, on its own line: the doors were eating half a phone's
-          width, and a word is wider than a circle — sharing one row left a
-          single lens visible before the chevron. Own line, full width, ~5
-          visible. */}
-      <ScrollHintRow className="mkt__lensrow h-scroll" role="toolbar" ariaLabel="Modes of exchange" gutter fade>
+      {/* The lens band — ICON CIRCLES now, Home's and Maps' grammar (founder
+          2026-10-23, superseding her stacked icon-over-word ask of the same
+          hour: "since we have the circle icons that go to two rows, versus
+          force a scroll, can marketplace be the same. Can we just hover over
+          the icon and it will say the word associated? That way, we have
+          consistency visually and people will learn what the icons represent
+          by hovering, so we have fewer words on the platform over time"):
+          multi-select circles that WRAP instead of scrolling, lit peach when
+          on, the word riding title/aria for hover and screen readers. */}
+      <div className="mkt__lensrow" role="toolbar" aria-label="Modes of exchange">
         {MODES.map((m) => {
           const on = activeChips.includes(m.chip);
           return (
             <button
               key={m.chip}
-              className={'mkt__lens' + (on ? ' is-on' : '')}
+              className={'mkt__action' + (on ? ' is-active' : '')}
               onClick={() => toggleChip(m.chip)}
               aria-pressed={on}
-              title={on ? `Showing ${m.label.toLowerCase()} — tap to hide` : `Tap to show ${m.label.toLowerCase()}`}
+              aria-label={m.label}
+              title={on ? `${m.label} — showing; tap to hide` : `${m.label} — tap to show`}
             >
-              <Icon name={m.icon} size={16} />
-              {m.label}{on ? ' ✓' : ''}
+              <span className="mkt__action-circle"><Icon name={m.icon} size={15} /></span>
             </button>
           );
         })}
-      </ScrollHintRow>
+      </div>
 
       {showSearch && (
         <Suspense fallback={<p className="mkt__empty-sub">Loading search…</p>}>
