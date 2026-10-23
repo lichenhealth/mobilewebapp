@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
-import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
+import EngagementFooter, { SignalChips, MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import { LinkifiedText, CarePreview } from './CarePostCard';
 import { WeaveMark } from './WeaveMark';
 import VideoPlayer from './VideoPlayer';
@@ -376,6 +376,10 @@ export default function FeedCard({
                 ) : eyebrow}
               </span>
             )}
+            {/* THE SIGNALS SIT BESIDE THE NAME (founder 2026-10-23, moving
+                them up from the footer's lower-left): light peach when your
+                network has engaged, hover/tap a lit chip to see WHO. */}
+            <SignalChips mycelium={mycelium} />
           </div>
           {trustLine && !authorIsSpace && (
             <span className="feed-card__trustline">
@@ -614,7 +618,6 @@ export default function FeedCard({
           2026-10-12 IA): Recommend · Share · Save · Chat, all real. */}
       <div className="feed-card__engwrap">
         <EngagementFooter
-          mycelium={mycelium}
           trusted={trusted}
           recommended={recommended}
           saved={saved}
