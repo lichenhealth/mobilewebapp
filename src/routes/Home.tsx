@@ -205,20 +205,6 @@ export default function Home() {
             return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
           return it;
         })}
-        // The full rooms stay one tap away while filtering (the lenses used
-        // to BE the doors — never strand someone outside Marketplace). They
-        // ride the TOOLS row since 2026-10-15 (founder markup: below the
-        // filter band "it looks weird having the cta down there, maybe up by
-        // the search and plus bars" — same placement at every width).
-        trailing={areaSel.size > 0 && (
-          <span className="lensdoors lensdoors--tools">
-            {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
-              <button key={l.area} className="lensdoor" onClick={() => navigate(l.room)}>
-                <span className="link-cue">Open {l.label}</span> ›
-              </button>
-            ))}
-          </span>
-        )}
       />
       {/* Feed = ALL; the sections light as multi-select lenses on the river
           (founder 2026-10-12). Members stays a DOOR — people aren't posts,
@@ -229,9 +215,15 @@ export default function Home() {
         items={[
           { icon: 'newsfeed', label: 'Feed',
             variant: areaSel.size === 0 ? 'icon-row__btn--here' : undefined },
+          // A LIT lens grows its › door tab (founder 2026-10-23, replacing
+          // the stacked "Open «Section» ›" text — filter on the circle, walk
+          // in on the tab; the never-strand rule, now worn by the lens itself).
           ...FEED_LENSES.map((l) => ({
             icon: l.icon, label: l.label,
             variant: areaSel.has(l.area) ? 'icon-row__btn--here' : undefined,
+            door: areaSel.has(l.area)
+              ? { label: `Open ${l.label}`, onClick: () => navigate(l.room) }
+              : undefined,
           })),
           { icon: 'member-heart', label: 'Members', to: '/directory' },
         ]}

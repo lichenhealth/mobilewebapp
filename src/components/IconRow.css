@@ -86,15 +86,36 @@
 }
 .icon-row--lenses.h-scroll { padding-top: 16px; }
 
-/* THE WAY INTO THE FULL ROOMS while lenses filter the feed (founder
-   2026-10-12 — the lenses used to BE the doors; never strand someone
-   outside Marketplace). Since 2026-10-15 they ride the TOOLS ROW's open
-   right side (founder markup: below the filter band the CTA "looks weird…
-   maybe up by the search and plus bars" — same placement at every width),
-   as one wrapping flex item beside the brain. */
-.lensdoors { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 2px 0 6px; }
-.lensdoors--tools { margin: 0 0 0 12px; align-items: center; min-height: 34px; }
-.lensdoor {
-  background: none; border: none; padding: 0; cursor: pointer;
-  font-family: inherit; font-size: 13.5px; color: var(--ink);
+/* THE DOOR RIDES THE LIT LENS (founder 2026-10-23, retiring the 2026-10-15
+   tools-row "Open «Section» ›" text doors as "clunky" stacking — the way
+   into the full rooms stays one tap away, the 2026-10-12 never-strand rule):
+   a lit lens circle grows a small peach-deep › tab hugging its right edge —
+   circle toggles the filter, the tab walks into the section. It only exists
+   while the lens is lit, so it teaches itself right where the finger just
+   was. */
+.icon-row__lenswrap {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
 }
+.icon-row__door {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 22px;
+  margin-left: -4px;      /* tucks under the circle's edge — attached, not adrift */
+  padding: 0;
+  border: 0;
+  border-radius: 0 9px 9px 0;
+  cursor: pointer;
+  background: var(--peach-deep);
+  color: var(--bone-warm);
+}
+.icon-row__door:hover { background: var(--peach); }
+/* The tab draws small but taps big — an invisible halo widens the target
+   past the 15px visual, phone-thumb territory. */
+.icon-row__door { position: relative; }
+.icon-row__door::before { content: ''; position: absolute; inset: -8px -10px -8px 0; }
+.icon-row__lenswrap .icon-row__btn { position: relative; z-index: 1; }
