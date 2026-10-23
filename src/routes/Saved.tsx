@@ -384,13 +384,25 @@ export default function Saved() {
     t: string; key: string; icon: IconName; photo?: string | null;
     title: string; meta: string; areas?: string[]; go: () => void;
   };
+  /** A folder's right-edge section icons: the union of what's inside — or,
+   *  for a COURSE folder with nothing in it yet, the courses mark itself
+   *  (founder 2026-10-23: "Even if the course doesn't have a photo, still do
+   *  the peach grad hat on the right for consistency"). A plain empty
+   *  collection stays bare — it has no section identity to claim. */
+  function folderAreaList(c: CollectionRow): string[] {
+    const got = folderAreas.get(c.id) ?? [];
+    if (got.length) return got;
+    if (c.kind === 'course' || (c.details as { forCourse?: string }).forCourse) return ['courses'];
+    return [];
+  }
+
   const recents = useMemo<RecentRow[]>(() => {
     const rows: RecentRow[] = [];
     for (const c of foldersVisible) rows.push({
       t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
       title: c.name,
       meta: `Folder · ${c.item_count === 1 ? '1 item' : `${c.item_count} items`}`,
-      areas: folderAreas.get(c.id) ?? [],
+      areas: folderAreaList(c),
       go: () => navigate(`/collections/${c.id}`),
     });
     for (const p of visible) {
@@ -880,7 +892,7 @@ export default function Saved() {
                     {c.is_public ? ' · Published' : ' · Private'}
                   </span>
                 </span>
-                <AreaSet areas={folderAreas.get(c.id) ?? []} />
+                <AreaSet areas={folderAreaList(c)} />
                 {folderActs(c)}
               </div>
             ))}
@@ -915,7 +927,7 @@ export default function Saved() {
                     {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
                     {c.is_public ? ' · Published' : ''}
                   </span>
-                  <AreaSet areas={folderAreas.get(c.id) ?? []} size={13} />
+                  <AreaSet areas={folderAreaList(c)} size={13} />
                 </span>
               </div>
             ))}

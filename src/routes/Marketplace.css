@@ -187,18 +187,19 @@
   padding-bottom: 10px;
   border-bottom: 1px solid var(--bone-edge);
 }
-.mkt__lensrow.h-scroll {
+/* ICON CIRCLES + WRAPPING since 2026-10-23 (founder, superseding her
+   icon-over-word ask of the same hour: "since we have the circle icons that
+   go to two rows, versus force a scroll, can marketplace be the same …
+   hover over the icon and it will say the word") — Home's lens-grid shape,
+   Maps' circles-are-lenses exception extended here. No scroll, no chevron,
+   every lens always visible; the word lives in title/aria. */
+.mkt__lensrow {
   display: flex;
   align-items: center;
-  /* Tight: a word takes more width than a circle did, so every pixel of gap
-     is one fewer lens visible before the chevron (founder 2026-08-13: fill
-     the space — five lenses should sit before the scroll on a phone). */
-  gap: 6px;
-  padding: 14px 0 var(--s-2);   /* side gutters live on the ScrollHintRow wrapper */
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px var(--s-5) var(--s-2);
 }
-.mkt__lensrow::-webkit-scrollbar { display: none; }
 .mkt__lens {
   flex: 0 0 auto;
   display: inline-flex;
@@ -217,6 +218,9 @@
 .mkt__lens svg { width: 16px; height: 16px; }
 .mkt__lens:hover { color: var(--ink); }
 .mkt__lens.is-on { color: var(--peach-deep); }
+/* (.mkt__lens itself survives for AreaFeed's inline media/travel lenses,
+   which share a row with the door circles — the founder's circle-lens call
+   was for Marketplace's mode band; extend it there only on her word.) */
 .mkt__action:hover { transform: translateY(-1px); }
 .mkt__action:active { transform: scale(0.96); }
 
