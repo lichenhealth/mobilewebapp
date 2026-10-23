@@ -19,6 +19,14 @@ export interface IconRowItem {
    *  2026-10-12 — every door still one size, founder 2026-08-08), so reach
    *  for this only with a real reason. */
   size?: number;
+  /** THE DOOR RIDES THE LIT LENS (founder 2026-10-23, replacing the stacked
+   *  "Open «Section» ›" text doors: "it gets clunky to have open
+   *  marketplace, open travel, etc, get added on each time I select a
+   *  filter"; on the proposal, "yes, let's deploy the tab — will it have a
+   *  little arrow in it?"): a small peach › tab attached to the circle's
+   *  right edge. Tap the circle = toggle the filter; tap the tab = walk into
+   *  the section. Pass it only while the lens is lit. */
+  door?: { label: string; onClick: () => void };
 }
 
 interface IconRowProps {
@@ -29,9 +37,9 @@ interface IconRowProps {
    *  UI), and each needs its own spacing. */
   className?: string;
   ariaLabel?: string;
-  /** Rendered after the circles, on the same line (wrapping with the row) —
-   *  the lit lenses' "Open «Section» ›" doors ride the TOOLS row here
-   *  (founder 2026-10-15 markup: "maybe up by the search and plus bars"). */
+  /** Rendered after the circles, on the same line (wrapping with the row).
+   *  Its original tenant — the stacked "Open «Section» ›" doors — retired
+   *  2026-10-23 for the per-lens door tab below; the slot stays generic. */
   trailing?: ReactNode;
 }
 
@@ -39,14 +47,14 @@ export default function IconRow({ items, onSelect, className, ariaLabel, trailin
   const navigate = useNavigate();
   return (
     <ScrollHintRow className={'icon-row h-scroll' + (className ? ' ' + className : '')} role="toolbar" ariaLabel={ariaLabel ?? 'Categories'} gutter>
-      {items.flatMap(({ icon, label, to, divider, variant, size }, i) => {
+      {items.flatMap(({ icon, label, to, divider, variant, size, door }, i) => {
         const nodes = [];
         if (divider && i > 0) {
           nodes.push(<span key={`${label}-div`} className="icon-row__divider" aria-hidden="true" />);
         }
-        nodes.push(
+        const circle = (
           <button
-            key={label}
+            key={door ? undefined : label}
             className={'icon-row__btn' + (variant ? ' ' + variant : '')}
             onClick={() => {
               if (to) navigate(to);
@@ -58,6 +66,19 @@ export default function IconRow({ items, onSelect, className, ariaLabel, trailin
             <Icon name={icon} size={size ?? 16} />
           </button>
         );
+        nodes.push(door ? (
+          <span key={label} className="icon-row__lenswrap">
+            {circle}
+            <button
+              className="icon-row__door"
+              onClick={door.onClick}
+              aria-label={door.label}
+              title={door.label}
+            >
+              <Icon name="chevron-right" size={11} />
+            </button>
+          </span>
+        ) : circle);
         return nodes;
       })}
       {trailing}

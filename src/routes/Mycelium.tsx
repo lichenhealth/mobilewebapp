@@ -184,19 +184,6 @@ export default function Mycelium() {
             return { ...it, to: `/compose?area=${[...areaSel].join(',')}` };
           return it;
         })}
-        // The full rooms stay one tap away — inside your web (?web=1). The
-        // doors ride the TOOLS row since 2026-10-15 (founder markup: the CTA
-        // below the filter band "looks weird... maybe up by the search and
-        // plus bars" — same placement at every width).
-        trailing={areaSel.size > 0 && (
-          <span className="lensdoors lensdoors--tools">
-            {FEED_LENSES.filter((l) => areaSel.has(l.area)).map((l) => (
-              <button key={l.area} className="lensdoor" onClick={() => navigate(`${l.room}?web=1`)}>
-                <span className="link-cue">Open {l.label}</span> ›
-              </button>
-            ))}
-          </span>
-        )}
       />
       <IconRow
         className="icon-row--lenses"
@@ -204,9 +191,14 @@ export default function Mycelium() {
         items={[
           { icon: 'newsfeed', label: 'Feed',
             variant: areaSel.size === 0 ? 'icon-row__btn--here' : undefined },
+          // A LIT lens grows its › door tab (founder 2026-10-23, Home's
+          // grammar) — here it walks into the section INSIDE your web (?web=1).
           ...FEED_LENSES.map((l) => ({
             icon: l.icon, label: l.label,
             variant: areaSel.has(l.area) ? 'icon-row__btn--here' : undefined,
+            door: areaSel.has(l.area)
+              ? { label: `Open ${l.label}`, onClick: () => navigate(`${l.room}?web=1`) }
+              : undefined,
           })),
           { icon: 'member-heart', label: 'Members', to: '/mycelium/directory' },
         ]}
