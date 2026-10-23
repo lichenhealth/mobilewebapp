@@ -117,6 +117,13 @@ export function SignalChips({ mycelium }: { mycelium?: MyceliumSignals }) {
 }
 
 interface Props {
+  /** THE POST PAGE'S SIGNALS SIT AT THE BOTTOM (founder 2026-10-23, second
+   *  pass on the same day's header move: on the expanded post "the trust and
+   *  recommend architecture should be at the bottom, so you hover there and
+   *  it does the drop down") — pass the signals here and the footer leads
+   *  with the chips + a divider, home's old balanced shape. Stream cards
+   *  keep their chips beside the name and leave this out. */
+  signals?: MyceliumSignals;
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
@@ -143,6 +150,7 @@ interface Props {
  *  (founder; see SignalChips above) — the old left slot and its divider are
  *  gone. Unavailable actions show lighter-gray and can't be tapped. */
 export default function EngagementFooter({
+  signals,
   trusted, recommended, saved,
   availability,
   onTrust, onRecommend, onShare, onSave, onChat,
@@ -186,8 +194,17 @@ export default function EngagementFooter({
   return (
     <div className="engage">
       <div className="engage__row">
-        {/* The signals LEFT this bar 2026-10-23 — they live beside the
-            author's name now (SignalChips above). Actions only here. */}
+        {/* On stream cards the signals live beside the author's name; the
+            EXPANDED post page passes them back down here (founder 2026-10-23)
+            — same chips, same hover drop-down, home's balanced bar shape. */}
+        {signals !== undefined && (
+          <>
+            <div className="engage__signals-slot">
+              <SignalChips mycelium={signals} />
+            </div>
+            <div className="engage__divider" aria-hidden="true" />
+          </>
+        )}
         <div className="engage__actions">
           {/* NO TRUST BUTTON HERE — and none in the card header anymore
               either (founder 2026-10-12 retired the shield by the name; the

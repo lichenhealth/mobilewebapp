@@ -67,6 +67,22 @@
 }
 .sigchips__pop .engage__panel-label { display: block; }
 
+/* The expanded post page's signals lead the bar (founder 2026-10-23: "the
+   trust and recommend architecture should be at the bottom" on the post's
+   own page) — chips left, a full-height divider, then the actions: home's
+   balanced shape. Stream cards skip this slot. */
+.engage__signals-slot {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+.engage__divider {
+  width: 1px;
+  background: var(--bone-edge);
+  flex-shrink: 0;
+}
+
 /* RIGHT: actions */
 .engage__actions {
   display: flex;

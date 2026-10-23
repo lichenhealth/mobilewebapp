@@ -247,10 +247,17 @@
   color: var(--ink-soft);
   transition: all var(--d-fast) var(--ease-out);
 }
+/* LIT IS LIGHT PEACH, NEVER OPAQUE (founder 2026-10-23: "the icons are
+   still selected opaque orange, when the peach should be ~40% filled, or
+   whatever light peach selection percentage we use across the platform") —
+   the same tint + ring + peach-deep glyph as Home's lit lenses
+   (icon-row__btn--here), so a selected circle reads one way everywhere.
+   Maps' layer circles keep their founder-chosen dark-orange fill (2026-10-06
+   "dark orange") — her explicit call, not this rule's to override. */
 .mkt__action.is-active .mkt__action-circle {
-  background: var(--peach);
+  background: var(--peach-tint);
   border-color: var(--peach);
-  color: var(--bone-warm);
+  color: var(--peach-deep);
 }
 
 .mkt__action-label {

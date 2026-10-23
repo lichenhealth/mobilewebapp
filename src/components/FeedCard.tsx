@@ -376,10 +376,12 @@ export default function FeedCard({
                 ) : eyebrow}
               </span>
             )}
-            {/* THE SIGNALS SIT BESIDE THE NAME (founder 2026-10-23, moving
-                them up from the footer's lower-left): light peach when your
-                network has engaged, hover/tap a lit chip to see WHO. */}
-            <SignalChips mycelium={mycelium} />
+            {/* THE SIGNALS SIT BESIDE THE NAME on stream cards (founder
+                2026-10-23): light peach when your network has engaged,
+                hover/tap a lit chip to see WHO. The EXPANDED post page
+                carries them in its footer instead (her second pass, same
+                day) — never both. */}
+            {!expanded && <SignalChips mycelium={mycelium} />}
           </div>
           {trustLine && !authorIsSpace && (
             <span className="feed-card__trustline">
@@ -618,6 +620,7 @@ export default function FeedCard({
           2026-10-12 IA): Recommend · Share · Save · Chat, all real. */}
       <div className="feed-card__engwrap">
         <EngagementFooter
+          signals={expanded ? (mycelium ?? {}) : undefined}
           trusted={trusted}
           recommended={recommended}
           saved={saved}
