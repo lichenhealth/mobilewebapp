@@ -1179,7 +1179,7 @@ export default function Saved() {
               hint: collections.length ? undefined : 'Create your first folder above',
               onClick: () => openPicker(p.id),
             }]}
-            onMessage={me && p.author_id !== me ? () => messageAbout(p) : undefined}
+            onMessage={me ? () => messageAbout(p) : undefined}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
           />

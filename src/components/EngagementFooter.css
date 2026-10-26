@@ -126,11 +126,18 @@
   flex-shrink: 0;
 }
 
-/* RIGHT: actions */
+/* THE ACTIONS HUG LEFT, CLOSE TOGETHER (founder 2026-10-26: "the spacing for
+   the icons is still wonky. Make them closer together and move them left…
+   Putting everything closer together and moving it left should mean that all
+   of those things can fit" — the old flex:1 buttons spread across the whole
+   bar with Chat stranded at the right edge). Each action is content-sized
+   now; free room collects at the bar's right instead of between the words. */
 .engage__actions {
   display: flex;
   flex: 1;
   align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -142,6 +149,7 @@
 @media (max-width: 1023px) {
   .engage__action { gap: 3px; padding: 10px 3px; }
   .engage__actions { gap: 0; }
+  .engage__signals-slot { padding: 0 8px; }
 }
 /* Only a genuinely tight EMBED (narrow columns inside frames) still gives
    way to icons — a floor, not the phone default. */
@@ -153,12 +161,12 @@
 }
 
 .engage__action {
-  flex: 1;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 10px 6px;
+  gap: 4px;
+  padding: 10px 5px;
   background: transparent;
   border: 0;
   font-family: inherit;
@@ -262,12 +270,11 @@
 /* Breathing room for the labeled row on the tightest phones (founder
    2026-09-14: copy back OR icons closer — we keep the copy and let the
    type shrink a step instead of colliding). Below the base rules on
-   purpose (the same-file ordering doctrine). */
+   purpose (the same-file ordering doctrine). The old space-between here is
+   RETIRED (founder 2026-10-26: "Make them closer together and move them
+   left") — the base left-hug rules govern at every width now; this query
+   only steps the type down so the fuller rows still fit. */
 @container (max-width: 429px) {
-  /* flex:1 hands every button an EQUAL box, and "Recommend"'s content is
-     wider than a quarter of a tight row — its nowrap text spilled into the
-     next button's icon. Content-sized buttons spread evenly instead. */
-  .engage__action { flex: 0 1 auto; font-size: 9px; letter-spacing: -0.01em; }
-  .engage__actions { justify-content: space-between; gap: 2px; }
+  .engage__action { font-size: 9px; letter-spacing: -0.01em; }
   .engage__action svg { width: 12px; height: 12px; }
 }

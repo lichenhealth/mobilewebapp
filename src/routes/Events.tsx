@@ -225,7 +225,7 @@ export default function Events() {
       viewerIsAuthor={p.author_id === me}
       onManage={() => navigate(`/events/${p.id}`)}
       onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-      onMessage={p.author_id !== me ? () => messageAbout(p) : undefined}
+      onMessage={me ? () => messageAbout(p) : undefined}
     />
   );
 

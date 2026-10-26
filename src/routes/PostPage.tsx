@@ -7,7 +7,7 @@ import FeedCard from '../components/FeedCard';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { useAuth } from '../auth/AuthProvider';
 import { loadTrustWeb, loadTrustEdgesFor, trustPathTo, namesFor } from '../lib/trustPath';
-import { ensureDirectChat } from '../lib/chatApi';
+import { chatPathForPost } from '../lib/chatApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { listBudgetPostIds, addBudgetPost, removeBudgetPost } from '../lib/budgetApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -271,8 +271,8 @@ export default function PostPage() {
         onEdit={() => navigate(`/compose?post=${p.id}`)}
         onDelete={() => { void deletePost(p.id).then(back).catch(console.error); }}
         onHide={me ? () => { void setHidden(p.id, true).then(back).catch(console.error); } : undefined}
-        onMessage={me && p.author_id !== me ? async () => {
-          try { navigate(`/chat/${await ensureDirectChat(p.author_id)}?about=${p.id}`); } catch (e) { console.error(e); }
+        onMessage={me ? async () => {
+          try { navigate(await chatPathForPost(p)); } catch (e) { console.error(e); }
         } : undefined}
         onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
       />
@@ -346,8 +346,8 @@ export default function PostPage() {
               saved={mySaves.has('post:' + rp.id)}
               onSave={(on) => { void setSaved('post', rp.id, on).then(() => { if (on) promptSaved(rp.id); }).catch(console.error); }}
               viewerIsAuthor={rp.author_id === me}
-              onMessage={me && rp.author_id !== me ? async () => {
-                try { navigate(`/chat/${await ensureDirectChat(rp.author_id)}?about=${rp.id}`); } catch (e) { console.error(e); }
+              onMessage={me ? async () => {
+                try { navigate(await chatPathForPost(rp)); } catch (e) { console.error(e); }
               } : undefined}
               onOpen={() => navigate(postOpenPath(rp))}
               onAuthor={() => navigate(rp.author_space_id ? `/spaces/${rp.author_space_id}` : `/members/${rp.author_id}`)}

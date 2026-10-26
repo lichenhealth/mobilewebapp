@@ -325,7 +325,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
             onDelete={interactive && !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={interactive && me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onMessage={interactive && me && p.author_id !== me ? () => messageAbout(p) : undefined}
+            onMessage={interactive && me ? () => messageAbout(p) : undefined}
           />
         ))}
       </div>}

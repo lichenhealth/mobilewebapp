@@ -195,8 +195,11 @@ export function chatTitle(
     return 'Lichen Help';
   }
   if (kind === 'direct') {
-    const other = members.find((m) => m.profile_id !== me) ?? members[0];
-    return other?.name ?? 'Direct message';
+    const other = members.find((m) => m.profile_id !== me);
+    // Nobody but you = the SELF TEXT (founder 2026-10-26) — name the act,
+    // not the person, or the row reads like a stranger wearing your name.
+    if (!other) return members.length ? 'Note to self' : 'Direct message';
+    return other.name ?? 'Direct message';
   }
   if ((kind === 'space_dm' || kind === 'suggestion') && party) {
     // The visitor sees the SPACE; the space's admins see the visitor.
@@ -341,14 +344,28 @@ export async function ensureSuggestionChat(spaceId: string): Promise<string> {
  *  admin who wrote it; a personal post opens the DM. Returns the /chat path
  *  with the post pinned (?about=). */
 export async function chatPathForPost(post: { id: string; author_id: string; author_space_id?: string | null }): Promise<string> {
-  const chatId = post.author_space_id
-    ? await ensureSpaceChat(post.author_space_id, post.author_id)
-    : await ensureDirectChat(post.author_id);
+  // YOUR OWN POST opens the SELF TEXT (founder 2026-10-26: "I get why you
+  // can't chat with yourself, but maybe you should be able to text yourself
+  // things") — the post rides along as ?about= like any other chat door.
+  const { data: { user } } = await supabase.auth.getUser();
+  const me = user?.id;
+  let chatId: string;
+  if (post.author_id === me) chatId = await ensureSelfChat();
+  else if (post.author_space_id) chatId = await ensureSpaceChat(post.author_space_id, post.author_id);
+  else chatId = await ensureDirectChat(post.author_id);
   return `/chat/${chatId}?about=${post.id}`;
 }
 
 export async function ensureDirectChat(otherId: string): Promise<string> {
   const { data, error } = await supabase.rpc('ensure_direct_chat', { p_other: otherId });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Find-or-create the member's own notes-to-self thread (founder 2026-10-26
+ *  — "text yourself things"); kind 'direct', direct_key `me:me`, one seat. */
+export async function ensureSelfChat(): Promise<string> {
+  const { data, error } = await supabase.rpc('ensure_self_chat');
   if (error) throw error;
   return data as string;
 }
