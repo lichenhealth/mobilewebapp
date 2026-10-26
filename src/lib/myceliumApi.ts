@@ -113,6 +113,32 @@ export async function setVouch(type: TargetType, id: string, on: boolean): Promi
 /** The feed cards' shield = vouch the author (trust implies adding). */
 export const setTrust = setVouch;
 
+/** TRUST FOLLOWS THE POSTER (founder 2026-10-26: "the trust is simply always
+ *  the trust of the poster, so the person, organization, place, community,
+ *  group" + "Yes, I like the ability to trust an org. You can take that
+ *  trust away, too"): a card's shield targets the DISPLAYED author — the
+ *  SPACE when the post speaks in its voice, else the person — the same
+ *  entity feedMapping's `weaveTarget` resolves. Superseded: the 2026-08-07
+ *  person-only trust target (the `mycelium_no_space_trust` CHECK dropped in
+ *  migration 20261026190000; `mycelium_space_cannot_vouch` STANDS — a space
+ *  still holds no trust of its own). */
+export function posterTrustKey(
+  p: { author_id: string; author_space_id?: string | null },
+): string {
+  return p.author_space_id ? `space:${p.author_space_id}` : `profile:${p.author_id}`;
+}
+
+/** Vouch (or withdraw) the viewer's trust of a post's poster — person or
+ *  space. The one write every card surface's onTrust routes through. */
+export function trustPostPoster(
+  p: { author_id: string; author_space_id?: string | null },
+  on: boolean,
+): Promise<void> {
+  return p.author_space_id
+    ? setVouch('space', p.author_space_id, on)
+    : setVouch('profile', p.author_id, on);
+}
+
 /** Everything the current user recommends, as `${type}:${id}` keys (same
  *  polymorphic shape as trust — posts, profiles, and spaces alike). */
 /** Keys are 'type:id' for a whole target, and 'type:id#category' for a
@@ -201,12 +227,15 @@ async function myFellowSpaceMembers(me: string): Promise<Set<string>> {
  * trust the post content or creator"). Never a count — relevance over volume.
  *
  * Two networks, deliberately different (the trust-privacy boundary):
- * - TRUSTED = people in YOUR WEB (mycelium membership) who vouch the author.
- *   Trust is a private person-to-person signal, so it surfaces only through
- *   people you yourself chose to weave in — never bare group-mates. Read via
- *   `trust_edges_for_targets()` (SECURITY DEFINER, scoped to the authors in
- *   view): mycelium's SELECT RLS is own-rows-only, so the old direct client
- *   read silently returned nothing — the shield could never light.
+ * - TRUSTED = people in YOUR WEB (mycelium membership) who vouch the POSTER —
+ *   the person, or since 2026-10-26 the SPACE a post speaks for (founder:
+ *   "I like the ability to trust an org… The trust is simply always the
+ *   trust of the poster"). Trust is a private signal held by PEOPLE, so it
+ *   surfaces only through people you yourself chose to weave in — never bare
+ *   group-mates. Read via `trust_edges_for_targets()` (SECURITY DEFINER,
+ *   scoped to the targets in view): mycelium's SELECT RLS is own-rows-only,
+ *   so the old direct client read silently returned nothing — the shield
+ *   could never light.
  * - RECOMMENDED = your web PLUS fellow members of your spaces who recommend
  *   the post or its creator. Recommendations are the public amplify signal,
  *   so the wider network is safe there.
@@ -216,7 +245,7 @@ async function myFellowSpaceMembers(me: string): Promise<Set<string>> {
  * Returns a map of post id → signals (only posts with at least one endorser).
  */
 export async function loadEndorsements(
-  posts: { id: string; author_id: string }[],
+  posts: { id: string; author_id: string; author_space_id?: string | null }[],
   myWeb: MyWeb,
 ): Promise<Record<string, MyceliumSignals>> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -232,38 +261,55 @@ export async function loadEndorsements(
   recNetwork.delete(me);
   if (recNetwork.size === 0 && webProfiles.size === 0) return {};
 
-  const authorIds = [...new Set(posts.map((p) => p.author_id))];
   const postIds = posts.map((p) => p.id);
   const authorOf = new Map(posts.map((p) => [p.id, p.author_id]));
+  // BOTH second-group signals follow the displayed POSTER: the space when the
+  // post speaks in its voice, else the person (founder 2026-10-26 — orgs are
+  // trustable, and their recs are first-class).
+  const posterKeyOf = posterTrustKey;
+  const personPosterIds = [...new Set(posts.filter((p) => !p.author_space_id).map((p) => p.author_id))];
+  const spacePosterIds = [...new Set(posts.flatMap((p) => p.author_space_id ? [p.author_space_id] : []))];
+  const trustTargets = [...new Set(posts.map(posterKeyOf))].map((k) => {
+    const i = k.indexOf(':');
+    return { type: k.slice(0, i), id: k.slice(i + 1) };
+  });
 
-  const [trustRes, postRecRes, authorRecRes] = await Promise.all([
+  type RecRow = { recommender_id: string; target_type: string; target_id: string };
+  const [trustRes, postRecRes, personRecRes, spaceRecRes] = await Promise.all([
     webProfiles.size
-      ? supabase.rpc('trust_edges_for_targets', {
-          p_targets: authorIds.map((id) => ({ type: 'profile', id })),
-        })
+      ? supabase.rpc('trust_edges_for_targets', { p_targets: trustTargets })
       : Promise.resolve({ data: [] }),
     // A recommendation made AS a space is the space's voice, not a person in
     // your network speaking — personal rows only.
-    supabase.from('recommendations').select('recommender_id, target_id')
+    supabase.from('recommendations').select('recommender_id, target_type, target_id')
       .eq('target_type', 'post').in('target_id', postIds)
       .is('recommender_space_id', null),
-    supabase.from('recommendations').select('recommender_id, target_id')
-      .eq('target_type', 'profile').in('target_id', authorIds)
-      .is('recommender_space_id', null),
+    personPosterIds.length
+      ? supabase.from('recommendations').select('recommender_id, target_type, target_id')
+          .eq('target_type', 'profile').in('target_id', personPosterIds)
+          .is('recommender_space_id', null)
+      : Promise.resolve({ data: [] as RecRow[] }),
+    spacePosterIds.length
+      ? supabase.from('recommendations').select('recommender_id, target_type, target_id')
+          .eq('target_type', 'space').in('target_id', spacePosterIds)
+          .is('recommender_space_id', null)
+      : Promise.resolve({ data: [] as RecRow[] }),
   ]);
 
-  const trustRows = ((trustRes.data ?? []) as { target_id: string; truster_id: string }[])
+  const trustRows = ((trustRes.data ?? []) as { target_type: string; target_id: string; truster_id: string }[])
     .filter((r) => webProfiles.has(r.truster_id) && r.truster_id !== r.target_id);
-  const postRecRows = ((postRecRes.data ?? []) as { recommender_id: string; target_id: string }[])
+  const postRecRows = ((postRecRes.data ?? []) as RecRow[])
     .filter((r) => recNetwork.has(r.recommender_id)
       && r.recommender_id !== authorOf.get(r.target_id));
-  const authorRecRows = ((authorRecRes.data ?? []) as { recommender_id: string; target_id: string }[])
-    .filter((r) => recNetwork.has(r.recommender_id) && r.recommender_id !== r.target_id);
+  const posterRecRows = ([
+    ...((personRecRes.data ?? []) as RecRow[]),
+    ...((spaceRecRes.data ?? []) as RecRow[]),
+  ]).filter((r) => recNetwork.has(r.recommender_id) && r.recommender_id !== r.target_id);
 
   const whoIds = [...new Set([
     ...trustRows.map((r) => r.truster_id),
     ...postRecRows.map((r) => r.recommender_id),
-    ...authorRecRows.map((r) => r.recommender_id),
+    ...posterRecRows.map((r) => r.recommender_id),
   ])];
   if (whoIds.length === 0) return {};
   const { data: profs } = await supabase
@@ -279,12 +325,14 @@ export async function loadEndorsements(
     };
   };
 
-  // author → network members who trust that author (all their posts inherit it)
-  const trustByAuthor = new Map<string, Map<string, MyceliumMember>>();
+  // poster (person or space) → network members who trust them — every post in
+  // that voice inherits it.
+  const trustByTarget = new Map<string, Map<string, MyceliumMember>>();
   for (const r of trustRows) {
-    const m = trustByAuthor.get(r.target_id) ?? new Map<string, MyceliumMember>();
+    const k = `${r.target_type}:${r.target_id}`;
+    const m = trustByTarget.get(k) ?? new Map<string, MyceliumMember>();
     m.set(r.truster_id, member(r.truster_id));
-    trustByAuthor.set(r.target_id, m);
+    trustByTarget.set(k, m);
   }
   // post → network members who recommend that specific post
   const recByPost = new Map<string, Map<string, MyceliumMember>>();
@@ -293,17 +341,20 @@ export async function loadEndorsements(
     m.set(r.recommender_id, member(r.recommender_id));
     recByPost.set(r.target_id, m);
   }
-  // author → network members who recommend the CREATOR (their work/offerings)
-  const recByAuthor = new Map<string, Map<string, MyceliumMember>>();
-  for (const r of authorRecRows) {
-    const m = recByAuthor.get(r.target_id) ?? new Map<string, MyceliumMember>();
+  // poster (person or space) → network members who recommend THEM — their
+  // whole body of offerings, not this one post.
+  const recByPoster = new Map<string, Map<string, MyceliumMember>>();
+  for (const r of posterRecRows) {
+    const k = `${r.target_type}:${r.target_id}`;
+    const m = recByPoster.get(k) ?? new Map<string, MyceliumMember>();
     m.set(r.recommender_id, member(r.recommender_id));
-    recByAuthor.set(r.target_id, m);
+    recByPoster.set(k, m);
   }
 
   const out: Record<string, MyceliumSignals> = {};
   for (const p of posts) {
-    const trustedMap = trustByAuthor.get(p.author_id);
+    const posterKey = posterKeyOf(p);
+    const trustedMap = trustByTarget.get(posterKey);
     // RECOMMENDS ARE FIRST FOR THE SPECIFIC POST, then recommends of the
     // person (founder 2026-10-26: "Sarah Smith recommends these shirts…
     // and then after that Melanie Bright recommends Galyn" — a listing with
@@ -315,7 +366,7 @@ export async function loadEndorsements(
       recList.push({ ...m, about: 'post' });
       recSeen.add(id);
     }
-    for (const [id, m] of recByAuthor.get(p.author_id) ?? new Map<string, MyceliumMember>()) {
+    for (const [id, m] of recByPoster.get(posterKey) ?? new Map<string, MyceliumMember>()) {
       if (recSeen.has(id)) continue;
       recList.push({ ...m, about: 'creator' });
       recSeen.add(id);

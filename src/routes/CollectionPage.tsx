@@ -14,7 +14,7 @@ import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { deletePost, loadAuthorFeed, loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { setHidden } from '../lib/hiddenApi';
@@ -1427,12 +1427,12 @@ export default function CollectionPage() {
               key={p.id}
               {...postToCard(p, me || undefined)}
               {...weaveProps(p, myWebSet, me || undefined)}
-              trusted={myMyc.has('profile:' + p.author_id)}
+              trusted={myMyc.has(posterTrustKey(p))}
               recommended={myRecs.has('post:' + p.id)}
               saved={mySaves.has('post:' + p.id)}
               mycelium={overlays[p.id]}
               availability={{ trust: !!me && p.author_id !== me }}
-              onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+              onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
               onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
               onSave={me ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}
               keepMenu

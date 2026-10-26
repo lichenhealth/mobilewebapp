@@ -9,7 +9,7 @@ import InstallPrompt from '../components/InstallPrompt';
 import { loadFeed, loadAuthorFeed, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
@@ -285,11 +285,11 @@ export default function Home() {
             key={p.id}
             {...postToCard(p, user?.id, spaceNames)}
             {...weaveProps(p, myWebSet, user?.id)}
-            trusted={myMyc.has('profile:' + p.author_id)}
+            trusted={myMyc.has(posterTrustKey(p))}
             recommended={myRecs.has('post:' + p.id)}
             mycelium={overlays[p.id]}
             availability={{ trust: p.author_id !== user?.id }}
-            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+            onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}

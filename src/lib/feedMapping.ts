@@ -39,7 +39,9 @@ export function weaveTarget(p: FeedPost): { type: 'profile' | 'space'; id: strin
 }
 
 /** Card props for the 1-click weave mark. Empty for signed-out viewers and
- *  for the viewer's own person-authored posts (you're not in your own web). */
+ *  for the viewer's own person-authored posts (you're not in your own web).
+ *  (Trust follows the same displayed-author rule — `posterTrustKey` /
+ *  `trustPostPoster` in myceliumApi.) */
 export function weaveProps(
   p: FeedPost,
   myWeb: Set<string>,

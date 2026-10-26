@@ -9,7 +9,7 @@ import { chatPathForPost } from '../lib/chatApi';
 import { postAreas, deletePost, loadAuthorFeed, serviceAreaIcon, SERVICE_AREAS, type FeedPost, type ServiceArea } from '../lib/postsApi';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } from '../lib/savedApi';
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
@@ -1157,12 +1157,12 @@ export default function Saved() {
             key={p.id}
             {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
-            trusted={myMyc.has('profile:' + p.author_id)}
+            trusted={myMyc.has(posterTrustKey(p))}
             recommended={myRecs.has('post:' + p.id)}
             saved={!unsaved.has(p.id)}
             mycelium={overlays[p.id]}
             availability={{ trust: !!me && p.author_id !== me }}
-            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+            onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}

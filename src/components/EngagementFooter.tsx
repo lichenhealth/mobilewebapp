@@ -50,17 +50,19 @@ export interface ActionAvailability {
  *  one truth). The recommend list groups POST recs first, then recs of the
  *  poster ("Recommends are first for the specific post, and then we have
  *  recommends of the person" — so a barely-seen post still shows the
- *  creator's network validation). Trust stays person-to-person: a space-
- *  authored post's shield pop says so honestly instead of offering an act. */
+ *  creator's network validation). ORGS ARE TRUSTABLE since 2026-10-26
+ *  (founder: "I like the ability to trust an org. You can take that trust
+ *  away, too") — a space-authored post's shield acts on the SPACE, the same
+ *  gesture as trusting a person; the old person-to-person honest line is
+ *  superseded. */
 export function SignalChips({
-  mycelium, subjectName, subjectIsSpace,
+  mycelium, subjectName,
   myTrust, onTrustAct, myRec, onRecAct,
 }: {
   mycelium?: MyceliumSignals;
-  /** Who posted — e.g. "@galyn" — named in labels and on the trust act. */
+  /** Who posted — e.g. "@galyn" or "@pine-valley-grange" — named in labels
+   *  and on the trust act. */
   subjectName?: string;
-  /** Space-authored: trust is person-to-person, so no trust act offers. */
-  subjectIsSpace?: boolean;
   myTrust?: boolean;
   /** Toggle YOUR trust of the poster (absent = no act button renders). */
   onTrustAct?: () => void;
@@ -144,22 +146,13 @@ export function SignalChips({
         <span className="sigchips__pop" ref={popRef} onClick={(e) => e.stopPropagation()}>
           {hasTrust ? (
             <>
-              {/* On a space-authored post the trust edges belong to the HUMAN
-                  who posted in its voice — say so, never imply a space holds
-                  trust. */}
-              <p className="engage__panel-label">
-                {subjectIsSpace
-                  ? 'In your web, trusting the member who posted this:'
-                  : `In your web, trusting ${subject}:`}
-              </p>
+              <p className="engage__panel-label">In your web, trusting {subject}:</p>
               {memberList(trustedBy)}
             </>
-          ) : !subjectIsSpace ? (
+          ) : (
             <p className="sigchips__note">No one in your web has trusted {subject} yet.</p>
-          ) : null}
-          {subjectIsSpace ? (
-            <p className="sigchips__note">Trust is person-to-person — it lives with the people behind {subject}, on their own profiles.</p>
-          ) : onTrustAct ? (
+          )}
+          {onTrustAct && (
             <button
               type="button"
               className={'sigchips__act' + (myTrust ? ' is-on' : '')}
@@ -167,7 +160,7 @@ export function SignalChips({
             >
               {myTrust ? 'You trust them ✓ — withdraw' : `Trust ${subject}`}
             </button>
-          ) : null}
+          )}
         </span>
       )}
       {openPanel === 'recommend' && (
@@ -207,11 +200,10 @@ interface Props {
    *  since 2026-10-26 (the Figma mock's footer shape): chips bottom-left, a
    *  full-height divider, then the actions. */
   signals?: MyceliumSignals;
-  /** Who posted (e.g. "@galyn") — named by the signal pops and the trust act. */
+  /** Who posted (e.g. "@galyn", "@pine-valley-grange") — named by the signal
+   *  pops and the trust act. Trust follows the poster: person OR space
+   *  (founder 2026-10-26 — orgs are trustable). */
   subjectName?: string;
-  /** The poster is a space — the shield pop explains person-to-person trust
-   *  instead of offering a trust act. */
-  subjectIsSpace?: boolean;
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
@@ -239,7 +231,7 @@ interface Props {
  *  (Recommend, Share, Save, Chat; Budget on the post's own page).
  *  Unavailable actions show lighter-gray and can't be tapped. */
 export default function EngagementFooter({
-  signals, subjectName, subjectIsSpace,
+  signals, subjectName,
   trusted, recommended, saved,
   availability,
   onTrust, onRecommend, onShare, onSave, onChat,
@@ -303,9 +295,8 @@ export default function EngagementFooter({
               <SignalChips
                 mycelium={signals}
                 subjectName={subjectName}
-                subjectIsSpace={subjectIsSpace}
                 myTrust={myTrust}
-                onTrustAct={can.trust && onTrust && !subjectIsSpace ? actTrust : undefined}
+                onTrustAct={can.trust && onTrust ? actTrust : undefined}
                 myRec={myRec}
                 onRecAct={can.recommend && onRecommend ? actRec : undefined}
               />
