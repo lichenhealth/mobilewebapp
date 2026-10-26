@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Icon, IconName } from './Icon';
-import EngagementFooter, { SignalChips, MyceliumSignals, ActionAvailability } from './EngagementFooter';
+import EngagementFooter, { MyceliumSignals, ActionAvailability } from './EngagementFooter';
 import { LinkifiedText, CarePreview } from './CarePostCard';
 import { WeaveMark } from './WeaveMark';
 import VideoPlayer from './VideoPlayer';
@@ -376,12 +376,10 @@ export default function FeedCard({
                 ) : eyebrow}
               </span>
             )}
-            {/* THE SIGNALS SIT BESIDE THE NAME on stream cards (founder
-                2026-10-23): light peach when your network has engaged,
-                hover/tap a lit chip to see WHO. The EXPANDED post page
-                carries them in its footer instead (her second pass, same
-                day) — never both. */}
-            {!expanded && <SignalChips mycelium={mycelium} />}
+            {/* The signal chips moved to the FOOTER's bottom-left on EVERY
+                card (founder 2026-10-26, pointing at Figma 286-19122 — the
+                mock's footer leads with the two bare signal icons + a
+                divider; the 10-23 beside-the-name placement is retired). */}
           </div>
           {trustLine && !authorIsSpace && (
             <span className="feed-card__trustline">
@@ -620,7 +618,7 @@ export default function FeedCard({
           2026-10-12 IA): Recommend · Share · Save · Chat, all real. */}
       <div className="feed-card__engwrap">
         <EngagementFooter
-          signals={expanded ? (mycelium ?? {}) : undefined}
+          signals={mycelium ?? {}}
           trusted={trusted}
           recommended={recommended}
           saved={saved}

@@ -28,13 +28,12 @@ export interface ActionAvailability {
   chat?: boolean;
 }
 
-/** THE SIGNALS LIVE BESIDE THE NAME (founder 2026-10-23, superseding the
- *  2026-10-12 lower-left slot: "move the trust and recommend icons next to
- *  the name of the person" + "light peach when selects, not opaque"):
- *  shield = your web trusts the creator, thumb = your network recommends
- *  this — LIGHT peach (tint) when lit, gray when quiet, hover or tap a lit
- *  chip to see WHO (never how many). Rendered by FeedCard's header; the
- *  footer below is actions only now. */
+/** THE SIGNALS LIVE AT THE FOOTER'S BOTTOM LEFT, on every card (founder
+ *  2026-10-26, pointing at the Figma mock 286-19122 whose footer leads with
+ *  the two bare signal icons + a divider — retiring the 10-23 beside-the-
+ *  name placement after three days): shield = your web trusts the creator,
+ *  thumb = your network recommends this — LIGHT peach (tint) when lit, gray
+ *  when quiet, hover or tap a lit chip to see WHO (never how many). */
 export function SignalChips({ mycelium }: { mycelium?: MyceliumSignals }) {
   const [openPanel, setOpenPanel] = useState<'trust' | 'recommend' | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -117,12 +116,9 @@ export function SignalChips({ mycelium }: { mycelium?: MyceliumSignals }) {
 }
 
 interface Props {
-  /** THE POST PAGE'S SIGNALS SIT AT THE BOTTOM (founder 2026-10-23, second
-   *  pass on the same day's header move: on the expanded post "the trust and
-   *  recommend architecture should be at the bottom, so you hover there and
-   *  it does the drop down") — pass the signals here and the footer leads
-   *  with the chips + a divider, home's old balanced shape. Stream cards
-   *  keep their chips beside the name and leave this out. */
+  /** The network signals (see SignalChips above) — every card passes them
+   *  since 2026-10-26 (the Figma mock's footer shape): chips bottom-left, a
+   *  full-height divider, then the actions. */
   signals?: MyceliumSignals;
   trusted?: boolean;
   recommended?: boolean;
@@ -194,9 +190,8 @@ export default function EngagementFooter({
   return (
     <div className="engage">
       <div className="engage__row">
-        {/* On stream cards the signals live beside the author's name; the
-            EXPANDED post page passes them back down here (founder 2026-10-23)
-            — same chips, same hover drop-down, home's balanced bar shape. */}
+        {/* Signals lead the bar on EVERY card (founder 2026-10-26, the Figma
+            mock's shape) — chips, divider, then the actions. */}
         {signals !== undefined && (
           <>
             <div className="engage__signals-slot">

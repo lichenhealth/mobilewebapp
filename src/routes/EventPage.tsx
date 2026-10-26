@@ -15,6 +15,9 @@ import {
   loadPost, loadEventUpdates, rsvpToEvent, unRsvp, deletePost,
   type FeedPost,
 } from '../lib/postsApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend } from '../lib/myceliumApi';
+import { loadMySaved, setSaved } from '../lib/savedApi';
+import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
 import { loadEventGuests, inviteEventGuest, type EventGuest } from '../lib/eventGuestsApi';
 import './EventPage.css';
@@ -35,6 +38,9 @@ export default function EventPage() {
   const [post, setPost] = useState<FeedPost | null>(null);
   const [calEvent, setCalEvent] = useState<EventRow | null>(null);
   const [updates, setUpdates] = useState<FeedPost[]>([]);
+  const [upOverlays, setUpOverlays] = useState<Record<string, MyceliumSignals>>({});
+  const [upRecs, setUpRecs] = useState<Set<string>>(new Set());
+  const [upSaves, setUpSaves] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<Tab>('About');
   const [loading, setLoading] = useState(true);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -57,9 +63,22 @@ export default function EventPage() {
         loadEventUpdates(p.linked_event_id, p.id),
       ]);
       setCalEvent(ev); setUpdates(ups);
+      // The updates' cards wear the platform signals too (founder 2026-10-26,
+      // the mock's footer on EVERY card) — this was the one FeedCard surface
+      // that never loaded the who-engaged overlay, so its chips sat gray and
+      // its Recommend/Save wrote nothing.
+      if (ups.length && me) {
+        try {
+          const [{ web, vouched }, recs, saves] = await Promise.all([
+            loadMyWeb(), loadMyRecommendations(), loadMySaved(),
+          ]);
+          const ov = await loadEndorsements(ups, { web, vouched });
+          setUpOverlays(ov); setUpRecs(recs); setUpSaves(saves);
+        } catch (e) { console.error(e); }
+      }
     }
     setLoading(false);
-  }, [postId]);
+  }, [postId, me]);
   useEffect(() => { load(); }, [load]);
 
   // Load external guests once we know the viewer is the host.
@@ -251,7 +270,18 @@ export default function EventPage() {
       {tab === 'Updates' && (
         <div className="evp__body">
           {updates.length === 0 && <p className="evp__muted">No updates yet — the host's follow-up posts will land here.</p>}
-          {updates.map((p) => <FeedCard key={p.id} {...postToCard(p, me)} />)}
+          {updates.map((p) => (
+            <FeedCard
+              key={p.id}
+              {...postToCard(p, me)}
+              mycelium={upOverlays[p.id]}
+              recommended={upRecs.has('post:' + p.id)}
+              onRecommend={me ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
+              saved={upSaves.has('post:' + p.id)}
+              onSave={me ? (on) => { void setSaved('post', p.id, on).catch(console.error); } : undefined}
+              viewerIsAuthor={p.author_id === me}
+            />
+          ))}
         </div>
       )}
 
