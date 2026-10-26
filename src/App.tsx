@@ -408,11 +408,20 @@ export default function App() {
               addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help."
               browse browseStyle="rows" />
           } />
-          <Route path="/art"      element={
-            <AreaFeed area="art" icon="palette" crumb="Art"
-              title="Lichen" italic="Art."
-              sub="What members make — images, sound, words, and crafts."
-              addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
+          {/* ART + TRAVEL join the alpha curtain (founder 2026-10-26: "Let's
+              have Travel, Art and Library have a coming soon sign for alpha
+              users, just like Courses does" — Library already wore it, from
+              the 2026-08-25 call). Same shape: admins see the real room, the
+              gate is this route alone, delete it to reopen. */}
+          <Route path="/art"      element={!isAdmin
+            ? <ComingSoon icon="palette" title="Art." line="Images, sound, words, and crafts from members' own hands — the gallery is being tended before it opens. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="art" icon="palette" crumb="Art"
+                title="Lichen" italic="Art."
+                sub="What members make — images, sound, words, and crafts."
+                addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
+            </>
           } />
           <Route path="/food"     element={
             <AreaFeed area="food" icon="fork-spoon" crumb="Food"
@@ -420,11 +429,15 @@ export default function App() {
               sub="Meals, harvests, recipes, and nourishment."
               addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
           } />
-          <Route path="/travel"   element={
-            <AreaFeed area="travel" icon="plane" crumb="Travel"
-              title="Lichen" italic="Travel."
-              sub="Rides, hauls, flights and stays — exchanged between people your web knows."
-              addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
+          <Route path="/travel"   element={!isAdmin
+            ? <ComingSoon icon="plane" title="Travel." line="Rides, hauls, flights and stays — exchanged between people your web knows. The road is being paved before it opens. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="travel" icon="plane" crumb="Travel"
+                title="Lichen" italic="Travel."
+                sub="Rides, hauls, flights and stays — exchanged between people your web knows."
+                addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
+            </>
           } />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
