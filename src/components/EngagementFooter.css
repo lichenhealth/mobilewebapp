@@ -126,20 +126,26 @@
   flex-shrink: 0;
 }
 
-/* THE ACTIONS HUG LEFT, CLOSE TOGETHER (founder 2026-10-26: "the spacing for
-   the icons is still wonky. Make them closer together and move them left…
-   Putting everything closer together and moving it left should mean that all
-   of those things can fit" — the old flex:1 buttons spread across the whole
-   bar with Chat stranded at the right edge). Each action is content-sized
-   now; free room collects at the bar's right instead of between the words. */
+/* THE ACTIONS SPAN TO A SOLID RIGHT MARGIN (founder 2026-10-26, two passes
+   the same sitting: "Make them closer together and move them left", then —
+   marking the new row with a line just right of Chat — "Have the 't' in chat
+   end where the line is, create more space between each CTA with the extra
+   space. Make this the solid margin to the right for all posts moving
+   forward"): each action is content-sized (never flex:1 — "Recommend" must
+   not decide every button's width), the row distributes the EXTRA room
+   BETWEEN the CTAs, the last label ends exactly at the right margin, and on
+   a row with no extra room the buttons simply pack tight. */
 .engage__actions {
   display: flex;
   flex: 1;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 2px;
   min-width: 0;
+  padding-right: 14px;
 }
+/* The last label's own edge IS the margin line — no trailing button padding. */
+.engage__actions > .engage__action:last-child { padding-right: 0; }
 
 /* THE WORDS STAY ON PHONES (founder 2026-09-14: "the stories on the actual
    platform don't have copy to explain each button, which they should").
@@ -147,8 +153,8 @@
    actions; at four, compact spacing fits the 430px column and a word under
    a hand beats a mystery glyph. Phones get tighter gaps, not fewer words. */
 @media (max-width: 1023px) {
-  .engage__action { gap: 3px; padding: 10px 3px; }
-  .engage__actions { gap: 0; }
+  .engage__action { gap: 3px; padding: 10px 2px; }
+  .engage__actions { gap: 0; padding-right: 8px; }
   .engage__signals-slot { padding: 0 8px; }
 }
 /* Only a genuinely tight EMBED (narrow columns inside frames) still gives

@@ -864,6 +864,54 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* THE RECEIVER SEES THE WHOLE CARD (founder 2026-10-26): a shared post rides
+   its message as a postref and renders as this mini card inside the bubble —
+   photo, title, words, who — opening the post on tap. */
+.bubble__postref {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 200px;
+  margin: 2px 0 4px;
+  padding: 10px 12px;
+  background: var(--bone);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.bubble__postref:hover { border-color: var(--peach); }
+.bubble__postref-photo {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  margin-bottom: 4px;
+  display: block;
+}
+.bubble__postref-title { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+.bubble__postref-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bubble__postref-who { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+.bubble__postref--gone {
+  cursor: default;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-style: italic;
+}
+.bubble__postref--loading { min-height: 54px; background: var(--bone-warm); }
 /* A conversation WITH a space: one logo wearing the answering admin's face.
    Its OWN box — the stacked-faces rules above position every child span/img
    absolutely and would drag the badge to the top-left. */
