@@ -17,7 +17,7 @@ import {
 } from '../lib/postsApi';
 import { postToCard, weaveProps, postOpenPath } from '../lib/feedMapping';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import './PostPage.css';
 import { loadSpaceNames } from '../lib/postsApi';
@@ -238,11 +238,11 @@ export default function PostPage() {
         {...weaveProps(p, myWebSet, me || undefined)}
         expanded
         conditions={condLines.length > 0 ? condLines : undefined}
-        trusted={myMyc.has('profile:' + p.author_id)}
+        trusted={myMyc.has(posterTrustKey(p))}
         recommended={recommended}
         mycelium={overlay}
         availability={{ trust: !!me && p.author_id !== me }}
-        onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+        onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
         onRecommend={(on) => {
           void setRecommend('post', p.id, on).catch(console.error);
           speak(on ? 'Recommended ✓ — your network can see you stand behind it.' : 'Recommendation withdrawn.');
@@ -337,10 +337,11 @@ export default function PostPage() {
               key={rp.id}
               {...postToCard(rp, me || undefined, spaceNames)}
               {...weaveProps(rp, myWebSet, me || undefined)}
-              trusted={myMyc.has('profile:' + rp.author_id)}
+              trusted={myMyc.has(posterTrustKey(rp))}
               recommended={myRecs.has('post:' + rp.id)}
               mycelium={relOverlays[rp.id]}
               availability={{ trust: !!me && rp.author_id !== me }}
+              onTrust={(on) => { void trustPostPoster(rp, on).catch(console.error); }}
               onRecommend={(on) => { void setRecommend('post', rp.id, on).catch(console.error); }}
               saved={mySaves.has('post:' + rp.id)}
               onSave={(on) => { void setSaved('post', rp.id, on).then(() => { if (on) promptSaved(rp.id); }).catch(console.error); }}

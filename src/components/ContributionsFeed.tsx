@@ -13,7 +13,7 @@ import {
   loadAuthorFeed, deletePost, postAreas, SERVICE_AREAS,
   type FeedPost, type ServiceArea,
 } from '../lib/postsApi';
-import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -306,7 +306,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             eyebrow={whenLabel(p) ?? postToCard(p, me, spaceNames).eyebrow}
             onOpen={() => navigate(postOpenPath(p))}
             onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-            trusted={interactive && myMyc.has('profile:' + p.author_id)}
+            trusted={interactive && myMyc.has(posterTrustKey(p))}
             recommended={interactive && myRecs.has('post:' + p.id)}
             mycelium={interactive ? overlays[p.id] : undefined}
             // On the open web every Lichen action grays out rather than
@@ -316,7 +316,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
             availability={interactive
               ? { trust: !!me && p.author_id !== me }
               : { trust: false, recommend: false, share: false, save: false, chat: false }}
-            onTrust={interactive ? (on) => { void setTrust('profile', p.author_id, on).catch(console.error); } : undefined}
+            onTrust={interactive ? (on) => { void trustPostPoster(p, on).catch(console.error); } : undefined}
             onRecommend={interactive ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
             saved={interactive && mySaves.has('post:' + p.id)}
             onSave={interactive ? (on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); } : undefined}

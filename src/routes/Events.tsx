@@ -18,7 +18,7 @@ import {
 } from '../lib/postsApi';
 import { supabase } from '../lib/supabase';
 import { minToLabel } from '../lib/calendarApi';
-import { loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -214,11 +214,11 @@ export default function Events() {
       onBadgeAction={() => onBadge(p)}
       onOpen={() => navigate(`/events/${p.id}`)}
       onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-      trusted={myMyc.has('profile:' + p.author_id)}
+      trusted={myMyc.has(posterTrustKey(p))}
       recommended={myRecs.has('post:' + p.id)}
       mycelium={overlays[p.id]}
       availability={{ trust: p.author_id !== me }}
-      onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+      onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
       onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
       saved={mySaves.has('post:' + p.id)}
       onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}

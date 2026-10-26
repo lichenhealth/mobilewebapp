@@ -9,7 +9,7 @@ import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import ShareToClaudeSheet from '../components/ShareToClaudeSheet';
 import {
-  loadMyWeb, loadMyRecommendations, loadEndorsements, setTrust, setRecommend,
+  loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -115,7 +115,7 @@ export default function Mycelium() {
       // vouched or not) — and always your own posts, so what you share to your
       // mycelium shows in your own web.
       .filter((p) =>
-        myWeb.has('profile:' + p.author_id)
+        myWeb.has(posterTrustKey(p))
         || (p.author_space_id != null && myWeb.has('space:' + p.author_space_id))
         || p.author_id === user?.id)
       .map((p) => ({
@@ -125,11 +125,11 @@ export default function Mycelium() {
         card: {
           ...postToCard(p, user?.id, spaceNames),
           ...weaveProps(p, myWeb, user?.id),
-          trusted: myMyc.has('profile:' + p.author_id),
+          trusted: myMyc.has(posterTrustKey(p)),
           recommended: myRecs.has('post:' + p.id),
           mycelium: overlays[p.id],
           availability: { trust: p.author_id !== user?.id },
-          onTrust: (on: boolean) => { void setTrust('profile', p.author_id, on).catch(console.error); },
+          onTrust: (on: boolean) => { void trustPostPoster(p, on).catch(console.error); },
           onRecommend: (on: boolean) => { void setRecommend('post', p.id, on).catch(console.error); },
           saved: mySaves.has('post:' + p.id),
           onSave: (on: boolean) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); },

@@ -15,7 +15,7 @@ import {
   loadPost, loadEventUpdates, rsvpToEvent, unRsvp, deletePost,
   type FeedPost,
 } from '../lib/postsApi';
-import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, setTrust } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
@@ -276,9 +276,9 @@ export default function EventPage() {
               key={p.id}
               {...postToCard(p, me)}
               mycelium={upOverlays[p.id]}
-              trusted={upVouched.has('profile:' + p.author_id)}
+              trusted={upVouched.has(posterTrustKey(p))}
               availability={{ trust: !!me && p.author_id !== me }}
-              onTrust={me ? (on) => { void setTrust('profile', p.author_id, on).catch(console.error); } : undefined}
+              onTrust={me ? (on) => { void trustPostPoster(p, on).catch(console.error); } : undefined}
               recommended={upRecs.has('post:' + p.id)}
               onRecommend={me ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
               saved={upSaves.has('post:' + p.id)}

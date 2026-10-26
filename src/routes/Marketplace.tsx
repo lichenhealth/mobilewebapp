@@ -18,7 +18,7 @@ import { loadTrustWeb, loadTrustEdgesFor, trustPathTo, namesFor, type TrustWeb }
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import ViewToggle from '../components/ViewToggle';
 import { supabase } from '../lib/supabase';
-import { webAuthorFilter } from '../lib/myceliumApi';
+import { webAuthorFilter, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { loadFeed, loadAuthorFeed, loadForIdentity, deletePost, postAreas, type FeedPost } from '../lib/postsApi';
 import { resolveIdentityScope } from '../lib/identityScope';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
@@ -548,11 +548,11 @@ export default function Marketplace() {
             key={p.id}
             {...postToCard(p, me || undefined, spaceNames)}
             {...weaveProps(p, myWebSet, me || undefined)}
-            trusted={myMyc.has('profile:' + p.author_id)}
+            trusted={myMyc.has(posterTrustKey(p))}
             recommended={myRecs.has(recommendKey('post', p.id, undefined, asSpace))}
             mycelium={overlays[p.id]}
             availability={{ trust: !!me && p.author_id !== me }}
-            onTrust={(on) => { void setTrust('profile', p.author_id, on).catch(console.error); }}
+            onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
             onRecommend={(on) => { void setRecommend('post', p.id, on, undefined, asSpace).catch(console.error); }}
             saved={mySaves.has('post:' + p.id)}
             onSave={(on) => { void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error); }}

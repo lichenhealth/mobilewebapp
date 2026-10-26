@@ -464,6 +464,20 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     try { await setRecommend('space', id, next); } catch (e) { console.error(e); setRecommended(!next); }
   }
 
+  // ORGS ARE TRUSTABLE (founder 2026-10-26: "Yes, I like the ability to trust
+  // an org. You can take that trust away, too. I think building orgs that
+  // people trust is important") — MemberProfile's toggleTrust, aimed at the
+  // space. The vouch is the PERSON's (truster_space_id null) and stays
+  // private; a space still holds no trust of its own.
+  async function toggleTrust() {
+    if (!me) return;
+    const next = !trusted;
+    setTrusted(next);                         // optimistic — a private vouch
+    if (next && !inWeb) setInWebState(true);  // trusting auto-adds to the web
+    try { await setVouch('space', id, next); }
+    catch (e) { console.error(e); setTrusted(!next); }
+  }
+
   async function decideShare(r: SectionShareRow, approve: boolean, promote = false) {
     await decideSectionShare(id, r.post_id, r.area as SectionArea, approve);
     if (approve && promote) {
@@ -1077,13 +1091,20 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       >
         <Icon name="user-multiple" size={14} /> {inWeb ? 'In your My-celium ✓' : 'Add to My-celium'}
       </button>
-      {/* NO TRUST ON A SPACE (founder 2026-08-07: "you can trust a person, but
-          recommend an org, group or community... shouldn't trust not be an
-          option for them?"). Trust is the private signal between people;
-          an organisation is something you vouch FOR, in public, which is
-          exactly recommend. This supersedes the both-on-everything rule from
-          PR #77 — existing space vouches stay in the data, they just can't be
-          made or unmade here any more. */}
+      {/* TRUST AN ORG (founder 2026-10-26: "I like the ability to trust an
+          org. You can take that trust away, too" — superseding her 2026-08-07
+          recommend-only call for spaces): the same private shield a member's
+          page wears, aimed at the space. Recommend stays the public signal
+          beside it. */}
+      <button
+        className={'btn mprof__btn mprof__btn--trust' + (trusted ? ' is-on' : '')}
+        onClick={toggleTrust}
+        title={trusted
+          ? 'You trust this — private, seen only through your own web. Tap to withdraw.'
+          : 'Trust it — a private signal, never counted'}
+      >
+        <Icon name="shield-user" size={14} /> {trusted ? 'Trusted ✓' : 'Trust'}
+      </button>
       <button
         className={'btn mprof__btn mprof__btn--trust' + (recommended ? ' is-on' : '')}
         onClick={toggleRecommend}
