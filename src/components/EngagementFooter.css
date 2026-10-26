@@ -13,12 +13,11 @@
   min-height: 42px;
 }
 
-/* THE SIGNALS SIT BESIDE THE NAME NOW (founder 2026-10-23: "move the trust
-   and recommend icons next to the name of the person … light peach when
-   selects, not opaque") — SignalChips renders them in FeedCard's handle row,
-   LIGHT peach (tint) when the network has engaged, gray when quiet; a lit
-   chip's hover/tap opens a small popover listing WHO, never how many. The
-   footer's old left slot, solid-peach fill and divider are retired. */
+/* THE SIGNAL CHIPS lead the footer bottom-left (founder 2026-10-26, the
+   Figma mock — the 10-23 beside-the-name placement is retired): LIGHT peach
+   (tint) when the network has engaged, gray when quiet; any tap opens the
+   pop, which lists WHO (never how many) and carries the confirm-the-act
+   button — Trust the poster / Recommend this post. */
 .sigchips {
   display: inline-flex;
   align-items: center;
@@ -37,10 +36,13 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  cursor: default;
+  /* Every chip opens its pop now — lit shows WHO, quiet shows the honest
+     empty state; either way the pop carries the act (founder 2026-10-26). */
+  cursor: pointer;
   flex-shrink: 0;
   transition: background var(--d-fast) var(--ease-out);
 }
+.sigchips__chip:hover { background: var(--bone); }
 .sigchips__chip svg { display: block; }
 .sigchips__chip.is-lit {
   background: var(--peach-tint);
@@ -66,6 +68,47 @@
   display: block;
 }
 .sigchips__pop .engage__panel-label { display: block; }
+/* Two rec groups stack: post recs first, then the poster's own — a hairline
+   seam between them keeps the grouping legible. */
+.sigchips__pop .engage__members + .engage__panel-label {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bone-edge);
+}
+/* THE POP CONFIRMS THE ACT (founder 2026-10-26): the foot button is the
+   deliberate second tap — "Trust @galyn" / "Recommend this post". */
+.sigchips__act {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--peach);
+  border-radius: var(--r-full);
+  background: var(--peach-tint);
+  color: var(--peach-deep);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  text-align: center;
+}
+.sigchips__act:hover { background: var(--peach-light, var(--peach-tint)); }
+.sigchips__act.is-on {
+  background: var(--bone-warm);
+  border-color: var(--bone-edge);
+  color: var(--ink-soft);
+}
+/* The honest empty state / the person-to-person trust note on space posts. */
+.sigchips__note {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  margin: 0;
+}
+.sigchips__note + .sigchips__note,
+.engage__members + .sigchips__note { margin-top: 8px; }
 
 /* The expanded post page's signals lead the bar (founder 2026-10-23: "the
    trust and recommend architecture should be at the bottom" on the post's

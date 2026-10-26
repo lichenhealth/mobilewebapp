@@ -15,7 +15,7 @@ import {
   loadPost, loadEventUpdates, rsvpToEvent, unRsvp, deletePost,
   type FeedPost,
 } from '../lib/postsApi';
-import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend } from '../lib/myceliumApi';
+import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, setTrust } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
@@ -41,6 +41,7 @@ export default function EventPage() {
   const [upOverlays, setUpOverlays] = useState<Record<string, MyceliumSignals>>({});
   const [upRecs, setUpRecs] = useState<Set<string>>(new Set());
   const [upSaves, setUpSaves] = useState<Set<string>>(new Set());
+  const [upVouched, setUpVouched] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<Tab>('About');
   const [loading, setLoading] = useState(true);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function EventPage() {
             loadMyWeb(), loadMyRecommendations(), loadMySaved(),
           ]);
           const ov = await loadEndorsements(ups, { web, vouched });
-          setUpOverlays(ov); setUpRecs(recs); setUpSaves(saves);
+          setUpOverlays(ov); setUpRecs(recs); setUpSaves(saves); setUpVouched(vouched);
         } catch (e) { console.error(e); }
       }
     }
@@ -275,6 +276,9 @@ export default function EventPage() {
               key={p.id}
               {...postToCard(p, me)}
               mycelium={upOverlays[p.id]}
+              trusted={upVouched.has('profile:' + p.author_id)}
+              availability={{ trust: !!me && p.author_id !== me }}
+              onTrust={me ? (on) => { void setTrust('profile', p.author_id, on).catch(console.error); } : undefined}
               recommended={upRecs.has('post:' + p.id)}
               onRecommend={me ? (on) => { void setRecommend('post', p.id, on).catch(console.error); } : undefined}
               saved={upSaves.has('post:' + p.id)}

@@ -304,14 +304,24 @@ export async function loadEndorsements(
   const out: Record<string, MyceliumSignals> = {};
   for (const p of posts) {
     const trustedMap = trustByAuthor.get(p.author_id);
-    // One list, deduped by person: a member who recommends both the post and
-    // its creator still lists once.
-    const recMap = new Map<string, MyceliumMember>([
-      ...(recByAuthor.get(p.author_id) ?? new Map<string, MyceliumMember>()),
-      ...(recByPost.get(p.id) ?? new Map<string, MyceliumMember>()),
-    ]);
+    // RECOMMENDS ARE FIRST FOR THE SPECIFIC POST, then recommends of the
+    // person (founder 2026-10-26: "Sarah Smith recommends these shirts…
+    // and then after that Melanie Bright recommends Galyn" — a listing with
+    // few recs of its own still shows the creator's network validation).
+    // Deduped by person: someone recommending both lists once, as a post rec.
+    const recList: MyceliumMember[] = [];
+    const recSeen = new Set<string>();
+    for (const [id, m] of recByPost.get(p.id) ?? new Map<string, MyceliumMember>()) {
+      recList.push({ ...m, about: 'post' });
+      recSeen.add(id);
+    }
+    for (const [id, m] of recByAuthor.get(p.author_id) ?? new Map<string, MyceliumMember>()) {
+      if (recSeen.has(id)) continue;
+      recList.push({ ...m, about: 'creator' });
+      recSeen.add(id);
+    }
     const trusted = trustedMap ? [...trustedMap.values()] : undefined;
-    const recommended = recMap.size ? [...recMap.values()] : undefined;
+    const recommended = recList.length ? recList : undefined;
     if (trusted?.length || recommended?.length) {
       out[p.id] = { trusted, recommended };
     }
