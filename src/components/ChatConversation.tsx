@@ -11,6 +11,7 @@ import {
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
+import type { FeedPost } from '../lib/postsApi';
 import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import DocRefCard from './ChatDocCard';
@@ -268,8 +269,9 @@ export default function ChatConversation({
   useEffect(() => {
     const need = new Set<string>();
     for (const m of messages) for (const a of m.attachments ?? []) {
-      // A docref carries a chat_docs id, not a storage path — never sign it.
-      if (a.type !== 'docref' && !mediaUrls[a.url]) need.add(a.url);
+      // A docref carries a chat_docs id and a postref a post id, not a
+      // storage path — never sign those.
+      if (a.type !== 'docref' && a.type !== 'postref' && !mediaUrls[a.url]) need.add(a.url);
     }
     if (need.size === 0) return;
     let active = true;
@@ -348,14 +350,18 @@ export default function ChatConversation({
     const text = draft.trim();
     const ask = careAsk ?? null;
     if ((!text && pending.length === 0 && !about && !ask) || !me || !chat || uploading) return;
-    const attachments: Attachment[] | null = pending.length
-      ? pending.map((p) => ({ type: p.type, url: p.path }))
-      : null;
+    // The pinned post rides the message as a POSTREF attachment, so BOTH
+    // sides see the whole card in the thread (founder 2026-10-26: "have the
+    // receiver see the whole card") — the body is just the member's words,
+    // the iMessage photo-with-caption shape. A care ask keeps its worded line
+    // (it names + bells the entry's author, not a post).
+    const uploaded: Attachment[] = pending.map((p) => ({ type: p.type, url: p.path }));
+    const withPost: Attachment[] = about
+      ? [{ type: 'postref', url: about.id }, ...uploaded]
+      : uploaded;
+    const attachments: Attachment[] | null = withPost.length ? withPost : null;
     const reply = replyTo?.id ?? null;
-    // The pinned post/entry rides along on the first message, then steps aside.
-    const bodyText = about
-      ? `About "${about.label}" — ${window.location.origin}${about.path}${text ? `\n\n${text}` : ''}`
-      : ask
+    const bodyText = ask
       ? `@${ask.authorName} · about "${ask.snippet}"${text ? `\n\n${text}` : ''}`
       : (text || null);
     setDraft(''); setPending([]); setReplyTo(null); setAbout(null);
@@ -894,9 +900,12 @@ function MessageRun({
                     names={Object.fromEntries(Object.values(members).map((x) => [x.profile_id, x.name]))}
                   />
                 ))}
-                {(m.attachments ?? []).some((a) => a.type !== 'docref') && (
+                {(m.attachments ?? []).filter((a) => a.type === 'postref').map((a, k) => (
+                  <PostRefCard key={`post${k}`} postId={a.url} />
+                ))}
+                {(m.attachments ?? []).some((a) => a.type !== 'docref' && a.type !== 'postref') && (
                   <div className="bubble__media">
-                    {(m.attachments ?? []).filter((a) => a.type !== 'docref').map((a, k) => (
+                    {(m.attachments ?? []).filter((a) => a.type !== 'docref' && a.type !== 'postref').map((a, k) => (
                       <MediaItem key={k} attachment={a} url={mediaUrls[a.url]} />
                     ))}
                   </div>
@@ -1018,6 +1027,48 @@ function MessageRun({
         </span>
       )}
     </div>
+  );
+}
+
+/** THE RECEIVER SEES THE WHOLE CARD (founder 2026-10-26): a chat-about
+ *  message carries the post as a 'postref' attachment, and this renders it
+ *  in the bubble for BOTH sides — photo, title, words, who posted — opening
+ *  the post on tap. Resolved at read time through RLS (the saved-messages
+ *  idiom), so a post that was deleted or closed since shows an honest stub
+ *  instead of silently vanishing. */
+const postRefCache = new Map<string, FeedPost | null>();
+function PostRefCard({ postId }: { postId: string }) {
+  const navigate = useNavigate();
+  const [post, setPost] = useState<FeedPost | null | undefined>(postRefCache.get(postId));
+  useEffect(() => {
+    if (postRefCache.has(postId)) { setPost(postRefCache.get(postId)); return; }
+    let live = true;
+    void loadPost(postId).then((p) => {
+      postRefCache.set(postId, p);
+      if (live) setPost(p);
+    });
+    return () => { live = false; };
+  }, [postId]);
+  if (post === undefined) return <div className="bubble__postref bubble__postref--loading" aria-hidden="true" />;
+  if (post === null) {
+    return <div className="bubble__postref bubble__postref--gone">This post isn&rsquo;t available anymore.</div>;
+  }
+  const media = (post.details as { media?: { type?: string; url?: string }[] } | null)?.media;
+  const photo = media?.find((m) => m.type === 'photo' && m.url)?.url ?? post.image_url ?? null;
+  const who = (post as unknown as { author_space?: { name?: string } | null; author?: { full_name?: string } | null });
+  const byline = who.author_space?.name || who.author?.full_name || '';
+  return (
+    <button
+      type="button"
+      className="bubble__postref"
+      onClick={() => navigate(postOpenPath(post))}
+      title="Open the post"
+    >
+      {photo && <img className="bubble__postref-photo" src={photo} alt="" loading="lazy" />}
+      {post.title && <span className="bubble__postref-title">{post.title}</span>}
+      {post.body && <span className="bubble__postref-body">{post.body}</span>}
+      {byline && <span className="bubble__postref-who">Posted by {byline}</span>}
+    </button>
   );
 }
 

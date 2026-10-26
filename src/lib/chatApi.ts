@@ -26,8 +26,12 @@ export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at
  *  render time. A 'docref' attachment (2026-10-21) instead carries a chat_docs
  *  id in `url` (+ its kind): the card a doc/poll/spreadsheet created from the
- *  composer rides into the room on. Never send a docref to media signing. */
-export interface Attachment { type: MediaType | 'docref'; url: string; kind?: 'doc' | 'poll' | 'sheet'; }
+ *  composer rides into the room on. A 'postref' (2026-10-26, founder: "have
+ *  the receiver see the whole card") carries a POST id in `url` — the full
+ *  post card a chat-about message rides on, rendered at read time through
+ *  RLS so a post that later closes shows an honest stub. Never send a docref
+ *  or postref to media signing. */
+export interface Attachment { type: MediaType | 'docref' | 'postref'; url: string; kind?: 'doc' | 'poll' | 'sheet'; }
 
 export interface MemberInfo { profile_id: string; name: string; avatarUrl?: string | null; }
 export interface MessageRow {
@@ -225,6 +229,7 @@ export function messagePreview(msg: MessageRow): string {
     if (first.type === 'docref') {
       return first.kind === 'poll' ? '📊 Poll' : first.kind === 'sheet' ? '📋 Spreadsheet' : '📄 Doc';
     }
+    if (first.type === 'postref') return '🔗 A post';
     const label = first.type === 'photo' ? 'Photo' : first.type === 'video' ? 'Video' : 'Audio';
     return `📎 ${label}${a.length > 1 ? ` +${a.length - 1}` : ''}`;
   }
