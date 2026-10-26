@@ -58,6 +58,7 @@ export interface ActionAvailability {
 export function SignalChips({
   mycelium, subjectName,
   myTrust, onTrustAct, myRec, onRecAct,
+  openPanel, pinned, onPanel,
 }: {
   mycelium?: MyceliumSignals;
   /** Who posted — e.g. "@galyn" or "@pine-valley-grange" — named in labels
@@ -69,9 +70,14 @@ export function SignalChips({
   myRec?: boolean;
   /** Toggle YOUR recommendation of this post. */
   onRecAct?: () => void;
+  /** THE POP IS CONTROLLED BY THE FOOTER (founder 2026-10-26, the labeled
+   *  Trust action: "add trust back to the actions on each post, with the pop
+   *  up confirming") — the parent owns which panel is open so its own Trust
+   *  button opens the same confirm pop the shield chip does. */
+  openPanel: 'trust' | 'recommend' | null;
+  pinned: boolean;
+  onPanel: (panel: 'trust' | 'recommend' | null, pinned: boolean) => void;
 }) {
-  const [openPanel, setOpenPanel] = useState<'trust' | 'recommend' | null>(null);
-  const [pinned, setPinned] = useState(false);
   // The card clips horizontally (overflow-x: clip), so the pop must stay
   // inside it — on open, shift it left until its right edge clears the
   // card's (or the viewport's, wherever these chips end up without a card).
@@ -98,8 +104,8 @@ export function SignalChips({
   // A tap always opens — the pop is where the ACT lives now, so a quiet chip
   // still answers with the honest empty state + the confirm button.
   const toggle = (which: 'trust' | 'recommend') => {
-    if (openPanel === which && pinned) { setOpenPanel(null); setPinned(false); }
-    else { setOpenPanel(which); setPinned(true); }
+    if (openPanel === which && pinned) onPanel(null, false);
+    else onPanel(which, true);
   };
   const memberList = (list: MyceliumMember[]) => (
     <ul className="engage__members">
@@ -117,12 +123,12 @@ export function SignalChips({
     </ul>
   );
   return (
-    <span className="sigchips" onMouseLeave={() => { if (!pinned) setOpenPanel(null); }}>
+    <span className="sigchips" onMouseLeave={() => { if (!pinned) onPanel(null, false); }}>
       <button
         type="button"
         className={'sigchips__chip' + (hasTrust ? ' is-lit' : '') + (openPanel === 'trust' ? ' is-open' : '')}
         onClick={(e) => { e.stopPropagation(); toggle('trust'); }}
-        onMouseEnter={() => { if (hasTrust && !pinned) setOpenPanel('trust'); }}
+        onMouseEnter={() => { if (hasTrust && !pinned) onPanel('trust', false); }}
         aria-label={hasTrust
           ? `Trusted by ${trustedBy.length} ${trustedBy.length === 1 ? 'person' : 'people'} in your web — open to see who, or add your trust`
           : `No one in your web has trusted ${subject} yet — open to add your trust`}
@@ -134,7 +140,7 @@ export function SignalChips({
         type="button"
         className={'sigchips__chip' + (hasRec ? ' is-lit' : '') + (openPanel === 'recommend' ? ' is-open' : '')}
         onClick={(e) => { e.stopPropagation(); toggle('recommend'); }}
-        onMouseEnter={() => { if (hasRec && !pinned) setOpenPanel('recommend'); }}
+        onMouseEnter={() => { if (hasRec && !pinned) onPanel('recommend', false); }}
         aria-label={hasRec
           ? `Recommended by ${recommendedBy.length} ${recommendedBy.length === 1 ? 'person' : 'people'} in your network — open to see who, or add yours`
           : 'No one in your network has recommended this yet — open to recommend it'}
@@ -153,13 +159,20 @@ export function SignalChips({
             <p className="sigchips__note">No one in your web has trusted {subject} yet.</p>
           )}
           {onTrustAct && (
-            <button
-              type="button"
-              className={'sigchips__act' + (myTrust ? ' is-on' : '')}
-              onClick={(e) => { e.stopPropagation(); onTrustAct(); }}
-            >
-              {myTrust ? 'You trust them ✓ — withdraw' : `Trust ${subject}`}
-            </button>
+            <>
+              {/* THE CONFIRM NAMES WHAT IS TRUSTED (founder 2026-10-26: "the
+                  pop up confirming that you're trusting the person, not the
+                  shirts"): trust is of the poster and all they offer, never
+                  one listing. */}
+              <p className="sigchips__note">This is trust in {subject} — them and all they offer, not just this post.</p>
+              <button
+                type="button"
+                className={'sigchips__act' + (myTrust ? ' is-on' : '')}
+                onClick={(e) => { e.stopPropagation(); onTrustAct(); }}
+              >
+                {myTrust ? `You trust ${subject} ✓ — withdraw` : `Trust ${subject}`}
+              </button>
+            </>
           )}
         </span>
       )}
@@ -204,6 +217,11 @@ interface Props {
    *  pops and the trust act. Trust follows the poster: person OR space
    *  (founder 2026-10-26 — orgs are trustable). */
   subjectName?: string;
+  /** The viewer wrote this post (founder 2026-10-26: "For your own posts,
+   *  trust and recommend should be absent") — no signal chips, no Trust, no
+   *  Recommend; the bar is Share · Save · (Budget) · Chat, where Chat is the
+   *  self text. */
+  ownPost?: boolean;
   trusted?: boolean;
   recommended?: boolean;
   saved?: boolean;
@@ -231,12 +249,17 @@ interface Props {
  *  (Recommend, Share, Save, Chat; Budget on the post's own page).
  *  Unavailable actions show lighter-gray and can't be tapped. */
 export default function EngagementFooter({
-  signals, subjectName,
+  signals, subjectName, ownPost,
   trusted, recommended, saved,
   availability,
   onTrust, onRecommend, onShare, onSave, onChat,
   budgeted, onBudget,
 }: Props) {
+  // The signal pop — owned here so the labeled Trust ACTION opens the same
+  // confirm pop the shield chip does (founder 2026-10-26).
+  const [panel, setPanel] = useState<'trust' | 'recommend' | null>(null);
+  const [panelPinned, setPanelPinned] = useState(false);
+  const onPanel = (p: 'trust' | 'recommend' | null, pin: boolean) => { setPanel(p); setPanelPinned(pin); };
   const [myTrust, setMyTrust] = useState(trusted ?? false);
   const [myRec, setMyRec] = useState(recommended ?? false);
   const [mySaved, setMySaved] = useState(saved ?? false);
@@ -287,9 +310,12 @@ export default function EngagementFooter({
   return (
     <div className="engage">
       <div className="engage__row">
-        {/* Signals lead the bar on EVERY card (founder 2026-10-26, the Figma
-            mock's shape) — chips, divider, then the actions. */}
-        {signals !== undefined && (
+        {/* Signals lead the bar (founder 2026-10-26, the Figma mock's shape)
+            — chips, divider, then the actions — EXCEPT on your own post,
+            where trust and recommend are ABSENT entirely (founder, same day:
+            "For your own posts, trust and recommend should be absent, versus
+            showing you everyone you trust or recommend"). */}
+        {signals !== undefined && !ownPost && (
           <>
             <div className="engage__signals-slot">
               <SignalChips
@@ -299,26 +325,48 @@ export default function EngagementFooter({
                 onTrustAct={can.trust && onTrust ? actTrust : undefined}
                 myRec={myRec}
                 onRecAct={can.recommend && onRecommend ? actRec : undefined}
+                openPanel={panel}
+                pinned={panelPinned}
+                onPanel={onPanel}
               />
             </div>
             <div className="engage__divider" aria-hidden="true" />
           </>
         )}
         <div className="engage__actions">
-          {/* NO TRUST BUTTON IN THE ACTIONS ROW — trusting is what you think
-              of the PERSON, not the content. Since 2026-10-26 the act lives
-              in the lower-left shield chip's pop ("Trust @galyn", confirmed
-              there), alongside the profile's Trust door — several doors, one
-              write. The 2026-10-12 header shield stays retired. */}
-          <button
-            className={'engage__action' + (myRec && can.recommend ? ' is-active' : '')}
-            onClick={handleRec}
-            disabled={!can.recommend}
-            title={can.recommend ? undefined : 'Not available for this content'}
-          >
-            <Icon name="thumbs-up" size={13} />
-            <span>Recommend</span>
-          </button>
+          {/* TRUST IS BACK IN THE ACTIONS ROW (founder 2026-10-26: "we need
+              to add trust back to the actions on each post, with the pop up
+              confirming that you're trusting the person, not the shirts") —
+              the button OPENS the shield's confirm pop rather than toggling
+              silently, so the act always says WHO it lands on. One pop, one
+              write, several doors. */}
+          {!ownPost && (
+            <button
+              className={'engage__action' + (myTrust && can.trust ? ' is-active' : '')}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!can.trust) return;
+                if (panel === 'trust' && panelPinned) onPanel(null, false);
+                else onPanel('trust', true);
+              }}
+              disabled={!can.trust}
+              title={can.trust ? undefined : 'Not available for this content'}
+            >
+              <Icon name="shield-user" size={13} />
+              <span>Trust</span>
+            </button>
+          )}
+          {!ownPost && (
+            <button
+              className={'engage__action' + (myRec && can.recommend ? ' is-active' : '')}
+              onClick={handleRec}
+              disabled={!can.recommend}
+              title={can.recommend ? undefined : 'Not available for this content'}
+            >
+              <Icon name="thumbs-up" size={13} />
+              <span>Recommend</span>
+            </button>
+          )}
           <button
             className="engage__action"
             onClick={(e) => { e.stopPropagation(); if (can.share) onShare?.(); }}

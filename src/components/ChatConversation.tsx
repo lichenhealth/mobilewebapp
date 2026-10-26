@@ -77,7 +77,10 @@ export default function ChatConversation({
   // carries a line naming the post, so the other side has the context too.
   const [params] = useSearchParams();
   const aboutId = params.get('about');
-  const [about, setAbout] = useState<{ id: string; title: string; path: string; spaceName: string | null } | null>(null);
+  const [about, setAbout] = useState<{
+    id: string; label: string; title: string; path: string; spaceName: string | null;
+    body: string; photo: string | null;
+  } | null>(null);
   const aboutDone = useRef(false);
   useEffect(() => {
     if (!aboutId || aboutDone.current) return;
@@ -89,7 +92,22 @@ export default function ChatConversation({
         const names = await loadSpaceNames([p.author_space_id]);
         spaceName = names.get(p.author_space_id) ?? null;
       }
-      setAbout({ id: p.id, title: p.title || p.body.slice(0, 60), path: postOpenPath(p), spaceName });
+      // THE FULL POST RIDES THE PIN (founder 2026-10-26: "the full post that
+      // we're chatting about should be loaded, with the capacity to add text
+      // below it in the share, just as you would a picture on your phone") —
+      // photo + words, the iMessage photo-with-caption compose, with the
+      // composer right beneath it.
+      const media = (p.details as { media?: { type?: string; url?: string }[] } | null)?.media;
+      const photo = media?.find((m) => m.type === 'photo' && m.url)?.url ?? p.image_url ?? null;
+      setAbout({
+        id: p.id,
+        label: p.title || p.body.slice(0, 60) || 'this post',
+        title: p.title || '',
+        body: p.body || '',
+        path: postOpenPath(p),
+        spaceName,
+        photo,
+      });
     });
   }, [aboutId]);
   // ?draft= — same idea with the words supplied whole (the availability nudge
@@ -336,7 +354,7 @@ export default function ChatConversation({
     const reply = replyTo?.id ?? null;
     // The pinned post/entry rides along on the first message, then steps aside.
     const bodyText = about
-      ? `About "${about.title}" — ${window.location.origin}${about.path}${text ? `\n\n${text}` : ''}`
+      ? `About "${about.label}" — ${window.location.origin}${about.path}${text ? `\n\n${text}` : ''}`
       : ask
       ? `@${ask.authorName} · about "${ask.snippet}"${text ? `\n\n${text}` : ''}`
       : (text || null);
@@ -466,10 +484,17 @@ export default function ChatConversation({
         })}
       </div>
       {about && (
-        <div className="thread__about" role="note">
+        /* THE FULL POST IN THE COMPOSE (founder 2026-10-26: "think of the
+           full post with the capacity to text details about it, below it" —
+           the iMessage photo-with-caption shape): photo, title, words, then
+           the composer right beneath. Tapping the post opens it; × keeps
+           just the chat. */
+        <div className="thread__about thread__about--full" role="note">
           <button className="thread__about-body" onClick={() => navigate(about.path)} title="Open the post">
+            {about.photo && <img className="thread__about-photo" src={about.photo} alt="" loading="lazy" />}
             <span className="thread__about-kicker">About this post</span>
-            <span className="thread__about-title">{about.title}</span>
+            {about.title && <span className="thread__about-title">{about.title}</span>}
+            {about.body && <span className="thread__about-excerpt">{about.body}</span>}
             {about.spaceName && (
               <span className="thread__about-who">
                 {chat?.kind === 'space_dm'
@@ -539,6 +564,7 @@ export default function ChatConversation({
         pending={pending} onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}
         uploading={uploading} onAttach={addPending}
         onCreateDoc={docable ? (k) => { setDocMsg(''); setDocPanel(k); } : undefined}
+        placeholder={about ? 'Say something about it\u2026' : undefined}
         replyTo={replyTo} replyName={replyTo ? (members[replyTo.sender_id]?.name ?? 'Member') : ''}
         onCancelReply={() => setReplyTo(null)}
       />
@@ -1023,7 +1049,7 @@ function groupReactions(rx: ReactionRow[], me: string): ReactionGroup[] {
 
 function ChatInputBar({
   draft, setDraft, onSend, inputRef, pending, onRemovePending, uploading, onAttach, onCreateDoc,
-  replyTo, replyName, onCancelReply,
+  placeholder, replyTo, replyName, onCancelReply,
 }: {
   draft: string;
   setDraft: (s: string) => void;
@@ -1036,6 +1062,8 @@ function ChatInputBar({
   /** Space rooms only (founder 2026-10-21): the composer's + offers Doc ·
    *  Poll · Spreadsheet, each landing in this room's drive. */
   onCreateDoc?: (kind: ChatDocKind) => void;
+  /** While a post is pinned above (?about=), the box invites the caption. */
+  placeholder?: string;
   replyTo: MessageRow | null;
   replyName: string;
   onCancelReply: () => void;
@@ -1188,7 +1216,7 @@ function ChatInputBar({
         <textarea
           ref={inputRef}
           className="thread__input-text"
-          placeholder="Write something kind"
+          placeholder={placeholder ?? 'Write something kind'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

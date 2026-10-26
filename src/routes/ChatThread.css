@@ -833,6 +833,37 @@
   border: 1px solid var(--bone-edge); background: var(--bone); color: var(--ink-soft);
   font-size: 16px; line-height: 1; cursor: pointer;
 }
+/* THE FULL POST IN THE COMPOSE (founder 2026-10-26: "the full post that
+   we're chatting about should be loaded, with the capacity to add text below
+   it… just as you would a picture on your phone"): the pin is the top half
+   of the compose bubble — photo, title, words — and the input bar sits right
+   under it as the caption line, the iMessage shape. */
+.thread__about--full {
+  background: var(--bone);
+  margin-bottom: 4px;
+  padding: 10px 10px 10px 12px;
+  max-height: 46dvh;
+  overflow-y: auto;
+}
+.thread__about--full .thread__about-photo {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  margin-bottom: 6px;
+  display: block;
+}
+.thread__about--full .thread__about-title { white-space: normal; }
+.thread__about--full .thread__about-excerpt {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 /* A conversation WITH a space: one logo wearing the answering admin's face.
    Its OWN box — the stacked-faces rules above position every child span/img
    absolutely and would drag the badge to the top-left. */

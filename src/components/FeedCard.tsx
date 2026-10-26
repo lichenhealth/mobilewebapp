@@ -620,6 +620,7 @@ export default function FeedCard({
         <EngagementFooter
           signals={mycelium ?? {}}
           subjectName={handle}
+          ownPost={viewerIsAuthor}
           trusted={trusted}
           recommended={recommended}
           saved={saved}
