@@ -54,5 +54,10 @@ verify_jwt = false
 [functions.send-booking-mail]
 verify_jwt = false
 
+# Guests pay with their booking token as the whole authorization (members
+# pass a JWT the function checks itself) — the gate is in the function.
+[functions.booking-checkout]
+verify_jwt = false
+
 [functions.zoom-meeting]
 verify_jwt = false

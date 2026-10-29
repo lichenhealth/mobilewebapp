@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { LichenMark } from '../components/LichenMark';
 import {
   loadGuestBooking, guestCancelBooking, guestRescheduleBooking, sendBookingMail,
-  publicBookingBoard, slotsForDay, type GuestBookingView, type BookingBoard,
+  publicBookingBoard, slotsForDay, startBookingCheckout, usdLabel, payOpen,
+  type GuestBookingView, type BookingBoard,
 } from '../lib/bookingApi';
 import { addDays, todayISO } from '../lib/conciergeApi';
 import { icsDataUri, googleCalUrl } from '../lib/ics';
@@ -39,6 +40,11 @@ export default function GuestBooking() {
   const [moving, setMoving] = useState(false);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [moveErr, setMoveErr] = useState('');
+  // Payment (founder 2026-10-29): arriving back from Stripe (?paid=1) the
+  // webhook's stamp can lag a breath — re-read once instead of showing an
+  // unpaid page to someone who just paid.
+  const [payErr, setPayErr] = useState('');
+  const justPaid = new URLSearchParams(location.search).get('paid') === '1';
 
   useEffect(() => {
     if (!moving || !row?.type_id || board) return;
@@ -63,6 +69,24 @@ export default function GuestBooking() {
     void loadGuestBooking(token).then((r) => { if (live) { setRow(r); setReady(true); } });
     return () => { live = false; };
   }, [token]);
+
+  // Quiet re-reads after a Stripe return while the webhook lands (a few
+  // tries, then the page stands as it is — the emailed receipt still comes).
+  useEffect(() => {
+    if (!justPaid || !ready || row?.paid_at) return;
+    let live = true; let tries = 0;
+    const t = setInterval(() => {
+      tries += 1;
+      if (tries > 6) { clearInterval(t); return; }
+      void loadGuestBooking(token).then((r) => {
+        if (!live || !r) return;
+        setRow(r);
+        if (r.paid_at) clearInterval(t);
+      });
+    }, 2500);
+    return () => { live = false; clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justPaid, ready, row?.paid_at]);
 
   const cal = useMemo(() => {
     if (!row) return null;
@@ -113,6 +137,35 @@ export default function GuestBooking() {
         </p>
         <p className="bkg__sub">{s.sub}</p>
       </header>
+
+      {/* PAYMENT (founder 2026-10-29): the frozen price + where it stands.
+          Instant types pay right away; request types once confirmed —
+          nothing charges before the provider's yes. */}
+      {!!row.price_cents && row.paid_at && (
+        <p className="bkg__sub" style={{ color: '#4a7a52', fontWeight: 600 }}>Paid ✓ · {usdLabel(row.price_cents)}</p>
+      )}
+      {!!row.price_cents && !row.paid_at && justPaid && (
+        <p className="bkg__sub">Payment received — confirming it now…</p>
+      )}
+      {payErr && <p className="bkg__error">{payErr}</p>}
+      {payOpen(row) && !justPaid && (
+        <div className="bkg__doneactions">
+          <button
+            className="btn btn-primary bkg__btn"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true); setPayErr('');
+              try { window.location.href = await startBookingCheckout({ token }); }
+              catch (e) { setPayErr((e as { message?: string } | null)?.message || 'Checkout failed.'); setBusy(false); }
+            }}
+          >
+            {busy ? 'One moment…' : `Pay ${usdLabel(row.price_cents!)} to secure it`}
+          </button>
+        </div>
+      )}
+      {!!row.price_cents && !row.paid_at && row.status === 'pending' && row.approval !== 'instant' && (
+        <p className="bkg__sub">{usdLabel(row.price_cents)} — payment opens once {row.provider_name} confirms.</p>
+      )}
 
       {row.status === 'confirmed' && row.meeting_url && (
         <div className="bkg__doneactions">

@@ -2,6 +2,7 @@ import CurrentcyCard from '../components/CurrentcyCard';
 import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
 import BudgetCard from '../components/BudgetCard';
+import CashOutCard from '../components/CashOutCard';
 import './Concierge.css';
 import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive's shape)
 
@@ -40,6 +41,10 @@ export default function Currentcy() {
       </div>
       <MoneyInDoors />
       <CurrentcyCard />
+      {/* MONEY OUT (founder 2026-10-29: "you can choose to have it be cash
+          out, current-cy or either") — the wallet-level door covers earnings
+          from anywhere: sessions, Marketplace, gifts. */}
+      <CashOutCard />
       {/* Budget (founder 2026-10-02) — wallet page only for now; Profile's
           drawer stays the compact card, deliberately. */}
       <BudgetCard />

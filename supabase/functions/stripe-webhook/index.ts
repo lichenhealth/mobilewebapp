@@ -277,6 +277,35 @@ Deno.serve(async (req) => {
         }
       }
 
+      // BOOKING PAYMENTS (founder 2026-10-29 — "Let's do both"): the booker
+      // paid dollars for a session; the provider accrues Current 1:1 (or an
+      // auto cash-out, their payout_pref). record_booking_payment is
+      // idempotent per session; a thrown error 500s so Stripe retries until
+      // the mint lands — a paid session is never dropped. Bank debits ride
+      // the same async_payment_succeeded path as loads (the 2026-10-02 rule:
+      // nothing mints before funds land).
+      if (s.metadata?.kind === 'booking_payment' && s.metadata?.booking && s.payment_status === 'paid') {
+        const { error } = await admin.rpc('record_booking_payment', {
+          p_booking: s.metadata.booking,
+          p_session: s.id,
+          p_amount_cents: s.amount_total ?? 0,
+        });
+        if (error) throw new Error(`record_booking_payment: ${error.message}`);
+        // A guest's receipt: re-send their booking mail, which now carries
+        // the Paid ✓ state — best-effort, the mint above is the truth.
+        try {
+          const { data: bk } = await admin.from('bookings')
+            .select('guest_token, guest_email').eq('id', s.metadata.booking).maybeSingle();
+          if (bk?.guest_token && bk?.guest_email) {
+            await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-booking-mail`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: bk.guest_token }),
+            });
+          }
+        } catch (e) { console.error('booking paid mail:', e); }
+      }
+
       const giveKind = s.metadata?.kind === 'sponsorship' ? 'sponsorship'
         : s.metadata?.kind === 'donation' ? 'donation' : null;
       if (giveKind && s.payment_status === 'paid') {

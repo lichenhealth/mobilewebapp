@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import MintCurrent from '../components/MintCurrent';
 import DonationsDesk from '../components/DonationsDesk';
+import PayoutsDesk from '../components/PayoutsDesk';
 import RoutingDesk from '../components/RoutingDesk';
 import './AdminCategories.css';
 
@@ -635,6 +636,9 @@ export default function AdminSupporters() {
       </div>
 
       <DonationsDesk />
+      {/* Cash-outs to pay (founder 2026-10-29) — the dollars half of the
+          practitioner's Current-cy/cash choice. */}
+      <PayoutsDesk />
       <RoutingDesk />
       <MintCurrent />
 

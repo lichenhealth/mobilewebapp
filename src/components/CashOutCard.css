@@ -1,0 +1,140 @@
+/* Cash out — the wallet's dollars door (founder 2026-10-29). Lives on
+ * /currentcy under the wallet card; speaks the curx/budg paper grammar. */
+
+.cashout {
+  background: var(--bone);
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  margin-top: var(--s-5);
+}
+
+.cashout__h2 {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  margin: 0 0 6px;
+}
+
+.cashout__sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+}
+
+.cashout__prefrow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+/* The pill-select draws its OWN chevron (the conc__dash-select rule — a
+ * native arrow reads differently per device). */
+.cashout__select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bone-warm) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%232A3338' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  padding: 9px 32px 9px 14px;
+  max-width: 100%;
+}
+
+.cashout__ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cashout__dollar { font-size: 15px; }
+
+.cashout__amount {
+  flex: 1;
+  min-width: 0;
+  max-width: 140px;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-md);
+  background: var(--bone-warm);
+}
+
+.cashout__btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--peach-deep);
+  background: var(--peach-tint);
+  border: 1px solid var(--peach);
+  border-radius: var(--r-full);
+  padding: 9px 16px;
+  cursor: pointer;
+}
+.cashout__btn:disabled { opacity: 0.5; cursor: default; }
+
+.cashout__bal {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: 8px 0 0;
+}
+
+.cashout__note {
+  font-size: 12.5px;
+  color: var(--green-deep, #4a7a52);
+  margin: 10px 0 0;
+}
+
+.cashout__error {
+  font-size: 12.5px;
+  color: var(--red-deep, #a53f2b);
+  margin: 0 0 10px;
+}
+
+.cashout__list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cashout__list--settled { opacity: 0.75; }
+
+.cashout__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--bone-edge-soft, var(--bone-edge));
+  padding-top: 8px;
+}
+
+.cashout__quiet {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid var(--bone-edge);
+  border-radius: var(--r-full);
+  padding: 5px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cashout__quiet:hover { color: var(--peach-deep); border-color: var(--peach); }
+
+.cashout__fine {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin: 14px 0 0;
+}

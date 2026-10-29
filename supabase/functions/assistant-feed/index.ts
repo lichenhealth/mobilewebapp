@@ -252,6 +252,7 @@ const CALENDAR_TOOLS = [
         title: { type: 'string' },
         duration_min: { type: 'number', description: '15–480 minutes.' },
         price: { type: 'string' },
+        collect_online_usd: { type: 'number', description: 'Collect this many DOLLARS by card at booking through Lichen ($1–$5,000; decimals fine). The provider receives it as Current-cy 1:1, or as dollars via their wallet\'s cash-out choice. 0 = no online payment (the default — the words-price above is just display). Request-approval types never charge before the provider accepts.' },
         approval: { type: 'string', enum: ['request', 'instant'], description: 'request = they approve each booking; instant = it books straight in.' },
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
         description: { type: 'string', description: 'A sentence or two shown on the booking page.' },
@@ -282,6 +283,7 @@ const CALENDAR_TOOLS = [
         new_title: { type: 'string' },
         duration_min: { type: 'number' },
         price: { type: 'string' },
+        collect_online_usd: { type: 'number', description: 'Dollars collected by card at booking ($1–$5,000); 0 removes online payment.' },
         approval: { type: 'string', enum: ['request', 'instant'] },
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
         description: { type: 'string' },
@@ -1635,7 +1637,7 @@ Deno.serve(async (req) => {
     if (name === 'my_calendar_setup') {
       const [hours, types, care, prof] = await Promise.all([
         (await sb(`availability_windows?profile_id=eq.${profile_id}&booking_type_id=is.null&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
-        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind,slot_increment_min&order=created_at`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind,slot_increment_min,price_cents&order=created_at`)).json(),
         (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
         (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json(),
       ]);
@@ -1653,7 +1655,7 @@ Deno.serve(async (req) => {
         hours: hs.length
           ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
           : 'none set — they are not bookable and never counted available',
-        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null; slot_increment_min: number | null }) =>
+        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null; slot_increment_min: number | null; price_cents: number | null }) =>
           `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}`
           + `${t.hours_kind && t.hours_kind !== 'work' ? `, books from ${t.hours_kind === 'custom' ? 'its OWN hours' : t.hours_kind.replace('_', '-') + ' hours'}` : ''}`
           + `${(t.capacity ?? 1) > 1 ? `, group of up to ${t.capacity}` : ''}`
@@ -1661,6 +1663,7 @@ Deno.serve(async (req) => {
           + `${t.max_days_out != null ? `, bookable ${t.max_days_out} days out` : ''}`
           + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
           + `${t.slot_increment_min != null ? `, starts every ${t.slot_increment_min} min` : ''}`
+          + `${t.price_cents != null ? `, collects $${(t.price_cents / 100).toFixed(t.price_cents % 100 ? 2 : 0)} online at booking` : ''}`
           + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
           + `${meetBy.get(t.id)?.zoom_unique ? ', unique Zoom meeting minted per booking' : ''}`
           + `${meetBy.get(t.id)?.url ? `, ${videoServiceOf(meetBy.get(t.id)!.url!) ?? 'video'} link set (shared only once a booking confirms)` : ''}`
@@ -1730,6 +1733,12 @@ Deno.serve(async (req) => {
       if (inp.max_days_out !== undefined) { const n = Number(inp.max_days_out); if (n === 0) out.max_days_out = null; else if (n >= 1 && n <= 365) out.max_days_out = n; else errs.push('max_days_out must be 1–365, or 0 for no limit'); }
       if (inp.max_per_day !== undefined) { const n = Number(inp.max_per_day); if (n === 0) out.max_per_day = null; else if (n >= 1 && n <= 48) out.max_per_day = n; else errs.push('max_per_day must be 1–48, or 0 for no cap'); }
       if (inp.slot_increment !== undefined) { const n = Number(inp.slot_increment); if (n === 0) out.slot_increment_min = null; else if (n >= 5 && n <= 240) out.slot_increment_min = n; else errs.push('slot_increment must be 5–240 minutes, or 0 to step by the session length'); }
+      if (inp.collect_online_usd !== undefined) {
+        const n = Math.round(Number(inp.collect_online_usd) * 100);
+        if (n === 0) out.price_cents = null;
+        else if (n >= 100 && n <= 500000) out.price_cents = n;
+        else errs.push('collect_online_usd must be $1–$5,000, or 0 for no online payment');
+      }
       if (inp.capacity !== undefined) { const n = Number(inp.capacity); if (n >= 1 && n <= 200) out.capacity = n; else errs.push('capacity must be 1–200'); }
       if (inp.questions !== undefined) {
         const qs = (Array.isArray(inp.questions) ? inp.questions : []).map((q) => String(q).trim().slice(0, 200)).filter(Boolean).slice(0, 5);
