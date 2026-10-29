@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
@@ -28,6 +28,17 @@ export default function AssistantComposer({
   uploaderId?: string;
 }) {
   const [ask, setAsk] = useState(initialText ?? '');
+  // THE BOX GROWS WITH ITS WORDS (founder 2026-10-29, a brain-door prefill
+  // arriving clipped: "clicking in didn't show the entire text for me to
+  // edit, so the box needs to expand") — height follows content from the
+  // first paint (prefills included), capped at ~6 lines, then it scrolls.
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  }, [ask]);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
   const [images, setImages] = useState<string[]>([]);
@@ -124,6 +135,7 @@ export default function AssistantComposer({
         <textarea
           className="assist-composer__input"
           rows={1}
+          ref={taRef}
           value={ask}
           placeholder={placeholder}
           onChange={(e) => setAsk(e.target.value)}
