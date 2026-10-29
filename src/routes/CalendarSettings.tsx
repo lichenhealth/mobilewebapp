@@ -331,7 +331,7 @@ export default function CalendarSettings() {
                 </span>
               </div>
               <p className="cset__bkmeta">
-                {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
                 {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
                   : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
@@ -486,6 +486,18 @@ export default function CalendarSettings() {
                 <option value={28}>Up to 4 weeks out</option>
                 <option value={56}>Up to 8 weeks out</option>
                 <option value={84}>Up to 12 weeks out</option>
+              </select>
+              {/* Start-time increments independent of session length (founder
+                  2026-10-29, the Calendly-parity gap closed): a 60-min
+                  session can offer start times every 30. Null = step by the
+                  session length, the original behavior — existing types are
+                  untouched. */}
+              <select className="cset__select" value={bkEdit.slot_increment_min ?? ''}
+                onChange={(e) => setBkEdit((c) => ({ ...c, slot_increment_min: e.target.value ? Number(e.target.value) : null }))} aria-label="Start times every">
+                <option value="">Start times every session length</option>
+                {[15, 20, 30, 45, 60].map((n) => (
+                  <option key={n} value={n}>Start times every {n} min</option>
+                ))}
               </select>
               {/* Daily cap + group capacity (founder 2026-10-03, the
                   Calendly audit). Cap counts sessions, not seats — joining

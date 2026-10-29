@@ -262,6 +262,7 @@ const CALENDAR_TOOLS = [
         min_notice_min: { type: 'number', description: 'Minimum notice in MINUTES (24 hours = 1440). Default 60.' },
         max_days_out: { type: 'number', description: 'How far ahead people may book, in days (1–365). 0 = no limit (the default).' },
         max_per_day: { type: 'number', description: 'At most N sessions of this type per day (1–48). 0 = no cap (the default).' },
+        slot_increment: { type: 'number', description: 'Offered start times step by this many MINUTES, independent of the session length (a 60-min session starting every 30 — the Calendly shape). 5–240; 0 = step by the session length (the default).' },
         capacity: { type: 'number', description: '1 = one person per slot (default). More = a GROUP session: that many people share each slot and one calendar event, slots say "N left".' },
         questions: { type: 'array', items: { type: 'string' }, description: 'Up to 5 questions people must answer when booking; answers land on the request for them to read.' },
         unique_zoom: { type: 'boolean', description: 'true = a FRESH Zoom meeting is created on Lichen\'s own Zoom for every confirmed booking (nobody can land in a room booked for someone else; a cancelled booking\'s room is deleted). Only available to providers the platform has opened this to — the tool refuses otherwise, and that is a capacity limit, not an outage. Any video_link they also set becomes the fallback.' },
@@ -292,6 +293,7 @@ const CALENDAR_TOOLS = [
         min_notice_min: { type: 'number' },
         max_days_out: { type: 'number' },
         max_per_day: { type: 'number' },
+        slot_increment: { type: 'number', description: 'Start times step in minutes (5–240); 0 = back to stepping by the session length.' },
         capacity: { type: 'number' },
         questions: { type: 'array', items: { type: 'string' } },
         books_from: { type: 'string', enum: ['work', 'social', 'on_call', 'custom'] },
@@ -1633,7 +1635,7 @@ Deno.serve(async (req) => {
     if (name === 'my_calendar_setup') {
       const [hours, types, care, prof] = await Promise.all([
         (await sb(`availability_windows?profile_id=eq.${profile_id}&booking_type_id=is.null&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
-        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind&order=created_at`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind,slot_increment_min&order=created_at`)).json(),
         (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
         (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json(),
       ]);
@@ -1651,13 +1653,14 @@ Deno.serve(async (req) => {
         hours: hs.length
           ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
           : 'none set — they are not bookable and never counted available',
-        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null }) =>
+        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null; slot_increment_min: number | null }) =>
           `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}`
           + `${t.hours_kind && t.hours_kind !== 'work' ? `, books from ${t.hours_kind === 'custom' ? 'its OWN hours' : t.hours_kind.replace('_', '-') + ' hours'}` : ''}`
           + `${(t.capacity ?? 1) > 1 ? `, group of up to ${t.capacity}` : ''}`
           + `${t.min_notice_min != null && t.min_notice_min !== 60 ? `, ${t.min_notice_min >= 60 ? (t.min_notice_min / 60) + 'h' : t.min_notice_min + 'min'} notice` : ''}`
           + `${t.max_days_out != null ? `, bookable ${t.max_days_out} days out` : ''}`
           + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
+          + `${t.slot_increment_min != null ? `, starts every ${t.slot_increment_min} min` : ''}`
           + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
           + `${meetBy.get(t.id)?.zoom_unique ? ', unique Zoom meeting minted per booking' : ''}`
           + `${meetBy.get(t.id)?.url ? `, ${videoServiceOf(meetBy.get(t.id)!.url!) ?? 'video'} link set (shared only once a booking confirms)` : ''}`
@@ -1726,6 +1729,7 @@ Deno.serve(async (req) => {
       if (inp.min_notice_min !== undefined) { const n = Number(inp.min_notice_min); if (n >= 0 && n <= 20160) out.min_notice_min = n; else errs.push('min_notice_min must be 0–20160 (minutes; 24h = 1440)'); }
       if (inp.max_days_out !== undefined) { const n = Number(inp.max_days_out); if (n === 0) out.max_days_out = null; else if (n >= 1 && n <= 365) out.max_days_out = n; else errs.push('max_days_out must be 1–365, or 0 for no limit'); }
       if (inp.max_per_day !== undefined) { const n = Number(inp.max_per_day); if (n === 0) out.max_per_day = null; else if (n >= 1 && n <= 48) out.max_per_day = n; else errs.push('max_per_day must be 1–48, or 0 for no cap'); }
+      if (inp.slot_increment !== undefined) { const n = Number(inp.slot_increment); if (n === 0) out.slot_increment_min = null; else if (n >= 5 && n <= 240) out.slot_increment_min = n; else errs.push('slot_increment must be 5–240 minutes, or 0 to step by the session length'); }
       if (inp.capacity !== undefined) { const n = Number(inp.capacity); if (n >= 1 && n <= 200) out.capacity = n; else errs.push('capacity must be 1–200'); }
       if (inp.questions !== undefined) {
         const qs = (Array.isArray(inp.questions) ? inp.questions : []).map((q) => String(q).trim().slice(0, 200)).filter(Boolean).slice(0, 5);

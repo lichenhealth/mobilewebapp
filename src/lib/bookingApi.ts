@@ -40,6 +40,10 @@ export interface BookingType {
    *  lichen.health/book/<handle>/<slug> → straight to this type. Lowercase
    *  kebab, unique per member, null = no vanity link. */
   slug: string | null;
+  /** Offered start times step by this many minutes (founder 2026-10-29,
+   *  the Calendly-parity gap closed: a 60-min session can start every 30) —
+   *  null = step by the session length, the original behavior. */
+  slot_increment_min: number | null;
   /** Which hours pool this type books from (founder 2026-10-03: "an event
    *  itself can have hour rules"): work (the default — yesterday's
    *  behavior), social, on_call, or custom = its own weekly windows
@@ -74,7 +78,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -283,6 +287,7 @@ export interface BookingBoard {
     & {
       provider_id: string; min_notice_min?: number | null; max_days_out?: number | null;
       max_per_day?: number | null; capacity?: number | null; questions?: string[] | null;
+      slot_increment_min?: number | null;
       /** The provider's IANA timezone — slots are THEIR wall time. */
       provider_tz?: string | null;
     };
@@ -305,7 +310,10 @@ export async function loadBookingBoard(typeId: string, from: string, to: string)
 /** Open slot starts (minutes) for one day: inside a declared window, clear of
  *  every busy span (recurrence expanded with the calendar's own engine),
  *  buffered, past the type's minimum notice, and inside its booking window.
- *  Slots step by the session length. ⚠ The notice is a real datetime compare
+ *  Slots step by the type's slot_increment_min when set, else the session
+ *  length (an increment shorter than the session offers overlapping start
+ *  choices — whichever books first blocks the rest via the busy check, the
+ *  Calendly behavior). ⚠ The notice is a real datetime compare
  *  (slot's local midnight + minutes vs now + notice) — the old today-only
  *  minute compare let a 24h notice leak through at midnight. */
 export function slotsForDay(board: BookingBoard, iso: string, now = new Date()): number[] {
@@ -359,7 +367,8 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
     if (w.weekday !== weekday) continue;
     if (w.valid_from && w.valid_from > iso) continue;
     if (w.valid_to && w.valid_to < iso) continue;
-    for (let t = w.start_min; t + dur <= w.end_min; t += dur) {
+    const step = board.type.slot_increment_min ?? dur;
+    for (let t = w.start_min; t + dur <= w.end_min; t += step) {
       if (d.getTime() + t * 60000 < cutoffMs) continue;
       if (dayFull && capacity > 1 && !heldStarts.has(t)) continue;
       if (capacity > 1 && seatsLeft(board, iso, t) <= 0) continue;
