@@ -60,7 +60,7 @@ const MODES: { chip: Chip; label: string; icon: IconName; iconSize?: number; let
   // The rent sign renders bigger (founder 2026-10-29: "make the rent sign
   // bigger so it can be read") — the yard-sign glyph is detailed, 15px
   // smudged it.
-  { chip: 'rent',       label: 'Rent',        icon: 'rent', iconSize: 19 },
+  { chip: 'rent',       label: 'Rent',        icon: 'rent', iconSize: 22 },
   // "Lend", not "Lending" (founder 2026-10-23: "so that words are shorter"
   // — the lens still covers lend AND borrow, the 2026-08-13 one-coin merge).
   { chip: 'lend',       label: 'Lend',        icon: 'lend' },
