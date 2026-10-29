@@ -72,6 +72,7 @@ function RuleSelect(props: {
   decimals?: boolean;
   aria: string;
   onChange: (v: number | null) => void;
+  onBrain?: () => void;
 }) {
   const [custom, setCustom] = useState(false);
   const scale = props.scale ?? 1;
@@ -81,6 +82,7 @@ function RuleSelect(props: {
       <FitSelect
         className="cset__select"
         aria-label={props.aria}
+        onBrain={props.onBrain}
         value={custom ? 'custom' : listed ? String(props.value) : 'off:' + String(props.value)}
         onChange={(e) => {
           if (e.target.value === 'custom') { setCustom(true); return; }
@@ -122,6 +124,16 @@ export default function CalendarSettings() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  // THE BRAIN DOOR ON EVERY DROPDOWN (founder 2026-10-29: "it may help
+  // people learn that they don't have to do manual setup, but can go to the
+  // brain for cal and type in rules that generate bookings, availability,
+  // etc"): picking "✨ Ask the brain…" opens the calendar assistant with a
+  // started sentence, unsent — the member finishes it in their own words.
+  const brainTo = (ask: string) =>
+    navigate(`/assistant/feed?thread=calendar&convo=new&ask=${encodeURIComponent(ask)}`);
+  const hoursBrain = () => brainTo('Set my hours: ');
+  const typeBrain = () => brainTo(
+    bkEdit.title?.trim() ? `Change my "${bkEdit.title.trim()}" session: ` : 'Set up my session type: ');
   const confirmDialog = useConfirm();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
@@ -149,6 +161,11 @@ export default function CalendarSettings() {
   // people work a typical work week (founder 2026-10-19), so one Add can lay
   // down the whole set. Storage stays one row per day either way.
   const [wDay, setWDay] = useState<string>('weekdays');
+  // The composer FOLDS now (founder 2026-10-29: "I decided I don't want to
+  // add any but there's no 'x' out option… would like an x in line so I
+  // don't have to navigate") — a ⊕ Add hours pill opens it, the inline ✕
+  // closes it right there.
+  const [wOpen, setWOpen] = useState(false);
   const [wStart, setWStart] = useState(9 * 60);
   const [wEnd, setWEnd] = useState(17 * 60);
   const [wKind, setWKind] = useState<AvailabilityKind>('available');
@@ -325,26 +342,32 @@ export default function CalendarSettings() {
               <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
             </div>
           ))}
+          {!wOpen && (
+            <button className="cedit__add cedit__add--sm" onClick={() => setWOpen(true)}>
+              <Icon name="plus" size={12} /> Add hours
+            </button>
+          )}
+          {wOpen && (
           <div className="cset__add">
             {/* The KIND leads (founder 2026-08-19): what these hours ARE, then
                 when. On call is offered only to active caregivers — a duty of
                 a role, not a general setting; rows someone already has always
                 render, and the option returns while any exist so they can be
                 understood and removed. */}
-            <FitSelect className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
+            <FitSelect className="cset__select" value={wKind} onBrain={hoursBrain} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
               <option value="available">Work</option>
               <option value="social">Social</option>
               {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
             </FitSelect>
-            <FitSelect className="cset__select" value={wDay} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
+            <FitSelect className="cset__select" value={wDay} onBrain={hoursBrain} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
               <option value="weekdays">Monday – Friday</option>
               <option value="weekend">Saturday &amp; Sunday</option>
               <option value="everyday">Every day</option>
               {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
             </FitSelect>
-            <TimeField value={wStart} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+            <TimeField value={wStart} onBrain={hoursBrain} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
             <span className="rec__lbl">to</span>
-            <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
+            <TimeField value={wEnd} onBrain={hoursBrain} onChange={setWEnd} min={wStart} ariaLabel="Until" />
             <button
               className="cedit__add cedit__add--sm"
               onClick={() => act(() => addAvailability(me, {
@@ -357,7 +380,15 @@ export default function CalendarSettings() {
             >
               <Icon name="plus" size={12} /> Add
             </button>
+            <button
+              className="cedit__remove"
+              aria-label="Never mind — close without adding"
+              onClick={() => setWOpen(false)}
+            >
+              <Icon name="close" size={12} />
+            </button>
           </div>
+          )}
           {myPhone !== null && !myPhone && windows.some((w) => w.kind === 'on_call') && (
             <p className="cedit__hint">
               You have on-call hours but no phone number — add one in your{' '}
@@ -488,8 +519,7 @@ export default function CalendarSettings() {
                 value={bkEdit.duration_min ?? 60}
                 options={[30, 45, 60, 90, 120].map((m) => ({ v: m, label: `${m} min` }))}
                 offLabel={(v) => `${v} min`}
-                unit="minutes" min={15} max={480} aria="Length"
-                onChange={(v) => setBkEdit((c) => ({ ...c, duration_min: v ?? 60 }))}
+                unit="minutes" min={15} max={480} aria="Length" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, duration_min: v ?? 60 }))}
               />
               <input
                 className="cedit__input cset__extfield"
@@ -576,7 +606,7 @@ export default function CalendarSettings() {
                   </span>
                 </label>
               )}
-              <FitSelect className="cset__select" value={bkEdit.approval ?? 'request'}
+              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.approval ?? 'request'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
                 <option value="request">I approve each request</option>
                 <option value="instant">Book instantly</option>
@@ -596,8 +626,7 @@ export default function CalendarSettings() {
                   { v: 2880, label: 'At least 48 hours\u2019 notice' },
                 ]}
                 offLabel={(v) => v >= 60 && v % 60 === 0 ? `At least ${v / 60} hours\u2019 notice` : `At least ${v} min notice`}
-                unit="hours" scale={60} min={0} max={336} decimals aria="Minimum notice"
-                onChange={(v) => setBkEdit((c) => ({ ...c, min_notice_min: v ?? 60 }))}
+                unit="hours" scale={60} min={0} max={336} decimals aria="Minimum notice" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, min_notice_min: v ?? 60 }))}
               />
               <RuleSelect
                 value={bkEdit.max_days_out ?? null}
@@ -610,8 +639,7 @@ export default function CalendarSettings() {
                   { v: 84, label: 'Up to 12 weeks out' },
                 ]}
                 offLabel={(v) => `Up to ${v} days out`}
-                unit="days" min={1} max={365} aria="How far out people can book"
-                onChange={(v) => setBkEdit((c) => ({ ...c, max_days_out: v }))}
+                unit="days" min={1} max={365} aria="How far out people can book" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, max_days_out: v }))}
               />
               {/* Start-time increments independent of session length (founder
                   2026-10-29, the Calendly-parity gap closed): a 60-min
@@ -625,8 +653,7 @@ export default function CalendarSettings() {
                   ...[15, 20, 30, 45, 60].map((n) => ({ v: n, label: `Start times every ${n} min` })),
                 ]}
                 offLabel={(v) => `Start times every ${v} min`}
-                unit="minutes" min={5} max={240} aria="Start times every"
-                onChange={(v) => setBkEdit((c) => ({ ...c, slot_increment_min: v }))}
+                unit="minutes" min={5} max={240} aria="Start times every" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, slot_increment_min: v }))}
               />
               {/* Daily cap + group capacity (founder 2026-10-03, the
                   Calendly audit). Cap counts sessions, not seats — joining
@@ -638,8 +665,7 @@ export default function CalendarSettings() {
                   ...[1, 2, 3, 4, 6].map((n) => ({ v: n, label: `At most ${n} ${n === 1 ? 'session' : 'sessions'} a day` })),
                 ]}
                 offLabel={(v) => `At most ${v} sessions a day`}
-                unit="sessions" min={1} max={48} aria="Daily limit"
-                onChange={(v) => setBkEdit((c) => ({ ...c, max_per_day: v }))}
+                unit="sessions" min={1} max={48} aria="Daily limit" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, max_per_day: v }))}
               />
               <RuleSelect
                 value={bkEdit.capacity ?? 1}
@@ -648,13 +674,12 @@ export default function CalendarSettings() {
                   ...[2, 4, 6, 8, 10, 12, 20].map((n) => ({ v: n, label: `Group — up to ${n} people` })),
                 ]}
                 offLabel={(v) => `Group — up to ${v} people`}
-                unit="people" min={1} max={200} aria="Group size"
-                onChange={(v) => setBkEdit((c) => ({ ...c, capacity: v ?? 1 }))}
+                unit="people" min={1} max={200} aria="Group size" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, capacity: v ?? 1 }))}
               />
               {/* An event's HOUR RULES (founder 2026-10-03: "it can be work,
                   social, or on call if you have that; or custom and you can
                   set hours for that event type"). */}
-              <FitSelect className="cset__select" value={bkEdit.hours_kind ?? 'work'}
+              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.hours_kind ?? 'work'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, hours_kind: e.target.value as BookingType['hours_kind'] }))} aria-label="Books from which hours">
                 <option value="work">Books from your work hours</option>
                 <option value="social">Books from your social hours</option>
@@ -673,15 +698,15 @@ export default function CalendarSettings() {
                     </div>
                   ))}
                   <div className="cset__typehour-add">
-                    <FitSelect className="cset__select" value={chDay} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
+                    <FitSelect className="cset__select" value={chDay} onBrain={typeBrain} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
                       <option value="weekdays">Monday – Friday</option>
                       <option value="weekend">Saturday &amp; Sunday</option>
                       <option value="everyday">Every day</option>
                       {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
                     </FitSelect>
-                    <TimeField value={chStart} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+                    <TimeField value={chStart} onBrain={typeBrain} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
                     <span className="rec__lbl">to</span>
-                    <TimeField value={chEnd} onChange={setChEnd} min={chStart} ariaLabel="Until" />
+                    <TimeField value={chEnd} onBrain={typeBrain} onChange={setChEnd} min={chStart} ariaLabel="Until" />
                     <button className="cedit__add cedit__add--sm"
                       onClick={() => {
                         const days = chDay === 'weekdays' ? [0, 1, 2, 3, 4]
@@ -770,7 +795,7 @@ export default function CalendarSettings() {
                 placeholder={'Questions to ask when someone books — one per line, up to five.\ne.g. What would you like to focus on?'}
                 rows={2}
               />
-              <FitSelect className="cset__select" value={bkEdit.audience ?? 'everyone'}
+              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="public">Anyone — even outside Lichen, via your link</option>
                 <option value="everyone">Anyone on Lichen</option>
