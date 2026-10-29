@@ -284,26 +284,40 @@ Deno.serve(async (req) => {
       // the mint lands — a paid session is never dropped. Bank debits ride
       // the same async_payment_succeeded path as loads (the 2026-10-02 rule:
       // nothing mints before funds land).
-      if (s.metadata?.kind === 'booking_payment' && s.metadata?.booking && s.payment_status === 'paid') {
-        const { error } = await admin.rpc('record_booking_payment', {
-          p_booking: s.metadata.booking,
-          p_session: s.id,
-          p_amount_cents: s.amount_total ?? 0,
-        });
-        if (error) throw new Error(`record_booking_payment: ${error.message}`);
-        // A guest's receipt: re-send their booking mail, which now carries
-        // the Paid ✓ state — best-effort, the mint above is the truth.
-        try {
-          const { data: bk } = await admin.from('bookings')
-            .select('guest_token, guest_email').eq('id', s.metadata.booking).maybeSingle();
-          if (bk?.guest_token && bk?.guest_email) {
-            await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-booking-mail`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: bk.guest_token }),
-            });
-          }
-        } catch (e) { console.error('booking paid mail:', e); }
+      if (s.metadata?.kind === 'booking_payment' && s.metadata?.booking) {
+        if (s.payment_status === 'paid') {
+          const { error } = await admin.rpc('record_booking_payment', {
+            p_booking: s.metadata.booking,
+            p_session: s.id,
+            p_amount_cents: s.amount_total ?? 0,
+          });
+          if (error) throw new Error(`record_booking_payment: ${error.message}`);
+          // A guest's receipt: re-send their booking mail, which now carries
+          // the Paid ✓ state — best-effort, the mint above is the truth.
+          try {
+            const { data: bk } = await admin.from('bookings')
+              .select('guest_token, guest_email').eq('id', s.metadata.booking).maybeSingle();
+            if (bk?.guest_token && bk?.guest_email) {
+              await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-booking-mail`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: bk.guest_token }),
+              });
+            }
+          } catch (e) { console.error('booking paid mail:', e); }
+        } else {
+          // A BANK transfer completed checkout unpaid (founder 2026-10-29,
+          // "bank transfer" among the payment options — the 2026-10-02 async
+          // lesson): mark it in transit so the pay door closes while the
+          // money rides. Nothing mints until async_payment_succeeded runs
+          // the paid block above. Best-effort — a failure here loses only
+          // the display, never money.
+          try {
+            await admin.from('bookings')
+              .update({ payment_pending_at: new Date().toISOString() })
+              .eq('id', s.metadata.booking).is('paid_at', null);
+          } catch (e) { console.error('booking payment pending stamp:', e); }
+        }
       }
 
       const giveKind = s.metadata?.kind === 'sponsorship' ? 'sponsorship'
@@ -361,6 +375,34 @@ Deno.serve(async (req) => {
         await admin.from('pending_loads')
           .update({ status: 'failed', resolved_at: new Date().toISOString() })
           .eq('stripe_session_id', s.id).eq('status', 'pending');
+      }
+      // A booking's bank transfer bounced: reopen the pay door, tell the
+      // provider, and re-mail the guest — the mail derives from the row, so
+      // it honestly reads "pay at the link below" again.
+      if (s.metadata?.kind === 'booking_payment' && s.metadata?.booking) {
+        const { data: bk } = await admin.from('bookings')
+          .update({ payment_pending_at: null })
+          .eq('id', s.metadata.booking).is('paid_at', null)
+          .select('provider_id, guest_token, guest_email, guest_name, price_cents').maybeSingle();
+        if (bk) {
+          try {
+            await admin.from('notifications').insert({
+              recipient_id: bk.provider_id, section: 'calendar', type: 'booking',
+              title: `${bk.guest_name ?? 'A booker'}'s bank transfer didn't go through`,
+              body: 'Their payment door is open again — they were emailed the link.',
+              link: '/bookings',
+            });
+          } catch (e) { console.error('bank-fail bell:', e); }
+          if (bk.guest_token && bk.guest_email) {
+            try {
+              await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-booking-mail`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: bk.guest_token }),
+              });
+            } catch (e) { console.error('bank-fail mail:', e); }
+          }
+        }
       }
     }
   } catch (err) {

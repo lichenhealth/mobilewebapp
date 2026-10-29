@@ -436,9 +436,23 @@ export default function CalendarSettings() {
               />
               {bkEdit.price_cents != null && (
                 <p className="cedit__hint cset__linkhint">
-                  {usdLabel(bkEdit.price_cents)} collected by card at booking ($1–$5,000) — you receive it
-                  as Current-cy, or as dollars via your wallet&rsquo;s cash-out choice.
+                  {usdLabel(bkEdit.price_cents)} collected by card or US bank transfer at booking
+                  ($1–$5,000) — you receive it as Current-cy, or as dollars via your
+                  wallet&rsquo;s cash-out choice.
                 </p>
+              )}
+              {bkEdit.price_cents != null && (
+                <label className="cset__zoomcheck">
+                  <input
+                    type="checkbox"
+                    checked={bkEdit.allow_pay_later !== false}
+                    onChange={(e) => setBkEdit((c) => ({ ...c, allow_pay_later: e.target.checked }))}
+                  />
+                  <span>
+                    Offer <strong>&ldquo;invoice me later&rdquo;</strong> at booking — they can settle
+                    from their booking link any time. Unchecked, payment is asked up front.
+                  </span>
+                </label>
               )}
               <input
                 className="cedit__input cset__grow"

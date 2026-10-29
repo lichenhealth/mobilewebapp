@@ -96,11 +96,15 @@ export default function Bookings() {
     <span className="bkg__row-note">
       {b.paid_at
         ? <strong style={{ color: 'var(--green-deep, #4a7a52)' }}>Paid ✓ · {usdLabel(b.price_cents)}</strong>
-        : <>Awaiting payment · {usdLabel(b.price_cents)}</>}
+        : b.payment_pending_at
+          ? <>Bank transfer clearing · {usdLabel(b.price_cents)}</>
+          : b.pay_choice === 'later'
+            ? <>To be invoiced · {usdLabel(b.price_cents)}</>
+            : <>Awaiting payment · {usdLabel(b.price_cents)}</>}
     </span>
   );
   const payBtn = (b: BookingRow) =>
-    payOpen({ status: b.status, price_cents: b.price_cents, paid_at: b.paid_at, approval: b.type?.approval }) ? (
+    payOpen({ status: b.status, price_cents: b.price_cents, paid_at: b.paid_at, approval: b.type?.approval, payment_pending_at: b.payment_pending_at }) ? (
       <button className="btn btn-primary bkg__btn" onClick={() => {
         void act(async () => { window.location.href = await startBookingCheckout({ bookingId: b.id }); });
       }}>Pay {usdLabel(b.price_cents!)}</button>

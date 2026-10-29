@@ -111,3 +111,12 @@
 .bkg__slot.is-on .bkg__seats { color: inherit; }
 .bkg__q { display: flex; flex-direction: column; gap: 4px; }
 .bkg__q > span { font-size: 12.5px; color: var(--ink-soft); }
+
+/* Payment options at booking (founder 2026-10-29): pay-now vs invoice-me
+ * pills in the confirm panel — the slot-chip grammar, side by side. */
+.bkpub__paychoice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 6px;
+}
