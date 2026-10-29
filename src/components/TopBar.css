@@ -162,6 +162,10 @@
 }
 .top-bar__acting .avatar { width: 100% !important; height: 100% !important; }
 .top-bar__acting.is-entity { border: 2px solid var(--peach); }
+/* Signed out the chip holds the Sign-in PILL, not a face — the fixed 38px
+   circle (2026-10-12) clipped its lettering ("Sign i…", founder 2026-10-29:
+   "the sign in error seems to be back"). Let the pill keep its own width. */
+.top-bar__acting--out { width: auto; border: 0; overflow: visible; background: none; }
 .top-bar__acting-avatar {
   width: 100%; height: 100%; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;
