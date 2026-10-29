@@ -228,7 +228,24 @@ the WeavePitch template.
   dollars"): answered with the standing flag — proposed safe v1 is a
   request door + admin-approved manual payout (burn + founder pays by
   hand, W-9/1099 tally), automatic payouts (Stripe Connect) only after
-  the attorney consult. Awaiting her go; nothing built yet.
+  the attorney consult. **HER GO CAME 2026-10-29** ("Let's do both — you
+  can choose to have it be cash out, current-cy or either as the
+  practitioner" + "Let's have these options exist across the platform")
+  and the SAFE V1 SHAPE ABOVE IS LIVE (see CLAUDE.md's PAYMENTS ON
+  BOOKINGS + CASH-OUT entry): bookings collect real dollars by card
+  (booking_types.price_cents, frozen per booking; request types never
+  charge before her accept), providers accrue Current 1:1 (float rule
+  holds), payout_pref chooses keep-vs-auto-cash-out, the wallet's
+  Cash-out door covers the WHOLE balance (sessions, Marketplace, gifts),
+  and the admin Payouts desk (/admin/supporters#payouts) marks dollars
+  paid BY HAND with per-member year totals flagging $600+ 1099
+  territory. ⚠ The fintech-attorney flag STANDS — manual founder-paid
+  payouts are the lowest-transmission-risk shape, but the consult (money
+  transmission / stored value / barter-exchange classification) is still
+  hers to have before Connect automation or any volume. ⚠ The
+  loaded-vs-earned accounting rule (a refund of a load ≠ income) is
+  still undesigned — today's desk notes say HOW each payout was sent,
+  not which Current it drew from; raise before 1099 season.
   **Her follow-up tax design, with one caution** (same day: "email folks
   income documentation when they take currentcy earned ON lichen and
   export it into dollars, as that's when the IRS cares… if it stays
@@ -243,7 +260,12 @@ the WeavePitch template.
   may be taxable; here's your documentation" but must NEVER promise
   "Current kept on-platform isn't taxable" until Eva/the attorney sign
   off. Loaded-vs-earned Current also needs an accounting rule before
-  payouts are labeled (a refund of a load ≠ income).
+  payouts are labeled (a refund of a load ≠ income). **HELD 2026-10-29**:
+  she repeated the framing while greenlighting cash-out ("knowing that if
+  things keep flowing internally as current-cy, they're not taxable
+  income") — the shipped copy stayed NEUTRAL per this flag ("stays in the
+  Lichen economy", "tracked for tax reporting", "ask your tax person"),
+  and she was told plainly why in the ship report.
   (3) **Gifts come FROM Current-cy** ("a gift can be made from current-cy"):
   the wallet's Send + a load-the-shortfall prompt replace the dollar-gift
   door once loads are live; ⚡ (the bolt icon) is Current-cy's $ sign.
