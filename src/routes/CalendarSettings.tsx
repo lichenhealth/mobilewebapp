@@ -178,6 +178,11 @@ export default function CalendarSettings() {
   const [bkHours, setBkHours] = useState<TypeHourRow[]>([]);
   const [bkConds, setBkConds] = useState<TypeCondition[]>([]);
   const [condQ, setCondQ] = useState('');
+  // The rules field explains itself on focus (founder 2026-10-29: the old
+  // placeholder was cut off AND read like the baseline you're-free check —
+  // "have the box expand to reveal the entire text before the person can
+  // type in"; her meditation-room example carries the explainer).
+  const [condFocus, setCondFocus] = useState(false);
   const [condHits, setCondHits] = useState<TypeCondition[]>([]);
   // Batch day options for a type's OWN hours too (founder 2026-10-29:
   // "Let's have the Monday - Friday and other options on the standard cal
@@ -719,14 +724,26 @@ export default function CalendarSettings() {
                 ))}
                 <input
                   className="cedit__input cset__grow"
-                  placeholder="Rule: only when a person or bookable area is free? Search…"
+                  placeholder="Rule: only if someone or something else is free…"
                   value={condQ}
+                  onFocus={() => setCondFocus(true)}
+                  onBlur={() => setCondFocus(false)}
                   onChange={(e) => {
                     const v = e.target.value; setCondQ(v);
                     void searchConditionTargets(v).then((hits) => setCondHits(
                       hits.filter((h) => !bkConds.some((c) => c.target_id === h.target_id))));
                   }}
                 />
+                {(condFocus || condQ.trim().length > 0) && (
+                  <p className="cedit__hint cset__linkhint">
+                    Your own free time is always checked — a rule adds someone or
+                    something <strong>else</strong> that must (or must not) be free:
+                    &ldquo;only if Melanie is free&rdquo;, &ldquo;only if the meditation
+                    room is open&rdquo;. Type a member&rsquo;s name or a bookable area
+                    &amp; thing to add one. (Rules shape the open slots — booking the
+                    room itself is still its own act.)
+                  </p>
+                )}
                 {condQ.trim().length >= 2 && condHits.map((h) => (
                   <button className="cedit__add cedit__add--sm" key={h.target_id}
                     onClick={() => { setBkConds((rows) => [...rows, h]); setCondQ(''); setCondHits([]); }}>
