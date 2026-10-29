@@ -564,3 +564,39 @@
 }
 .mkt__trustlens-chip:hover { color: var(--ink); }
 .mkt__trustlens-chip.is-on { color: var(--peach-deep); font-weight: 600; }
+
+/* THE LENS SPEAKS ON HOVER (founder 2026-10-29: "when you hover over each
+ * icon, can the text appear so people don't have to guess" — replacing the
+ * slow native title tooltip with a prompt one). Hover and keyboard focus
+ * alike; phones tap to toggle, where the lit state itself teaches. */
+.mkt__lensrow .mkt__action { position: relative; }
+.mkt__lensrow .mkt__action::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bone);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease-out) 0.08s;
+  z-index: 30;
+}
+.mkt__lensrow .mkt__action:hover::after,
+.mkt__lensrow .mkt__action:focus-visible::after { opacity: 1; }
+/* The last lens's tip hugs the right edge instead of poking past it. */
+.mkt__lensrow .mkt__action:last-child::after { left: auto; right: 0; transform: none; }
+
+/* ISO as LETTERS (founder 2026-10-29) — the circle says the word itself. */
+.mkt__action-letters {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}

@@ -1,4 +1,5 @@
 import { TIME_STEPS, minToLabel } from '../lib/calendarApi';
+import FitSelect from './FitSelect';
 
 interface Props {
   value: number;                    // minutes since local midnight
@@ -12,14 +13,16 @@ export default function TimeField({ value, onChange, min, ariaLabel }: Props) {
   const steps = min == null ? TIME_STEPS : TIME_STEPS.filter((m) => m > min);
   // Keep the current value selectable even if it violates min (transient states).
   const options = steps.includes(value) ? steps : [value, ...steps].sort((a, b) => a - b);
+  // FitSelect (founder 2026-10-29): the pill is as wide as "9am", not as
+  // wide as "12:45pm" — the platform's hug-the-selection rule.
   return (
-    <select
+    <FitSelect
       className="timefield"
       value={value}
       aria-label={ariaLabel ?? 'Time'}
       onChange={(e) => onChange(Number(e.target.value))}
     >
       {options.map((m) => <option key={m} value={m}>{minToLabel(m)}</option>)}
-    </select>
+    </FitSelect>
   );
 }

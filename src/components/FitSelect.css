@@ -1,0 +1,28 @@
+/* FitSelect — a select exactly as wide as its current selection (founder
+ * 2026-10-29). The ghost span wears the select's own className, so padding,
+ * font and chevron room mirror whatever pill class the caller uses; the
+ * select overlays it in the same grid cell. */
+
+.fitsel {
+  display: inline-grid;
+  grid-template-areas: 'f';
+  align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fitsel__ghost {
+  grid-area: f;
+  visibility: hidden;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.fitsel > select {
+  grid-area: f;
+  /* width: 0 keeps the select's own intrinsic width (its WIDEST option) out
+   * of the grid track's sizing — the hidden ghost alone decides the cell —
+   * while min-width: 100% stretches the select back over it. */
+  width: 0;
+  min-width: 100%;
+}

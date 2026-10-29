@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import TimeField from '../components/TimeField';
+import FitSelect from '../components/FitSelect';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { WEEKDAYS_SHORT, WEEKDAYS_FULL } from '../lib/recurrence';
@@ -255,17 +256,17 @@ export default function CalendarSettings() {
                 a role, not a general setting; rows someone already has always
                 render, and the option returns while any exist so they can be
                 understood and removed. */}
-            <select className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
+            <FitSelect className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
               <option value="available">Work</option>
               <option value="social">Social</option>
               {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
-            </select>
-            <select className="cset__select" value={wDay} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
+            </FitSelect>
+            <FitSelect className="cset__select" value={wDay} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
               <option value="weekdays">Monday – Friday</option>
               <option value="weekend">Saturday &amp; Sunday</option>
               <option value="everyday">Every day</option>
               {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
-            </select>
+            </FitSelect>
             <TimeField value={wStart} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
             <span className="rec__lbl">to</span>
             <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
@@ -408,10 +409,10 @@ export default function CalendarSettings() {
                 value={bkEdit.title ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, title: e.target.value }))}
               />
-              <select className="cset__select" value={bkEdit.duration_min ?? 60}
+              <FitSelect className="cset__select" value={bkEdit.duration_min ?? 60}
                 onChange={(e) => setBkEdit((c) => ({ ...c, duration_min: Number(e.target.value) }))} aria-label="Length">
                 {[30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}
-              </select>
+              </FitSelect>
               <input
                 className="cedit__input cset__extfield"
                 placeholder="Price (e.g. $90, Free)"
@@ -497,16 +498,16 @@ export default function CalendarSettings() {
                   </span>
                 </label>
               )}
-              <select className="cset__select" value={bkEdit.approval ?? 'request'}
+              <FitSelect className="cset__select" value={bkEdit.approval ?? 'request'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
                 <option value="request">I approve each request</option>
                 <option value="instant">Book instantly</option>
-              </select>
+              </FitSelect>
               {/* Calendly-parity scheduling rules (founder 2026-10-03): how
                   close to now a slot may start, and how far out the book
                   opens. Enforced client-side in slotsForDay AND server-side
                   by the booking_notice_window trigger. */}
-              <select className="cset__select" value={bkEdit.min_notice_min ?? 60}
+              <FitSelect className="cset__select" value={bkEdit.min_notice_min ?? 60}
                 onChange={(e) => setBkEdit((c) => ({ ...c, min_notice_min: Number(e.target.value) }))} aria-label="Minimum notice">
                 <option value={0}>No minimum notice</option>
                 <option value={60}>At least 1 hour&rsquo;s notice</option>
@@ -514,8 +515,8 @@ export default function CalendarSettings() {
                 <option value={720}>At least 12 hours&rsquo; notice</option>
                 <option value={1440}>At least 24 hours&rsquo; notice</option>
                 <option value={2880}>At least 48 hours&rsquo; notice</option>
-              </select>
-              <select className="cset__select" value={bkEdit.max_days_out ?? ''}
+              </FitSelect>
+              <FitSelect className="cset__select" value={bkEdit.max_days_out ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, max_days_out: e.target.value ? Number(e.target.value) : null }))} aria-label="How far out people can book">
                 <option value="">Bookable any time ahead</option>
                 <option value={7}>Up to 1 week out</option>
@@ -523,46 +524,46 @@ export default function CalendarSettings() {
                 <option value={28}>Up to 4 weeks out</option>
                 <option value={56}>Up to 8 weeks out</option>
                 <option value={84}>Up to 12 weeks out</option>
-              </select>
+              </FitSelect>
               {/* Start-time increments independent of session length (founder
                   2026-10-29, the Calendly-parity gap closed): a 60-min
                   session can offer start times every 30. Null = step by the
                   session length, the original behavior — existing types are
                   untouched. */}
-              <select className="cset__select" value={bkEdit.slot_increment_min ?? ''}
+              <FitSelect className="cset__select" value={bkEdit.slot_increment_min ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, slot_increment_min: e.target.value ? Number(e.target.value) : null }))} aria-label="Start times every">
                 <option value="">Start times every session length</option>
                 {[15, 20, 30, 45, 60].map((n) => (
                   <option key={n} value={n}>Start times every {n} min</option>
                 ))}
-              </select>
+              </FitSelect>
               {/* Daily cap + group capacity (founder 2026-10-03, the
                   Calendly audit). Cap counts sessions, not seats — joining
                   a group slot already on the books is never a new one. */}
-              <select className="cset__select" value={bkEdit.max_per_day ?? ''}
+              <FitSelect className="cset__select" value={bkEdit.max_per_day ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, max_per_day: e.target.value ? Number(e.target.value) : null }))} aria-label="Daily limit">
                 <option value="">No daily limit</option>
                 {[1, 2, 3, 4, 6].map((n) => (
                   <option key={n} value={n}>At most {n} {n === 1 ? 'session' : 'sessions'} a day</option>
                 ))}
-              </select>
-              <select className="cset__select" value={bkEdit.capacity ?? 1}
+              </FitSelect>
+              <FitSelect className="cset__select" value={bkEdit.capacity ?? 1}
                 onChange={(e) => setBkEdit((c) => ({ ...c, capacity: Number(e.target.value) }))} aria-label="Group size">
                 <option value={1}>One person per slot (1:1)</option>
                 {[2, 4, 6, 8, 10, 12, 20].map((n) => (
                   <option key={n} value={n}>Group — up to {n} people</option>
                 ))}
-              </select>
+              </FitSelect>
               {/* An event's HOUR RULES (founder 2026-10-03: "it can be work,
                   social, or on call if you have that; or custom and you can
                   set hours for that event type"). */}
-              <select className="cset__select" value={bkEdit.hours_kind ?? 'work'}
+              <FitSelect className="cset__select" value={bkEdit.hours_kind ?? 'work'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, hours_kind: e.target.value as BookingType['hours_kind'] }))} aria-label="Books from which hours">
                 <option value="work">Books from your work hours</option>
                 <option value="social">Books from your social hours</option>
                 {(isCaregiver || bkEdit.hours_kind === 'on_call') && <option value="on_call">Books from your on-call hours</option>}
                 <option value="custom">Has its own hours</option>
-              </select>
+              </FitSelect>
               {(bkEdit.hours_kind === 'custom') && (
                 <div className="cset__typehours">
                   {bkHours.map((h, i) => (
@@ -575,9 +576,9 @@ export default function CalendarSettings() {
                     </div>
                   ))}
                   <div className="cset__typehour-add">
-                    <select className="cset__select" value={chDay} onChange={(e) => setChDay(Number(e.target.value))} aria-label="Day">
+                    <FitSelect className="cset__select" value={chDay} onChange={(e) => setChDay(Number(e.target.value))} aria-label="Day">
                       {WEEKDAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                    </select>
+                    </FitSelect>
                     <TimeField value={chStart} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
                     <span className="rec__lbl">to</span>
                     <TimeField value={chEnd} onChange={setChEnd} min={chStart} ariaLabel="Until" />
@@ -600,11 +601,11 @@ export default function CalendarSettings() {
                 {bkConds.map((c, i) => (
                   <div className="cset__typehour" key={i}>
                     <span>{c.label ?? 'Someone'}</span>
-                    <select className="cset__select" value={c.require} aria-label="Rule"
+                    <FitSelect className="cset__select" value={c.require} aria-label="Rule"
                       onChange={(e) => setBkConds((rows) => rows.map((r, j) => j === i ? { ...r, require: e.target.value as TypeCondition['require'] } : r))}>
                       <option value="available">must be available</option>
                       <option value="unavailable">must NOT be available</option>
-                    </select>
+                    </FitSelect>
                     <button className="cedit__remove" aria-label="Remove this rule"
                       onClick={() => setBkConds((rows) => rows.filter((_, j) => j !== i))}>
                       <Icon name="close" size={12} />
@@ -647,19 +648,19 @@ export default function CalendarSettings() {
                 placeholder={'Questions to ask when someone books — one per line, up to five.\ne.g. What would you like to focus on?'}
                 rows={2}
               />
-              <select className="cset__select" value={bkEdit.audience ?? 'everyone'}
+              <FitSelect className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="public">Anyone — even outside Lichen, via your link</option>
                 <option value="everyone">Anyone on Lichen</option>
                 <option value="mycelium">My-celium only</option>
                 <option value="space">Members of one of your groups…</option>
-              </select>
+              </FitSelect>
               {bkEdit.audience === 'space' && (
-                <select className="cset__select" value={bkEdit.audience_space_id ?? ''}
+                <FitSelect className="cset__select" value={bkEdit.audience_space_id ?? ''}
                   onChange={(e) => setBkEdit((c) => ({ ...c, audience_space_id: e.target.value || null }))} aria-label="Which group">
                   <option value="">Pick the group…</option>
                   {mySpaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
-                </select>
+                </FitSelect>
               )}
               <button
                 className="cedit__add cedit__add--sm"
