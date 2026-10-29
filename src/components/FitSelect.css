@@ -20,6 +20,9 @@
   visibility: hidden;
   white-space: pre;
   overflow: hidden;
+  /* A 2px safety so sub-pixel font differences between a span and a native
+   * select can never shave the last letter (seen live: "No daily limi…"). */
+  border-right: 2px solid transparent;
 }
 
 .fitsel > select {
@@ -29,4 +32,7 @@
    * while min-width: 100% stretches the select back over it. */
   width: 0;
   min-width: 100%;
+  /* Form controls don't inherit letter-spacing; the ghost span does — make
+   * them render the same text at the same width. */
+  letter-spacing: inherit;
 }
