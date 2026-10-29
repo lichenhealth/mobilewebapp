@@ -15,9 +15,21 @@ export default function PayoutsDesk() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  // The cash-out bells deep-link here (#payouts — founder 2026-10-29,
+  // "Just seems confusing" when a bell landed at the top of the invite
+  // page): answer the anchor even when nothing waits, and scroll to it
+  // once the rows have loaded (the /invite#door lesson — scroll after the
+  // content above has had its chance to land).
+  const called = typeof location !== 'undefined' && location.hash === '#payouts';
+  const [loaded, setLoaded] = useState(false);
 
-  const load = useCallback(async () => { setRows(await listAllPayouts()); }, []);
+  const load = useCallback(async () => { setRows(await listAllPayouts()); setLoaded(true); }, []);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!called || !loaded) return;
+    const el = document.getElementById('payouts');
+    if (el) setTimeout(() => el.scrollIntoView({ block: 'start' }), 150);
+  }, [called, loaded]);
 
   const waiting = rows.filter((r) => r.status === 'requested');
   const paid = rows.filter((r) => r.status === 'paid');
@@ -35,7 +47,7 @@ export default function PayoutsDesk() {
     return [...by.values()].sort((a, b) => b.total - a.total);
   }, [paid]);
 
-  if (!rows.length) return null;
+  if (!rows.length && !called) return null;
 
   const act = async (id: string, fn: () => Promise<void>) => {
     setBusy(id); setError('');
@@ -47,14 +59,16 @@ export default function PayoutsDesk() {
     iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
   return (
-    <section className="adminc__gift curc__mint">
+    <section className="adminc__gift curc__mint" id="payouts" style={{ scrollMarginTop: 'calc(var(--top-h, 64px) + 10px)' }}>
       <h2 className="adminc__h2">Payouts — cash-outs to pay</h2>
       <p className="adminc__sub">
         Their Current is already set aside; paying the dollars is your act (bank,
         Venmo, check — note how). $600+ paid to one person in a year is 1099 territory.
       </p>
       {error && <p className="curc__error">{error}</p>}
-      {waiting.length === 0 && <p className="curc__empty">Nothing waiting.</p>}
+      {waiting.length === 0 && (
+        <p className="curc__empty">Nothing waiting right now — every cash-out is settled or returned.</p>
+      )}
       {waiting.map((r) => (
         <div className="curc__donation" key={r.id} style={{ flexWrap: 'wrap', gap: 8 }}>
           <span>

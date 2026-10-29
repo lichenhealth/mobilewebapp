@@ -6,7 +6,9 @@ import type { Recurrence } from './recurrence';
 // Session types are the practitioner's offerings; slots come from declared
 // hours minus ALL busy time (Lichen events, imported calendars, held
 // bookings); a confirmed booking is a real events row on both calendars.
-// No payments v1 — price is words, money moves as it already does.
+// Payments shipped 2026-10-29: a type may collect price_cents by card at
+// booking (booking-checkout → stripe-webhook → record_booking_payment);
+// the words-price stays for display/sliding.
 
 export interface BookingType {
   id: string;
