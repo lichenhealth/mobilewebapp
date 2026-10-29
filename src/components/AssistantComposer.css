@@ -30,7 +30,7 @@
 .assist-composer__input {
   flex: 1; min-width: 0; border: 0; background: transparent; resize: none;
   font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink);
-  padding: 7px 4px; max-height: 140px;
+  padding: 7px 4px; max-height: 140px; overflow-y: auto;
 }
 .assist-composer__input:focus { outline: none; }
 .assist-composer__input::placeholder { color: var(--ink-faint); }
