@@ -7,8 +7,12 @@
   display: inline-grid;
   grid-template-areas: 'f';
   align-items: stretch;
-  min-width: 0;
   max-width: 100%;
+  /* Never shrink below the words (founder 2026-10-29: "make the box wider so
+   * it doesn't cut off the text") — a crowded wrap row drops the whole pill
+   * to the next line instead of shaving its label. A bare select refuses to
+   * shrink; the ghost's overflow:hidden accidentally allowed it. */
+  flex-shrink: 0;
 }
 
 .fitsel__ghost {

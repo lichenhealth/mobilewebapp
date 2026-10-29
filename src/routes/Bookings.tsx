@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
@@ -7,7 +7,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { formatDateShort, todayISO } from '../lib/conciergeApi';
 import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
-  sendBookingMail, startBookingCheckout, usdLabel, payOpen,
+  sendBookingMail, startBookingCheckout, usdLabel, payOpen, listMyBookingTypes,
 } from '../lib/bookingApi';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
@@ -39,13 +39,20 @@ export default function Bookings() {
   const [bookQ, setBookQ] = useState('');
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  // How many session types the member OFFERS — the empty state must tell
+  // "you haven't offered anything" apart from "offered, nothing booked yet"
+  // (founder 2026-10-29, reading the old copy with two live types: "it says
+  // there aren't any - but I do have sessions setup").
+  const [myTypes, setMyTypes] = useState(0);
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [{ asProvider: p, asBooker: b }, sessions] = await Promise.all([
-      listMyBookings(me), listOpenSessions(me),
+    const [{ asProvider: p, asBooker: b }, sessions, mine] = await Promise.all([
+      listMyBookings(me), listOpenSessions(me), listMyBookingTypes(me),
     ]);
-    setAsProvider(p); setAsBooker(b); setOpen(sessions); setReady(true);
+    setAsProvider(p); setAsBooker(b); setOpen(sessions);
+    setMyTypes(mine.filter((t) => t.active).length);
+    setReady(true);
   }, [me]);
   useEffect(() => { load(); }, [load]);
 
@@ -158,10 +165,18 @@ export default function Bookings() {
       )}
 
       {ready && open.length === 0 && requests.length === 0 && upcoming.length === 0 && mine.length === 0 && (
-        <p className="bkg__muted">
-          Nothing here yet. Offer sessions from Calendar settings — they&rsquo;ll
-          appear here for others to book.
-        </p>
+        myTypes > 0 ? (
+          <p className="bkg__muted">
+            Nothing on the books yet — your {myTypes === 1 ? 'session type is' : `${myTypes} session types are`} live
+            and waiting. When someone requests or books one, it lands here.
+            Your sendable links are in <Link to="/calendar/settings" className="link-cue">Calendar settings</Link>.
+          </p>
+        ) : (
+          <p className="bkg__muted">
+            Nothing here yet. Offer sessions from <Link to="/calendar/settings" className="link-cue">Calendar settings</Link> —
+            requests and booked sessions land here.
+          </p>
+        )
       )}
 
       {requests.length > 0 && (
