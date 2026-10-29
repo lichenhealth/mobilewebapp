@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,booking_types(title,location,duration_min),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,booking_types(title,location,duration_min,approval),provider:profiles!bookings_provider_id_fkey(full_name)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -104,7 +104,21 @@ Deno.serve(async (req) => {
       && /^https:\/\/\S+$/i.test(row.meeting_url) ? row.meeting_url as string : null;
     const meetLabel = meet ? `Join ${videoServiceOf(meet) ?? 'the video call'}` : '';
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
+    // PAYMENT state (founder 2026-10-29): a priced booking says where the
+    // money stands — Paid ✓, or a pay-at-the-link ask. The ask shows only
+    // once payment is actually open (instant any time; request types once
+    // confirmed — nothing is charged before the provider's yes). All derived
+    // from the row, like everything else in this mail.
+    const usd = row.price_cents ? `$${(row.price_cents / 100).toLocaleString(undefined, { minimumFractionDigits: row.price_cents % 100 ? 2 : 0 })}` : '';
+    const payOpen = !!row.price_cents && !row.paid_at
+      && (row.status === 'confirmed' || (row.status === 'pending' && t.approval === 'instant'));
+    const payLine = row.price_cents
+      ? (row.paid_at ? `Paid ✓ · ${usd}`
+        : payOpen ? `${usd} — pay at the link below to secure it`
+        : row.status === 'pending' ? `${usd} — payment opens once ${provider} confirms` : '')
+      : '';
+
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -113,6 +127,7 @@ Deno.serve(async (req) => {
       <p style="margin:0;font-size:16px;font-weight:600">${esc(t.title ?? 'A session')}</p>
       <p style="margin:6px 0 0;font-size:14px">${esc(when)}</p>
       ${t.location ? `<p style="margin:6px 0 0;font-size:14px;color:#6b6b66">${esc(t.location)}</p>` : ''}
+      ${payLine ? `<p style="margin:6px 0 0;font-size:14px;${row.paid_at ? 'color:#4a7a52' : 'color:#2b2b28;font-weight:600'}">${esc(payLine)}</p>` : ''}
       ${
         // The join link wears the SERVICE'S NAME, lit in the LICHEN blue —
         // founder 2026-10-07: "zoom be what is shown in the invite as the

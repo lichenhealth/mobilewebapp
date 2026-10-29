@@ -40,6 +40,10 @@ export interface BookingType {
    *  lichen.health/book/<handle>/<slug> → straight to this type. Lowercase
    *  kebab, unique per member, null = no vanity link. */
   slug: string | null;
+  /** Collect this online at booking (USD cents, founder 2026-10-29 —
+   *  payments; $1–$5,000); null = no online payment, price stays words.
+   *  FROZEN onto each booking row at insert by trigger. */
+  price_cents?: number | null;
   /** Offered start times step by this many minutes (founder 2026-10-29,
    *  the Calendly-parity gap closed: a 60-min session can start every 30) —
    *  null = step by the session length, the original behavior. */
@@ -65,6 +69,10 @@ export interface BookingRow {
   note: string;
   /** The booker's answers to the type's questions, [{q, a}]. */
   answers?: { q: string; a: string }[] | null;
+  /** Payment (founder 2026-10-29): the price FROZEN at booking + whether
+   *  it's been paid. */
+  price_cents?: number | null;
+  paid_at?: string | null;
   /** Guest bookings (the public link): no member behind them — a name, an
    *  email, and an unguessable token that is their whole authorization. */
   guest_name?: string | null;
@@ -73,12 +81,12 @@ export interface BookingRow {
   /** The session's video link (Zoom, Meet…) — stamped server-side when the
    *  booking is CONFIRMED, never on a pending request. */
   meeting_url?: string | null;
-  type?: { title: string; price: string; location: string } | null;
+  type?: { title: string; price: string; location: string; approval?: 'request' | 'instant' } | null;
   provider?: { full_name: string | null } | null;
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -288,6 +296,7 @@ export interface BookingBoard {
       provider_id: string; min_notice_min?: number | null; max_days_out?: number | null;
       max_per_day?: number | null; capacity?: number | null; questions?: string[] | null;
       slot_increment_min?: number | null;
+      price_cents?: number | null;
       /** The provider's IANA timezone — slots are THEIR wall time. */
       provider_tz?: string | null;
     };
@@ -567,6 +576,12 @@ export interface GuestBookingView {
   provider_name: string; type_id: string; capacity: number;
   /** The video link — returned only while the booking is confirmed. */
   meeting_url?: string | null;
+  /** Payment state (founder 2026-10-29): the FROZEN price and whether it's
+   *  been paid; approval says when the pay door opens (instant = right
+   *  away, request = once the provider confirms). */
+  approval?: 'request' | 'instant';
+  price_cents?: number | null;
+  paid_at?: string | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
@@ -586,9 +601,102 @@ export function sendBookingMail(token: string): void {
   void supabase.functions.invoke('send-booking-mail', { body: { token } }).catch(console.error);
 }
 
+// ── PAYMENTS + CASH-OUT (founder 2026-10-29: "Let's do both — you can choose
+//    to have it be cash out, current-cy or either as the practitioner").
+//    The booker pays dollars via Lichen's Stripe; the provider accrues
+//    Current 1:1 (or an auto cash-out, their payout_pref). The charged
+//    amount is always the booking row's FROZEN price — never client input. ──
+
+/** Open Stripe Checkout for a priced booking. Guests pass their token (the
+ *  whole authorization, the /b/ pattern); members pass the booking id and
+ *  their session rides along. Returns the Stripe URL to send them to. */
+export async function startBookingCheckout(args: { token?: string; bookingId?: string }): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('booking-checkout', {
+    body: args.token ? { token: args.token } : { booking_id: args.bookingId },
+  });
+  if (error) {
+    // supabase-js wraps non-2xx answers — surface the function's own words.
+    const ctx = (error as { context?: Response }).context;
+    if (ctx) {
+      const j = await ctx.json().catch(() => null) as { error?: string } | null;
+      if (j?.error) throw new Error(j.error);
+    }
+    throw error;
+  }
+  const url = (data as { url?: string } | null)?.url;
+  if (!url) throw new Error('Checkout failed.');
+  return url;
+}
+
+/** Dollars, pretty: cents → "$45" / "$45.50". */
+export function usdLabel(cents: number): string {
+  return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: cents % 100 ? 2 : 0 })}`;
+}
+
+/** Is this booking's pay door open? (Instant: right away; request: only once
+ *  the provider has said yes — nothing charges before their confirmation.) */
+export function payOpen(b: { status: string; price_cents?: number | null; paid_at?: string | null; approval?: string }): boolean {
+  if (!b.price_cents || b.paid_at) return false;
+  return b.status === 'confirmed' || (b.status === 'pending' && b.approval === 'instant');
+}
+
+export interface PayoutRequest {
+  id: string; profile_id: string; amount: number;
+  status: 'requested' | 'paid' | 'returned'; source: 'manual' | 'auto';
+  note: string; requested_at: string; resolved_at: string | null;
+  member?: { full_name: string | null } | null;
+}
+
+export async function listMyPayouts(me: string): Promise<PayoutRequest[]> {
+  const { data, error } = await supabase.from('payout_requests')
+    .select('id, profile_id, amount, status, source, note, requested_at, resolved_at')
+    .eq('profile_id', me).order('requested_at', { ascending: false }).limit(20);
+  if (error) { console.warn('listMyPayouts:', error.message); return []; }
+  return (data as PayoutRequest[] | null) ?? [];
+}
+
+/** Burn Current toward dollars — opens a payout request the desk pays by
+ *  hand. The server checks the balance under the same advisory lock every
+ *  other spend takes. */
+export async function requestCashout(amount: number): Promise<string> {
+  const { data, error } = await supabase.rpc('request_cashout', { p_amount: amount });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function cancelCashout(id: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_cashout', { p_request: id });
+  if (error) throw error;
+}
+
+export async function markPayoutPaid(id: string, note: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_payout_paid', { p_request: id, p_note: note });
+  if (error) throw error;
+}
+
+/** The admin desk's view: everything waiting plus this year's paid history
+ *  (the 1099 signal — RLS admits admins only). */
+export async function listAllPayouts(): Promise<PayoutRequest[]> {
+  const { data, error } = await supabase.from('payout_requests')
+    .select('id, profile_id, amount, status, source, note, requested_at, resolved_at, member:profiles(full_name)')
+    .order('requested_at', { ascending: false }).limit(200);
+  if (error) { console.warn('listAllPayouts:', error.message); return []; }
+  return (data as unknown as PayoutRequest[] | null) ?? [];
+}
+
+export async function loadPayoutPref(me: string): Promise<'keep' | 'auto_cashout'> {
+  const { data } = await supabase.from('profiles').select('payout_pref').eq('id', me).maybeSingle();
+  return ((data as { payout_pref?: string } | null)?.payout_pref === 'auto_cashout') ? 'auto_cashout' : 'keep';
+}
+
+export async function savePayoutPref(me: string, pref: 'keep' | 'auto_cashout'): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ payout_pref: pref }).eq('id', me);
+  if (error) throw error;
+}
+
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, ' +
-  'type:booking_types(title, price, location), ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, price_cents, paid_at, ' +
+  'type:booking_types(title, price, location, approval), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';
 

@@ -9,6 +9,7 @@ import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
+  startBookingCheckout, usdLabel,
   type PublicBookingPage, type BookingBoard,
 } from '../lib/bookingApi';
 import './Bookings.css';
@@ -127,6 +128,11 @@ export default function BookPublic() {
   const unanswered = questions.some((_, i) => !(answers[i] ?? '').trim());
 
   if (doneToken) {
+    // Payment (founder 2026-10-29): an INSTANT priced session asks for the
+    // money right here — the frozen price, straight into Stripe Checkout. A
+    // REQUEST type never charges before the provider's yes: the acceptance
+    // email carries the pay link instead.
+    const cents = board?.type.price_cents ?? null;
     return (
       <div className="gev">
         <div className="gev__mark"><LichenMark size={40} /><span>Lichen</span></div>
@@ -140,10 +146,28 @@ export default function BookPublic() {
               ? `${activeType?.title ?? 'Your session'} with ${providerName} is on their calendar.`
               : `${providerName} confirms each request by hand — you’ll get an email either way.`}
             {' '}A confirmation is on its way to {email.trim()}.
+            {cents && doneStatus === 'pending'
+              ? ` If they accept, that email carries the ${usdLabel(cents)} payment link.` : ''}
           </p>
         </header>
+        {error && <p className="bkg__error">{error}</p>}
+        {cents && doneStatus === 'confirmed' ? (
+          <div className="bkg__doneactions">
+            <button
+              className="btn btn-primary bkg__btn"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true); setError('');
+                try { window.location.href = await startBookingCheckout({ token: doneToken }); }
+                catch (e) { setError((e as { message?: string } | null)?.message || 'Checkout failed.'); setBusy(false); }
+              }}
+            >
+              {busy ? 'One moment…' : `Pay ${usdLabel(cents)} to secure it`}
+            </button>
+          </div>
+        ) : null}
         <div className="bkg__doneactions">
-          <button className="btn btn-primary bkg__btn" onClick={() => navigate(`/b/${doneToken}`)}>
+          <button className={'btn bkg__btn' + (cents && doneStatus === 'confirmed' ? '' : ' btn-primary')} onClick={() => navigate(`/b/${doneToken}`)}>
             See your booking
           </button>
         </div>
@@ -225,6 +249,12 @@ export default function BookPublic() {
               return v && ve ? ` (${v.label} – ${ve.label} your time)` : '';
             })()}
           </p>
+          {!!board?.type.price_cents && (
+            <p className="bkpub__fine">
+              {usdLabel(board.type.price_cents)} — paid online by card, {activeType.approval === 'instant'
+                ? 'right after you book.' : `once ${first} accepts your request.`}
+            </p>
+          )}
           <input className="bkg__note bkpub__field" value={name}
             onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           <input className="bkg__note bkpub__field" type="email" value={email}
@@ -255,6 +285,7 @@ export default function BookPublic() {
                 sendBookingMail(token);
                 setDoneStatus(activeType.approval === 'instant' ? 'confirmed' : 'pending');
                 setDoneToken(token);
+                setBusy(false);
               } catch (e) {
                 setError((e as { message?: string } | null)?.message || 'Something went wrong.');
                 setBusy(false);

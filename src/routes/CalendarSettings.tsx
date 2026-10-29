@@ -25,8 +25,9 @@ import {
   TypeHourRow, TypeCondition, listTypeHours, saveTypeHours,
   listTypeConditions, saveTypeConditions, searchConditionTargets,
   listMyMeetingLinks, saveMeetingLink, normalizeMeetingUrl,
-  MeetingSetting, zoomMintAllowed,
+  MeetingSetting, zoomMintAllowed, usdLabel,
 } from '../lib/bookingApi';
+import { numericAmount } from '../lib/ledgerApi';
 import './Concierge.css';
 import './Calendar.css';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -331,7 +332,7 @@ export default function CalendarSettings() {
                 </span>
               </div>
               <p className="cset__bkmeta">
-                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
                 {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
                   : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
@@ -417,6 +418,28 @@ export default function CalendarSettings() {
                 value={bkEdit.price ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, price: e.target.value }))}
               />
+              {/* ONLINE PAYMENT (founder 2026-10-29: "Let's do both"): a real
+                  amount collected by card at booking via Lichen's Stripe —
+                  the provider accrues Current-cy 1:1 (or an auto cash-out,
+                  their wallet's choice). Empty = no online payment; the
+                  words-price above stays for display/sliding. Request types
+                  never charge before the provider accepts. */}
+              <input
+                className="cedit__input cset__extfield"
+                inputMode="decimal"
+                placeholder="Collect online: $ (optional)"
+                value={bkEdit.price_cents != null ? String(bkEdit.price_cents / 100) : ''}
+                onChange={(e) => {
+                  const clean = numericAmount(e.target.value);
+                  setBkEdit((c) => ({ ...c, price_cents: clean ? Math.round(Number(clean) * 100) : null }));
+                }}
+              />
+              {bkEdit.price_cents != null && (
+                <p className="cedit__hint cset__linkhint">
+                  {usdLabel(bkEdit.price_cents)} collected by card at booking ($1–$5,000) — you receive it
+                  as Current-cy, or as dollars via your wallet&rsquo;s cash-out choice.
+                </p>
+              )}
               <input
                 className="cedit__input cset__grow"
                 placeholder="Where (an address, or e.g. Online)"

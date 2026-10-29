@@ -7,7 +7,7 @@ import { minToLabel } from '../lib/calendarApi';
 import { formatDateShort, todayISO } from '../lib/conciergeApi';
 import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
-  sendBookingMail,
+  sendBookingMail, startBookingCheckout, usdLabel, payOpen,
 } from '../lib/bookingApi';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
@@ -88,6 +88,24 @@ export default function Bookings() {
     <span className="bkg__row-note" key={i}><strong>{x.q}</strong> — {x.a}</span>
   ));
 
+  // PAYMENT state on a priced booking (founder 2026-10-29): both sides see
+  // where the money stands; the booker gets the pay door once it's open
+  // (instant right away, request types once accepted — nothing charges
+  // before the provider's yes). The charged amount is the row's FROZEN price.
+  const payState = (b: BookingRow) => !b.price_cents ? null : (
+    <span className="bkg__row-note">
+      {b.paid_at
+        ? <strong style={{ color: 'var(--green-deep, #4a7a52)' }}>Paid ✓ · {usdLabel(b.price_cents)}</strong>
+        : <>Awaiting payment · {usdLabel(b.price_cents)}</>}
+    </span>
+  );
+  const payBtn = (b: BookingRow) =>
+    payOpen({ status: b.status, price_cents: b.price_cents, paid_at: b.paid_at, approval: b.type?.approval }) ? (
+      <button className="btn btn-primary bkg__btn" onClick={() => {
+        void act(async () => { window.location.href = await startBookingCheckout({ bookingId: b.id }); });
+      }}>Pay {usdLabel(b.price_cents!)}</button>
+    ) : null;
+
   return (
     <div className="bkg">
       <button className="cmp__back" onClick={() => navigate('/calendar')}>
@@ -150,6 +168,10 @@ export default function Bookings() {
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
+                {!!b.price_cents && !b.paid_at && (
+                  <span className="bkg__row-note">{usdLabel(b.price_cents)} — their payment link opens once you accept</span>
+                )}
+                {!!b.price_cents && b.paid_at && payState(b)}
                 {answerLines(b)}
                 {b.note && <span className="bkg__row-note">&ldquo;{b.note}&rdquo;</span>}
               </div>
@@ -171,6 +193,7 @@ export default function Bookings() {
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 <span className="bkg__row-sub">{when(b)}</span>
                 <JoinLink b={b} />
+                {payState(b)}
                 {answerLines(b)}
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
@@ -196,7 +219,9 @@ export default function Bookings() {
                 </span>
                 <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
                 <JoinLink b={b} />
+                {payState(b)}
               </div>
+              {payBtn(b)}
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
                 Reschedule
               </button>
