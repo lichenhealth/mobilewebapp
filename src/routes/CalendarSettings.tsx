@@ -52,6 +52,72 @@ const SHOW_GOOGLE_CONNECT = false;
 
 /** Calendar settings: declared weekly hours (availability / on-call) and
  *  audience visibility rules (most-specific wins). */
+
+/** A scheduling-rule dropdown with a Google-cal-style "Custom…" tail
+ *  (founder 2026-10-29: "let's have custom options as the bottom drop down
+ *  for each one, which allows you to make custom rules, kinda like google
+ *  cal"). Presets list as before; Custom… opens a small numeric input in the
+ *  field's own unit; an off-list value (typed here, or set by the assistant)
+ *  renders as its own labeled option instead of blanking the select.
+ *  Module-level on purpose — defined inside the page it would remount and
+ *  drop the input's focus every parent render (the EText lesson). */
+function RuleSelect(props: {
+  value: number | null;
+  options: { v: number | null; label: string }[];
+  offLabel: (v: number) => string;
+  unit: string;
+  /** input × scale = stored (notice stores minutes, asks in hours). */
+  scale?: number;
+  min: number; max: number;
+  decimals?: boolean;
+  aria: string;
+  onChange: (v: number | null) => void;
+}) {
+  const [custom, setCustom] = useState(false);
+  const scale = props.scale ?? 1;
+  const listed = props.options.some((o) => o.v === props.value);
+  return (
+    <span className="cset__rulewrap">
+      <FitSelect
+        className="cset__select"
+        aria-label={props.aria}
+        value={custom ? 'custom' : listed ? String(props.value) : 'off:' + String(props.value)}
+        onChange={(e) => {
+          if (e.target.value === 'custom') { setCustom(true); return; }
+          setCustom(false);
+          const raw = e.target.value.startsWith('off:') ? e.target.value.slice(4) : e.target.value;
+          props.onChange(raw === 'null' ? null : Number(raw));
+        }}
+      >
+        {props.options.map((o, i) => <option key={i} value={String(o.v)}>{o.label}</option>)}
+        {!listed && props.value != null && (
+          <option value={'off:' + String(props.value)}>{props.offLabel(props.value)}</option>
+        )}
+        <option value="custom">Custom…</option>
+      </FitSelect>
+      {custom && (
+        <>
+          <input
+            className="cedit__input cset__ruleinput"
+            inputMode={props.decimals ? 'decimal' : 'numeric'}
+            placeholder={props.unit}
+            autoFocus
+            defaultValue={props.value != null ? String(props.value / scale) : ''}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n) && n >= props.min && n <= props.max) {
+                props.onChange(Math.round(n * scale));
+              }
+            }}
+            onBlur={() => setCustom(false)}
+          />
+          <span className="cset__ruleunit">{props.unit}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
 export default function CalendarSettings() {
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -113,7 +179,11 @@ export default function CalendarSettings() {
   const [bkConds, setBkConds] = useState<TypeCondition[]>([]);
   const [condQ, setCondQ] = useState('');
   const [condHits, setCondHits] = useState<TypeCondition[]>([]);
-  const [chDay, setChDay] = useState(0);
+  // Batch day options for a type's OWN hours too (founder 2026-10-29:
+  // "Let's have the Monday - Friday and other options on the standard cal
+  // apply here, too, so you don't have to do the laborious day by day") —
+  // one Add writes one row per covered day, the main composer's shape.
+  const [chDay, setChDay] = useState<string>('weekdays');
   const [chStart, setChStart] = useState(540);
   const [chEnd, setChEnd] = useState(1020);
   // The provider's own spaces — the audience picker for space-scoped types.
@@ -409,10 +479,13 @@ export default function CalendarSettings() {
                 value={bkEdit.title ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, title: e.target.value }))}
               />
-              <FitSelect className="cset__select" value={bkEdit.duration_min ?? 60}
-                onChange={(e) => setBkEdit((c) => ({ ...c, duration_min: Number(e.target.value) }))} aria-label="Length">
-                {[30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}
-              </FitSelect>
+              <RuleSelect
+                value={bkEdit.duration_min ?? 60}
+                options={[30, 45, 60, 90, 120].map((m) => ({ v: m, label: `${m} min` }))}
+                offLabel={(v) => `${v} min`}
+                unit="minutes" min={15} max={480} aria="Length"
+                onChange={(v) => setBkEdit((c) => ({ ...c, duration_min: v ?? 60 }))}
+              />
               <input
                 className="cedit__input cset__extfield"
                 placeholder="Price (e.g. $90, Free)"
@@ -507,53 +580,72 @@ export default function CalendarSettings() {
                   close to now a slot may start, and how far out the book
                   opens. Enforced client-side in slotsForDay AND server-side
                   by the booking_notice_window trigger. */}
-              <FitSelect className="cset__select" value={bkEdit.min_notice_min ?? 60}
-                onChange={(e) => setBkEdit((c) => ({ ...c, min_notice_min: Number(e.target.value) }))} aria-label="Minimum notice">
-                <option value={0}>No minimum notice</option>
-                <option value={60}>At least 1 hour&rsquo;s notice</option>
-                <option value={240}>At least 4 hours&rsquo; notice</option>
-                <option value={720}>At least 12 hours&rsquo; notice</option>
-                <option value={1440}>At least 24 hours&rsquo; notice</option>
-                <option value={2880}>At least 48 hours&rsquo; notice</option>
-              </FitSelect>
-              <FitSelect className="cset__select" value={bkEdit.max_days_out ?? ''}
-                onChange={(e) => setBkEdit((c) => ({ ...c, max_days_out: e.target.value ? Number(e.target.value) : null }))} aria-label="How far out people can book">
-                <option value="">Bookable any time ahead</option>
-                <option value={7}>Up to 1 week out</option>
-                <option value={14}>Up to 2 weeks out</option>
-                <option value={28}>Up to 4 weeks out</option>
-                <option value={56}>Up to 8 weeks out</option>
-                <option value={84}>Up to 12 weeks out</option>
-              </FitSelect>
+              <RuleSelect
+                value={bkEdit.min_notice_min ?? 60}
+                options={[
+                  { v: 0, label: 'No minimum notice' },
+                  { v: 60, label: 'At least 1 hour\u2019s notice' },
+                  { v: 240, label: 'At least 4 hours\u2019 notice' },
+                  { v: 720, label: 'At least 12 hours\u2019 notice' },
+                  { v: 1440, label: 'At least 24 hours\u2019 notice' },
+                  { v: 2880, label: 'At least 48 hours\u2019 notice' },
+                ]}
+                offLabel={(v) => v >= 60 && v % 60 === 0 ? `At least ${v / 60} hours\u2019 notice` : `At least ${v} min notice`}
+                unit="hours" scale={60} min={0} max={336} decimals aria="Minimum notice"
+                onChange={(v) => setBkEdit((c) => ({ ...c, min_notice_min: v ?? 60 }))}
+              />
+              <RuleSelect
+                value={bkEdit.max_days_out ?? null}
+                options={[
+                  { v: null, label: 'Bookable any time ahead' },
+                  { v: 7, label: 'Up to 1 week out' },
+                  { v: 14, label: 'Up to 2 weeks out' },
+                  { v: 28, label: 'Up to 4 weeks out' },
+                  { v: 56, label: 'Up to 8 weeks out' },
+                  { v: 84, label: 'Up to 12 weeks out' },
+                ]}
+                offLabel={(v) => `Up to ${v} days out`}
+                unit="days" min={1} max={365} aria="How far out people can book"
+                onChange={(v) => setBkEdit((c) => ({ ...c, max_days_out: v }))}
+              />
               {/* Start-time increments independent of session length (founder
                   2026-10-29, the Calendly-parity gap closed): a 60-min
                   session can offer start times every 30. Null = step by the
                   session length, the original behavior — existing types are
                   untouched. */}
-              <FitSelect className="cset__select" value={bkEdit.slot_increment_min ?? ''}
-                onChange={(e) => setBkEdit((c) => ({ ...c, slot_increment_min: e.target.value ? Number(e.target.value) : null }))} aria-label="Start times every">
-                <option value="">Start times every session length</option>
-                {[15, 20, 30, 45, 60].map((n) => (
-                  <option key={n} value={n}>Start times every {n} min</option>
-                ))}
-              </FitSelect>
+              <RuleSelect
+                value={bkEdit.slot_increment_min ?? null}
+                options={[
+                  { v: null, label: 'Start times every session length' },
+                  ...[15, 20, 30, 45, 60].map((n) => ({ v: n, label: `Start times every ${n} min` })),
+                ]}
+                offLabel={(v) => `Start times every ${v} min`}
+                unit="minutes" min={5} max={240} aria="Start times every"
+                onChange={(v) => setBkEdit((c) => ({ ...c, slot_increment_min: v }))}
+              />
               {/* Daily cap + group capacity (founder 2026-10-03, the
                   Calendly audit). Cap counts sessions, not seats — joining
                   a group slot already on the books is never a new one. */}
-              <FitSelect className="cset__select" value={bkEdit.max_per_day ?? ''}
-                onChange={(e) => setBkEdit((c) => ({ ...c, max_per_day: e.target.value ? Number(e.target.value) : null }))} aria-label="Daily limit">
-                <option value="">No daily limit</option>
-                {[1, 2, 3, 4, 6].map((n) => (
-                  <option key={n} value={n}>At most {n} {n === 1 ? 'session' : 'sessions'} a day</option>
-                ))}
-              </FitSelect>
-              <FitSelect className="cset__select" value={bkEdit.capacity ?? 1}
-                onChange={(e) => setBkEdit((c) => ({ ...c, capacity: Number(e.target.value) }))} aria-label="Group size">
-                <option value={1}>One person per slot (1:1)</option>
-                {[2, 4, 6, 8, 10, 12, 20].map((n) => (
-                  <option key={n} value={n}>Group — up to {n} people</option>
-                ))}
-              </FitSelect>
+              <RuleSelect
+                value={bkEdit.max_per_day ?? null}
+                options={[
+                  { v: null, label: 'No daily limit' },
+                  ...[1, 2, 3, 4, 6].map((n) => ({ v: n, label: `At most ${n} ${n === 1 ? 'session' : 'sessions'} a day` })),
+                ]}
+                offLabel={(v) => `At most ${v} sessions a day`}
+                unit="sessions" min={1} max={48} aria="Daily limit"
+                onChange={(v) => setBkEdit((c) => ({ ...c, max_per_day: v }))}
+              />
+              <RuleSelect
+                value={bkEdit.capacity ?? 1}
+                options={[
+                  { v: 1, label: 'One person per slot (1:1)' },
+                  ...[2, 4, 6, 8, 10, 12, 20].map((n) => ({ v: n, label: `Group — up to ${n} people` })),
+                ]}
+                offLabel={(v) => `Group — up to ${v} people`}
+                unit="people" min={1} max={200} aria="Group size"
+                onChange={(v) => setBkEdit((c) => ({ ...c, capacity: v ?? 1 }))}
+              />
               {/* An event's HOUR RULES (founder 2026-10-03: "it can be work,
                   social, or on call if you have that; or custom and you can
                   set hours for that event type"). */}
@@ -576,14 +668,27 @@ export default function CalendarSettings() {
                     </div>
                   ))}
                   <div className="cset__typehour-add">
-                    <FitSelect className="cset__select" value={chDay} onChange={(e) => setChDay(Number(e.target.value))} aria-label="Day">
-                      {WEEKDAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    <FitSelect className="cset__select" value={chDay} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
+                      <option value="weekdays">Monday – Friday</option>
+                      <option value="weekend">Saturday &amp; Sunday</option>
+                      <option value="everyday">Every day</option>
+                      {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
                     </FitSelect>
                     <TimeField value={chStart} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
                     <span className="rec__lbl">to</span>
                     <TimeField value={chEnd} onChange={setChEnd} min={chStart} ariaLabel="Until" />
                     <button className="cedit__add cedit__add--sm"
-                      onClick={() => setBkHours((rows) => [...rows, { weekday: chDay, start_min: chStart, end_min: chEnd }])}>
+                      onClick={() => {
+                        const days = chDay === 'weekdays' ? [0, 1, 2, 3, 4]
+                          : chDay === 'weekend' ? [5, 6]
+                          : chDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
+                          : [Number(chDay)];
+                        setBkHours((rows) => [
+                          ...rows,
+                          ...days.filter((d) => !rows.some((r) => r.weekday === d && r.start_min === chStart && r.end_min === chEnd))
+                            .map((d) => ({ weekday: d, start_min: chStart, end_min: chEnd })),
+                        ]);
+                      }}>
                       <Icon name="plus" size={12} /> Add
                     </button>
                   </div>
