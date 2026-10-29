@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { LichenMark } from '../components/LichenMark';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { minToLabel } from '../lib/calendarApi';
@@ -103,7 +102,6 @@ export default function BookPublic() {
   if (!page) {
     return (
       <div className="gev">
-        <div className="gev__mark"><LichenMark size={40} /><span>Lichen</span></div>
         <p className="gev__muted">Nothing bookable lives at this address.</p>
       </div>
     );
@@ -139,7 +137,6 @@ export default function BookPublic() {
     const cents = board?.type.price_cents ?? null;
     return (
       <div className="gev">
-        <div className="gev__mark"><LichenMark size={40} /><span>Lichen</span></div>
         <header className="bkg__head">
           <p className="eyebrow">{doneStatus === 'confirmed' ? 'Booked' : 'Requested'}</p>
           <h1 className="bkg__title display-italic">
@@ -187,7 +184,6 @@ export default function BookPublic() {
 
   return (
     <div className="gev bkpub">
-      <div className="gev__mark"><LichenMark size={40} /><span>Lichen</span></div>
       <header className="bkg__head">
         <Avatar id={provider.id} name={providerName} url={provider.avatar_url ?? undefined} size={72} />
         <h1 className="bkg__title display-italic">Book time with {providerName}</h1>

@@ -47,10 +47,26 @@
 .bkg__slot:hover { border-color: var(--peach); }
 .bkg__slot.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
 .bkg__confirm {
-  position: sticky; bottom: var(--s-3); margin-top: var(--s-4);
+  /* Sticky so picking any slot surfaces the card at once — and the offset
+   * must CLEAR the fixed bottom nav, or its tail (the Book button, the fine
+   * print) hides behind it (founder 2026-10-29: "you have to scroll all the
+   * way down to get to the bottom of the pop up"). */
+  position: sticky; bottom: calc(var(--nav-h) + var(--safe-bot) + var(--s-3));
+  margin-top: var(--s-4);
   background: var(--bone); border: 1px solid var(--peach);
   border-radius: var(--r-lg); box-shadow: var(--sh-pop);
   padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2);
+  /* A type with several questions can outgrow the screen — the card itself
+   * scrolls then, so "above the fold" stays true whatever it carries. */
+  max-height: calc(100dvh - var(--top-h) - var(--nav-h) - var(--safe-bot) - 40px);
+  overflow-y: auto;
+}
+@media (min-width: 1024px) {
+  /* No bottom nav standing — the docked rail lives at the side. */
+  .bkg__confirm {
+    bottom: var(--s-3);
+    max-height: calc(100dvh - var(--top-h) - 40px);
+  }
 }
 .bkg__confirm-when { font-size: 13px; font-weight: 600; color: var(--ink); }
 .bkg__note {

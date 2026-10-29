@@ -284,7 +284,7 @@ export default function TopBar({
       <div className="top-bar__right">
         <div className="top-bar__switch-wrap">
         <button
-          className={'top-bar__acting' + (actor.type !== 'self' ? ' is-entity' : '')}
+          className={'top-bar__acting' + (actor.type !== 'self' ? ' is-entity' : '') + (!user ? ' top-bar__acting--out' : '')}
           onClick={() => (user ? setSwitchOpen((o) => !o)
             : reconnecting ? undefined
             : navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`))}
