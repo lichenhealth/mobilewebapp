@@ -198,7 +198,10 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px var(--s-5) var(--s-2);
+  /* Extra floor below the lenses (founder 2026-10-29: "move the drop down
+     white bubbles down a bit, so it doesn't cut off the hover text") — the
+     hover tip lives in this band instead of fighting the category pills. */
+  padding: 12px var(--s-5) 30px;
 }
 .mkt__lens {
   flex: 0 0 auto;
@@ -576,17 +579,23 @@
   top: calc(100% + 5px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--ink);
-  color: var(--bone);
+  /* Peach, not ink (founder 2026-10-29, second pass settling the look:
+     "peach text with a peach circle around it, but no fill, just the
+     platform tan") — tan paper, peach ring, peach-deep words. */
+  background: var(--bone-warm);
+  border: 1px solid var(--peach);
+  color: var(--peach-deep);
   font-size: 10.5px;
+  font-weight: 500;
   letter-spacing: 0.01em;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--r-full);
   white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(40, 30, 20, 0.10);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--d-fast) var(--ease-out) 0.08s;
-  z-index: 30;
+  z-index: 60;
 }
 .mkt__lensrow .mkt__action:hover::after,
 .mkt__lensrow .mkt__action:focus-visible::after { opacity: 1; }
