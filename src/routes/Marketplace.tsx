@@ -52,17 +52,23 @@ const CHIP_MODES: Record<Chip, Mode[]> = {
   gift: ['gift'], trade: ['trade'], rent: ['rent'],
   lend: ['lend', 'borrow'], iso: ['iso'], sale: ['sale', 'sliding'],
 };
-const MODES: { chip: Chip; label: string; icon: IconName }[] = [
+const MODES: { chip: Chip; label: string; icon: IconName; iconSize?: number; letters?: string; tip?: string }[] = [
   // The gift manner wears the PRESENT since 2026-10-15 (founder: "the present
   // next to the 'gift' text") — one mark per manner, lens chip and tile alike.
   { chip: 'gift',       label: 'Gift',        icon: 'gift' },
   { chip: 'trade',      label: 'Trade',       icon: 'trade' },
-  { chip: 'rent',       label: 'Rent',        icon: 'rent' },
+  // The rent sign renders bigger (founder 2026-10-29: "make the rent sign
+  // bigger so it can be read") — the yard-sign glyph is detailed, 15px
+  // smudged it.
+  { chip: 'rent',       label: 'Rent',        icon: 'rent', iconSize: 19 },
   // "Lend", not "Lending" (founder 2026-10-23: "so that words are shorter"
   // — the lens still covers lend AND borrow, the 2026-08-13 one-coin merge).
   { chip: 'lend',       label: 'Lend',        icon: 'lend' },
   { chip: 'sale',       label: 'For Sale',    icon: 'dollar' },
-  { chip: 'iso',        label: 'ISO',         icon: 'search' },
+  // ISO wears the LETTERS, never the magnifier (founder 2026-10-29: "have
+  // the search glass removed so people don't get it confused with search");
+  // the hover tip speaks it in full.
+  { chip: 'iso',        label: 'ISO',         icon: 'search', letters: 'ISO', tip: 'In Search of' },
 ];
 const ALL_CHIPS: Chip[] = MODES.map((m) => m.chip);
 
@@ -428,10 +434,14 @@ export default function Marketplace() {
               className={'mkt__action' + (on ? ' is-active' : '')}
               onClick={() => toggleChip(m.chip)}
               aria-pressed={on}
-              aria-label={m.label}
-              title={on ? `${m.label} — showing; tap to hide` : `${m.label} — tap to show`}
+              aria-label={m.tip ?? m.label}
+              data-tip={m.tip ?? m.label}
             >
-              <span className="mkt__action-circle"><Icon name={m.icon} size={15} /></span>
+              <span className="mkt__action-circle">
+                {m.letters
+                  ? <span className="mkt__action-letters">{m.letters}</span>
+                  : <Icon name={m.icon} size={m.iconSize ?? 15} />}
+              </span>
             </button>
           );
         })}
