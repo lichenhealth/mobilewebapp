@@ -72,8 +72,10 @@ export default function GuestBooking() {
 
   // Quiet re-reads after a Stripe return while the webhook lands (a few
   // tries, then the page stands as it is — the emailed receipt still comes).
+  // A bank transfer resolves to the in-transit state instead of paid — the
+  // re-read picks up payment_pending_at and the page says so.
   useEffect(() => {
-    if (!justPaid || !ready || row?.paid_at) return;
+    if (!justPaid || !ready || row?.paid_at || row?.payment_pending_at) return;
     let live = true; let tries = 0;
     const t = setInterval(() => {
       tries += 1;
@@ -144,7 +146,13 @@ export default function GuestBooking() {
       {!!row.price_cents && row.paid_at && (
         <p className="bkg__sub" style={{ color: '#4a7a52', fontWeight: 600 }}>Paid ✓ · {usdLabel(row.price_cents)}</p>
       )}
-      {!!row.price_cents && !row.paid_at && justPaid && (
+      {!!row.price_cents && !row.paid_at && row.payment_pending_at && (
+        <p className="bkg__sub">
+          Your bank transfer is on its way — it usually clears within a few
+          business days. Nothing more to do; you&rsquo;ll get an email when it lands.
+        </p>
+      )}
+      {!!row.price_cents && !row.paid_at && !row.payment_pending_at && justPaid && (
         <p className="bkg__sub">Payment received — confirming it now…</p>
       )}
       {payErr && <p className="bkg__error">{payErr}</p>}
@@ -159,7 +167,9 @@ export default function GuestBooking() {
               catch (e) { setPayErr((e as { message?: string } | null)?.message || 'Checkout failed.'); setBusy(false); }
             }}
           >
-            {busy ? 'One moment…' : `Pay ${usdLabel(row.price_cents!)} to secure it`}
+            {busy ? 'One moment…'
+              : row.pay_choice === 'later' ? `Settle up — pay ${usdLabel(row.price_cents!)}`
+              : `Pay ${usdLabel(row.price_cents!)} to secure it`}
           </button>
         </div>
       )}

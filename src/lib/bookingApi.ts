@@ -46,6 +46,10 @@ export interface BookingType {
    *  payments; $1–$5,000); null = no online payment, price stays words.
    *  FROZEN onto each booking row at insert by trigger. */
   price_cents?: number | null;
+  /** Offer "invoice me later" at booking (founder 2026-10-29, the payment
+   *  options); false = payment asked up front. Only meaningful with a
+   *  price_cents. */
+  allow_pay_later?: boolean;
   /** Offered start times step by this many minutes (founder 2026-10-29,
    *  the Calendly-parity gap closed: a 60-min session can start every 30) —
    *  null = step by the session length, the original behavior. */
@@ -75,6 +79,8 @@ export interface BookingRow {
    *  it's been paid. */
   price_cents?: number | null;
   paid_at?: string | null;
+  pay_choice?: 'now' | 'later' | null;
+  payment_pending_at?: string | null;
   /** Guest bookings (the public link): no member behind them — a name, an
    *  email, and an unguessable token that is their whole authorization. */
   guest_name?: string | null;
@@ -88,7 +94,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, allow_pay_later, active';
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -299,6 +305,7 @@ export interface BookingBoard {
       max_per_day?: number | null; capacity?: number | null; questions?: string[] | null;
       slot_increment_min?: number | null;
       price_cents?: number | null;
+      allow_pay_later?: boolean;
       /** The provider's IANA timezone — slots are THEIR wall time. */
       provider_tz?: string | null;
     };
@@ -584,6 +591,11 @@ export interface GuestBookingView {
   approval?: 'request' | 'instant';
   price_cents?: number | null;
   paid_at?: string | null;
+  /** 'later' = they chose to be invoiced; the booking link stays the
+   *  standing payment door. */
+  pay_choice?: 'now' | 'later' | null;
+  /** A bank transfer in transit — the pay door closes while it rides. */
+  payment_pending_at?: string | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
@@ -636,10 +648,21 @@ export function usdLabel(cents: number): string {
 }
 
 /** Is this booking's pay door open? (Instant: right away; request: only once
- *  the provider has said yes — nothing charges before their confirmation.) */
-export function payOpen(b: { status: string; price_cents?: number | null; paid_at?: string | null; approval?: string }): boolean {
-  if (!b.price_cents || b.paid_at) return false;
+ *  the provider has said yes — nothing charges before their confirmation. A
+ *  bank transfer in transit closes it until it clears or bounces.) */
+export function payOpen(b: { status: string; price_cents?: number | null; paid_at?: string | null; approval?: string; payment_pending_at?: string | null }): boolean {
+  if (!b.price_cents || b.paid_at || b.payment_pending_at) return false;
   return b.status === 'confirmed' || (b.status === 'pending' && b.approval === 'instant');
+}
+
+/** The booker's declared intent — "invoice me later" keeps the booking link
+ *  as the standing payment door (guests authorize by token, members by
+ *  being the booker). */
+export async function setBookingPayChoice(args: { token?: string; bookingId?: string; later: boolean }): Promise<void> {
+  const { error } = await supabase.rpc('set_booking_pay_choice', {
+    p_later: args.later, p_token: args.token ?? null, p_booking: args.bookingId ?? null,
+  });
+  if (error) throw error;
 }
 
 export interface PayoutRequest {
@@ -697,7 +720,7 @@ export async function savePayoutPref(me: string, pref: 'keep' | 'auto_cashout'):
 }
 
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, price_cents, paid_at, ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, price_cents, paid_at, pay_choice, payment_pending_at, ' +
   'type:booking_types(title, price, location, approval), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';

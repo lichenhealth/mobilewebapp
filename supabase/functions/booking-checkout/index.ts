@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
   // Resolve the booking by GUEST TOKEN (the unguessable string IS the
   // authorization) or by id + the caller's own JWT (must be the booker).
-  const SEL = 'id, type_id, provider_id, booker_id, status, price_cents, paid_at, guest_token, guest_email, on_date';
+  const SEL = 'id, type_id, provider_id, booker_id, status, price_cents, paid_at, payment_pending_at, guest_token, guest_email, on_date';
   // deno-lint-ignore no-explicit-any
   let b: any = null;
   if (typeof body.token === 'string' && body.token.length >= 32) {
@@ -72,6 +72,11 @@ Deno.serve(async (req) => {
 
   if (!b.price_cents || b.price_cents <= 0) return json({ error: 'This session has no online payment.' }, 400);
   if (b.paid_at) return json({ error: 'Already paid — nothing owed here.' }, 400);
+  // A bank transfer in transit closes the pay door (no double-pay): it
+  // clears in a few business days, or reopens here if the bank returns it.
+  if (b.payment_pending_at) {
+    return json({ error: 'A bank transfer for this booking is already on its way — it usually clears within a few business days.' }, 400);
+  }
   if (b.status === 'cancelled' || b.status === 'declined') {
     return json({ error: 'This booking is no longer held, so there is nothing to pay.' }, 400);
   }

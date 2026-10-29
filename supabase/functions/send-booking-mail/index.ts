@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,booking_types(title,location,duration_min,approval),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval),provider:profiles!bookings_provider_id_fkey(full_name)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -114,7 +114,10 @@ Deno.serve(async (req) => {
       && (row.status === 'confirmed' || (row.status === 'pending' && t.approval === 'instant'));
     const payLine = row.price_cents
       ? (row.paid_at ? `Paid ✓ · ${usd}`
-        : payOpen ? `${usd} — pay at the link below to secure it`
+        : row.payment_pending_at ? `${usd} — your bank transfer is on its way (it usually clears within a few business days)`
+        : payOpen ? (row.pay_choice === 'later'
+          ? `${usd} — you chose to settle later; the link below takes payment by card or bank whenever you're ready`
+          : `${usd} — pay at the link below (card or US bank transfer) to secure it`)
         : row.status === 'pending' ? `${usd} — payment opens once ${provider} confirms` : '')
       : '';
 

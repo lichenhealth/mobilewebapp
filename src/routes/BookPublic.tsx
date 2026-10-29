@@ -9,7 +9,7 @@ import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
-  startBookingCheckout, usdLabel,
+  startBookingCheckout, usdLabel, setBookingPayChoice,
   type PublicBookingPage, type BookingBoard,
 } from '../lib/bookingApi';
 import './Bookings.css';
@@ -42,6 +42,10 @@ export default function BookPublic() {
   const [note, setNote] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [mineTime, setMineTime] = useState(true);
+  // PAYMENT OPTIONS (founder 2026-10-29: "bank transfer, card, invoice you
+  // later"): card + US bank ride the one Stripe page; "invoice me later" is
+  // the booker's declared intent, offered when the type allows it.
+  const [payLater, setPayLater] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [doneToken, setDoneToken] = useState<string | null>(null);
@@ -147,11 +151,17 @@ export default function BookPublic() {
               : `${providerName} confirms each request by hand — you’ll get an email either way.`}
             {' '}A confirmation is on its way to {email.trim()}.
             {cents && doneStatus === 'pending'
-              ? ` If they accept, that email carries the ${usdLabel(cents)} payment link.` : ''}
+              ? (payLater
+                ? ` You chose to be invoiced — if they accept, your booking link takes payment (card or bank) whenever you're ready.`
+                : ` If they accept, that email carries the ${usdLabel(cents)} payment link.`)
+              : ''}
+            {cents && doneStatus === 'confirmed' && payLater
+              ? ` You chose to be invoiced — your email and booking link carry the ${usdLabel(cents)} payment door whenever you're ready.`
+              : ''}
           </p>
         </header>
         {error && <p className="bkg__error">{error}</p>}
-        {cents && doneStatus === 'confirmed' ? (
+        {cents && doneStatus === 'confirmed' && !payLater ? (
           <div className="bkg__doneactions">
             <button
               className="btn btn-primary bkg__btn"
@@ -167,7 +177,7 @@ export default function BookPublic() {
           </div>
         ) : null}
         <div className="bkg__doneactions">
-          <button className={'btn bkg__btn' + (cents && doneStatus === 'confirmed' ? '' : ' btn-primary')} onClick={() => navigate(`/b/${doneToken}`)}>
+          <button className={'btn bkg__btn' + (cents && doneStatus === 'confirmed' && !payLater ? '' : ' btn-primary')} onClick={() => navigate(`/b/${doneToken}`)}>
             See your booking
           </button>
         </div>
@@ -251,9 +261,25 @@ export default function BookPublic() {
           </p>
           {!!board?.type.price_cents && (
             <p className="bkpub__fine">
-              {usdLabel(board.type.price_cents)} — paid online by card, {activeType.approval === 'instant'
+              {usdLabel(board.type.price_cents)} — paid online by card or US bank transfer, {activeType.approval === 'instant'
                 ? 'right after you book.' : `once ${first} accepts your request.`}
             </p>
+          )}
+          {!!board?.type.price_cents && board.type.allow_pay_later !== false && (
+            <div className="bkpub__paychoice">
+              <button
+                className={'bkg__slot' + (!payLater ? ' is-on' : '')}
+                onClick={() => setPayLater(false)}
+              >
+                Pay {activeType.approval === 'instant' ? 'now' : 'when accepted'}
+              </button>
+              <button
+                className={'bkg__slot' + (payLater ? ' is-on' : '')}
+                onClick={() => setPayLater(true)}
+              >
+                Invoice me — settle later
+              </button>
+            </div>
           )}
           <input className="bkg__note bkpub__field" value={name}
             onChange={(e) => setName(e.target.value)} placeholder="Your name" />
@@ -282,6 +308,9 @@ export default function BookPublic() {
                   typeId!, pick.iso, pick.start, name.trim(), email.trim(), note.trim(),
                   questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
                 );
+                // Record the invoice-me-later intent BEFORE the mail, so the
+                // email speaks it (best-effort — the booking stands either way).
+                if (payLater) await setBookingPayChoice({ token, later: true }).catch(console.error);
                 sendBookingMail(token);
                 setDoneStatus(activeType.approval === 'instant' ? 'confirmed' : 'pending');
                 setDoneToken(token);
