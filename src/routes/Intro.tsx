@@ -131,9 +131,11 @@ export default function Intro() {
           animals and the land that sustains us.
         </p>
         <p className="intro__text">
+          {/* Founder's tweak 2026-11-01: "We step out of its way, letting
+              what's imbalanced fall under its own weight." */}
           Like a martial artist, we don&rsquo;t push against something stronger
-          than we are. We step out of its way, let what&rsquo;s imbalanced fall
-          under its own weight. Instead, we choose to build something
+          than we are. We step out of its way, letting what&rsquo;s imbalanced
+          fall under its own weight. Instead, we choose to build something
           better — an alternative society for people to choose.
         </p>
       </div>
@@ -152,7 +154,7 @@ export default function Intro() {
         </p>
         <p className="intro__text">
           Community and Concierge will grow exactly as fast as people are
-          willing to assemble at a grassroots level and build better systems
+          willing to assemble at a grassroots level to build better systems
           than the ones crumbling.
         </p>
       </div>
