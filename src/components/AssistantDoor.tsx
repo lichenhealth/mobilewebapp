@@ -52,11 +52,9 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
           setAlignRight(!!r && r.left > window.innerWidth / 2);
           setAsk((a) => !a);
         }}
-        aria-label={on ? 'Your assistant’s briefing for this section' : 'Assistant is off here — tap to turn it back on'}
+        aria-label={on ? (label ?? 'Your assistant’s briefing for this section') : 'Assistant is off here — tap to turn it back on'}
         aria-expanded={on ? undefined : ask}
-        title={on
-          ? (label ?? 'Your assistant — a briefing for this part of your Lichen life')
-          : 'The assistant is off for this section — tap to turn it back on.'}
+        data-tip={on ? 'Assistant' : 'Assistant — off here'}
       >
         <Icon name="brain" size={Math.round(size * 0.47)} />
         {!on && <span className="ai-door__slash" aria-hidden />}

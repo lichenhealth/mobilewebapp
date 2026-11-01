@@ -713,13 +713,13 @@ export default function Saved() {
         <div className="saved__bar">
           <button
             className={'mkt__action' + (showSearch ? ' is-active' : '')}
-            aria-label="Search" title="Search"
+            aria-label="Search" data-tip="Search"
             onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
           >
             <span className="mkt__action-circle"><Icon name="search" size={16} /></span>
           </button>
           <div className="saved__add">
-            <button className="mkt__action" aria-label="Add" title="Add"
+            <button className="mkt__action" aria-label="Add" data-tip="Add"
               onClick={() => setAddOpen((v) => !v)}>
               <span className="mkt__action-circle"><Icon name="plus" size={16} /></span>
             </button>
@@ -791,7 +791,7 @@ export default function Saved() {
                     onClick={() => toggleArea(a.value)}
                     aria-pressed={on}
                     aria-label={a.label}
-                    title={a.label}
+                    data-tip={a.label}
                   >
                     <Icon name={a.icon} size={18} />
                   </button>

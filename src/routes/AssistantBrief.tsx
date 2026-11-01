@@ -977,7 +977,7 @@ export default function AssistantBrief() {
               type="button"
               className="abrief__rail-btn abrief__tool"
               aria-label="Search your history with Claude"
-              title="Search"
+              data-tip="Search"
               onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
             >
               <Icon name="search" size={16} />
@@ -986,7 +986,7 @@ export default function AssistantBrief() {
               type="button"
               className="abrief__rail-btn abrief__tool"
               aria-label="New conversation"
-              title="New conversation"
+              data-tip="New conversation"
               onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
             >
               <Icon name="plus" size={16} />
@@ -1010,7 +1010,7 @@ export default function AssistantBrief() {
                 aria-label={it.section === section
                   ? (section === 'home' ? `${it.label} — you're here` : `${it.label} — you're here; tap for the whole brain`)
                   : `Open the ${it.label} brain`}
-                title={it.label}
+                data-tip={it.label}
                 onClick={() => {
                   if (it.section === section) {
                     if (section !== 'home') navigate(`/assistant?section=home${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`);

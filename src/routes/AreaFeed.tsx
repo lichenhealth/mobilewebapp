@@ -265,7 +265,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <button
           className={'mkt__action' + (showSearch ? ' is-active' : '')}
           aria-label="Search"
-          title="Search"
+          data-tip="Search"
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setQuery(''); }}
         >
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
@@ -273,7 +273,7 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         <button
           className="mkt__action"
           aria-label={addLabel}
-          title={addLabel}
+          data-tip={addLabel}
           onClick={() => navigate(composeHref)}
         >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>

@@ -365,7 +365,7 @@ export default function MapView() {
           <button
             className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
             onClick={() => setSearchOpen((o) => !o)}
-            aria-label="Search the map"
+            aria-label="Search the map" data-tip="Search"
           >
             <Icon name="search" size={16} />
           </button>
@@ -373,7 +373,7 @@ export default function MapView() {
             <button
               className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
               onClick={() => { setSheetOpen((o) => !o); setSearchOpen(false); }}
-              aria-label="Add a place"
+              aria-label="Add a place" data-tip="Add a place"
             >
               <Icon name="plus" size={16} />
             </button>
@@ -400,7 +400,7 @@ export default function MapView() {
                 onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
                 aria-pressed={on}
                 aria-label={l.label}
-                title={l.label}
+                data-tip={l.label}
               >
                 <Icon name={l.icon} size={16} />
               </button>

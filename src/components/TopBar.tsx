@@ -206,7 +206,7 @@ export default function TopBar({
         <button
           className="top-bar__icon top-bar__hamburger"
           onClick={user ? onMenu : askGuestGate}
-          aria-label="Open menu"
+          aria-label="Open menu" data-tip="Menu"
         >
           <Icon name="menu" size={20} />
         </button>
@@ -236,8 +236,7 @@ export default function TopBar({
               const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
               if (idx > 0) navigate(-1); else navigate('/home');
             }}
-            aria-label="Back"
-            title="Back"
+            aria-label="Back" data-tip="Back"
           >
             <Icon name="arrow-left" size={18} />
           </button>
@@ -381,7 +380,7 @@ export default function TopBar({
             className="top-bar__icon top-bar__bell"
             onClick={() => navigate(`/spaces/${actor.id}?manage=1`)}
             aria-label={`${actor.name}'s desk (${deskCount} waiting)`}
-            title={`${actor.name}'s desk`}
+            data-tip={`${actor.name}’s desk`}
           >
             <Icon name="bell" size={18} />
             {deskCount > 0 && (
@@ -394,7 +393,7 @@ export default function TopBar({
           <button
             className="top-bar__icon top-bar__bell"
             onClick={() => (user ? setPanelOpen((o) => !o) : askGuestGate())}
-            aria-label={`Notifications (${notificationCount})`}
+            aria-label={`Notifications (${notificationCount})`} data-tip="Notifications"
           >
             <Icon name="bell" size={18} />
             {notificationCount > 0 && (

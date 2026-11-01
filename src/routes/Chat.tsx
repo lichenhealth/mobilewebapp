@@ -127,13 +127,13 @@ export default function Chat() {
         <button
           className={'chat__tool-circle' + (searchOpen ? ' is-on' : '')}
           onClick={() => setSearchOpen((o) => { if (o) setQuery(''); return !o; })}
-          aria-label="Search messages and people"
+          aria-label="Search messages and people" data-tip="Search"
           aria-expanded={searchOpen}
         >
           <Icon name="search" size={15} />
         </button>
         {!asSpace && (
-          <button className="chat__tool-circle" onClick={() => setPicking(true)} aria-label="New message" title="New message">
+          <button className="chat__tool-circle" onClick={() => setPicking(true)} aria-label="New message" data-tip="New message">
             <Icon name="plus" size={15} />
           </button>
         )}
