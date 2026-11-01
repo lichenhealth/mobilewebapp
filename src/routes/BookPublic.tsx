@@ -315,7 +315,7 @@ export default function BookPublic() {
         {!user && (
           <footer className="gev__join">
             <p>
-              Lichen is a community for healing, growing and creating — {providerName} is a member.{' '}
+              Lichen is a community for healing, growing and creating — <span className="nobr">{providerName}</span> is a member.{' '}
               <button className="gev__joinlink" onClick={() => navigate('/signup')}>Request to join Lichen</button>
             </p>
           </footer>
@@ -522,7 +522,7 @@ export default function BookPublic() {
       {!user && (
         <footer className="gev__join">
           <p>
-            Lichen is a community for healing, growing and creating — {providerName} is a member.{' '}
+            Lichen is a community for healing, growing and creating — <span className="nobr">{providerName}</span> is a member.{' '}
             <button className="gev__joinlink" onClick={() => navigate('/signup')}>Request to join Lichen</button>
           </p>
         </footer>

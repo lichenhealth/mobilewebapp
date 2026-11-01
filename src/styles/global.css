@@ -405,3 +405,10 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
   text-underline-offset: 3px;
 }
 .link-cue:hover { text-decoration-color: var(--peach-deep); }
+
+/* A PERSON'S NAME NEVER BREAKS ACROSS LINES in flowing prose (founder
+ * 2026-11-01, "Galyn / Burke" split on the booking page's join blurb:
+ * "it would look nicer to end with the hyphen and then have my full name
+ * on the next line"). Wrap an inline name in .nobr and the wrap falls
+ * before the whole name instead of inside it. */
+.nobr { white-space: nowrap; }

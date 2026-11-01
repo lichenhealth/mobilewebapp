@@ -24,6 +24,9 @@
 .gev__btn:hover { border-color: var(--peach); }
 .gev__btn.is-on { background: var(--green); border-color: var(--green); color: #fff; }
 .gev__join { margin-top: var(--s-6); font-size: 14px; color: var(--ink-soft); }
+/* Graceful rag where supported — no orphaned last words (progressive
+ * enhancement; browsers without text-wrap:pretty just wrap as before). */
+.gev__join p { text-wrap: pretty; }
 .gev__join a { color: var(--peach-deep, var(--peach)); text-decoration: underline; text-underline-offset: 2px; }
 /* The join CTA rides INLINE in the blurb's own sentence, in peach, so it
  * reads as a link (founder 2026-11-01: "move this up to the line above and
