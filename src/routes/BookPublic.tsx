@@ -8,9 +8,10 @@ import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
-  startBookingCheckout, usdLabel, setBookingPayChoice,
-  type PublicBookingPage, type BookingBoard,
+  startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
+  type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
+import { supabase } from '../lib/supabase';
 import './Bookings.css';
 import './GuestEvent.css';
 
@@ -33,6 +34,17 @@ export default function BookPublic() {
 
   const [page, setPage] = useState<PublicBookingPage | null>(null);
   const [ready, setReady] = useState(false);
+  // SIGNED IN, THE MAIN LINK SHOWS EVERY SESSION YOU MAY SEE (founder
+  // 2026-11-01: "Shouldn't all my session types be on my main link?"): the
+  // public RPC serves the open web public types only, so a member landing
+  // on /book/<handle> resolves the provider through RLS and lists ALL their
+  // visible types — picking one opens the member slot picker (/book/<id>),
+  // their account on the booking, the vanity-link precedent.
+  const [memberView, setMemberView] = useState<{
+    provider: { id: string; full_name: string | null; avatar_url: string | null; headline: string | null };
+    types: BookingType[];
+  } | null>(null);
+  const [mvReady, setMvReady] = useState(false);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
@@ -82,6 +94,27 @@ export default function BookPublic() {
   }, [handle, slug, user?.id]);
 
   useEffect(() => {
+    if (!user || slug) { setMemberView(null); setMvReady(true); return; }
+    let live = true;
+    setMvReady(false);
+    void (async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name, avatar_url, headline')
+        .ilike('handle', handle).maybeSingle();
+      if (!live) return;
+      if (data) {
+        const prov = data as { id: string; full_name: string | null; avatar_url: string | null; headline: string | null };
+        const types = await listBookableTypes(prov.id);
+        if (!live) return;
+        setMemberView({ provider: prov, types });
+      }
+      setMvReady(true);
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handle, slug, user?.id]);
+
+  useEffect(() => {
     if (!typeId) { setBoard(null); return; }
     let live = true;
     setPick(null);
@@ -98,7 +131,40 @@ export default function BookPublic() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
-  if (!ready) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
+  if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
+
+  // Signed in on the bare handle link: the WHOLE menu, not just the public
+  // slice — every active type the viewer's standing lets them see, each
+  // opening the member slot picker so the booking carries their account.
+  if (user && !slug && memberView) {
+    const mName = memberView.provider.full_name ?? 'A Lichen member';
+    const mFirst = mName.split(' ')[0];
+    const AUD_TAG: Record<string, string> = { everyone: ' · members', mycelium: ' · my-celium', space: ' · group' };
+    return (
+      <div className="gev bkpub">
+        <header className="bkg__head">
+          <Avatar id={memberView.provider.id} name={mName} url={memberView.provider.avatar_url ?? undefined} size={72} />
+          <h1 className="bkg__title display-italic">Book time with {mName}</h1>
+          {memberView.provider.headline && <p className="bkg__sub">{memberView.provider.headline}</p>}
+        </header>
+        {memberView.types.length === 0 ? (
+          <p className="bkg__muted">{mFirst} has nothing bookable for you right now.</p>
+        ) : (
+          <>
+            <p className="bkpub__tz">Pick a session — you&rsquo;re signed in, so it books under your name.</p>
+            <div className="bkpub__types">
+              {memberView.types.map((t) => (
+                <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
+                  {t.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}{AUD_TAG[t.audience] ?? ''}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (!page) {
     return (
       <div className="gev">
@@ -178,6 +244,12 @@ export default function BookPublic() {
             See your booking
           </button>
         </div>
+        {!user && (
+          <footer className="gev__join">
+            <p>Lichen is a community for healing, growing and creating — {providerName} is a member.</p>
+            <button className="btn bkg__btn" onClick={() => navigate('/signup')}>Request to join Lichen</button>
+          </footer>
+        )}
       </div>
     );
   }
@@ -330,7 +402,7 @@ export default function BookPublic() {
       {!user && (
         <footer className="gev__join">
           <p>Lichen is a community for healing, growing and creating — {providerName} is a member.</p>
-          <button className="btn bkg__btn" onClick={() => navigate('/signup')}>Learn about joining</button>
+          <button className="btn bkg__btn" onClick={() => navigate('/signup')}>Request to join Lichen</button>
         </footer>
       )}
     </div>
