@@ -47,7 +47,15 @@ the WeavePitch template.
 - **Memberships** (Stripe): Community and Concierge tiers. Every new member
   gets one automatic 3-month Concierge gift (the growth gift). Alpha-cohort
   gifts were clocked to ~late Oct 2026 (2026-07-23) as a shared
-  make-it-indispensable deadline.
+  make-it-indispensable deadline — SUPERSEDED 2026-11-01 (founder: "we nix
+  the 3 months, as we don't know how long we'll be in alpha, and i want it
+  to be free throughout"): **membership is free for the WHOLE alpha** —
+  `platform_settings.alpha_free_access` (true) keeps the app's paywall gate
+  open after the growth gift lapses, and every member-facing "3 months
+  free" line (app + marketing site + invite texts) now says free-while-in-
+  alpha. Ending alpha = flipping that one switch off (the $29/$99 gate
+  resumes untouched) + sweeping the copy back; decks may claim "free during
+  alpha", never a fixed free period.
 - **Donations**: min-5% operating share per gift, donor may direct a larger
   share to operations or give generally (founder 2026-08-28/09-01); the
   remainder funds subsidies. Historical code: `translate_donation` minted
