@@ -1,0 +1,17 @@
+/* The guest gate (founder 2026-11-01) — one small card over a soft veil. */
+.ggate {
+  position: fixed; inset: 0; z-index: 120;
+  background: rgba(26, 32, 36, 0.35);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--wall-gutter);
+}
+.ggate__card {
+  background: var(--bone); border: 1px solid var(--bone-edge);
+  border-radius: var(--r-lg); box-shadow: var(--sh-pop);
+  padding: var(--s-5); max-width: 330px; width: 100%;
+  display: flex; flex-direction: column; gap: var(--s-4);
+  text-align: center;
+}
+.ggate__msg { margin: 0; font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
+.ggate__row { display: flex; justify-content: center; gap: var(--s-2); flex-wrap: wrap; }
+.ggate__btn { font-size: 13px; padding: 9px 16px; }

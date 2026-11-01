@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
+import { askGuestGate } from './GuestGate';
 import { LichenMark } from './LichenMark';
 import { MyceliumMark } from './MyceliumMark';
 import { useNotifications } from '../notifications/NotificationsProvider';
@@ -204,7 +205,7 @@ export default function TopBar({
             aria-label="Open menu" — the class below is the stable hook. */}
         <button
           className="top-bar__icon top-bar__hamburger"
-          onClick={onMenu}
+          onClick={user ? onMenu : askGuestGate}
           aria-label="Open menu"
         >
           <Icon name="menu" size={20} />
@@ -392,7 +393,7 @@ export default function TopBar({
         ) : (
           <button
             className="top-bar__icon top-bar__bell"
-            onClick={() => setPanelOpen((o) => !o)}
+            onClick={() => (user ? setPanelOpen((o) => !o) : askGuestGate())}
             aria-label={`Notifications (${notificationCount})`}
           >
             <Icon name="bell" size={18} />
