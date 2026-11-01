@@ -886,9 +886,9 @@ export default function CalendarSettings() {
             <div className="cset__publink">
               {myHandle ? (
                 <>
-                  Anyone with this link (on Lichen, or off) will be able to
-                  book time with you. They will see all meeting types
-                  you&rsquo;ve set to be view-able via your public booking link.
+                  Anyone with this link (on Lichen, or off) can book time
+                  with you. They will see all meeting types you&rsquo;ve set
+                  to be view-able via your public booking link.
                   <span className="cset__publink-row">
                     <code>lichen.health/book/{myHandle}</code>
                     <button
