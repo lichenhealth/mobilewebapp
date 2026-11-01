@@ -219,6 +219,19 @@ export default function App() {
         const { data: granted } = await supabase.rpc('grant_growth_gift');
         ok = granted === true;
       }
+      if (!ok) {
+        // FREE THROUGHOUT ALPHA (founder 2026-11-01: "we nix the 3 months,
+        // as we don't know how long we'll be in alpha, and i want it to be
+        // free throughout"): while platform_settings.alpha_free_access is
+        // true, a lapsed or absent subscription never paywalls anyone —
+        // this is what keeps the marketing site's and invite emails'
+        // free-for-the-whole-alpha promise true. Flip the setting off when
+        // alpha ends and the ordinary gate resumes. A failed read falls
+        // through to the normal paywall decision.
+        const { data: alpha } = await supabase.from('platform_settings')
+          .select('value').eq('key', 'alpha_free_access').maybeSingle();
+        ok = (alpha as { value: unknown } | null)?.value === true;
+      }
       if (ok) {
         memberOk.current = true;
         // Time-boxed gift? Let the DB decide whether an ending-soon warning

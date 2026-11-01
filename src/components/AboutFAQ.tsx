@@ -13,7 +13,7 @@ const HUBSPOT_FORM = '66b86cc2-3710-48bd-8c08-c94c1198dc0e';
 const FAQS: { q: string; a: string; link?: { href: string; label: string } }[] = [
   {
     q: 'What does membership cost?',
-    a: 'Every new member gets three months of full Concierge membership, free — no card required. When that ends, choose Community ($29/mo) or Community + Concierge ($99/mo), right inside the app.',
+    a: 'While Lichen is in alpha, membership is free — the complete platform, no card required. When alpha ends, choose Community ($29/mo) or Community + Concierge ($99/mo), right inside the app.',
   },
   {
     q: 'Is my data private?',
