@@ -35,5 +35,7 @@
 .tzpick__row:hover { background: var(--bone-warm); }
 .tzpick__row.is-on { background: var(--peach-tint); color: var(--peach-deep); font-weight: 600; }
 .tzpick__row em { font-style: normal; font-size: 11.5px; color: var(--ink-muted); margin-left: 4px; }
+/* The zone's plain-English name ("Alaska Daylight Time") — searchable and shown. */
+.tzpick__name { font-style: normal; font-size: 11.5px; color: var(--ink-muted); margin-left: 5px; }
 .tzpick__seam { border-top: 1px solid var(--bone-edge); margin: 4px 0; }
 .tzpick__none { margin: 0; padding: 8px; font-size: 12.5px; color: var(--ink-faint); }
