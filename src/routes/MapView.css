@@ -7,17 +7,25 @@
   margin-top: calc(var(--top-h) + var(--safe-top));
 }
 
-/* ── controls bar ── */
+/* ── controls bar — Home's stacked grammar (founder 2026-11-01: "can the
+   home screen setup be used for maps, too?"): tools row with the bone-edge
+   seam under it, lens rows below, wrapping. ── */
 .mapv__bar {
-  display: flex; align-items: center; gap: var(--s-2);
-  padding: var(--s-2) var(--s-4);
+  display: flex; flex-direction: column;
+  padding: var(--s-2) var(--s-4) var(--s-3);
   background: var(--bone);
   border-bottom: 1px solid var(--bone-edge);
 }
+.mapv__tools {
+  display: flex; align-items: center; gap: var(--s-2);
+  width: 100%;
+  /* the platform seam: hairline under the tools, real air before the lenses */
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bone-edge);
+}
 .mapv__bar-btn {
-  /* flex-shrink 0: overflowing layer pills used to squash these circles */
   flex-shrink: 0;
-  width: 36px; height: 36px; border-radius: var(--r-full);
+  width: 34px; height: 34px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   color: var(--ink-soft); cursor: pointer;
@@ -26,21 +34,14 @@
 .mapv__bar-btn:hover { border-color: var(--peach); color: var(--ink); }
 .mapv__bar-btn.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
 
-/* Layer pills scroll in their own lane; the ScrollHintRow wrapper takes the
-   rest of the bar and floats the more-this-way chevron when pills overflow */
-.mapv__bar .scrollrow { flex: 1; min-width: 0; }
-.mapv__layers.h-scroll {
+.mapv__layers {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  /* The layer lenses WRAP instead of scrolling (founder 2026-10-12:
-     "multiple rows for the subsection icons… instead of a scroll" — the
-     overall UI; supersedes this row's 2026-10-06 keep-the-scroll note). */
   flex-wrap: wrap;
   row-gap: 6px;
-  padding: 2px 0;
+  padding-top: 16px;
 }
-.mapv__layers::-webkit-scrollbar { display: none; }
 
 /* ── search overlay (drops under the bar; home of the future two-mode search) ── */
 .mapv__search {
@@ -219,13 +220,14 @@
 /* Layer lenses — Marketplace's grammar (text + icon, a check when on), not
    filled pills, so every filter row on the platform reads the same. */
 /* LAYERS ARE ICON CIRCLES, MULTI-SELECT (founder 2026-10-06: "have these be
-   the circle icons, not words - but you can click multiple icons… dark
-   orange" — her own override of the text-lens grammar, for Maps only): each
-   layer is a circle wearing its section's mark, several can be lit at once,
-   and lit = peach-deep fill. The row keeps home's scroll grammar (hide-mode
-   ScrollHintRow, swipe or arrow-click both scroll). */
+   the circle icons, not words - but you can click multiple icons"): each
+   layer is a circle wearing its section's mark, several can be lit at once.
+   Lit wears the PLATFORM light-peach selection since 2026-11-01 (founder:
+   "design in-consistency to remedy" against Home — superseding her
+   2026-10-06 dark-orange fill; the icon-row__btn--here treatment, so a
+   selected circle reads one way everywhere). */
 .mapv__layer {
-  flex: 0 0 auto; width: 36px; height: 36px; border-radius: var(--r-full);
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   color: var(--ink-soft); cursor: pointer;
@@ -233,10 +235,4 @@
 }
 .mapv__layer svg { flex-shrink: 0; }
 .mapv__layer:hover { border-color: var(--peach); color: var(--ink); }
-.mapv__layer.is-on { background: var(--peach-deep); border-color: var(--peach-deep); color: var(--bone-warm); }
-
-/* Doors | lenses — the same hairline every room draws */
-.mapv__bar-divider {
-  width: 1px; align-self: stretch; background: var(--bone-edge);
-  margin: 2px 6px 2px 2px; flex-shrink: 0;
-}
+.mapv__layer.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }

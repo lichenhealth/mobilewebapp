@@ -8,7 +8,6 @@ import { areaLabel } from '../lib/locationApi';
 import { Icon, iconSvgMarkup, type IconName } from '../components/Icon';
 import ScopeBack from '../components/ScopeBack';
 import AssistantDoor from '../components/AssistantDoor';
-import { ScrollHintRow } from '../components/ScrollHintRow';
 import LocationField from '../components/LocationField';
 import { useAuth } from '../auth/AuthProvider';
 import { colorFor, monogramFor } from '../lib/chatApi';
@@ -356,39 +355,42 @@ export default function MapView() {
   return (
     <div className="mapv">
       <ScopeBack />
-      {/* One anatomy everywhere (founder 2026-08-15): acting doors on the left
-          in Home's order — Search · + · AI — then a hairline, then this
-          room's own lenses. */}
+      {/* Home's stacked anatomy (founder 2026-11-01: "can the home screen
+          setup be used for maps, too? design in-consistency to remedy" —
+          superseding this bar's one-line tools|divider|lenses shape): the
+          tools row — Search · + · AI — on its own line with the bone-edge
+          seam under it, then the layer lenses below, wrapping full-width. */}
       <div className="mapv__bar">
-        <button
-          className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
-          onClick={() => setSearchOpen((o) => !o)}
-          aria-label="Search the map"
-        >
-          <Icon name="search" size={16} />
-        </button>
-        <div className="mapv__add-wrap">
+        <div className="mapv__tools">
           <button
-            className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
-            onClick={() => { setSheetOpen((o) => !o); setSearchOpen(false); }}
-            aria-label="Add a place"
+            className={'mapv__bar-btn' + (searchOpen ? ' is-on' : '')}
+            onClick={() => setSearchOpen((o) => !o)}
+            aria-label="Search the map"
           >
-            <Icon name="plus" size={16} />
+            <Icon name="search" size={16} />
           </button>
-          {sheetOpen && (
-            <AddPlaceSheet
-              me={me}
-              onClose={() => setSheetOpen(false)}
-              onSaved={async (geo) => {
-                await reloadSpaces();
-                if (geo) flyTo(geo.lng, geo.lat, 13);
-              }}
-            />
-          )}
+          <div className="mapv__add-wrap">
+            <button
+              className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
+              onClick={() => { setSheetOpen((o) => !o); setSearchOpen(false); }}
+              aria-label="Add a place"
+            >
+              <Icon name="plus" size={16} />
+            </button>
+            {sheetOpen && (
+              <AddPlaceSheet
+                me={me}
+                onClose={() => setSheetOpen(false)}
+                onSaved={async (geo) => {
+                  await reloadSpaces();
+                  if (geo) flyTo(geo.lng, geo.lat, 13);
+                }}
+              />
+            )}
+          </div>
+          <AssistantDoor section="maps" size={34} label="Your assistant — what's near you and worth knowing" />
         </div>
-        <AssistantDoor section="maps" size={34} label="Your assistant — what's near you and worth knowing" />
-        <span className="mapv__bar-divider" aria-hidden="true" />
-        <ScrollHintRow className="mapv__layers h-scroll" role="toolbar" ariaLabel="Map layers">
+        <div className="mapv__layers" role="toolbar" aria-label="Map layers">
           {LAYERS.map((l) => {
             const on = layers[l.key];
             return (
@@ -404,7 +406,7 @@ export default function MapView() {
               </button>
             );
           })}
-        </ScrollHintRow>
+        </div>
       </div>
 
       {searchOpen && (
