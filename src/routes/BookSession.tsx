@@ -7,13 +7,14 @@ import { supabase } from '../lib/supabase';
 import SlotMonth from '../components/SlotMonth';
 import { minToLabel, freeBusy, type FreeBusyRow } from '../lib/calendarApi';
 import { occursOn } from '../lib/recurrence';
+import { revealBelow } from '../lib/smartReveal';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
   rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   listBookableTypes, sessionLengthLabel, type BookingType,
 } from '../lib/bookingApi';
-import FitSelect from '../components/FitSelect';
+import TimeZonePick from '../components/TimeZonePick';
 import { ensureDirectChat } from '../lib/chatApi';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
@@ -118,7 +119,9 @@ export default function BookSession() {
   const dayRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!selDay) return;
-    requestAnimationFrame(() => dayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // Scroll JUST ENOUGH (founder 2026-11-01's crop mock): the times'
+    // bottom comes into view; the calendar above keeps as much as fits.
+    requestAnimationFrame(() => revealBelow(dayRef.current));
   }, [selDay]);
 
   // TIMED busy only — an all-day import ("Holiday") dimming a whole day
@@ -133,11 +136,7 @@ export default function BookSession() {
   const ptz = board?.type.provider_tz ?? null;
   const zone = dispZone || ptz || '';
   const zoneDiffers = !!(ptz && zone && zone !== ptz);
-  const zoneOptions = useMemo(() => {
-    const all = allTimeZones();
-    const lead = [ptz, viewerZone()].filter((z): z is string => !!z);
-    return [...new Set([...lead, ...all])];
-  }, [ptz]);
+  const zoneOptions = useMemo(() => allTimeZones(), []);
   const slotLabel = (iso: string, s: number): string => {
     if (!zoneDiffers) return minToLabel(s);
     const v = zoneSlotLabel(iso, s, ptz, zone);
@@ -209,12 +208,15 @@ export default function BookSession() {
         {ptz && (
           <p className="bkpub__tz bkg__tzrow">
             Times shown in{' '}
-            <FitSelect className="bkg__tzsel" value={zone} aria-label="Time zone"
-              onChange={(e) => setDispZone(e.target.value)}>
-              {zoneOptions.map((z) => (
-                <option key={z} value={z}>{z.replace(/_/g, ' ')}{z === ptz ? ` — ${providerName ? `${providerName.split(' ')[0]}’s` : 'their'} time` : ''}</option>
-              ))}
-            </FitSelect>
+            <TimeZonePick
+              value={zone}
+              zones={zoneOptions}
+              lead={[
+                { zone: ptz, label: `${providerName ? `${providerName.split(' ')[0]}’s` : 'their'} time` },
+                ...(viewerZone() && viewerZone() !== ptz ? [{ zone: viewerZone(), label: 'your time' }] : []),
+              ]}
+              onChange={setDispZone}
+            />
           </p>
         )}
         {t.description && !rescheduleId && <p className="bkg__desc">{t.description}</p>}

@@ -6,6 +6,7 @@ import SlotMonth from '../components/SlotMonth';
 import { useAuth } from '../auth/AuthProvider';
 import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
+import { revealBelow } from '../lib/smartReveal';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
@@ -13,7 +14,7 @@ import {
   groupTypesByTitle, sessionLengthLabel,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
-import FitSelect from '../components/FitSelect';
+import TimeZonePick from '../components/TimeZonePick';
 import { supabase } from '../lib/supabase';
 import './Bookings.css';
 import './GuestEvent.css';
@@ -165,7 +166,9 @@ export default function BookPublic() {
   const dayRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!selDay) return;
-    requestAnimationFrame(() => dayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // Scroll JUST ENOUGH (founder 2026-11-01's crop mock): the times'
+    // bottom comes into view; the calendar above keeps as much as fits.
+    requestAnimationFrame(() => revealBelow(dayRef.current));
   }, [selDay]);
 
   if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
@@ -257,10 +260,7 @@ export default function BookPublic() {
   const ptz = provider.timezone ?? null;
   const zone = dispZone || ptz || '';
   const zoneDiffers = !!(ptz && zone && zone !== ptz);
-  const zoneOptions = (() => {
-    const lead = [ptz, viewerZone()].filter((z): z is string => !!z);
-    return [...new Set([...lead, ...allTimeZones()])];
-  })();
+  const zoneOptions = allTimeZones();
   const slotLabel = (iso: string, s: number): string => {
     if (!zoneDiffers) return minToLabel(s);
     const v = zoneSlotLabel(iso, s, ptz, zone);
@@ -341,12 +341,15 @@ export default function BookPublic() {
         {ptz ? (
           <p className="bkpub__tz bkg__tzrow">
             Times shown in{' '}
-            <FitSelect className="bkg__tzsel" value={zone} aria-label="Time zone"
-              onChange={(e) => setDispZone(e.target.value)}>
-              {zoneOptions.map((z) => (
-                <option key={z} value={z}>{z.replace(/_/g, ' ')}{z === ptz ? ` — ${first}’s time` : ''}</option>
-              ))}
-            </FitSelect>
+            <TimeZonePick
+              value={zone}
+              zones={zoneOptions}
+              lead={[
+                { zone: ptz, label: `${first}’s time` },
+                ...(viewerZone() && viewerZone() !== ptz ? [{ zone: viewerZone(), label: 'your time' }] : []),
+              ]}
+              onChange={setDispZone}
+            />
           </p>
         ) : (
           <p className="bkpub__tz">Times are in {first}’s local time.</p>
