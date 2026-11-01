@@ -478,7 +478,11 @@ export default function App() {
           2026-10-21: "shouldn't the bottom nav be below the compose and have
           chat highlighted?") — the thread's own height stops at the nav's
           top edge (ChatThread.css), so the composer sits right above it. */}
-      {!isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
+      {/* …and only for MEMBERS (founder 2026-11-01, on the signed-out
+          booking page: "the icons on mobile show up on the bottom, but if
+          I'm not signed in or a member, they wouldn't be there, right?") —
+          a visitor has no sections to walk; the Sign in pill is their door. */}
+      {!!user && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
       {/* Claude's walkthrough companion (founder 2026-10-19) — floats over
           the real screens while a new member's tour is active. */}
       {!isAuth && !isGuest && !isEmbed && <GuideCompanion />}
