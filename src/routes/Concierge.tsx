@@ -1509,7 +1509,7 @@ export default function Concierge() {
             setShowSearch((s) => !s);
             if (showSearch) setQuery('');
           }}
-          aria-label="Search"
+          aria-label="Search" data-tip="Search"
         >
           <Icon name="search" size={14} />
         </button>
@@ -1520,7 +1520,7 @@ export default function Concierge() {
               ? `${basePath}/wow/edit`
               : `${basePath}/koc/edit${scope === 'Day' ? `?date=${anchor}` : ''}`)}
             aria-label={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
-            title={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
+            data-tip={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
           >
             <Icon name="plus" size={14} />
           </button>

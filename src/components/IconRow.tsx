@@ -61,7 +61,7 @@ export default function IconRow({ items, onSelect, className, ariaLabel, trailin
               onSelect?.(label);
             }}
             aria-label={label}
-            title={label}
+            data-tip={label}
           >
             <Icon name={icon} size={size ?? 16} />
           </button>
@@ -73,7 +73,7 @@ export default function IconRow({ items, onSelect, className, ariaLabel, trailin
               className="icon-row__door"
               onClick={door.onClick}
               aria-label={door.label}
-              title={door.label}
+              data-tip={door.label}
             >
               <Icon name="chevron-right" size={11} />
             </button>

@@ -747,14 +747,14 @@ export default function Calendar() {
           <button
             className={'calp__tool' + (searchOpen ? ' is-on' : '')}
             onClick={() => { setSearchOpen((s) => !s); setQuery(''); }}
-            aria-label="Search events"
+            aria-label="Search events" data-tip="Search"
           >
             <Icon name="search" size={16} />
           </button>
           <button
             className="calp__tool calp__tool--new"
             onClick={() => navigate('/calendar/new' + composerQS())}
-            aria-label="New event"
+            aria-label="New event" data-tip="New event"
           >
             <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -779,11 +779,11 @@ export default function Calendar() {
             {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
           </select>
           {hasBookables && (
-            <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" title="Bookings">
+            <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" data-tip="Bookings">
               <Icon name="booking-tap" size={16} />
             </button>
           )}
-          <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings">
+          <button className="calp__tool" onClick={() => navigate('/calendar/settings')} aria-label="Calendar settings" data-tip="Settings">
             <Icon name="settings" size={16} />
           </button>
         </div>

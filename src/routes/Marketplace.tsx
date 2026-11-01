@@ -397,13 +397,13 @@ export default function Marketplace() {
         <button
           className={'mkt__action mkt__action--door' + (showSearch ? ' is-active' : '')}
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setSearchActive(false); }}
-          aria-label="Search" title="Search"
+          aria-label="Search" data-tip="Search"
         >
           <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
         </button>
         <button className="mkt__action mkt__action--door"
           onClick={() => navigate(`/compose?area=marketplace${space ? `&space=${space}` : ''}`)}
-          aria-label="List something" title="List something">
+          aria-label="List something" data-tip="List something">
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
         </button>
         <div className="mkt__action mkt__action--door mkt__action--assistant">

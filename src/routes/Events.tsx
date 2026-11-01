@@ -271,14 +271,14 @@ export default function Events() {
             <button
               className="evt__action evt__action--door"
               onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
-              aria-label="Search" title="Search"
+              aria-label="Search" data-tip="Search"
             >
               <span className="evt__action-circle"><Icon name="search" size={14} /></span>
             </button>
             <button
               className="evt__action evt__action--door"
               onClick={() => navigate(`/compose?area=events${space ? `&space=${space}` : ''}`)}
-              aria-label="Post an event" title="Post an event"
+              aria-label="Post an event" data-tip="Post an event"
             >
               <span className="evt__action-circle">
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -293,7 +293,7 @@ export default function Events() {
             <div className="evt__action-spacer" />
             {/* The lit Feed door — this page IS the events feed, said the way
                 Home says it (founder 2026-08-20: consistency). */}
-            <button className="evt__action evt__action--here" aria-current="page" title="The events feed — you're here">
+            <button className="evt__action evt__action--here" aria-current="page" data-tip="Feed">
               <span className="evt__action-circle"><Icon name="newsfeed" size={14} /></span>
             </button>
             <div className="evt__action-push" />
@@ -331,10 +331,10 @@ export default function Events() {
                 ))}
               </div>
               <span className="evt__nav-doors">
-                <button className="evt__navdoor" onClick={() => navigate('/events/mine')} title="My Events">
+                <button className="evt__navdoor" onClick={() => navigate('/events/mine')} data-tip="My Events">
                   <Icon name="rsvp" size={13} /><span>My Events</span>
                 </button>
-                <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} title="My Calendar">
+                <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} data-tip="My Calendar">
                   <Icon name="calendar" size={13} /><span>My Calendar</span>
                 </button>
               </span>

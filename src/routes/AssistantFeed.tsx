@@ -751,7 +751,7 @@ export default function AssistantFeed() {
           <button
             key={t.id}
             className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
-            title={`${t.label} — ${t.blurb}`}
+            data-tip={t.label}
             aria-label={t.label}
             onClick={() => {
               // Every brain door lands on that section's BRIEF now —
@@ -771,7 +771,7 @@ export default function AssistantFeed() {
           dynamic room, not one of the six standing ones; it wears the
           space's own face. */}
       {spaceId && (
-        <button className="afeed__thread afeed__thread--space is-on" title={spaceRoom === 'currentcy' ? `${possessive(sctx?.name ?? 'this space')} Current-cy room` : `Building ${possessive(sctx?.name ?? 'this space')} page`} aria-label={sctx?.name ?? 'This space'}>
+        <button className="afeed__thread afeed__thread--space is-on" data-tip={sctx?.name ?? 'This space'} aria-label={sctx?.name ?? 'This space'}>
           <Avatar id={spaceId} name={sctx?.name ?? 'This space'} url={sctx?.avatarUrl} size={30} />
           {/* Its thread is the one on screen — no badge on what you're reading. */}
         </button>
@@ -829,12 +829,12 @@ export default function AssistantFeed() {
         className={'afeed__search-btn' + (searchOpen ? ' is-on' : '')}
         onClick={() => setSearchOpen((o) => !o)}
         aria-expanded={searchOpen}
-        aria-label="Search this feed"
+        aria-label="Search this feed" data-tip="Search"
       >
         <Icon name="search" size={16} />
       </button>
       {personal && (
-        <button className="afeed__search-btn" onClick={startNewConvo} aria-label="New conversation" title="New conversation">
+        <button className="afeed__search-btn" onClick={startNewConvo} aria-label="New conversation" data-tip="New conversation">
           <Icon name="plus" size={16} />
         </button>
       )}

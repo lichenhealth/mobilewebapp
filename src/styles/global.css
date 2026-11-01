@@ -412,3 +412,55 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
  * on the next line"). Wrap an inline name in .nobr and the wrap falls
  * before the whole name instead of inside it. */
 .nobr { white-space: nowrap; }
+
+/* EVERY ICON SPEAKS ON HOVER — the platform tooltip (founder 2026-11-01:
+   "let's have the hover cards on the types of selling for marketplace
+   persist for all icons on the platform - including maps filters, home
+   icons...so if you hover over the plane it will say travel"). The
+   Marketplace lens tip (2026-10-29: tan paper, peach ring, peach-deep
+   words — her settled look) generalized: any element wearing data-tip
+   grows the prompt bubble on hover AND keyboard focus; phones tap, where
+   the lit state itself teaches. Put the word in data-tip and DROP any
+   native title on the same element (it double-tips). .tip-left/.tip-right
+   hug an edge instead of centering — for a circle close enough to the
+   viewport edge that a centered bubble would poke past it. */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bone-warm);
+  border: 1px solid var(--peach);
+  color: var(--peach-deep);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(40, 30, 20, 0.10);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease-out) 0.08s;
+  z-index: 60;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after { opacity: 1; }
+[data-tip].tip-left::after { left: 0; right: auto; transform: none; }
+[data-tip].tip-right::after { left: auto; right: 0; transform: none; }
+
+/* A SCROLL CONTAINER CLIPS THE TIP: rows that carry data-tip circles shed
+   .h-scroll's overflow and WRAP instead (finishing the 2026-10-12
+   wrap-not-scroll direction) — the bubble needs to hang below the row.
+   ScrollHintRow's chevrons stand down by themselves once nothing overflows. */
+.icon-row.h-scroll,
+.afeed__threads.h-scroll,
+.abrief__rail.h-scroll,
+.mkt__actions.h-scroll,
+.evt__actions.h-scroll {
+  overflow: visible;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
