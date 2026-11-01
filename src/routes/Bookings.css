@@ -37,7 +37,9 @@
 }
 .bkg__search:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
 
-.bkg__day { margin-bottom: var(--s-4); }
+/* Picking a day scrolls its times into view (founder 2026-11-01) — the
+ * margin keeps the day heading clear of the fixed top bar when it lands. */
+.bkg__day { margin-bottom: var(--s-4); scroll-margin-top: calc(var(--top-h) + 10px); }
 .bkg__slots { display: flex; flex-wrap: wrap; gap: 6px; }
 .bkg__slot {
   padding: 8px 12px; border-radius: var(--r-full);

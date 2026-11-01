@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
@@ -154,6 +154,15 @@ export default function BookPublic() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
   const openDays = useMemo(() => new Set(dayMap.keys()), [dayMap]);
+
+  // The month grid can fill the whole screen, so a picked day's times land
+  // below the fold (founder 2026-11-01: "maybe it scrolls down enough to
+  // see the times?") — walk them into view on every pick.
+  const dayRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selDay) return;
+    requestAnimationFrame(() => dayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [selDay]);
 
   if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
 
@@ -406,7 +415,7 @@ export default function BookPublic() {
           />
           {!selDay && <p className="bkg__muted bkg__pickhint">Pick a day to see the open times.</p>}
           {selDay && dayMap.has(selDay) && (
-            <section className="bkg__day">
+            <section className="bkg__day" ref={dayRef}>
               <h2 className="bkg__h2">{DOW[localDate(selDay).getDay()]} · {localDate(selDay).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</h2>
               <div className="bkg__slots">
                 {dayMap.get(selDay)!.map((s) => (
