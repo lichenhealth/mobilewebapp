@@ -85,13 +85,15 @@ export default function Intro() {
           <div className="intro__half">
             <span className="intro__half-icon"><Icon name="user-multiple" size={22} /></span>
             <h2 className="intro__half-title">Community</h2>
-            {/* A condensed cut of the founder's copy (2026-11-01: "re-write
-                the community blurb to be an efficient version of this"). */}
+            {/* Founder's verbatim copy (2026-11-01, her own final cut
+                superseding the condensed Fibonacci paragraph; the trust
+                paragraph below is hers from the same message). */}
             <p className="intro__text">
-              Inspired by the efficiency and wisdom of the Fibonacci spiral,
-              each community, group, organization and place enjoys its own
-              complete ecosystem — every feature of the greater network,
-              with spinning out your own app on the roadmap.
+              A corrective social network, where each member enjoys the
+              complete ecosystem — where individuals, Groups, Communities,
+              Organizations and Places can leverage a completely integrated
+              ecosystem, including Marketplace, Events, Courses, Travel,
+              Maps, Chat, and more.
             </p>
             <p className="intro__text">
               Filter it all through the members, providers, communities,
