@@ -8,11 +8,12 @@ import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
-  resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
+  resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
   groupTypesByTitle, sessionLengthLabel,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
+import FitSelect from '../components/FitSelect';
 import { supabase } from '../lib/supabase';
 import './Bookings.css';
 import './GuestEvent.css';
@@ -62,7 +63,10 @@ export default function BookPublic() {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [mineTime, setMineTime] = useState(true);
+  // THE TIMEZONE DROPDOWN (founder 2026-11-01: "a drop down that lets you
+  // change time zones before you book") — display zone only; stored minutes
+  // stay provider-local by doctrine.
+  const [dispZone, setDispZone] = useState<string>(() => viewerZone());
   // PAYMENT OPTIONS (founder 2026-10-29: "bank transfer, card, invoice you
   // later"): card + US bank ride the one Stripe page; "invoice me later" is
   // the booker's declared intent, offered when the type allows it.
@@ -247,15 +251,19 @@ export default function BookPublic() {
   const activeType = page.types.find((t) => t.id === typeId) ?? null;
 
   // The logged timezone follow-up, built (founder 2026-10-03): slots are the
-  // PROVIDER's wall time by doctrine; a visitor on another clock reads them
-  // in their own by default, with the honest note and a flip. Stored minutes
-  // never convert — only labels.
+  // PROVIDER's wall time by doctrine; the visitor reads them in whatever
+  // zone the dropdown says (defaulting to their own). Stored minutes never
+  // convert — only labels.
   const ptz = provider.timezone ?? null;
-  const vz = viewerZone();
-  const foreign = !!(ptz && vz && ptz !== vz);
+  const zone = dispZone || ptz || '';
+  const zoneDiffers = !!(ptz && zone && zone !== ptz);
+  const zoneOptions = (() => {
+    const lead = [ptz, viewerZone()].filter((z): z is string => !!z);
+    return [...new Set([...lead, ...allTimeZones()])];
+  })();
   const slotLabel = (iso: string, s: number): string => {
-    if (!foreign || !mineTime) return minToLabel(s);
-    const v = viewerSlotLabel(iso, s, ptz);
+    if (!zoneDiffers) return minToLabel(s);
+    const v = zoneSlotLabel(iso, s, ptz, zone);
     if (!v) return minToLabel(s);
     return v.label + (v.dayShift === 1 ? ' (+1d)' : v.dayShift === -1 ? ' (−1d)' : '');
   };
@@ -330,20 +338,19 @@ export default function BookPublic() {
         <Avatar id={provider.id} name={providerName} url={provider.avatar_url ?? undefined} size={72} />
         <h1 className="bkg__title display-italic">Book time with {providerName}</h1>
         {provider.headline && <p className="bkg__sub">{provider.headline}</p>}
-        <p className="bkpub__tz">
-          {foreign
-            ? (mineTime
-              ? `Times are shown in your time zone (${vz}).`
-              : `Times are shown in ${first}’s time zone (${ptz}).`)
-            : `Times are in ${first}’s local time${ptz ? ` (${ptz})` : ''}.`}
-          {foreign && (
-            <>{' '}
-              <button className="bkg__tzflip" onClick={() => setMineTime((v) => !v)}>
-                Show in {mineTime ? `${first}’s` : 'your'} time
-              </button>
-            </>
-          )}
-        </p>
+        {ptz ? (
+          <p className="bkpub__tz bkg__tzrow">
+            Times shown in{' '}
+            <FitSelect className="bkg__tzsel" value={zone} aria-label="Time zone"
+              onChange={(e) => setDispZone(e.target.value)}>
+              {zoneOptions.map((z) => (
+                <option key={z} value={z}>{z.replace(/_/g, ' ')}{z === ptz ? ` — ${first}’s time` : ''}</option>
+              ))}
+            </FitSelect>
+          </p>
+        ) : (
+          <p className="bkpub__tz">Times are in {first}’s local time.</p>
+        )}
       </header>
 
       {error && <p className="bkg__error">{error}</p>}
@@ -441,10 +448,10 @@ export default function BookPublic() {
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + activeType.duration_min)}
-            {foreign && (() => {
-              const v = viewerSlotLabel(pick.iso, pick.start, ptz);
-              const ve = viewerSlotLabel(pick.iso, pick.start + activeType.duration_min, ptz);
-              return v && ve ? ` (${v.label} – ${ve.label} your time)` : '';
+            {zoneDiffers && (() => {
+              const v = zoneSlotLabel(pick.iso, pick.start, ptz, zone);
+              const ve = zoneSlotLabel(pick.iso, pick.start + activeType.duration_min, ptz, zone);
+              return v && ve ? ` (${v.label} – ${ve.label} in ${zone.replace(/_/g, ' ')})` : '';
             })()}
           </p>
           {!!board?.type.price_cents && (

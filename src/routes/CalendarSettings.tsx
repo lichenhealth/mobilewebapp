@@ -879,6 +879,40 @@ export default function CalendarSettings() {
             each length keeps its own link, price and rules.
           </p>
 
+          {/* THE PUBLIC LINK LEADS (founder 2026-11-01, her markup: "public
+              booking link should be at the top and have the link below the
+              text so copy can be next to it" — copy is her verbatim words). */}
+          {bkTypes.some((t) => t.audience === 'public' && t.active) && (
+            <div className="cset__publink">
+              {myHandle ? (
+                <>
+                  Anyone with this link (on Lichen, or off) will be able to
+                  book time with you. They will see all meeting types
+                  you&rsquo;ve set to be view-able via your public booking link.
+                  <span className="cset__publink-row">
+                    <code>lichen.health/book/{myHandle}</code>
+                    <button
+                      className="cedit__add cedit__add--sm"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}`);
+                        setLinkCopied(true);
+                        window.setTimeout(() => setLinkCopied(false), 2000);
+                      }}
+                    >
+                      {linkCopied ? 'Copied ✓' : 'Copy'}
+                    </button>
+                  </span>
+                </>
+              ) : (
+                <>
+                  Your public link needs an address first —{' '}
+                  <Link to="/profile#public-page">set yours in Profile → Public page</Link>{' '}
+                  and it becomes <code>lichen.health/book/&lt;your-address&gt;</code>.
+                </>
+              )}
+            </div>
+          )}
+
           {/* THE SESSION CARD (founder 2026-10-07: "Make the UI for these
               different meeting types more readable — audit calendly and
               other similar software"): the Calendly/Cal.com event-type
@@ -953,35 +987,6 @@ export default function CalendarSettings() {
               {bkOpen && bkEdit.id === bt.id && bkForm}
             </div>
           ))}
-
-          {bkTypes.some((t) => t.audience === 'public' && t.active) && (
-            <p className="cset__publink">
-              {myHandle ? (
-                <>
-                  Your public booking link:{' '}
-                  <code>lichen.health/book/{myHandle}</code>{' '}
-                  <button
-                    className="cedit__add cedit__add--sm"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}`);
-                      setLinkCopied(true);
-                      window.setTimeout(() => setLinkCopied(false), 2000);
-                    }}
-                  >
-                    {linkCopied ? 'Copied ✓' : 'Copy'}
-                  </button>
-                  <br />Anyone with it — on Lichen or not — sees your live
-                  availability and books straight in.
-                </>
-              ) : (
-                <>
-                  Your public link needs an address first —{' '}
-                  <Link to="/profile#public-page">set yours in Profile → Public page</Link>{' '}
-                  and it becomes <code>lichen.health/book/&lt;your-address&gt;</code>.
-                </>
-              )}
-            </p>
-          )}
 
           {!bkOpen && (
             <button className="cedit__add cedit__add--sm" onClick={() => {
