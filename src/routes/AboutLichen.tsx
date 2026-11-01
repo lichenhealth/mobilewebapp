@@ -744,9 +744,9 @@ export default function AboutLichen() {
             invitation</strong>. Every member arrives through someone already here, woven into
             their web from day one. Know someone inside? Ask them for an invite. Don’t know
             anyone yet? Introduce yourself at the door — a real person reads every note and
-            writes back. Every new member gets <strong>3 months of full access, free</strong> —
+            writes back. While we’re in alpha, <strong>membership is free</strong> —
             time to make Lichen yours, tell us what you need, and help shape the beginning of a
-            better world. Then you choose the plan that fits:{' '}
+            better world. When alpha ends, you choose the plan that fits:{' '}
             <strong>Community at $29/month</strong>, or <strong>Concierge at $99/month</strong>.
           </p>
           <p>

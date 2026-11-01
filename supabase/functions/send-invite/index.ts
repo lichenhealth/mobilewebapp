@@ -92,12 +92,11 @@ function content(inviterName: string, note: string, giftTier: string, giftMonths
   // "give you the boilerplate language as a template to edit"). Empty falls
   // back to the standard words.
   const missionText = (mission ?? '').trim() || DEFAULT_MISSION;
-  // Everyone gets 3 months free on signup (growth phase) — framed as a
-  // co-creation window, not a trial. A specific admin gift supersedes it.
-  // ⚠ "Your Alpha membership is on us" is the founder's framing (2026-10-19)
-  // of the SAME 3-month growth gift grant_growth_gift mints — the machinery
-  // is unchanged; if alpha should be free for longer, that's a gift change,
-  // not a copy change.
+  // "Your Alpha membership is on us" is the founder's framing (2026-10-19),
+  // and since 2026-11-01 it is true for the WHOLE alpha ("i want it to be
+  // free throughout"): the 3-month growth gift still mints, and the
+  // platform_settings.alpha_free_access switch keeps the door open after it
+  // lapses, until alpha ends. A specific admin gift supersedes this line.
   const trial = giftLine ? '' :
     `Your Alpha membership is on us. Use the time to make Lichen yours — tell us what you need to see in order `
     + `to value the platform as a social utility that uses Community Subscriptions ($29/month) and Concierge `

@@ -206,7 +206,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
               Sign in
             </button>
             <button className="btn" onClick={() => navigate('/signup')}>
-              Join Lichen — 3 months free
+              Join Lichen — free in alpha
             </button>
           </div>
         ) : (

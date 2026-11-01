@@ -209,8 +209,8 @@ export default function AdminSupporters() {
     const message = intent === 'practitioner'
       ? `${myName || 'A friend'} invited you to join Lichen as a care practitioner — coordinate each client's care with a care team around them, with subsidies for the clients who need them. Your Concierge dashboard is ready the moment you join: ${link}`
       : intent === 'client'
-        ? `${myName || 'A friend'} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. Your first 3 months are on us. Join: ${link}`
-        : `${myName || 'A friend'} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: ${link}`;
+        ? `${myName || 'A friend'} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. It’s free while we’re in alpha. Join: ${link}`
+        : `${myName || 'A friend'} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; it’s free while we’re in alpha — come help us build it out and be part of the beginning of a better world. Join: ${link}`;
     const href = `sms:${stored}?&body=${encodeURIComponent(message)}`;
     setText({ phone: email.trim(), href, message });
     setMsg('Their text is ready below — tap it to send from your Messages.');

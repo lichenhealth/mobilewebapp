@@ -242,8 +242,8 @@ export default function Invite() {
     const lead = intent === 'practitioner'
       ? `${who} invited you to join Lichen as a care practitioner — coordinate each client's care with a care team around them, with subsidies for the clients who need them. Your Concierge dashboard is ready the moment you join: https://lichen.health/signup`
       : intent === 'client'
-        ? `${who} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. Your first 3 months are on us. Join: https://lichen.health/signup`
-        : `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; your first 3 months are on us — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
+        ? `${who} invited you into Lichen Concierge — a care team and a care plan woven around you, starting with a gentle guided intake. It’s free while we’re in alpha. Join: https://lichen.health/signup`
+        : `${who} invited you to Lichen — a corrective social network for the whole of a life: care, work & offerings, events, places, a fairer economy. It’s early; it’s free while we’re in alpha — come help us build it out and be part of the beginning of a better world. Join: https://lichen.health/signup`;
     return note.trim() ? `${lead}\n\n${note.trim()}` : lead;
   };
 
@@ -425,7 +425,7 @@ export default function Invite() {
       <header className="invite__head">
         <h1 className="invite__title">Invite to Lichen</h1>
         <p className="invite__sub">
-          Know someone who belongs here? Their first 3 months are on us — an invitation to help
+          Know someone who belongs here? Membership is free while we’re in alpha — an invitation to help
           build out a new way of being together.
         </p>
       </header>
@@ -527,8 +527,8 @@ export default function Invite() {
         {isAdmin && channel !== 'phone' && (
           <div className="invite__gift">
             <p className="invite__gift-auto">
-              Every new member automatically gets <strong>3 months of Concierge, free</strong> — no
-              gift needed. This is for extending that welcome.
+              Every new member gets <strong>the full platform free while we’re in alpha</strong> — no
+              gift needed. This is for granting a standing membership beyond it.
             </p>
             <label className="invite__gift-toggle">
               <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
@@ -570,7 +570,7 @@ export default function Invite() {
             )}
             {gift && (
               <p className="invite__gift-hint">
-                This replaces the standard 3-month welcome — it activates the moment they sign up
+                This replaces the standard alpha welcome — it activates the moment they sign up
                 with this email, no paywall.
                 {phonesIn.length > 0 && ' The gift rides the email invitations; texted invites carry the standard welcome.'}
               </p>
