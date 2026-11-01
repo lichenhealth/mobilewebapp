@@ -46,6 +46,12 @@
 }
 .bkg__slot:hover { border-color: var(--peach); }
 .bkg__slot.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+/* "Availability for the both of you" (founder 2026-11-01): a slot that
+ * overlaps the signed-in viewer's OWN calendar dims but stays bookable —
+ * their calendar may hold soft blocks, the pick is theirs. */
+.bkg__slot--clash:not(.is-on) { opacity: 0.4; }
+.bkg__clashnote { font-size: 12px; color: var(--ink-muted); margin-top: var(--s-2); }
+.bkg__pickhint { text-align: center; }
 .bkg__confirm {
   /* Sticky so picking any slot surfaces the card at once — and the offset
    * must CLEAR the fixed bottom nav, or its tail (the Book button, the fine

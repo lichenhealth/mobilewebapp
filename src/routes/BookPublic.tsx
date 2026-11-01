@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
+import SlotMonth from '../components/SlotMonth';
 import { useAuth } from '../auth/AuthProvider';
 import { minToLabel } from '../lib/calendarApi';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
@@ -48,6 +49,9 @@ export default function BookPublic() {
   const [typeId, setTypeId] = useState<string | null>(null);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
+  // SCREEN 1 → SCREEN 2 (founder 2026-11-01, her Calendly markup): the month
+  // grid leads, a picked day reveals its times.
+  const [selDay, setSelDay] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
@@ -63,7 +67,8 @@ export default function BookPublic() {
   const [doneStatus, setDoneStatus] = useState<'pending' | 'confirmed'>('pending');
 
   const from = todayISO();
-  const to = addDays(from, 29);
+  // Two browsable months — the month grid made the old fortnight feel short.
+  const to = addDays(from, 59);
 
   useEffect(() => {
     let live = true;
@@ -117,19 +122,24 @@ export default function BookPublic() {
   useEffect(() => {
     if (!typeId) { setBoard(null); return; }
     let live = true;
-    setPick(null);
+    setPick(null); setSelDay(null);
     void publicBookingBoard(typeId, from, to).then((b) => { if (live) setBoard(b); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeId]);
 
-  const days = useMemo(() => {
-    if (!board) return [];
-    return Array.from({ length: 14 }, (_, i) => addDays(from, i))
-      .map((iso) => ({ iso, slots: slotsForDay(board, iso) }))
-      .filter((d) => d.slots.length > 0);
+  const dayMap = useMemo(() => {
+    const m = new Map<string, number[]>();
+    if (!board) return m;
+    for (let i = 0; i < 60; i++) {
+      const iso = addDays(from, i);
+      const slots = slotsForDay(board, iso);
+      if (slots.length > 0) m.set(iso, slots);
+    }
+    return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
+  const openDays = useMemo(() => new Set(dayMap.keys()), [dayMap]);
 
   if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
 
@@ -294,27 +304,39 @@ export default function BookPublic() {
 
       {activeType?.description && <p className="bkg__desc">{activeType.description}</p>}
 
-      {typeId && board && days.length === 0 && (
-        <p className="bkg__muted">No open times in the next two weeks — check back soon.</p>
+      {typeId && board && openDays.size === 0 && (
+        <p className="bkg__muted">No open times in the next two months — check back soon.</p>
       )}
 
-      {days.map(({ iso, slots }) => (
-        <section className="bkg__day" key={iso}>
-          <h2 className="bkg__h2">{DOW[localDate(iso).getDay()]} · {localDate(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</h2>
-          <div className="bkg__slots">
-            {slots.map((s) => (
-              <button
-                key={s}
-                className={'bkg__slot' + (pick?.iso === iso && pick.start === s ? ' is-on' : '')}
-                onClick={() => setPick({ iso, start: s })}
-              >
-                {slotLabel(iso, s)}
-                {capacity > 1 && board && <em className="bkg__seats"> · {seatsLeft(board, iso, s)} left</em>}
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
+      {openDays.size > 0 && (
+        <>
+          <SlotMonth
+            availableDays={openDays}
+            selected={selDay}
+            onSelect={(d) => { setSelDay(d); setPick(null); }}
+            minIso={from}
+            maxIso={to}
+          />
+          {!selDay && <p className="bkg__muted bkg__pickhint">Pick a day to see the open times.</p>}
+          {selDay && dayMap.has(selDay) && (
+            <section className="bkg__day">
+              <h2 className="bkg__h2">{DOW[localDate(selDay).getDay()]} · {localDate(selDay).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</h2>
+              <div className="bkg__slots">
+                {dayMap.get(selDay)!.map((s) => (
+                  <button
+                    key={s}
+                    className={'bkg__slot' + (pick?.iso === selDay && pick.start === s ? ' is-on' : '')}
+                    onClick={() => setPick({ iso: selDay, start: s })}
+                  >
+                    {slotLabel(selDay, s)}
+                    {capacity > 1 && board && <em className="bkg__seats"> · {seatsLeft(board, selDay, s)} left</em>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       {pick && activeType && (
         <div className="bkg__confirm">
