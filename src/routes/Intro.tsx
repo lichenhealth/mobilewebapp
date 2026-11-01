@@ -85,23 +85,20 @@ export default function Intro() {
           <div className="intro__half">
             <span className="intro__half-icon"><Icon name="user-multiple" size={22} /></span>
             <h2 className="intro__half-title">Community</h2>
-            {/* Founder's verbatim copy (2026-11-01, her own final cut
-                superseding the condensed Fibonacci paragraph; the trust
-                paragraph below is hers from the same message). */}
+            {/* Founder's verbatim copy (2026-11-01, her third pass the same
+                day — "Further tweaks to community copy"). */}
             <p className="intro__text">
-              A corrective social network, where each member enjoys the
-              complete ecosystem — where individuals, Groups, Communities,
-              Organizations and Places can leverage a completely integrated
-              ecosystem, including Marketplace, Events, Courses, Travel,
-              Maps, Chat, and more.
+              The corrective social network. A complete ecosystem — where
+              individuals, Groups, Communities, Organizations and Places
+              can leverage a completely integrated ecosystem, including
+              Marketplace, Events, Courses, Travel, Maps, Chat, and more.
             </p>
             <p className="intro__text">
-              Filter it all through the members, providers, communities,
-              groups and organizations you trust — expandable to those they
-              trust. Trust stays private, dissuading inauthentic
-              endorsements while scaling trusted recommendations for the
-              information, goods and services, healthcare, places and
-              entertainment you choose.
+              Filter it all through members you trust and recommend —
+              expandable to those they trust and recommend. Trust stays
+              private, dissuading inauthentic endorsements while scaling
+              trusted recommendations for the information, goods and
+              services, healthcare, places and entertainment you choose.
             </p>
           </div>
           <div className="intro__half">
