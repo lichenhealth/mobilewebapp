@@ -513,6 +513,34 @@ export function viewerSlotLabel(
   return { label, dayShift };
 }
 
+/** A slot's label in ANY chosen zone (founder 2026-11-01: "a drop down that
+ *  lets you change time zones before you book") — viewerSlotLabel's shape
+ *  with an explicit target zone instead of the browser's. */
+export function zoneSlotLabel(
+  iso: string, min: number, providerTz: string | null | undefined, zone: string,
+): { label: string; dayShift: number } | null {
+  const at = slotInstant(iso, min, providerTz);
+  if (!at) return null;
+  try {
+    const label = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone })
+      .toLowerCase().replace(' ', '').replace(':00', '');
+    // en-CA formats YYYY-MM-DD — the zone-local date for the day-shift read.
+    const localIso = new Intl.DateTimeFormat('en-CA', {
+      timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(at);
+    const dayShift = Math.round((new Date(localIso + 'T00:00:00').getTime() - new Date(iso + 'T00:00:00').getTime()) / 86400000);
+    return { label, dayShift };
+  } catch { return null; }
+}
+
+/** Every IANA zone the browser knows — the timezone dropdown's vocabulary. */
+export function allTimeZones(): string[] {
+  try {
+    const list = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone');
+    return list ?? [];
+  } catch { return []; }
+}
+
 /** Nobody is bookable by default (founder 2026-08-14): no declared hours means
  *  NOT available — unknown is never yes, same doctrine as presence and the
  *  find-a-time shading. When a booker hits that wall, this turns their demand

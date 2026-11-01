@@ -10,9 +10,10 @@ import { occursOn } from '../lib/recurrence';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
-  rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, viewerSlotLabel,
+  rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   listBookableTypes, sessionLengthLabel, type BookingType,
 } from '../lib/bookingApi';
+import FitSelect from '../components/FitSelect';
 import { ensureDirectChat } from '../lib/chatApi';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
@@ -52,7 +53,10 @@ export default function BookSession() {
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
   const [note, setNote] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [mineTime, setMineTime] = useState(true);
+  // THE TIMEZONE DROPDOWN (founder 2026-11-01: "a drop down that lets you
+  // change time zones before you book") — display zone, defaulting to the
+  // viewer's own clock; stored minutes stay provider-local by doctrine.
+  const [dispZone, setDispZone] = useState<string>(() => viewerZone());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<'requested' | 'booked' | 'moved' | null>(null);
   // An instant booking's video link, read back once the booking exists.
@@ -124,14 +128,19 @@ export default function BookSession() {
       && occursOn(b, iso) && b.start_min < start + dur && b.end_min > start);
 
   // Provider-local minutes are the stored truth; only LABELS convert when
-  // the viewer's clock runs elsewhere (founder 2026-10-03 — the public
-  // link's logged timezone follow-up, applied to the member picker too).
+  // the chosen display zone runs elsewhere (founder 2026-10-03 — the public
+  // link's logged timezone follow-up; the dropdown is 2026-11-01's pass).
   const ptz = board?.type.provider_tz ?? null;
-  const vz = viewerZone();
-  const foreign = !!(ptz && vz && ptz !== vz);
+  const zone = dispZone || ptz || '';
+  const zoneDiffers = !!(ptz && zone && zone !== ptz);
+  const zoneOptions = useMemo(() => {
+    const all = allTimeZones();
+    const lead = [ptz, viewerZone()].filter((z): z is string => !!z);
+    return [...new Set([...lead, ...all])];
+  }, [ptz]);
   const slotLabel = (iso: string, s: number): string => {
-    if (!foreign || !mineTime) return minToLabel(s);
-    const v = viewerSlotLabel(iso, s, ptz);
+    if (!zoneDiffers) return minToLabel(s);
+    const v = zoneSlotLabel(iso, s, ptz, zone);
     if (!v) return minToLabel(s);
     return v.label + (v.dayShift === 1 ? ' (+1d)' : v.dayShift === -1 ? ' (−1d)' : '');
   };
@@ -197,14 +206,15 @@ export default function BookSession() {
           {capacity > 1 ? ` · group session, up to ${capacity} people` : ''}
           {t.approval === 'request' ? ' · requests are confirmed by hand' : ' · books instantly'}
         </p>
-        {foreign && (
-          <p className="bkpub__tz">
-            {mineTime
-              ? `Times are shown in your time zone (${vz}).`
-              : `Times are shown in ${providerName ? `${providerName.split(' ')[0]}’s` : 'their'} time zone (${ptz}).`}{' '}
-            <button className="bkg__tzflip" onClick={() => setMineTime((v) => !v)}>
-              Show in {mineTime ? (providerName ? `${providerName.split(' ')[0]}’s` : 'their') : 'your'} time
-            </button>
+        {ptz && (
+          <p className="bkpub__tz bkg__tzrow">
+            Times shown in{' '}
+            <FitSelect className="bkg__tzsel" value={zone} aria-label="Time zone"
+              onChange={(e) => setDispZone(e.target.value)}>
+              {zoneOptions.map((z) => (
+                <option key={z} value={z}>{z.replace(/_/g, ' ')}{z === ptz ? ` — ${providerName ? `${providerName.split(' ')[0]}’s` : 'their'} time` : ''}</option>
+              ))}
+            </FitSelect>
           </p>
         )}
         {t.description && !rescheduleId && <p className="bkg__desc">{t.description}</p>}
@@ -315,10 +325,10 @@ export default function BookSession() {
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + t.duration_min)}
-            {foreign && (() => {
-              const v = viewerSlotLabel(pick.iso, pick.start, ptz);
-              const ve = viewerSlotLabel(pick.iso, pick.start + t.duration_min, ptz);
-              return v && ve ? ` (${v.label} – ${ve.label} your time)` : '';
+            {zoneDiffers && (() => {
+              const v = zoneSlotLabel(pick.iso, pick.start, ptz, zone);
+              const ve = zoneSlotLabel(pick.iso, pick.start + t.duration_min, ptz, zone);
+              return v && ve ? ` (${v.label} – ${ve.label} in ${zone.replace(/_/g, ' ')})` : '';
             })()}
           </p>
           {!rescheduleId && questions.map((q, i) => (

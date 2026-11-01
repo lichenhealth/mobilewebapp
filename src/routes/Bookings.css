@@ -132,6 +132,20 @@
 .bkpub__fine { font-size: 11.5px; color: var(--ink-faint); text-align: center; margin: 8px 0 0; }
 .bkpub__signin { border: none; background: none; color: var(--peach-deep); cursor: pointer; font: inherit; font-size: 11.5px; text-decoration: underline; }
 
+/* THE TIMEZONE DROPDOWN (founder 2026-11-01: "a drop down that lets you
+ * change time zones before you book") — an inline pill on the tz line,
+ * through FitSelect so it hugs the chosen zone; draws its own chevron
+ * (the conc__dash-select pill rule). */
+.bkg__tzrow { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.bkg__tzsel {
+  appearance: none; -webkit-appearance: none;
+  padding: 4px 24px 4px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: var(--bone-warm);
+  font-family: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236B7479' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+
 /* Calendly parity (founder 2026-10-03): timezone flip, group seats,
    intake questions. */
 .bkg__tzflip {

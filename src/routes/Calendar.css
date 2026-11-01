@@ -654,6 +654,10 @@
 }
 .cset__publink code { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); }
 .cset__publink a { color: var(--peach-deep); }
+/* The link on its own line under the blurb, Copy right beside it (founder
+ * 2026-11-01's markup — "have the link below the text so copy can be next
+ * to it, versus on the next line"). */
+.cset__publink-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 
 /* Chips that HOLD (founder 2026-08-14): body-tap parks (white, still in the
    row), only the × removes. The × inherits the chip's ink. */
