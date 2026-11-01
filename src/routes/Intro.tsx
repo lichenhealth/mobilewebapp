@@ -33,7 +33,7 @@ export default function Intro() {
   const [i, setI] = useState(0);
   const touchX = useRef<number | null>(null);
 
-  const N = 6;
+  const N = 7;
   const last = i === N - 1;
 
   // Reaching the end counts as seen even if they then idle here.
@@ -78,43 +78,45 @@ export default function Intro() {
       </div>
     ),
     (
-      <div className="intro__body intro__body--tight" key="c2">
+      /* The two parts are TWO SCREENS since 2026-11-01 (founder: "can you
+         design a two screen scroll - first is community, 2nd is concierge,
+         so its not a scroll down to then move ahead?") — each card fits a
+         phone whole, the arrow is the only forward gesture. */
+      <div className="intro__body" key="c2a">
+        <span className="intro__glyph"><Icon name="user-multiple" size={30} /></span>
         <p className="intro__eyebrow">Two parts, one organism</p>
-        <h1 className="intro__title">Community &amp; Concierge</h1>
-        <div className="intro__pair">
-          <div className="intro__half">
-            <span className="intro__half-icon"><Icon name="user-multiple" size={22} /></span>
-            <h2 className="intro__half-title">Community</h2>
-            {/* Founder's verbatim copy (2026-11-01, her third pass the same
-                day — "Further tweaks to community copy"). */}
-            <p className="intro__text">
-              The corrective social network. A complete ecosystem — where
-              individuals, Groups, Communities, Organizations and Places
-              can leverage a completely integrated ecosystem, including
-              Marketplace, Events, Courses, Travel, Maps, Chat, and more.
-            </p>
-            <p className="intro__text">
-              Filter it all through members you trust and recommend —
-              expandable to those they trust and recommend. Trust stays
-              private, dissuading inauthentic endorsements while scaling
-              trusted recommendations for the information, goods and
-              services, healthcare, places and entertainment you choose.
-            </p>
-          </div>
-          <div className="intro__half">
-            <span className="intro__half-icon"><Icon name="concierge" size={22} /></span>
-            <h2 className="intro__half-title">Concierge</h2>
-            {/* Founder's copy (2026-11-01). */}
-            <p className="intro__text">
-              Your care team assembles around you, leveraging Lichen&rsquo;s
-              Concierge platform to collaborate in weaving the land, plants,
-              animals, elements, eco-spiritual practices, western medicine,
-              naturopathic interventions and cutting edge technology
-              necessary to best support your unique path to healing and
-              expansion.
-            </p>
-          </div>
-        </div>
+        <h1 className="intro__title">Community</h1>
+        {/* Founder's verbatim copy (2026-11-01, her third pass the same
+            day — "Further tweaks to community copy"). */}
+        <p className="intro__text intro__text--left">
+          The corrective social network. A complete ecosystem — where
+          individuals, Groups, Communities, Organizations and Places
+          can leverage a completely integrated ecosystem, including
+          Marketplace, Events, Courses, Travel, Maps, Chat, and more.
+        </p>
+        <p className="intro__text intro__text--left">
+          Filter it all through members you trust and recommend —
+          expandable to those they trust and recommend. Trust stays
+          private, dissuading inauthentic endorsements while scaling
+          trusted recommendations for the information, goods and
+          services, healthcare, places and entertainment you choose.
+        </p>
+      </div>
+    ),
+    (
+      <div className="intro__body" key="c2b">
+        <span className="intro__glyph"><Icon name="concierge" size={30} /></span>
+        <p className="intro__eyebrow">Two parts, one organism</p>
+        <h1 className="intro__title">Concierge</h1>
+        {/* Founder's copy (2026-11-01). */}
+        <p className="intro__text intro__text--left">
+          Your care team assembles around you, leveraging Lichen&rsquo;s
+          Concierge platform to collaborate in weaving the land, plants,
+          animals, elements, eco-spiritual practices, western medicine,
+          naturopathic interventions and cutting edge technology
+          necessary to best support your unique path to healing and
+          expansion.
+        </p>
       </div>
     ),
     (
