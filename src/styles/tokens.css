@@ -5,7 +5,13 @@
 
 :root {
   /* ─── Color ─────────────────────────────────────────────────────── */
-  --wall-gutter: 8px;         /* the mandatory minimum indent from the app's walls */
+  /* The mandatory minimum indent from the app's walls — widened 8→14px
+     (founder 2026-11-01: "let's make our left and right margins a bit
+     wider, so there's a little more dead space on each side"). Her same
+     message grants the exception: where a wider gutter would force one
+     word onto its own line, a screen may deliberately tighten its own
+     padding — an exception is a choice, never a drift. */
+  --wall-gutter: 14px;
   --bone:        #F0EEE9;     /* primary canvas — matches wireframe */
   --bone-warm:   #FFFFFF;     /* lifted surfaces / cards */
   --bone-deep:   #E6E2DA;     /* recessed */
