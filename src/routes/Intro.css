@@ -15,15 +15,26 @@
   min-height: 32px;
 }
 .intro__wordmark {
+  display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-display, serif); font-size: 19px; color: var(--ink);
 }
+/* Later slides' top-right skip — a visible peach pill (founder 2026-11-01:
+   "make it more easy to see for subsequent slides"). */
 .intro__skip {
-  background: none; border: 0; padding: 6px 0; cursor: pointer;
-  font-size: var(--t-sm); color: var(--ink-muted);
-  text-decoration: underline; text-decoration-color: var(--peach);
-  text-underline-offset: 3px;
+  background: var(--peach); border: 1px solid var(--peach);
+  border-radius: var(--r-full); padding: 7px 16px; cursor: pointer;
+  font-size: var(--t-sm); font-weight: 600; color: var(--ink);
 }
-.intro__skip:hover { color: var(--ink); text-decoration-color: var(--peach-deep); }
+.intro__skip:hover { background: var(--peach-deep); border-color: var(--peach-deep); }
+/* The first card's skip — peach, below the card, straight to the request
+   form (founder 2026-11-01). */
+.intro__skipbtn {
+  background: var(--peach); border: 1px solid var(--peach);
+  border-radius: var(--r-full); padding: 11px 28px; cursor: pointer;
+  font-size: 14.5px; font-weight: 600; color: var(--ink);
+  margin-bottom: 14px;
+}
+.intro__skipbtn:hover { background: var(--peach-deep); border-color: var(--peach-deep); }
 
 .intro__card {
   width: 100%; max-width: 620px;
@@ -68,28 +79,33 @@
 }
 .intro__text:last-child { margin-bottom: 0; }
 
-/* Card 2 — the two halves */
+/* Card 2 — the two halves. Tightened + icons centered (founder 2026-11-01:
+   "move the icons to the center and move the text up a little to save
+   above the fold room"). */
+.intro__body--tight { padding: 30px 24px 26px; }
+.intro__body--tight .intro__title { margin-bottom: 8px; }
 .intro__pair {
-  display: grid; grid-template-columns: 1fr; gap: 18px;
-  margin-top: 6px; text-align: left;
+  display: grid; grid-template-columns: 1fr; gap: 14px;
+  margin-top: 4px; text-align: left;
 }
 @media (min-width: 640px) { .intro__pair { grid-template-columns: 1fr 1fr; } }
 .intro__half {
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge); border-radius: 16px;
-  padding: 16px 16px 14px;
+  padding: 12px 14px;
 }
 .intro__half-icon {
-  display: inline-flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: 50%;
   background: #fff; border: 1px solid var(--bone-edge);
-  color: var(--peach-deep); margin-bottom: 8px;
+  color: var(--peach-deep); margin: 0 auto 6px;
 }
 .intro__half-title {
   margin: 0 0 6px; font-family: var(--font-display, serif);
   font-size: 19px; font-weight: 500; color: var(--ink);
 }
 .intro__half .intro__text { font-size: 14.5px; margin: 0; max-width: none; }
+.intro__half .intro__text + .intro__text { margin-top: 8px; }
 
 /* Card 6 — the three doors */
 .intro__ctas { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 6px; }

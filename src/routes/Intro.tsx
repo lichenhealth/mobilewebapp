@@ -10,9 +10,13 @@ import './Intro.css';
  * in front of /signup. The last card's choice rides localStorage
  * ('lichen.introIntent') into Onboarding, where the person's OWN pick wins
  * over the invitation's intent — self-sorting at the door supersedes the
- * inviter's guess, exactly once, by their own hand. Skip is always one tap
- * (top right), and every path out of here lands on /signup with the arrival
- * params (invite token, ?from) intact. */
+ * inviter's guess, exactly once, by their own hand. Skip is always one tap —
+ * on the FIRST card it's a peach button right below the card, going straight
+ * to the request form (founder 2026-11-01: "a skip intro button in peach
+ * below the tile cards… get rid of the one at the top right for that screen
+ * only"); later cards carry it top right as a visible peach pill ("make it
+ * more easy to see for subsequent slides"). Every path out of here lands on
+ * /signup with the arrival params (invite token, ?from) intact. */
 
 type IntroIntent = 'community' | 'client' | 'practitioner';
 
@@ -74,31 +78,41 @@ export default function Intro() {
       </div>
     ),
     (
-      <div className="intro__body" key="c2">
+      <div className="intro__body intro__body--tight" key="c2">
         <p className="intro__eyebrow">Two parts, one organism</p>
         <h1 className="intro__title">Community &amp; Concierge</h1>
         <div className="intro__pair">
           <div className="intro__half">
             <span className="intro__half-icon"><Icon name="user-multiple" size={22} /></span>
             <h2 className="intro__half-title">Community</h2>
-            {/* Founder's copy (2026-10-19). */}
+            {/* A condensed cut of the founder's copy (2026-11-01: "re-write
+                the community blurb to be an efficient version of this"). */}
             <p className="intro__text">
-              The living network helping people, organizations, communities,
-              groups and places share goods and resources via marketplace,
-              organize experiences via events, manage schedules with
-              calendar, exchange information via feed and chat, deliver
-              wisdom courses, share art and music, and navigate our
-              expansive and breathtaking world via travel and maps.
+              Inspired by the efficiency and wisdom of the Fibonacci spiral,
+              each community, group, organization and place enjoys its own
+              complete ecosystem — every feature of the greater network,
+              with spinning out your own app on the roadmap.
+            </p>
+            <p className="intro__text">
+              Filter it all through the members, providers, communities,
+              groups and organizations you trust — expandable to those they
+              trust. Trust stays private, dissuading inauthentic
+              endorsements while scaling trusted recommendations for the
+              information, goods and services, healthcare, places and
+              entertainment you choose.
             </p>
           </div>
           <div className="intro__half">
             <span className="intro__half-icon"><Icon name="concierge" size={22} /></span>
             <h2 className="intro__half-title">Concierge</h2>
+            {/* Founder's copy (2026-11-01). */}
             <p className="intro__text">
-              Holistic care, woven around a whole person — your Web of
-              Wellbeing, a care team you choose, and care plans that hold
-              every dimension of health. As someone receiving care, or
-              someone offering it.
+              Your care team assembles around you, leveraging Lichen&rsquo;s
+              Concierge platform to collaborate in weaving the land, plants,
+              animals, elements, eco-spiritual practices, western medicine,
+              naturopathic interventions and cutting edge technology
+              necessary to best support your unique path to healing and
+              expansion.
             </p>
           </div>
         </div>
@@ -212,8 +226,8 @@ export default function Intro() {
       }}
     >
       <div className="intro__top">
-        <span className="intro__wordmark">Lichen</span>
-        {!last && (
+        <span className="intro__wordmark"><LichenMark size={24} /> Lichen</span>
+        {i > 0 && !last && (
           <button type="button" className="intro__skip" onClick={toSignup}>Skip intro ›</button>
         )}
       </div>
@@ -221,6 +235,12 @@ export default function Intro() {
       <div className="intro__card" key={i}>
         {cards[i]}
       </div>
+
+      {i === 0 && (
+        <button type="button" className="intro__skipbtn" onClick={toSignup}>
+          Skip intro ›
+        </button>
+      )}
 
       <div className="intro__foot">
         <button type="button" className="intro__nav" onClick={() => step(-1)}
