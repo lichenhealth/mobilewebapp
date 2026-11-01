@@ -73,6 +73,7 @@ import AreaFeed from './routes/AreaFeed';
 import Courses from './routes/Courses';
 import BottomNav from './components/BottomNav';
 import GuideCompanion from './components/GuideCompanion';
+import GuestGate from './components/GuestGate';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
@@ -478,14 +479,19 @@ export default function App() {
           2026-10-21: "shouldn't the bottom nav be below the compose and have
           chat highlighted?") — the thread's own height stops at the nav's
           top edge (ChatThread.css), so the composer sits right above it. */}
-      {/* …and only for MEMBERS (founder 2026-11-01, on the signed-out
-          booking page: "the icons on mobile show up on the bottom, but if
-          I'm not signed in or a member, they wouldn't be there, right?") —
-          a visitor has no sections to walk; the Sign in pill is their door. */}
-      {!!user && !isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
+      {/* …for visitors too, but GATED (founder 2026-11-01, second pass the
+          same day — the ☰ and bell still stood, so hiding the nav alone was
+          inconsistent: "add back the lower nav and keep those pieces and
+          when someone tries to use the nav, there's a pop up that says sign
+          in to use platform features, or ask to join"). Signed out, every
+          member door opens the GuestGate instead of acting. */}
+      {!isAuth && !isGuest && !isAbout && !isEmbed && <BottomNav />}
       {/* Claude's walkthrough companion (founder 2026-10-19) — floats over
           the real screens while a new member's tour is active. */}
       {!isAuth && !isGuest && !isEmbed && <GuideCompanion />}
+      {/* The guest gate (founder 2026-11-01): signed-out taps on member
+          doors land here — Sign in, or Request to join. */}
+      {!isAuth && !isGuest && !isEmbed && <GuestGate />}
       {/* The docked desktop rail is app chrome too — it stands down with the
           rest on a naked-site rendering (founder 2026-09-09: the builder's
           Preview showed the side nav). */}

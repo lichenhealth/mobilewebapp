@@ -1,6 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
 import { useNotifications } from '../notifications/NotificationsProvider';
+import { useAuth } from '../auth/AuthProvider';
+import { askGuestGate } from './GuestGate';
 import { sectionForRoute } from '../lib/sections';
 import { navFamily } from '../lib/navFamily';
 import './BottomNav.css';
@@ -29,6 +31,10 @@ const ITEMS: NavItem[] = [
 
 export default function BottomNav() {
   const { countsBySection, totalUnread } = useNotifications();
+  // Signed out, the nav STANDS but every tab opens the guest gate instead
+  // (founder 2026-11-01: "a pop up that says sign in to use platform
+  // features, or ask to join").
+  const { user } = useAuth();
   const { pathname } = useLocation();
   const countFor = (to: string) =>
     to === '/home' ? totalUnread : (countsBySection[sectionForRoute(to) ?? ''] ?? 0);
@@ -47,6 +53,7 @@ export default function BottomNav() {
             <li key={item.to}>
               <NavLink
                 to={item.to}
+                onClick={(e) => { if (!user) { e.preventDefault(); askGuestGate(); } }}
                 className={({ isActive }) => {
                   const lit = family ? item.to === family : isActive;
                   return 'bottom-nav__item' + (lit ? ' is-active' : '');
