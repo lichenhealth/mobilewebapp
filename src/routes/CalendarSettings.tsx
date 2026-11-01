@@ -311,257 +311,13 @@ export default function CalendarSettings() {
     );
   }
 
-  return (
-    <div className="cedit">
-      <header className="cedit__head cedit__head--noback">
-                <h1 className="cedit__title">Calendar settings</h1>
-        {/* The brain lives HERE too (founder 2026-10-03: "tell the Ai
-            assistant your work and social hours and it can manage your
-            cal for you, like a human secretary") — the calendar thread's
-            tools already set hours and build session types by voice. */}
-        <AssistantDoor section="calendar" label="Tell your assistant your hours — it manages your calendar" />
-      </header>
-
-      {error && <p className="cedit__error">{error}</p>}
-
-      <div className="cedit__body">
-        {/* ── My hours ── */}
-        <div className="cedit__field">
-          <span className="cedit__label">My hours</span>
-          <p className="cedit__hint">
-            {isCaregiver ? 'Three kinds' : 'Two kinds'}, because they're genuinely different hours.
-            <strong> Work</strong> is when you'd take a booking — groups also use it
-            (plus your events) to find meeting times.
-            <strong> Social</strong> is when you'd welcome a chat; it's what shows your
-            web that you&rsquo;re available, without you having to be in the app.
-            {isCaregiver && <>
-              <strong> On call</strong> powers your care team&rsquo;s urgent coverage.
-            </>}
-            {' '}Anything booked takes you out of work and social hours automatically —
-            people can still message you, they just know not to expect you.
-            {' '}Or just tell your assistant (the brain above) &ldquo;work 9&ndash;5 weekdays,
-            social Sunday afternoons&rdquo; — it sets all of this for you.
-          </p>
-          {windows.map((w) => (
-            wEdit?.id === w.id ? (
-              <div className="cset__row is-editing" key={w.id}>
-                <FitSelect className="cset__select" value={wEdit.kind} onChange={(e) => setWEdit({ ...wEdit, kind: e.target.value as AvailabilityKind })} aria-label="Kind">
-                  <option value="available">Work</option>
-                  <option value="social">Social</option>
-                  {(isCaregiver || wEdit.kind === 'on_call') && <option value="on_call">On call</option>}
-                </FitSelect>
-                <FitSelect className="cset__select" value={String(wEdit.day)} onChange={(e) => setWEdit({ ...wEdit, day: Number(e.target.value) })} aria-label="Weekday">
-                  {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
-                </FitSelect>
-                <TimeField value={wEdit.start} onChange={(m) => setWEdit({ ...wEdit, start: m, end: wEdit.end <= m ? Math.min(m + 60, 1440) : wEdit.end })} ariaLabel="From" />
-                <span className="rec__lbl">to</span>
-                <TimeField value={wEdit.end} onChange={(m) => setWEdit({ ...wEdit, end: m })} min={wEdit.start} ariaLabel="Until" />
-                <button
-                  className="cedit__add cedit__add--sm"
-                  onClick={() => act(async () => {
-                    await updateAvailability(wEdit.id, {
-                      weekday: wEdit.day, startMin: wEdit.start, endMin: wEdit.end, kind: wEdit.kind,
-                    });
-                    setWEdit(null);
-                  })}
-                >
-                  Save
-                </button>
-                <button
-                  className="cedit__remove"
-                  aria-label="Never mind — keep the hours as they were"
-                  onClick={() => setWEdit(null)}
-                >
-                  <Icon name="close" size={13} />
-                </button>
-              </div>
-            ) : (
-            <div className="cset__row" key={w.id}>
-              <span className={'cset__kind'
-                + (w.kind === 'on_call' ? ' is-oncall' : '')
-                + (w.kind === 'social' ? ' is-social' : '')}>
-                {w.kind === 'on_call' ? 'On call' : w.kind === 'social' ? 'Social' : 'Work'}
-              </span>
-              <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
-              <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
-              <button
-                className="cset__editlink"
-                onClick={() => setWEdit({ id: w.id, kind: w.kind, day: w.weekday, start: w.start_min, end: w.end_min })}
-              >
-                Edit
-              </button>
-              <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
-            </div>
-            )
-          ))}
-          {!wOpen && (
-            <button className="cedit__add cedit__add--sm" onClick={() => setWOpen(true)}>
-              <Icon name="plus" size={12} /> Add hours
-            </button>
-          )}
-          {wOpen && (
-          <div className="cset__add">
-            {/* The KIND leads (founder 2026-08-19): what these hours ARE, then
-                when. On call is offered only to active caregivers — a duty of
-                a role, not a general setting; rows someone already has always
-                render, and the option returns while any exist so they can be
-                understood and removed. */}
-            <FitSelect className="cset__select" value={wKind} onBrain={hoursBrain} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
-              <option value="available">Work</option>
-              <option value="social">Social</option>
-              {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
-            </FitSelect>
-            <FitSelect className="cset__select" value={wDay} onBrain={hoursBrain} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
-              <option value="weekdays">Monday – Friday</option>
-              <option value="weekend">Saturday &amp; Sunday</option>
-              <option value="everyday">Every day</option>
-              {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
-            </FitSelect>
-            <TimeField value={wStart} onBrain={hoursBrain} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
-            <span className="rec__lbl">to</span>
-            <TimeField value={wEnd} onBrain={hoursBrain} onChange={setWEnd} min={wStart} ariaLabel="Until" />
-            <button
-              className="cedit__add cedit__add--sm"
-              onClick={() => act(() => addAvailability(me, {
-                weekday: wDay === 'weekdays' ? [0, 1, 2, 3, 4]
-                  : wDay === 'weekend' ? [5, 6]
-                  : wDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
-                  : Number(wDay),
-                startMin: wStart, endMin: wEnd, kind: wKind,
-              }))}
-            >
-              <Icon name="plus" size={12} /> Add
-            </button>
-            <button
-              className="cedit__remove"
-              aria-label="Never mind — close without adding"
-              onClick={() => setWOpen(false)}
-            >
-              <Icon name="close" size={12} />
-            </button>
-          </div>
-          )}
-          {myPhone !== null && !myPhone && windows.some((w) => w.kind === 'on_call') && (
-            <p className="cedit__hint">
-              You have on-call hours but no phone number — add one in your{' '}
-              <Link to="/profile">Profile</Link> so clients can call you when you&rsquo;re on call.
-            </p>
-          )}
-        </div>
-
-        {/* ── Bookable sessions (the Calendly layer) ── */}
-        <div className="cedit__field">
-          <span className="cedit__label">Bookable sessions</span>
-          <p className="cedit__hint">
-            Offer sessions members can book from your profile. Open times come
-            from your hours above minus everything on your calendar (imported
-            calendars included). Price is just words — payment happens however
-            you and your people already do it. Give two session types the
-            same name and bookers see ONE session with a choice of lengths —
-            each length keeps its own link, price and rules.
-          </p>
-
-          {/* THE SESSION CARD (founder 2026-10-07: "Make the UI for these
-              different meeting types more readable — audit calendly and
-              other similar software"): the Calendly/Cal.com event-type
-              anatomy on Lichen's paper — the TITLE owns its own line and
-              never truncates (the screenshot showed "Care T…"), the facts
-              breathe on a fine line below, and the sendable link (or the
-              honest needs-an-address note) gets the full width. */}
-          {bkTypes.map((bt) => (
-            <div className={'cset__bkcard' + (bt.active ? '' : ' cset__bkoff')} key={bt.id}>
-              <div className="cset__bkhead">
-                <span className="cset__bktitle">{bt.title}</span>
-                {!bt.active && <em className="cset__bkpaused">Paused</em>}
-                <span className="cset__bkbtns">
-                  <button className="cedit__add cedit__add--sm" onClick={() => {
-                    setBkEdit(bt); setBkOpen(true);
-                    setBkLink(bkLinks[bt.id]?.url ?? '');
-                    setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
-                    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
-                    void listTypeHours(bt.id).then(setBkHours);
-                    void listTypeConditions(bt.id).then(setBkConds);
-                  }}>Edit</button>
-                  <button
-                    className="cedit__remove"
-                    aria-label={bt.active ? 'Pause' : 'Resume'}
-                    title={bt.active ? 'Pause bookings' : 'Resume bookings'}
-                    onClick={() => act(async () => { await saveBookingType(me, { ...bt, active: !bt.active }); })}
-                  >
-                    <Icon name={bt.active ? 'close' : 'plus'} size={13} />
-                  </button>
-                </span>
-              </div>
-              <p className="cset__bkmeta">
-                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
-                {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
-                {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
-                  : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
-              </p>
-              {/* The vanity link (founder 2026-10-03, the Calendly shape):
-                  this session's own sendable address. */}
-              {bt.slug && myHandle && (
-                <span className="cset__bkrow-vanity">
-                  <code>lichen.health/book/{myHandle}/{bt.slug}</code>
-                  <button
-                    className="cedit__add cedit__add--sm"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}/${bt.slug}`);
-                      setCopiedType(bt.id);
-                      window.setTimeout(() => setCopiedType(''), 2000);
-                    }}
-                  >
-                    {copiedType === bt.id ? 'Copied ✓' : 'Copy'}
-                  </button>
-                </span>
-              )}
-              {bt.slug && !myHandle && (
-                <span className="cset__bkrow-vanity cset__bkrow-vanity--muted">
-                  Its direct link needs an address first — set yours in Profile → Public page, or just ask the brain here to set your handle.
-                </span>
-              )}
-            </div>
-          ))}
-
-          {bkTypes.some((t) => t.audience === 'public' && t.active) && (
-            <p className="cset__publink">
-              {myHandle ? (
-                <>
-                  Your public booking link:{' '}
-                  <code>lichen.health/book/{myHandle}</code>{' '}
-                  <button
-                    className="cedit__add cedit__add--sm"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}`);
-                      setLinkCopied(true);
-                      window.setTimeout(() => setLinkCopied(false), 2000);
-                    }}
-                  >
-                    {linkCopied ? 'Copied ✓' : 'Copy'}
-                  </button>
-                  <br />Anyone with it — on Lichen or not — sees your live
-                  availability and books straight in.
-                </>
-              ) : (
-                <>
-                  Your public link needs an address first —{' '}
-                  <Link to="/profile#public-page">set yours in Profile → Public page</Link>{' '}
-                  and it becomes <code>lichen.health/book/&lt;your-address&gt;</code>.
-                </>
-              )}
-            </p>
-          )}
-
-          {!bkOpen ? (
-            <button className="cedit__add cedit__add--sm" onClick={() => {
-              setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
-              setBkLink(''); setBkZoom(false);
-              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
-              setBkOpen(true);
-            }}>
-              <Icon name="plus" size={12} /> New session type
-            </button>
-          ) : (
+  // THE TYPE FORM EXPANDS THE CARD IT EDITS (founder 2026-11-01: pressing
+  // Edit "appears that nothing happens", because the form rendered below
+  // the whole session list, below the fold — "have an edit either expand
+  // the bubble down, pushing things lower on the page so you can edit").
+  // One form, two seats: inside the card being edited, or under the New
+  // session type button for a fresh one. The eye-connection rule again.
+  const bkForm = !bkOpen ? null : (
             <div className="cset__add cset__add--wrap">
               <input
                 className="cedit__input cset__grow"
@@ -948,7 +704,262 @@ export default function CalendarSettings() {
                 <Icon name="close" size={13} />
               </button>
             </div>
+  );
+
+  return (
+    <div className="cedit">
+      <header className="cedit__head cedit__head--noback">
+                <h1 className="cedit__title">Calendar settings</h1>
+        {/* The brain lives HERE too (founder 2026-10-03: "tell the Ai
+            assistant your work and social hours and it can manage your
+            cal for you, like a human secretary") — the calendar thread's
+            tools already set hours and build session types by voice. */}
+        <AssistantDoor section="calendar" label="Tell your assistant your hours — it manages your calendar" />
+      </header>
+
+      {error && <p className="cedit__error">{error}</p>}
+
+      <div className="cedit__body">
+        {/* ── My hours ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">My hours</span>
+          <p className="cedit__hint">
+            {isCaregiver ? 'Three kinds' : 'Two kinds'}, because they're genuinely different hours.
+            <strong> Work</strong> is when you'd take a booking — groups also use it
+            (plus your events) to find meeting times.
+            <strong> Social</strong> is when you'd welcome a chat; it's what shows your
+            web that you&rsquo;re available, without you having to be in the app.
+            {isCaregiver && <>
+              <strong> On call</strong> powers your care team&rsquo;s urgent coverage.
+            </>}
+            {' '}Anything booked takes you out of work and social hours automatically —
+            people can still message you, they just know not to expect you.
+            {' '}Or just tell your assistant (the brain above) &ldquo;work 9&ndash;5 weekdays,
+            social Sunday afternoons&rdquo; — it sets all of this for you.
+          </p>
+          {windows.map((w) => (
+            wEdit?.id === w.id ? (
+              <div className="cset__row is-editing" key={w.id}>
+                <FitSelect className="cset__select" value={wEdit.kind} onChange={(e) => setWEdit({ ...wEdit, kind: e.target.value as AvailabilityKind })} aria-label="Kind">
+                  <option value="available">Work</option>
+                  <option value="social">Social</option>
+                  {(isCaregiver || wEdit.kind === 'on_call') && <option value="on_call">On call</option>}
+                </FitSelect>
+                <FitSelect className="cset__select" value={String(wEdit.day)} onChange={(e) => setWEdit({ ...wEdit, day: Number(e.target.value) })} aria-label="Weekday">
+                  {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
+                </FitSelect>
+                <TimeField value={wEdit.start} onChange={(m) => setWEdit({ ...wEdit, start: m, end: wEdit.end <= m ? Math.min(m + 60, 1440) : wEdit.end })} ariaLabel="From" />
+                <span className="rec__lbl">to</span>
+                <TimeField value={wEdit.end} onChange={(m) => setWEdit({ ...wEdit, end: m })} min={wEdit.start} ariaLabel="Until" />
+                <button
+                  className="cedit__add cedit__add--sm"
+                  onClick={() => act(async () => {
+                    await updateAvailability(wEdit.id, {
+                      weekday: wEdit.day, startMin: wEdit.start, endMin: wEdit.end, kind: wEdit.kind,
+                    });
+                    setWEdit(null);
+                  })}
+                >
+                  Save
+                </button>
+                <button
+                  className="cedit__remove"
+                  aria-label="Never mind — keep the hours as they were"
+                  onClick={() => setWEdit(null)}
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+            ) : (
+            <div className="cset__row" key={w.id}>
+              <span className={'cset__kind'
+                + (w.kind === 'on_call' ? ' is-oncall' : '')
+                + (w.kind === 'social' ? ' is-social' : '')}>
+                {w.kind === 'on_call' ? 'On call' : w.kind === 'social' ? 'Social' : 'Work'}
+              </span>
+              <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
+              <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
+              <button
+                className="cset__editlink"
+                onClick={() => setWEdit({ id: w.id, kind: w.kind, day: w.weekday, start: w.start_min, end: w.end_min })}
+              >
+                Edit
+              </button>
+              <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
+            </div>
+            )
+          ))}
+          {!wOpen && (
+            <button className="cedit__add cedit__add--sm" onClick={() => setWOpen(true)}>
+              <Icon name="plus" size={12} /> Add hours
+            </button>
           )}
+          {wOpen && (
+          <div className="cset__add">
+            {/* The KIND leads (founder 2026-08-19): what these hours ARE, then
+                when. On call is offered only to active caregivers — a duty of
+                a role, not a general setting; rows someone already has always
+                render, and the option returns while any exist so they can be
+                understood and removed. */}
+            <FitSelect className="cset__select" value={wKind} onBrain={hoursBrain} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
+              <option value="available">Work</option>
+              <option value="social">Social</option>
+              {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
+            </FitSelect>
+            <FitSelect className="cset__select" value={wDay} onBrain={hoursBrain} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
+              <option value="weekdays">Monday – Friday</option>
+              <option value="weekend">Saturday &amp; Sunday</option>
+              <option value="everyday">Every day</option>
+              {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
+            </FitSelect>
+            <TimeField value={wStart} onBrain={hoursBrain} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+            <span className="rec__lbl">to</span>
+            <TimeField value={wEnd} onBrain={hoursBrain} onChange={setWEnd} min={wStart} ariaLabel="Until" />
+            <button
+              className="cedit__add cedit__add--sm"
+              onClick={() => act(() => addAvailability(me, {
+                weekday: wDay === 'weekdays' ? [0, 1, 2, 3, 4]
+                  : wDay === 'weekend' ? [5, 6]
+                  : wDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
+                  : Number(wDay),
+                startMin: wStart, endMin: wEnd, kind: wKind,
+              }))}
+            >
+              <Icon name="plus" size={12} /> Add
+            </button>
+            <button
+              className="cedit__remove"
+              aria-label="Never mind — close without adding"
+              onClick={() => setWOpen(false)}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+          )}
+          {myPhone !== null && !myPhone && windows.some((w) => w.kind === 'on_call') && (
+            <p className="cedit__hint">
+              You have on-call hours but no phone number — add one in your{' '}
+              <Link to="/profile">Profile</Link> so clients can call you when you&rsquo;re on call.
+            </p>
+          )}
+        </div>
+
+        {/* ── Bookable sessions (the Calendly layer) ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">Bookable sessions</span>
+          <p className="cedit__hint">
+            Offer sessions members can book from your profile. Open times come
+            from your hours above minus everything on your calendar (imported
+            calendars included). Price is just words — payment happens however
+            you and your people already do it. Give two session types the
+            same name and bookers see ONE session with a choice of lengths —
+            each length keeps its own link, price and rules.
+          </p>
+
+          {/* THE SESSION CARD (founder 2026-10-07: "Make the UI for these
+              different meeting types more readable — audit calendly and
+              other similar software"): the Calendly/Cal.com event-type
+              anatomy on Lichen's paper — the TITLE owns its own line and
+              never truncates (the screenshot showed "Care T…"), the facts
+              breathe on a fine line below, and the sendable link (or the
+              honest needs-an-address note) gets the full width. */}
+          {bkTypes.map((bt) => (
+            <div className={'cset__bkcard' + (bt.active ? '' : ' cset__bkoff') + (bkOpen && bkEdit.id === bt.id ? ' is-editing' : '')} key={bt.id}>
+              <div className="cset__bkhead">
+                <span className="cset__bktitle">{bt.title}</span>
+                {!bt.active && <em className="cset__bkpaused">Paused</em>}
+                <span className="cset__bkbtns">
+                  <button className="cedit__add cedit__add--sm" onClick={() => {
+                    setBkEdit(bt); setBkOpen(true);
+                    setBkLink(bkLinks[bt.id]?.url ?? '');
+                    setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
+                    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
+                    void listTypeHours(bt.id).then(setBkHours);
+                    void listTypeConditions(bt.id).then(setBkConds);
+                  }}>Edit</button>
+                  <button
+                    className="cedit__remove"
+                    aria-label={bt.active ? 'Pause' : 'Resume'}
+                    title={bt.active ? 'Pause bookings' : 'Resume bookings'}
+                    onClick={() => act(async () => { await saveBookingType(me, { ...bt, active: !bt.active }); })}
+                  >
+                    <Icon name={bt.active ? 'close' : 'plus'} size={13} />
+                  </button>
+                </span>
+              </div>
+              <p className="cset__bkmeta">
+                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
+                {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
+                  : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
+              </p>
+              {/* The vanity link (founder 2026-10-03, the Calendly shape):
+                  this session's own sendable address. */}
+              {bt.slug && myHandle && (
+                <span className="cset__bkrow-vanity">
+                  <code>lichen.health/book/{myHandle}/{bt.slug}</code>
+                  <button
+                    className="cedit__add cedit__add--sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}/${bt.slug}`);
+                      setCopiedType(bt.id);
+                      window.setTimeout(() => setCopiedType(''), 2000);
+                    }}
+                  >
+                    {copiedType === bt.id ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </span>
+              )}
+              {bt.slug && !myHandle && (
+                <span className="cset__bkrow-vanity cset__bkrow-vanity--muted">
+                  Its direct link needs an address first — set yours in Profile → Public page, or just ask the brain here to set your handle.
+                </span>
+              )}
+              {/* Edit expands THIS bubble down — the form lives in the card. */}
+              {bkOpen && bkEdit.id === bt.id && bkForm}
+            </div>
+          ))}
+
+          {bkTypes.some((t) => t.audience === 'public' && t.active) && (
+            <p className="cset__publink">
+              {myHandle ? (
+                <>
+                  Your public booking link:{' '}
+                  <code>lichen.health/book/{myHandle}</code>{' '}
+                  <button
+                    className="cedit__add cedit__add--sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(`https://lichen.health/book/${myHandle}`);
+                      setLinkCopied(true);
+                      window.setTimeout(() => setLinkCopied(false), 2000);
+                    }}
+                  >
+                    {linkCopied ? 'Copied ✓' : 'Copy'}
+                  </button>
+                  <br />Anyone with it — on Lichen or not — sees your live
+                  availability and books straight in.
+                </>
+              ) : (
+                <>
+                  Your public link needs an address first —{' '}
+                  <Link to="/profile#public-page">set yours in Profile → Public page</Link>{' '}
+                  and it becomes <code>lichen.health/book/&lt;your-address&gt;</code>.
+                </>
+              )}
+            </p>
+          )}
+
+          {!bkOpen && (
+            <button className="cedit__add cedit__add--sm" onClick={() => {
+              setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
+              setBkLink(''); setBkZoom(false);
+              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
+              setBkOpen(true);
+            }}>
+              <Icon name="plus" size={12} /> New session type
+            </button>
+          )}
+          {bkOpen && !bkEdit.id && bkForm}
         </div>
 
         {/* ── Other calendars (secret iCal import) ── */}
