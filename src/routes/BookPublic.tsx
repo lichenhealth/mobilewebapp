@@ -161,8 +161,8 @@ export default function BookPublic() {
           <p className="bkg__muted">{mFirst} has nothing bookable for you right now.</p>
         ) : (
           <>
-            <p className="bkpub__tz">Pick a session — you&rsquo;re signed in, so it books under your name.</p>
-            <div className="bkpub__types">
+            <p className="bkpub__tz bkpub__pick">Pick a session — you&rsquo;re signed in, so it books under your name.</p>
+            <div className="bkpub__types bkpub__types--menu">
               {memberView.types.map((t) => (
                 <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
                   {t.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}{AUD_TAG[t.audience] ?? ''}
