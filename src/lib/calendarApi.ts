@@ -283,6 +283,19 @@ export async function addAvailability(me: string, w: { weekday: number | number[
   if (error) throw error;
 }
 
+/** Edit a standing window in place (founder 2026-11-01: "We should have an
+ *  edit next to the 'x' so we can just edit what we already have, not just
+ *  add"). One row, one day — a batch choice is an ADD gesture. */
+export async function updateAvailability(
+  id: string,
+  w: { weekday: number; startMin: number; endMin: number; kind: AvailabilityKind },
+): Promise<void> {
+  const { error } = await supabase.from('availability_windows')
+    .update({ weekday: w.weekday, start_min: w.startMin, end_min: w.endMin, kind: w.kind })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export async function deleteAvailability(id: string): Promise<void> {
   const { error } = await supabase.from('availability_windows').delete().eq('id', id);
   if (error) throw error;

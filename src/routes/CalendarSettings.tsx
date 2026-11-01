@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 import { WEEKDAYS_SHORT, WEEKDAYS_FULL } from '../lib/recurrence';
 import {
   AvailabilityKind, AvailabilityWindow, ShareRule, minToLabel,
-  loadMyAvailability, addAvailability, deleteAvailability,
+  loadMyAvailability, addAvailability, updateAvailability, deleteAvailability,
   loadMyShares, upsertShare, deleteShare,
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
   removeExternalCalendar, syncExternalCalendars, deleteEveryoneShare,
@@ -169,6 +169,12 @@ export default function CalendarSettings() {
   const [wStart, setWStart] = useState(9 * 60);
   const [wEnd, setWEnd] = useState(17 * 60);
   const [wKind, setWKind] = useState<AvailabilityKind>('available');
+  // EDIT IN PLACE (founder 2026-11-01: "We should have an edit next to the
+  // 'x' so we can just edit what we already have, not just add"): a row's
+  // Edit loads it into the same composer, Save updates that one row. While
+  // editing the day select offers single days only — an edit changes ONE
+  // row; laying down a week is the Add gesture.
+  const [wEditId, setWEditId] = useState<string | null>(null);
 
 
   // Bookable sessions (the Calendly layer)
@@ -208,6 +214,9 @@ export default function CalendarSettings() {
   const [chDay, setChDay] = useState<string>('weekdays');
   const [chStart, setChStart] = useState(540);
   const [chEnd, setChEnd] = useState(1020);
+  // Edit-in-place for a type's own hours too (founder 2026-11-01, the same
+  // gesture as My hours): the row loads into the pickers, Save replaces it.
+  const [chEditIdx, setChEditIdx] = useState<number | null>(null);
   // The provider's own spaces — the audience picker for space-scoped types.
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
@@ -331,7 +340,7 @@ export default function CalendarSettings() {
             social Sunday afternoons&rdquo; — it sets all of this for you.
           </p>
           {windows.map((w) => (
-            <div className="cset__row" key={w.id}>
+            <div className={'cset__row' + (wEditId === w.id ? ' is-editing' : '')} key={w.id}>
               <span className={'cset__kind'
                 + (w.kind === 'on_call' ? ' is-oncall' : '')
                 + (w.kind === 'social' ? ' is-social' : '')}>
@@ -339,6 +348,15 @@ export default function CalendarSettings() {
               </span>
               <span className="cset__day">{WEEKDAYS_SHORT[w.weekday]}</span>
               <span className="cset__time">{minToLabel(w.start_min)} – {minToLabel(w.end_min)}</span>
+              <button
+                className="cset__editlink"
+                onClick={() => {
+                  setWEditId(w.id); setWKind(w.kind); setWDay(String(w.weekday));
+                  setWStart(w.start_min); setWEnd(w.end_min); setWOpen(true);
+                }}
+              >
+                Edit
+              </button>
               <button className="cedit__remove" onClick={() => act(() => deleteAvailability(w.id))} aria-label="Remove"><Icon name="close" size={13} /></button>
             </div>
           ))}
@@ -360,9 +378,10 @@ export default function CalendarSettings() {
               {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
             </FitSelect>
             <FitSelect className="cset__select" value={wDay} onBrain={hoursBrain} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
-              <option value="weekdays">Monday – Friday</option>
-              <option value="weekend">Saturday &amp; Sunday</option>
-              <option value="everyday">Every day</option>
+              {/* An edit changes ONE row — batch days are the Add gesture. */}
+              {!wEditId && <option value="weekdays">Monday – Friday</option>}
+              {!wEditId && <option value="weekend">Saturday &amp; Sunday</option>}
+              {!wEditId && <option value="everyday">Every day</option>}
               {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
             </FitSelect>
             <TimeField value={wStart} onBrain={hoursBrain} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
@@ -370,20 +389,29 @@ export default function CalendarSettings() {
             <TimeField value={wEnd} onBrain={hoursBrain} onChange={setWEnd} min={wStart} ariaLabel="Until" />
             <button
               className="cedit__add cedit__add--sm"
-              onClick={() => act(() => addAvailability(me, {
-                weekday: wDay === 'weekdays' ? [0, 1, 2, 3, 4]
-                  : wDay === 'weekend' ? [5, 6]
-                  : wDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
-                  : Number(wDay),
-                startMin: wStart, endMin: wEnd, kind: wKind,
-              }))}
+              onClick={() => act(async () => {
+                if (wEditId) {
+                  await updateAvailability(wEditId, {
+                    weekday: Number(wDay), startMin: wStart, endMin: wEnd, kind: wKind,
+                  });
+                  setWEditId(null); setWOpen(false);
+                  return;
+                }
+                await addAvailability(me, {
+                  weekday: wDay === 'weekdays' ? [0, 1, 2, 3, 4]
+                    : wDay === 'weekend' ? [5, 6]
+                    : wDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
+                    : Number(wDay),
+                  startMin: wStart, endMin: wEnd, kind: wKind,
+                });
+              })}
             >
-              <Icon name="plus" size={12} /> Add
+              {wEditId ? 'Save' : <><Icon name="plus" size={12} /> Add</>}
             </button>
             <button
               className="cedit__remove"
-              aria-label="Never mind — close without adding"
-              onClick={() => setWOpen(false)}
+              aria-label={wEditId ? 'Never mind — keep the hours as they were' : 'Never mind — close without adding'}
+              onClick={() => { setWEditId(null); setWOpen(false); }}
             >
               <Icon name="close" size={12} />
             </button>
@@ -424,7 +452,7 @@ export default function CalendarSettings() {
                     setBkEdit(bt); setBkOpen(true);
                     setBkLink(bkLinks[bt.id]?.url ?? '');
                     setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
-                    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
+                    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEditIdx(null);
                     void listTypeHours(bt.id).then(setBkHours);
                     void listTypeConditions(bt.id).then(setBkConds);
                   }}>Edit</button>
@@ -502,7 +530,7 @@ export default function CalendarSettings() {
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
               setBkLink(''); setBkZoom(false);
-              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]);
+              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEditIdx(null);
               setBkOpen(true);
             }}>
               <Icon name="plus" size={12} /> New session type
@@ -689,19 +717,29 @@ export default function CalendarSettings() {
               {(bkEdit.hours_kind === 'custom') && (
                 <div className="cset__typehours">
                   {bkHours.map((h, i) => (
-                    <div className="cset__typehour" key={i}>
+                    <div className={'cset__typehour' + (chEditIdx === i ? ' is-editing' : '')} key={i}>
                       <span>{WEEKDAYS_FULL[h.weekday]} {minToLabel(h.start_min)} – {minToLabel(h.end_min)}</span>
+                      <button
+                        className="cset__editlink"
+                        onClick={() => {
+                          setChEditIdx(i); setChDay(String(h.weekday));
+                          setChStart(h.start_min); setChEnd(h.end_min);
+                        }}
+                      >
+                        Edit
+                      </button>
                       <button className="cedit__remove" aria-label="Remove these hours"
-                        onClick={() => setBkHours((rows) => rows.filter((_, j) => j !== i))}>
+                        onClick={() => { setBkHours((rows) => rows.filter((_, j) => j !== i)); setChEditIdx(null); }}>
                         <Icon name="close" size={12} />
                       </button>
                     </div>
                   ))}
                   <div className="cset__typehour-add">
                     <FitSelect className="cset__select" value={chDay} onBrain={typeBrain} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
-                      <option value="weekdays">Monday – Friday</option>
-                      <option value="weekend">Saturday &amp; Sunday</option>
-                      <option value="everyday">Every day</option>
+                      {/* An edit changes ONE row — batch days are the Add gesture. */}
+                      {chEditIdx === null && <option value="weekdays">Monday – Friday</option>}
+                      {chEditIdx === null && <option value="weekend">Saturday &amp; Sunday</option>}
+                      {chEditIdx === null && <option value="everyday">Every day</option>}
                       {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
                     </FitSelect>
                     <TimeField value={chStart} onBrain={typeBrain} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
@@ -709,6 +747,13 @@ export default function CalendarSettings() {
                     <TimeField value={chEnd} onBrain={typeBrain} onChange={setChEnd} min={chStart} ariaLabel="Until" />
                     <button className="cedit__add cedit__add--sm"
                       onClick={() => {
+                        if (chEditIdx !== null) {
+                          setBkHours((rows) => rows.map((r, j) => j === chEditIdx
+                            ? { ...r, weekday: Number(chDay), start_min: chStart, end_min: chEnd }
+                            : r));
+                          setChEditIdx(null);
+                          return;
+                        }
                         const days = chDay === 'weekdays' ? [0, 1, 2, 3, 4]
                           : chDay === 'weekend' ? [5, 6]
                           : chDay === 'everyday' ? [0, 1, 2, 3, 4, 5, 6]
@@ -719,8 +764,17 @@ export default function CalendarSettings() {
                             .map((d) => ({ weekday: d, start_min: chStart, end_min: chEnd })),
                         ]);
                       }}>
-                      <Icon name="plus" size={12} /> Add
+                      {chEditIdx !== null ? 'Save' : <><Icon name="plus" size={12} /> Add</>}
                     </button>
+                    {chEditIdx !== null && (
+                      <button
+                        className="cedit__remove"
+                        aria-label="Never mind — keep these hours as they were"
+                        onClick={() => setChEditIdx(null)}
+                      >
+                        <Icon name="close" size={12} />
+                      </button>
+                    )}
                   </div>
                   {bkHours.length === 0 && (
                     <p className="cedit__hint">No hours yet — this session can&rsquo;t be booked until it has some.</p>
@@ -845,7 +899,7 @@ export default function CalendarSettings() {
                       || wantZoom !== (bkLinks[typeId]?.zoom_unique ?? false)) {
                     await saveMeetingLink(typeId, link.url, wantZoom);
                   }
-                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]);
+                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]); setChEditIdx(null);
                 })}
               >
                 <Icon name="plus" size={12} /> Save
