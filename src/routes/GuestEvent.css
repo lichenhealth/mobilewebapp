@@ -25,3 +25,11 @@
 .gev__btn.is-on { background: var(--green); border-color: var(--green); color: #fff; }
 .gev__join { margin-top: var(--s-6); font-size: 14px; color: var(--ink-soft); }
 .gev__join a { color: var(--peach-deep, var(--peach)); text-decoration: underline; text-underline-offset: 2px; }
+/* The join CTA rides INLINE in the blurb's own sentence, in peach, so it
+ * reads as a link (founder 2026-11-01: "move this up to the line above and
+ * make it peach, so you know you can link it"). */
+.gev__joinlink {
+  border: 0; background: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--peach-deep, var(--peach));
+  text-decoration: underline; text-underline-offset: 2px;
+}
