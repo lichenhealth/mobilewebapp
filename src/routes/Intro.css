@@ -79,33 +79,11 @@
 }
 .intro__text:last-child { margin-bottom: 0; }
 
-/* Card 2 — the two halves. Tightened + icons centered (founder 2026-11-01:
-   "move the icons to the center and move the text up a little to save
-   above the fold room"). */
-.intro__body--tight { padding: 30px 24px 26px; }
-.intro__body--tight .intro__title { margin-bottom: 8px; }
-.intro__pair {
-  display: grid; grid-template-columns: 1fr; gap: 14px;
-  margin-top: 4px; text-align: left;
-}
-@media (min-width: 640px) { .intro__pair { grid-template-columns: 1fr 1fr; } }
-.intro__half {
-  background: var(--bone-warm);
-  border: 1px solid var(--bone-edge); border-radius: 16px;
-  padding: 12px 14px;
-}
-.intro__half-icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 50%;
-  background: #fff; border: 1px solid var(--bone-edge);
-  color: var(--peach-deep); margin: 0 auto 6px;
-}
-.intro__half-title {
-  margin: 0 0 6px; font-family: var(--font-display, serif);
-  font-size: 19px; font-weight: 500; color: var(--ink);
-}
-.intro__half .intro__text { font-size: 14.5px; margin: 0; max-width: none; }
-.intro__half .intro__text + .intro__text { margin-top: 8px; }
+/* Cards 2–3, Community then Concierge, each a whole screen (founder
+   2026-11-01: "a two screen scroll - first is community, 2nd is concierge,
+   so its not a scroll down to then move ahead" — the two-halves card
+   retired). Their longer blurbs read left-aligned. */
+.intro__text--left { text-align: left; }
 
 /* Card 6 — the three doors */
 .intro__ctas { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 6px; }
