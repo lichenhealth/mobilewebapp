@@ -4,7 +4,9 @@ import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { minToLabel } from '../lib/calendarApi';
+import SlotMonth from '../components/SlotMonth';
+import { minToLabel, freeBusy, type FreeBusyRow } from '../lib/calendarApi';
+import { occursOn } from '../lib/recurrence';
 import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
@@ -34,6 +36,14 @@ export default function BookSession() {
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [providerName, setProviderName] = useState('');
   const [ready, setReady] = useState(false);
+  // SCREEN 1 → SCREEN 2 (founder 2026-11-01, her Calendly markup: "this is
+  // screen 1, and then once you select a day, screen 2"): the month grid
+  // leads, a picked day reveals its times.
+  const [selDay, setSelDay] = useState<string | null>(null);
+  // "Show availability for the both of you": the viewer's OWN busy over the
+  // window — slots that clash render dimmed, never hidden (their calendar
+  // may carry soft blocks; the pick stays theirs).
+  const [myBusy, setMyBusy] = useState<FreeBusyRow[]>([]);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
   const [note, setNote] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -44,8 +54,9 @@ export default function BookSession() {
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
 
+  // Two browsable months — the month grid made the old fortnight feel short.
   const from = todayISO();
-  const to = addDays(from, 29);
+  const to = addDays(from, 59);
 
   useEffect(() => {
     if (!me || !typeId) return;
@@ -60,17 +71,33 @@ export default function BookSession() {
       }
       setReady(true);
     })();
+    // The both-of-you overlay — skipped while MOVING a booking: the booking
+    // being moved is the viewer's own busy and would dim its own old slot.
+    if (!rescheduleId) {
+      void freeBusy([me], from, to).then((rows) => { if (live) setMyBusy(rows); });
+    }
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, typeId]);
 
-  const days = useMemo(() => {
-    if (!board) return [];
-    return Array.from({ length: 14 }, (_, i) => addDays(from, i))
-      .map((iso) => ({ iso, slots: slotsForDay(board, iso) }))
-      .filter((d) => d.slots.length > 0);
+  const dayMap = useMemo(() => {
+    const m = new Map<string, number[]>();
+    if (!board) return m;
+    for (let i = 0; i < 60; i++) {
+      const iso = addDays(from, i);
+      const slots = slotsForDay(board, iso);
+      if (slots.length > 0) m.set(iso, slots);
+    }
+    return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
+  const openDays = useMemo(() => new Set(dayMap.keys()), [dayMap]);
+
+  // TIMED busy only — an all-day import ("Holiday") dimming a whole day
+  // would read as closed when it isn't.
+  const clashes = (iso: string, start: number, dur: number): boolean =>
+    myBusy.some((b) => !b.all_day && b.start_min != null && b.end_min != null
+      && occursOn(b, iso) && b.start_min < start + dur && b.end_min > start);
 
   // Provider-local minutes are the stored truth; only LABELS convert when
   // the viewer's clock runs elsewhere (founder 2026-10-03 — the public
@@ -193,30 +220,54 @@ export default function BookSession() {
             They&rsquo;ll get a notification, and you can send them a note in your own words.
           </p>
         </div>
-      ) : days.length === 0 && (
+      ) : openDays.size === 0 && (
         <p className="bkg__muted">
-          No open times in the next two weeks — check back, or message them
+          No open times in the next two months — check back, or message them
           from their profile.
         </p>
       )}
 
-      {days.map(({ iso, slots }) => (
-        <section className="bkg__day" key={iso}>
-          <h2 className="bkg__h2">{DOW[localDate(iso).getDay()]} · {localDate(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</h2>
-          <div className="bkg__slots">
-            {slots.map((s) => (
-              <button
-                key={s}
-                className={'bkg__slot' + (pick?.iso === iso && pick.start === s ? ' is-on' : '')}
-                onClick={() => setPick({ iso, start: s })}
-              >
-                {slotLabel(iso, s)}
-                {capacity > 1 && <em className="bkg__seats"> · {seatsLeft(board, iso, s)} left</em>}
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
+      {openDays.size > 0 && (
+        <>
+          <SlotMonth
+            availableDays={openDays}
+            selected={selDay}
+            onSelect={(d) => { setSelDay(d); setPick(null); }}
+            minIso={from}
+            maxIso={to}
+          />
+          {!selDay && <p className="bkg__muted bkg__pickhint">Pick a day to see the open times.</p>}
+          {selDay && dayMap.has(selDay) && (
+            <section className="bkg__day">
+              <h2 className="bkg__h2">{DOW[localDate(selDay).getDay()]} · {localDate(selDay).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</h2>
+              <div className="bkg__slots">
+                {dayMap.get(selDay)!.map((s) => {
+                  const clash = !rescheduleId && clashes(selDay, s, t.duration_min);
+                  return (
+                    <button
+                      key={s}
+                      className={'bkg__slot'
+                        + (pick?.iso === selDay && pick.start === s ? ' is-on' : '')
+                        + (clash ? ' bkg__slot--clash' : '')}
+                      title={clash ? 'You have something on your own calendar then' : undefined}
+                      onClick={() => setPick({ iso: selDay, start: s })}
+                    >
+                      {slotLabel(selDay, s)}
+                      {capacity > 1 && <em className="bkg__seats"> · {seatsLeft(board, selDay, s)} left</em>}
+                    </button>
+                  );
+                })}
+              </div>
+              {!rescheduleId && dayMap.get(selDay)!.some((s) => clashes(selDay, s, t.duration_min)) && (
+                <p className="bkg__clashnote">
+                  Dimmed times overlap something on your own calendar — the bright
+                  ones work for both of you.
+                </p>
+              )}
+            </section>
+          )}
+        </>
+      )}
 
       {pick && (
         <div className="bkg__confirm">
