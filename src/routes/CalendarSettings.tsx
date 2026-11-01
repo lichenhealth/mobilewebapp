@@ -27,6 +27,7 @@ import {
   listTypeConditions, saveTypeConditions, searchConditionTargets,
   listMyMeetingLinks, saveMeetingLink, normalizeMeetingUrl,
   MeetingSetting, zoomMintAllowed, usdLabel,
+  listTypeSpaces, listMyTypeSpaces, saveTypeSpaces,
 } from '../lib/bookingApi';
 import { numericAmount } from '../lib/ledgerApi';
 import './Concierge.css';
@@ -184,6 +185,10 @@ export default function CalendarSettings() {
   // which others can read) — kept beside the form, not inside bkEdit, so
   // saveBookingType never tries to write a column booking_types doesn't have.
   const [bkLinks, setBkLinks] = useState<Record<string, MeetingSetting>>({});
+  // SEVERAL CIRCLES PER TYPE (founder 2026-11-01): the editing type's circle
+  // set + every type's set for the cards' facts line.
+  const [bkSpaces, setBkSpaces] = useState<string[]>([]);
+  const [bkSets, setBkSets] = useState<Record<string, string[]>>({});
   const [bkLink, setBkLink] = useState('');
   // Unique Zoom meeting per booking (founder 2026-10-07): minted on
   // Lichen's own Zoom at confirm. Offered only to providers on the
@@ -285,6 +290,7 @@ export default function CalendarSettings() {
     setExtCals(ext);
     setBkTypes(bk);
     setBkLinks(await listMyMeetingLinks(bk.map((t) => t.id)));
+    setBkSets(await listMyTypeSpaces());
     setZoomOk(await zoomMintAllowed(me));
   }, [me]);
   useEffect(() => { load(); }, [load]);
@@ -643,18 +649,32 @@ export default function CalendarSettings() {
                 <option value="public">Anyone — even outside Lichen, via your link</option>
                 <option value="everyone">Anyone on Lichen</option>
                 <option value="mycelium">My-celium only</option>
-                <option value="space">Members of one of your groups…</option>
+                <option value="space">Members of circles you pick…</option>
               </FitSelect>
+              {/* THE SET (founder 2026-11-01: "a specific set of groups,
+                  organizations, communities, places") — tick any number;
+                  being in ANY of them is enough to see and book it. */}
               {bkEdit.audience === 'space' && (
-                <FitSelect className="cset__select" value={bkEdit.audience_space_id ?? ''}
-                  onChange={(e) => setBkEdit((c) => ({ ...c, audience_space_id: e.target.value || null }))} aria-label="Which group">
-                  <option value="">Pick the group…</option>
-                  {mySpaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
-                </FitSelect>
+                <div className="cset__spacepick" role="group" aria-label="Which circles">
+                  {mySpaces.map((sp) => (
+                    <label key={sp.id} className="cset__spacepick-row">
+                      <input
+                        type="checkbox"
+                        checked={bkSpaces.includes(sp.id)}
+                        onChange={(e) => setBkSpaces((cur) => e.target.checked
+                          ? [...cur, sp.id] : cur.filter((x) => x !== sp.id))}
+                      />
+                      {sp.name}
+                    </label>
+                  ))}
+                  {mySpaces.length === 0 && (
+                    <span className="cedit__hint">You&rsquo;re not part of any groups, organizations, communities or places yet.</span>
+                  )}
+                </div>
               )}
               <button
                 className="cedit__add cedit__add--sm"
-                disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && !bkEdit.audience_space_id)}
+                disabled={!(bkEdit.title ?? '').trim() || (bkEdit.audience === 'space' && bkSpaces.length === 0)}
                 onClick={() => act(async () => {
                   const qs = (bkEdit.questions ?? []).map((s) => s.trim()).filter(Boolean);
                   const link = normalizeMeetingUrl(bkLink);
@@ -672,6 +692,8 @@ export default function CalendarSettings() {
                       questions: qs.length ? qs : null,
                       slug: slugify(bkEdit.slug ?? '') || null,
                       hours_kind: bkEdit.hours_kind ?? 'work',
+                      // The legacy single mirrors the set's first pick.
+                      audience_space_id: bkEdit.audience === 'space' ? (bkSpaces[0] ?? null) : null,
                     } as Partial<BookingType> & { title: string });
                   } catch (e) {
                     const msg = (e as { message?: string } | null)?.message ?? '';
@@ -683,12 +705,13 @@ export default function CalendarSettings() {
                   // clears the leftovers so nothing books from ghost hours.
                   await saveTypeHours(me, typeId, (bkEdit.hours_kind === 'custom') ? bkHours : []);
                   await saveTypeConditions(typeId, bkConds);
+                  await saveTypeSpaces(typeId, bkEdit.audience === 'space' ? bkSpaces : []);
                   const wantZoom = bkZoom && zoomOk;
                   if ((link.url ?? null) !== (bkLinks[typeId]?.url ?? null)
                       || wantZoom !== (bkLinks[typeId]?.zoom_unique ?? false)) {
                     await saveMeetingLink(typeId, link.url, wantZoom);
                   }
-                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]); setChEdit(null);
+                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]); setChEdit(null); setBkSpaces([]);
                 })}
               >
                 <Icon name="plus" size={12} /> Save
@@ -700,7 +723,7 @@ export default function CalendarSettings() {
                   });
                 }}>Delete</button>
               )}
-              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); }}>
+              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkSpaces([]); }}>
                 <Icon name="close" size={13} />
               </button>
             </div>
@@ -874,6 +897,8 @@ export default function CalendarSettings() {
                     setBkLink(bkLinks[bt.id]?.url ?? '');
                     setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
                     setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
+                    setBkSpaces(bt.audience_space_id ? [bt.audience_space_id] : []);
+                    void listTypeSpaces(bt.id).then((ids) => { if (ids.length) setBkSpaces(ids); });
                     void listTypeHours(bt.id).then(setBkHours);
                     void listTypeConditions(bt.id).then(setBkConds);
                   }}>Edit</button>
@@ -889,7 +914,16 @@ export default function CalendarSettings() {
               </div>
               <p className="cset__bkmeta">
                 {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
-                {bt.audience === 'mycelium' ? ' · my-celium only' : bt.audience === 'public' ? ' · public link' : bt.audience === 'space' ? ` · ${mySpaces.find((sp) => sp.id === bt.audience_space_id)?.name ?? 'one group'}` : ' · anyone on Lichen'}
+                {bt.audience === 'mycelium' ? ' · my-celium only'
+                  : bt.audience === 'public' ? ' · public link'
+                  : bt.audience === 'space' ? ` · ${(() => {
+                      // Name the SET (founder 2026-11-01) — first two, then a count.
+                      const ids = bkSets[bt.id]?.length ? bkSets[bt.id] : (bt.audience_space_id ? [bt.audience_space_id] : []);
+                      const names = ids.map((id) => mySpaces.find((sp) => sp.id === id)?.name).filter(Boolean) as string[];
+                      if (!names.length) return 'one group';
+                      return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2} more` : '');
+                    })()}`
+                  : ' · anyone on Lichen'}
                 {bkLinks[bt.id]?.zoom_unique ? ' · unique Zoom per booking'
                   : bkLinks[bt.id]?.url ? ` · ${videoServiceOf(bkLinks[bt.id].url!) ?? 'video'} link` : ''}
               </p>
@@ -953,7 +987,7 @@ export default function CalendarSettings() {
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
               setBkLink(''); setBkZoom(false);
-              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
+              setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null); setBkSpaces([]);
               setBkOpen(true);
             }}>
               <Icon name="plus" size={12} /> New session type

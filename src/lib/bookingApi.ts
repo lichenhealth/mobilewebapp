@@ -227,6 +227,39 @@ export async function deleteBookingType(me: string, id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ── SEVERAL CIRCLES PER TYPE (founder 2026-11-01: "a specific set of
+// groups, organizations, communities, places") — audience='space' may name
+// several spaces via booking_type_spaces; audience_space_id stays as the
+// legacy single and mirrors the set's first pick. ──────────────────────────
+
+export async function listTypeSpaces(typeId: string): Promise<string[]> {
+  const { data, error } = await supabase.from('booking_type_spaces')
+    .select('space_id').eq('type_id', typeId);
+  if (error) { console.warn('listTypeSpaces:', error.message); return []; }
+  return ((data as { space_id: string }[] | null) ?? []).map((r) => r.space_id);
+}
+
+/** Every set the provider holds, keyed by type — for the cards' facts line. */
+export async function listMyTypeSpaces(): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase.from('booking_type_spaces').select('type_id, space_id');
+  if (error) { console.warn('listMyTypeSpaces:', error.message); return {}; }
+  const out: Record<string, string[]> = {};
+  for (const r of (data as { type_id: string; space_id: string }[] | null) ?? []) {
+    (out[r.type_id] ??= []).push(r.space_id);
+  }
+  return out;
+}
+
+/** Replace a type's circle set wholesale — the editor's one save. */
+export async function saveTypeSpaces(typeId: string, spaceIds: string[]): Promise<void> {
+  const del = await supabase.from('booking_type_spaces').delete().eq('type_id', typeId);
+  if (del.error) throw del.error;
+  if (!spaceIds.length) return;
+  const { error } = await supabase.from('booking_type_spaces')
+    .insert(spaceIds.map((space_id) => ({ type_id: typeId, space_id })));
+  if (error) throw error;
+}
+
 // ── A type's OWN hours + its place/people rules (founder 2026-10-03) ─────────
 
 export interface TypeHourRow { weekday: number; start_min: number; end_min: number }
