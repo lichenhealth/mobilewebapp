@@ -122,6 +122,9 @@
  * room") — air on both sides, and the menu's pills breathe a little more. */
 .bkpub__pick { margin: var(--s-4) 0 var(--s-5); text-align: center; }
 .bkpub__types--menu { gap: 10px; }
+/* The length switcher on the slot picker (founder 2026-11-01): same-name
+ * siblings are one session's other lengths, the current one lit. */
+.bkg__lenrow { margin-bottom: var(--s-4); }
 .bkpub__types { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: var(--s-3); }
 .bkpub__field { min-height: 0; height: 42px; resize: none; }
 .bkpub__fine { font-size: 11.5px; color: var(--ink-faint); text-align: center; margin: 8px 0 0; }

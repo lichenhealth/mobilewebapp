@@ -111,6 +111,35 @@ export async function listBookableTypes(profileId: string): Promise<BookingType[
   return (data as BookingType[] | null) ?? [];
 }
 
+/** SESSION LENGTHS, THE CALENDLY WAY (founder 2026-11-01: "a screen in
+ * between picking a meeting type and booking time that allows for multiple
+ * session lengths… it won't mean you have a gazillion meeting type
+ * options"): session types sharing one TITLE read as ONE session with a
+ * choice of lengths — the pickers show the name once, then a "how long?"
+ * step. Each length stays its own booking_types row (own slug, price,
+ * rules, payment), which is exactly what keeps a duration's vanity link
+ * skipping the chooser — her "send someone the 30 minute URL". */
+export function groupTypesByTitle<T extends { title: string; duration_min: number }>(
+  types: T[],
+): { key: string; title: string; variants: T[] }[] {
+  const out: { key: string; title: string; variants: T[] }[] = [];
+  for (const t of types) {
+    const key = t.title.trim().toLowerCase();
+    const g = out.find((x) => x.key === key);
+    if (g) g.variants.push(t);
+    else out.push({ key, title: t.title.trim(), variants: [t] });
+  }
+  for (const g of out) g.variants.sort((a, b) => a.duration_min - b.duration_min);
+  return out;
+}
+
+/** "30 minutes" / "1 hour" / "1 hr 30 min" — the length chooser's words. */
+export function sessionLengthLabel(min: number): string {
+  if (min % 60 === 0) { const h = min / 60; return h === 1 ? '1 hour' : `${h} hours`; }
+  if (min > 60) return `${Math.floor(min / 60)} hr ${min % 60} min`;
+  return `${min} minutes`;
+}
+
 export async function saveBookingType(
   me: string,
   t: Partial<BookingType> & { title: string },

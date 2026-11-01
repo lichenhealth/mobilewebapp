@@ -11,6 +11,7 @@ import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
   rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, viewerSlotLabel,
+  listBookableTypes, sessionLengthLabel, type BookingType,
 } from '../lib/bookingApi';
 import { ensureDirectChat } from '../lib/chatApi';
 import { videoServiceOf } from '../lib/linkify';
@@ -34,6 +35,10 @@ export default function BookSession() {
   const rescheduleId = params.get('reschedule');
 
   const [board, setBoard] = useState<BookingBoard | null>(null);
+  // SESSION LENGTHS (founder 2026-11-01): this type's same-NAME siblings —
+  // the provider's other lengths of the same session. More than one renders
+  // a length-switcher row, so arriving on any length still offers the rest.
+  const [sibs, setSibs] = useState<BookingType[]>([]);
   const [providerName, setProviderName] = useState('');
   const [ready, setReady] = useState(false);
   // SCREEN 1 → SCREEN 2 (founder 2026-11-01, her Calendly markup: "this is
@@ -61,6 +66,9 @@ export default function BookSession() {
   useEffect(() => {
     if (!me || !typeId) return;
     let live = true;
+    // Switching lengths re-enters this effect — a day picked on the old
+    // length may not be open on the new one.
+    setSelDay(null); setPick(null);
     (async () => {
       const b = await loadBookingBoard(typeId, from, to);
       if (!live) return;
@@ -68,6 +76,12 @@ export default function BookSession() {
       if (b) {
         const { data } = await supabase.from('profiles').select('full_name').eq('id', b.type.provider_id).maybeSingle();
         if (live) setProviderName((data as { full_name: string | null } | null)?.full_name ?? '');
+        const all = await listBookableTypes(b.type.provider_id);
+        if (live) {
+          setSibs(all
+            .filter((x) => x.title.trim().toLowerCase() === b.type.title.trim().toLowerCase())
+            .sort((a, z) => a.duration_min - z.duration_min));
+        }
       }
       setReady(true);
     })();
@@ -185,6 +199,23 @@ export default function BookSession() {
         )}
         {t.description && !rescheduleId && <p className="bkg__desc">{t.description}</p>}
       </header>
+
+      {/* The length switcher (founder 2026-11-01): same-name siblings are
+          one session's other lengths — the current one lit, the rest a tap
+          away. A reschedule keeps its booked length. */}
+      {sibs.length > 1 && !rescheduleId && (
+        <div className="bkpub__types bkg__lenrow">
+          {sibs.map((s) => (
+            <button
+              key={s.id}
+              className={'bkg__slot' + (s.id === t.id ? ' is-on' : '')}
+              onClick={() => { if (s.id !== t.id) navigate(`/book/${s.id}`, { replace: true }); }}
+            >
+              {sessionLengthLabel(s.duration_min)}{s.price ? ` · ${s.price}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <p className="bkg__error">{error}</p>}
 

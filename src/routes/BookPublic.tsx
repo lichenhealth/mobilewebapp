@@ -10,6 +10,7 @@ import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, viewerSlotLabel,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
+  groupTypesByTitle, sessionLengthLabel,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
 import { supabase } from '../lib/supabase';
@@ -46,6 +47,11 @@ export default function BookPublic() {
     types: BookingType[];
   } | null>(null);
   const [mvReady, setMvReady] = useState(false);
+  // SESSION LENGTHS (founder 2026-11-01, her Calendly screenshot): types
+  // sharing one title are ONE session with a "how long?" step — lenKey is
+  // the signed-in menu's open group, pubKey the guest page's picked group.
+  const [lenKey, setLenKey] = useState<string | null>(null);
+  const [pubKey, setPubKey] = useState<string | null>(null);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
@@ -91,7 +97,15 @@ export default function BookPublic() {
         return;
       }
       setPage(p);
-      if (p && p.types.length === 1) setTypeId(p.types[0].id);
+      if (p) {
+        // One session name on offer → walk straight into it; a single
+        // LENGTH skips the chooser too, several show the how-long step.
+        const gs = groupTypesByTitle(p.types);
+        if (gs.length === 1) {
+          setPubKey(gs[0].key);
+          if (gs[0].variants.length === 1) setTypeId(gs[0].variants[0].id);
+        }
+      }
       setReady(true);
     });
     return () => { live = false; };
@@ -120,7 +134,7 @@ export default function BookPublic() {
   }, [handle, slug, user?.id]);
 
   useEffect(() => {
-    if (!typeId) { setBoard(null); return; }
+    if (!typeId) { setBoard(null); setPick(null); setSelDay(null); return; }
     let live = true;
     setPick(null); setSelDay(null);
     void publicBookingBoard(typeId, from, to).then((b) => { if (live) setBoard(b); });
@@ -159,18 +173,53 @@ export default function BookPublic() {
         </header>
         {memberView.types.length === 0 ? (
           <p className="bkg__muted">{mFirst} has nothing bookable for you right now.</p>
-        ) : (
-          <>
-            <p className="bkpub__tz bkpub__pick">Pick a session — you&rsquo;re signed in, so it books under your name.</p>
-            <div className="bkpub__types bkpub__types--menu">
-              {memberView.types.map((t) => (
-                <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
-                  {t.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}{AUD_TAG[t.audience] ?? ''}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        ) : (() => {
+          // One menu entry per session NAME; a name with several lengths
+          // opens the how-long step (founder 2026-11-01, Calendly's shape).
+          const groups = groupTypesByTitle(memberView.types);
+          const open = lenKey ? groups.find((g) => g.key === lenKey) ?? null : null;
+          if (open && open.variants.length > 1) {
+            return (
+              <>
+                <p className="bkpub__tz bkpub__pick">{open.title} — how long would you like?</p>
+                <div className="bkpub__types bkpub__types--menu">
+                  {open.variants.map((t) => (
+                    <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
+                      {sessionLengthLabel(t.duration_min)}{t.price ? ` · ${t.price}` : ''}
+                    </button>
+                  ))}
+                </div>
+                <p className="bkg__muted bkg__pickhint">
+                  <button className="bkg__tzflip" onClick={() => setLenKey(null)}>← All sessions</button>
+                </p>
+              </>
+            );
+          }
+          return (
+            <>
+              <p className="bkpub__tz bkpub__pick">Pick a session — you&rsquo;re signed in, so it books under your name.</p>
+              <div className="bkpub__types bkpub__types--menu">
+                {groups.map((g) => {
+                  const t = g.variants[0];
+                  if (g.variants.length === 1) {
+                    return (
+                      <button key={g.key} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
+                        {g.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}{AUD_TAG[t.audience] ?? ''}
+                      </button>
+                    );
+                  }
+                  const samePrice = g.variants.every((v) => (v.price ?? '') === (t.price ?? ''));
+                  const sameAud = g.variants.every((v) => v.audience === t.audience);
+                  return (
+                    <button key={g.key} className="bkg__slot" onClick={() => setLenKey(g.key)}>
+                      {g.title}{samePrice && t.price ? ` · ${t.price}` : ''}{sameAud ? (AUD_TAG[t.audience] ?? '') : ''} ›
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          );
+        })()}
       </div>
     );
   }
@@ -288,19 +337,57 @@ export default function BookPublic() {
 
       {error && <p className="bkg__error">{error}</p>}
 
-      {page.types.length > 1 && !slug && (
-        <div className="bkpub__types">
-          {page.types.map((t) => (
-            <button
-              key={t.id}
-              className={'bkg__slot' + (typeId === t.id ? ' is-on' : '')}
-              onClick={() => setTypeId(t.id)}
-            >
-              {t.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* One pill per session NAME (founder 2026-11-01, Calendly's shape);
+          a name with several lengths reveals the how-long row below. A
+          vanity slug locked the page onto one length already — it skips
+          both, her "send someone the 30 minute URL". */}
+      {!slug && (() => {
+        const groups = groupTypesByTitle(page.types);
+        const sel = pubKey ? groups.find((g) => g.key === pubKey) ?? null : null;
+        return (
+          <>
+            {groups.length > 1 && (
+              <div className="bkpub__types">
+                {groups.map((g) => {
+                  const t0 = g.variants[0];
+                  const samePrice = g.variants.every((v) => (v.price ?? '') === (t0.price ?? ''));
+                  return (
+                    <button
+                      key={g.key}
+                      className={'bkg__slot' + (pubKey === g.key ? ' is-on' : '')}
+                      onClick={() => {
+                        setPubKey(g.key);
+                        setTypeId(g.variants.length === 1 ? g.variants[0].id : null);
+                      }}
+                    >
+                      {g.title}
+                      {g.variants.length === 1
+                        ? ` · ${t0.duration_min}m${t0.price ? ` · ${t0.price}` : ''}`
+                        : samePrice && t0.price ? ` · ${t0.price}` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {sel && sel.variants.length > 1 && (
+              <section className="bkg__day">
+                <h2 className="bkg__h2">How long would you like?</h2>
+                <div className="bkg__slots bkpub__types">
+                  {sel.variants.map((t) => (
+                    <button
+                      key={t.id}
+                      className={'bkg__slot' + (typeId === t.id ? ' is-on' : '')}
+                      onClick={() => setTypeId(t.id)}
+                    >
+                      {sessionLengthLabel(t.duration_min)}{t.price ? ` · ${t.price}` : ''}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        );
+      })()}
 
       {activeType?.description && <p className="bkg__desc">{activeType.description}</p>}
 

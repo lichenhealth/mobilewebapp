@@ -17,7 +17,7 @@ import {
 } from '../lib/locationApi';
 import ContributionsFeed from '../components/ContributionsFeed';
 import { loadMemberProfile, loadMemberOfferings, type MemberProfile as MemberRow, type MemberOfferings } from '../lib/membersApi';
-import { BookingType, listBookableTypes, publicBookingPage } from '../lib/bookingApi';
+import { BookingType, listBookableTypes, publicBookingPage, groupTypesByTitle } from '../lib/bookingApi';
 import '../routes/Bookings.css';
 import './Profile.css';
 import './MemberProfile.css';
@@ -306,17 +306,27 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
       )}
       {bookables.length > 0 && (
         <div className="mprof__book">
-          {bookables.map((bt) => (
-            <button className="mprof__book-row" key={bt.id} onClick={() => navigate(`/book/${bt.id}`)}>
-              <span className="mprof__book-body">
-                <span className="mprof__book-title">{bt.title}</span>
-                <span className="mprof__book-sub">
-                  {bt.duration_min} min{bt.price ? ` · ${bt.price}` : ''}{bt.location ? ` · ${bt.location}` : ''}
+          {/* One row per session NAME (founder 2026-11-01, Calendly's shape):
+              several lengths of the same session read as one door — the slot
+              picker's length switcher offers the rest. */}
+          {groupTypesByTitle(bookables).map((g) => {
+            const bt = g.variants[0];
+            const samePrice = g.variants.every((v) => (v.price ?? '') === (bt.price ?? ''));
+            return (
+              <button className="mprof__book-row" key={g.key} onClick={() => navigate(`/book/${bt.id}`)}>
+                <span className="mprof__book-body">
+                  <span className="mprof__book-title">{g.title}</span>
+                  <span className="mprof__book-sub">
+                    {g.variants.length === 1
+                      ? `${bt.duration_min} min${bt.price ? ` · ${bt.price}` : ''}`
+                      : `${g.variants.map((v) => v.duration_min).join(' or ')} min — your choice${samePrice && bt.price ? ` · ${bt.price}` : ''}`}
+                    {bt.location ? ` · ${bt.location}` : ''}
+                  </span>
                 </span>
-              </span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          ))}
+                <Icon name="chevron-right" size={14} />
+              </button>
+            );
+          })}
         </div>
       )}
       {me && !isSelf && (

@@ -456,7 +456,9 @@ export default function CalendarSettings() {
             Offer sessions members can book from your profile. Open times come
             from your hours above minus everything on your calendar (imported
             calendars included). Price is just words — payment happens however
-            you and your people already do it.
+            you and your people already do it. Give two session types the
+            same name and bookers see ONE session with a choice of lengths —
+            each length keeps its own link, price and rules.
           </p>
 
           {/* THE SESSION CARD (founder 2026-10-07: "Make the UI for these
