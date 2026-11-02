@@ -235,6 +235,11 @@ export default function Bookings() {
                 <JoinLink b={b} />
                 {payState(b)}
                 {answerLines(b)}
+                {/* The booker's own words ride the row (founder 2026-11-02:
+                    "add any relevant session details, like the optional
+                    note people can type in, or any questions you ask
+                    people to answer in the bookings detail"). */}
+                {b.note && <span className="bkg__row-note">&ldquo;{b.note}&rdquo;</span>}
               </div>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
                 Reschedule
