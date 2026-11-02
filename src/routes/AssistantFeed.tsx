@@ -12,7 +12,7 @@ import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId,
   loadSectionPresence, groupConvos, loadConvoNames, renameConvo,
-  ASSISTANT_THREADS, threadLabel, sectionIcon, sectionLabel,
+  ASSISTANT_THREADS, BRAIN_RAIL, threadLabel, sectionIcon, sectionLabel,
   type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
 import { setConsent } from '../lib/assistantConsentApi';
@@ -740,35 +740,31 @@ export default function AssistantFeed() {
   // can never drift.
   const threadButtons = (
     <>
-      {/* The STANDING rail holds the feed-shaped sections (founder
-          2026-10-21: Concierge and Current-cy have their own bottom-nav /
-          sidebar doors and section brains — their circles step off); an
-          off-rail thread still shows its OWN lit circle while you're in it,
-          so the room you're reading stays legible. */}
-      {ASSISTANT_THREADS.filter((t) => !t.offRail || t.id === thread).map((t) => {
-        const off = setup ? !setup[t.id] : false;
-        // THE FEED CIRCLE IS "ALL CONVERSATIONS" (founder 2026-11-02): the
-        // general slot wears Home's feed mark — the brain moved up to the
-        // tools row as the lit section identity.
-        const icon = t.id === 'general' ? 'newsfeed' : t.icon;
-        const label = t.id === 'general' ? 'All conversations' : t.label;
+      {/* THE ONE FIXED RAIL (founder 2026-11-02, superseding the 10-21
+          offRail call): every section in one consistent order, the
+          bottom-nav sections standing — Drive and Maps ride as brief-only
+          brains (no thread, so no badge and never "on" here); the open
+          thread's circle lights in place. */}
+      {BRAIN_RAIL.map((it) => {
+        const t = it.thread ? ASSISTANT_THREADS.find((th) => th.id === it.thread) : null;
+        const off = t && setup ? !setup[t.id] : false;
         return (
           <button
-            key={t.id}
-            className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
-            data-tip={label}
-            aria-label={label}
+            key={it.section}
+            className={'afeed__thread' + (t && t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
+            data-tip={it.label}
+            aria-label={it.label}
             onClick={() => {
               // Every brain door lands on that section's BRIEF now —
               // summary, seam, conversations, one click (founder
               // 2026-10-13). A PUSH, never a replace (2026-10-05): Back
               // still returns to the conversation you left, words intact.
-              navigate(`/assistant?section=${sectionForThread(t.id)}`);
+              navigate(`/assistant?section=${it.section}`);
             }}
           >
-            <Icon name={icon as IconName} size={16} />
+            <Icon name={it.icon as IconName} size={16} />
             {/* No badge on the thread that's on screen — you're reading it. */}
-            {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
+            {t && t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
           </button>
         );
       })}

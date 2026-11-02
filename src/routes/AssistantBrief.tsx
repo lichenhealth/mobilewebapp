@@ -7,7 +7,7 @@ import AssistantComposer from '../components/AssistantComposer';
 import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
-  ASSISTANT_THREADS, sectionIcon, sectionLabel, renameConvo,
+  ASSISTANT_THREADS, BRAIN_RAIL, sectionIcon, sectionLabel, renameConvo,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { useTopBackFor } from '../lib/topBack';
@@ -825,25 +825,16 @@ export default function AssistantBrief() {
   const sectionTag = !spaceParam && section !== 'home' && threadForSection(section) !== section
     ? section : null;
 
-  // THE SECTION RAIL's items: every brain (the thread list, general reading
-  // as the Home/whole-life brief), with a non-thread section (maps…)
-  // prepended as its own lit circle when that's where you stand.
+  // THE SECTION RAIL: the ONE fixed order (founder 2026-11-02: "the sub
+  // section we've selected be orange but put it to the right of the feed
+  // screen and keep them all in a consistent order - with the low navs
+  // always showing up in the list (which means we'll have 2 rows)") — the
+  // current section lights IN PLACE; a section outside the standing list
+  // (my-celium, a kind directory…) appends at the END, never prepends.
   const railItems = useMemo(() => {
-    // The standing rail is the feed-shaped sections (founder 2026-10-21:
-    // Concierge and Current-cy are reached through their own bottom-nav /
-    // sidebar doors and carry their brains there) — an off-rail section's
-    // own brief prepends itself lit, exactly like Maps always has.
-    const threads = ASSISTANT_THREADS.filter((t) => !t.offRail).map((t) => ({
-      section: t.id === 'general' ? 'home' : t.id,
-      // THE FEED CIRCLE LEADS (founder 2026-11-02: "the feed icon selected
-      // for all conversations"): the whole-brain slot wears Home's feed
-      // mark, lit on the home brief — the brain itself moved up to the
-      // tools row. Section circles unchanged.
-      icon: t.id === 'general' ? 'newsfeed' : t.icon,
-      label: t.id === 'general' ? 'All conversations' : t.label,
-    }));
-    if (threads.some((t) => t.section === section)) return threads;
-    return [{ section, icon: sectionIcon(section), label: sectionLabel(section) }, ...threads];
+    const items = BRAIN_RAIL.map((it) => ({ section: it.section, icon: it.icon, label: it.label }));
+    if (items.some((it) => it.section === section)) return items;
+    return [...items, { section, icon: sectionIcon(section), label: sectionLabel(section) }];
   }, [section]);
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
