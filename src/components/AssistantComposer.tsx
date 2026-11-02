@@ -50,7 +50,9 @@ export default function AssistantComposer({
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
-    if (typedYet.current) revealBelow(ta.closest('form'));
+    // 'auto' (instant), never smooth: per-keystroke smooth scrolls cancel
+    // each other into zero net motion (smartReveal.ts has the story).
+    if (typedYet.current) revealBelow(ta.closest('form'), 'auto');
     typedYet.current = true;
   }, [ask]);
   const [sending, setSending] = useState(false);
