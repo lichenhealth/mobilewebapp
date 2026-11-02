@@ -25,7 +25,7 @@ const STATUS_LINE: Record<string, { head: string; sub: string }> = {
   pending: { head: 'Requested', sub: 'They confirm each request by hand — you’ll get an email as soon as they answer.' },
   confirmed: { head: 'You’re booked', sub: 'It’s on their calendar. Add it to yours below.' },
   declined: { head: 'That time didn’t work', sub: 'Their live availability always has the current picture — pick another slot whenever you like.' },
-  cancelled: { head: 'Cancelled', sub: 'This booking is no longer held.' },
+  cancelled: { head: 'Cancelled', sub: 'This booking has been cancelled.' },
 };
 
 /** The guest's booking page (/b/:token) — the emailed link IS the key: see
@@ -145,6 +145,19 @@ export default function GuestBooking() {
         <p className="bkg__sub">{s.sub}</p>
         {justBooked && <p className="bkg__sub">A confirmation email is on its way to your inbox.</p>}
       </header>
+
+      {/* THE WAY FORWARD (founder 2026-11-02, from the cancelled page whose
+          only link was the dead booking: "a CTA to book a different
+          time/meeting type with Galyn, and take users to
+          lichen.health/book/galyn so they see the highest level link"):
+          cancelled/declined lead to the provider's TOP-LEVEL booking menu. */}
+      {(row.status === 'cancelled' || row.status === 'declined') && row.provider_handle && (
+        <div className="bkg__doneactions">
+          <a className="btn btn-primary bkg__btn" href={`/book/${row.provider_handle}`}>
+            Book another time with {row.provider_name.split(' ')[0]}
+          </a>
+        </div>
+      )}
 
       {/* PAYMENT (founder 2026-10-29): the frozen price + where it stands.
           Instant types pay right away; request types once confirmed —

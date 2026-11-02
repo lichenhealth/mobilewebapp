@@ -826,6 +826,9 @@ export interface GuestBookingView {
   payment_pending_at?: string | null;
   /** The provider's off-platform ways to be paid (founder 2026-11-02). */
   pay_methods?: PayMethod[] | null;
+  /** The provider's handle — the way FORWARD from a cancelled/declined
+   *  booking (founder 2026-11-02: the CTA to /book/<handle>). */
+  provider_handle?: string | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
