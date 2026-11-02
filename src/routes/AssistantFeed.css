@@ -154,12 +154,16 @@
 /* The calendar thread's way back to manual setup (founder 2026-11-02;
    second pass the same day: the LINK is the first line alone, the
    explanation plain text under it). */
-.afeed__manualback {
-  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
-  margin: -4px 0 var(--s-3); font-size: 12.5px;
+/* ONE IDIOM (founder 2026-11-02, later the same day: "resolve the design
+   inconsistency… I think I prefer the toggle"): the link became the SAME
+   Set-up-manually | Edit-with-AI view-toggle Calendar settings wears — AI
+   side lit here — with the shared-state promise as the quiet line under. */
+.afeed__manualtoggle {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  margin: -4px 0 var(--s-3);
 }
-.afeed__manualback a { color: var(--peach-deep); } /* peach backs, founder 2026-11-02 */
-.afeed__manualback span { color: var(--ink-muted); }
+.afeed__manualtoggle .view-toggle-row { margin: 0; }
+.afeed__manualtoggle-sub { font-size: 12.5px; color: var(--ink-muted); }
 /* COMPACT CIRCLES (founder 2026-10-12: "should we make these smaller, so you
    don't have to scroll?"): 34px — the tool-circle size — puts all eight
    thread doors inside the phone column (8×34 + 7×8 = 328px < the 430 shell's

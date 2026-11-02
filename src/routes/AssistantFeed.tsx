@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing, type SpaceKind } from '../acting/ActingProvider';
 import { useTopIdentityFor } from '../lib/topIdentity';
+import { useTopBackFor } from '../lib/topBack';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
@@ -50,6 +51,12 @@ export default function AssistantFeed() {
   const [params, setParams] = useSearchParams();
   const thread = params.get('thread') || 'general';
   const back = params.get('back') || '';
+  // THE UNIVERSAL BACK (founder 2026-11-02, crossing out the "← Back" pill:
+  // "have the universal back button be a circle in the upper left with a
+  // carrot"): the feed broadcasts its back to the TopBar's arrow beside the
+  // ☰ — the AssistantBrief precedent — carrying the same ?back= meaning the
+  // worded chip held (a door errand's "Back to manual mode" included).
+  useTopBackFor(() => { if (back) navigate(back); else navigate(-1); });
   // A space's build thread (founder 2026-08-22): `space:<id>` — Build with
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
@@ -913,11 +920,7 @@ export default function AssistantFeed() {
             space={{ id: spaceId!, name: sctx?.name ?? 'this space' }}
           />
         </div>
-      ) : (
-        <button className="cmp__back afeed__back" onClick={() => (back ? navigate(back) : navigate(-1))}>
-          ← {back ? 'Back to manual mode' : 'Back'}
-        </button>
-      )}
+      ) : null}
 
       <header className="afeed__head">
         <Avatar id={CLAUDE_PROFILE_ID} name="Claude" url={avatars.claude} size={44} />
@@ -975,11 +978,24 @@ export default function AssistantFeed() {
           plain text (founder 2026-11-02 markup: "have the link only apply
           to the first line, everything after the hyphen is just text below
           the link, and you can get rid of the hyphen"). */}
+      {/* ONE IDIOM, BOTH SIDES (founder 2026-11-02, resolving her own
+          markup: "let's resolve the design inconsistency and do one or the
+          other with 'return to manual mode' versus the toggle… I think I
+          prefer the toggle"): the calendar thread wears the SAME
+          Set-up-manually | Edit-with-AI toggle Calendar settings does — AI
+          side lit here, the manual side switching back. Both modes write
+          the same rows (the shared-state rule), so the quiet line under it
+          stays the honest promise. */}
       {thread === 'calendar' && !spaceRoom && (
-        <p className="afeed__manualback">
-          <Link className="link-cue" to="/calendar/settings">Return to manual mode ›</Link>
-          <span>Everything set here is already in your Calendar settings.</span>
-        </p>
+        <div className="afeed__manualtoggle">
+          <div className="view-toggle-row">
+            <span className="view-toggle" role="group" aria-label="How to set up your calendar">
+              <button type="button" className="view-toggle__side" onClick={() => navigate('/calendar/settings')}>Set up manually</button>
+              <button type="button" className="view-toggle__side is-on">Edit with AI</button>
+            </span>
+          </div>
+          <span className="afeed__manualtoggle-sub">Everything set here is already in your Calendar settings.</span>
+        </div>
       )}
 
       {/* Building your presence happens HERE, in the profile thread, rather
