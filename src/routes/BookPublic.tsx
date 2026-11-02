@@ -11,7 +11,7 @@ import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
-  groupTypesByTitle, sessionLengthLabel,
+  groupTypesByTitle, sessionLengthLabel, slugify,
   saveBookResume, readBookResume, clearBookResume, emailIsMember, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
@@ -29,11 +29,18 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  imported calendars, and held bookings). Guests book with a name and an
  *  email; the emailed token link is theirs to view or cancel. */
 export default function BookPublic() {
-  // /book/<handle> = the whole public page; /book/<handle>/<link-name> = a
-  // VANITY LINK straight to one session type (founder 2026-10-03, the
-  // Calendly shape). The slug locks the page onto that type; a SIGNED-IN
-  // member is handed to the member slot picker instead, which also lets a
-  // vanity link work for everyone/mycelium-audience types they may see.
+  // THREE TIERS OF DETAIL (founder 2026-11-02: "/book/galyn is all public
+  // meeting types, /book/galyn/catch-up then asks what duration and
+  // /book/galyn/catch-up-15 is smart enough to know its 15 minutes and have
+  // that pre-selected" — platform-wide, every provider's links):
+  //   1. /book/<handle>            — the whole menu.
+  //   2. /book/<handle>/<title>    — a session NAME shared by several
+  //      lengths opens the how-long chooser for that family. The family
+  //      name BEATS a sibling whose own slug happens to be the bare name.
+  //   3. /book/<handle>/<link>     — an exact length's link pre-selects it;
+  //      with same-name siblings the length row stays visible, switchable.
+  // Signed in, exact links still hand to the member slot picker (their
+  // account on the booking; its length switcher covers tier 3 there).
   const { param: handle = '', slug = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -56,6 +63,11 @@ export default function BookPublic() {
   // the signed-in menu's open group, pubKey the guest page's picked group.
   const [lenKey, setLenKey] = useState<string | null>(null);
   const [pubKey, setPubKey] = useState<string | null>(null);
+  // Tier 2/3 slug modes: slugFam = the URL named a session FAMILY (or a
+  // length with visible siblings), so the how-long row renders under a
+  // slug route too. A signed-in slug that resolves to nothing falls
+  // through to the honest !page miss below.
+  const [slugFam, setSlugFam] = useState(false);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [pick, setPick] = useState<{ iso: string; start: number } | null>(null);
@@ -88,19 +100,33 @@ export default function BookPublic() {
     void publicBookingPage(handle).then(async (p) => {
       if (!live) return;
       if (slug) {
-        // Vanity link: the slug names ONE type. Signed in → the member
-        // picker (their account on the booking, and non-public audiences
-        // they may see resolve too). Guest → this page locked to it.
-        const pubHit = p?.types.find((t) => (t.slug ?? '') === slug.toLowerCase()) ?? null;
-        if (user || !pubHit) {
-          const id = await resolveBookingVanity(handle, slug);
-          if (!live) return;
-          if (id && user) { navigate(`/book/${id}`, { replace: true }); return; }
-          if (!id && !pubHit) { setPage(null); setReady(true); return; }  // honest miss
+        // Signed in, the memberView effect owns slug resolution (it sees
+        // every type the viewer's standing allows, not just the public
+        // slice) — this effect just stands down.
+        if (user) { setReady(true); return; }
+        const low = slug.toLowerCase();
+        const groupsPub = groupTypesByTitle(p?.types ?? []);
+        // TIER 2 — the slug is a session NAME with several lengths: open
+        // the how-long chooser. The family name BEATS a sibling whose own
+        // link happens to carry the bare name (her explicit spec).
+        const famPub = groupsPub.find((g) => slugify(g.title) === low && g.variants.length > 1) ?? null;
+        if (famPub) { setPage(p); setPubKey(famPub.key); setSlugFam(true); setReady(true); return; }
+        // TIER 3 — an exact length's link: pre-selected, and when visible
+        // siblings share the name the length row stays on screen to switch.
+        const pubHit = p?.types.find((t) => (t.slug ?? '') === low) ?? null;
+        if (pubHit) {
+          setPage(p);
+          setTypeId(pubHit.id);
+          const g = groupsPub.find((x) => x.variants.some((v) => v.id === pubHit.id));
+          if (g && g.variants.length > 1) { setPubKey(g.key); setSlugFam(true); }
+          setReady(true);
+          return;
         }
-        setPage(p);
-        if (pubHit) setTypeId(pubHit.id);
-        setReady(true);
+        // A single-length family name still answers (slugify(title) match,
+        // one variant) — the link teaches itself.
+        const famOne = groupsPub.find((g) => slugify(g.title) === low) ?? null;
+        if (famOne) { setPage(p); setTypeId(famOne.variants[0].id); setReady(true); return; }
+        setPage(null); setReady(true);  // honest miss
         return;
       }
       setPage(p);
@@ -120,7 +146,7 @@ export default function BookPublic() {
   }, [handle, slug, user?.id]);
 
   useEffect(() => {
-    if (!user || slug) { setMemberView(null); setMvReady(true); return; }
+    if (!user) { setMemberView(null); setMvReady(true); return; }
     let live = true;
     setMvReady(false);
     void (async () => {
@@ -132,7 +158,29 @@ export default function BookPublic() {
         const prov = data as { id: string; full_name: string | null; avatar_url: string | null; headline: string | null };
         const types = await listBookableTypes(prov.id);
         if (!live) return;
+        if (slug) {
+          // Signed-in slug resolution, against EVERYTHING their standing
+          // lets them see (the public RPC would miss members-only types).
+          const low = slug.toLowerCase();
+          const groups = groupTypesByTitle(types);
+          const fam = groups.find((g) => slugify(g.title) === low && g.variants.length > 1) ?? null;
+          if (fam) {
+            // Tier 2: the family's how-long step, right here.
+            setLenKey(fam.key); setSlugFam(true);
+          } else {
+            const hit = types.find((t) => (t.slug ?? '') === low)
+              ?? groups.find((g) => slugify(g.title) === low)?.variants[0] ?? null;
+            if (hit) { navigate(`/book/${hit.id}`, { replace: true }); return; }
+          }
+        }
         setMemberView({ provider: prov, types });
+      } else if (slug) {
+        // The provider's profile row may be unreadable to this viewer
+        // (unfindable, no shared circle) while their PUBLIC link is still
+        // real — the SECURITY DEFINER vanity resolver covers that case.
+        const id = await resolveBookingVanity(handle, slug);
+        if (!live) return;
+        if (id) { navigate(`/book/${id}`, { replace: true }); return; }
       }
       setMvReady(true);
     })();
@@ -266,7 +314,9 @@ export default function BookPublic() {
   // Signed in on the bare handle link: the WHOLE menu, not just the public
   // slice — every active type the viewer's standing lets them see, each
   // opening the member slot picker so the booking carries their account.
-  if (user && !slug && memberView) {
+  // A tier-2 family link (slugFam) lands here too, with its how-long step
+  // already open.
+  if (user && memberView && (!slug || slugFam)) {
     const mName = memberView.provider.full_name ?? 'A Lichen member';
     const mFirst = mName.split(' ')[0];
     return (
@@ -458,15 +508,19 @@ export default function BookPublic() {
       {error && <p className="bkg__error">{error}</p>}
 
       {/* One pill per session NAME (founder 2026-11-01, Calendly's shape);
-          a name with several lengths reveals the how-long row below. A
-          vanity slug locked the page onto one length already — it skips
-          both, her "send someone the 30 minute URL". */}
-      {!slug && (() => {
+          a name with several lengths reveals the how-long row below. THREE
+          TIERS under a slug (founder 2026-11-02): a family-name link opens
+          straight onto this how-long row (nothing picked), an exact
+          length's link arrives with its length lit and switchable, and
+          only a single-length session skips the row entirely — her "send
+          someone the 30 minute URL" skip, kept for the one case where
+          there is nothing to choose. */}
+      {(!slug || slugFam) && (() => {
         const groups = groupTypesByTitle(page.types);
         const sel = pubKey ? groups.find((g) => g.key === pubKey) ?? null : null;
         return (
           <>
-            {groups.length > 1 && (
+            {!slug && groups.length > 1 && (
               <div className="bkpub__types">
                 {/* Title only (founder 2026-11-02) — the details live on
                     the picked session's own screen below. */}
