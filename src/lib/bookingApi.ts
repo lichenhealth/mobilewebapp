@@ -630,7 +630,7 @@ export interface PublicBookingPage {
  * localStorage doctrine. */
 export interface BookResume {
   path: string; typeId: string | null; date: string | null; start: number | null;
-  name?: string; email?: string; note?: string; at: number;
+  name?: string; email?: string; note?: string; answers?: Record<number, string>; at: number;
 }
 const BOOK_RESUME_KEY = 'lichen.bookResume';
 export function saveBookResume(r: Omit<BookResume, 'at'>): void {
@@ -647,6 +647,17 @@ export function readBookResume(): BookResume | null {
 }
 export function clearBookResume(): void {
   try { localStorage.removeItem(BOOK_RESUME_KEY); } catch { /* storage off */ }
+}
+
+/** Does this email belong to a Lichen account? (founder 2026-11-02, Gabe
+ *  booking her session logged out: "see if someone is booking from an email
+ *  that is a registered Lichen user and ask them to sign in? But still
+ *  deliver them to the booking page") — boolean only, from the anon-safe
+ *  `email_is_member` RPC; a failed read answers false, never a nag. */
+export async function emailIsMember(email: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('email_is_member', { p_email: email });
+  if (error) { console.warn('email_is_member:', error.message); return false; }
+  return data === true;
 }
 
 /* THE PRICE SPEAKS AN EXCHANGE MANNER (founder 2026-11-02: "Price should be

@@ -12,7 +12,7 @@ import {
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
   groupTypesByTitle, sessionLengthLabel,
-  saveBookResume, readBookResume, clearBookResume, type BookResume,
+  saveBookResume, readBookResume, clearBookResume, emailIsMember, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
@@ -173,10 +173,30 @@ export default function BookPublic() {
     saveBookResume({
       path: window.location.pathname, typeId,
       date: pick?.iso ?? selDay, start: pick?.start ?? null,
-      name, email, note,
+      name, email, note, answers,
     });
     navigate(`${dest}?next=${encodeURIComponent(window.location.pathname)}`);
   };
+
+  // A MEMBER'S EMAIL IS RECOGNIZED (founder 2026-11-02, Gabe booking her
+  // session logged out: "see if someone is booking from an email that is a
+  // registered Lichen user and ask them to sign in? But still deliver them
+  // to the booking page?"): a debounced boolean check on the typed email —
+  // a hit offers the sign-in door, which parks everything typed and the
+  // pick (the round trip). Booking as a guest stays one tap away; the
+  // nudge never blocks.
+  const [knownMember, setKnownMember] = useState(false);
+  useEffect(() => {
+    if (user) { setKnownMember(false); return; }
+    const v = email.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { setKnownMember(false); return; }
+    let live = true;
+    const t = window.setTimeout(() => {
+      void emailIsMember(v).then((hit) => { if (live) setKnownMember(hit); });
+    }, 500);
+    return () => { live = false; window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, user?.id]);
   useEffect(() => {
     if (!ready || resumed.current) return;
     const r = readBookResume();
@@ -187,6 +207,7 @@ export default function BookPublic() {
     if (r.name) setName(r.name);
     if (r.email) setEmail(r.email);
     if (r.note) setNote(r.note);
+    if (r.answers) setAnswers(r.answers);
     if (r.typeId) {
       setTypeId(r.typeId);
       if (page) {
@@ -548,6 +569,15 @@ export default function BookPublic() {
             onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           <input className="bkg__note bkpub__field" type="email" value={email}
             onChange={(e) => setEmail(e.target.value)} placeholder="Your email — the confirmation lands here" />
+          {!user && knownMember && (
+            <p className="bkpub__fine bkpub__known">
+              That email already has a Lichen account —{' '}
+              <button className="bkpub__signin" onClick={() => parkAndGo('/login')}>
+                sign in to complete your booking
+              </button>
+              {' '}under it. Booking as a guest works too.
+            </p>
+          )}
           {questions.map((q, i) => (
             <label className="bkg__q" key={i}>
               <span>{q}</span>
