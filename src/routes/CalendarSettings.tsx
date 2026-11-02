@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import TimeField from '../components/TimeField';
 import FitSelect from '../components/FitSelect';
 import { useAuth } from '../auth/AuthProvider';
+import { postAssistantHandoff, renameConvo } from '../lib/assistantFeedApi';
 import { supabase } from '../lib/supabase';
 import { WEEKDAYS_SHORT, WEEKDAYS_FULL } from '../lib/recurrence';
 import {
@@ -278,31 +279,48 @@ export default function CalendarSettings() {
     setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
     setBkSpaces([]); setBkPrice({ kind: 'none', amt: '', note: '' }); setBkCardOn(false);
   };
-  // The hand-off summary — deterministic, no model call, capped so the URL
-  // stays sane: hours, session types, and any unsaved form in flight.
-  const editWithAi = () => {
+  // THE HAND-OFF IS A DELIVERED CLAUDE NOTE (founder 2026-11-02,
+  // superseding the same day's prefilled-composer shape: "the briefing of
+  // whats been done manually should be a sent message to claude, not a
+  // composed one. just have the summary itself be clearly a hand off text…
+  // how about its from claude to claude?"): still deterministic — no model
+  // call — but spoken in CLAUDE's voice and landed in a fresh conversation
+  // via post_assistant_handoff, so the member arrives facing the note with
+  // an EMPTY composer; their next words carry it as context, and the edge
+  // fn reads it back as the assistant's own prior message.
+  const editWithAi = async () => {
     const kindWord = (k: AvailabilityKind) => k === 'on_call' ? 'on call' : k === 'social' ? 'social' : 'work';
     const parts: string[] = [];
     if (windows.length) {
-      parts.push('My hours so far: ' + windows.map((w) =>
+      parts.push('Your hours so far: ' + windows.map((w) =>
         `${kindWord(w.kind)} ${WEEKDAYS_SHORT[w.weekday]} ${minToLabel(w.start_min)}–${minToLabel(w.end_min)}`).join('; ') + '.');
     }
     if (bkTypes.length) {
       const detail = bkTypes.map((t) =>
         `“${t.title}” (${t.duration_min} min${t.price ? `, ${t.price}` : ''}, ${t.approval === 'instant' ? 'books instantly' : 'by request'}${t.active ? '' : ', paused'})`).join('; ');
       const short = bkTypes.map((t) => `“${t.title}”`).join(', ');
-      parts.push(`My bookable sessions: ${detail.length > 700 ? short : detail}.`);
+      parts.push(`Your bookable sessions: ${detail.length > 700 ? short : detail}.`);
     }
     if (bkOpen) {
       const t = (bkEdit.title ?? '').trim();
       parts.push(t
-        ? `I'm partway through a session called “${t}” that I haven't saved.`
-        : 'I’m partway through a new session type I haven’t saved.');
+        ? `A session called “${t}” is open in the form, unsaved.`
+        : 'A new session type is open in the form, unsaved.');
     }
-    const standing = parts.length
-      ? `I’ve been setting up my calendar manually. ${parts.join(' ')} Pick up from here — `
-      : 'Help me set up my calendar — hours, bookable sessions, rules. I’d like to ';
-    brainTo(standing.slice(0, 1500));
+    const note = parts.length
+      ? `Hand-off from manual mode — here’s where your calendar stands. ${parts.join(' ')} Tell me what you’d like to change and I’ll pick it up from here.`
+      : 'Hand-off from manual mode — nothing is set up yet: no hours, no bookable sessions. Tell me what you’d like and I’ll build it with you.';
+    try {
+      const { convoId } = await postAssistantHandoff('calendar', note.slice(0, 1500));
+      // Name the exchange so the list never reads Untitled (the proactive-
+      // notes rule); a failed name never blocks the walk-through.
+      renameConvo(convoId, 'Calendar hand-off').catch(() => undefined);
+      navigate(`/assistant/feed?thread=calendar&convo=${convoId}`);
+    } catch {
+      // The RPC not answering shouldn't strand the door — fall back to the
+      // old prefilled-unsent shape.
+      brainTo(note.slice(0, 1500));
+    }
   };
 
   // External calendars (secret iCal import)
