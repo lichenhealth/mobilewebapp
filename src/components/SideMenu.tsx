@@ -85,7 +85,7 @@ const SECTIONS: NavSection[] = SPACE_SECTIONS.map((s) =>
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { user, isAdmin: platformAdmin } = useAuth();
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
@@ -221,7 +221,7 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     // Off-prefix screens light their family here too (founder 2026-10-21) —
     // the bottom nav's rule, same meaning on the docked rail. One map,
     // src/lib/navFamily.ts.
-    const family = navFamily(pathname);
+    const family = navFamily(pathname + search);
     return (
       <Fragment key={p.to}>
         {/* "you" above the line, platform doors below it */}
