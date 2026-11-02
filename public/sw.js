@@ -17,7 +17,20 @@ self.addEventListener('push', (event) => {
     tag: data.tag || undefined,      // collapse repeats of the same thing
     data: { link: data.link || '/' },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  // The HOME-SCREEN ICON's number (founder 2026-11-02): send-push includes the
+  // member's live unread-bell count as `badge`, and a closed PWA only updates
+  // its icon through push — so set it here. Best-effort: older payloads carry
+  // no count, unsupported platforms lack the API; the notification still shows.
+  const tasks = [self.registration.showNotification(title, options)];
+  if (typeof data.badge === 'number' && 'setAppBadge' in self.navigator) {
+    tasks.push(
+      (data.badge > 0
+        ? self.navigator.setAppBadge(data.badge)
+        : self.navigator.clearAppBadge()
+      ).catch(() => {})
+    );
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener('notificationclick', (event) => {
