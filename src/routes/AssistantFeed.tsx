@@ -744,12 +744,17 @@ export default function AssistantFeed() {
           so the room you're reading stays legible. */}
       {ASSISTANT_THREADS.filter((t) => !t.offRail || t.id === thread).map((t) => {
         const off = setup ? !setup[t.id] : false;
+        // THE FEED CIRCLE IS "ALL CONVERSATIONS" (founder 2026-11-02): the
+        // general slot wears Home's feed mark — the brain moved up to the
+        // tools row as the lit section identity.
+        const icon = t.id === 'general' ? 'newsfeed' : t.icon;
+        const label = t.id === 'general' ? 'All conversations' : t.label;
         return (
           <button
             key={t.id}
             className={'afeed__thread' + (t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
-            data-tip={t.label}
-            aria-label={t.label}
+            data-tip={label}
+            aria-label={label}
             onClick={() => {
               // Every brain door lands on that section's BRIEF now —
               // summary, seam, conversations, one click (founder
@@ -758,7 +763,7 @@ export default function AssistantFeed() {
               navigate(`/assistant?section=${sectionForThread(t.id)}`);
             }}
           >
-            <Icon name={t.icon as IconName} size={16} />
+            <Icon name={icon as IconName} size={16} />
             {/* No badge on the thread that's on screen — you're reading it. */}
             {t.id !== thread && counts[t.id] ? <em>{counts[t.id]}</em> : null}
           </button>
@@ -833,6 +838,15 @@ export default function AssistantFeed() {
       {personal && (
         <button className="afeed__search-btn" onClick={startNewConvo} aria-label="New conversation" data-tip="New conversation">
           <Icon name="plus" size={16} />
+        </button>
+      )}
+      {/* THE LIT BRAIN (founder 2026-11-02: "the brain should be highlighted
+          and on the top row") — you're inside the brain, so it reads
+          selected; tapping it opens the WHOLE brain (the home brief). */}
+      {personal && (
+        <button className="afeed__search-btn afeed__brainlit" onClick={() => navigate('/assistant?section=home')}
+          aria-label="The whole brain — every conversation" data-tip="Assistant">
+          <Icon name="brain" size={16} />
         </button>
       )}
     </div>
