@@ -383,17 +383,14 @@ export default function AssistantFeed() {
     if (!end) return;
     const nearFoot = end.getBoundingClientRect().top - window.innerHeight < 600;
     const lastIsMine = viewEntries[viewEntries.length - 1]?.author === 'member';
-    // A CONVERSATION OPENS AT ITS TOP (founder 2026-10-12: "it takes me
-    // below the title, somehow to the middle of the convo — can it start at
-    // the top?"): a discrete exchange reads from its title down, email's
-    // way — superseding the 2026-09-09 snap-to-newest for conversation
-    // opens. A space build thread is still a STREAM (no convo id), so it
-    // keeps the newest-words landing; new entries while you watch still
-    // follow to the foot. ⚠ The app's scroller is #root, not window.
-    if (first) {
-      if (openConvo) document.getElementById('root')?.scrollTo({ top: 0 });
-      else end.scrollIntoView({ block: 'end' });
-    }
+    // EVERY OPEN LANDS AT THE NEWEST WORDS (founder 2026-11-02: "in brain
+    // convos, go to the bottom of the convo, instead of the top and making
+    // the person scroll down" — reversing her 2026-10-12 open-at-top call;
+    // the title + Rename stay one scroll up). Streams always landed here;
+    // new entries while you watch still follow to the foot only when the
+    // reader is near it or the newest words are their own send. ⚠ The
+    // app's scroller is #root, not window.
+    if (first) end.scrollIntoView({ block: 'end' });
     else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [loading, listMode, viewEntries, thread, openConvo]);
 

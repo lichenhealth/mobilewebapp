@@ -19,9 +19,12 @@
   margin-bottom: var(--s-3); padding: 6px 12px;
   border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  font-size: 12px; color: var(--ink-soft); cursor: pointer;
+  /* Back affordances read PEACH platform-wide (founder 2026-11-02: "have
+     all back buttons be peach and have the back arrow… some are black with
+     peach underline so let's make those all peach for consistency"). */
+  font-size: 12px; color: var(--peach-deep); cursor: pointer;
 }
-.cmp__back:hover { border-color: var(--peach); color: var(--ink); }
+.cmp__back:hover { border-color: var(--peach); }
 .cmp__back svg { color: var(--peach-deep, var(--peach)); }
 
 .cmp__head { text-align: center; margin-bottom: var(--s-5); }

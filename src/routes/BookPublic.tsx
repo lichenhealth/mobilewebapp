@@ -247,7 +247,6 @@ export default function BookPublic() {
   if (user && !slug && memberView) {
     const mName = memberView.provider.full_name ?? 'A Lichen member';
     const mFirst = mName.split(' ')[0];
-    const AUD_TAG: Record<string, string> = { everyone: ' · members', mycelium: ' · my-celium', space: ' · group' };
     return (
       <div className="gev bkpub">
         <header className="bkg__head">
@@ -285,18 +284,21 @@ export default function BookPublic() {
               <div className="bkpub__types bkpub__types--menu">
                 {groups.map((g) => {
                   const t = g.variants[0];
+                  {/* TITLE ONLY on the menu pills (founder 2026-11-02,
+                      striking "· 50m · Sessions charged manually via Ivy
+                      Pay": "let's only have the title for the booking
+                      link... the details after are included on the next,
+                      booking page"). */}
                   if (g.variants.length === 1) {
                     return (
                       <button key={g.key} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
-                        {g.title} · {t.duration_min}m{t.price ? ` · ${t.price}` : ''}{AUD_TAG[t.audience] ?? ''}
+                        {g.title}
                       </button>
                     );
                   }
-                  const samePrice = g.variants.every((v) => (v.price ?? '') === (t.price ?? ''));
-                  const sameAud = g.variants.every((v) => v.audience === t.audience);
                   return (
                     <button key={g.key} className="bkg__slot" onClick={() => setLenKey(g.key)}>
-                      {g.title}{samePrice && t.price ? ` · ${t.price}` : ''}{sameAud ? (AUD_TAG[t.audience] ?? '') : ''} ›
+                      {g.title} ›
                     </button>
                   );
                 })}
@@ -437,25 +439,20 @@ export default function BookPublic() {
           <>
             {groups.length > 1 && (
               <div className="bkpub__types">
-                {groups.map((g) => {
-                  const t0 = g.variants[0];
-                  const samePrice = g.variants.every((v) => (v.price ?? '') === (t0.price ?? ''));
-                  return (
-                    <button
-                      key={g.key}
-                      className={'bkg__slot' + (pubKey === g.key ? ' is-on' : '')}
-                      onClick={() => {
-                        setPubKey(g.key);
-                        setTypeId(g.variants.length === 1 ? g.variants[0].id : null);
-                      }}
-                    >
-                      {g.title}
-                      {g.variants.length === 1
-                        ? ` · ${t0.duration_min}m${t0.price ? ` · ${t0.price}` : ''}`
-                        : samePrice && t0.price ? ` · ${t0.price}` : ''}
-                    </button>
-                  );
-                })}
+                {/* Title only (founder 2026-11-02) — the details live on
+                    the picked session's own screen below. */}
+                {groups.map((g) => (
+                  <button
+                    key={g.key}
+                    className={'bkg__slot' + (pubKey === g.key ? ' is-on' : '')}
+                    onClick={() => {
+                      setPubKey(g.key);
+                      setTypeId(g.variants.length === 1 ? g.variants[0].id : null);
+                    }}
+                  >
+                    {g.title}
+                  </button>
+                ))}
               </div>
             )}
             {sel && sel.variants.length > 1 && (
