@@ -56,6 +56,10 @@ export default function AssistantComposer({
   const [listening, setListening] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [upBusy, setUpBusy] = useState(false);
+  // DRAG IT STRAIGHT IN (founder 2026-11-02: "pull a screenshot from
+  // desktop into the composer"): a dropped image rides the same addFiles
+  // pipeline as paste and the + picker.
+  const [dragOver, setDragOver] = useState(false);
 
   // Usable-here check, not merely present (src/lib/dictation.ts): on iOS
   // this is null — starting recognition in an installed web app hangs the
@@ -119,7 +123,19 @@ export default function AssistantComposer({
   }
 
   return (
-    <form className={'assist-composer ' + className} onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+    <form
+      className={'assist-composer ' + className + (dragOver ? ' is-dragover' : '')}
+      onSubmit={(e) => { e.preventDefault(); void submit(); }}
+      onDragOver={(e) => {
+        if (uploaderId && [...e.dataTransfer.items].some((it) => it.kind === 'file')) { e.preventDefault(); setDragOver(true); }
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        if (!uploaderId) return;
+        e.preventDefault(); setDragOver(false);
+        void addFiles([...e.dataTransfer.files]);
+      }}
+    >
       {images.length > 0 && (
         <div className="assist-composer__shots">
           {images.map((url) => (
