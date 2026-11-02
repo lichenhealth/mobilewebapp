@@ -77,7 +77,10 @@
 
 /* The Back chip shares the card's left edge (founder nit 2026-07-28). */
 .abrief .cmp__back.calp__backchip { margin: var(--s-2) 0 var(--s-3); }
-.abrief__consent { display: flex; align-items: flex-start; gap: 8px; margin-bottom: var(--s-3); font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+/* Air above the consent line (founder 2026-11-02: "let's move this down so
+   it doesn't crowd the buttons above") — the rail's circles keep clear
+   floor, the ~27px stacked-surface breath. */
+.abrief__consent { display: flex; align-items: flex-start; gap: 8px; margin: 26px 0 var(--s-3); font-size: 13px; color: var(--ink-soft); cursor: pointer; }
 .abrief__consent input { margin-top: 2px; }
 .abrief__consent em { font-style: normal; color: var(--ink-faint); }
 
