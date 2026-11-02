@@ -33,12 +33,6 @@ export default function Intro() {
   const [i, setI] = useState(0);
   const touchX = useRef<number | null>(null);
 
-  const N = 7;
-  const last = i === N - 1;
-
-  // Reaching the end counts as seen even if they then idle here.
-  useEffect(() => { if (last) markSeen(); }, [last]);
-
   function toSignup() {
     markSeen();
     navigate('/signup' + search, { replace: true });
@@ -243,6 +237,15 @@ export default function Intro() {
       </div>
     ),
   ];
+
+  // N is DERIVED from the deck, never hardcoded — a literal 7 silently made
+  // the chooser card unreachable the day the money card joined (found live
+  // 2026-11-02: the dots read 7 and the deck ended on "wayshower").
+  const N = cards.length;
+  const last = i === N - 1;
+
+  // Reaching the end counts as seen even if they then idle here.
+  useEffect(() => { if (last) markSeen(); }, [last]);
 
   return (
     <div
