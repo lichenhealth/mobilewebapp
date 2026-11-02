@@ -151,6 +151,27 @@ export default function BookSession() {
     myBusy.some((b) => !b.all_day && b.start_min != null && b.end_min != null
       && occursOn(b, iso) && b.start_min < start + dur && b.end_min > start);
 
+  // THE CONFIRM CARD NEVER COVERS THE TIMES (founder 2026-11-02: "it also
+  // covers the times, it should expand and scroll you down below, so you
+  // see what's above"): measure the sticky card, give the page that much
+  // extra foot room, and walk the day's slots clear of it.
+  const confRef = useRef<HTMLDivElement | null>(null);
+  const [confH, setConfH] = useState(0);
+  useEffect(() => {
+    if (!pick) { setConfH(0); return; }
+    const el = confRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setConfH(el.offsetHeight));
+    ro.observe(el);
+    setConfH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [pick]);
+  useEffect(() => {
+    if (!pick || !confH) return;
+    requestAnimationFrame(() => revealBelow(dayRef.current, 'smooth', confH + 12));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick, confH]);
+
   // Provider-local minutes are the stored truth; only LABELS convert when
   // the chosen display zone runs elsewhere (founder 2026-10-03 — the public
   // link's logged timezone follow-up; the dropdown is 2026-11-01's pass).
@@ -219,7 +240,7 @@ export default function BookSession() {
   }
 
   return (
-    <div className="bkg">
+    <div className="bkg" style={pick && confH ? { paddingBottom: confH + 20 } : undefined}>
       <PageHead />
       <header className="bkg__head">
         {/* The practitioner's name is a door to their profile (founder
@@ -261,7 +282,7 @@ export default function BookSession() {
               className={'bkg__slot' + (s.id === t.id ? ' is-on' : '')}
               onClick={() => { if (s.id !== t.id) navigate(`/book/${s.id}`, { replace: true }); }}
             >
-              {sessionLengthLabel(s.duration_min)}{s.price ? ` · ${s.price}` : ''}
+              {sessionLengthLabel(s.duration_min)}
             </button>
           ))}
         </div>
@@ -351,7 +372,15 @@ export default function BookSession() {
       )}
 
       {pick && (
-        <div className="bkg__confirm">
+        <div className="bkg__confirm" ref={confRef}>
+          {/* A way OUT of the pick (founder 2026-11-02: "the pop up doesn't
+              have an x out, and it should, in case you change your mind
+              about booking"). */}
+          <button
+            type="button" className="bkg__confirm-x"
+            aria-label="Never mind — clear this time"
+            onClick={() => setPick(null)}
+          >×</button>
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + t.duration_min)}
@@ -361,6 +390,12 @@ export default function BookSession() {
               return v && ve ? ` (${v.label} – ${ve.label} in ${zone.replace(/_/g, ' ')})` : '';
             })()}
           </p>
+          {!rescheduleId && clashes(pick.iso, pick.start, t.duration_min) && (
+            <p className="bkg__confirm-clash">
+              Heads up — this time overlaps something on your own calendar.
+              Booking it is still your call.
+            </p>
+          )}
           {!rescheduleId && questions.map((q, i) => (
             <label className="bkg__q" key={i}>
               <span>{q}</span>
@@ -418,9 +453,14 @@ export default function BookSession() {
               }
             }}
           >
-            {busy ? 'One moment…'
-              : rescheduleId ? 'Move it to this time'
-                : t.approval === 'instant' ? 'Book it' : 'Request this time'}
+            {(() => {
+              if (busy) return 'One moment…';
+              if (rescheduleId) return 'Move it to this time';
+              const anyway = clashes(pick.iso, pick.start, t.duration_min);
+              return t.approval === 'instant'
+                ? (anyway ? 'Book it anyway' : 'Book it')
+                : (anyway ? 'Request it anyway' : 'Request this time');
+            })()}
           </button>
           {unanswered && <p className="bkg__muted">A quick answer to each question above and you&rsquo;re set.</p>}
         </div>
