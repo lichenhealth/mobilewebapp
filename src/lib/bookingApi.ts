@@ -619,6 +619,36 @@ export interface PublicBookingPage {
     & { slug?: string | null })[];
 }
 
+/* THE BOOKING RESUME (founder 2026-11-02: "Sign in to complete your booking,
+ * and it should take them right to the same booking spot, so they don't have
+ * to re-do anything once logged in" + the request-an-invite round trip): the
+ * pick and typed fields park here before the sign-in/signup door, and
+ * whichever picker loads next restores them — BookPublic matches by path,
+ * BookSession by type id (sign-in hands a bare-handle visitor to the member
+ * picker, so the path changes but the type doesn't). Per-device convenience
+ * only (try/catch, 45-min expiry), never state that must persist — the
+ * localStorage doctrine. */
+export interface BookResume {
+  path: string; typeId: string | null; date: string | null; start: number | null;
+  name?: string; email?: string; note?: string; at: number;
+}
+const BOOK_RESUME_KEY = 'lichen.bookResume';
+export function saveBookResume(r: Omit<BookResume, 'at'>): void {
+  try { localStorage.setItem(BOOK_RESUME_KEY, JSON.stringify({ ...r, at: Date.now() })); } catch { /* storage off */ }
+}
+export function readBookResume(): BookResume | null {
+  try {
+    const raw = localStorage.getItem(BOOK_RESUME_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw) as BookResume;
+    if (!r || Date.now() - (r.at ?? 0) > 45 * 60000) { localStorage.removeItem(BOOK_RESUME_KEY); return null; }
+    return r;
+  } catch { return null; }
+}
+export function clearBookResume(): void {
+  try { localStorage.removeItem(BOOK_RESUME_KEY); } catch { /* storage off */ }
+}
+
 /* THE PRICE SPEAKS AN EXCHANGE MANNER (founder 2026-11-02: "Price should be
  * a drop down with Free, Current-cy, Dollars, then the marketplace options
  * with a trade option, or basically any relevant options for a service,

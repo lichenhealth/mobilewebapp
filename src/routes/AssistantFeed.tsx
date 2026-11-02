@@ -961,10 +961,15 @@ export default function AssistantFeed() {
           edits selected in manual mode") — both modes write the same rows
           (the shared-state rule), so the settings screen already holds
           everything the assistant set the moment it loads. */}
+      {/* Only the first line is the LINK; the explanation sits under it as
+          plain text (founder 2026-11-02 markup: "have the link only apply
+          to the first line, everything after the hyphen is just text below
+          the link, and you can get rid of the hyphen"). */}
       {thread === 'calendar' && !spaceRoom && (
-        <Link className="afeed__manualback link-cue" to="/calendar/settings">
-          Return to manual mode — everything set here is already in your Calendar settings ›
-        </Link>
+        <p className="afeed__manualback">
+          <Link className="link-cue" to="/calendar/settings">Return to manual mode ›</Link>
+          <span>Everything set here is already in your Calendar settings.</span>
+        </p>
       )}
 
       {/* Building your presence happens HERE, in the profile thread, rather

@@ -361,10 +361,15 @@ export default function TopBar({
         {candleOn !== null && (
           <button
             ref={setCandleEl}
-            className={'top-bar__icon top-bar__candle' + (candleOn ? ' is-lit' : '')}
+            className={'top-bar__icon top-bar__candle tip-right' + (candleOn ? ' is-lit' : '')}
             onClick={toggleCandle}
             aria-pressed={candleOn}
-            title={candleOn ? 'Present — open to connecting. Tap to snuff.' : 'Light your candle — show you’re present'}
+            // The candle speaks the platform tip, not the browser's gray box
+            // (founder 2026-11-02: "when you hover over the light, give the
+            // presence blurb, just like you show the title of each icon
+            // elsewhere"). tip-right hugs the viewport's right edge — the
+            // blurb is long and the candle sits near the corner.
+            data-tip={candleOn ? 'Present — open to connecting. Tap to snuff.' : 'Light your candle — show you’re present'}
             aria-label={candleOn ? 'Snuff your presence candle' : 'Light your presence candle'}
           >
             <span aria-hidden="true">🕯️</span>
