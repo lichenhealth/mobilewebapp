@@ -315,6 +315,29 @@ const CALENDAR_TOOLS = [
       required: ['title', 'active'],
     },
   },
+  // THE CALENDAR BRAIN IS AN ADMIN (founder 2026-11-02: "I approve a therapy
+  // session via a chat with Ai, or I can do so manually via the bookings
+  // button in cal? both work?"): answering a request here flips the SAME
+  // bookings row the Bookings screen's Accept/Decline buttons flip.
+  {
+    name: 'my_booking_requests',
+    description: 'Read the booking requests waiting on THEIR yes — pending requests on their request-approval sessions: who asked, which session, when, their note and intake answers. Call this before answering any question about requests, and ALWAYS right before respond_booking_request.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'respond_booking_request',
+    description: 'Accept or decline ONE pending booking request on their own calendar — the very act the Accept/Decline buttons in Bookings perform, so the answer shows there instantly. Name it by who (the booker’s name or email as my_booking_requests lists them) plus date, and start_min when two could still match; it must resolve to EXACTLY ONE pending request or this refuses and lists what is waiting. Accepting puts it on their calendar and tells the booker (a guest gets the confirmation email — with the payment link when the session is priced); declining answers kindly. Only respond when the member clearly asked you to answer that specific request — never on your own initiative.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        who: { type: 'string', description: 'The booker’s name or email, as my_booking_requests lists them.' },
+        date: { type: 'string', description: 'YYYY-MM-DD — the request’s date.' },
+        start_min: { type: 'number', description: 'Minutes since midnight — only when who + date still match more than one.' },
+        decision: { type: 'string', enum: ['accept', 'decline'] },
+      },
+      required: ['who', 'decision'],
+    },
+  },
 ];
 
 // COURSE TOOLS (founder 2026-10-05: "I'm wanting the course builder to
@@ -1123,7 +1146,8 @@ Deno.serve(async (req) => {
       + '\n- Make the change when they ask; never hand back instructions to click through instead.'
       + '\n- Change only what they asked about. Name every change; a change you did not name is a broken promise.'
       + '\n- No hours means NOT available and NOT bookable — unknown is never yes on Lichen. If they want to be bookable, work hours come first.'
-      + '\n- on_call belongs to active caregivers only; the tool refuses otherwise — do not offer it to anyone else.';
+      + '\n- on_call belongs to active caregivers only; the tool refuses otherwise — do not offer it to anyone else.'
+      + '\n- BOOKING REQUESTS: you can answer them. Read my_booking_requests, then respond_booking_request accepts or declines the one they name — the same act as the Bookings screen, which shows the answer instantly; both doors always work. Only ever respond to a request they clearly asked you to answer.';
   }
 
   // DRAFT-FIRST (founder 2026-08-31): the assistant's page edits land in the
@@ -1980,6 +2004,107 @@ Deno.serve(async (req) => {
       return { ok: true, change: `${active ? 'switched on' : 'switched off'} the session "${title}"` };
     }
 
+    // ── Booking requests (founder 2026-11-02: the calendar brain as an
+    // admin). Reads and answers are sender-scoped: only bookings whose
+    // provider IS the sender, resolved by who+date against that list (the
+    // exactly-one-match rule — never a bare id from the model), answered
+    // through assistant_respond_booking, the service-role twin of the very
+    // RPC the Bookings screen calls. One row, two doors, zero drift.
+    const pendingBookings = async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await (await sb(`bookings?provider_id=eq.${profile_id}&status=eq.pending&on_date=gte.${today}&select=id,on_date,start_min,end_min,note,answers,booker_id,guest_name,guest_email,guest_token,type_id&order=on_date,start_min`)).json();
+      const list = (Array.isArray(rows) ? rows : []) as {
+        id: string; on_date: string; start_min: number; end_min: number;
+        note: string | null; answers: { q: string; a: string }[] | null;
+        booker_id: string | null; guest_name: string | null; guest_email: string | null;
+        guest_token: string | null; type_id: string;
+      }[];
+      const typeIds = [...new Set(list.map((b) => b.type_id))];
+      const types = typeIds.length
+        ? await (await sb(`booking_types?id=in.(${typeIds.join(',')})&select=id,title,price,price_cents`)).json() : [];
+      const tBy = new Map((Array.isArray(types) ? types : []).map(
+        (t: { id: string; title: string; price: string | null; price_cents: number | null }) => [t.id, t]));
+      const bookerIds = [...new Set(list.map((b) => b.booker_id).filter(Boolean))] as string[];
+      const profs = bookerIds.length
+        ? await (await sb(`profiles?id=in.(${bookerIds.join(',')})&select=id,full_name`)).json() : [];
+      const pBy = new Map((Array.isArray(profs) ? profs : []).map(
+        (p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? '']));
+      const whoOf = (b: typeof list[number]) => b.booker_id
+        ? (pBy.get(b.booker_id) || 'a member')
+        : [b.guest_name, b.guest_email].filter(Boolean).join(' · ') || 'a guest (outside Lichen)';
+      return { list, tBy, whoOf };
+    };
+
+    if (name === 'my_booking_requests') {
+      const { list, tBy, whoOf } = await pendingBookings();
+      return {
+        ok: true,
+        waiting_on_their_yes: list.length ? list.map((b) => {
+          const t = tBy.get(b.type_id) as { title?: string; price?: string | null; price_cents?: number | null } | undefined;
+          return {
+            who: whoOf(b),
+            from_outside_lichen: !b.booker_id || undefined,
+            session: t?.title ?? 'a session',
+            date: b.on_date,
+            time: `${minLabel(b.start_min)}–${minLabel(b.end_min)}`,
+            note: b.note || undefined,
+            answers: Array.isArray(b.answers) && b.answers.length ? b.answers : undefined,
+            paid_online: t?.price_cents ? `$${(t.price_cents / 100).toFixed(2).replace(/\.00$/, '')} collected once confirmed and paid` : undefined,
+          };
+        }) : 'nothing — no pending booking requests right now',
+        note: 'Answering here (respond_booking_request) and the Bookings screen are the same door — either shows in the other instantly.',
+      };
+    }
+
+    if (name === 'respond_booking_request') {
+      const decision = String(input.decision ?? '');
+      if (!['accept', 'decline'].includes(decision)) return { ok: false, error: 'decision must be accept or decline.' };
+      const who = String(input.who ?? '').trim().toLowerCase();
+      if (!who) return { ok: false, error: 'Say who the request is from — read my_booking_requests first.' };
+      const { list, tBy, whoOf } = await pendingBookings();
+      if (!list.length) return { ok: false, error: 'Nothing is waiting — there are no pending booking requests.' };
+      let matches = list.filter((b) => whoOf(b).toLowerCase().includes(who));
+      const date = String(input.date ?? '').trim();
+      if (date) matches = matches.filter((b) => b.on_date === date);
+      if (typeof input.start_min === 'number') matches = matches.filter((b) => b.start_min === input.start_min);
+      const line = (b: typeof list[number]) => {
+        const t = tBy.get(b.type_id) as { title?: string } | undefined;
+        return `${whoOf(b)} — ${t?.title ?? 'a session'} on ${b.on_date} at ${minLabel(b.start_min)} (start_min ${b.start_min})`;
+      };
+      if (matches.length === 0) {
+        return { ok: false, error: `No pending request matches "${input.who}"${date ? ` on ${date}` : ''}. Waiting: ${list.map(line).join('; ')}.` };
+      }
+      if (matches.length > 1) {
+        return { ok: false, error: `That matches ${matches.length} requests — add date and start_min to single one out: ${matches.map(line).join('; ')}.` };
+      }
+      const b = matches[0];
+      const r = await sb('rpc/assistant_respond_booking', {
+        method: 'POST',
+        body: JSON.stringify({ p_provider: profile_id, p_booking: b.id, p_accept: decision === 'accept' }),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        return { ok: false, error: `Could not ${decision} it: ${text.slice(0, 160)}` };
+      }
+      // A guest hears by email, status-derived — the manual Accept button's
+      // own follow-through (Bookings.tsx does exactly this).
+      if (!b.booker_id && b.guest_token) {
+        void fetch(`${SUPABASE_URL}/functions/v1/send-booking-mail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY! },
+          body: JSON.stringify({ token: b.guest_token }),
+        }).catch(() => {});
+      }
+      const t = tBy.get(b.type_id) as { title?: string; price_cents?: number | null } | undefined;
+      return {
+        ok: true,
+        change: `${decision === 'accept' ? 'accepted' : 'declined'} ${whoOf(b)}'s request for "${t?.title ?? 'a session'}" on ${b.on_date} at ${minLabel(b.start_min)}`,
+        note: decision === 'accept'
+          ? `It's confirmed — on their calendar and in Bookings.${!b.booker_id ? ' The guest got the confirmation email' + (t?.price_cents ? ', which carries the payment link' : '') + '.' : ''}`
+          : 'They were told kindly that this time didn’t work.',
+      };
+    }
+
     // ── Course tools (founder 2026-10-05) — sender-scoped, no targets.
     // They write the SAME collections rows + details jsonb the Teach
     // builder edits (the shared-state rule): a course described here opens
@@ -2381,6 +2506,7 @@ Deno.serve(async (req) => {
     save_web_image: 'profile', select_space: 'profile',
     my_calendar_setup: 'calendar', add_hours: 'calendar', remove_hours: 'calendar',
     add_booking_type: 'calendar', update_booking_type: 'calendar',
+    my_booking_requests: 'calendar', respond_booking_request: 'calendar',
     set_booking_type_active: 'calendar', add_task: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
     my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace',
