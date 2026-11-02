@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { LichenMark } from '../components/LichenMark';
 import { loadGuestEvent, guestRsvp, type GuestEventInfo, type GuestStatus } from '../lib/eventGuestsApi';
-import { icsDataUri, googleCalUrl } from '../lib/ics';
+import AddToCal from '../components/AddToCal';
 import './GuestEvent.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -79,8 +79,7 @@ export default function GuestEvent() {
       <div className="gev__section">
         <p className="gev__label">Add it to your calendar</p>
         <div className="gev__cal">
-          {cal && <a className="btn gev__btn" href={icsDataUri(cal)} download={`${info.title}.ics`}>Apple / Outlook (.ics)</a>}
-          {cal && <a className="btn gev__btn" href={googleCalUrl(cal)} target="_blank" rel="noreferrer">Google Calendar</a>}
+          {cal && <AddToCal ev={cal} file={`${info.title}.ics`} btnClass="btn gev__btn" />}
         </div>
       </div>
 
@@ -93,9 +92,15 @@ export default function GuestEvent() {
         </div>
       </div>
 
-      <p className="gev__join">
-        Want the full experience? <a href="/signup">Create a Lichen account</a> — it’s free to try.
-      </p>
+      {/* The standard join footer (founder 2026-11-02 — one sentence, the
+          host's name whole [.nobr], the CTA inline; "free to try" retired
+          with the alpha-copy sweep). */}
+      <footer className="gev__join">
+        <p>
+          Lichen is a community for healing, growing and creating — <span className="nobr">{info.host_name}</span> is a member.{' '}
+          <a className="gev__joinlink" href="/signup">Request to join Lichen</a>
+        </p>
+      </footer>
     </div>
   );
 }

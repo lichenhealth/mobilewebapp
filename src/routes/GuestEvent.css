@@ -36,3 +36,7 @@
   color: var(--peach-deep, var(--peach));
   text-decoration: underline; text-underline-offset: 2px;
 }
+
+/* ONE add-to-calendar row (founder 2026-11-02): the four major-calendar
+   doors wrap and center on every guest confirmation surface. */
+.addcal { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: var(--s-3); }

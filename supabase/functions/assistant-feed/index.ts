@@ -267,7 +267,7 @@ const CALENDAR_TOOLS = [
         min_notice_min: { type: 'number', description: 'Minimum notice in MINUTES (24 hours = 1440). Default 60.' },
         max_days_out: { type: 'number', description: 'How far ahead people may book, in days (1–365). 0 = no limit (the default).' },
         max_per_day: { type: 'number', description: 'At most N sessions of this type per day (1–48). 0 = no cap (the default).' },
-        slot_increment: { type: 'number', description: 'Offered start times step by this many MINUTES, independent of the session length (a 60-min session starting every 30 — the Calendly shape). 5–240; 0 = step by the session length (the default).' },
+        slot_increment: { type: 'number', description: 'Offered start times step by this many MINUTES, independent of the session length (a 60-min session starting every 30 — the Calendly shape). 5–240; 0 = the default: starts on 30-minute marks, except a session shorter than 30 min steps by its own length.' },
         capacity: { type: 'number', description: '1 = one person per slot (default). More = a GROUP session: that many people share each slot and one calendar event, slots say "N left".' },
         questions: { type: 'array', items: { type: 'string' }, description: 'Up to 5 questions people must answer when booking; answers land on the request for them to read.' },
         unique_zoom: { type: 'boolean', description: 'true = a FRESH Zoom meeting is created on Lichen\'s own Zoom for every confirmed booking (nobody can land in a room booked for someone else; a cancelled booking\'s room is deleted). Only available to providers the platform has opened this to — the tool refuses otherwise, and that is a capacity limit, not an outage. Any video_link they also set becomes the fallback.' },
@@ -303,7 +303,7 @@ const CALENDAR_TOOLS = [
         min_notice_min: { type: 'number' },
         max_days_out: { type: 'number' },
         max_per_day: { type: 'number' },
-        slot_increment: { type: 'number', description: 'Start times step in minutes (5–240); 0 = back to stepping by the session length.' },
+        slot_increment: { type: 'number', description: 'Start times step in minutes (5–240); 0 = back to the default (30-minute marks; a shorter session steps by its own length).' },
         capacity: { type: 'number' },
         questions: { type: 'array', items: { type: 'string' } },
         books_from: { type: 'string', enum: ['work', 'social', 'on_call', 'custom'] },
@@ -1791,7 +1791,7 @@ Deno.serve(async (req) => {
       if (inp.min_notice_min !== undefined) { const n = Number(inp.min_notice_min); if (n >= 0 && n <= 20160) out.min_notice_min = n; else errs.push('min_notice_min must be 0–20160 (minutes; 24h = 1440)'); }
       if (inp.max_days_out !== undefined) { const n = Number(inp.max_days_out); if (n === 0) out.max_days_out = null; else if (n >= 1 && n <= 365) out.max_days_out = n; else errs.push('max_days_out must be 1–365, or 0 for no limit'); }
       if (inp.max_per_day !== undefined) { const n = Number(inp.max_per_day); if (n === 0) out.max_per_day = null; else if (n >= 1 && n <= 48) out.max_per_day = n; else errs.push('max_per_day must be 1–48, or 0 for no cap'); }
-      if (inp.slot_increment !== undefined) { const n = Number(inp.slot_increment); if (n === 0) out.slot_increment_min = null; else if (n >= 5 && n <= 240) out.slot_increment_min = n; else errs.push('slot_increment must be 5–240 minutes, or 0 to step by the session length'); }
+      if (inp.slot_increment !== undefined) { const n = Number(inp.slot_increment); if (n === 0) out.slot_increment_min = null; else if (n >= 5 && n <= 240) out.slot_increment_min = n; else errs.push('slot_increment must be 5–240 minutes, or 0 for the default 30-minute marks'); }
       if (inp.collect_online_usd !== undefined) {
         const n = Math.round(Number(inp.collect_online_usd) * 100);
         if (n === 0) out.price_cents = null;

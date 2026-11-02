@@ -74,6 +74,41 @@ export function googleCalUrl(e: EventForCal): string {
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }
 
+/** Next day with dashes — Outlook's all-day enddt wants ISO dates. */
+function nextDayDash(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/** Outlook-family deeplinks (founder 2026-11-02: "links to the major
+ *  calendars out there") — the same floating-local times as the ICS. */
+function outlookParams(e: EventForCal): string {
+  const iso = (date: string, min: number) =>
+    `${date}T${pad(Math.floor(min / 60))}:${pad(min % 60)}:00`;
+  const p = new URLSearchParams({ path: '/calendar/action/compose', rru: 'addevent', subject: e.title });
+  if (e.all_day || e.start_min == null) {
+    p.set('startdt', e.start_date);
+    p.set('enddt', nextDayDash(e.end_date));
+    p.set('allday', 'true');
+  } else {
+    p.set('startdt', iso(e.start_date, e.start_min));
+    p.set('enddt', iso(e.end_date, e.end_min ?? e.start_min));
+  }
+  const body = [e.description, e.url].filter(Boolean).join('\n');
+  if (body) p.set('body', body);
+  if (e.location) p.set('location', e.location);
+  return p.toString();
+}
+
+export function outlookCalUrl(e: EventForCal): string {
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${outlookParams(e)}`;
+}
+
+export function office365CalUrl(e: EventForCal): string {
+  return `https://outlook.office.com/calendar/0/deeplink/compose?${outlookParams(e)}`;
+}
+
 function hash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
