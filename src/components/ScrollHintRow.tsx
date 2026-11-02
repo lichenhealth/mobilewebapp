@@ -45,6 +45,18 @@ export function ScrollHintRow({ className, role, ariaLabel, gutter, fade, childr
     const kids = Array.from(el.children) as HTMLElement[];
     const eligible = (k: HTMLElement) => k.getBoundingClientRect().width >= 24;
 
+    // A WRAPPING row never scrolls, so hints and straddle-hides are both
+    // meaningless there — and worse than meaningless: a lit lens's door tab
+    // pokes a few px past the row's right edge, which read as overflow and
+    // summoned a phantom right chevron ON TOP of the tab, eating the tap
+    // (founder 2026-11-02: "there is a right arrow still, even though we now
+    // have 2 rows, and it appears to prevent the click thru to travel").
+    if (getComputedStyle(el).flexWrap === 'wrap') {
+      for (const kid of kids) kid.style.visibility = '';
+      setHints((prev) => (prev.l === null && prev.r === null ? prev : { l: null, r: null }));
+      return;
+    }
+
     for (const kid of kids) {
       const kr = kid.getBoundingClientRect();
       const straddlesR = kr.left < rect.right - 1 && kr.right > rect.right + 1;
