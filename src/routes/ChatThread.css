@@ -974,3 +974,7 @@
 .thread__docpanel-ai input { accent-color: var(--peach-deep); }
 .thread__docpanel-foot { display: flex; align-items: center; gap: 10px; }
 .thread__docpanel-msg { font-size: 12px; color: var(--red-deep, #b4553f); }
+
+/* DRAG IT STRAIGHT IN (founder 2026-11-02): the chat composer catches a
+   dropped screenshot/video/audio file — peach dashed ring while hovering. */
+.thread__input-wrap.is-dragover { outline: 2px dashed var(--peach); outline-offset: -3px; }

@@ -40,3 +40,7 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .assist-composer__send:disabled { background: var(--bone-edge); color: var(--ink-faint); cursor: default; }
+
+/* DRAG IT STRAIGHT IN (founder 2026-11-02): a file dragged over the box
+   says it will be caught — peach dashed ring while hovering. */
+.assist-composer.is-dragover { outline: 2px dashed var(--peach); outline-offset: 3px; border-radius: 14px; }

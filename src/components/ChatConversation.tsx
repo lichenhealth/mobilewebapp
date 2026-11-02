@@ -1144,6 +1144,24 @@ function ChatInputBar({
     setAttachOpen(false);
   }
 
+  // DRAG IT STRAIGHT IN (founder 2026-11-02: "i want to be able to pull a
+  // screenshot from desktop into the composer … instead of manually
+  // uploading a screenshot from desktop as my only way to input pictures"):
+  // dropped or PASTED media rides the same onAttach door the paperclip
+  // uses — one intake, three gestures.
+  const [dragOver, setDragOver] = useState(false);
+  function takeFiles(files: File[]) {
+    for (const f of files) {
+      const type: MediaType | null =
+        f.type.startsWith('image/') ? 'photo'
+        : f.type.startsWith('video/') ? 'video'
+        : f.type.startsWith('audio/') ? 'audio' : null;
+      if (!type) continue;
+      const ext = f.name.split('.').pop() || (type === 'photo' ? 'jpg' : type === 'video' ? 'mp4' : 'webm');
+      onAttach(f, ext, type);
+    }
+  }
+
   async function toggleRecord() {
     if (recording) {
       recRef.current?.stop();
@@ -1190,7 +1208,14 @@ function ChatInputBar({
   }
 
   return (
-    <div className="thread__input-wrap">
+    <div
+      className={'thread__input-wrap' + (dragOver ? ' is-dragover' : '')}
+      onDragOver={(e) => {
+        if ([...e.dataTransfer.items].some((it) => it.kind === 'file')) { e.preventDefault(); setDragOver(true); }
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); takeFiles([...e.dataTransfer.files]); }}
+    >
       {replyTo && (
         <div className="thread__reply-preview">
           <Icon name="reply" size={14} />
@@ -1270,6 +1295,13 @@ function ChatInputBar({
           placeholder={placeholder ?? 'Write something kind'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onPaste={(e) => {
+            const fs = [...e.clipboardData.items]
+              .filter((it) => it.kind === 'file')
+              .map((it) => it.getAsFile())
+              .filter((f): f is File => !!f);
+            if (fs.length) { e.preventDefault(); takeFiles(fs); }
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
           }}
