@@ -403,7 +403,7 @@ export default function BookPublic() {
 
   if (!page) {
     return (
-      <div className="gev" style={pick && confH ? { paddingBottom: confH + 20 } : undefined}>
+      <div className="gev">
         <p className="gev__muted">Nothing bookable lives at this address.</p>
       </div>
     );
@@ -433,7 +433,7 @@ export default function BookPublic() {
   const unanswered = questions.some((_, i) => !(answers[i] ?? '').trim());
 
   return (
-    <div className="gev bkpub">
+    <div className="gev bkpub" style={pick && confH ? { paddingBottom: confH + 20 } : undefined}>
       <header className="bkg__head">
         <Avatar id={provider.id} name={providerName} url={provider.avatar_url ?? undefined} size={72} />
         <h1 className="bkg__title display-italic">Book time with {providerName}</h1>
