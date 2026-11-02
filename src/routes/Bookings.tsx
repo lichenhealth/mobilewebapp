@@ -75,6 +75,24 @@ export default function Bookings() {
   const today = todayISO();
   const when = (b: BookingRow) =>
     `${formatDateShort(b.on_date)} · ${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}`;
+  // Sessions list BY DAY (founder 2026-11-02: "can the list have a bit of
+  // calendar organization to it?") — day headers carry the date, rows keep
+  // just their times.
+  const timeOnly = (b: BookingRow) => `${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}`;
+  const byDay = (rows: BookingRow[]): Array<[string, BookingRow[]]> => {
+    const m = new Map<string, BookingRow[]>();
+    const sorted = [...rows].sort((a, z) =>
+      a.on_date === z.on_date ? a.start_min - z.start_min : (a.on_date < z.on_date ? -1 : 1));
+    for (const b of sorted) {
+      if (!m.has(b.on_date)) m.set(b.on_date, []);
+      m.get(b.on_date)!.push(b);
+    }
+    return [...m.entries()];
+  };
+  const dayHead = (iso: string) => {
+    const [y, mo, d] = iso.split('-').map(Number);
+    return new Date(y, mo - 1, d).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  };
   // A guest row has no member behind it — name it honestly.
   const who = (b: BookingRow) =>
     b.booker_id ? (b.booker?.full_name ?? 'A member') : `${b.guest_name ?? 'A guest'} · from outside Lichen`;
@@ -207,11 +225,13 @@ export default function Bookings() {
       {upcoming.length > 0 && (
         <section className="bkg__sec">
           <h2 className="bkg__h2">On your books</h2>
-          {upcoming.map((b) => (
+          {byDay(upcoming).map(([iso, rows]) => (<div key={iso}>
+          <h3 className="bkg__dayhead">{dayHead(iso)}</h3>
+          {rows.map((b) => (
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
-                <span className="bkg__row-sub">{when(b)}</span>
+                <span className="bkg__row-sub">{timeOnly(b)}</span>
                 <JoinLink b={b} />
                 {payState(b)}
                 {answerLines(b)}
@@ -224,20 +244,23 @@ export default function Bookings() {
               }}>Cancel</button>
             </div>
           ))}
+          </div>))}
         </section>
       )}
 
       {mine.length > 0 && (
         <section className="bkg__sec">
           <h2 className="bkg__h2">Your sessions</h2>
-          {mine.map((b) => (
+          {byDay(mine).map(([iso, rows]) => (<div key={iso}>
+          <h3 className="bkg__dayhead">{dayHead(iso)}</h3>
+          {rows.map((b) => (
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">
                   {b.type?.title ?? 'Session'} with {b.provider?.full_name ?? 'a member'}
                   {b.status === 'pending' && <em className="bkg__pending"> · awaiting reply</em>}
                 </span>
-                <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
+                <span className="bkg__row-sub">{timeOnly(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
                 <JoinLink b={b} />
                 {payState(b)}
                 {/* The provider's own ways to be paid (founder 2026-11-02) —
@@ -258,6 +281,7 @@ export default function Bookings() {
               }}>Cancel</button>
             </div>
           ))}
+          </div>))}
         </section>
       )}
     </div>

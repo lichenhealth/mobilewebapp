@@ -307,6 +307,27 @@ export default function BookPublic() {
     requestAnimationFrame(() => revealBelow(dayRef.current));
   }, [selDay]);
 
+  // THE CONFIRM CARD NEVER COVERS THE TIMES (founder 2026-11-02: "it also
+  // covers the times, it should expand and scroll you down below, so you
+  // see what's above"): measure the sticky card, give the page that much
+  // extra foot room, and walk the day's slots clear of it.
+  const confRef = useRef<HTMLDivElement | null>(null);
+  const [confH, setConfH] = useState(0);
+  useEffect(() => {
+    if (!pick) { setConfH(0); return; }
+    const el = confRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setConfH(el.offsetHeight));
+    ro.observe(el);
+    setConfH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [pick]);
+  useEffect(() => {
+    if (!pick || !confH) return;
+    requestAnimationFrame(() => revealBelow(dayRef.current, 'smooth', confH + 12));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick, confH]);
+
   if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
 
   // Signed in on the bare handle link: the WHOLE menu, not just the public
@@ -338,7 +359,7 @@ export default function BookPublic() {
                 <div className="bkpub__types bkpub__types--menu">
                   {open.variants.map((t) => (
                     <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
-                      {sessionLengthLabel(t.duration_min)}{t.price ? ` · ${t.price}` : ''}
+                      {sessionLengthLabel(t.duration_min)}
                     </button>
                   ))}
                 </div>
@@ -382,7 +403,7 @@ export default function BookPublic() {
 
   if (!page) {
     return (
-      <div className="gev">
+      <div className="gev" style={pick && confH ? { paddingBottom: confH + 20 } : undefined}>
         <p className="gev__muted">Nothing bookable lives at this address.</p>
       </div>
     );
@@ -478,7 +499,7 @@ export default function BookPublic() {
                       className={'bkg__slot' + (typeId === t.id ? ' is-on' : '')}
                       onClick={() => setTypeId(t.id)}
                     >
-                      {sessionLengthLabel(t.duration_min)}{t.price ? ` · ${t.price}` : ''}
+                      {sessionLengthLabel(t.duration_min)}
                     </button>
                   ))}
                 </div>
@@ -488,6 +509,16 @@ export default function BookPublic() {
         );
       })()}
 
+      {/* The meeting type's DETAILS live here, on the picked session's own
+          screen (founder 2026-11-02: "get rid of the free detail and tell
+          them on the next page in the meeting type details"). */}
+      {activeType && (
+        <p className="bkg__desc bkpub__typefacts">
+          {sessionLengthLabel(activeType.duration_min)}
+          {activeType.price ? ` · ${activeType.price}` : ''}
+          {activeType.location ? ` · ${activeType.location}` : ''}
+        </p>
+      )}
       {activeType?.description && <p className="bkg__desc">{activeType.description}</p>}
 
       {typeId && board && openDays.size === 0 && (
@@ -525,7 +556,15 @@ export default function BookPublic() {
       )}
 
       {pick && activeType && (
-        <div className="bkg__confirm">
+        <div className="bkg__confirm" ref={confRef}>
+          {/* A way OUT of the pick (founder 2026-11-02: "the pop up doesn't
+              have an x out, and it should, in case you change your mind
+              about booking"). */}
+          <button
+            type="button" className="bkg__confirm-x"
+            aria-label="Never mind — clear this time"
+            onClick={() => setPick(null)}
+          >×</button>
           <p className="bkg__confirm-when">
             {localDate(pick.iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             {' · '}{minToLabel(pick.start)} – {minToLabel(pick.start + activeType.duration_min)}
@@ -631,9 +670,18 @@ export default function BookPublic() {
 
       {!user && (
         <footer className="gev__join">
+          {/* The member fast path leads (founder 2026-11-02: "shouldn't
+              this have the CTA 'already a member? login to complete
+              booking faster.' And then the CTA to request to join") —
+              signing in rides the park-and-go round trip, so anything
+              already picked or typed survives the hop. */}
+          <p>
+            Already a member?{' '}
+            <button className="gev__joinlink" onClick={() => parkAndGo('/login')}>Sign in to complete your booking faster</button>
+          </p>
           <p>
             Lichen is a community for healing, growing and creating — <span className="nobr">{providerName}</span> is a member.{' '}
-            <button className="gev__joinlink" onClick={() => navigate('/signup')}>Request to join Lichen</button>
+            <button className="gev__joinlink" onClick={() => parkAndGo('/signup')}>Request to join Lichen</button>
           </p>
         </footer>
       )}

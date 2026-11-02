@@ -153,7 +153,17 @@ Deno.serve(async (req) => {
       ? `${row.price_cents ? 'Or pay directly' : 'Ways to pay'}: ${methodWords.join(' · ')}`
       : '';
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${bookAgain ? `Book another time with ${first}: ${bookAgain}\n` : ''}${link}`;
+    // GMAIL FOLDS REPEATED TAILS (founder 2026-11-02, from her screenshot of
+    // the "…" pill hiding the See-your-booking button): successive mails
+    // about ONE booking (confirmed → rescheduled → reminder) used to share a
+    // byte-identical ending, which Gmail collapses behind the three dots as
+    // "trimmed content". A per-send stamp in the fine print makes every
+    // tail unique, so the whole body — button included — stays expanded.
+    const sentStamp = new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'UTC',
+    }) + ' UTC';
+
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${bookAgain ? `Book another time with ${first}: ${bookAgain}\n` : ''}${link}\n\nSent ${sentStamp}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -180,6 +190,7 @@ Deno.serve(async (req) => {
     <p style="font-size:12px;color:#8a8a84">That link shows every session ${esc(first)} offers, with live availability. Your old booking stays viewable at <a href="${link}" style="color:#8a8a84">this link</a>.</p>`
       : `<p style="margin:22px 0"><a href="${link}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">See your booking</a></p>
     <p style="font-size:12px;color:#8a8a84">No account needed — that link is yours to view or cancel the booking.</p>`}
+    <p style="font-size:11px;color:#b3afa6;margin:14px 0 0">Sent ${esc(sentStamp)}</p>
   </div>
 </div>`;
 
