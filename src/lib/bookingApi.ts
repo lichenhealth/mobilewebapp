@@ -619,6 +619,50 @@ export interface PublicBookingPage {
     & { slug?: string | null })[];
 }
 
+/* THE PRICE SPEAKS AN EXCHANGE MANNER (founder 2026-11-02: "Price should be
+ * a drop down with Free, Current-cy, Dollars, then the marketplace options
+ * with a trade option, or basically any relevant options for a service,
+ * including Gift. If you press currentcy or dollars, you input the amount
+ * manually. Trade, you put in what you're willing to trade for, or 'make me
+ * a trade offer'"): storage stays the ONE display string every surface
+ * already renders (booking_types.price) — these two helpers are the grammar
+ * between that string and the editor's manner dropdown, so a legacy
+ * free-text price round-trips as "Custom wording", never a blanked select
+ * (the RuleSelect off-list rule). Rent/lend/borrow are deliberately absent:
+ * they aren't session shapes. */
+export type PriceManner = 'none' | 'free' | 'gift' | 'dollars' | 'currentcy' | 'trade' | 'sliding' | 'custom';
+export interface PriceParts { kind: PriceManner; amt: string; note: string }
+
+export function parsePriceManner(price: string | null | undefined): PriceParts {
+  const t = (price ?? '').trim();
+  if (!t) return { kind: 'none', amt: '', note: '' };
+  if (/^free$/i.test(t)) return { kind: 'free', amt: '', note: '' };
+  if (/^(a )?gift$/i.test(t)) return { kind: 'gift', amt: '', note: '' };
+  let m = t.match(/^\$\s?(\d+(?:\.\d{1,2})?)$/);
+  if (m) return { kind: 'dollars', amt: m[1], note: '' };
+  m = t.match(/^(\d+(?:\.\d{1,2})?)\s*current(?:-cy)?$/i);
+  if (m) return { kind: 'currentcy', amt: m[1], note: '' };
+  if (/^make me a trade offer$/i.test(t)) return { kind: 'trade', amt: '', note: '' };
+  m = t.match(/^trade\s*[—-]\s*(.+)$/i);
+  if (m) return { kind: 'trade', amt: '', note: m[1] };
+  m = t.match(/^sliding scale\s*(.*)$/i);
+  if (m) return { kind: 'sliding', amt: '', note: m[1] };
+  return { kind: 'custom', amt: '', note: t };
+}
+
+export function composePriceManner(p: PriceParts): string {
+  switch (p.kind) {
+    case 'none': return '';
+    case 'free': return 'Free';
+    case 'gift': return 'A gift';
+    case 'dollars': return p.amt ? `$${p.amt}` : '';
+    case 'currentcy': return p.amt ? `${p.amt} Current-cy` : '';
+    case 'trade': return p.note.trim() ? `Trade — ${p.note.trim()}` : 'Make me a trade offer';
+    case 'sliding': return p.note.trim() ? `Sliding scale ${p.note.trim()}` : 'Sliding scale';
+    case 'custom': return p.note.trim();
+  }
+}
+
 /** The vanity link's one sanitizer — shared by the editor and anywhere a
  *  link name is read from typing: lowercase kebab, 48 chars, no edge dashes. */
 export function slugify(raw: string): string {
