@@ -50,6 +50,13 @@ export interface BookingType {
    *  options); false = payment asked up front. Only meaningful with a
    *  price_cents. */
   allow_pay_later?: boolean;
+  /** HOW TO COLLECT PAYMENT, off-platform (founder 2026-11-02: "buttons to
+   *  all the options - credit card, venmo, etc"): the provider's own
+   *  pointers — Venmo/PayPal/Cash App/Zelle handles or free words. Card or
+   *  bank THROUGH LICHEN stays price_cents above; these are shown to
+   *  bookers once a booking is CONFIRMED (the card door's own posture) and
+   *  Lichen never tracks whether an off-platform payment happened. */
+  pay_methods?: PayMethod[] | null;
   /** Offered start times step by this many minutes (founder 2026-10-29,
    *  the Calendly-parity gap closed: a 60-min session can start every 30) —
    *  null = step by the session length, the original behavior. */
@@ -89,12 +96,50 @@ export interface BookingRow {
   /** The session's video link (Zoom, Meet…) — stamped server-side when the
    *  booking is CONFIRMED, never on a pending request. */
   meeting_url?: string | null;
-  type?: { title: string; price: string; location: string; approval?: 'request' | 'instant' } | null;
+  type?: { title: string; price: string; location: string; approval?: 'request' | 'instant'; pay_methods?: PayMethod[] | null } | null;
   provider?: { full_name: string | null } | null;
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, allow_pay_later, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, allow_pay_later, pay_methods, active';
+
+// ── Off-platform payment methods (founder 2026-11-02) ───────────────────────
+/** One way a provider collects payment outside Lichen's own checkout. */
+export interface PayMethod { kind: 'venmo' | 'paypal' | 'cashapp' | 'zelle' | 'other'; value: string }
+
+export const PAY_METHOD_KINDS: { kind: PayMethod['kind']; label: string; placeholder: string }[] = [
+  { kind: 'venmo', label: 'Venmo', placeholder: '@your-venmo-handle' },
+  { kind: 'paypal', label: 'PayPal', placeholder: 'paypal.me link or handle' },
+  { kind: 'cashapp', label: 'Cash App', placeholder: '$yourcashtag' },
+  { kind: 'zelle', label: 'Zelle', placeholder: 'The email or phone people pay' },
+  { kind: 'other', label: 'Other', placeholder: 'e.g. Cash at the door, Ivy Pay invoice' },
+];
+
+/** The booker-facing door for one method: a label and, where the service
+ *  has a public pay page, a link. Zelle and free words stay plain text. */
+export function payMethodDoor(m: PayMethod): { label: string; href: string | null } {
+  const v = (m.value || '').trim();
+  if (!v) return { label: '', href: null };
+  switch (m.kind) {
+    case 'venmo':
+      return { label: `Venmo ${v.startsWith('@') ? v : '@' + v}`, href: `https://venmo.com/u/${encodeURIComponent(v.replace(/^@/, ''))}` };
+    case 'paypal':
+      if (/^https?:\/\//i.test(v)) return { label: 'PayPal', href: v };
+      if (/paypal\.me\//i.test(v)) return { label: `PayPal ${v}`, href: `https://${v.replace(/^https?:\/\//i, '')}` };
+      return { label: `PayPal ${v}`, href: `https://paypal.me/${encodeURIComponent(v.replace(/^@/, ''))}` };
+    case 'cashapp': {
+      const tag = v.startsWith('$') ? v : '$' + v;
+      return { label: `Cash App ${tag}`, href: `https://cash.app/${encodeURIComponent(tag)}` };
+    }
+    case 'zelle': return { label: `Zelle: ${v}`, href: null };
+    default: return { label: v, href: null };
+  }
+}
+
+/** Methods worth showing a booker — selected rows whose handle was filled. */
+export function realPayMethods(raw: PayMethod[] | null | undefined): PayMethod[] {
+  return (raw ?? []).filter((m) => (m.value || '').trim().length > 0);
+}
 
 export async function listMyBookingTypes(me: string): Promise<BookingType[]> {
   const { data, error } = await supabase.from('booking_types')
@@ -368,6 +413,7 @@ export interface BookingBoard {
       slot_increment_min?: number | null;
       price_cents?: number | null;
       allow_pay_later?: boolean;
+      pay_methods?: PayMethod[] | null;
       /** The provider's IANA timezone — slots are THEIR wall time. */
       provider_tz?: string | null;
     };
@@ -771,6 +817,8 @@ export interface GuestBookingView {
   pay_choice?: 'now' | 'later' | null;
   /** A bank transfer in transit — the pay door closes while it rides. */
   payment_pending_at?: string | null;
+  /** The provider's off-platform ways to be paid (founder 2026-11-02). */
+  pay_methods?: PayMethod[] | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {
@@ -896,7 +944,7 @@ export async function savePayoutPref(me: string, pref: 'keep' | 'auto_cashout'):
 
 const BOOKING_EMBED =
   'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, price_cents, paid_at, pay_choice, payment_pending_at, ' +
-  'type:booking_types(title, price, location, approval), ' +
+  'type:booking_types(title, price, location, approval, pay_methods), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';
 

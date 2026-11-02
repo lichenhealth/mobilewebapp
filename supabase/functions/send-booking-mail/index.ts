@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval,pay_methods),provider:profiles!bookings_provider_id_fkey(full_name)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -121,7 +121,30 @@ Deno.serve(async (req) => {
         : row.status === 'pending' ? `${usd} — payment opens once ${provider} confirms` : '')
       : '';
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
+    // OFF-PLATFORM WAYS TO PAY (founder 2026-11-02: "buttons to all the
+    // options - credit card, venmo, etc"): the provider's own pointers,
+    // stored on the type and shown once the booking is CONFIRMED and no
+    // online payment has landed — derived from the row like everything else.
+    const rawMethods = Array.isArray(t.pay_methods) ? t.pay_methods as { kind?: string; value?: string }[] : [];
+    const methodWords = (row.status === 'confirmed' && !row.paid_at)
+      ? rawMethods
+          .filter((m) => typeof m?.value === 'string' && m.value.trim())
+          .map((m) => {
+            const v = (m.value as string).trim();
+            switch (m.kind) {
+              case 'venmo': return `Venmo ${v.startsWith('@') ? v : '@' + v}`;
+              case 'paypal': return /paypal\.me|^https?:/i.test(v) ? `PayPal ${v}` : `PayPal paypal.me/${v.replace(/^@/, '')}`;
+              case 'cashapp': return `Cash App ${v.startsWith('$') ? v : '$' + v}`;
+              case 'zelle': return `Zelle: ${v}`;
+              default: return v;
+            }
+          })
+      : [];
+    const methodsLine = methodWords.length
+      ? `${row.price_cents ? 'Or pay directly' : 'Ways to pay'}: ${methodWords.join(' · ')}`
+      : '';
+
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -131,6 +154,7 @@ Deno.serve(async (req) => {
       <p style="margin:6px 0 0;font-size:14px">${esc(when)}</p>
       ${t.location ? `<p style="margin:6px 0 0;font-size:14px;color:#6b6b66">${esc(t.location)}</p>` : ''}
       ${payLine ? `<p style="margin:6px 0 0;font-size:14px;${row.paid_at ? 'color:#4a7a52' : 'color:#2b2b28;font-weight:600'}">${esc(payLine)}</p>` : ''}
+      ${methodsLine ? `<p style="margin:6px 0 0;font-size:13px;color:#6b6b66">${esc(methodsLine)}</p>` : ''}
       ${
         // The join link wears the SERVICE'S NAME, lit in the LICHEN blue —
         // founder 2026-10-07: "zoom be what is shown in the invite as the

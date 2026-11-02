@@ -295,6 +295,42 @@
 }
 .cset__flab:first-of-type { margin-top: 2px; }
 .cset__fwide { flex: 1 1 100%; }
+
+/* HOW TO COLLECT PAYMENT (founder 2026-11-02): method buttons — the
+   platform's light-peach selection on the chosen ones. */
+.cset__paykinds {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cset__paykind {
+  border: 1px solid var(--bone-edge);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.cset__paykind.is-on {
+  background: var(--peach-tint);
+  border-color: var(--peach);
+  color: var(--peach-deep);
+}
+.cset__payrow {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cset__paylbl {
+  flex: 0 0 auto;
+  min-width: 64px;
+  font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted);
+}
 /* The open editor's fold-up carrot (founder 2026-11-02) — chevron-right
  * turned to point up. */
 .cset__foldup svg { transform: rotate(-90deg); }

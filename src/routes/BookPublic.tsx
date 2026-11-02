@@ -16,6 +16,7 @@ import {
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
+import PayDoors from '../components/PayDoors';
 import { supabase } from '../lib/supabase';
 import './Bookings.css';
 import './GuestEvent.css';
@@ -406,6 +407,13 @@ export default function BookPublic() {
             </button>
           </div>
         ) : null}
+        {doneStatus === 'confirmed' && (
+          <PayDoors
+            methods={board?.type.pay_methods}
+            lead={cents ? 'Or pay directly' : `Ways to pay${board?.type.price ? ` ${board.type.price}` : ''}`}
+            className="bkg__paydoors"
+          />
+        )}
         <div className="bkg__doneactions">
           <button className={'btn bkg__btn' + (cents && doneStatus === 'confirmed' && !payLater ? '' : ' btn-primary')} onClick={() => navigate(`/b/${doneToken}`)}>
             See your booking

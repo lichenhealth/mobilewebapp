@@ -29,6 +29,7 @@ import {
   MeetingSetting, zoomMintAllowed, usdLabel,
   listTypeSpaces, listMyTypeSpaces, saveTypeSpaces,
   PriceParts, PriceManner, parsePriceManner, composePriceManner,
+  PAY_METHOD_KINDS, realPayMethods,
 } from '../lib/bookingApi';
 import { numericAmount } from '../lib/ledgerApi';
 import './Concierge.css';
@@ -262,12 +263,19 @@ export default function CalendarSettings() {
     setBkPrice(p);
     setBkEdit((c) => ({ ...c, price: composePriceManner(p) }));
   };
+  // HOW TO COLLECT PAYMENT (founder 2026-11-02): whether the Card/bank —
+  // through Lichen button is on. price_cents is the stored truth; this
+  // local flag keeps the button lit while the amount box sits empty.
+  const [bkCardOn, setBkCardOn] = useState(false);
+  /** Price manners that involve a payment — the collect group only renders
+   *  for these ("free means the price input is not applicable"). */
+  const PRICED_MANNERS = new Set<PriceManner>(['dollars', 'currentcy', 'sliding', 'custom']);
   // One fold-up for every way out of the type form (the carrot, the ✕,
   // Save, Delete) — so no exit leaves half the working state behind.
   const closeBkForm = () => {
     setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false);
     setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
-    setBkSpaces([]); setBkPrice({ kind: 'none', amt: '', note: '' });
+    setBkSpaces([]); setBkPrice({ kind: 'none', amt: '', note: '' }); setBkCardOn(false);
   };
   // The hand-off summary — deterministic, no model call, capped so the URL
   // stays sane: hours, session types, and any unsaved form in flight.
@@ -450,46 +458,128 @@ export default function CalendarSettings() {
               )}
               {bkPrice.kind === 'dollars' && !!bkPrice.amt && bkEdit.price_cents == null && (
                 <p className="cedit__hint cset__linkhint">
-                  Want to collect it at booking? Put the amount under Collect online payment, below.
+                  Want to collect it at booking? Choose how, under How to collect payment below.
                 </p>
               )}
-              {/* ONLINE PAYMENT (founder 2026-10-29: "Let's do both"): a real
-                  amount collected by card at booking via Lichen's Stripe —
-                  the provider accrues Current-cy 1:1 (or an auto cash-out,
-                  their wallet's choice). Empty = no online payment; the
-                  words-price above stays for display/sliding. Request types
-                  never charge before the provider accepts. */}
-              <span className="cset__flab">Collect online payment — optional</span>
-              <input
-                className="cedit__input cset__extfield"
-                inputMode="decimal"
-                placeholder="$ amount"
-                value={bkEdit.price_cents != null ? String(bkEdit.price_cents / 100) : ''}
-                onChange={(e) => {
-                  const clean = numericAmount(e.target.value);
-                  setBkEdit((c) => ({ ...c, price_cents: clean ? Math.round(Number(clean) * 100) : null }));
-                }}
-              />
-              {bkEdit.price_cents != null && (
-                <p className="cedit__hint cset__linkhint">
-                  {usdLabel(bkEdit.price_cents)} collected by card or US bank transfer at booking
-                  ($1–$5,000) — you receive it as Current-cy, or as dollars via your
-                  wallet&rsquo;s cash-out choice.
-                </p>
-              )}
-              {bkEdit.price_cents != null && (
-                <label className="cset__zoomcheck">
+              {/* HOW TO COLLECT PAYMENT (founder 2026-11-02: "price should
+                  show up once you select payment as an option, as free means
+                  that the price input is not applicable. Then there should
+                  also be a how to collect online payment if its priced, with
+                  buttons to all the options - credit card, venmo, etc"):
+                  the whole group renders only once the Price manner involves
+                  payment — or when something is already stored, so nothing
+                  ever hides silently. Card/bank is Lichen's own checkout
+                  (price_cents, the 10-29 machinery — provider accrues
+                  Current-cy 1:1 or auto cash-out); the rest are the
+                  provider's own off-platform pointers, shown to bookers once
+                  a booking confirms. */}
+              {(PRICED_MANNERS.has(bkPrice.kind) || bkEdit.price_cents != null || (bkEdit.pay_methods?.length ?? 0) > 0) && (<>
+                <span className="cset__flab">How to collect payment — optional</span>
+                {!PRICED_MANNERS.has(bkPrice.kind) && (
+                  <p className="cedit__hint cset__linkhint">
+                    The price above doesn&rsquo;t name a payment, but these collection details
+                    still stand — clear them if you no longer collect.
+                  </p>
+                )}
+                <div className="cset__paykinds">
+                  <button
+                    type="button"
+                    className={'cset__paykind' + (bkCardOn ? ' is-on' : '')}
+                    onClick={() => {
+                      if (bkCardOn) { setBkCardOn(false); setBkEdit((c) => ({ ...c, price_cents: null })); }
+                      else {
+                        setBkCardOn(true);
+                        // A Dollars price seeds the collected amount — one number, typed once.
+                        if (bkPrice.kind === 'dollars' && bkPrice.amt) {
+                          setBkEdit((c) => (c.price_cents == null
+                            ? { ...c, price_cents: Math.round(Number(bkPrice.amt) * 100) } : c));
+                        }
+                      }
+                    }}
+                  >
+                    Card / bank — through Lichen
+                  </button>
+                  {PAY_METHOD_KINDS.map((k) => {
+                    const on = (bkEdit.pay_methods ?? []).some((m) => m.kind === k.kind);
+                    return (
+                      <button
+                        key={k.kind}
+                        type="button"
+                        className={'cset__paykind' + (on ? ' is-on' : '')}
+                        onClick={() => setBkEdit((c) => {
+                          const cur = c.pay_methods ?? [];
+                          return on
+                            ? { ...c, pay_methods: cur.filter((m) => m.kind !== k.kind) }
+                            : { ...c, pay_methods: [...cur, { kind: k.kind, value: '' }] };
+                        })}
+                      >
+                        {k.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {bkCardOn && (<>
                   <input
-                    type="checkbox"
-                    checked={bkEdit.allow_pay_later !== false}
-                    onChange={(e) => setBkEdit((c) => ({ ...c, allow_pay_later: e.target.checked }))}
+                    className="cedit__input cset__extfield"
+                    inputMode="decimal"
+                    placeholder="$ amount"
+                    value={bkEdit.price_cents != null ? String(bkEdit.price_cents / 100) : ''}
+                    onChange={(e) => {
+                      const clean = numericAmount(e.target.value);
+                      setBkEdit((c) => ({ ...c, price_cents: clean ? Math.round(Number(clean) * 100) : null }));
+                    }}
                   />
-                  <span>
-                    Offer <strong>&ldquo;invoice me later&rdquo;</strong> at booking — they can settle
-                    from their booking link any time. Unchecked, payment is asked up front.
-                  </span>
-                </label>
-              )}
+                  {bkEdit.price_cents != null ? (
+                    <p className="cedit__hint cset__linkhint">
+                      {usdLabel(bkEdit.price_cents)} collected by card or US bank transfer at booking
+                      ($1–$5,000) — you receive it as Current-cy, or as dollars via your
+                      wallet&rsquo;s cash-out choice.
+                    </p>
+                  ) : (
+                    <p className="cedit__hint cset__linkhint">
+                      Enter the amount to collect by card or US bank transfer at booking.
+                    </p>
+                  )}
+                  {bkEdit.price_cents != null && (
+                    <label className="cset__zoomcheck">
+                      <input
+                        type="checkbox"
+                        checked={bkEdit.allow_pay_later !== false}
+                        onChange={(e) => setBkEdit((c) => ({ ...c, allow_pay_later: e.target.checked }))}
+                      />
+                      <span>
+                        Offer <strong>&ldquo;invoice me later&rdquo;</strong> at booking — they can settle
+                        from their booking link any time. Unchecked, payment is asked up front.
+                      </span>
+                    </label>
+                  )}
+                </>)}
+                {(bkEdit.pay_methods ?? []).map((m) => {
+                  const def = PAY_METHOD_KINDS.find((k) => k.kind === m.kind);
+                  if (!def) return null;
+                  return (
+                    <div className="cset__payrow" key={m.kind}>
+                      <span className="cset__paylbl">{def.label}</span>
+                      <input
+                        className="cedit__input cset__grow"
+                        placeholder={def.placeholder}
+                        value={m.value}
+                        autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                        onChange={(e) => setBkEdit((c) => ({
+                          ...c,
+                          pay_methods: (c.pay_methods ?? []).map((x) => x.kind === m.kind ? { ...x, value: e.target.value } : x),
+                        }))}
+                      />
+                    </div>
+                  );
+                })}
+                {(bkEdit.pay_methods ?? []).length > 0 && (
+                  <p className="cedit__hint cset__linkhint">
+                    These show to the booker once a session is confirmed — Lichen doesn&rsquo;t
+                    track payments made outside its own checkout.
+                  </p>
+                )}
+              </>)}
               <span className="cset__flab">Where it happens</span>
               <input
                 className="cedit__input cset__fwide"
@@ -818,6 +908,8 @@ export default function CalendarSettings() {
                     typeId = await saveBookingType(me, {
                       ...bkEdit, title: (bkEdit.title ?? '').trim(),
                       location: where,
+                      // A selected method with no handle is nothing to show.
+                      pay_methods: realPayMethods(bkEdit.pay_methods).length ? realPayMethods(bkEdit.pay_methods) : null,
                       questions: qs.length ? qs : null,
                       slug: slugify(bkEdit.slug ?? '') || null,
                       hours_kind: bkEdit.hours_kind ?? 'work',
@@ -1082,6 +1174,7 @@ export default function CalendarSettings() {
                   <button className="cedit__add cedit__add--sm" onClick={() => {
                     setBkEdit(bt); setBkOpen(true);
                     setBkPrice(parsePriceManner(bt.price));
+                    setBkCardOn(bt.price_cents != null);
                     setBkLink(bkLinks[bt.id]?.url ?? '');
                     setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
                     setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
@@ -1102,7 +1195,7 @@ export default function CalendarSettings() {
                 </span>
               </div>
               <p className="cset__bkmeta">
-                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''}{realPayMethods(bt.pay_methods).length ? ` · takes ${realPayMethods(bt.pay_methods).map((m) => m.kind === 'other' ? m.value : (PAY_METHOD_KINDS.find((k) => k.kind === m.kind)?.label ?? m.kind)).join(', ')}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
                 {bt.audience === 'mycelium' ? ' · my-celium only'
                   : bt.audience === 'public' ? ' · public link'
                   : bt.audience === 'space' ? ` · ${(() => {
@@ -1146,7 +1239,7 @@ export default function CalendarSettings() {
           {!bkOpen && (
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
-              setBkLink(''); setBkZoom(false); setBkPrice({ kind: 'none', amt: '', note: '' });
+              setBkLink(''); setBkZoom(false); setBkPrice({ kind: 'none', amt: '', note: '' }); setBkCardOn(false);
               setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null); setBkSpaces([]);
               setBkOpen(true);
             }}>

@@ -1,0 +1,13 @@
+/* Ways-to-pay pointers (founder 2026-11-02) — a quiet inline line. */
+.paydoors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.paydoors__lead { color: var(--ink-muted); }
+.paydoors__door { white-space: nowrap; }
+a.paydoors__door { color: var(--ink); }

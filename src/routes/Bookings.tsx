@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import PayDoors from '../components/PayDoors';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
 import { minToLabel } from '../lib/calendarApi';
@@ -239,6 +240,14 @@ export default function Bookings() {
                 <span className="bkg__row-sub">{when(b)}{b.type?.location ? ` · ${b.type.location}` : ''}</span>
                 <JoinLink b={b} />
                 {payState(b)}
+                {/* The provider's own ways to be paid (founder 2026-11-02) —
+                    once confirmed, until an online payment lands. */}
+                {b.status === 'confirmed' && !b.paid_at && (
+                  <PayDoors
+                    methods={b.type?.pay_methods}
+                    lead={b.price_cents ? 'Or pay directly' : `Ways to pay${b.type?.price ? ` ${b.type.price}` : ''}`}
+                  />
+                )}
               </div>
               {payBtn(b)}
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
