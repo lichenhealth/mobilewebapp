@@ -14,6 +14,15 @@ export default function SignUp() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const inviteToken = params.get('invite');
+  // ?next= — an in-app path to walk back to after the knock (founder
+  // 2026-11-02, the booking round trip: "Request an invite, which should
+  // drop you back on this screen to complete your booking"). In-app paths
+  // only, the Login safeNext rule — an absolute URL would be an open
+  // redirect.
+  const next = (() => {
+    const v = params.get('next') ?? '';
+    return v.startsWith('/') && !v.startsWith('//') ? v : '';
+  })();
 
   // THE WELCOME FLIGHT (founder 2026-10-18): a first-ever arrival walks the
   // intro cards before the door — once per device, Skip always one tap, and
@@ -139,10 +148,17 @@ export default function SignUp() {
             </p>
           </div>
           {kSent ? (
-            <p className="auth__notice">
-              Got it — thank you. We read every introduction and write back personally.
-              Watch your email.
-            </p>
+            <>
+              <p className="auth__notice">
+                Got it — thank you. We read every introduction and write back personally.
+                Watch your email.
+              </p>
+              {next && (
+                <button className="btn btn-primary auth__submit" onClick={() => navigate(next)}>
+                  {next.startsWith('/book') ? '← Back to complete your booking' : '← Back to where you were'}
+                </button>
+              )}
+            </>
           ) : (
             <form className="auth__form" onSubmit={knock}>
               <label className="auth__label">

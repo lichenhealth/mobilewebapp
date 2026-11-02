@@ -12,6 +12,7 @@ import {
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
   groupTypesByTitle, sessionLengthLabel,
+  saveBookResume, readBookResume, clearBookResume, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
@@ -146,6 +147,73 @@ export default function BookPublic() {
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeId]);
+
+  // Freshly signed in on the bare handle with a parked pick: skip the menu
+  // and land straight on that type's member picker, which restores the day
+  // and slot itself — "right to the same booking spot".
+  useEffect(() => {
+    if (!user || !mvReady || !memberView) return;
+    const r = readBookResume();
+    if (r?.typeId && memberView.types.some((t) => t.id === r.typeId)) {
+      navigate(`/book/${r.typeId}`, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, mvReady, memberView]);
+
+  // THE ROUND TRIP (founder 2026-11-02: "Sign in to complete your booking,
+  // and it should take them right to the same booking spot, so they don't
+  // have to re-do anything" + "Request an invite, which should drop you
+  // back on this screen to complete your booking"): parking before the
+  // door, restoring on return. The day/slot land through pendingResume
+  // AFTER the board arrives, because the typeId effect above rightly
+  // clears them on every type change.
+  const pendingResume = useRef<BookResume | null>(null);
+  const resumed = useRef(false);
+  const parkAndGo = (dest: '/login' | '/signup') => {
+    saveBookResume({
+      path: window.location.pathname, typeId,
+      date: pick?.iso ?? selDay, start: pick?.start ?? null,
+      name, email, note,
+    });
+    navigate(`${dest}?next=${encodeURIComponent(window.location.pathname)}`);
+  };
+  useEffect(() => {
+    if (!ready || resumed.current) return;
+    const r = readBookResume();
+    if (!r || r.path !== window.location.pathname) return;
+    resumed.current = true;
+    clearBookResume();
+    pendingResume.current = r;
+    if (r.name) setName(r.name);
+    if (r.email) setEmail(r.email);
+    if (r.note) setNote(r.note);
+    if (r.typeId) {
+      setTypeId(r.typeId);
+      if (page) {
+        const g = groupTypesByTitle(page.types).find((x) => x.variants.some((v) => v.id === r.typeId));
+        if (g) setPubKey(g.key);
+      }
+    }
+    // The board may already be standing (the slug case loads it before this
+    // runs) — then the [board] effect below never re-fires, so apply now.
+    if (board && (!r.typeId || r.typeId === typeId)) {
+      pendingResume.current = null;
+      if (r.date) {
+        setSelDay(r.date);
+        if (r.start != null) setPick({ iso: r.date, start: r.start });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, page, board]);
+  useEffect(() => {
+    const r = pendingResume.current;
+    if (!r || !board) return;
+    pendingResume.current = null;
+    if (r.date) {
+      setSelDay(r.date);
+      if (r.start != null) setPick({ iso: r.date, start: r.start });
+    }
+  }, [board]);
 
   const dayMap = useMemo(() => {
     const m = new Map<string, number[]>();
@@ -521,11 +589,20 @@ export default function BookPublic() {
           >
             {busy ? 'One moment…' : activeType.approval === 'instant' ? 'Book it' : 'Request this time'}
           </button>
+          {/* The round-trip doors (founder 2026-11-02): both park the pick
+              and typed fields, so nothing is redone on return. */}
           <p className="bkpub__fine">
             No account needed — you&rsquo;ll get an email with a link to view or
             cancel. {user ? '' : 'On Lichen already? '}
-            {!user && <button className="bkpub__signin" onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}>Sign in instead</button>}
+            {!user && <button className="bkpub__signin" onClick={() => parkAndGo('/login')}>Sign in to complete your booking</button>}
           </p>
+          {!user && (
+            <p className="bkpub__fine">
+              Want to join Lichen?{' '}
+              <button className="bkpub__signin" onClick={() => parkAndGo('/signup')}>Request an invite</button>
+              {' '}— you&rsquo;ll land right back here to finish your booking.
+            </p>
+          )}
         </div>
       )}
 

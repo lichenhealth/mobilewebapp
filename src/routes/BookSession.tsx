@@ -12,7 +12,8 @@ import { addDays, localDate, todayISO } from '../lib/conciergeApi';
 import {
   BookingBoard, loadBookingBoard, slotsForDay, createBooking, bookingMeetingUrl, nudgeAvailability,
   rescheduleBooking, sendBookingMail, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
-  listBookableTypes, sessionLengthLabel, type BookingType,
+  listBookableTypes, sessionLengthLabel, readBookResume, clearBookResume,
+  type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
 import { ensureDirectChat } from '../lib/chatApi';
@@ -98,6 +99,25 @@ export default function BookSession() {
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, typeId]);
+
+  // THE SIGN-IN ROUND TRIP (founder 2026-11-02: "it should take them right
+  // to the same booking spot, so they don't have to re-do anything once
+  // logged in"): a guest who parked a pick on the public page and signed in
+  // lands here (the member picker) — restore their day, slot and note when
+  // the parked resume names THIS type. Runs after the board stands, since
+  // the load effect above rightly clears the pick on entry.
+  useEffect(() => {
+    if (!board || rescheduleId) return;
+    const r = readBookResume();
+    if (!r || r.typeId !== typeId) return;
+    clearBookResume();
+    if (r.date) {
+      setSelDay(r.date);
+      if (r.start != null) setPick({ iso: r.date, start: r.start });
+    }
+    if (r.note) setNote(r.note);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board]);
 
   const dayMap = useMemo(() => {
     const m = new Map<string, number[]>();
