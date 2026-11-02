@@ -35,6 +35,9 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .afeed__search-btn:hover, .afeed__search-btn.is-on { border-color: var(--peach); color: var(--peach-deep); }
+/* The lit brain in the tools row (founder 2026-11-02: "the brain should be
+   highlighted and on the top row") — the platform's light-peach selection. */
+.afeed__search-btn.afeed__brainlit { border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep); }
 
 .afeed__search {
   display: flex; align-items: center; gap: var(--s-2);

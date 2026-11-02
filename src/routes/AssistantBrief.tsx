@@ -10,6 +10,7 @@ import {
   ASSISTANT_THREADS, sectionIcon, sectionLabel, renameConvo,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
+import { useTopBackFor } from '../lib/topBack';
 import { useAuth } from '../auth/AuthProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
@@ -166,6 +167,16 @@ export default function AssistantBrief() {
   // brain door as anywhere, with the context that you're here to build).
   const backTo = params.get('back') || '';
   const buildIntent = params.get('intent') === 'build';
+  // THE BACK RIDES THE TOPBAR ARROW (founder 2026-11-02, crossing out the
+  // worded "← Back to Home" chip: "let's have the back button be up top
+  // with the arrow for consistency"): the brief broadcasts its back through
+  // topBack — the same named-route behavior the chip carried (manual-mode
+  // door first, then the section's own route, then history).
+  useTopBackFor(() => {
+    if (backTo) navigate(backTo);
+    else if (backRoute) navigate(backRoute);
+    else navigate(-1);
+  });
   // ?collection=<id> — the update on one course's content (founder 2026-08-15).
   const collectionId = params.get('collection');
   // ?mine=0 — the ALL-of-them view of a spaces section (founder 2026-08-15).
@@ -806,8 +817,12 @@ export default function AssistantBrief() {
     // own brief prepends itself lit, exactly like Maps always has.
     const threads = ASSISTANT_THREADS.filter((t) => !t.offRail).map((t) => ({
       section: t.id === 'general' ? 'home' : t.id,
-      icon: t.icon,
-      label: t.id === 'general' ? 'General' : t.label,
+      // THE FEED CIRCLE LEADS (founder 2026-11-02: "the feed icon selected
+      // for all conversations"): the whole-brain slot wears Home's feed
+      // mark, lit on the home brief — the brain itself moved up to the
+      // tools row. Section circles unchanged.
+      icon: t.id === 'general' ? 'newsfeed' : t.icon,
+      label: t.id === 'general' ? 'All conversations' : t.label,
     }));
     if (threads.some((t) => t.section === section)) return threads;
     return [{ section, icon: sectionIcon(section), label: sectionLabel(section) }, ...threads];
@@ -921,7 +936,11 @@ export default function AssistantBrief() {
 
   return (
     <div className="abrief">
-      {buildIntent && backTo ? (
+      {/* The worded back chip RETIRED 2026-11-02 (founder, crossing it out:
+          "let's have the back button be up top with the arrow for
+          consistency") — the TopBar arrow beside the ☰ carries the same
+          named-route back via the useTopBackFor broadcast above. */}
+      {buildIntent && backTo && (
         /* The SAME segmented toggle the builder shows, from this side — Build
            with Claude is where you stand, Build manually is the way back
            (founder 2026-08-20: "the other button doesn't go away, it just
@@ -932,13 +951,6 @@ export default function AssistantBrief() {
             <button className="view-toggle__side is-on"><Icon name="brain" size={12} /> Build with Claude</button>
           </span>
         </div>
-      ) : (
-        <button
-          className="cmp__back calp__backchip"
-          onClick={() => (backTo ? navigate(backTo) : backRoute ? navigate(backRoute) : navigate(-1))}
-        >
-          ← {backTo ? 'Back to manual mode' : backName ? `Back to ${backName}` : 'Back'}
-        </button>
       )}
       {/* Shaped like every other profile on Lichen (founder 2026-08-05):
           picture, then the name under it. The mark wears an Si badge in the
@@ -990,6 +1002,19 @@ export default function AssistantBrief() {
               onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
             >
               <Icon name="plus" size={16} />
+            </button>
+            {/* THE BRAIN RIDES THE TOOLS ROW, LIT (founder 2026-11-02:
+                "the brain should be highlighted and on the top row") —
+                Home's search · + · brain order; you're inside the brain,
+                so it reads selected, and tapping it opens the WHOLE brain. */}
+            <button
+              type="button"
+              className="abrief__rail-btn abrief__tool is-here"
+              aria-label={section === 'home' ? 'The whole brain — you’re here' : 'The whole brain — every conversation'}
+              data-tip="Assistant"
+              onClick={() => { if (section !== 'home') navigate(`/assistant?section=home${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`); }}
+            >
+              <Icon name="brain" size={16} />
             </button>
           </div>
           {/* THE SECTION RAIL (founder 2026-10-07: icons, where you are lit
