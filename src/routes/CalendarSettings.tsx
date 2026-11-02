@@ -16,7 +16,7 @@ import {
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
 import CalImportGuide from '../components/CalImportGuide';
-import AssistantDoor from '../components/AssistantDoor';
+import AssistantDoor, { aiDoorOn } from '../components/AssistantDoor';
 import ShareRulesEditor from '../components/ShareRulesEditor';
 import TaskShareRules from '../components/TaskShareRules';
 import { loadMyPhone } from '../lib/conciergeApi';
@@ -28,6 +28,7 @@ import {
   listMyMeetingLinks, saveMeetingLink, normalizeMeetingUrl,
   MeetingSetting, zoomMintAllowed, usdLabel,
   listTypeSpaces, listMyTypeSpaces, saveTypeSpaces,
+  PriceParts, PriceManner, parsePriceManner, composePriceManner,
 } from '../lib/bookingApi';
 import { numericAmount } from '../lib/ledgerApi';
 import './Concierge.css';
@@ -125,16 +126,21 @@ export default function CalendarSettings() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
-  // THE BRAIN DOOR ON EVERY DROPDOWN (founder 2026-10-29: "it may help
-  // people learn that they don't have to do manual setup, but can go to the
-  // brain for cal and type in rules that generate bookings, availability,
-  // etc"): picking "✨ Ask the brain…" opens the calendar assistant with a
-  // started sentence, unsent — the member finishes it in their own words.
+  // EDIT WITH AI (founder 2026-11-02, superseding the 10-29 per-dropdown
+  // "✨ Ask the brain…" option: "Instead of having 'ask the brain' in each
+  // drop down, invite people to switch to 'Edit with Ai' as the CTA
+  // somewhere near the top of the page, and have all of the decisions
+  // you've made manually translate into a text to the Ai brain that
+  // summarizes what's already been done manually, so you can hit the
+  // ground running"): one view-toggle up top; the hand-off composes a
+  // deterministic summary of the standing manual setup (plus any unsaved
+  // form) into the calendar thread as a prefilled, UNSENT ask — the member
+  // finishes the sentence in their own words. The thread shows a
+  // return-to-manual link back here (her same message), and since both
+  // modes write the same rows, everything the assistant does is already
+  // selected in manual mode on return — the shared-state rule.
   const brainTo = (ask: string) =>
     navigate(`/assistant/feed?thread=calendar&convo=new&ask=${encodeURIComponent(ask)}`);
-  const hoursBrain = () => brainTo('Set my hours: ');
-  const typeBrain = () => brainTo(
-    bkEdit.title?.trim() ? `Change my "${bkEdit.title.trim()}" session: ` : 'Set up my session type: ');
   const confirmDialog = useConfirm();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
@@ -248,6 +254,47 @@ export default function CalendarSettings() {
   }, [me]);
   const [bkOpen, setBkOpen] = useState(false);
   const [bkEdit, setBkEdit] = useState<Partial<BookingType>>({});
+  // THE PRICE MANNER (founder 2026-11-02): the dropdown's working parts —
+  // composed into bkEdit.price on every change, so the save path and every
+  // card/picker keep reading the one display string.
+  const [bkPrice, setBkPrice] = useState<PriceParts>({ kind: 'none', amt: '', note: '' });
+  const setPrice = (p: PriceParts) => {
+    setBkPrice(p);
+    setBkEdit((c) => ({ ...c, price: composePriceManner(p) }));
+  };
+  // One fold-up for every way out of the type form (the carrot, the ✕,
+  // Save, Delete) — so no exit leaves half the working state behind.
+  const closeBkForm = () => {
+    setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false);
+    setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
+    setBkSpaces([]); setBkPrice({ kind: 'none', amt: '', note: '' });
+  };
+  // The hand-off summary — deterministic, no model call, capped so the URL
+  // stays sane: hours, session types, and any unsaved form in flight.
+  const editWithAi = () => {
+    const kindWord = (k: AvailabilityKind) => k === 'on_call' ? 'on call' : k === 'social' ? 'social' : 'work';
+    const parts: string[] = [];
+    if (windows.length) {
+      parts.push('My hours so far: ' + windows.map((w) =>
+        `${kindWord(w.kind)} ${WEEKDAYS_SHORT[w.weekday]} ${minToLabel(w.start_min)}–${minToLabel(w.end_min)}`).join('; ') + '.');
+    }
+    if (bkTypes.length) {
+      const detail = bkTypes.map((t) =>
+        `“${t.title}” (${t.duration_min} min${t.price ? `, ${t.price}` : ''}, ${t.approval === 'instant' ? 'books instantly' : 'by request'}${t.active ? '' : ', paused'})`).join('; ');
+      const short = bkTypes.map((t) => `“${t.title}”`).join(', ');
+      parts.push(`My bookable sessions: ${detail.length > 700 ? short : detail}.`);
+    }
+    if (bkOpen) {
+      const t = (bkEdit.title ?? '').trim();
+      parts.push(t
+        ? `I'm partway through a session called “${t}” that I haven't saved.`
+        : 'I’m partway through a new session type I haven’t saved.');
+    }
+    const standing = parts.length
+      ? `I’ve been setting up my calendar manually. ${parts.join(' ')} Pick up from here — `
+      : 'Help me set up my calendar — hours, bookable sessions, rules. I’d like to ';
+    brainTo(standing.slice(0, 1500));
+  };
 
   // External calendars (secret iCal import)
   const [extCals, setExtCals] = useState<ExternalCalendar[]>([]);
@@ -325,34 +372,98 @@ export default function CalendarSettings() {
   // session type button for a fresh one. The eye-connection rule again.
   const bkForm = !bkOpen ? null : (
             <div className="cset__add cset__add--wrap">
+              {/* EVERY FIELD WEARS A LABEL LINE (founder 2026-11-02: "Calendar
+                  link editing is really hard to navigate visually. Why don't
+                  we have a line that says Title: and then the box underneath
+                  is edit-able" — placeholder-only fields truncated into
+                  riddles like "Collect online: $ (optiona"). */}
+              <span className="cset__flab">Title</span>
               <input
-                className="cedit__input cset__grow"
-                placeholder="Session name (e.g. Reiki, 1:1 coaching)"
+                className="cedit__input cset__fwide"
+                placeholder="e.g. Reiki, 1:1 coaching"
                 value={bkEdit.title ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, title: e.target.value }))}
               />
+              <span className="cset__flab">Length</span>
               <RuleSelect
                 value={bkEdit.duration_min ?? 60}
                 options={[30, 45, 60, 90, 120].map((m) => ({ v: m, label: `${m} min` }))}
                 offLabel={(v) => `${v} min`}
-                unit="minutes" min={15} max={480} aria="Length" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, duration_min: v ?? 60 }))}
+                unit="minutes" min={15} max={480} aria="Length" onChange={(v) => setBkEdit((c) => ({ ...c, duration_min: v ?? 60 }))}
               />
-              <input
-                className="cedit__input cset__extfield"
-                placeholder="Price (e.g. $90, Free)"
-                value={bkEdit.price ?? ''}
-                onChange={(e) => setBkEdit((c) => ({ ...c, price: e.target.value }))}
-              />
+              {/* THE PRICE IS A MANNER (founder 2026-11-02: "Price should be
+                  a drop down with Free, Current-cy, Dollars, then the
+                  marketplace options with a trade option… including Gift").
+                  Dollars/Current-cy open an amount box; Trade asks what
+                  you'd trade for (empty = "Make me a trade offer"); a
+                  legacy free-text price reads back as Custom wording. */}
+              <span className="cset__flab">Price</span>
+              <FitSelect className="cset__select" value={bkPrice.kind} aria-label="Price"
+                onChange={(e) => {
+                  const kind = e.target.value as PriceManner;
+                  setPrice({ kind, amt: '', note: kind === 'custom' ? (bkEdit.price ?? '') : '' });
+                }}>
+                <option value="none">No price listed</option>
+                <option value="free">Free</option>
+                <option value="gift">A gift</option>
+                <option value="dollars">Dollars</option>
+                <option value="currentcy">Current-cy</option>
+                <option value="trade">Trade</option>
+                <option value="sliding">Sliding scale</option>
+                <option value="custom">Custom wording…</option>
+              </FitSelect>
+              {(bkPrice.kind === 'dollars' || bkPrice.kind === 'currentcy') && (
+                <input
+                  className="cedit__input cset__extfield"
+                  inputMode="decimal"
+                  placeholder={bkPrice.kind === 'dollars' ? 'Amount in $' : 'Amount in Current-cy'}
+                  value={bkPrice.amt}
+                  onChange={(e) => setPrice({ ...bkPrice, amt: numericAmount(e.target.value) })}
+                />
+              )}
+              {bkPrice.kind === 'trade' && (
+                <input
+                  className="cedit__input cset__grow"
+                  placeholder="What you’d trade for — empty says “Make me a trade offer”"
+                  value={bkPrice.note}
+                  onChange={(e) => setPrice({ ...bkPrice, note: e.target.value })}
+                />
+              )}
+              {bkPrice.kind === 'sliding' && (
+                <input
+                  className="cedit__input cset__extfield"
+                  placeholder="e.g. $20–$40"
+                  value={bkPrice.note}
+                  onChange={(e) => setPrice({ ...bkPrice, note: e.target.value })}
+                />
+              )}
+              {bkPrice.kind === 'custom' && (
+                <input
+                  className="cedit__input cset__grow"
+                  placeholder="Price in your own words (e.g. $90 per family)"
+                  value={bkPrice.note}
+                  onChange={(e) => setPrice({ ...bkPrice, note: e.target.value })}
+                />
+              )}
+              {bkPrice.kind === 'trade' && !bkPrice.note.trim() && (
+                <p className="cedit__hint cset__linkhint">Bookers will see “Make me a trade offer”.</p>
+              )}
+              {bkPrice.kind === 'dollars' && !!bkPrice.amt && bkEdit.price_cents == null && (
+                <p className="cedit__hint cset__linkhint">
+                  Want to collect it at booking? Put the amount under Collect online payment, below.
+                </p>
+              )}
               {/* ONLINE PAYMENT (founder 2026-10-29: "Let's do both"): a real
                   amount collected by card at booking via Lichen's Stripe —
                   the provider accrues Current-cy 1:1 (or an auto cash-out,
                   their wallet's choice). Empty = no online payment; the
                   words-price above stays for display/sliding. Request types
                   never charge before the provider accepts. */}
+              <span className="cset__flab">Collect online payment — optional</span>
               <input
                 className="cedit__input cset__extfield"
                 inputMode="decimal"
-                placeholder="Collect online: $ (optional)"
+                placeholder="$ amount"
                 value={bkEdit.price_cents != null ? String(bkEdit.price_cents / 100) : ''}
                 onChange={(e) => {
                   const clean = numericAmount(e.target.value);
@@ -379,19 +490,21 @@ export default function CalendarSettings() {
                   </span>
                 </label>
               )}
+              <span className="cset__flab">Where it happens</span>
               <input
-                className="cedit__input cset__grow"
-                placeholder="Where (an address, or e.g. Online)"
+                className="cedit__input cset__fwide"
+                placeholder="An address, or e.g. Online"
                 value={bkEdit.location ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, location: e.target.value }))}
               />
               {/* The video link (founder 2026-10-06): an IDENTIFIER field —
                   declines autocorrect. Shared only with people who book. */}
+              <span className="cset__flab">Video call — optional</span>
               <input
-                className="cedit__input cset__grow"
+                className="cedit__input cset__fwide"
                 type="url"
                 inputMode="url"
-                placeholder="Video call link — Zoom, Google Meet, Teams… (optional)"
+                placeholder="Zoom, Google Meet, Teams… link"
                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={bkLink}
                 onChange={(e) => setBkLink(e.target.value)}
@@ -422,7 +535,8 @@ export default function CalendarSettings() {
                   </span>
                 </label>
               )}
-              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.approval ?? 'request'}
+              <span className="cset__flab">Booking rules</span>
+              <FitSelect className="cset__select" value={bkEdit.approval ?? 'request'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, approval: e.target.value as BookingType['approval'] }))} aria-label="Approval">
                 <option value="request">I approve each request</option>
                 <option value="instant">Book instantly</option>
@@ -442,7 +556,7 @@ export default function CalendarSettings() {
                   { v: 2880, label: 'At least 48 hours\u2019 notice' },
                 ]}
                 offLabel={(v) => v >= 60 && v % 60 === 0 ? `At least ${v / 60} hours\u2019 notice` : `At least ${v} min notice`}
-                unit="hours" scale={60} min={0} max={336} decimals aria="Minimum notice" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, min_notice_min: v ?? 60 }))}
+                unit="hours" scale={60} min={0} max={336} decimals aria="Minimum notice" onChange={(v) => setBkEdit((c) => ({ ...c, min_notice_min: v ?? 60 }))}
               />
               <RuleSelect
                 value={bkEdit.max_days_out ?? null}
@@ -455,7 +569,7 @@ export default function CalendarSettings() {
                   { v: 84, label: 'Up to 12 weeks out' },
                 ]}
                 offLabel={(v) => `Up to ${v} days out`}
-                unit="days" min={1} max={365} aria="How far out people can book" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, max_days_out: v }))}
+                unit="days" min={1} max={365} aria="How far out people can book" onChange={(v) => setBkEdit((c) => ({ ...c, max_days_out: v }))}
               />
               {/* Start-time increments independent of session length (founder
                   2026-10-29, the Calendly-parity gap closed): a 60-min
@@ -469,7 +583,7 @@ export default function CalendarSettings() {
                   ...[15, 20, 30, 45, 60].map((n) => ({ v: n, label: `Start times every ${n} min` })),
                 ]}
                 offLabel={(v) => `Start times every ${v} min`}
-                unit="minutes" min={5} max={240} aria="Start times every" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, slot_increment_min: v }))}
+                unit="minutes" min={5} max={240} aria="Start times every" onChange={(v) => setBkEdit((c) => ({ ...c, slot_increment_min: v }))}
               />
               {/* Daily cap + group capacity (founder 2026-10-03, the
                   Calendly audit). Cap counts sessions, not seats — joining
@@ -481,7 +595,7 @@ export default function CalendarSettings() {
                   ...[1, 2, 3, 4, 6].map((n) => ({ v: n, label: `At most ${n} ${n === 1 ? 'session' : 'sessions'} a day` })),
                 ]}
                 offLabel={(v) => `At most ${v} sessions a day`}
-                unit="sessions" min={1} max={48} aria="Daily limit" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, max_per_day: v }))}
+                unit="sessions" min={1} max={48} aria="Daily limit" onChange={(v) => setBkEdit((c) => ({ ...c, max_per_day: v }))}
               />
               <RuleSelect
                 value={bkEdit.capacity ?? 1}
@@ -490,12 +604,13 @@ export default function CalendarSettings() {
                   ...[2, 4, 6, 8, 10, 12, 20].map((n) => ({ v: n, label: `Group — up to ${n} people` })),
                 ]}
                 offLabel={(v) => `Group — up to ${v} people`}
-                unit="people" min={1} max={200} aria="Group size" onBrain={typeBrain} onChange={(v) => setBkEdit((c) => ({ ...c, capacity: v ?? 1 }))}
+                unit="people" min={1} max={200} aria="Group size" onChange={(v) => setBkEdit((c) => ({ ...c, capacity: v ?? 1 }))}
               />
               {/* An event's HOUR RULES (founder 2026-10-03: "it can be work,
                   social, or on call if you have that; or custom and you can
                   set hours for that event type"). */}
-              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.hours_kind ?? 'work'}
+              <span className="cset__flab">Hours it books from</span>
+              <FitSelect className="cset__select" value={bkEdit.hours_kind ?? 'work'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, hours_kind: e.target.value as BookingType['hours_kind'] }))} aria-label="Books from which hours">
                 <option value="work">Books from your work hours</option>
                 <option value="social">Books from your social hours</option>
@@ -507,14 +622,14 @@ export default function CalendarSettings() {
                   {bkHours.map((h, i) => (
                     chEdit?.idx === i ? (
                       <div className="cset__typehour is-editing" key={i}>
-                        <FitSelect className="cset__select" value={String(chEdit.day)} onBrain={typeBrain}
+                        <FitSelect className="cset__select" value={String(chEdit.day)}
                           onChange={(e) => setChEdit({ ...chEdit, day: Number(e.target.value) })} aria-label="Day">
                           {WEEKDAYS_FULL.map((d, j) => <option key={j} value={String(j)}>{d}</option>)}
                         </FitSelect>
-                        <TimeField value={chEdit.start} onBrain={typeBrain}
+                        <TimeField value={chEdit.start}
                           onChange={(m) => setChEdit({ ...chEdit, start: m, end: chEdit.end <= m ? Math.min(m + 60, 1440) : chEdit.end })} ariaLabel="From" />
                         <span className="rec__lbl">to</span>
-                        <TimeField value={chEdit.end} onBrain={typeBrain}
+                        <TimeField value={chEdit.end}
                           onChange={(m) => setChEdit({ ...chEdit, end: m })} min={chEdit.start} ariaLabel="Until" />
                         <button className="cedit__add cedit__add--sm"
                           onClick={() => {
@@ -547,15 +662,15 @@ export default function CalendarSettings() {
                     )
                   ))}
                   <div className="cset__typehour-add">
-                    <FitSelect className="cset__select" value={chDay} onBrain={typeBrain} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
+                    <FitSelect className="cset__select" value={chDay} onChange={(e) => setChDay(e.target.value)} aria-label="Day">
                       <option value="weekdays">Monday – Friday</option>
                       <option value="weekend">Saturday &amp; Sunday</option>
                       <option value="everyday">Every day</option>
                       {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
                     </FitSelect>
-                    <TimeField value={chStart} onBrain={typeBrain} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+                    <TimeField value={chStart} onChange={(m) => { setChStart(m); if (chEnd <= m) setChEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
                     <span className="rec__lbl">to</span>
-                    <TimeField value={chEnd} onBrain={typeBrain} onChange={setChEnd} min={chStart} ariaLabel="Until" />
+                    <TimeField value={chEnd} onChange={setChEnd} min={chStart} ariaLabel="Until" />
                     <button className="cedit__add cedit__add--sm"
                       onClick={() => {
                         const days = chDay === 'weekdays' ? [0, 1, 2, 3, 4]
@@ -581,6 +696,7 @@ export default function CalendarSettings() {
                   available or isn't available"). A person's times reach a
                   booking page only as anonymous shapes, and only as far as
                   YOUR OWN calendar standing with them already sees. */}
+              <span className="cset__flab">Rules — optional</span>
               <div className="cset__rules">
                 {bkConds.map((c, i) => (
                   <div className="cset__typehour" key={i}>
@@ -598,7 +714,7 @@ export default function CalendarSettings() {
                 ))}
                 <input
                   className="cedit__input cset__grow"
-                  placeholder="Rule: only if someone or something else is free…"
+                  placeholder="e.g. only allow booking if a certain space or person is free — type their name"
                   value={condQ}
                   onFocus={() => setCondFocus(true)}
                   onBlur={() => setCondFocus(false)}
@@ -627,13 +743,20 @@ export default function CalendarSettings() {
               </div>
               {/* The vanity link name (founder 2026-10-03): an IDENTIFIER
                   field, so it declines autocorrect (the standing rule). */}
+              <span className="cset__flab">Vanity URL — optional</span>
               <input
-                className="cedit__input cset__grow"
-                placeholder="Link name for a direct URL (e.g. care-coordination) — optional"
+                className="cedit__input cset__fwide"
+                placeholder="e.g. care-coordination"
                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={bkEdit.slug ?? ''}
                 onChange={(e) => setBkEdit((c) => ({ ...c, slug: e.target.value }))}
               />
+              {!!(bkEdit.slug ?? '').trim() && myHandle && (
+                <p className="cedit__hint cset__linkhint">
+                  lichen.health/book/{myHandle}/{slugify(bkEdit.slug ?? '')}
+                </p>
+              )}
+              <span className="cset__flab">Questions at booking — optional</span>
               <textarea
                 className="cedit__input cset__questions"
                 value={(bkEdit.questions ?? []).join('\n')}
@@ -644,12 +767,18 @@ export default function CalendarSettings() {
                 placeholder={'Questions to ask when someone books — one per line, up to five.\ne.g. What would you like to focus on?'}
                 rows={2}
               />
-              <FitSelect className="cset__select" onBrain={typeBrain} value={bkEdit.audience ?? 'everyone'}
+              {/* Founder 2026-11-02: "the title for who can see the link is
+                  Visibility:". */}
+              <span className="cset__flab">Visibility</span>
+              <FitSelect className="cset__select" value={bkEdit.audience ?? 'everyone'}
                 onChange={(e) => setBkEdit((c) => ({ ...c, audience: e.target.value as BookingType['audience'] }))} aria-label="Who can book">
                 <option value="public">Anyone — even outside Lichen, via your link</option>
                 <option value="everyone">Anyone on Lichen</option>
                 <option value="mycelium">My-celium only</option>
-                <option value="space">Members of circles you pick…</option>
+                {/* Founder 2026-11-02: "members of circles you pick is
+                    confusing, have it be 'Communities, Groups, Members,
+                    etc...'" */}
+                <option value="space">Communities, Groups, Members, etc…</option>
               </FitSelect>
               {/* THE SET (founder 2026-11-01: "a specific set of groups,
                   organizations, communities, places") — tick any number;
@@ -711,7 +840,7 @@ export default function CalendarSettings() {
                       || wantZoom !== (bkLinks[typeId]?.zoom_unique ?? false)) {
                     await saveMeetingLink(typeId, link.url, wantZoom);
                   }
-                  setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkHours([]); setBkConds([]); setChEdit(null); setBkSpaces([]);
+                  closeBkForm();
                 })}
               >
                 <Icon name="plus" size={12} /> Save
@@ -719,11 +848,11 @@ export default function CalendarSettings() {
               {bkEdit.id && (
                 <button className="cedit__add cedit__add--sm" onClick={() => {
                   void confirmDialog({ message: 'Delete this session type? Its booking history goes with it.', confirmLabel: 'Delete', danger: true }).then((ok) => {
-                    if (ok) void act(async () => { await deleteBookingType(me, bkEdit.id!); setBkOpen(false); setBkEdit({}); });
+                    if (ok) void act(async () => { await deleteBookingType(me, bkEdit.id!); closeBkForm(); });
                   });
                 }}>Delete</button>
               )}
-              <button className="cedit__remove" aria-label="Close" onClick={() => { setBkOpen(false); setBkEdit({}); setBkLink(''); setBkZoom(false); setBkSpaces([]); }}>
+              <button className="cedit__remove" aria-label="Close" onClick={closeBkForm}>
                 <Icon name="close" size={13} />
               </button>
             </div>
@@ -739,6 +868,20 @@ export default function CalendarSettings() {
             tools already set hours and build session types by voice. */}
         <AssistantDoor section="calendar" label="Tell your assistant your hours — it manages your calendar" />
       </header>
+
+      {/* EDIT WITH AI (founder 2026-11-02): the manual↔AI pair as the app's
+          one view-toggle idiom, near the top — the AI side hands the brain a
+          summary of everything already set up here, prefilled and unsent.
+          Rendered only while calendar AI is on; off, the header's grayed
+          brain is the honest turn-on door (no door lands on a refusal). */}
+      {aiDoorOn('calendar') && (
+        <div className="view-toggle-row cset__moderow">
+          <span className="view-toggle" role="group" aria-label="How to set up your calendar">
+            <button type="button" className="view-toggle__side is-on">Set up manually</button>
+            <button type="button" className="view-toggle__side" onClick={editWithAi}>Edit with AI</button>
+          </span>
+        </div>
+      )}
 
       {error && <p className="cedit__error">{error}</p>}
 
@@ -757,8 +900,8 @@ export default function CalendarSettings() {
             </>}
             {' '}Anything booked takes you out of work and social hours automatically —
             people can still message you, they just know not to expect you.
-            {' '}Or just tell your assistant (the brain above) &ldquo;work 9&ndash;5 weekdays,
-            social Sunday afternoons&rdquo; — it sets all of this for you.
+            {' '}Or press <strong>Edit with AI</strong> above and just say &ldquo;work 9&ndash;5
+            weekdays, social Sunday afternoons&rdquo; — the assistant sets all of this for you.
           </p>
           {windows.map((w) => (
             wEdit?.id === w.id ? (
@@ -824,20 +967,20 @@ export default function CalendarSettings() {
                 a role, not a general setting; rows someone already has always
                 render, and the option returns while any exist so they can be
                 understood and removed. */}
-            <FitSelect className="cset__select" value={wKind} onBrain={hoursBrain} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
+            <FitSelect className="cset__select" value={wKind} onChange={(e) => setWKind(e.target.value as AvailabilityKind)} aria-label="Kind">
               <option value="available">Work</option>
               <option value="social">Social</option>
               {(isCaregiver || wKind === 'on_call' || windows.some((w) => w.kind === 'on_call')) && <option value="on_call">On call</option>}
             </FitSelect>
-            <FitSelect className="cset__select" value={wDay} onBrain={hoursBrain} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
+            <FitSelect className="cset__select" value={wDay} onChange={(e) => setWDay(e.target.value)} aria-label="Weekday">
               <option value="weekdays">Monday – Friday</option>
               <option value="weekend">Saturday &amp; Sunday</option>
               <option value="everyday">Every day</option>
               {WEEKDAYS_FULL.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
             </FitSelect>
-            <TimeField value={wStart} onBrain={hoursBrain} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
+            <TimeField value={wStart} onChange={(m) => { setWStart(m); if (wEnd <= m) setWEnd(Math.min(m + 60, 1440)); }} ariaLabel="From" />
             <span className="rec__lbl">to</span>
-            <TimeField value={wEnd} onBrain={hoursBrain} onChange={setWEnd} min={wStart} ariaLabel="Until" />
+            <TimeField value={wEnd} onChange={setWEnd} min={wStart} ariaLabel="Until" />
             <button
               className="cedit__add cedit__add--sm"
               onClick={() => act(() => addAvailability(me, {
@@ -926,8 +1069,19 @@ export default function CalendarSettings() {
                 <span className="cset__bktitle">{bt.title}</span>
                 {!bt.active && <em className="cset__bkpaused">Paused</em>}
                 <span className="cset__bkbtns">
+                  {/* Open, the Edit control becomes an up-carrot that folds
+                      the editor back (founder 2026-11-02: "Once you press
+                      edit, you shouldn't be able to edit it again and have
+                      nothing happen, so have a drop down carrot instead, so
+                      you can scroll it back up if you don't want to edit"). */}
+                  {bkOpen && bkEdit.id === bt.id ? (
+                    <button className="cedit__remove cset__foldup" aria-label="Fold the editor back up" onClick={closeBkForm}>
+                      <Icon name="chevron-right" size={13} />
+                    </button>
+                  ) : (
                   <button className="cedit__add cedit__add--sm" onClick={() => {
                     setBkEdit(bt); setBkOpen(true);
+                    setBkPrice(parsePriceManner(bt.price));
                     setBkLink(bkLinks[bt.id]?.url ?? '');
                     setBkZoom(bkLinks[bt.id]?.zoom_unique ?? false);
                     setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null);
@@ -936,6 +1090,7 @@ export default function CalendarSettings() {
                     void listTypeHours(bt.id).then(setBkHours);
                     void listTypeConditions(bt.id).then(setBkConds);
                   }}>Edit</button>
+                  )}
                   <button
                     className="cedit__remove"
                     aria-label={bt.active ? 'Pause' : 'Resume'}
@@ -991,7 +1146,7 @@ export default function CalendarSettings() {
           {!bkOpen && (
             <button className="cedit__add cedit__add--sm" onClick={() => {
               setBkEdit({ duration_min: 60, approval: 'request', audience: 'everyone', active: true });
-              setBkLink(''); setBkZoom(false);
+              setBkLink(''); setBkZoom(false); setBkPrice({ kind: 'none', amt: '', note: '' });
               setBkHours([]); setBkConds([]); setCondQ(''); setCondHits([]); setChEdit(null); setBkSpaces([]);
               setBkOpen(true);
             }}>

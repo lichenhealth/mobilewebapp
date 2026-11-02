@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
@@ -953,6 +953,18 @@ export default function AssistantFeed() {
       <ScrollHintRow className="afeed__threads h-scroll" ariaLabel="Assistant threads">
         {threadButtons}
       </ScrollHintRow>
+      )}
+
+      {/* THE WAY BACK TO MANUAL (founder 2026-11-02, with Calendar settings'
+          Edit-with-AI hand-off: "you should have a 'return to manual mode'
+          link in the Ai chat that returns you to manual with all the Ai
+          edits selected in manual mode") — both modes write the same rows
+          (the shared-state rule), so the settings screen already holds
+          everything the assistant set the moment it loads. */}
+      {thread === 'calendar' && !spaceRoom && (
+        <Link className="afeed__manualback link-cue" to="/calendar/settings">
+          Return to manual mode — everything set here is already in your Calendar settings ›
+        </Link>
       )}
 
       {/* Building your presence happens HERE, in the profile thread, rather
