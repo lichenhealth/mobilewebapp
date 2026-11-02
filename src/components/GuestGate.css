@@ -6,12 +6,21 @@
   padding: var(--wall-gutter);
 }
 .ggate__card {
+  position: relative;
   background: var(--bone); border: 1px solid var(--bone-edge);
   border-radius: var(--r-lg); box-shadow: var(--sh-pop);
   padding: var(--s-5); max-width: 330px; width: 100%;
   display: flex; flex-direction: column; gap: var(--s-4);
   text-align: center;
 }
+/* The corner × (founder 2026-11-02) — the veil-click close stays too. */
+.ggate__x {
+  position: absolute; top: 6px; right: 10px;
+  background: none; border: 0; cursor: pointer;
+  font-size: 22px; line-height: 1; color: var(--ink-muted);
+  padding: 4px;
+}
+.ggate__x:hover { color: var(--ink); }
 .ggate__msg { margin: 0; font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
 .ggate__row { display: flex; justify-content: center; gap: var(--s-2); flex-wrap: wrap; }
 .ggate__btn { font-size: 13px; padding: 9px 16px; }

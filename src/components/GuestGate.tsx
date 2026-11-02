@@ -28,6 +28,12 @@ export default function GuestGate() {
   return (
     <div className="ggate" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label="Members only">
       <div className="ggate__card" onClick={(e) => e.stopPropagation()}>
+        {/* A visible way out (founder 2026-11-02: "put an 'x' at the top,
+            right so people know they can x out" — clicking the veil still
+            closes it too, deliberately kept). */}
+        <button type="button" className="ggate__x" aria-label="Close" onClick={() => setOpen(false)}>
+          ×
+        </button>
         <p className="ggate__msg">
           That part of Lichen is for members — sign in to use platform
           features, or ask to join.
