@@ -37,6 +37,20 @@
   text-decoration: underline; text-underline-offset: 2px;
 }
 
-/* ONE add-to-calendar row (founder 2026-11-02): the four major-calendar
-   doors wrap and center on every guest confirmation surface. */
-.addcal { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: var(--s-3); }
+/* ONE add-to-calendar card (founder 2026-11-02, two passes: first the four
+   major-calendar doors, then her markup — "put the 4 calendar options in a
+   centered rectangle… Maybe we make the cal add options buttons? So they
+   feel different than the links?"): a centered framed card holding four
+   PEACH pill buttons — peach because they're actionable, her rule. */
+.addcal {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  margin: var(--s-4) auto 0; padding: var(--s-4);
+  max-width: 400px;
+  border: 1px solid var(--bone-edge); border-radius: 14px;
+  background: var(--bone-warm);
+}
+.addcal__btn {
+  font-size: 12px; padding: 8px 14px;
+  border-color: var(--peach); color: var(--peach-deep);
+}
+.addcal__btn:hover { background: var(--peach-tint); border-color: var(--peach-deep); }

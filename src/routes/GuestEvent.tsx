@@ -79,7 +79,7 @@ export default function GuestEvent() {
       <div className="gev__section">
         <p className="gev__label">Add it to your calendar</p>
         <div className="gev__cal">
-          {cal && <AddToCal ev={cal} file={`${info.title}.ics`} btnClass="btn gev__btn" />}
+          {cal && <AddToCal ev={cal} file={`${info.title}.ics`} />}
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import {
 } from '../lib/bookingApi';
 import { addDays, todayISO } from '../lib/conciergeApi';
 import AddToCal from '../components/AddToCal';
+import SlotMonth from '../components/SlotMonth';
 import { videoServiceOf } from '../lib/linkify';
 import { Icon } from '../components/Icon';
 import PayDoors from '../components/PayDoors';
@@ -41,6 +42,11 @@ export default function GuestBooking() {
   const [moving, setMoving] = useState(false);
   const [board, setBoard] = useState<BookingBoard | null>(null);
   const [moveErr, setMoveErr] = useState('');
+  // The month grid's picked day — seeded to the day they'd BOOKED when the
+  // picker opens (founder 2026-11-02: "bring back the cal with the orange
+  // circles, but have the day they'd chosen selected as a placeholder…
+  // choose a diff day if they want to, before selecting a new time").
+  const [moveSel, setMoveSel] = useState<string | null>(null);
   // Payment (founder 2026-10-29): arriving back from Stripe (?paid=1) the
   // webhook's stamp can lag a breath — re-read once instead of showing an
   // unpaid page to someone who just paid.
@@ -51,23 +57,33 @@ export default function GuestBooking() {
   // confirmation LANDS here now, so say the email is coming.
   const justBooked = new URLSearchParams(location.search).get('just') === '1';
 
+  // The pickers' two-month browsable window (the SlotMonth standard).
+  const moveFrom = useMemo(() => todayISO(), []);
+  const moveTo = useMemo(() => addDays(moveFrom, 59), [moveFrom]);
+
   useEffect(() => {
     if (!moving || !row?.type_id || board) return;
     let live = true;
-    const from = todayISO();
-    void publicBookingBoard(row.type_id, from, addDays(from, 29))
+    void publicBookingBoard(row.type_id, moveFrom, moveTo)
       .then((b) => { if (live) setBoard(b); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moving, row?.type_id]);
 
-  const moveDays = useMemo(() => {
-    if (!board) return [];
-    const from = todayISO();
-    return Array.from({ length: 14 }, (_, i) => addDays(from, i))
-      .map((iso) => ({ iso, slots: slotsForDay(board, iso) }))
-      .filter((d) => d.slots.length > 0);
-  }, [board]);
+  // Every day in the window with at least one open time — SlotMonth's fuel.
+  const moveOpenDays = useMemo(() => {
+    const out = new Set<string>();
+    if (!board) return out;
+    for (let i = 0; i < 60; i++) {
+      const iso = addDays(moveFrom, i);
+      if (slotsForDay(board, iso).length > 0) out.add(iso);
+    }
+    return out;
+  }, [board, moveFrom]);
+  const moveSlots = useMemo(
+    () => (board && moveSel ? slotsForDay(board, moveSel) : []),
+    [board, moveSel],
+  );
 
   useEffect(() => {
     let live = true;
@@ -218,13 +234,23 @@ export default function GuestBooking() {
           cal") — one shared row, the .ics as the universal catch-all. */}
       {row.status === 'confirmed' && cal && <AddToCal ev={cal} />}
 
+      {/* Actionable, so PEACH, with air above (founder 2026-11-02 markup). */}
       {(row.status === 'pending' || row.status === 'confirmed') && (
-        <div className="bkg__doneactions">
-          <button className="btn bkg__btn" onClick={() => { setMoveErr(''); setMoving((v) => !v); }}>
+        <div className="bkg__doneactions bkg__doneactions--roomy">
+          <button
+            className="btn bkg__btn bkg__btn--act"
+            onClick={() => {
+              setMoveErr('');
+              // Opening the picker seeds the month grid on the day they'd
+              // already chosen — a placeholder they can walk away from.
+              setMoveSel(row.on_date);
+              setMoving((v) => !v);
+            }}
+          >
             {moving ? 'Never mind — keep this time' : 'Pick a new time'}
           </button>
           <button
-            className="btn bkg__btn"
+            className="btn bkg__btn bkg__btn--act"
             disabled={busy}
             onClick={async () => {
               setBusy(true);
@@ -240,45 +266,63 @@ export default function GuestBooking() {
         </div>
       )}
 
+      {/* The reschedule picker speaks the SlotMonth grammar (founder
+          2026-11-02: "when you choose a new time, bring back the cal with
+          the orange circles, but have the day they'd chosen selected as a
+          placeholder" — so a different day is one tap before any time). */}
       {moving && (row.status === 'pending' || row.status === 'confirmed') && (
         <section className="bkg__sec">
           {moveErr && <p className="bkg__error">{moveErr}</p>}
           {!board && <p className="gev__muted">Loading open times…</p>}
-          {board && moveDays.length === 0 && (
-            <p className="gev__muted">No open times in the next two weeks — check back soon, or cancel and rebook later.</p>
+          {board && moveOpenDays.size === 0 && (
+            <p className="gev__muted">No open times in the next two months — check back soon, or cancel and rebook later.</p>
           )}
-          {moveDays.map(({ iso, slots }) => {
-            const [yy, mm, dd] = iso.split('-').map(Number);
-            const dt = new Date(Date.UTC(yy, mm - 1, dd));
-            return (
-              <section className="bkg__day" key={iso}>
-                <h2 className="bkg__h2">{WEEKDAY[dt.getUTCDay()]} · {MONTHS[mm - 1]} {dd}</h2>
-                <div className="bkg__slots">
-                  {slots.map((s) => (
-                    <button
-                      key={s}
-                      className="bkg__slot"
-                      disabled={busy}
-                      onClick={async () => {
-                        setBusy(true); setMoveErr('');
-                        try {
-                          await guestRescheduleBooking(token, iso, s);
-                          sendBookingMail(token);
-                          const fresh = await loadGuestBooking(token);
-                          if (fresh) setRow(fresh);
-                          setMoving(false); setBoard(null);
-                        } catch (e) {
-                          setMoveErr((e as { message?: string } | null)?.message || 'Something went wrong.');
-                        } finally { setBusy(false); }
-                      }}
-                    >
-                      {minLabel(s)}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+          {board && moveOpenDays.size > 0 && (
+            <>
+              <SlotMonth
+                availableDays={moveOpenDays}
+                selected={moveSel}
+                onSelect={setMoveSel}
+                minIso={moveFrom}
+                maxIso={moveTo}
+              />
+              {moveSel && (() => {
+                const [yy, mm, dd] = moveSel.split('-').map(Number);
+                const dt = new Date(Date.UTC(yy, mm - 1, dd));
+                return (
+                  <section className="bkg__day">
+                    <h2 className="bkg__h2">{WEEKDAY[dt.getUTCDay()]} · {MONTHS[mm - 1]} {dd}</h2>
+                    {moveSlots.length === 0 && (
+                      <p className="gev__muted">Nothing open this day — pick a lit day above.</p>
+                    )}
+                    <div className="bkg__slots">
+                      {moveSlots.map((s) => (
+                        <button
+                          key={s}
+                          className="bkg__slot"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true); setMoveErr('');
+                            try {
+                              await guestRescheduleBooking(token, moveSel, s);
+                              sendBookingMail(token);
+                              const fresh = await loadGuestBooking(token);
+                              if (fresh) setRow(fresh);
+                              setMoving(false); setBoard(null); setMoveSel(null);
+                            } catch (e) {
+                              setMoveErr((e as { message?: string } | null)?.message || 'Something went wrong.');
+                            } finally { setBusy(false); }
+                          }}
+                        >
+                          {minLabel(s)}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
+            </>
+          )}
         </section>
       )}
 
