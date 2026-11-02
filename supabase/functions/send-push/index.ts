@@ -69,11 +69,35 @@ Deno.serve(async (req) => {
   const subs = (await subRes.json().catch(() => [])) as Subscription[];
   if (!Array.isArray(subs) || subs.length === 0) return json({ ok: true, skipped: 'no-devices' });
 
+  // The app-icon badge number (founder 2026-11-02): a closed PWA only updates
+  // its home-screen badge through push, and the service worker can't query the
+  // DB — so carry the recipient's live unread-bell count in the payload. The
+  // count is the BELL's own rule (unread, minus the admin-desk types the bell
+  // excludes) so the icon and the in-app bell always agree. A failed count
+  // just omits `badge` — the notification itself never waits on it.
+  const DESK_TYPES = 'space_join_request,space_member_suggested,group_nesting_request,section_share_request';
+  let badge: number | undefined;
+  try {
+    const cRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/notifications?recipient_id=eq.${n.recipient_id}` +
+        `&read_at=is.null&type=not.in.(${DESK_TYPES})&select=id`,
+      {
+        headers: {
+          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+          Prefer: 'count=exact', Range: '0-0',
+        },
+      },
+    );
+    const total = Number(cRes.headers.get('content-range')?.split('/')[1] ?? NaN);
+    if (Number.isFinite(total)) badge = total;
+  } catch { /* badge stays undefined — the push still goes out */ }
+
   const message = JSON.stringify({
     title: n.title || 'Lichen',
     body: n.body || '',
     link: n.link || '/',
     tag: n.type || undefined,
+    badge,
   });
 
   let sent = 0;

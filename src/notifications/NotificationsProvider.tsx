@@ -7,6 +7,7 @@ import {
   NotificationRow, loadNotifications, markNotificationRead, markScopeReadRemote, rowsForScope,
   isDeskRow,
 } from '../lib/notificationsApi';
+import { syncAppBadge } from '../lib/appBadge';
 
 interface NotificationsState {
   rows: NotificationRow[];
@@ -82,12 +83,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [me]);
 
-  const { countsBySection, countsBySpace, totalUnread } = useMemo(() => {
+  const { countsBySection, countsBySpace, totalUnread, iconTotal } = useMemo(() => {
     const sec: Record<string, number> = {};
     const spc: Record<string, number> = {};
     let total = 0;
+    let icon = 0;
     for (const r of rows) {
       if (r.read_at || isDeskRow(r)) continue;
+      // The HOME-SCREEN ICON wears no hat: it counts everything addressed to
+      // the person (the bell's own rule, actor-independent) — the device is
+      // theirs whichever identity they were last wearing in the app.
+      icon += 1;
       // Per-space buckets stay actor-independent — a space PAGE's scope
       // reads them whoever you're wearing.
       if (r.space_id) spc[r.space_id] = (spc[r.space_id] ?? 0) + 1;
@@ -100,8 +106,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         sec[r.section] = (sec[r.section] ?? 0) + 1;
       }
     }
-    return { countsBySection: sec, countsBySpace: spc, totalUnread: total };
+    return { countsBySection: sec, countsBySpace: spc, totalUnread: total, iconTotal: icon };
   }, [rows, actingSpace, actingReady]);
+
+  // Keep the installed app's HOME-SCREEN ICON badge in step with the bell
+  // (founder 2026-11-02). Signed out clears it (no rows → 0); sw.js carries
+  // the same number while the app is closed, from send-push's payload.
+  useEffect(() => { syncAppBadge(me ? iconTotal : 0); }, [me, iconTotal]);
 
   const unreadForScope = (scope: Scope) => {
     if (scope.kind === 'global') return totalUnread;
