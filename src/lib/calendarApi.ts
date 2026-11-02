@@ -529,3 +529,26 @@ export async function removeCalendarPin(
     .eq('profile_id', me).eq('target_kind', kind).eq('target_id', targetId);
   if (error) console.warn('removeCalendarPin:', error.message);
 }
+
+// ── Your Lichen calendar, in Google (founder 2026-11-02) ────────────────────
+// The OUTBOUND half of calendar sync: a private ICS feed Google/Apple/Outlook
+// subscribe to by URL (the calendar-feed edge fn; the token IS the
+// authorization, so the UI says keep it private and Rotate kills old links).
+
+/** The member's existing feed token, or null — never mints. */
+export async function loadMyCalendarFeedToken(): Promise<string | null> {
+  const { data, error } = await supabase.from('calendar_feeds').select('token').maybeSingle();
+  if (error) { console.warn('loadMyCalendarFeedToken:', error.message); return null; }
+  return (data as { token: string } | null)?.token ?? null;
+}
+
+/** Mint-or-read the feed token; rotate replaces it (old links stop working). */
+export async function mintCalendarFeedToken(rotate = false): Promise<string> {
+  const { data, error } = await supabase.rpc('my_calendar_feed', { p_rotate: rotate });
+  if (error) throw error;
+  return data as string;
+}
+
+export function calendarFeedUrl(token: string): string {
+  return `https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/calendar-feed?t=${token}`;
+}
