@@ -16,6 +16,7 @@ import {
   type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
+import PayDoors from '../components/PayDoors';
 import { ensureDirectChat } from '../lib/chatApi';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
@@ -201,6 +202,13 @@ export default function BookSession() {
             </a>
             <span className="bkg__joinnote">It&rsquo;s also on the calendar event and in your sessions.</span>
           </div>
+        )}
+        {(done === 'booked' || done === 'moved') && (
+          <PayDoors
+            methods={t.pay_methods}
+            lead={t.price_cents ? 'Or pay directly' : `Ways to pay${t.price ? ` ${t.price}` : ''}`}
+            className="bkg__paydoors"
+          />
         )}
         <div className="bkg__doneactions">
           <button className="btn btn-primary bkg__btn" onClick={() => navigate('/bookings')}>See your sessions</button>

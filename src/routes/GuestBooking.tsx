@@ -10,6 +10,7 @@ import { addDays, todayISO } from '../lib/conciergeApi';
 import { icsDataUri, googleCalUrl } from '../lib/ics';
 import { videoServiceOf } from '../lib/linkify';
 import { Icon } from '../components/Icon';
+import PayDoors from '../components/PayDoors';
 import './GuestEvent.css';
 import './Bookings.css';
 
@@ -175,6 +176,15 @@ export default function GuestBooking() {
       )}
       {!!row.price_cents && !row.paid_at && row.status === 'pending' && row.approval !== 'instant' && (
         <p className="bkg__sub">{usdLabel(row.price_cents)} — payment opens once {row.provider_name} confirms.</p>
+      )}
+      {/* The provider's own ways to be paid (founder 2026-11-02) — shown once
+          confirmed, until an online payment is recorded. */}
+      {row.status === 'confirmed' && !row.paid_at && (
+        <PayDoors
+          methods={row.pay_methods}
+          lead={payOpen(row) ? 'Or pay directly' : 'Ways to pay'}
+          className="bkg__paydoors"
+        />
       )}
 
       {row.status === 'confirmed' && row.meeting_url && (
