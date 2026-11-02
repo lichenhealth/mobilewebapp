@@ -20,6 +20,37 @@ export const aiDoorOn = (section: string): boolean =>
 export const setAiDoor = (section: string, on: boolean): void =>
   setConsent('section', section, on);
 
+// THE HINT IS SMART PER SECTION (founder 2026-11-02, rewriting Profile
+// admin's "Or just ask": "let's change the copy to read 'Or work with Ai to
+// build and edit your profile.' Have the text be smart relevant to each
+// section. So for marketplace, 'Or work with Ai to manage goods and
+// services on Marketplace' and have 'Or work with Ai to manage your Travel'
+// for travel, 'Or work with Ai to build and manage your courses' etc"):
+// ONE vocabulary — the full sentences for hint LINES beside a brain
+// (Profile/SpaceProfile admin today; any new manage surface joins), and the
+// short twins for the brain circles' tooltips, which are nowrap pills.
+// profile/market/travel/courses are her verbatim lines; the rest are easy
+// one-line rewords in her grammar.
+const AI_HINTS: Record<string, { line: string; tip: string }> = {
+  profile: { line: 'Or work with AI to build and edit your profile.', tip: 'Work with AI — your profile' },
+  market: { line: 'Or work with AI to manage goods and services on Marketplace.', tip: 'Work with AI — Marketplace' },
+  travel: { line: 'Or work with AI to manage your Travel.', tip: 'Work with AI — Travel' },
+  courses: { line: 'Or work with AI to build and manage your courses.', tip: 'Work with AI — your courses' },
+  calendar: { line: 'Or work with AI to manage your calendar and sessions.', tip: 'Work with AI — your calendar' },
+  events: { line: 'Or work with AI to create and manage your events.', tip: 'Work with AI — Events' },
+  concierge: { line: 'Or work with AI on your care.', tip: 'Work with AI — your care' },
+  currentcy: { line: 'Or work with AI on your Current-cy.', tip: 'Work with AI — Current-cy' },
+  mycelium: { line: 'Or work with AI on your web.', tip: 'Work with AI — My-celium' },
+  maps: { line: 'Or work with AI on Maps.', tip: 'Work with AI — Maps' },
+  chat: { line: 'Or work with AI across your conversations.', tip: 'Work with AI — Chat' },
+};
+
+/** The full hint sentence for a section's brain row. */
+export const aiWorkHint = (section: string): string =>
+  AI_HINTS[section]?.line ?? 'Or work with AI here.';
+/** The short tooltip a section's brain circle wears. */
+const aiTip = (section: string): string => AI_HINTS[section]?.tip ?? 'Assistant';
+
 /** `size` matches the door to the circles it sits beside — 34px on its own,
  *  30px in a row of mkt__action circles (founder 2026-08-08: the brain must
  *  not read larger than the magnifier and the +). Size means "you are here"
@@ -54,7 +85,7 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
         }}
         aria-label={on ? (label ?? 'Your assistant’s briefing for this section') : 'Assistant is off here — tap to turn it back on'}
         aria-expanded={on ? undefined : ask}
-        data-tip={on ? 'Assistant' : 'Assistant — off here'}
+        data-tip={on ? aiTip(section) : 'Assistant — off here'}
       >
         <Icon name="brain" size={Math.round(size * 0.47)} />
         {!on && <span className="ai-door__slash" aria-hidden />}

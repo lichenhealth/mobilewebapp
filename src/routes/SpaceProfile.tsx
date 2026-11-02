@@ -1628,8 +1628,10 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               size={38}
               label={`Ask Claude to change any of this — ${possessive(space.name)} page, what's public, the words`}
             />
+            {/* Section-smart copy (founder 2026-11-02) — the space's work is
+                its page, so the line names that. */}
             <span className="sprof__brainrow-hint">
-              Or just ask — the brain changes any of this by conversation.
+              Or work with AI to build and edit this page.
             </span>
           </div>
         )}

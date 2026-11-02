@@ -938,10 +938,12 @@ export default function AssistantBrief() {
     return days === 1 ? '1 day ago' : `${days} days ago`;
   };
 
-  // The build door on the profile brief (founder 2026-08-17: Build with
-  // Claude is the brain's own page, arriving with the context that you came
-  // to build). Leads the page when that's why you came; sits under the
-  // briefing otherwise. Lands in the profile thread with the builder open.
+  // The build door on the profile brief (founder 2026-08-17): leads the
+  // page ONLY on a ?intent=build arrival now — the STANDING copy of this
+  // card under every profile briefing was RETIRED 2026-11-02 (founder,
+  // crossing it out: "seems weird now to have this notification - since the
+  // brain is there in the manual build section" — Profile admin's brain row
+  // is the standing door).
   const buildCard = (
     <button
       className="snap__invite abrief__build"
@@ -1126,8 +1128,6 @@ export default function AssistantBrief() {
       </div>
         </div>
       </div>
-
-      {section === 'profile' && !buildIntent && buildCard}
 
       {/* The "Open your feed" / "Search instead" pills were RETIRED here
           (founder 2026-10-03: "seems non contextual because I'm in my

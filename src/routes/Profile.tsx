@@ -36,7 +36,7 @@ import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } fro
 import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
-import AssistantDoor from '../components/AssistantDoor';
+import AssistantDoor, { aiWorkHint } from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
@@ -870,9 +870,9 @@ export default function Profile() {
           size={38}
           label="Ask Claude to change any of this — your page, what's public, the words"
         />
-        <span className="sprof__brainrow-hint">
-          Or just ask — the brain changes any of this by conversation.
-        </span>
+        {/* Section-smart copy (founder 2026-11-02): her verbatim line, from
+            the one AI_HINTS vocabulary in AssistantDoor. */}
+        <span className="sprof__brainrow-hint">{aiWorkHint('profile')}</span>
       </div>
 
       {/* YOUR LICHEN PROFILE leads (founder 2026-08-20 consolidation):
