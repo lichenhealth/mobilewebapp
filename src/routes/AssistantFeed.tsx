@@ -1273,8 +1273,16 @@ export default function AssistantFeed() {
         )}
         {visible.map((p) => {
           const shared = p.source_post_id ? sourcePosts.get(p.source_post_id) : null;
+          // THE HAND-OFF NOTE (founder 2026-11-02: "how about its from
+          // claude to claude?"): a delivered Claude note carrying the
+          // manual-mode state — same left bubble, dressed as a baton pass.
+          const handoff = (p.attachments ?? []).some((a) => a.type === 'handoff');
           return (
-            <div className={'afeed__entry' + (p.author === 'claude' ? ' afeed__entry--claude' : '')} key={p.id}>
+            <div
+              className={'afeed__entry' + (p.author === 'claude' ? ' afeed__entry--claude' : '')
+                + (handoff ? ' afeed__entry--handoff' : '')}
+              key={p.id}
+            >
               {/* In a space's build thread, your entries wear the SPACE's
                   logo with your face as the small peach-ringed dot — the
                   steward-face idiom space chats already use (founder
@@ -1311,7 +1319,9 @@ export default function AssistantFeed() {
                       {p.author === 'claude' ? 'Claude' : 'You'}
                     </span>
                     <span className="afeed__entry-role">
-                      · {p.author === 'claude' ? 'AI Assistant' : `steward of ${sctx?.name ?? 'this space'}`}
+                      · {p.author === 'claude'
+                        ? (handoff ? 'hand-off from manual mode' : 'AI Assistant')
+                        : `steward of ${sctx?.name ?? 'this space'}`}
                     </span>
                   </div>
                 )}

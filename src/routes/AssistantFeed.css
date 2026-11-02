@@ -552,3 +552,15 @@
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .afeed__sumbtn:hover { border-color: var(--peach); color: var(--peach-deep); }
+
+/* THE HAND-OFF NOTE (founder 2026-11-02: the manual-mode briefing "should
+   be a sent message to claude, not a composed one… from claude to claude"):
+   Claude's own left bubble, dressed as a baton pass — warm paper with a
+   dashed peach edge so it reads as carried-over state, not conversation. */
+.afeed__entry--handoff .afeed__entry-text {
+  background: var(--bone-warm);
+  border: 1px dashed var(--peach);
+  border-radius: 4px 14px 14px 14px;
+  padding: 8px 12px;
+}
+.afeed__entry--handoff .afeed__entry-role { color: var(--peach-deep); }

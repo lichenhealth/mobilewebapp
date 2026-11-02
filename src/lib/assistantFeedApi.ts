@@ -38,7 +38,13 @@ export type FeedAttachment =
    *  check when its copied"): the reply hands a real Copy button instead of
    *  pasting a long URL into prose. Text is composed server-side (the
    *  app_link rule — never model-written). */
-  | { type: 'copy_text'; text: string; label: string };
+  | { type: 'copy_text'; text: string; label: string }
+  /** THE HAND-OFF (founder 2026-11-02: "the briefing of whats been done
+   *  manually should be a sent message to claude, not a composed one…
+   *  how about its from claude to claude?"): marks a DELIVERED
+   *  Claude-authored note carrying the manual-mode state — minted only by
+   *  the post_assistant_handoff RPC, dressed as a baton pass in the feed. */
+  | { type: 'handoff' };
 
 export interface FeedPostRow {
   id: string;
@@ -425,6 +431,25 @@ export async function loadConvoNames(): Promise<Record<string, string>> {
   (((data as { convo_id: string; title: string }[] | null) ?? []))
     .forEach((r) => { out[r.convo_id] = r.title; });
   return out;
+}
+
+/** THE HAND-OFF DOOR (founder 2026-11-02): lands the manual-mode summary in
+ *  a personal thread as a DELIVERED Claude note — a fresh conversation the
+ *  member walks straight into, composer empty for their actual ask. Rides
+ *  the post_assistant_handoff RPC (the one door to a client-triggered
+ *  claude-authored row — plain INSERTs stay author='member' by RLS), which
+ *  deliberately never fires the reply trigger: the note just stands, and
+ *  the member's next message carries it as conversation context (the edge
+ *  fn already reads claude rows as the assistant's own prior words). */
+export async function postAssistantHandoff(
+  thread: string, body: string,
+): Promise<{ id: string; convoId: string }> {
+  const { data, error } = await supabase.rpc('post_assistant_handoff', {
+    p_thread: thread, p_body: body,
+  });
+  if (error) throw error;
+  const row = (Array.isArray(data) ? data[0] : data) as { id: string; convo_id: string };
+  return { id: row.id, convoId: row.convo_id };
 }
 
 export async function renameConvo(convoId: string, title: string): Promise<void> {
