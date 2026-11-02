@@ -35,14 +35,16 @@ export default function BottomNav() {
   // (founder 2026-11-01: "a pop up that says sign in to use platform
   // features, or ask to join").
   const { user } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const countFor = (to: string) =>
     to === '/home' ? totalUnread : (countsBySection[sectionForRoute(to) ?? ''] ?? 0);
   // Off-prefix screens light their FAMILY (founder 2026-10-21: a room's
   // drive, /organize — "drive highlighted … systemically build these nav
   // rules in"). One map, src/lib/navFamily.ts; when it answers, it answers
   // whole — prefix matches stand down so Chat doesn't stay lit on /chat/:id/drive.
-  const family = navFamily(pathname);
+  // navFamily reads pathname + search: the chat-brain brief lives at
+  // /assistant?section=chat (founder 2026-11-02).
+  const family = navFamily(pathname + search);
 
   return (
     <nav className="bottom-nav" aria-label="Primary">

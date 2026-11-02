@@ -124,8 +124,16 @@ export default function AssistantBrief() {
   // CLIENT already gathered — never from the model — so a link can't be
   // invented (founder 2026-08-05: "can all of the linkable content within
   // the AI update show up with a blue link?").
-  const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(params.get('section') ?? 'home')?.refs ?? []);
-  const section = params.get('section') ?? 'home';
+  // THE CHAT BRAIN IS THE WHOLE BRAIN (founder 2026-11-02, crossing out the
+  // prepended chat circle: "chat with Ai at the general level is just like
+  // going into the brain from the home screen - because Ai interactions are
+  // all chat"): section=chat RENDERS the general brief — Feed circle lit,
+  // no prepended chat circle — while the URL keeps section=chat so the
+  // bottom nav lights CHAT (navFamily) and the arrow returns to /chat. The
+  // chat consent switch stays real (the brain door's off-popup + Privacy).
+  const rawSection = params.get('section') ?? 'home';
+  const section = rawSection === 'chat' ? 'home' : rawSection;
+  const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(section)?.refs ?? []);
   // "← Back" says WHERE it goes (founder 2026-09-13: "so people remember
   // where they came from") — chip-friendly names, not FRAMES' sentence titles.
   const BACK_NAMES: Record<string, string> = {
@@ -154,8 +162,10 @@ export default function AssistantBrief() {
   // Only a PLAIN section brief takes the named route — a member/space/course
   // briefing came from that entity's own page, and history is the honest way
   // back there.
+  // rawSection, not the alias: arriving from Chat's brain, the arrow
+  // returns to /chat even though the brief renders as the whole brain.
   const backRoute = (!params.get('member') && !params.get('space') && !params.get('collection'))
-    ? SECTION_ROUTES[section] : undefined;
+    ? SECTION_ROUTES[rawSection] : undefined;
   // ?member=<id> — the relationship briefing for one person.
   const memberId = params.get('member');
   // ?space=<id> — the briefing on one space (founder 2026-08-22): the brain
@@ -193,6 +203,14 @@ export default function AssistantBrief() {
   const me = user?.id ?? '';
   const { rows } = useNotifications();
   const [doorOn, setDoorOn] = useState(() => aiDoorOn(section));
+  // RE-SYNC PER SECTION (founder 2026-11-02: "when i turned the assistant
+  // off for courses, it un-checked the feed box for everything… i think
+  // that's a bug"): walking the rail changes ?section= WITHOUT remounting
+  // this component, so a once-seeded doorOn carried the last toggle's value
+  // onto every other section's checkbox. The WRITES were always
+  // per-section — only the display lied. Each section change re-reads its
+  // own consent.
+  useEffect(() => { setDoorOn(aiDoorOn(section)); }, [section]);
   const cached = cache.get(briefKey);
   const [brief, setBrief] = useState<string | null>(cached?.text ?? null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(cached?.at ?? null);

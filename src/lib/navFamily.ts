@@ -15,6 +15,13 @@
  *  arrow too would be the one-back mistake. */
 const OFF_PREFIX: { re: RegExp; family: string; mark: boolean }[] = [
   { re: /^\/organize/, family: '/drive', mark: true },
+  // THE CHAT BRAIN IS THE WHOLE BRAIN (founder 2026-11-02): Chat's brain
+  // door renders the general brief at ?section=chat — the bottom nav keeps
+  // CHAT lit so the context the retired rail circle carried survives.
+  // mark: false — the brief's masthead is the AI Assistant, not Chat, and
+  // its arrow already rides the useTopBackFor broadcast. ⚠ Needs the SEARCH
+  // string: BottomNav/SideMenu pass pathname + search to navFamily().
+  { re: /^\/assistant(?:\/feed)?\?(?:[^#]*&)?section=chat(?:&|$)/, family: '/chat', mark: false },
   { re: /^\/chat\/[^/]+\/drive/, family: '/drive', mark: true },
   { re: /^\/spaces\/[^/]+\/drive/, family: '/drive', mark: true },
   { re: /^\/docs\/[^/]+/, family: '/drive', mark: false },
