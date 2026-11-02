@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
+import { revealBelow } from '../lib/smartReveal';
 import './AssistantComposer.css';
 
 /** The text box every surface that talks to Claude sends through — the
@@ -32,12 +33,24 @@ export default function AssistantComposer({
   // arriving clipped: "clicking in didn't show the entire text for me to
   // edit, so the box needs to expand") — height follows content from the
   // first paint (prefills included), capped at ~6 lines, then it scrolls.
+  // AND THE SCREEN FOLLOWS THE BOX (founder 2026-11-02: "the type gets
+  // cutoff and i keep typing, but its below the fold, can you fix the
+  // scroll?"): each time the box actually GROWS, the page scrolls just
+  // enough to keep the whole composer above the bottom nav — revealBelow,
+  // the one platform scroll helper. Only on a height change, never on
+  // mount: the brief renders this same composer mid-page and must not
+  // auto-scroll to it on arrival.
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const lastH = useRef<number | null>(null);
   useLayoutEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    const h = Math.min(ta.scrollHeight, 140);
+    ta.style.height = h + 'px';
+    const grew = lastH.current != null && h > lastH.current;
+    lastH.current = h;
+    if (grew) revealBelow(ta.closest('form'));
   }, [ask]);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
