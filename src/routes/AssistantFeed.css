@@ -150,7 +150,7 @@
   display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
   margin: -4px 0 var(--s-3); font-size: 12.5px;
 }
-.afeed__manualback a { color: var(--ink); }
+.afeed__manualback a { color: var(--peach-deep); } /* peach backs, founder 2026-11-02 */
 .afeed__manualback span { color: var(--ink-muted); }
 /* COMPACT CIRCLES (founder 2026-10-12: "should we make these smaller, so you
    don't have to scroll?"): 34px — the tool-circle size — puts all eight

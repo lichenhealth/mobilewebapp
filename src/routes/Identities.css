@@ -4,7 +4,7 @@
 
 .idn__back {
   display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
-  font-size: var(--t-xs); color: var(--ink-soft); background: none; border: 0;
+  font-size: var(--t-xs); color: var(--peach-deep); background: none; border: 0; /* peach backs, founder 2026-11-02 */
   padding: 0; margin-bottom: var(--s-2); cursor: pointer; font-family: inherit;
 }
 .idn__back:hover { color: var(--peach-deep); }
