@@ -131,6 +131,9 @@
 .bkpub__field { min-height: 0; height: 42px; resize: none; }
 .bkpub__fine { font-size: 11.5px; color: var(--ink-faint); text-align: center; margin: 8px 0 0; }
 .bkpub__signin { border: none; background: none; color: var(--peach-deep); cursor: pointer; font: inherit; font-size: 11.5px; text-decoration: underline; }
+/* A member's email, recognized (founder 2026-11-02, Gabe booking logged
+   out) — the nudge reads peach-deep so it's noticed, never blocking. */
+.bkpub__known { color: var(--peach-deep); }
 
 /* THE TIMEZONE DROPDOWN (founder 2026-11-01: "a drop down that lets you
  * change time zones before you book") — an inline pill on the tz line,
