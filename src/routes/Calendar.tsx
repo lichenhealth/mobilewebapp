@@ -94,8 +94,10 @@ export default function Calendar() {
 
   // Schedule (agenda list) is the phone default — a 7-column grid through a
   // keyhole is nobody's friend (founder + Gabe, 2026-07-17).
+  // Default view (founder 2026-11-02: "have cal default to 3 day on mobile
+  // and week on desktop, not schedule") — Schedule stays one pick away.
   const [view, setView] = useState<View>(() =>
-    window.matchMedia('(max-width: 640px)').matches ? 'schedule' : 'week');
+    window.matchMedia('(max-width: 640px)').matches ? '3day' : 'week');
   // To-Do is a peer "view" toggled from the toolbar; toggling off returns to
   // the grid view you were on.
   const [prevGridView, setPrevGridView] = useState<GridView>('week');
