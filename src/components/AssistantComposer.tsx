@@ -33,24 +33,25 @@ export default function AssistantComposer({
   // arriving clipped: "clicking in didn't show the entire text for me to
   // edit, so the box needs to expand") — height follows content from the
   // first paint (prefills included), capped at ~6 lines, then it scrolls.
-  // AND THE SCREEN FOLLOWS THE BOX (founder 2026-11-02: "the type gets
+  // AND THE SCREEN FOLLOWS THE WORDS (founder 2026-11-02: "the type gets
   // cutoff and i keep typing, but its below the fold, can you fix the
-  // scroll?"): each time the box actually GROWS, the page scrolls just
-  // enough to keep the whole composer above the bottom nav — revealBelow,
-  // the one platform scroll helper. Only on a height change, never on
-  // mount: the brief renders this same composer mid-page and must not
-  // auto-scroll to it on arrival.
+  // scroll?"): EVERY text change keeps the whole composer above the bottom
+  // nav — revealBelow, the one platform scroll helper, which no-ops when
+  // it's already in view (so this costs one rect read per keystroke).
+  // Per-keystroke, not per-growth, deliberately: a smooth scroll can get
+  // clamped mid-animation and the box stops growing at its cap, so each
+  // keystroke self-corrects whatever the last one missed. Never on mount:
+  // the brief renders this same composer mid-page and must not auto-scroll
+  // to it on arrival.
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const lastH = useRef<number | null>(null);
+  const typedYet = useRef(false);
   useLayoutEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    const h = Math.min(ta.scrollHeight, 140);
-    ta.style.height = h + 'px';
-    const grew = lastH.current != null && h > lastH.current;
-    lastH.current = h;
-    if (grew) revealBelow(ta.closest('form'));
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    if (typedYet.current) revealBelow(ta.closest('form'));
+    typedYet.current = true;
   }, [ask]);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
