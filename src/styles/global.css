@@ -450,6 +450,15 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
 [data-tip]:focus-visible::after { opacity: 1; }
 [data-tip].tip-left::after { left: 0; right: auto; transform: none; }
 [data-tip].tip-right::after { left: auto; right: 0; transform: none; }
+/* A tip carrying a SENTENCE (the candle's gift blurb, founder 2026-11-02:
+   "let's make this copy longer") wraps as a small card instead of one
+   endless pill — pair with .tip-left/.tip-right so it hugs an edge. */
+[data-tip].tip-wrap::after {
+  white-space: normal; width: max-content;
+  max-width: min(250px, calc(100vw - 32px));
+  border-radius: 10px; text-align: left; line-height: 1.5;
+  padding: 6px 10px;
+}
 
 /* A SCROLL CONTAINER CLIPS THE TIP: rows that carry data-tip circles shed
    .h-scroll's overflow and WRAP instead (finishing the 2026-10-12
