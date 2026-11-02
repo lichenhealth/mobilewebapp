@@ -56,7 +56,19 @@ export default function AssistantFeed() {
   // carrot"): the feed broadcasts its back to the TopBar's arrow beside the
   // ☰ — the AssistantBrief precedent — carrying the same ?back= meaning the
   // worded chip held (a door errand's "Back to manual mode" included).
-  useTopBackFor(() => { if (back) navigate(back); else navigate(-1); });
+  useTopBackFor(() => {
+    if (back) { navigate(back); return; }
+    // From an OPEN conversation the arrow returns to the list + the
+    // status update — the section's brief (founder 2026-11-02, retiring
+    // the "← All Calendar conversations" chip: "a back button in the top
+    // left and it goes back to the list of convos and the current status
+    // update, like when you click into a signal thread").
+    if (!listMode && personal && openConvo) {
+      navigate(`/assistant?section=${thread === 'general' ? 'home' : thread}`);
+      return;
+    }
+    navigate(-1);
+  });
   // A space's build thread (founder 2026-08-22): `space:<id>` — Build with
   // Claude on a space's builder lands here, ABOUT that space, instead of the
   // member's own profile thread.
@@ -1212,16 +1224,9 @@ export default function AssistantFeed() {
         </div>
       )}
 
-      {/* The way back to the BRAIN — the section's brief, summary + list,
-          one click (founder 2026-10-13). */}
-      {!listMode && personal && openConvo && (
-        <button
-          className="afeed__convoback"
-          onClick={() => navigate(`/assistant?section=${sectionForThread(thread)}`)}
-        >
-          ← {thread === 'general' ? 'Every conversation' : `All ${threadLabel(thread)} conversations`}
-        </button>
-      )}
+      {/* The worded all-conversations chip retired 2026-11-02 — the TopBar's
+          universal arrow carries the same walk (the Signal-thread shape):
+          open conversation → the section's brief, list + status update. */}
 
       {/* THE CONVERSATION'S NAME (founder 2026-10-12: "name a convo, like
           you can name a file? So we can organize them?"): the open exchange
