@@ -162,6 +162,34 @@ export default function Intro() {
       </div>
     ),
     (
+      <div className="intro__body" key="c4b">
+        <span className="intro__glyph"><Icon name="currentcy" size={30} /></span>
+        {/* Synthesized from lichen.health/business (founder 2026-11-02:
+            "add a tile in lichen.health/intro that explains that alpha
+            membership is free, once the platform is dialed, all revenue
+            from concierge and community subscriptions not required to run
+            the platform will go back into subsidies"). Placed right after
+            the alpha-honesty card — where-we-are, then what it costs and
+            where the money goes. */}
+        <p className="intro__eyebrow">The business, plainly</p>
+        <h1 className="intro__title">Alpha membership is free.</h1>
+        <p className="intro__text">
+          While we build together, membership costs nothing. And once the
+          platform is dialed in, Lichen stays a nonprofit with lean
+          operations and no investors or shareholders to pay — so Community
+          and Concierge subscription revenue beyond what it takes to run
+          the platform flows back into subsidizing the care, goods and
+          services members need to heal and thrive.
+        </p>
+        <p className="intro__text">
+          Every contribution and subsidy is tracked transparently through
+          Current-cy, Lichen&rsquo;s own unit of account — because there&rsquo;s no
+          shame in receiving support when the old systems under-resourced
+          you. Rebalancing is the whole point.
+        </p>
+      </div>
+    ),
+    (
       <div className="intro__body" key="c5">
         <span className="intro__glyph"><Icon name="fingerprint" size={30} /></span>
         <p className="intro__eyebrow">Why you</p>
