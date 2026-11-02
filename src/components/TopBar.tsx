@@ -361,7 +361,7 @@ export default function TopBar({
         {candleOn !== null && (
           <button
             ref={setCandleEl}
-            className={'top-bar__icon top-bar__candle tip-right' + (candleOn ? ' is-lit' : '')}
+            className={'top-bar__icon top-bar__candle tip-right tip-wrap' + (candleOn ? ' is-lit' : '')}
             onClick={toggleCandle}
             aria-pressed={candleOn}
             // The candle speaks the platform tip, not the browser's gray box
@@ -369,7 +369,11 @@ export default function TopBar({
             // presence blurb, just like you show the title of each icon
             // elsewhere"). tip-right hugs the viewport's right edge — the
             // blurb is long and the candle sits near the corner.
-            data-tip={candleOn ? 'Present — open to connecting. Tap to snuff.' : 'Light your candle — show you’re present'}
+            data-tip={candleOn
+              // Founder's verbatim copy (2026-11-02: "let's make this copy
+              // longer") — the gift framing over the terse state line.
+              ? 'Being present is a gift. If you’re open to connecting, keep your candle lit. If you’re busy, snuff it out.'
+              : 'Being present is a gift. Light your candle to show you’re open to connecting.'}
             aria-label={candleOn ? 'Snuff your presence candle' : 'Light your presence candle'}
           >
             <span aria-hidden="true">🕯️</span>
