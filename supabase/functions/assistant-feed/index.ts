@@ -277,11 +277,13 @@ const CALENDAR_TOOLS = [
   },
   {
     name: 'update_booking_type',
-    description: 'Change one of their existing session types, named by its EXACT title from the setup read. Only the fields you pass change. 0 clears max_days_out / max_per_day; an empty link_name removes the vanity link; an empty video_link removes the video link; an empty questions array removes the questions. Use new_title to rename.',
+    description: 'Change one of their existing session types, named by its EXACT title from the setup read. Only the fields you pass change. 0 clears max_days_out / max_per_day; an empty link_name removes the vanity link; an empty video_link removes the video link; an empty questions array removes the questions. Use new_title to rename. ⚠ One session may be SEVERAL rows sharing one title — one per length ("Catch-up" at 15/30/60 min). When the title matches several, the tool refuses unless you pass of_length_min (change that one length) or all_lengths=true (change every one — right for shared facts like hours, price, approval; never for duration_min or link_name, which belong to one length). After a multi-type build or edit, read my_calendar_setup again and report from what it returns.',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'The exact current title from my_calendar_setup.' },
+        of_length_min: { type: 'number', description: 'When several lengths share the title: the duration in minutes of the ONE to change.' },
+        all_lengths: { type: 'boolean', description: 'When several lengths share the title: true applies the change to EVERY one of them.' },
         new_title: { type: 'string' },
         duration_min: { type: 'number' },
         price: { type: 'string' },
@@ -1166,7 +1168,11 @@ Deno.serve(async (req) => {
       + '\n- Change only what they asked about. Name every change; a change you did not name is a broken promise.'
       + '\n- No hours means NOT available and NOT bookable — unknown is never yes on Lichen. If they want to be bookable, work hours come first.'
       + '\n- on_call belongs to active caregivers only; the tool refuses otherwise — do not offer it to anyone else.'
-      + '\n- BOOKING REQUESTS: you can answer them. Read my_booking_requests, then respond_booking_request accepts or declines the one they name — the same act as the Bookings screen, which shows the answer instantly; both doors always work. Only ever respond to a request they clearly asked you to answer.';
+      + '\n- BOOKING REQUESTS: you can answer them. Read my_booking_requests, then respond_booking_request accepts or declines the one they name — the same act as the Bookings screen, which shows the answer instantly; both doors always work. Only ever respond to a request they clearly asked you to answer.'
+      // CHECK YOUR OWN WORK (founder 2026-11-02, after a five-length build
+      // shipped one wrong duration and missed one type's hours while the
+      // reply said "all five": the summary came from intention, not rows).
+      + '\n- CHECK YOUR OWN WORK: after creating or changing SEVERAL session types in one exchange, read my_calendar_setup once more and write your summary from what it returns — durations, hours, links as SAVED. If a saved row differs from what was asked, say so and fix it; never report from memory of what you meant to do.';
   }
 
   // DRAFT-FIRST (founder 2026-08-31): the assistant's page edits land in the
@@ -1988,7 +1994,9 @@ Deno.serve(async (req) => {
           : `They have NO ${pool === 'available' ? 'work' : pool.replace('_', '-')} hours — nothing is bookable until they add some. Say so.`;
       }
       return {
-        ok: true, change: `created the bookable session "${title}" (${duration}min, ${approval}, ${audience}${vl.url && !linkNote ? `, ${videoServiceOf(vl.url) ?? 'video'} link — shared with people once their booking confirms` : ''}${uz.on && !zoomNote ? ', a unique Zoom meeting is created for each confirmed booking' : ''})`,
+        // Echo the row AS SAVED (created.*), never the inputs — the one
+        // honest base for the model's report (founder 2026-11-02).
+        ok: true, change: `created the bookable session "${created.title}" (saved as ${created.duration_min} min, ${created.approval}, ${created.audience}, books from ${created.hours_kind ?? 'work'}${created.slug ? `, link ${created.slug}` : ''}${vl.url && !linkNote ? `, ${videoServiceOf(vl.url) ?? 'video'} link — shared with people once their booking confirms` : ''}${uz.on && !zoomNote ? ', a unique Zoom meeting is created for each confirmed booking' : ''})`,
         vanity: await vanityLine(extra.slug),
         note: [hoursNote, linkNote, zoomNote].filter(Boolean).join(' ') || undefined,
       };
@@ -1996,9 +2004,30 @@ Deno.serve(async (req) => {
 
     if (name === 'update_booking_type') {
       const title = String(input.title ?? '').trim();
-      const rows = await (await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}&select=id&limit=1`)).json();
-      if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: `No session type titled "${title}" — read my_calendar_setup and use the exact title.` };
+      // ⚠ EXACTLY-ONE-MATCH, finally honored here (founder 2026-11-02): one
+      // session can legitimately be SEVERAL same-title rows — one per length
+      // (the one-name-many-lengths ship) — and the old limit=1 pick patched a
+      // semi-random sibling (each PATCH moves the row in the heap, so the
+      // next un-ordered read lands elsewhere). Several matches now need
+      // of_length_min (one length) or all_lengths=true (every one).
+      const allRows = await (await sb(`booking_types?profile_id=eq.${profile_id}&title=eq.${encodeURIComponent(title)}&select=id,duration_min,slug&order=duration_min`)).json();
+      if (!Array.isArray(allRows) || allRows.length === 0) return { ok: false, error: `No session type titled "${title}" — read my_calendar_setup and use the exact title.` };
+      let targets = allRows as { id: string; duration_min: number; slug: string | null }[];
+      const allLengths = allRows.length > 1 && input.all_lengths === true;
+      if (allRows.length > 1 && !allLengths) {
+        const want = Number(input.of_length_min);
+        const picked = Number.isFinite(want) ? targets.filter((t) => t.duration_min === want) : [];
+        if (picked.length !== 1) {
+          const lens = targets.map((t) => `${t.duration_min} min${t.slug ? ` (${t.slug})` : ''}`).join(', ');
+          return { ok: false, error: `${allRows.length} lengths share the title "${title}": ${lens}. Pass of_length_min to change ONE of them, or all_lengths=true to change every one.` };
+        }
+        targets = picked;
+      }
       const { out: patch, errs } = normTypeFields(input);
+      // Per-length facts can't be set across the whole family at once.
+      if (allLengths && (input.duration_min !== undefined || input.link_name !== undefined)) {
+        return { ok: false, error: 'duration_min and link_name belong to ONE length — use of_length_min for those, not all_lengths.' };
+      }
       const vl = normVideoLink(input);
       if (vl.err) errs.push(vl.err);
       const uz = await normUniqueZoom(input);
@@ -2013,33 +2042,53 @@ Deno.serve(async (req) => {
       }
       const ocErr = await onCallRefused(patch.hours_kind);
       if (ocErr) return { ok: false, error: ocErr };
-      if (Object.keys(patch).length) {
-        const r = await sb(`booking_types?id=eq.${rows[0].id}&profile_id=eq.${profile_id}`, {
-          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
-        });
-        if (!r.ok) {
-          const text = await r.text();
-          return { ok: false, error: slugTaken(text) ? `That link name is already on another of their sessions — pick a different link_name.` : `The update failed: ${text.slice(0, 140)}` };
+      // Apply to every target (one, or the whole same-title family). Each
+      // writes its own row; notes dedupe.
+      const noteBits: string[] = [];
+      let savedEcho = '';
+      let firstLinkNote: string | null = null, firstZoomNote: string | null = null;
+      for (const t of targets) {
+        if (Object.keys(patch).length) {
+          const r = await sb(`booking_types?id=eq.${t.id}&profile_id=eq.${profile_id}`, {
+            method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch),
+          });
+          if (!r.ok) {
+            const text = await r.text();
+            return { ok: false, error: slugTaken(text) ? `That link name is already on another of their sessions — pick a different link_name.` : `The update failed: ${text.slice(0, 140)}` };
+          }
+          // Echo the row AS SAVED (founder 2026-11-02: report rows, not
+          // intentions) — single-target only; a family echo would name one
+          // sibling's length for all of them.
+          const saved = (await r.json())?.[0];
+          if (saved && targets.length === 1) {
+            savedEcho = ` Saved as: ${saved.duration_min} min, ${saved.approval}, ${saved.audience}, books from ${saved.hours_kind}${saved.slug ? `, link ${saved.slug}` : ''}.`;
+          }
         }
-      }
-      const linkNote = vl.set ? await writeVideoLink(rows[0].id, vl.url) : null;
-      const zoomNote = uz.set ? await writeUniqueZoom(rows[0].id, uz.on) : null;
-      // Only EXPLICIT custom_hours replace the windows — re-stating
-      // books_from=custom must never wipe hours the member already set.
-      let hoursNote: string | null = null;
-      if (input.custom_hours !== undefined) {
-        hoursNote = await writeCustomHours(rows[0].id, input.custom_hours);
-      } else if (patch.hours_kind === 'custom') {
-        const have = await (await sb(`availability_windows?booking_type_id=eq.${rows[0].id}&select=id&limit=1`)).json();
-        if (!Array.isArray(have) || !have.length) {
-          hoursNote = 'the session now books from its own hours but has NONE yet — pass custom_hours or it cannot be booked. Say so.';
+        const linkNote = vl.set ? await writeVideoLink(t.id, vl.url) : null;
+        const zoomNote = uz.set ? await writeUniqueZoom(t.id, uz.on) : null;
+        if (firstLinkNote === null) firstLinkNote = linkNote;
+        if (firstZoomNote === null) firstZoomNote = zoomNote;
+        // Only EXPLICIT custom_hours replace the windows — re-stating
+        // books_from=custom must never wipe hours the member already set.
+        let hoursNote: string | null = null;
+        if (input.custom_hours !== undefined) {
+          hoursNote = await writeCustomHours(t.id, input.custom_hours);
+        } else if (patch.hours_kind === 'custom') {
+          const have = await (await sb(`availability_windows?booking_type_id=eq.${t.id}&select=id&limit=1`)).json();
+          if (!Array.isArray(have) || !have.length) {
+            hoursNote = 'the session now books from its own hours but has NONE yet — pass custom_hours or it cannot be booked. Say so.';
+          }
         }
+        for (const n of [hoursNote, linkNote, zoomNote]) if (n && !noteBits.includes(n)) noteBits.push(n);
       }
+      const whoChanged = targets.length > 1
+        ? ` (every length: ${targets.map((t) => `${t.duration_min} min`).join(', ')})`
+        : allRows.length > 1 ? ` (the ${targets[0].duration_min}-minute one)` : '';
       return {
         ok: true,
-        change: `updated the session "${title}": ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : []), ...(vl.set && !linkNote ? [vl.url ? `video link (${videoServiceOf(vl.url) ?? 'video'})` : 'removed the video link'] : []), ...(uz.set && !zoomNote ? [uz.on ? 'unique Zoom meeting per booking: ON' : 'unique Zoom meeting per booking: off'] : [])].join(', ')}`,
+        change: `updated the session "${title}"${whoChanged}: ${[...Object.keys(patch), ...(input.custom_hours !== undefined ? ['custom_hours'] : []), ...(vl.set && !firstLinkNote ? [vl.url ? `video link (${videoServiceOf(vl.url) ?? 'video'})` : 'removed the video link'] : []), ...(uz.set && !firstZoomNote ? [uz.on ? 'unique Zoom meeting per booking: ON' : 'unique Zoom meeting per booking: off'] : [])].join(', ')}.${savedEcho}`,
         vanity: await vanityLine(patch.slug),
-        note: [hoursNote, linkNote, zoomNote].filter(Boolean).join(' ') || undefined,
+        note: noteBits.join(' ') || undefined,
       };
     }
 
