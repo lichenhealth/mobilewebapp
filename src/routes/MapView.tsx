@@ -84,9 +84,21 @@ export default function MapView() {
   const [travelPins, setTravelPins] = useState<EventPin[]>([]);
   const [spacePins, setSpacePins] = useState<MappableSpace[]>([]);
   const [ready, setReady] = useState(false);
-  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
-    events: true, travel: true, places: true, orgs: true, communities: true, groups: true, people: true,
-  });
+  // THE LAYERS SPEAK HOME'S FEED GRAMMAR (founder 2026-11-02: "there should
+  // be a feed button to the left that is orange, with all the filters white,
+  // just like the homepage, so you know you're seeing all by default, and
+  // filtering to the airplane, for example, will show only travel map
+  // destinations"): an empty selection = EVERYTHING (the lit Feed door);
+  // picking layers narrows to just those, multi-select, and tapping Feed
+  // clears back to all. The derived record keeps every downstream
+  // visible-pin read unchanged.
+  const [layerSel, setLayerSel] = useState<Set<LayerKey>>(new Set());
+  const layers = useMemo(() => {
+    const all = layerSel.size === 0;
+    return Object.fromEntries(
+      LAYERS.map((l) => [l.key, all || layerSel.has(l.key)]),
+    ) as Record<LayerKey, boolean>;
+  }, [layerSel]);
   const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
   const [bizPins, setBizPins] = useState<BizLocationPin[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -391,13 +403,28 @@ export default function MapView() {
           <AssistantDoor section="maps" size={34} label="Your assistant — what's near you and worth knowing" />
         </div>
         <div className="mapv__layers" role="toolbar" aria-label="Map layers">
+          {/* The lit Feed door = everything, Home's grammar (founder
+              2026-11-02) — selecting any layer unlights it and narrows. */}
+          <button
+            className={'mapv__layer' + (layerSel.size === 0 ? ' is-on' : '')}
+            onClick={() => setLayerSel(new Set())}
+            aria-pressed={layerSel.size === 0}
+            aria-label="Everything"
+            data-tip="Everything"
+          >
+            <Icon name="newsfeed" size={16} />
+          </button>
           {LAYERS.map((l) => {
-            const on = layers[l.key];
+            const on = layerSel.has(l.key);
             return (
               <button
                 key={l.key}
                 className={'mapv__layer' + (on ? ' is-on' : '')}
-                onClick={() => setLayers((cur) => ({ ...cur, [l.key]: !cur[l.key] }))}
+                onClick={() => setLayerSel((cur) => {
+                  const next = new Set(cur);
+                  if (next.has(l.key)) next.delete(l.key); else next.add(l.key);
+                  return next;
+                })}
                 aria-pressed={on}
                 aria-label={l.label}
                 data-tip={l.label}
