@@ -77,14 +77,6 @@ export interface AssistantThread {
   emptyAsk: string;
   /** Empty-thread greeting when the section already holds their work. */
   welcome: string;
-  /** Off the brain's STANDING rail (founder 2026-10-21: "should the brain
-   *  only cover the aspects that have feeds? You can navigate to concierge
-   *  and current-cy via the bottom with mobile and the side bar with desktop
-   *  and go to the specific AI brain from there") — the thread still exists
-   *  (consent rows, proactive notes, deep links, section brain doors all
-   *  stand), it just doesn't ride the rail; its own brief/thread prepends
-   *  itself lit, the Maps pattern. */
-  offRail?: boolean;
 }
 
 export const ASSISTANT_THREADS: AssistantThread[] = [
@@ -129,7 +121,7 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
     welcome: 'Welcome back to Calendar. Tell me what to schedule, or how your hours should change.',
   },
   {
-    id: 'concierge', label: 'Concierge', icon: 'concierge', offRail: true,
+    id: 'concierge', label: 'Concierge', icon: 'concierge',
     blurb: 'Care — yours and the people you hold.',
     emptyAsk: 'No Concierge care set up yet. Tell me what wellbeing looks like for you right now, and we’ll begin your Web of Wellbeing together.',
     welcome: 'Welcome back to Concierge. Tell me how care is going, or what needs tending.',
@@ -138,7 +130,7 @@ export const ASSISTANT_THREADS: AssistantThread[] = [
   // relevant assistant and it can notice inefficiencies or suggest areas
   // to make more current-cy to help the person, financially").
   {
-    id: 'currentcy', label: 'Current-cy', icon: 'currentcy', offRail: true,
+    id: 'currentcy', label: 'Current-cy', icon: 'currentcy',
     blurb: 'Your wallet — a money coach for the gift-and-exchange economy.',
     emptyAsk: 'No Current has moved for you yet. Tell me what you offer — or what you need — and we’ll find your first exchange together.',
     welcome: 'Welcome back to Current-cy. Ask what moved, or where you could earn more.',
@@ -191,6 +183,35 @@ export async function loadSectionPresence(me: string): Promise<Record<string, bo
 
 export const threadLabel = (id: string) =>
   ASSISTANT_THREADS.find((t) => t.id === id)?.label ?? 'General';
+
+/** THE ONE RAIL — a FIXED order, selection lights IN PLACE (founder
+ *  2026-11-02, superseding the 2026-10-21 offRail call: "let's have the sub
+ *  section we've selected be orange but put it to the right of the feed
+ *  screen and keep them all in a consistent order - with the low navs
+ *  always showing up in the list (which means we'll have 2 rows)"): every
+ *  brain surface — the brief's section rail AND the feed's thread rail —
+ *  renders exactly this list, the whole-brain Feed circle first, then each
+ *  section in one standing order with the bottom-nav sections (Concierge ·
+ *  Drive · Maps · Current-cy) always present; at phone width the row wraps
+ *  to two. The CURRENT section lights where it stands, never prepended; a
+ *  section outside the list (my-celium, a kind directory…) appends at the
+ *  END lit. `thread` names the feed thread a circle badges/continues —
+ *  absent means a brief-only brain (Drive, Maps). Chat stays merged into
+ *  the whole brain (her same-day call — no chat circle). */
+export interface BrainRailItem { section: string; icon: string; label: string; thread?: string }
+export const BRAIN_RAIL: BrainRailItem[] = [
+  { section: 'home', icon: 'newsfeed', label: 'All conversations', thread: 'general' },
+  { section: 'profile', icon: 'profile', label: 'Profile management', thread: 'profile' },
+  { section: 'market', icon: 'store', label: 'Marketplace', thread: 'market' },
+  { section: 'events', icon: 'rsvp', label: 'Events', thread: 'events' },
+  { section: 'courses', icon: 'graduation-cap', label: 'Courses', thread: 'courses' },
+  { section: 'calendar', icon: 'calendar', label: 'Calendar', thread: 'calendar' },
+  { section: 'concierge', icon: 'concierge', label: 'Concierge', thread: 'concierge' },
+  // Drive's brain door says section="saved" (Saved.tsx) — the rail matches it.
+  { section: 'saved', icon: 'drive', label: 'Drive' },
+  { section: 'maps', icon: 'maps', label: 'Maps' },
+  { section: 'currentcy', icon: 'currentcy', label: 'Current-cy', thread: 'currentcy' },
+];
 
 /** Non-thread sections that can tag a conversation (founder 2026-10-07:
  *  a Maps-brain exchange wears the maps icon) — each with the mark its own
