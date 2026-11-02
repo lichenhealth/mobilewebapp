@@ -61,3 +61,9 @@ verify_jwt = false
 
 [functions.zoom-meeting]
 verify_jwt = false
+
+# A member's calendar served as a standing ICS feed — Google/Apple/Outlook
+# poll it with no JWT; the unguessable token in the URL is the authorization
+# (the guest_token pattern).
+[functions.calendar-feed]
+verify_jwt = false

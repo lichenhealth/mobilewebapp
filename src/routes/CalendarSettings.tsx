@@ -13,6 +13,7 @@ import {
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
   removeExternalCalendar, syncExternalCalendars, deleteEveryoneShare,
   startGoogleConnect, disconnectGoogle, googleAccountId,
+  loadMyCalendarFeedToken, mintCalendarFeedToken, calendarFeedUrl,
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
 import CalImportGuide from '../components/CalImportGuide';
@@ -311,6 +312,16 @@ export default function CalendarSettings() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [stepsSent, setStepsSent] = useState(false);
+
+  // The OUTBOUND feed (founder 2026-11-02): read the existing token on
+  // arrival (never mints by itself — the button is the deliberate act).
+  const [feedTok, setFeedTok] = useState<string | null>(null);
+  const [feedCopied, setFeedCopied] = useState(false);
+  const [feedRotateArm, setFeedRotateArm] = useState(false);
+  useEffect(() => {
+    if (!me) return;
+    void loadMyCalendarFeedToken().then((t) => { if (t) setFeedTok(t); });
+  }, [me]);
 
   // Back from Google's consent screen: sync the fresh connection, tidy the URL.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1416,6 +1427,68 @@ export default function CalendarSettings() {
               <Icon name="plus" size={12} /> Add calendar
             </button>
           </div>
+        </div>
+
+        {/* ── Your Lichen calendar, in Google (founder 2026-11-02: "I want
+            to see my Lichen cal on my google cal as well as seeing my
+            google cal on my lichen cal (already)") — the OUTBOUND half: a
+            private ICS feed Google/Apple/Outlook subscribe to by URL. The
+            token is the whole authorization, so the copy says keep it
+            private; Rotate mints a fresh link and the old one dies. ── */}
+        <div className="cedit__field">
+          <span className="cedit__label">Your Lichen calendar, elsewhere</span>
+          <p className="cedit__hint">
+            See your Lichen events inside Google, Apple, or Outlook: create your
+            private feed link, then in Google Calendar open <em>Settings &rarr;
+            Add calendar &rarr; From URL</em> and paste it. Your events and
+            confirmed sessions ride along; Google refreshes subscribed feeds on
+            its own schedule (often every 12&ndash;24 hours), so new things can
+            take a while to appear there.
+          </p>
+          {feedTok == null ? (
+            <button
+              className="cedit__add cedit__add--sm"
+              onClick={() => act(async () => { setFeedTok(await mintCalendarFeedToken()); })}
+            >
+              <Icon name="plus" size={12} /> Create your private feed link
+            </button>
+          ) : (
+            <>
+              <div className="cset__add cset__add--wrap">
+                <input
+                  className="cedit__input cset__grow"
+                  readOnly
+                  value={calendarFeedUrl(feedTok)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                />
+                <button
+                  className="cedit__add cedit__add--sm"
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(calendarFeedUrl(feedTok)); setFeedCopied(true); setTimeout(() => setFeedCopied(false), 2500); }
+                    catch { /* the field selects on focus as the fallback */ }
+                  }}
+                >
+                  {feedCopied ? 'Copied ✓' : 'Copy'}
+                </button>
+                <button
+                  className="cedit__add cedit__add--sm"
+                  onClick={() => {
+                    if (!feedRotateArm) { setFeedRotateArm(true); setTimeout(() => setFeedRotateArm(false), 4000); return; }
+                    setFeedRotateArm(false);
+                    void act(async () => { setFeedTok(await mintCalendarFeedToken(true)); });
+                  }}
+                >
+                  {feedRotateArm ? 'Old link stops working — sure?' : 'Rotate'}
+                </button>
+              </div>
+              <p className="cedit__hint">
+                Anyone holding this link can read your Lichen calendar — keep it
+                private, and Rotate it if it ever leaks (the old link stops
+                working the moment you do).
+              </p>
+            </>
+          )}
         </div>
         {/* ── My Lichen calendar — who sees it ── */}
         <div className="cedit__field">

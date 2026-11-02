@@ -317,6 +317,14 @@ const CALENDAR_TOOLS = [
       required: ['title', 'active'],
     },
   },
+  // THE OUTBOUND FEED (founder 2026-11-02: "I want to see my Lichen cal on
+  // my google cal"): mint-or-read the sender's own private ICS feed link —
+  // no arguments, the trigger's profile is the only possible owner.
+  {
+    name: 'calendar_feed_link',
+    description: 'Their private link for seeing the LICHEN calendar inside Google/Apple/Outlook (the reverse of importing Google into Lichen). Mints the link if none exists, returns the standing one otherwise — no input. Hand them the URL with the steps: in Google Calendar, Settings \u2192 Add calendar \u2192 From URL, paste it. Say plainly: anyone holding the link can read their calendar, so keep it private (rotating it in Calendar settings kills a leaked link), and Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
   // THE CALENDAR BRAIN IS AN ADMIN (founder 2026-11-02: "I approve a therapy
   // session via a chat with Ai, or I can do so manually via the bookings
   // button in cal? both work?"): answering a request here flips the SAME
@@ -2064,6 +2072,24 @@ Deno.serve(async (req) => {
       return { list, tBy, whoOf };
     };
 
+    if (name === 'calendar_feed_link') {
+      // Mint-or-read against the TRIGGER's profile — the no-target rule.
+      let row = ((await (await sb(`calendar_feeds?profile_id=eq.${profile_id}&select=token`)).json()) as { token: string }[] | null)?.[0];
+      if (!row) {
+        const ins = await sb('calendar_feeds', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ profile_id }),
+        });
+        row = ((await ins.json().catch(() => null)) as { token: string }[] | null)?.[0];
+      }
+      if (!row?.token) return { ok: false, error: 'The feed link could not be created just now — Calendar settings has the same button.' };
+      return {
+        ok: true,
+        feed_url: `${SUPABASE_URL}/functions/v1/calendar-feed?t=${row.token}`,
+        google_steps: 'Google Calendar \u2192 Settings \u2192 Add calendar \u2192 From URL \u2192 paste the link. Apple: Calendar \u2192 File \u2192 New Calendar Subscription.',
+        say_plainly: 'Anyone holding this link can read their Lichen calendar \u2014 keep it private; Rotate in Calendar settings kills a leaked link. Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
+      };
+    }
     if (name === 'my_booking_requests') {
       const { list, tBy, whoOf } = await pendingBookings();
       return {
@@ -2537,6 +2563,7 @@ Deno.serve(async (req) => {
     add_booking_type: 'calendar', update_booking_type: 'calendar',
     my_booking_requests: 'calendar', respond_booking_request: 'calendar',
     set_booking_type_active: 'calendar', add_task: 'calendar',
+    calendar_feed_link: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
     my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
