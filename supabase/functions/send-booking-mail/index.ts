@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval,pay_methods),provider:profiles!bookings_provider_id_fkey(full_name)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval,pay_methods),provider:profiles!bookings_provider_id_fkey(full_name,handle)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -64,6 +64,15 @@ Deno.serve(async (req) => {
     const provider = row.provider?.full_name ?? 'a Lichen member';
     const when = `${new Date(row.on_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${minToLabel(row.start_min)} – ${minToLabel(row.end_min)} (${provider}'s local time)`;
     const link = `${APP_URL}/b/${token}`;
+    // THE WAY FORWARD on a cancelled/declined booking (founder 2026-11-02:
+    // "a CTA to book a different time/meeting type with Galyn, and take
+    // users to lichen.health/book/galyn so they see the highest level
+    // link"): the provider's TOP-LEVEL booking menu, when they have a
+    // handle — derived from the row like everything else in this mail.
+    const handle = typeof row.provider?.handle === 'string' && row.provider.handle ? row.provider.handle as string : null;
+    const first = provider.split(' ')[0];
+    const bookAgain = (row.status === 'cancelled' || row.status === 'declined') && handle
+      ? `${APP_URL}/book/${handle}` : null;
 
     const CONTENT: Record<string, { subject: string; lead: string }> = {
       pending: {
@@ -76,11 +85,11 @@ Deno.serve(async (req) => {
       },
       declined: {
         subject: `${t.title} — that time didn't work`,
-        lead: `${provider} couldn't take that slot. Their live availability is always at the link below — pick another whenever you like.`,
+        lead: `${provider} couldn't take that slot. ${handle ? 'Their live availability is one tap below — pick another whenever you like.' : 'Pick another time whenever you like.'}`,
       },
       cancelled: {
         subject: `${t.title} on ${new Date(row.on_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} was cancelled`,
-        lead: `This booking has been cancelled. Their live availability is at the link below if you'd like another time.`,
+        lead: `This booking has been cancelled.${handle ? ` If you'd like another time, ${provider}'s live availability is one tap below.` : ''}`,
       },
     };
     // kind='reminder' (tick_booking_reminders via pg_net, 2026-10-03): the
@@ -144,7 +153,7 @@ Deno.serve(async (req) => {
       ? `${row.price_cents ? 'Or pay directly' : 'Ways to pay'}: ${methodWords.join(' · ')}`
       : '';
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${link}`;
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${bookAgain ? `Book another time with ${first}: ${bookAgain}\n` : ''}${link}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -166,8 +175,11 @@ Deno.serve(async (req) => {
         // links keep the peach link-cue.
         meet ? `<p style="margin:14px 0 0;font-size:15px"><a href="${esc(meet)}" style="color:#5E89AD;font-weight:600;text-decoration:underline">${esc(meetLabel)}</a></p>` : ''}
     </div>
-    <p style="margin:22px 0"><a href="${link}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">See your booking</a></p>
-    <p style="font-size:12px;color:#8a8a84">No account needed — that link is yours to view or cancel the booking.</p>
+    ${bookAgain
+      ? `<p style="margin:22px 0"><a href="${bookAgain}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">Book another time with ${esc(first)}</a></p>
+    <p style="font-size:12px;color:#8a8a84">That link shows every session ${esc(first)} offers, with live availability. Your old booking stays viewable at <a href="${link}" style="color:#8a8a84">this link</a>.</p>`
+      : `<p style="margin:22px 0"><a href="${link}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">See your booking</a></p>
+    <p style="font-size:12px;color:#8a8a84">No account needed — that link is yours to view or cancel the booking.</p>`}
   </div>
 </div>`;
 
