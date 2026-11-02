@@ -25,7 +25,20 @@ export type FeedAttachment =
    *  PERSON taps to re-enable; the model never arms anything. `which` names
    *  the switch: the member's own per-space choice, or the space's own
    *  assistant switch (steward-flippable). */
-  | { type: 'space_consent'; room: 'currentcy'; id: string; name: string; kind: string; which: 'member' | 'space' };
+  | { type: 'space_consent'; room: 'currentcy'; id: string; name: string; kind: string; which: 'member' | 'space' }
+  /** THE BRIEFING RIDES THE REPLY (founder 2026-11-02, the Mexico bug: she
+   *  replied to a brief summary and the model said "I don't have anything
+   *  about a Mexico trip" — the narration she was reading lives only on the
+   *  client, never in the conversation). A brief-composer send carries what
+   *  was on her screen so the model knows what "it" means. NEVER rendered —
+   *  the member saw it as the brief card already. */
+  | { type: 'brief_ctx'; section: string; text: string }
+  /** A COPYABLE VALUE (founder 2026-11-02, the feed-URL reply overflowing
+   *  its bubble in broken code fences: "just have a copy button and have it
+   *  check when its copied"): the reply hands a real Copy button instead of
+   *  pasting a long URL into prose. Text is composed server-side (the
+   *  app_link rule — never model-written). */
+  | { type: 'copy_text'; text: string; label: string };
 
 export interface FeedPostRow {
   id: string;
@@ -308,14 +321,24 @@ export async function postToAssistantFeed(
    *  ['maps'], so the Maps-filtered list can find it and its row can wear
    *  the maps icon. */
   sections?: string[],
+  /** The brief narration on screen when this was sent (founder 2026-11-02):
+   *  rides as a brief_ctx attachment so the reply knows what the member was
+   *  reading — the client never renders it. */
+  briefCtx?: { section: string; text: string },
 ): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const convo = convoId === undefined ? crypto.randomUUID() : convoId;
+  const atts = [
+    ...(images ?? []).map((url) => ({ type: 'photo', url } as const)),
+    ...(briefCtx?.text.trim()
+      ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000) } as const]
+      : []),
+  ];
   const { data, error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,
     source_post_id: sourcePostId ?? null, thread, convo_id: convo,
-    attachments: images?.length ? images.map((url) => ({ type: 'photo', url })) : null,
+    attachments: atts.length ? atts : null,
     sections: sections?.length ? sections : null,
   }).select('id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections').single();
   if (error) throw error;

@@ -867,8 +867,15 @@ export default function AssistantBrief() {
       const latest = await latestConvoIn(feedThread, sectionTag ?? undefined).catch(() => null);
       if (latest?.convoId && Date.now() - latest.at < CONVO_GAP_MS) convo = latest.convoId;
     }
+    // THE BRIEFING RIDES ALONG (founder 2026-11-02, the Mexico bug: she
+    // replied to the summary card and the model — whose context is the
+    // conversation's rows alone — said it had nothing about a Mexico trip):
+    // whatever narration is on her screen rides the send as a brief_ctx
+    // attachment, so "how long is the trip?" means what she just read.
+    const briefCtx = !spaceParam && state === 'ready' && brief?.trim()
+      ? { section, text: brief } : undefined;
     const row = await postToAssistantFeed(
-      text, undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined);
+      text, undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined, briefCtx);
     navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
 
@@ -1120,7 +1127,7 @@ export default function AssistantBrief() {
           </>
         )}
         {doorOn && state === 'capped' && (
-          <p className="abrief__text">You&rsquo;ve leaned on me a lot today — which I love. The briefing rests until tomorrow; everything&rsquo;s still in your bell and queues.</p>
+          <p className="abrief__text">Today&rsquo;s briefing budget is used up, so fresh summaries rest until tomorrow — a daily guardrail on AI costs, not a problem. Your bell and queues hold everything, and the conversations below still answer.</p>
         )}
         {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>

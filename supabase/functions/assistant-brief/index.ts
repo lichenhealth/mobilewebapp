@@ -92,9 +92,13 @@ async function resolveCaller(req: Request): Promise<string | null> {
 async function usedToday(profileId: string): Promise<number> {
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
+  // Brief and search SHARE this budget; feed and chat each have their own
+  // (the doctrine's four-caps-never-pooled rule). Counting every context
+  // here meant a day of feed conversations silently ate the briefings —
+  // the founder hit it live 2026-11-02 ("the briefing rests" at 22 briefs).
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/assistant_queries?profile_id=eq.${profileId}` +
-    `&created_at=gte.${dayStart.toISOString()}&select=id`,
+    `&context=in.(brief,search)&created_at=gte.${dayStart.toISOString()}&select=id`,
     { headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}`, Prefer: 'count=exact', Range: '0-0' } },
   );
   const total = Number((res.headers.get('content-range') ?? '').split('/')[1] ?? '0');

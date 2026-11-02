@@ -322,7 +322,7 @@ const CALENDAR_TOOLS = [
   // no arguments, the trigger's profile is the only possible owner.
   {
     name: 'calendar_feed_link',
-    description: 'Their private link for seeing the LICHEN calendar inside Google/Apple/Outlook (the reverse of importing Google into Lichen). Mints the link if none exists, returns the standing one otherwise — no input. Hand them the URL with the steps: in Google Calendar, Settings \u2192 Add calendar \u2192 From URL, paste it. Say plainly: anyone holding the link can read their calendar, so keep it private (rotating it in Calendar settings kills a leaked link), and Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
+    description: 'Their private link for seeing the LICHEN calendar inside Google/Apple/Outlook (the reverse of importing Google into Lichen). Mints the link if none exists, returns the standing one otherwise — no input. A "Copy your calendar link" button is attached under your reply automatically, so NEVER paste the raw URL or code fences into the reply text — the long link breaks the bubble. Give the steps: in Google Calendar, Settings \u2192 Add calendar \u2192 From URL, paste what the button copied. Say plainly: anyone holding the link can read their calendar, so keep it private (rotating it in Calendar settings kills a leaked link), and Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   // THE CALENDAR BRAIN IS AN ADMIN (founder 2026-11-02: "I approve a therapy
@@ -645,6 +645,15 @@ Deno.serve(async (req) => {
     .map((a: { url: string }) => a.url)
     .slice(0, 6);
   if (!trigger?.body?.trim() && triggerImages.length === 0) return json({ ok: true, skipped: 'empty-post' });
+  // THE BRIEFING THEY WERE READING (founder 2026-11-02, the Mexico bug): a
+  // brief-composer send carries the narration that was on their screen —
+  // without it, "how long is the trip?" lands in a conversation where no
+  // trip was ever mentioned and the honest answer reads as amnesia.
+  const briefCtxAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .find((a: { type?: string; text?: string }) => a?.type === 'brief_ctx' && typeof a.text === 'string');
+  const briefContext = briefCtxAtt?.text?.trim()
+    ? `\n\n[Right before sending this, they were reading this briefing of theirs on the same screen — they may be replying to it: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
+    : '';
 
   // A SPACE'S BUILD THREAD (founder 2026-08-22): thread `space:<uuid>` — the
   // member's own private rows, ABOUT a space. The space id comes from the
@@ -1185,6 +1194,11 @@ Deno.serve(async (req) => {
   // own resolution against stewardSpaces; the client renders the buttons
   // and the PERSON taps. The model never flips a switch itself.
   let treasuryDoor: { id: string; name: string; kind: string } | null = null;
+  // The calendar feed URL the reply should hand as a COPY BUTTON (founder
+  // 2026-11-02: the raw URL pasted in prose overflowed the bubble in broken
+  // code fences — "just have a copy button and have it check when its
+  // copied"). Set only by calendar_feed_link's own mint-or-read.
+  let calFeedUrl: string | null = null;
   let consentDoor: { id: string; name: string; kind: string; which: 'member' | 'space' } | null = null;
   // In-app doors this reply hands over (founder 2026-10-07, the transfer):
   // composed ONLY from the fixed APP_DOORS table, never model-written paths.
@@ -2083,10 +2097,11 @@ Deno.serve(async (req) => {
         row = ((await ins.json().catch(() => null)) as { token: string }[] | null)?.[0];
       }
       if (!row?.token) return { ok: false, error: 'The feed link could not be created just now — Calendar settings has the same button.' };
+      calFeedUrl = `${SUPABASE_URL}/functions/v1/calendar-feed?t=${row.token}`;
       return {
         ok: true,
-        feed_url: `${SUPABASE_URL}/functions/v1/calendar-feed?t=${row.token}`,
-        google_steps: 'Google Calendar \u2192 Settings \u2192 Add calendar \u2192 From URL \u2192 paste the link. Apple: Calendar \u2192 File \u2192 New Calendar Subscription.',
+        link_ready: 'A "Copy your calendar link" button rides under your reply \u2014 their tap copies the URL to the clipboard. Never paste the URL or code fences into your words.',
+        google_steps: 'Google Calendar \u2192 Settings \u2192 Add calendar \u2192 From URL \u2192 paste what the button copied. Apple: Calendar \u2192 File \u2192 New Calendar Subscription.',
         say_plainly: 'Anyone holding this link can read their Lichen calendar \u2014 keep it private; Rotate in Calendar settings kills a leaked link. Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
       };
     }
@@ -2526,18 +2541,21 @@ Deno.serve(async (req) => {
   // marker so history stays cheap.
   const messages: Record<string, unknown>[] = rows.map((p: { id: string; author: string; body: string; source_post_id: string | null; attachments?: { type?: string; url?: string }[] }) => {
     if (p.author === 'claude') return { role: 'assistant', content: p.body };
-    const hasShots = Array.isArray(p.attachments) && p.attachments.length > 0;
+    // Only PHOTOS mean "they attached a photo" — a brief_ctx rider is
+    // context, not an attachment they made (founder 2026-11-02).
+    const hasShots = Array.isArray(p.attachments)
+      && p.attachments.some((a) => a?.type === 'photo');
     if (p.id === feed_post_id && triggerImages.length) {
       return {
         role: 'user',
         content: [
           ...triggerImages.map((url) => ({ type: 'image', source: { type: 'url', url } })),
-          { type: 'text', text: `${p.body?.trim() || '(They sent the photo without words.)'}${sharedPostContext}` },
+          { type: 'text', text: `${p.body?.trim() || '(They sent the photo without words.)'}${sharedPostContext}${briefContext}` },
         ],
       };
     }
     const marker = hasShots ? '[they attached a photo] ' : '';
-    return { role: 'user', content: p.id === feed_post_id ? `${marker}${p.body}${sharedPostContext}` : `${marker}${p.body}` };
+    return { role: 'user', content: p.id === feed_post_id ? `${marker}${p.body}${sharedPostContext}${briefContext}` : `${marker}${p.body}` };
   });
 
   // Tool rounds run INSIDE one exchange: a multi-turn edit costs one entry in
@@ -2760,6 +2778,7 @@ Deno.serve(async (req) => {
       tab: lastEdit.tab,
     });
   }
+  if (calFeedUrl) replyAttachments.push({ type: 'copy_text', text: calFeedUrl, label: 'Copy your calendar link' });
   if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
   if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
   for (const d of appDoors) replyAttachments.push({ type: 'app_link', ...d });

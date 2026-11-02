@@ -110,9 +110,11 @@ async function resolveCaller(req: Request): Promise<string | null> {
 async function usedToday(profileId: string): Promise<number> {
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
+  // Search and brief SHARE this budget; feed and chat have their own —
+  // never pool all four (the 2026-11-02 phantom-cap bug).
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/assistant_queries?profile_id=eq.${profileId}` +
-    `&created_at=gte.${dayStart.toISOString()}&select=id`,
+    `&context=in.(brief,search)&created_at=gte.${dayStart.toISOString()}&select=id`,
     {
       headers: {
         apikey: SERVICE_ROLE_KEY,

@@ -447,6 +447,9 @@ export default function AssistantFeed() {
   // switch back on — the PERSON taps; the server only ever offered.
   const [doorBusy, setDoorBusy] = useState(false);
   const [doorErr, setDoorErr] = useState('');
+  // Which copy_text button last copied (founder 2026-11-02: "have it check
+  // when its copied to clipboard") — the check is the receipt.
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   async function enterTreasury(att: Extract<NonNullable<FeedPostRow['attachments']>[number], { type: 'space_thread' | 'space_consent' }>) {
     if (doorBusy) return;
     setDoorBusy(true); setDoorErr('');
@@ -1407,6 +1410,31 @@ export default function AssistantFeed() {
                       </button>
                     </div>
                   ))}
+                {/* A COPYABLE VALUE (founder 2026-11-02, the feed URL
+                    overflowing its bubble: "just have a copy button and
+                    have it check when its copied to clipboard"): the reply
+                    hands a Copy button; the tap's receipt is the ✓. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'copy_text' ? [a] : []))
+                  .map((a, i) => {
+                    const key = `${p.id}:copy:${i}`;
+                    return (
+                      <div className="afeed__pubrow" key={key}>
+                        <button className="afeed__pubbtn" type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(a.text)
+                              .then(() => setCopiedKey(key))
+                              .catch(() => {
+                                // Clipboard refused (rare) — select-and-copy
+                                // fallback via a prompt keeps the value reachable.
+                                window.prompt('Copy the link:', a.text);
+                              });
+                          }}>
+                          {copiedKey === key ? 'Copied to your clipboard ✓' : a.label}
+                        </button>
+                      </div>
+                    );
+                  })}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'space_thread' || a.type === 'space_consent' ? [a] : []))
                   .map((a) => (
