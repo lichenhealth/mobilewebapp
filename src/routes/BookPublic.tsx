@@ -88,8 +88,6 @@ export default function BookPublic() {
   const [payLater, setPayLater] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [doneToken, setDoneToken] = useState<string | null>(null);
-  const [doneStatus, setDoneStatus] = useState<'pending' | 'confirmed'>('pending');
 
   const from = todayISO();
   // Two browsable months — the month grid made the old fortnight feel short.
@@ -413,74 +411,6 @@ export default function BookPublic() {
   const capacity = board?.type.capacity ?? 1;
   const unanswered = questions.some((_, i) => !(answers[i] ?? '').trim());
 
-  if (doneToken) {
-    // Payment (founder 2026-10-29): an INSTANT priced session asks for the
-    // money right here — the frozen price, straight into Stripe Checkout. A
-    // REQUEST type never charges before the provider's yes: the acceptance
-    // email carries the pay link instead.
-    const cents = board?.type.price_cents ?? null;
-    return (
-      <div className="gev">
-        <header className="bkg__head">
-          <p className="eyebrow">{doneStatus === 'confirmed' ? 'Booked' : 'Requested'}</p>
-          <h1 className="bkg__title display-italic">
-            {doneStatus === 'confirmed' ? 'You’re booked.' : 'Request sent.'}
-          </h1>
-          <p className="bkg__sub">
-            {doneStatus === 'confirmed'
-              ? `${activeType?.title ?? 'Your session'} with ${providerName} is on their calendar.`
-              : `${providerName} confirms each request by hand — you’ll get an email either way.`}
-            {' '}A confirmation is on its way to {email.trim()}.
-            {cents && doneStatus === 'pending'
-              ? (payLater
-                ? ` You chose to be invoiced — if they accept, your booking link takes payment (card or bank) whenever you're ready.`
-                : ` If they accept, that email carries the ${usdLabel(cents)} payment link.`)
-              : ''}
-            {cents && doneStatus === 'confirmed' && payLater
-              ? ` You chose to be invoiced — your email and booking link carry the ${usdLabel(cents)} payment door whenever you're ready.`
-              : ''}
-          </p>
-        </header>
-        {error && <p className="bkg__error">{error}</p>}
-        {cents && doneStatus === 'confirmed' && !payLater ? (
-          <div className="bkg__doneactions">
-            <button
-              className="btn btn-primary bkg__btn"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true); setError('');
-                try { window.location.href = await startBookingCheckout({ token: doneToken }); }
-                catch (e) { setError((e as { message?: string } | null)?.message || 'Checkout failed.'); setBusy(false); }
-              }}
-            >
-              {busy ? 'One moment…' : `Pay ${usdLabel(cents)} to secure it`}
-            </button>
-          </div>
-        ) : null}
-        {doneStatus === 'confirmed' && (
-          <PayDoors
-            methods={board?.type.pay_methods}
-            lead={cents ? 'Or pay directly' : `Ways to pay${board?.type.price ? ` ${board.type.price}` : ''}`}
-            className="bkg__paydoors"
-          />
-        )}
-        <div className="bkg__doneactions">
-          <button className={'btn bkg__btn' + (cents && doneStatus === 'confirmed' && !payLater ? '' : ' btn-primary')} onClick={() => navigate(`/b/${doneToken}`)}>
-            See your booking
-          </button>
-        </div>
-        {!user && (
-          <footer className="gev__join">
-            <p>
-              Lichen is a community for healing, growing and creating — <span className="nobr">{providerName}</span> is a member.{' '}
-              <button className="gev__joinlink" onClick={() => navigate('/signup')}>Request to join Lichen</button>
-            </p>
-          </footer>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="gev bkpub">
       <header className="bkg__head">
@@ -667,9 +597,13 @@ export default function BookPublic() {
                 // email speaks it (best-effort — the booking stands either way).
                 if (payLater) await setBookingPayChoice({ token, later: true }).catch(console.error);
                 sendBookingMail(token);
-                setDoneStatus(activeType.approval === 'instant' ? 'confirmed' : 'pending');
-                setDoneToken(token);
-                setBusy(false);
+                // THE CONFIRMATION IS THE BOOKING PAGE (founder 2026-11-02:
+                // "bring all the details from the 'see your booking' page one
+                // page forward so you're not clicking more than we need to"):
+                // land straight on /b/<token> — status, add-to-calendar, the
+                // Join link, reschedule, cancel and the pay door all live
+                // there. One source of truth, zero extra clicks.
+                navigate(`/b/${token}?just=1`);
               } catch (e) {
                 setError((e as { message?: string } | null)?.message || 'Something went wrong.');
                 setBusy(false);

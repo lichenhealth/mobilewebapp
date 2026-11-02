@@ -7,7 +7,7 @@ import {
   type GuestBookingView, type BookingBoard,
 } from '../lib/bookingApi';
 import { addDays, todayISO } from '../lib/conciergeApi';
-import { icsDataUri, googleCalUrl } from '../lib/ics';
+import AddToCal from '../components/AddToCal';
 import { videoServiceOf } from '../lib/linkify';
 import { Icon } from '../components/Icon';
 import PayDoors from '../components/PayDoors';
@@ -46,6 +46,10 @@ export default function GuestBooking() {
   // unpaid page to someone who just paid.
   const [payErr, setPayErr] = useState('');
   const justPaid = new URLSearchParams(location.search).get('paid') === '1';
+  // Arriving straight from the booking flow (founder 2026-11-02: "bring all
+  // the details from the 'see your booking' page one page forward") — the
+  // confirmation LANDS here now, so say the email is coming.
+  const justBooked = new URLSearchParams(location.search).get('just') === '1';
 
   useEffect(() => {
     if (!moving || !row?.type_id || board) return;
@@ -139,6 +143,7 @@ export default function GuestBooking() {
           {row.type_location ? ` · ${row.type_location}` : ''}
         </p>
         <p className="bkg__sub">{s.sub}</p>
+        {justBooked && <p className="bkg__sub">A confirmation email is on its way to your inbox.</p>}
       </header>
 
       {/* PAYMENT (founder 2026-10-29): the frozen price + where it stands.
@@ -195,12 +200,10 @@ export default function GuestBooking() {
         </div>
       )}
 
-      {row.status === 'confirmed' && cal && (
-        <div className="bkg__doneactions">
-          <a className="btn bkg__btn" href={icsDataUri(cal)} download="lichen-booking.ics">Add to calendar (.ics)</a>
-          <a className="btn bkg__btn" href={googleCalUrl(cal)} target="_blank" rel="noopener noreferrer">Google Calendar</a>
-        </div>
-      )}
+      {/* The four major-calendar doors (founder 2026-11-02: "links to the
+          major calendars out there to seamlessly add it to your most used
+          cal") — one shared row, the .ics as the universal catch-all. */}
+      {row.status === 'confirmed' && cal && <AddToCal ev={cal} />}
 
       {(row.status === 'pending' || row.status === 'confirmed') && (
         <div className="bkg__doneactions">
