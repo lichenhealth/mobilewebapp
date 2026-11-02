@@ -27,6 +27,12 @@
 .bkg__row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .bkg__btn { font-size: 12px; padding: 8px 14px; }
 .bkg__btn--quiet { color: var(--ink-muted); }
+/* Actionable CTAs read PEACH, with air above (founder 2026-11-02, the /b/
+   markup: "create a bit more space before the cancel and change CTA's,
+   which should be peach because they're actionable"). */
+.bkg__btn--act { border-color: var(--peach); color: var(--peach-deep); }
+.bkg__btn--act:hover { background: var(--peach-tint); border-color: var(--peach-deep); }
+.bkg__doneactions--roomy { margin-top: var(--s-5); }
 /* Book-from-here rows are real buttons (whole row navigates) */
 .bkg__row--go { width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
 .bkg__row--go:hover { border-color: var(--peach); }
