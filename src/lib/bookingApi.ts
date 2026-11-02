@@ -493,7 +493,14 @@ export function slotsForDay(board: BookingBoard, iso: string, now = new Date()):
     if (w.weekday !== weekday) continue;
     if (w.valid_from && w.valid_from > iso) continue;
     if (w.valid_to && w.valid_to < iso) continue;
-    const step = board.type.slot_increment_min ?? dur;
+    // THE DEFAULT STEP IS 30 MINUTES (founder 2026-11-02: "every 15 minutes
+    // seems a bit laborious. shall we have the default be 30 minute
+    // increments?" — an open week read as a wall of pills): no explicit
+    // increment = starts on the hour and half hour, except a session
+    // SHORTER than 30 min still steps by its own length (a 30-min step on
+    // a 15-min session would strand half its openings). An explicit
+    // per-type increment always wins.
+    const step = board.type.slot_increment_min ?? Math.min(dur, 30);
     for (let t = w.start_min; t + dur <= w.end_min; t += step) {
       if (d.getTime() + t * 60000 < cutoffMs) continue;
       if (dayFull && capacity > 1 && !heldStarts.has(t)) continue;

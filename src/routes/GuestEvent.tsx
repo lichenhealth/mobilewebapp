@@ -93,9 +93,15 @@ export default function GuestEvent() {
         </div>
       </div>
 
-      <p className="gev__join">
-        Want the full experience? <a href="/signup">Create a Lichen account</a> — it’s free to try.
-      </p>
+      {/* The standard join footer (founder 2026-11-02 — one sentence, the
+          host's name whole [.nobr], the CTA inline; "free to try" retired
+          with the alpha-copy sweep). */}
+      <footer className="gev__join">
+        <p>
+          Lichen is a community for healing, growing and creating — <span className="nobr">{info.host_name}</span> is a member.{' '}
+          <a className="gev__joinlink" href="/signup">Request to join Lichen</a>
+        </p>
+      </footer>
     </div>
   );
 }

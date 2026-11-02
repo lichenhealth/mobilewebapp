@@ -680,7 +680,9 @@ export default function CalendarSettings() {
               <RuleSelect
                 value={bkEdit.slot_increment_min ?? null}
                 options={[
-                  { v: null, label: 'Start times every session length' },
+                  // The default steps on 30-min marks; a shorter session
+                  // steps by its own length (bookingApi's one rule).
+                  { v: null, label: `Start times every ${Math.min(bkEdit.duration_min ?? 60, 30)} min (default)` },
                   ...[15, 20, 30, 45, 60].map((n) => ({ v: n, label: `Start times every ${n} min` })),
                 ]}
                 offLabel={(v) => `Start times every ${v} min`}

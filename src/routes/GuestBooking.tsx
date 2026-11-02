@@ -266,9 +266,14 @@ export default function GuestBooking() {
         </section>
       )}
 
+      {/* The standard join footer (founder 2026-11-02, marking this page's
+          old button row: the name never splits [.nobr] and the CTA rides
+          INLINE in the sentence — the BookPublic shape, missed here). */}
       <footer className="gev__join">
-        <p>Lichen is a community for healing, growing and creating — {row.provider_name} is a member.</p>
-        <a className="btn bkg__btn" href="/signup">Learn about joining</a>
+        <p>
+          Lichen is a community for healing, growing and creating — <span className="nobr">{row.provider_name}</span> is a member.{' '}
+          <a className="gev__joinlink" href="/signup">Request to join Lichen</a>
+        </p>
       </footer>
     </div>
   );
