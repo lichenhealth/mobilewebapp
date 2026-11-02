@@ -22,7 +22,9 @@
 // by conversation rather than an undo stack.
 //
 // Env: ANTHROPIC_API_KEY (set), PUSH_HOOK_SECRET, optional ASSISTANT_FEED_MODEL
-// (default claude-sonnet-5) and ASSISTANT_FEED_CAP (default 20).
+// (default claude-sonnet-5) and ASSISTANT_FEED_CAP (default 100 — raised
+// from 20 the day the founder burned through 20 real build exchanges,
+// 2026-11-02; a cost guardrail, not a scarcity feature).
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
@@ -37,7 +39,7 @@ const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const MODEL = Deno.env.get('ASSISTANT_FEED_MODEL') ?? 'claude-sonnet-5';
-const DAILY_CAP = Number(Deno.env.get('ASSISTANT_FEED_CAP') ?? '20');
+const DAILY_CAP = Number(Deno.env.get('ASSISTANT_FEED_CAP') ?? '100');
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } });
 
@@ -693,7 +695,7 @@ Deno.serve(async (req) => {
   if (used >= DAILY_CAP) {
     await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
       profile_id, author: 'claude', thread: trigger.thread ?? 'general', convo_id: trigger.convo_id ?? null,
-      body: 'I’ve reached today’s limit with you — a small guardrail while the mycelium is young. Let’s pick this up tomorrow. 🌱',
+      body: 'We’ve used today’s conversation budget — a daily guardrail on AI costs, not a problem. Everything we built is saved, and I’m back tomorrow. 🌱',
     }) });
     return json({ ok: true, skipped: 'cap' });
   }
