@@ -317,7 +317,12 @@ export default function Invite() {
       // knocker who had signed up meanwhile, and the row sat at the door —
       // this early return used to skip the knock-resolution step below).
       const already = knocks.find((k) => k.email.toLowerCase() === to.toLowerCase());
-      if (already && already.status === 'new') void resolveKnock(already.id, 'invited');
+      // AWAITED, not fired-and-forgotten (founder 2026-11-03: "I had to
+      // refresh to get the knock at the door to go away"): send()/sendAll()
+      // call loadLedger() right after this returns, and an un-awaited UPDATE
+      // could lose that race — the fresh read then clobbered the optimistic
+      // resolution with the still-'new' row until a hand refresh.
+      if (already && already.status === 'new') await resolveKnock(already.id, 'invited');
       if (pendingKnock?.email === to.toLowerCase()) setPendingKnock(null);
       if (gifting) {
         const { error: ge } = await supabase.rpc('gift_subscription', { p_email: to, p_tier: giftTier, p_months: giftMonths });
@@ -366,8 +371,10 @@ export default function Invite() {
     }
     // NOW the knock is genuinely handled — matched on the address that was
     // actually sent to, so a direct send from a row resolves that row.
+    // Awaited so the loadLedger() that follows reads the COMMITTED status
+    // (the refresh-to-clear race, founder 2026-11-03).
     const hit = knocks.find((k) => k.email.toLowerCase() === to.toLowerCase());
-    if (hit && hit.status !== 'invited') void resolveKnock(hit.id, 'invited');
+    if (hit && hit.status !== 'invited') await resolveKnock(hit.id, 'invited');
     if (pendingKnock?.email === to.toLowerCase()) setPendingKnock(null);
     return {
       ok: true,
