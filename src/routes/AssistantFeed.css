@@ -197,7 +197,6 @@
    Mycelium nine-lens 30px so all eight still sit whole on small phones. */
 @media (max-width: 429px) {
   .afeed__threads.h-scroll { gap: 6px; }
-  .afeed__thread { width: 30px; height: 30px; }
 }
 /* A space's build thread wears the space's own face in the same circle. */
 .afeed__thread--space { padding: 0; overflow: visible; border-width: 2px; }

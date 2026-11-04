@@ -280,7 +280,7 @@ export default function Events() {
               onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
               aria-label="Search" data-tip="Search"
             >
-              <span className="evt__action-circle"><Icon name="search" size={14} /></span>
+              <span className="evt__action-circle"><Icon name="search" size={16} /></span>
             </button>
             <button
               className="evt__action evt__action--door"
@@ -288,13 +288,13 @@ export default function Events() {
               aria-label="Post an event" data-tip="Post an event"
             >
               <span className="evt__action-circle">
-                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                   <path d="M9 3.75V14.25M3.75 9H14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </span>
             </button>
             {/* The brain closes the tools group, Marketplace's slot. */}
-            <AssistantDoor section="events" size={30} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
+            <AssistantDoor section="events" label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
             {!scoped && (
               <>
                 {/* The personal doors sit pushed RIGHT (founder 2026-11-04:
@@ -303,11 +303,11 @@ export default function Events() {
                     tools from where-your-own-events-live. */}
                 <button className="evt__action evt__action--door evt__action--push" onClick={() => navigate('/events/mine')}
                   aria-label="My Events" data-tip="My Events">
-                  <span className="evt__action-circle"><Icon name="rsvp" size={14} /></span>
+                  <span className="evt__action-circle"><Icon name="rsvp" size={16} /></span>
                 </button>
                 <button className="evt__action evt__action--door" onClick={() => navigate('/calendar?from=events')}
                   aria-label="My Calendar" data-tip="My Calendar">
-                  <span className="evt__action-circle"><Icon name="calendar" size={14} /></span>
+                  <span className="evt__action-circle"><Icon name="calendar" size={16} /></span>
                 </button>
               </>
             )}
@@ -327,7 +327,7 @@ export default function Events() {
                   aria-pressed={on}
                   aria-label={m.label} data-tip={m.label}
                 >
-                  <span className="evt__action-circle"><Icon name={m.icon} size={15} /></span>
+                  <span className="evt__action-circle"><Icon name={m.icon} size={16} /></span>
                 </button>
               );
             })}

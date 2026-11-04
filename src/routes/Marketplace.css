@@ -239,8 +239,8 @@
 }
 
 .mkt__action-circle {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--r-full);
   background: var(--bone-warm);
   border: 1px solid var(--bone-edge);
@@ -577,7 +577,7 @@
 
 /* ISO as LETTERS (founder 2026-10-29) — the circle says the word itself. */
 .mkt__action-letters {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1;

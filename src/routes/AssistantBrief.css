@@ -36,7 +36,7 @@
    overall UI). It sits BELOW the tools now, left-aligned like the feed's. */
 .abrief__rail { display: flex; flex-wrap: wrap; gap: 10px; row-gap: 10px; margin: 16px 0 0; padding-top: 0; }
 .abrief__rail-btn {
-  width: 38px; height: 38px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 50%; border: 1px solid var(--bone-edge);
   background: var(--bone-warm); color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;

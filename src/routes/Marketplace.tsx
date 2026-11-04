@@ -60,7 +60,7 @@ const MODES: { chip: Chip; label: string; icon: IconName; iconSize?: number; let
   // The rent sign renders bigger (founder 2026-10-29: "make the rent sign
   // bigger so it can be read") — the yard-sign glyph is detailed, 15px
   // smudged it.
-  { chip: 'rent',       label: 'Rent',        icon: 'rent', iconSize: 22 },
+  { chip: 'rent',       label: 'Rent',        icon: 'rent', iconSize: 24 },
   // "Lend", not "Lending" (founder 2026-10-23: "so that words are shorter"
   // — the lens still covers lend AND borrow, the 2026-08-13 one-coin merge).
   { chip: 'lend',       label: 'Lend',        icon: 'lend' },
@@ -399,15 +399,15 @@ export default function Marketplace() {
           onClick={() => { setShowSearch((s) => !s); if (showSearch) setSearchActive(false); }}
           aria-label="Search" data-tip="Search"
         >
-          <span className="mkt__action-circle"><Icon name="search" size={14} /></span>
+          <span className="mkt__action-circle"><Icon name="search" size={16} /></span>
         </button>
         <button className="mkt__action mkt__action--door"
           onClick={() => navigate(`/compose?area=marketplace${space ? `&space=${space}` : ''}`)}
           aria-label="List something" data-tip="List something">
-          <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
+          <span className="mkt__action-circle"><Icon name="plus" size={16} /></span>
         </button>
         <div className="mkt__action mkt__action--door mkt__action--assistant">
-          <AssistantDoor section="market" size={30} label="Your assistant — offers, seeks, and what moved" />
+          <AssistantDoor section="market" label="Your assistant — offers, seeks, and what moved" />
         </div>
         {/* The Lichen★ entrust DOOR is RETIRED (founder 2026-10-12, crossing
             it out: "Lichen shouldn't be its own tab - if you '+' a post you
@@ -440,7 +440,7 @@ export default function Marketplace() {
               <span className="mkt__action-circle">
                 {m.letters
                   ? <span className="mkt__action-letters">{m.letters}</span>
-                  : <Icon name={m.icon} size={m.iconSize ?? 15} />}
+                  : <Icon name={m.icon} size={m.iconSize ?? 16} />}
               </span>
             </button>
           );

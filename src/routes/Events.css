@@ -52,7 +52,7 @@
    separation") — the gap splits constant tools from personal doors. */
 .evt__action--push { margin-left: auto; }
 .evt__action-circle {
-  width: 30px; height: 30px; border-radius: var(--r-full);
+  width: 34px; height: 34px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
