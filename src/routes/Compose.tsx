@@ -269,16 +269,41 @@ export default function Compose() {
   // standing default is the approval gate: off-list askers wait for the
   // host's yes (request_event_spot — built, now the named default).
   const [invitees, setInvitees] = useState<EvInvitee[]>([]);
+  // WHO'S INVITED — ON LICHEN / OFF LICHEN (founder 2026-11-04, two passes:
+  // "visibility should be Open: Anyone, Anyone on Lichen, then subsets…
+  // If you don't put an audience you have to choose one before it goes
+  // live", then "'Off Lichen' and 'On Lichen' where it has checkboxes for
+  // Everyone and Mycelium, then Communities, Groups, Etc"): the Everyone
+  // checkboxes ARE the visibility rungs — On-Lichen Everyone = every member,
+  // dark to the open web (visibility 'lichen'); Off-Lichen Anyone = the open
+  // web too (is_public). Both default OFF — an event never posts on a silent
+  // default; nothing checked and nobody invited = the Post button asks.
+  const [evLichen, setEvLichen] = useState(false);
+  const [evAnyone, setEvAnyone] = useState(false);
   const [invQ, setInvQ] = useState('');
   const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  // A typed email/phone that BELONGS to a member (founder 2026-11-04: "if
+  // you enter the phone number of a lichen member, it adds them … under
+  // members on lichen"): member_by_contact — exact match, findable only.
+  const [invContactHit, setInvContactHit] = useState<{ id: string; full_name: string | null } | null>(null);
   const [genLink, setGenLink] = useState(false);
   useEffect(() => {
     const q = invQ.trim();
-    if (q.length < 2 || !user) { setInvHits([]); return; }
+    if (q.length < 2 || !user) { setInvHits([]); setInvContactHit(null); return; }
     const t = window.setTimeout(() => {
       void supabase.from('profiles').select('id, full_name')
         .eq('findable', true).ilike('full_name', `%${q}%`).neq('id', user.id).limit(4)
         .then(({ data }) => setInvHits((data as { id: string; full_name: string | null }[] | null) ?? []));
+      const c = classifyInviteLine(q);
+      if (c.kind === 'email' || c.kind === 'phone') {
+        void supabase.rpc('member_by_contact', { p_contact: c.kind === 'email' ? c.email : c.digits })
+          .then(({ data }) => {
+            const row = (data as { id: string; full_name: string | null }[] | null)?.[0];
+            setInvContactHit(row && row.id !== user.id ? row : null);
+          });
+      } else {
+        setInvContactHit(null);
+      }
     }, 250);
     return () => window.clearTimeout(t);
   }, [invQ, user?.id]);
@@ -431,7 +456,7 @@ export default function Compose() {
 
   function draftSnapshot(): Record<string, unknown> {
     return {
-      face, contentType, title, body, linkName, invitees, genLink,
+      face, contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
@@ -480,6 +505,7 @@ export default function Compose() {
       s(d.face, setFace); s(d.contentType, setContentType);
       s(d.title, setTitle); s(d.body, setBody); s(d.linkName, setLinkName);
       if (Array.isArray(d.invitees)) setInvitees(d.invitees); s(d.genLink, setGenLink);
+      s(d.evLichen, setEvLichen); s(d.evAnyone, setEvAnyone);
       if (Array.isArray(d.areas)) setAreas(new Set(d.areas));
       s(d.isPublic, setIsPublic); s(d.toMycelium, setToMycelium);
       if (Array.isArray(d.audienceSpaces)) setAudienceSpaces(new Set(d.audienceSpaces));
@@ -582,6 +608,10 @@ export default function Compose() {
       setTitle(p.title ?? '');
       setBody(p.body ?? '');
       setLinkName(p.slug ?? '');
+      if (postAreas(p).includes('events')) {
+        setEvLichen(p.visibility === 'lichen');
+        setEvAnyone(p.is_public && p.visibility !== 'lichen');
+      }
       if (p.event_category) setEvCategory(p.event_category);
       if (p.event_mode) setEvMode(p.event_mode);
       const ev = p.linked_event;
@@ -776,11 +806,13 @@ export default function Compose() {
   };
   const isMarket = areas.has('marketplace');
   const isEvent = areas.has('events');
-  // An EVENT's invitation list counts as its audience (founder 2026-11-04:
-  // an invite-only event may have NO network audience — the invited people,
-  // circles, or the shareable link are who it's for).
+  // An EVENT's audience = an explicit visibility pick; the only-those-invited
+  // rung additionally needs SOMEONE on the list (founder 2026-11-04: "you
+  // could invite no one but have visibility be to anyone or anyone on
+  // lichen. If you don't put an audience you have to choose one before it
+  // goes live" — no silent default).
   const hasAudience = isEvent
-    ? (isPublic || toMycelium || audienceSpaces.size > 0 || invitees.length > 0 || genLink)
+    ? (evAnyone || evLichen || toMycelium || audienceSpaces.size > 0 || invitees.length > 0 || genLink)
     : (isPublic || toMycelium || audienceSpaces.size > 0);
   // Courses & Library posts are "targeted feed stories" (founder + Melanie,
   // 2026-07-26): no Type row (they're educational by nature), an Organize-into
@@ -962,11 +994,14 @@ export default function Compose() {
     if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
     if (!hasAudience) {
       setError(isEvent
-        ? 'Invite at least one person or circle — or set Visibility to Open.'
+        ? 'Choose who this event is for before it goes live — check Everyone on Lichen or Anyone, or invite people or circles.'
         : 'Pick at least one audience.');
       if (!isEvent) setAudOpen(true);
       return;
     }
+    // Events: the Everyone checkboxes decide the legacy booleans + the tier.
+    const effPublic = isEvent ? (evAnyone || evLichen) : isPublic;
+    const evVisOut = isEvent ? (evAnyone ? 'anyone' as const : evLichen ? 'lichen' as const : 'invited' as const) : null;
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
@@ -979,7 +1014,7 @@ export default function Compose() {
       const details: Record<string, unknown> = {};
       // Invite-only event (2026-11-04): the label the bridge trigger and
       // honest copy read; the enforcement is RLS (the attendee arm).
-      if (isEvent && !isPublic) details.inviteOnly = true;
+      if (isEvent && !evAnyone && !evLichen) details.inviteOnly = true;
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
@@ -1114,7 +1149,7 @@ export default function Compose() {
         }
         await updatePost(editPostId, {
           body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
-          isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
+          isPublic: effPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
           eventCategory: isEvent ? evCategory : null,
@@ -1122,7 +1157,7 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
           slug: linkName,
-          inviteOnly: isEvent && !isPublic,
+          eventVisibility: evVisOut,
         });
         navigate(isEvent ? `/events/${editPostId}` : '/home');
         return;
@@ -1154,7 +1189,7 @@ export default function Compose() {
       try {
         const created = await createPost({
           body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
-          isPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
+          isPublic: effPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
           authorBeingId: actor.type === 'being' ? actor.id : null,
@@ -1163,7 +1198,7 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
           slug: linkName,
-          inviteOnly: isEvent && !isPublic,
+          eventVisibility: evVisOut,
         });
         createdId = created?.id ?? null;
         // EVENT INVITES (founder 2026-11-04): emails send the pretty
@@ -1370,6 +1405,22 @@ export default function Compose() {
               && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
           : [];
         const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
+        const ikey = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
+        // Chips render INSIDE their group (members under On Lichen,
+        // email/phone under Off Lichen) — removal is by identity, never
+        // index, since each group is a filtered slice of one list.
+        const chipRow = (list: EvInvitee[]) => (editing || list.length === 0) ? null : (
+          <div className="cmp__invchips">
+            {list.map((inv) => (
+              <span key={ikey(inv)} className="cmp__invchip">
+                <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
+                {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
+                <button className="cmp__invchip-x" aria-label="Remove"
+                  onClick={() => setInvitees((cur) => cur.filter((x) => ikey(x) !== ikey(inv)))}>×</button>
+              </span>
+            ))}
+          </div>
+        );
         return (
           <>
             <label className="cmp__label">Who&rsquo;s invited?</label>
@@ -1379,23 +1430,19 @@ export default function Compose() {
               <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
             )}
             {!editing && (<>
-            {invitees.length > 0 && (
-              <div className="cmp__invchips">
-                {invitees.map((inv, i) => (
-                  <span key={i} className="cmp__invchip">
-                    <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
-                    {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
-                    <button className="cmp__invchip-x" aria-label="Remove"
-                      onClick={() => setInvitees((cur) => cur.filter((_, j) => j !== i))}>×</button>
-                  </span>
-                ))}
-              </div>
-            )}
             <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
               placeholder="Name, circle, email or phone"
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
             {(memberHits.length > 0 || spaceHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
               <div className="cmp__invsug">
+                {/* A typed email/phone that belongs to a member files them
+                    under ON LICHEN — a seated invite, not a blind guest row
+                    (founder 2026-11-04). The raw rows stay as the fallback. */}
+                {invContactHit && !invitees.some((i) => i.kind === 'member' && i.id === invContactHit.id) && (
+                  <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'member', id: invContactHit.id, name: invContactHit.full_name ?? 'A member' })}>
+                    <Icon name="profile" size={14} /> <strong>{invContactHit.full_name ?? 'A member'}</strong> · that&rsquo;s a member — invite them on Lichen
+                  </button>
+                )}
                 {contact.kind === 'email' && (
                   <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'email', value: contact.email, name: contactLineName(q) })}>
                     <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>
@@ -1419,65 +1466,77 @@ export default function Compose() {
               </div>
             )}
             </>)}
-            {/* Whole circles — the same audience machinery, read as invites.
-                My-celium here deliberately does NOT clear Open the way the
-                fold's pill does: inviting your web and being open coexist. */}
-            <div className="cmp__chips cmp__invcircles">
-              <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')}
-                onClick={() => setToMycelium((v) => !v)}>My-celium</button>
-              {mySpaces.length <= 6 && mySpaces.map((sp) => (
-                <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
-                  onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
-              ))}
-            </div>
-            {mySpaces.length > 6 && (
-              <div className="cmp__aud-groups">
-                {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
-                  .map(([kind, label]) => {
-                    const of = mySpaces.filter((sp) => sp.kind === kind);
-                    if (!of.length) return null;
-                    return (
-                      <div className="cmp__aud-group" key={kind}>
-                        <span className="cmp__aud-kind">{label}</span>
-                        {of.map((sp) => (
-                          <label className="cmp__aud-row" key={sp.id}>
-                            <input type="checkbox" checked={audienceSpaces.has(sp.id)}
-                              onChange={() => toggleSpace(sp.id)} />
-                            <span>{sp.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-            {!editing && (<>
-            <label className="cmp__evrow cmp__genlink">
-              <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
-              <span>
-                <strong>Generate a shareable link</strong> — anyone can open it;
-                people on your invite list RSVP straight away, anyone else asks
-                to come and waits for your yes (the standing default).
-              </span>
-            </label>
-            {invitees.some((i) => i.kind === 'phone') && (
-              <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
-            )}
-            </>)}
 
-            <label className="cmp__label">Visibility</label>
-            <div className="cmp__vischoices">
-              <button className={'cmp__vischoice' + (isPublic ? ' is-on' : '')}
-                onClick={() => setIsPublic(true)} aria-pressed={isPublic}>
-                <strong>Open</strong>
-                <span>Anyone on Lichen can find it and RSVP.</span>
-              </button>
-              <button className={'cmp__vischoice' + (!isPublic ? ' is-on' : '')}
-                onClick={() => setIsPublic(false)} aria-pressed={!isPublic}>
-                <strong>Invite-only</strong>
-                <span>Only the people and circles invited can see this event.</span>
-              </button>
+            {/* ON LICHEN (founder 2026-11-04: "'Off Lichen' and 'On Lichen'
+                where it has checkboxes for Everyone and Mycelium, then
+                Communities, Groups, Etc"). The Everyone checkbox IS the
+                members-only visibility rung (visibility 'lichen'). My-celium
+                here deliberately does NOT clear Anyone the way the fold's
+                pill does: inviting your web and being open coexist. */}
+            <div className="cmp__invgroup">
+              <span className="cmp__invgroup-h">On Lichen</span>
+              {chipRow(invitees.filter((i) => i.kind === 'member'))}
+              <label className="cmp__evrow">
+                <input type="checkbox" checked={evLichen} onChange={(e) => setEvLichen(e.target.checked)} />
+                <span><strong>Everyone on Lichen</strong> — every member can find it and RSVP; never the open web.</span>
+              </label>
+              <div className="cmp__chips cmp__invcircles">
+                <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')}
+                  onClick={() => setToMycelium((v) => !v)}>My-celium</button>
+                {mySpaces.length <= 6 && mySpaces.map((sp) => (
+                  <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
+                    onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
+                ))}
+              </div>
+              {mySpaces.length > 6 && (
+                <div className="cmp__aud-groups">
+                  {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
+                    .map(([kind, label]) => {
+                      const of = mySpaces.filter((sp) => sp.kind === kind);
+                      if (!of.length) return null;
+                      return (
+                        <div className="cmp__aud-group" key={kind}>
+                          <span className="cmp__aud-kind">{label}</span>
+                          {of.map((sp) => (
+                            <label className="cmp__aud-row" key={sp.id}>
+                              <input type="checkbox" checked={audienceSpaces.has(sp.id)}
+                                onChange={() => toggleSpace(sp.id)} />
+                              <span>{sp.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
+
+            {/* OFF LICHEN — the open web: the Anyone checkbox is the public
+                rung; email/phone guests and the shareable link live here. */}
+            <div className="cmp__invgroup">
+              <span className="cmp__invgroup-h">Off Lichen</span>
+              {chipRow(invitees.filter((i) => i.kind !== 'member'))}
+              <label className="cmp__evrow">
+                <input type="checkbox" checked={evAnyone} onChange={(e) => setEvAnyone(e.target.checked)} />
+                <span><strong>Anyone</strong> — the open web can see this event, on Lichen or off.</span>
+              </label>
+              {!editing && (<>
+              <label className="cmp__evrow cmp__genlink">
+                <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
+                <span>
+                  <strong>Generate a shareable link</strong> — anyone can open it;
+                  people on your invite list RSVP straight away, anyone else asks
+                  to come and waits for your yes (the standing default).
+                </span>
+              </label>
+              {invitees.some((i) => i.kind === 'phone') && (
+                <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
+              )}
+              </>)}
+            </div>
+            {!hasAudience && (
+              <p className="cmp__hint-ev">Nothing picked yet — check a box or invite someone before this event goes live.</p>
+            )}
           </>
         );
       })()}
