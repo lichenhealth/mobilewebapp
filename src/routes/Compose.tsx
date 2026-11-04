@@ -774,10 +774,14 @@ export default function Compose() {
     setAreas((cur) => (cur.size === 0 ? new Set(['marketplace' as ServiceArea]) : cur));
     setWhereOpen(true);
   };
-  const hasAudience = isPublic || toMycelium || audienceSpaces.size > 0;
-
   const isMarket = areas.has('marketplace');
   const isEvent = areas.has('events');
+  // An EVENT's invitation list counts as its audience (founder 2026-11-04:
+  // an invite-only event may have NO network audience — the invited people,
+  // circles, or the shareable link are who it's for).
+  const hasAudience = isEvent
+    ? (isPublic || toMycelium || audienceSpaces.size > 0 || invitees.length > 0 || genLink)
+    : (isPublic || toMycelium || audienceSpaces.size > 0);
   // Courses & Library posts are "targeted feed stories" (founder + Melanie,
   // 2026-07-26): no Type row (they're educational by nature), an Organize-into
   // picker, and — everything being an exchange — the offer block.
@@ -956,7 +960,13 @@ export default function Compose() {
 
   async function submit() {
     if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
-    if (!hasAudience) { setError('Pick at least one audience.'); setAudOpen(true); return; }
+    if (!hasAudience) {
+      setError(isEvent
+        ? 'Invite at least one person or circle — or set Visibility to Open.'
+        : 'Pick at least one audience.');
+      if (!isEvent) setAudOpen(true);
+      return;
+    }
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
@@ -967,6 +977,9 @@ export default function Compose() {
       // only) — no silent re-add here.
       const effAreas = new Set(areas);
       const details: Record<string, unknown> = {};
+      // Invite-only event (2026-11-04): the label the bridge trigger and
+      // honest copy read; the enforcement is RLS (the attendee arm).
+      if (isEvent && !isPublic) details.inviteOnly = true;
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
@@ -1109,6 +1122,7 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
           slug: linkName,
+          inviteOnly: isEvent && !isPublic,
         });
         navigate(isEvent ? `/events/${editPostId}` : '/home');
         return;
@@ -1149,6 +1163,7 @@ export default function Compose() {
           linkedEventId,
           image_url: firstPhoto, details,
           slug: linkName,
+          inviteOnly: isEvent && !isPublic,
         });
         createdId = created?.id ?? null;
         // EVENT INVITES (founder 2026-11-04): emails send the pretty
@@ -1283,6 +1298,12 @@ export default function Compose() {
         </p>
       )}
 
+      {/* NON-EVENT posts keep the Audience fold. EVENTS merge Audience +
+          invites into ONE "Who's invited?" section (founder 2026-11-04:
+          "Audience and who's invited have enough overlap that we just have
+          'Who's Invited'… Then visibility can be its own section") with
+          Visibility — Open vs Invite-only — below it. */}
+      {!isEvent && (<>
       <label className="cmp__label">Audience</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setAudOpen((o) => !o)} aria-expanded={audOpen}>
         {hasAudience ? (
@@ -1331,13 +1352,17 @@ export default function Compose() {
         </div>
       )}
       </div>)}
+      </>)}
 
-      {/* WHO'S INVITED — the smart box (founder 2026-11-04), AT THE AUDIENCE
-          (her second pass, finding it buried under the date fields: "audience
-          tab for new events also doesn't have type ahead" — it lives right
-          under the Audience fold now). Edits manage invites on the event
-          page itself, where the guest panel already lives. */}
-      {isEvent && !editing && (() => {
+      {/* WHO'S INVITED — the one section for events (founder 2026-11-04):
+          typed people (members / email / phone), whole circles, the
+          shareable link. VISIBILITY sits under it as its own choice — Open
+          (anyone on Lichen can find & RSVP) vs Invite-only (only the people
+          and circles invited can see the event at all; the posts RLS
+          attendee arm + the 'invite' legacy value carry it). On an EDIT,
+          people are managed on the event page's guest panel; circles and
+          visibility still edit here. */}
+      {isEvent && (() => {
         const q = invQ.trim();
         const contact = q ? classifyInviteLine(q) : { kind: 'other' as const };
         const spaceHits = q.length >= 2
@@ -1347,8 +1372,13 @@ export default function Compose() {
         const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
         return (
           <>
-            <label className="cmp__label">Who&rsquo;s invited? (optional)</label>
-            <p className="cmp__hint-ev">Type a member&rsquo;s name, one of your circles, or an email / phone number — the audience fills itself.</p>
+            <label className="cmp__label">Who&rsquo;s invited?</label>
+            {!editing ? (
+              <p className="cmp__hint-ev">Type a member&rsquo;s name, an email or a phone number — or invite whole circles below.</p>
+            ) : (
+              <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
+            )}
+            {!editing && (<>
             {invitees.length > 0 && (
               <div className="cmp__invchips">
                 {invitees.map((inv, i) => (
@@ -1383,11 +1413,45 @@ export default function Compose() {
                 ))}
                 {spaceHits.map((sp) => (
                   <button key={sp.id} className="cmp__invsug-row" onClick={() => { toggleSpace(sp.id); setInvQ(''); }}>
-                    <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · adds this {sp.kind} to the audience
+                    <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · invites this {sp.kind}
                   </button>
                 ))}
               </div>
             )}
+            </>)}
+            {/* Whole circles — the same audience machinery, read as invites.
+                My-celium here deliberately does NOT clear Open the way the
+                fold's pill does: inviting your web and being open coexist. */}
+            <div className="cmp__chips cmp__invcircles">
+              <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')}
+                onClick={() => setToMycelium((v) => !v)}>My-celium</button>
+              {mySpaces.length <= 6 && mySpaces.map((sp) => (
+                <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
+                  onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
+              ))}
+            </div>
+            {mySpaces.length > 6 && (
+              <div className="cmp__aud-groups">
+                {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
+                  .map(([kind, label]) => {
+                    const of = mySpaces.filter((sp) => sp.kind === kind);
+                    if (!of.length) return null;
+                    return (
+                      <div className="cmp__aud-group" key={kind}>
+                        <span className="cmp__aud-kind">{label}</span>
+                        {of.map((sp) => (
+                          <label className="cmp__aud-row" key={sp.id}>
+                            <input type="checkbox" checked={audienceSpaces.has(sp.id)}
+                              onChange={() => toggleSpace(sp.id)} />
+                            <span>{sp.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+            {!editing && (<>
             <label className="cmp__evrow cmp__genlink">
               <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
               <span>
@@ -1399,6 +1463,21 @@ export default function Compose() {
             {invitees.some((i) => i.kind === 'phone') && (
               <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
             )}
+            </>)}
+
+            <label className="cmp__label">Visibility</label>
+            <div className="cmp__vischoices">
+              <button className={'cmp__vischoice' + (isPublic ? ' is-on' : '')}
+                onClick={() => setIsPublic(true)} aria-pressed={isPublic}>
+                <strong>Open</strong>
+                <span>Anyone on Lichen can find it and RSVP.</span>
+              </button>
+              <button className={'cmp__vischoice' + (!isPublic ? ' is-on' : '')}
+                onClick={() => setIsPublic(false)} aria-pressed={!isPublic}>
+                <strong>Invite-only</strong>
+                <span>Only the people and circles invited can see this event.</span>
+              </button>
+            </div>
           </>
         );
       })()}
