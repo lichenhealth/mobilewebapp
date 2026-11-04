@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import FilterRow from '../components/FilterRow';
 import FeedCard from '../components/FeedCard';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import AssistantDoor from '../components/AssistantDoor';
@@ -13,8 +12,8 @@ import { formatDateShort, localDate, todayISO } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import {
   loadFeed, loadAuthorFeed, loadForIdentity, postAreas, loadMyRsvpStatuses, rsvpToEvent, unRsvp,
-  EVENT_CATEGORIES, EVENT_MODES,
-  type FeedPost, type EventCategory, type EventMode, type MyRsvpStatus,
+  EVENT_MODES,
+  type FeedPost, type EventMode, type MyRsvpStatus,
 } from '../lib/postsApi';
 import { supabase } from '../lib/supabase';
 import { minToLabel } from '../lib/calendarApi';
@@ -26,8 +25,6 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard, weaveProps } from '../lib/feedMapping';
 import { resolveIdentityScope } from '../lib/identityScope';
 import './Events.css';
-
-const TABS = ['All', ...EVENT_CATEGORIES.map((c) => c.label)];
 
 /** Human "when" for an event post's linked calendar event. */
 function whenLabel(p: FeedPost): string | undefined {
@@ -64,8 +61,10 @@ export default function Events() {
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [tab, setTab] = useState('All');
-  const [modes, setModes] = useState<EventMode[]>(['free', 'trade', 'paid']);   // lenses default all-on
+  // Lenses speak Home's Feed grammar now (founder 2026-11-04: "buttons for
+  // free, trade, pay with hover text, like marketplace"): empty = ALL (the
+  // lit Feed circle), picking a mode narrows and unlights Feed.
+  const [modes, setModes] = useState<EventMode[]>([]);
   const [statuses, setStatuses] = useState<Map<string, MyRsvpStatus>>(new Map());
   const [showPast, setShowPast] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
@@ -109,16 +108,18 @@ export default function Events() {
     setModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
 
   const visible = useMemo(() => {
-    const cat = EVENT_CATEGORIES.find((c) => c.label === tab)?.value as EventCategory | undefined;
+    // No lens picked = everything (the Feed circle). A picked lens narrows
+    // to DECLARED modes — an undeclared post shows only on the all-view
+    // (the travel-lenses rule). The category word-tabs are RETIRED
+    // (founder 2026-11-04); event_category stays authored data.
     return posts
-      .filter((p) => (tab === 'All' || p.event_category === cat))
-      .filter((p) => (p.event_mode == null ? modes.length > 0 : modes.includes(p.event_mode)))
+      .filter((p) => (modes.length === 0 ? true : p.event_mode != null && modes.includes(p.event_mode)))
       .sort((a, b) => {
         const da = a.linked_event?.start_date ?? '9999-12-31';
         const db = b.linked_event?.start_date ?? '9999-12-31';
         return da.localeCompare(db);
       });
-  }, [posts, tab, modes]);
+  }, [posts, modes]);
 
   // My Events: hosting + going + maybe, split into upcoming and past by the
   // linked calendar event (recurring events never age out).
@@ -262,12 +263,14 @@ export default function Events() {
 
       {view === 'browse' && (
         <>
-          {/* THE DOORS (icon-only, Marketplace's 2026-08-08 pattern) share one
-              row with the type lenses — Events only has 3 (not Marketplace's
-              6-8), so it comfortably fits without needing its own line.
-              ICONS ABOVE, TOGGLES BELOW (founder 2026-08-14): the category
-              word-tabs moved beneath this row, matching Home/My-celium. */}
-          <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools and type filters" gutter>
+          {/* THE STACKED GRAMMAR (founder 2026-11-04: "re-do the UI to match
+              the other UI's, like home feed and marketplace" — the old
+              one-row doors+text-lens squeeze wrapped wonkily): TOOLS on
+              their own seamed row (search · + · brain, plus Events' two
+              personal nav doors), then the LENSES below as Marketplace's
+              30px data-tip circles. The category word-tabs are RETIRED in
+              the same pass (her "should we get rid of the filters?"). */}
+          <ScrollHintRow className="evt__actions evt__actions--doors h-scroll" role="toolbar" ariaLabel="Event tools" gutter>
             <button
               className="evt__action evt__action--door"
               onClick={() => navigate(`/search?area=events${member ? `&member=${member}` : space ? `&space=${space}` : ''}`)}
@@ -286,60 +289,49 @@ export default function Events() {
                 </svg>
               </span>
             </button>
-            {/* The brain closes the doors group, same slot as Marketplace's
-                (founder 2026-08-14: "we need a brain for Events, so you can
-                click on your assistant and it can summarize your events"). */}
-            <AssistantDoor section="events" size={36} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
-            <div className="evt__action-spacer" />
-            {/* The lit Feed door — this page IS the events feed, said the way
-                Home says it (founder 2026-08-20: consistency). */}
-            <button className="evt__action evt__action--here" aria-current="page" data-tip="Feed">
+            {/* The brain closes the tools group, Marketplace's slot. */}
+            <AssistantDoor section="events" size={30} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
+            {!scoped && (
+              <>
+                <button className="evt__action evt__action--door" onClick={() => navigate('/events/mine')}
+                  aria-label="My Events" data-tip="My Events">
+                  <span className="evt__action-circle"><Icon name="rsvp" size={14} /></span>
+                </button>
+                <button className="evt__action evt__action--door" onClick={() => navigate('/calendar?from=events')}
+                  aria-label="My Calendar" data-tip="My Calendar">
+                  <span className="evt__action-circle"><Icon name="calendar" size={14} /></span>
+                </button>
+              </>
+            )}
+          </ScrollHintRow>
+
+          {/* Free/Trade/Paid as circles, Home's Feed grammar: the lit Feed
+              leads = everything (the default), a picked lens narrows and
+              unlights it; multi-select; the word rides data-tip. */}
+          <div className="evt__lensrow" role="toolbar" aria-label="Event type filters">
+            <button
+              className={'evt__action' + (modes.length === 0 ? ' is-active' : '')}
+              onClick={() => setModes([])}
+              aria-pressed={modes.length === 0}
+              aria-label="Feed — all events" data-tip="Feed"
+            >
               <span className="evt__action-circle"><Icon name="newsfeed" size={14} /></span>
             </button>
-            <div className="evt__action-push" />
-            {/* Free / Trade / Paid read as signals, same vocabulary as
-                Marketplace's mode lenses — text + icon, no circle, a check
-                when it's on. */}
             {EVENT_MODES.map((m) => {
               const on = modes.includes(m.value);
               return (
                 <button
                   key={m.value}
-                  className={'evt__lens' + (on ? ' is-on' : '')}
+                  className={'evt__action' + (on ? ' is-active' : '')}
                   onClick={() => toggleMode(m.value)}
                   aria-pressed={on}
-                  title={on ? `Showing ${m.label.toLowerCase()} events — tap to hide` : `Tap to show ${m.label.toLowerCase()} events`}
+                  aria-label={m.label} data-tip={m.label}
                 >
-                  <Icon name={m.icon} size={16} />
-                  {m.label}{on ? ' ✓' : ''}
+                  <span className="evt__action-circle"><Icon name={m.icon} size={15} /></span>
                 </button>
               );
             })}
-          </ScrollHintRow>
-
-          {scoped ? <FilterRow options={TABS} value={tab} onChange={setTab} /> : (
-            <div className="evt__nav evt__nav--below">
-              <div className="evt__nav-tabs">
-                {TABS.map((t) => (
-                  <button
-                    key={t}
-                    className={'evt__navtab' + (tab === t ? ' is-active' : '')}
-                    onClick={() => setTab(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <span className="evt__nav-doors">
-                <button className="evt__navdoor" onClick={() => navigate('/events/mine')} data-tip="My Events">
-                  <Icon name="rsvp" size={13} /><span>My Events</span>
-                </button>
-                <button className="evt__navdoor" onClick={() => navigate('/calendar?from=events')} data-tip="My Calendar">
-                  <Icon name="calendar" size={13} /><span>My Calendar</span>
-                </button>
-              </span>
-            </div>
-          )}
+          </div>
 
           <div className="evt__body">
           <section className="evt__feed">
