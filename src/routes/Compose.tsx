@@ -45,6 +45,26 @@ type EvInvitee =
   | { kind: 'email'; value: string; name: string }
   | { kind: 'phone'; value: string; sms: string; name: string };
 
+/** classifyCareContact reads a BARE phone, but the natural invite line is
+ *  "Testy Phone 303-555-0123" — a name classifies the whole line as a name.
+ *  So: the classifier first, then a phone-shaped TAIL pulled off the line
+ *  (7–16 digits), the email-token-inside-any-line rule applied to phones. */
+function classifyInviteLine(raw: string):
+  | { kind: 'email'; email: string }
+  | { kind: 'phone'; digits: string; sms: string }
+  | { kind: 'other' } {
+  const c = classifyCareContact(raw);
+  if (c.kind === 'email' || c.kind === 'phone') return c;
+  const m = /(\+?[\d(][\d\s().‐-―-]{5,})\s*$/.exec(raw);
+  if (m) {
+    const digits = m[1].replace(/\D/g, '');
+    if (digits.length >= 7 && digits.length <= 16) {
+      return { kind: 'phone', digits, sms: m[1].replace(/[^\d+]/g, '') };
+    }
+  }
+  return { kind: 'other' };
+}
+
 /** The name LEFT OVER when a contact token is pulled out of a typed line —
  *  "Rick Countryman rick@barn.com" invites Rick by name. */
 function contactLineName(raw: string): string {
@@ -2015,7 +2035,7 @@ export default function Compose() {
                   panel already lives. */}
               {!editing && (() => {
                 const q = invQ.trim();
-                const contact = q ? classifyCareContact(q) : { kind: 'empty' as const };
+                const contact = q ? classifyInviteLine(q) : { kind: 'other' as const };
                 const spaceHits = q.length >= 2
                   ? mySpaces.filter((sp) => !audienceSpaces.has(sp.id)
                       && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
