@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { loadMyHidden } from './hiddenApi';
 import type { IconName } from '../components/Icon';
 
-export type Visibility = 'public' | 'mycelium' | 'space' | 'invite';
+export type Visibility = 'public' | 'mycelium' | 'space' | 'invite' | 'lichen';
 export type ContentType = 'social' | 'creative' | 'educational' | 'actionable' | 'qa';
 export type ServiceArea =
   | 'marketplace' | 'work' | 'courses' | 'food' | 'art' | 'events' | 'places' | 'library' | 'people'
@@ -72,11 +72,14 @@ export type NewPost = {
   /** Vanity link name (founder 2026-11-04) — lichen.health/<section>/<handle>/<slug>.
    *  Lowercase kebab, unique per owner (posts_slug_per_owner); null = none. */
   slug?: string | null;
-  /** INVITE-ONLY EVENT (founder 2026-11-04): no network audience — the seats
-   *  on the linked event are the audience (posts RLS attendee arm). With no
-   *  circles picked the legacy visibility writes 'invite'; with circles it
-   *  stays the ordinary 'space' path. */
-  inviteOnly?: boolean;
+  /** EVENT VISIBILITY, the ladder (founder 2026-11-04: "Anyone, Anyone on
+   *  Lichen, then subsets"): 'anyone' = the open web (plain public post);
+   *  'lichen' = every member, never the open web (is_public true +
+   *  visibility 'lichen' — the anon policy reads only ='public');
+   *  'invited' = only the people and circles invited (the invite-only
+   *  machinery — no circles picked writes 'invite', circles keep the
+   *  ordinary 'space' path). Null/omitted = not an event. */
+  eventVisibility?: 'anyone' | 'lichen' | 'invited' | null;
 };
 
 // Upload a file (or recorded blob) into the post-media bucket; returns a public URL.
@@ -95,9 +98,11 @@ export async function createPost(input: NewPost) {
   // Legacy columns still written (visibility / space_id / service_area) so any
   // not-yet-refreshed client keeps rendering new posts during the transition;
   // the DB bridge trigger backstops both directions.
-  const visibility: Visibility = input.isPublic ? 'public'
+  const visibility: Visibility =
+    (input.eventVisibility === 'lichen' && input.isPublic) ? 'lichen'
+    : input.isPublic ? 'public'
     : input.toMycelium ? 'mycelium'
-    : (input.inviteOnly && input.audienceSpaceIds.length === 0) ? 'invite'
+    : (input.eventVisibility === 'invited' && input.audienceSpaceIds.length === 0) ? 'invite'
     : 'space';
   const { data, error } = await supabase.from('posts').insert({
     // Acting as a being you steward puts THEM in the author seat — the RLS
@@ -130,9 +135,11 @@ export async function createPost(input: NewPost) {
  *  columns createPost writes (visibility / space_id / service_area) so the
  *  v1↔v2 sync trigger never sees them drift. */
 export async function updatePost(id: string, input: NewPost): Promise<void> {
-  const visibility: Visibility = input.isPublic ? 'public'
+  const visibility: Visibility =
+    (input.eventVisibility === 'lichen' && input.isPublic) ? 'lichen'
+    : input.isPublic ? 'public'
     : input.toMycelium ? 'mycelium'
-    : (input.inviteOnly && input.audienceSpaceIds.length === 0) ? 'invite'
+    : (input.eventVisibility === 'invited' && input.audienceSpaceIds.length === 0) ? 'invite'
     : 'space';
   const { error } = await supabase.from('posts').update({
     author_space_id: input.authorSpaceId ?? null,
