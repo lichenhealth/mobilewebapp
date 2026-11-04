@@ -11,7 +11,7 @@
 // and check profiles.is_admin before sending. Requires RESEND_API_KEY.
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
+const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.health>';
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
 // Auto-injected into every edge function.

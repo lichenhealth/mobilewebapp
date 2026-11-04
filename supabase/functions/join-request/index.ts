@@ -9,7 +9,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
+const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.health>';
 const FOUNDER_INBOX = Deno.env.get('JOIN_REQUEST_INBOX') ?? 'connect@lichen.health';
 const db = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
