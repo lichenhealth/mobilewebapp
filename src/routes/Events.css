@@ -36,7 +36,11 @@
    feed and marketplace"): tools on their own SEAMED row, Free/Trade/Paid as
    Marketplace's 30px data-tip circles wrapping below, lit light-peach. */
 .evt__actions.h-scroll {
-  display: flex; align-items: center; gap: var(--s-3);
+  /* HOME'S GRID GAP (founder 2026-11-04, second pass: the size audit left
+     the GAPS — 12px here vs Home's 4px, so rows 1+2 drifted out of column
+     alignment after the first circle): 4px between circles, 8px between
+     wrapped rows, the icon-row numbers exactly. */
+  display: flex; align-items: center; gap: 8px 4px;
   padding: var(--s-3) 0 10px;   /* side gutters live on the wrapper */
   border-bottom: 1px solid var(--bone-edge);   /* the platform seam */
 }
@@ -68,7 +72,7 @@
    visible), with Marketplace's 30px bottom floor so the hover tip has a
    clear band to land in. */
 .evt__lensrow {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 4px;
   padding: 12px var(--s-5) 30px;
 }
 

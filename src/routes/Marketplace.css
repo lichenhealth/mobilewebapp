@@ -136,7 +136,7 @@
 /* ─── Action row ────────────────────────────────────────────────────── */
 .mkt__actions.h-scroll {
   display: flex;
-  gap: 6px;
+  gap: 8px 4px;   /* Home's grid gap (founder 2026-11-04) — rows 1+2 align */
   padding: var(--s-3) 0;   /* side gutters live on the ScrollHintRow wrapper */
   overflow-x: auto;
   scrollbar-width: none;
@@ -159,9 +159,9 @@
   transition: transform var(--d-fast) var(--ease-out);
 }
 @media (max-width: 520px) {
-  /* All six offer filters + tools fit a 375px screen: 4px gaps, tighter
-     label tracking (LEND/BORROW is the long pole), slim divider. */
-  .mkt__actions.h-scroll { gap: 4px; }
+  /* All six offer filters + tools fit a 375px screen: tighter label
+     tracking (LEND/BORROW is the long pole), slim divider; the 4px gap is
+     the base rule now (Home's grid gap, 2026-11-04). */
   .mkt__actions .mkt__action-spacer { margin: 0 2px; }
   .mkt__actions .mkt__action-label { letter-spacing: 0.02em; }
 }
@@ -197,7 +197,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 4px;   /* Home's grid gap (2026-11-04) */
   /* Extra floor below the lenses (founder 2026-10-29: "move the drop down
      white bubbles down a bit, so it doesn't cut off the hover text") — the
      hover tip lives in this band instead of fighting the category pills. */
