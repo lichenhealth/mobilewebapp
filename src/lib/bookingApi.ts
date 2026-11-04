@@ -178,6 +178,25 @@ export function groupTypesByTitle<T extends { title: string; duration_min: numbe
   return out;
 }
 
+/** THE FAMILY ANSWERS AT ITS SLUG PREFIX TOO (founder 2026-11-04: "multiple
+ *  vanity URLs pointing to the same booking page, just like multiple URLs
+ *  can drive to the same website" — her galyntime→time rename case): a
+ *  multi-length family's how-long step ALSO opens at any name that is the
+ *  common prefix of at least two siblings' own link names ("time-15" +
+ *  "time-30" → /time), so renaming a title never kills an old picker
+ *  address. Checked AFTER the title match and AFTER an exact length slug —
+ *  a stored address is deliberate and never shadowed by this derived one. */
+export function familyBySlugPrefix<T extends { title: string; duration_min: number; slug?: string | null }>(
+  groups: { key: string; title: string; variants: T[] }[], low: string,
+): { key: string; title: string; variants: T[] } | null {
+  const esc = low.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rx = new RegExp(`^${esc}-\\d+$`);
+  return groups.find((g) =>
+    g.variants.length > 1
+    && g.variants.filter((v) => rx.test((v.slug ?? '').toLowerCase())).length >= 2,
+  ) ?? null;
+}
+
 /** "30 minutes" / "1 hour" / "1 hr 30 min" — the length chooser's words. */
 export function sessionLengthLabel(min: number): string {
   if (min % 60 === 0) { const h = min / 60; return h === 1 ? '1 hour' : `${h} hours`; }

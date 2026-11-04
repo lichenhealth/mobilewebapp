@@ -11,7 +11,7 @@ import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
-  groupTypesByTitle, sessionLengthLabel, slugify,
+  familyBySlugPrefix, groupTypesByTitle, sessionLengthLabel, slugify,
   saveBookResume, readBookResume, clearBookResume, emailIsMember, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
@@ -120,6 +120,11 @@ export default function BookPublic() {
           setReady(true);
           return;
         }
+        // TIER 2b — the slug is the common PREFIX of a family's length
+        // links (time-15 + time-30 → /time): a second standing picker
+        // address, so a renamed title never kills old links.
+        const famPre = familyBySlugPrefix(groupsPub, low);
+        if (famPre) { setPage(p); setPubKey(famPre.key); setSlugFam(true); setReady(true); return; }
         // A single-length family name still answers (slugify(title) match,
         // one variant) — the link teaches itself.
         const famOne = groupsPub.find((g) => slugify(g.title) === low) ?? null;
@@ -166,9 +171,17 @@ export default function BookPublic() {
             // Tier 2: the family's how-long step, right here.
             setLenKey(fam.key); setSlugFam(true);
           } else {
-            const hit = types.find((t) => (t.slug ?? '') === low)
-              ?? groups.find((g) => slugify(g.title) === low)?.variants[0] ?? null;
+            const hit = types.find((t) => (t.slug ?? '') === low) ?? null;
             if (hit) { navigate(`/book/${hit.id}`, { replace: true }); return; }
+            // Tier 2b: the siblings' shared link-name prefix is a second
+            // picker address (the title match above stays the first).
+            const famPre = familyBySlugPrefix(groups, low);
+            if (famPre) {
+              setLenKey(famPre.key); setSlugFam(true);
+            } else {
+              const one = groups.find((g) => slugify(g.title) === low)?.variants[0] ?? null;
+              if (one) { navigate(`/book/${one.id}`, { replace: true }); return; }
+            }
           }
         }
         setMemberView({ provider: prov, types });

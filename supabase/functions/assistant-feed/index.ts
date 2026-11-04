@@ -1174,7 +1174,11 @@ Deno.serve(async (req) => {
       // CHECK YOUR OWN WORK (founder 2026-11-02, after a five-length build
       // shipped one wrong duration and missed one type's hours while the
       // reply said "all five": the summary came from intention, not rows).
-      + '\n- CHECK YOUR OWN WORK: after creating or changing SEVERAL session types in one exchange, read my_calendar_setup once more and write your summary from what it returns — durations, hours, links as SAVED. If a saved row differs from what was asked, say so and fix it; never report from memory of what you meant to do.';
+      + '\n- CHECK YOUR OWN WORK: after creating or changing SEVERAL session types in one exchange, read my_calendar_setup once more and write your summary from what it returns — durations, hours, links as SAVED. If a saved row differs from what was asked, say so and fix it; never report from memory of what you meant to do.'
+      // MULTIPLE VANITY URLS, ONE PICKER (founder 2026-11-04 — she asked the
+      // calendar brain for a second picker address and it said the capability
+      // didn’t exist; now it does, and the brain must know it).
+      + '\n- A session with several lengths has a pick-a-length page that answers at MORE THAN ONE address: the title turned URL-safe (title "Galyntime" → /book/<handle>/galyntime), AND any name that at least two of its lengths’ link names share as a prefix before "-<number>" (link names time-15 and time-30 → /book/<handle>/time also opens the picker). So to give a family a new picker address WITHOUT breaking old links, set each length’s link_name to <newname>-<minutes> (one update_booking_type per length, of_length_min) — the old title address and any old shared-prefix addresses keep working. Each length’s own link always opens that exact length.';
   }
 
   // DRAFT-FIRST (founder 2026-08-31): the assistant's page edits land in the
