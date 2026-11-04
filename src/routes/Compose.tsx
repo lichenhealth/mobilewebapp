@@ -1406,6 +1406,24 @@ export default function Compose() {
           : [];
         const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
         const ikey = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
+        // Either/or pickers (founder 2026-11-04): a subset under Everyone is
+        // a contradictory command — the LAST click wins, in both directions.
+        const pickEvLichen = (on: boolean) => {
+          setEvLichen(on);
+          if (on) { setToMycelium(false); setAudienceSpaces(new Set()); setEvAnyone(false); }
+        };
+        const pickEvAnyone = (on: boolean) => {
+          setEvAnyone(on);
+          if (on) setEvLichen(false);
+        };
+        const pickMycelium = (on: boolean) => {
+          setToMycelium(on);
+          if (on) setEvLichen(false);
+        };
+        const pickCircle = (id: string) => {
+          if (!audienceSpaces.has(id)) setEvLichen(false);
+          toggleSpace(id);
+        };
         // Chips render INSIDE their group (members under On Lichen,
         // email/phone under Off Lichen) — removal is by identity, never
         // index, since each group is a filtered slice of one list.
@@ -1459,7 +1477,7 @@ export default function Compose() {
                   </button>
                 ))}
                 {spaceHits.map((sp) => (
-                  <button key={sp.id} className="cmp__invsug-row" onClick={() => { toggleSpace(sp.id); setInvQ(''); }}>
+                  <button key={sp.id} className="cmp__invsug-row" onClick={() => { pickCircle(sp.id); setInvQ(''); }}>
                     <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · invites this {sp.kind}
                   </button>
                 ))}
@@ -1470,45 +1488,45 @@ export default function Compose() {
             {/* ON LICHEN (founder 2026-11-04: "'Off Lichen' and 'On Lichen'
                 where it has checkboxes for Everyone and Mycelium, then
                 Communities, Groups, Etc"). The Everyone checkbox IS the
-                members-only visibility rung (visibility 'lichen'). My-celium
-                here deliberately does NOT clear Anyone the way the fold's
-                pill does: inviting your web and being open coexist. */}
+                members-only visibility rung (visibility 'lichen'). EITHER/OR
+                (founder, same day: "its either everyone on lichen or
+                mycelium… if you check everyone on lichen and then a
+                community, it unchecks everyone on lichen, as its a
+                contradictory command"): a subset under Everyone is a
+                contradiction, so the LAST click wins — picking My-celium or
+                a circle unchecks Everyone on Lichen and vice versa; circles
+                coexist with My-celium. Anyone (the bigger everyone) and
+                Everyone on Lichen are the same either/or pair. */}
             <div className="cmp__invgroup">
               <span className="cmp__invgroup-h">On Lichen</span>
               {chipRow(invitees.filter((i) => i.kind === 'member'))}
               <label className="cmp__evrow">
-                <input type="checkbox" checked={evLichen} onChange={(e) => setEvLichen(e.target.checked)} />
+                <input type="checkbox" checked={evLichen} onChange={(e) => pickEvLichen(e.target.checked)} />
                 <span><strong>Everyone on Lichen</strong> — every member can find it and RSVP; never the open web.</span>
               </label>
-              <div className="cmp__chips cmp__invcircles">
-                <button className={'cmp__chip' + (toMycelium ? ' is-on' : '')}
-                  onClick={() => setToMycelium((v) => !v)}>My-celium</button>
-                {mySpaces.length <= 6 && mySpaces.map((sp) => (
-                  <button key={sp.id} className={'cmp__chip' + (audienceSpaces.has(sp.id) ? ' is-on' : '')}
-                    onClick={() => toggleSpace(sp.id)}>{sp.name}</button>
-                ))}
+              <label className="cmp__evrow">
+                <input type="checkbox" checked={toMycelium} onChange={(e) => pickMycelium(e.target.checked)} />
+                <span><strong>My-celium</strong> — everyone in your web.</span>
+              </label>
+              <div className="cmp__aud-groups">
+                {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
+                  .map(([kind, label]) => {
+                    const of = mySpaces.filter((sp) => sp.kind === kind);
+                    if (!of.length) return null;
+                    return (
+                      <div className="cmp__aud-group" key={kind}>
+                        <span className="cmp__aud-kind">{label}</span>
+                        {of.map((sp) => (
+                          <label className="cmp__aud-row" key={sp.id}>
+                            <input type="checkbox" checked={audienceSpaces.has(sp.id)}
+                              onChange={() => pickCircle(sp.id)} />
+                            <span>{sp.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
               </div>
-              {mySpaces.length > 6 && (
-                <div className="cmp__aud-groups">
-                  {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
-                    .map(([kind, label]) => {
-                      const of = mySpaces.filter((sp) => sp.kind === kind);
-                      if (!of.length) return null;
-                      return (
-                        <div className="cmp__aud-group" key={kind}>
-                          <span className="cmp__aud-kind">{label}</span>
-                          {of.map((sp) => (
-                            <label className="cmp__aud-row" key={sp.id}>
-                              <input type="checkbox" checked={audienceSpaces.has(sp.id)}
-                                onChange={() => toggleSpace(sp.id)} />
-                              <span>{sp.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
             </div>
 
             {/* OFF LICHEN — the open web: the Anyone checkbox is the public
@@ -1517,7 +1535,7 @@ export default function Compose() {
               <span className="cmp__invgroup-h">Off Lichen</span>
               {chipRow(invitees.filter((i) => i.kind !== 'member'))}
               <label className="cmp__evrow">
-                <input type="checkbox" checked={evAnyone} onChange={(e) => setEvAnyone(e.target.checked)} />
+                <input type="checkbox" checked={evAnyone} onChange={(e) => pickEvAnyone(e.target.checked)} />
                 <span><strong>Anyone</strong> — the open web can see this event, on Lichen or off.</span>
               </label>
               {!editing && (<>
