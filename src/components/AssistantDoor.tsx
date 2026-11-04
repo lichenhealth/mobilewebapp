@@ -61,20 +61,24 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
      *  reading — e.g. `collection=<id>` for one course. */
     scope?: string }) {
   const navigate = useNavigate();
-  // THE BRAIN IS ALWAYS A DOOR, AND NOW IT WEARS THE HOMEPAGE'S › TAB
-  // (founder 2026-11-04, retiring the 2026-10-06 ask-in-place popup after it
-  // rendered BURIED under Marketplace's lens circles: "let's have clicking
-  // it turn it on and that creates the click thru arrow, so you can click
-  // thru to it, just like homepage"): a lit brain carries the peach › tab
-  // (the icon-row__door grammar) that opens this section's briefing — the
-  // circle opens it too, members learned brain=briefing long ago. An OFF
-  // brain turns the assistant back ON right here in one tap — no popup, no
-  // navigation; the circle lighting and the tab appearing are the receipt.
-  // The catch-up truth needs no card now: consent gates at READ time, so
-  // the briefing itself reads the section as it stands, including whatever
-  // happened while it was off. Turning OFF stays a deliberate act elsewhere
-  // (Profile → Privacy, or the brief's own checkbox) — a tap must never
-  // silently close the eyes it just opened.
+  // THE CIRCLE RULE (founder 2026-11-04, setting the platform grammar in
+  // three passes one sitting: "clicking it turn[s] it on and that creates
+  // the click thru arrow… just like homepage", then "For all circle icons:
+  // one press turns it off if its on, or on if its off. two presses
+  // prompts the peach arrow to click thru… i want consistency across the
+  // entire platform", then "for the brain, for a filter of feed, like
+  // travel or courses. and when there's not a click thru destination…
+  // you just have select or de-select"): a STATEFUL circle toggles BOTH
+  // ways on one press, and the peach › arrow — standing only while it's
+  // on — is the one way through. So the brain circle toggles the
+  // section's AI consent (lit vs gray+slash is the visible receipt, never
+  // silent), and the › tab (the icon-row__door grammar) opens the
+  // briefing. Supersedes both the 2026-10-06 ask-in-place popup AND the
+  // same day's earlier circle-opens-the-briefing shape. Turning off also
+  // still lives in Profile → Privacy and the brief's checkbox — several
+  // doors, one truth. The catch-up truth needs no card: consent gates at
+  // READ time, so the briefing reads the section as it stands, including
+  // whatever happened while it was off.
   const [, bump] = useState(0);
   const on = aiDoorOn(section);
   const go = () => navigate(`/assistant?section=${section}${scope ? `&${scope}` : ''}`);
@@ -84,12 +88,12 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
         className={'ai-door' + (on ? '' : ' is-off')}
         style={size === 34 ? undefined : { width: size, height: size }}
         onClick={() => {
-          if (on) { go(); return; }
-          setAiDoor(section, true);
-          bump((n) => n + 1);   // aiDoorOn reads a module cache — re-render to light up
+          setAiDoor(section, !on);
+          bump((n) => n + 1);   // aiDoorOn reads a module cache — re-render to flip the face
         }}
-        aria-label={on ? (label ?? 'Your assistant’s briefing for this section') : 'Assistant is off here — tap to turn it back on'}
-        data-tip={on ? aiTip(section) : 'Assistant — off. Tap to turn on'}
+        aria-label={on ? 'AI is on for this section — tap to turn it off' : 'AI is off for this section — tap to turn it on'}
+        aria-pressed={on}
+        data-tip={on ? 'AI on — tap to turn off' : 'AI off — tap to turn on'}
       >
         <Icon name="brain" size={Math.round(size * 0.47)} />
         {!on && <span className="ai-door__slash" aria-hidden />}
@@ -98,8 +102,8 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
         <button
           className="ai-door__tab"
           onClick={go}
-          aria-label={label ?? 'Open the briefing'}
-          data-tip="Open the briefing"
+          aria-label={label ?? aiTip(section)}
+          data-tip={aiTip(section)}
         >
           <Icon name="chevron-right" size={11} />
         </button>
