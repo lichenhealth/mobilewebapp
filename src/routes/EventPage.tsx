@@ -19,7 +19,10 @@ import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, poste
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
-import { loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref, type EventGuest } from '../lib/eventGuestsApi';
+import {
+  loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref,
+  mintEventLink, approveEventGuest, declineEventGuest, type EventGuest,
+} from '../lib/eventGuestsApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import './EventPage.css';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -58,6 +61,16 @@ export default function EventPage() {
   const [gBusy, setGBusy] = useState(false);
   const [gMsg, setGMsg] = useState('');
   const [gText, setGText] = useState<{ name: string; href: string } | null>(null);
+  // THE OPEN EVENT URL (founder 2026-11-04: "An Event URL is really
+  // handy… if you're not also on an invite list, the request to attend
+  // prompts an approval from the host"): one shareable link per event,
+  // host-minted, rotatable (the kill switch for a leaked link); link-born
+  // asks arrive as 'requested' rows the host answers right here.
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [gActBusy, setGActBusy] = useState<string | null>(null);
+  const [armDecline, setArmDecline] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,13 +100,57 @@ export default function EventPage() {
   }, [postId, me]);
   useEffect(() => { load(); }, [load]);
 
-  // Load external guests once we know the viewer is the host.
+  // Load external guests (+ the standing shareable link, if minted) once
+  // we know the viewer is the host.
   useEffect(() => {
-    if (!post || post.author_id !== me || !post.linked_event_id) { setGuests([]); return; }
+    if (!post || post.author_id !== me || !post.linked_event_id) { setGuests([]); setShareLink(null); return; }
     let live = true;
     loadEventGuests(post.linked_event_id).then((g) => { if (live) setGuests(g); });
+    void supabase.from('events').select('guest_link_token').eq('id', post.linked_event_id).maybeSingle()
+      .then(({ data }) => {
+        const tok = (data as { guest_link_token: string | null } | null)?.guest_link_token;
+        if (live && tok) setShareLink(`https://lichen.health/e/${tok}`);
+      });
     return () => { live = false; };
   }, [post, me]);
+
+  async function makeLink(rotate = false) {
+    if (!post?.linked_event_id || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const tok = await mintEventLink(post.linked_event_id, rotate);
+      setShareLink(`https://lichen.health/e/${tok}`);
+      setLinkCopied(false);
+    } catch (e) { setGMsg((e as Error).message || 'Could not make the link.'); }
+    finally { setLinkBusy(false); }
+  }
+
+  async function copyLink() {
+    if (!shareLink) return;
+    try { await navigator.clipboard.writeText(shareLink); setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 3000); }
+    catch { window.prompt('Copy the link:', shareLink); }
+  }
+
+  async function approveGuest(g: EventGuest) {
+    if (gActBusy) return;
+    setGActBusy(g.id);
+    try {
+      await approveEventGuest(g);
+      if (post?.linked_event_id) setGuests(await loadEventGuests(post.linked_event_id));
+      setGMsg(g.email ? `${g.name} is in — they've been emailed.` : `${g.name} is in — text them the good news below.`);
+    } catch (e) { setGMsg((e as Error).message || 'Could not approve.'); }
+    finally { setGActBusy(null); }
+  }
+
+  async function refuseGuest(g: EventGuest) {
+    if (armDecline !== g.id) { setArmDecline(g.id); return; }   // worded second tap
+    setArmDecline(null); setGActBusy(g.id);
+    try {
+      await declineEventGuest(g.id);
+      if (post?.linked_event_id) setGuests(await loadEventGuests(post.linked_event_id));
+    } catch (e) { setGMsg((e as Error).message || 'Could not remove the request.'); }
+    finally { setGActBusy(null); }
+  }
 
   /** Short "when" for the texted invite ("Thu, Nov 20 · 5pm"). */
   const smsWhen = () => {
@@ -397,9 +454,60 @@ export default function EventPage() {
               {gText && (
                 <p className="evp__guests-msg"><a className="link-cue" href={gText.href}>Text {gText.name} the invite ›</a></p>
               )}
-              {guests.length > 0 && (
+
+              {/* THE SHAREABLE URL (founder 2026-11-04): one link for
+                  anywhere — recognized invitees land on their own
+                  invitation, new people ASK and the host approves below.
+                  "New link" is the kill switch for a leaked one. */}
+              <div className="evp__sharelink">
+                <p className="evp__guests-sub">
+                  Or share one link anywhere — a flyer, a group text, a post. People you invited
+                  directly are recognized and land on their own invitation; anyone new asks to come,
+                  and you approve them right here.
+                </p>
+                {shareLink ? (
+                  <>
+                    <p className="evp__sharelink-url">{shareLink}</p>
+                    <div className="evp__sharelink-row">
+                      <button className="btn evp__sharelink-btn" onClick={() => void copyLink()}>{linkCopied ? 'Copied ✓' : 'Copy the link'}</button>
+                      <button className="btn evp__sharelink-btn" onClick={() => void makeLink(true)} disabled={linkBusy}>New link</button>
+                    </div>
+                    <p className="evp__guests-fine">“New link” retires the old one everywhere it was posted.</p>
+                  </>
+                ) : (
+                  <button className="btn btn-primary evp__guests-send" onClick={() => void makeLink()} disabled={linkBusy}>
+                    {linkBusy ? 'Making it…' : 'Create the shareable link'}
+                  </button>
+                )}
+              </div>
+
+              {guests.some((g) => g.status === 'requested') && (
+                <>
+                  <h4 className="evp__guests-h4">Asked to come</h4>
+                  <ul className="evp__guests-list">
+                    {guests.filter((g) => g.status === 'requested').map((g) => (
+                      <li key={g.id} className="evp__guest">
+                        <span className="evp__guest-name">
+                          {g.name}
+                          <span className="evp__guest-contact"> · {g.email ?? g.phone}</span>
+                        </span>
+                        <span className="evp__guest-acts">
+                          <button className="evp__guest-approve" onClick={() => void approveGuest(g)} disabled={gActBusy === g.id}>
+                            {gActBusy === g.id ? '…' : 'Approve'}
+                          </button>
+                          <button className="evp__guest-refuse" onClick={() => void refuseGuest(g)} disabled={gActBusy === g.id}>
+                            {armDecline === g.id ? 'Sure?' : 'Not a fit'}
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {guests.some((g) => g.status !== 'requested') && (
                 <ul className="evp__guests-list">
-                  {guests.map((g) => (
+                  {guests.filter((g) => g.status !== 'requested').map((g) => (
                     <li key={g.id} className="evp__guest">
                       <span className="evp__guest-name">{g.name}</span>
                       {g.phone && (

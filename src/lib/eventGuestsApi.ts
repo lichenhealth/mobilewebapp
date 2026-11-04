@@ -34,6 +34,68 @@ export async function loadGuestEvent(token: string): Promise<GuestEventInfo | nu
   return rows && rows.length ? rows[0] : null;
 }
 
+// ── THE OPEN EVENT URL (founder 2026-11-04: "An Event URL is really
+// handy… if you're not also on an invite list, the request to attend
+// prompts an approval from the host") ────────────────────────────────────
+
+/** The same event shape, minus the guest fields, by the event's own
+ *  shareable LINK token. */
+export type OpenEventInfo = Omit<GuestEventInfo, 'guest_name' | 'guest_status'>;
+
+/** Open-link landing: the event by its shareable token (anon-callable). */
+export async function loadOpenEvent(linkToken: string): Promise<OpenEventInfo | null> {
+  const { data, error } = await supabase.rpc('open_event', { p_link: linkToken });
+  if (error) { console.warn('open_event:', error.message); return null; }
+  const rows = data as OpenEventInfo[] | null;
+  return rows && rows.length ? rows[0] : null;
+}
+
+/** Ask to come via the open link. A contact already ON the invite list is
+ *  recognized and handed their own standing token (on_list true); an
+ *  unknown person becomes a 'requested' row the host approves. */
+export async function requestEventSpot(
+  linkToken: string, name: string, contact: { email?: string; phone?: string },
+): Promise<{ on_list: boolean; token: string }> {
+  const { data, error } = await supabase.rpc('request_event_spot', {
+    p_link: linkToken, p_name: name,
+    p_email: contact.email ?? null, p_phone: contact.phone ?? null,
+  });
+  if (error) throw error;
+  return data as { on_list: boolean; token: string };
+}
+
+/** Host-side: mint (or rotate — the kill switch for a leaked link) the
+ *  event's shareable URL token. */
+export async function mintEventLink(eventId: string, rotate = false): Promise<string> {
+  const { data, error } = await supabase.rpc('mint_event_link', { p_event: eventId, p_rotate: rotate });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Host-side: approve a link-born request — the row flips to going (the
+ *  host policy's UPDATE covers it), and an email guest gets the "you're
+ *  in" mail (a phone guest gets texted via the row's Text › door). */
+export async function approveEventGuest(g: EventGuest): Promise<void> {
+  const { error } = await supabase.from('event_guests')
+    .update({ status: 'going' }).eq('id', g.id);
+  if (error) throw error;
+  if (g.email) {
+    const { data, error: e2 } = await supabase.functions.invoke('send-event-invite', {
+      body: { guest_id: g.id },
+    });
+    if (e2) throw e2;
+    const err = (data as { error?: string } | null)?.error;
+    if (err) throw new Error(err);
+  }
+}
+
+/** Host-side: a request that isn't a fit — the row goes; a pest can
+ *  re-ask, and the rotate above is the real kill switch. */
+export async function declineEventGuest(id: string): Promise<void> {
+  const { error } = await supabase.from('event_guests').delete().eq('id', id);
+  if (error) throw error;
+}
+
 /** Guest-side: RSVP by token. */
 export async function guestRsvp(token: string, status: GuestStatus): Promise<void> {
   const { error } = await supabase.rpc('guest_rsvp', { p_token: token, p_status: status });

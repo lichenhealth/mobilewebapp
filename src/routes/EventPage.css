@@ -106,8 +106,36 @@
 .evp__guests-send { align-self: flex-start; padding: 9px 18px; font-size: 13px; }
 .evp__guests-msg { font-size: 13px; color: var(--moss); margin: var(--s-2) 0 0; }
 .evp__guests-list { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s-3); }
-.evp__guest { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: 6px 0; }
+.evp__guest { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: 6px 0; flex-wrap: wrap; }
 .evp__guest-name { font-size: 14px; color: var(--ink); margin-right: auto; }
+.evp__guest-contact { color: var(--ink-soft); font-size: 13px; }
+
+/* THE SHAREABLE URL block + the asked-to-come queue (founder 2026-11-04,
+   the open event link: recognized invitees pass, strangers wait on the
+   host's yes). */
+.evp__sharelink { margin-top: var(--s-4); padding-top: var(--s-3); border-top: 1px dashed var(--bone-edge); }
+.evp__sharelink-url {
+  margin: 0 0 var(--s-2); padding: 8px 12px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.evp__sharelink-row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.evp__sharelink-btn { padding: 8px 14px; font-size: 13px; border-color: var(--peach); color: var(--peach-deep); }
+.evp__guests-fine { margin: var(--s-2) 0 0; font-size: 12px; color: var(--ink-faint); }
+.evp__guests-h4 { margin: var(--s-4) 0 2px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.evp__guest-acts { display: flex; gap: var(--s-2); }
+.evp__guest-approve {
+  border: 0; border-radius: var(--r-full); padding: 7px 14px;
+  background: var(--peach); color: var(--ink); font-size: 12.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.evp__guest-approve:hover { background: var(--peach-deep); color: #fff; }
+.evp__guest-refuse {
+  border: 1px solid var(--bone-edge); border-radius: var(--r-full); padding: 7px 12px;
+  background: none; color: var(--ink-muted); font-size: 12.5px; font-family: inherit; cursor: pointer;
+}
+.evp__guest-refuse:hover { border-color: var(--red, #b4553f); color: var(--red-deep, #9c4a37); }
 /* A phone guest's re-text door — same token, the sms just re-opens
    (the worded hover-peach edit-affordance rule). */
 .evp__guest-retext {

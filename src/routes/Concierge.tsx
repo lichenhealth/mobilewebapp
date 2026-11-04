@@ -1170,6 +1170,27 @@ export default function Concierge() {
   // WOW/KOC care-post board for whoever we're viewing (RLS scopes to care-team reads).
   const [wowPosts, setWowPosts] = useState<CarePostRow[]>([]);
   const [kocPosts, setKocPosts] = useState<CarePostRow[]>([]);
+  // THE BOARD SEARCH IS LIVE NOW (founder 2026-11-04, typing "summarize
+  // the economic tab" into the WOW tab's box: "search for concierge
+  // doesn't seem to be working - is it FPO or intelligent/live?" — the box
+  // was real but wired only on the Chat tab): on WOW/KOC a query ≥2 chars
+  // word-matches the LOADED entries (deterministic, the smartSearch no-AI
+  // idiom — the board must stay instant) and the results take the panel;
+  // a QUESTION is the brain's job, so the results always carry an Ask-the-
+  // brain door riding the typed words into the concierge thread ?ask=
+  // (prefilled, UNSENT — a model call is theirs to spend).
+  const boardHits = useMemo(() => {
+    if ((activeTab !== 'wow' && activeTab !== 'koc') || query.trim().length < 2) return null;
+    const words = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+    if (!words.length) return null;
+    const pool = activeTab === 'wow' ? wowPosts : kocPosts;
+    const scored = pool.map((p) => {
+      const hay = `${p.title ?? ''} ${p.body ?? ''} ${(p.dimensions ?? []).join(' ')}`.toLowerCase();
+      return { p, n: words.filter((w) => hay.includes(w)).length };
+    }).filter((x) => x.n > 0);
+    scored.sort((a, b) => b.n - a.n || b.p.created_at.localeCompare(a.p.created_at));
+    return scored.slice(0, 30).map((x) => x.p);
+  }, [activeTab, query, wowPosts, kocPosts]);
   // THE SECTIONED BOARD (founder 2026-09-21): Overall + the six threads,
   // each a summary with its own + door — per-section view choice lives here.
   const [wowView, setWowView] = useState<Record<string, 'summary' | 'chron'>>({});
@@ -1499,7 +1520,7 @@ export default function Concierge() {
             aria-label="Add to your care team"
             title="Add to your care team"
           >
-            <Icon name="plus" size={14} />
+            <Icon name="plus" size={16} />
           </button>
         ) : (
         <>
@@ -1511,7 +1532,7 @@ export default function Concierge() {
           }}
           aria-label="Search" data-tip="Search"
         >
-          <Icon name="search" size={14} />
+          <Icon name="search" size={16} />
         </button>
         {canAuthor && (activeTab === 'wow' || activeTab === 'koc') && (
           <button
@@ -1522,7 +1543,7 @@ export default function Concierge() {
             aria-label={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
             data-tip={activeTab === 'wow' ? 'Add a WOW entry' : 'Add to the care plan'}
           >
-            <Icon name="plus" size={14} />
+            <Icon name="plus" size={16} />
           </button>
         )}
         {/* THE BRAIN IS A DOOR HERE TOO (founder 2026-10-06: "Concierge
@@ -1572,7 +1593,7 @@ export default function Concierge() {
           <input
             autoFocus
             className="conc__search-input"
-            placeholder={activeTab === 'chat' ? 'Search your care conversations' : 'Search your snapshots'}
+            placeholder={activeTab === 'chat' ? 'Search your care conversations' : 'Search your care entries'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -1620,7 +1641,31 @@ export default function Concierge() {
       </nav>
 
       {/* Active tab content */}
-      {activeTab === 'wow' && (() => {
+      {/* Board-search results take the panel (the care-search pattern) —
+          matching entries as their real cards, and the brain door for the
+          asks a word-filter can't answer. */}
+      {boardHits && (
+        <div className="conc__bsearch">
+          <p className="conc__bsearch-note">
+            {boardHits.length > 0
+              ? `${boardHits.length} ${boardHits.length === 1 ? 'entry matches' : 'entries match'} “${query.trim()}”`
+              : `No ${activeTab === 'wow' ? 'WOW entries' : 'care-plan entries'} match “${query.trim()}”.`}
+          </p>
+          {boardHits.map((p) => (
+            <CarePostCard key={p.id} post={p} mediaUrls={mediaUrls} me={me}
+              canDelete={canAuthor && p.author_id === me} onDelete={removePost}
+              onAsk={p.author_id !== me ? askEntry : undefined} />
+          ))}
+          <button
+            className="conc__bsearch-brain"
+            onClick={() => navigate(`/assistant/feed?thread=concierge&ask=${encodeURIComponent(query.trim())}`)}
+          >
+            ✨ A question? Ask the brain: “{query.trim()}”
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'wow' && !boardHits && (() => {
         const lenses = computeWowLenses(wowPosts, subjectId, new Date(), wowWindow);
         const scores = lenses[wowLens];
         // The member's OWN answers, latest per aspect — the gate for the
@@ -1865,7 +1910,7 @@ export default function Concierge() {
         );
       })()}
 
-      {activeTab === 'koc' && (() => {
+      {activeTab === 'koc' && !boardHits && (() => {
         const dayLbl = (iso: string) => {
           const d = localDate(iso);
           return `${d.toLocaleDateString(undefined, { weekday: 'long' })} · ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
@@ -1903,11 +1948,11 @@ export default function Concierge() {
           {/* One row, the mock's grammar (founder 2026-09-23): whose plan,
               which window, the pager flanking it. */}
           <div className="koc__weeknav">
-            <button className="conc__tool-circle" onClick={() => shiftRange(-1)} aria-label={`Previous ${scope.toLowerCase()}`}><Icon name="chevron-left" size={14} /></button>
+            <button className="conc__tool-circle" onClick={() => shiftRange(-1)} aria-label={`Previous ${scope.toLowerCase()}`}><Icon name="chevron-left" size={16} /></button>
             <span className="koc__planlbl">
               {isClientView ? (clientName ? `${possessive(clientName)} care plan` : 'Care plan') : 'Your care plan'} · {planWhen}
             </span>
-            <button className="conc__tool-circle" onClick={() => shiftRange(1)} aria-label={`Next ${scope.toLowerCase()}`}><Icon name="chevron-right" size={14} /></button>
+            <button className="conc__tool-circle" onClick={() => shiftRange(1)} aria-label={`Next ${scope.toLowerCase()}`}><Icon name="chevron-right" size={16} /></button>
           </div>
           {canAuthor && (
             /* Day scope's + adds TO the day on screen; the other scopes

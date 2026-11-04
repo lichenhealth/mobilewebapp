@@ -793,7 +793,7 @@ export default function Saved() {
                     aria-label={a.label}
                     data-tip={a.label}
                   >
-                    <Icon name={a.icon} size={18} />
+                    <Icon name={a.icon} size={16} />
                   </button>
                 );
               })}

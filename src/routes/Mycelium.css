@@ -99,7 +99,7 @@
 }
 .myc__area {
   flex: 0 0 auto;
-  width: 38px; height: 38px;
+  width: 34px; height: 34px;
   border-radius: var(--r-full);
   border: 1px solid var(--bone-edge);
   background: var(--bone-warm);
@@ -130,8 +130,6 @@
 @media (max-width: 520px) {
   /* double class outranks .h-scroll's gap */
   .myc__areas.h-scroll { gap: 6px; flex-wrap: wrap; }
-  .myc__area { width: 30px; height: 30px; }
-  .myc__area svg { width: 15px; height: 15px; }
   .myc__kinds.h-scroll { gap: 6px; flex-wrap: wrap; }
   .myc__kind { font-size: 11px; padding: 4px 9px 4px 4px; gap: 4px; }
   .myc__kind-circle { width: 20px; height: 20px; }
