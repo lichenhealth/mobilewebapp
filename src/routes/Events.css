@@ -47,6 +47,10 @@
 }
 .evt__action:hover { transform: translateY(-1px); }
 .evt__action:active { transform: scale(0.96); }
+/* My Events + My Calendar hug the row's right edge (founder 2026-11-04:
+   "move the events tab and calendar to the right, so there's a
+   separation") — the gap splits constant tools from personal doors. */
+.evt__action--push { margin-left: auto; }
 .evt__action-circle {
   width: 30px; height: 30px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
