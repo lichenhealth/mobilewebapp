@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { consentOn, setConsent } from '../lib/assistantConsentApi';
@@ -61,49 +61,48 @@ export default function AssistantDoor({ section, label, size = 34, scope }:
      *  reading — e.g. `collection=<id>` for one course. */
     scope?: string }) {
   const navigate = useNavigate();
-  // THE BRAIN IS ALWAYS A DOOR (founder 2026-10-06, "Ai brain consistency"):
-  // on, it opens this section's briefing; OFF, it stays grayed and pressing
-  // it asks IN PLACE whether to turn the assistant back on — turning on
-  // clicks straight through. The popup also says the catch-up truth: while
-  // off, nothing here reached any assistant; back on, the briefing reads the
-  // section as it stands, so what was missed is caught up there.
-  const wrapRef = useRef<HTMLSpanElement>(null);
-  const [ask, setAsk] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
+  // THE BRAIN IS ALWAYS A DOOR, AND NOW IT WEARS THE HOMEPAGE'S › TAB
+  // (founder 2026-11-04, retiring the 2026-10-06 ask-in-place popup after it
+  // rendered BURIED under Marketplace's lens circles: "let's have clicking
+  // it turn it on and that creates the click thru arrow, so you can click
+  // thru to it, just like homepage"): a lit brain carries the peach › tab
+  // (the icon-row__door grammar) that opens this section's briefing — the
+  // circle opens it too, members learned brain=briefing long ago. An OFF
+  // brain turns the assistant back ON right here in one tap — no popup, no
+  // navigation; the circle lighting and the tab appearing are the receipt.
+  // The catch-up truth needs no card now: consent gates at READ time, so
+  // the briefing itself reads the section as it stands, including whatever
+  // happened while it was off. Turning OFF stays a deliberate act elsewhere
+  // (Profile → Privacy, or the brief's own checkbox) — a tap must never
+  // silently close the eyes it just opened.
+  const [, bump] = useState(0);
   const on = aiDoorOn(section);
   const go = () => navigate(`/assistant?section=${section}${scope ? `&${scope}` : ''}`);
   return (
-    <span className="ai-door-wrap" ref={wrapRef}>
+    <span className="ai-door-wrap">
       <button
         className={'ai-door' + (on ? '' : ' is-off')}
         style={size === 34 ? undefined : { width: size, height: size }}
         onClick={() => {
           if (on) { go(); return; }
-          const r = wrapRef.current?.getBoundingClientRect();
-          setAlignRight(!!r && r.left > window.innerWidth / 2);
-          setAsk((a) => !a);
+          setAiDoor(section, true);
+          bump((n) => n + 1);   // aiDoorOn reads a module cache — re-render to light up
         }}
         aria-label={on ? (label ?? 'Your assistant’s briefing for this section') : 'Assistant is off here — tap to turn it back on'}
-        aria-expanded={on ? undefined : ask}
-        data-tip={on ? aiTip(section) : 'Assistant — off here'}
+        data-tip={on ? aiTip(section) : 'Assistant — off. Tap to turn on'}
       >
         <Icon name="brain" size={Math.round(size * 0.47)} />
         {!on && <span className="ai-door__slash" aria-hidden />}
       </button>
-      {!on && ask && (
-        <span className={'ai-door__pop' + (alignRight ? ' ai-door__pop--right' : '')} role="dialog" aria-label="Turn the assistant back on?">
-          <span className="ai-door__pop-text">
-            The assistant’s eyes are off here — nothing from this section reaches it.
-            Turn it back on and the briefing catches you up: it reads the section as it
-            stands, including what happened while it was off.
-          </span>
-          <span className="ai-door__pop-row">
-            <button className="ai-door__pop-on" onClick={() => { setAiDoor(section, true); setAsk(false); go(); }}>
-              Turn on &amp; open
-            </button>
-            <button className="ai-door__pop-no" onClick={() => setAsk(false)}>Keep off</button>
-          </span>
-        </span>
+      {on && (
+        <button
+          className="ai-door__tab"
+          onClick={go}
+          aria-label={label ?? 'Open the briefing'}
+          data-tip="Open the briefing"
+        >
+          <Icon name="chevron-right" size={11} />
+        </button>
       )}
     </span>
   );
