@@ -107,5 +107,12 @@
 .evp__guests-msg { font-size: 13px; color: var(--moss); margin: var(--s-2) 0 0; }
 .evp__guests-list { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s-3); }
 .evp__guest { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: 6px 0; }
-.evp__guest-name { font-size: 14px; color: var(--ink); }
+.evp__guest-name { font-size: 14px; color: var(--ink); margin-right: auto; }
+/* A phone guest's re-text door — same token, the sms just re-opens
+   (the worded hover-peach edit-affordance rule). */
+.evp__guest-retext {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font-size: 13px; color: var(--ink-soft); font-family: inherit;
+}
+.evp__guest-retext:hover { color: var(--peach-deep); }
 .evp__guest-status { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }

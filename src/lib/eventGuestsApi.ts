@@ -17,6 +17,11 @@ export interface GuestEventInfo {
   end_min: number | null;
   recurrence: unknown;
   host_name: string;
+  /** The linked door-post — a signed-in MEMBER opens the real event page
+   *  from here ("if you are [a member], it auto fills your info"). */
+  post_id: string | null;
+  /** The event post's cover photo — what makes the invite pretty. */
+  photo_url: string | null;
 }
 
 export type GuestStatus = 'going' | 'tentative' | 'declined';
@@ -35,12 +40,17 @@ export async function guestRsvp(token: string, status: GuestStatus): Promise<voi
   if (error) throw error;
 }
 
-export interface EventGuest { id: string; name: string; email: string; status: string }
+export interface EventGuest {
+  id: string; name: string; email: string | null; phone: string | null;
+  token: string; status: string;
+}
 
-/** Host-side: the external guests for an event (owner-only RLS). */
+/** Host-side: the external guests for an event (owner-only RLS). The token
+ *  rides along so a PHONE row's "Text again ›" can rebuild the same sms —
+ *  one token per person, it never re-mints. */
 export async function loadEventGuests(eventId: string): Promise<EventGuest[]> {
   const { data, error } = await supabase.from('event_guests')
-    .select('id, name, email, status').eq('event_id', eventId).order('created_at');
+    .select('id, name, email, phone, token, status').eq('event_id', eventId).order('created_at');
   if (error) { console.warn('loadEventGuests:', error.message); return []; }
   return (data as EventGuest[] | null) ?? [];
 }
@@ -53,4 +63,26 @@ export async function inviteEventGuest(eventId: string, name: string, email: str
   if (error) throw error;
   const err = (data as { error?: string } | null)?.error;
   if (err) throw new Error(err);
+}
+
+/** Host-side PHONE invite (founder 2026-11-04, the Invite-to-Lichen
+ *  pattern): mint the tokened guest row — the tightened RLS lets only the
+ *  event's own creator insert — and the HOST texts the link from their own
+ *  Messages. No SMS provider, by standing doctrine. Returns the token. */
+export async function inviteEventGuestByPhone(eventId: string, name: string, phone: string): Promise<string> {
+  const { data: u } = await supabase.auth.getUser();
+  const me = u.user?.id;
+  if (!me) throw new Error('Not signed in');
+  const { data, error } = await supabase.from('event_guests')
+    .insert({ event_id: eventId, invited_by: me, name: name.trim(), phone })
+    .select('token').single();
+  if (error) throw error;
+  return (data as { token: string }).token;
+}
+
+/** The invite text a phone guest gets — short, tokened, sent from the
+ *  host's own phone. `sms` is the cleaned +digits number. */
+export function eventInviteSmsHref(sms: string, hostName: string, title: string, when: string, token: string): { href: string; body: string } {
+  const body = `${hostName} invited you to "${title}" — ${when}. Details, RSVP & add it to your calendar (no account needed): https://lichen.health/e/${token}`;
+  return { href: `sms:${sms}?&body=${encodeURIComponent(body)}`, body };
 }

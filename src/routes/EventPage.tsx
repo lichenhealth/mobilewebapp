@@ -19,7 +19,8 @@ import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, poste
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard } from '../lib/feedMapping';
-import { loadEventGuests, inviteEventGuest, type EventGuest } from '../lib/eventGuestsApi';
+import { loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref, type EventGuest } from '../lib/eventGuestsApi';
+import { classifyCareContact } from '../lib/careTeamApi';
 import './EventPage.css';
 import { useConfirm } from '../components/ConfirmDialog';
 
@@ -47,12 +48,16 @@ export default function EventPage() {
   const [chatId, setChatId] = useState<string | null>(null);
   const [chatErr, setChatErr] = useState(false);
   const chatAsked = useRef(false);
-  // Host: invite people outside Lichen (external guests).
+  // Host: invite people outside Lichen (external guests) — by EMAIL or
+  // PHONE since 2026-11-04 (founder: "I invite people to an event via
+  // email or phone"; the Invite-to-Lichen pattern — a phone invite opens
+  // the host's OWN Messages with the tokened text, no SMS provider).
   const [guests, setGuests] = useState<EventGuest[]>([]);
   const [gName, setGName] = useState('');
-  const [gEmail, setGEmail] = useState('');
+  const [gContact, setGContact] = useState('');
   const [gBusy, setGBusy] = useState(false);
   const [gMsg, setGMsg] = useState('');
+  const [gText, setGText] = useState<{ name: string; href: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,17 +95,49 @@ export default function EventPage() {
     return () => { live = false; };
   }, [post, me]);
 
+  /** Short "when" for the texted invite ("Thu, Nov 20 · 5pm"). */
+  const smsWhen = () => {
+    if (!calEvent) return '';
+    const d = formatDateShort(calEvent.start_date);
+    return calEvent.all_day || calEvent.start_min == null ? d : `${d} · ${minToLabel(calEvent.start_min)}`;
+  };
+
   async function sendGuestInvite() {
-    if (!post?.linked_event_id || !gName.trim() || !gEmail.trim() || gBusy) return;
-    setGBusy(true); setGMsg('');
+    if (!post?.linked_event_id || !gName.trim() || !gContact.trim() || gBusy) return;
+    const contact = classifyCareContact(gContact);
+    if (contact.kind !== 'email' && contact.kind !== 'phone') {
+      setGMsg('That doesn’t read as an email or a phone number.'); return;
+    }
+    setGBusy(true); setGMsg(''); setGText(null);
     try {
-      await inviteEventGuest(post.linked_event_id, gName.trim(), gEmail.trim());
-      setGMsg(`Invite sent to ${gEmail.trim()}.`);
-      setGName(''); setGEmail('');
+      if (contact.kind === 'email') {
+        await inviteEventGuest(post.linked_event_id, gName.trim(), contact.email);
+        setGMsg(`Invite sent to ${contact.email}.`);
+      } else {
+        // Phone: mint the token, then the HOST texts it from their own
+        // Messages (one token per person — it RSVPs for them).
+        const token = await inviteEventGuestByPhone(post.linked_event_id, gName.trim(), contact.sms);
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', me).maybeSingle();
+        const hostName = (data as { full_name: string | null } | null)?.full_name || 'A friend';
+        const { href } = eventInviteSmsHref(contact.sms, hostName, post.title ?? calEvent?.title ?? 'an event', smsWhen(), token);
+        setGText({ name: gName.trim(), href });
+        setGMsg('Their text is ready below — tap it to send from your Messages.');
+        window.location.href = href;
+      }
+      setGName(''); setGContact('');
       setGuests(await loadEventGuests(post.linked_event_id));
     } catch (e) {
       setGMsg((e as Error).message || 'Could not send the invite.');
     } finally { setGBusy(false); }
+  }
+
+  /** A phone row's "Text again ›" — same token, the sms just re-opens. */
+  async function reTextGuest(g: EventGuest) {
+    if (!g.phone) return;
+    const { data } = await supabase.from('profiles').select('full_name').eq('id', me).maybeSingle();
+    const hostName = (data as { full_name: string | null } | null)?.full_name || 'A friend';
+    const { href } = eventInviteSmsHref(g.phone.replace(/[^\d+]/g, ''), hostName, post?.title ?? calEvent?.title ?? 'an event', smsWhen(), g.token);
+    window.location.href = href;
   }
 
   // Everything hook-shaped must live ABOVE the early returns — React requires
@@ -341,21 +378,33 @@ export default function EventPage() {
           {isHost && post.linked_event_id && (
             <div className="evp__guests">
               <h3 className="evp__guests-h">Invite someone outside Lichen</h3>
-              <p className="evp__guests-sub">We’ll email them the details. No account needed — they can add it to their calendar or RSVP as a guest.</p>
+              <p className="evp__guests-sub">
+                An email sends them a pretty invitation{postToCard(post).media?.some((m) => m.type === 'photo') ? ' wearing your event’s cover photo' : ' — add a photo to this event and the invitation wears it'};
+                a phone number opens a ready-to-send text from your own Messages. No account
+                needed — they can RSVP, add it to their calendar, and ask to join Lichen.
+              </p>
               <div className="evp__guests-form">
                 <input className="evp__guests-input" placeholder="Their name" value={gName} onChange={(e) => setGName(e.target.value)} />
-                <input className="evp__guests-input" type="email" placeholder="Their email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} />
+                <input className="evp__guests-input" placeholder="Their email or phone"
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  value={gContact} onChange={(e) => setGContact(e.target.value)} />
                 <button className="btn btn-primary evp__guests-send" onClick={sendGuestInvite}
-                  disabled={gBusy || !gName.trim() || !gEmail.trim()}>
+                  disabled={gBusy || !gName.trim() || !gContact.trim()}>
                   {gBusy ? 'Sending…' : 'Send invite'}
                 </button>
               </div>
               {gMsg && <p className="evp__guests-msg">{gMsg}</p>}
+              {gText && (
+                <p className="evp__guests-msg"><a className="link-cue" href={gText.href}>Text {gText.name} the invite ›</a></p>
+              )}
               {guests.length > 0 && (
                 <ul className="evp__guests-list">
                   {guests.map((g) => (
                     <li key={g.id} className="evp__guest">
                       <span className="evp__guest-name">{g.name}</span>
+                      {g.phone && (
+                        <button className="evp__guest-retext" onClick={() => void reTextGuest(g)}>Text ›</button>
+                      )}
                       <span className="evp__guest-status">{g.status === 'invited' ? 'invited' : g.status === 'going' ? 'going' : g.status === 'tentative' ? 'maybe' : "can't"}</span>
                     </li>
                   ))}

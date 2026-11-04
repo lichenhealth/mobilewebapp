@@ -69,6 +69,20 @@ Deno.serve(async (req) => {
   const hosts = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
   const hostName = (Array.isArray(hosts) ? hosts[0]?.full_name : null) || 'A member';
 
+  // THE PRETTY INVITE (founder 2026-11-04: "pretty invites, like paperless
+  // post or canva"): the event's door-post cover photo crowns the emailed
+  // card — post media URLs are public by construction, so the mail client
+  // can load it straight.
+  let photo: string | null = null;
+  try {
+    const posts = await (await sb(`posts?linked_event_id=eq.${event_id}&select=details,image_url&limit=1`)).json();
+    const po = Array.isArray(posts) ? posts[0] : null;
+    if (po) {
+      const media: { type?: string; url?: string }[] = Array.isArray(po.details?.media) ? po.details.media : [];
+      photo = media.find((m) => m?.type === 'photo' && m?.url)?.url ?? po.image_url ?? null;
+    }
+  } catch { /* a missing photo never blocks the invite */ }
+
   // Mint the guest row + token.
   const insRes = await sb('event_guests', {
     method: 'POST',
@@ -84,19 +98,28 @@ Deno.serve(async (req) => {
   const where = (ev.location || '').trim();
   const subject = `${hostName} invited you to ${ev.title}`;
   const text = `${hostName} invited you to "${ev.title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nSee the details, add it to your calendar, or RSVP — no account needed:\n${link}\n\n— Lichen`;
+  // The invitation CARD (founder 2026-11-04, "pretty invites, like
+  // paperless post or canva"): cover photo on top, serif title, centered —
+  // the /e/ landing page wears the same anatomy, so the click keeps the
+  // promise. The per-send stamp keeps Gmail from folding a re-invite's
+  // tail as repeated content (the send-booking-mail lesson).
+  const stamp = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver' });
   const html = `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
-    <p style="font-size:22px;font-weight:600;margin:0 0 6px">Lichen</p>
-    <p style="font-size:16px;line-height:1.5;margin:0 0 18px"><strong>${esc(hostName)}</strong> invited you to an event.</p>
-    <div style="background:#fff;border:1px solid #e6e1d8;border-radius:14px;padding:18px 20px;margin:0 0 22px">
-      <p style="font-size:18px;font-weight:600;margin:0 0 8px">${esc(ev.title)}</p>
-      <p style="font-size:14px;color:#5a554c;margin:0 0 4px">${esc(when)}</p>
-      ${where ? `<p style="font-size:14px;color:#5a554c;margin:0">${esc(where)}</p>` : ''}
+    <p style="font-size:22px;font-weight:600;margin:0 0 14px">Lichen</p>
+    <div style="background:#fff;border:1px solid #e6e1d8;border-radius:18px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.08)">
+      ${photo ? `<img src="${esc(photo)}" alt="" width="520" style="display:block;width:100%;max-height:300px;object-fit:cover">` : ''}
+      <div style="padding:26px 24px 22px;text-align:center">
+        <p style="font-family:'Iowan Old Style',Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#c06b3e;margin:0 0 10px">You're invited</p>
+        <p style="font-family:'Iowan Old Style',Georgia,'Times New Roman',serif;font-size:28px;font-weight:400;line-height:1.2;margin:0 0 14px">${esc(ev.title)}</p>
+        <p style="font-size:15px;color:#2b2b28;margin:0 0 4px">${esc(when)}</p>
+        ${where ? `<p style="font-size:14px;color:#5a554c;margin:0 0 4px">${esc(where)}</p>` : ''}
+        <p style="font-size:14px;color:#5a554c;margin:12px 0 18px">Hosted by <strong>${esc(hostName)}</strong></p>
+        <a href="${link}" style="display:inline-block;background:#e8956b;color:#fff;text-decoration:none;padding:12px 24px;border-radius:999px;font-weight:600">RSVP &amp; see the details</a>
+      </div>
     </div>
-    <p style="margin:0 0 24px">
-      <a href="${link}" style="display:inline-block;background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">See the event &amp; RSVP</a>
-    </p>
-    <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0">No account needed — add it to your calendar or RSVP as a guest. You can make a Lichen account if you'd like.</p>
+    <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0 0 6px">No account needed — RSVP as a guest and add it to your own calendar in one tap. Lichen is a community for healing, growing and creating; you can request to join from the invitation.</p>
+    <p style="font-size:11px;color:#b5b0a6;margin:10px 0 0">Sent ${esc(stamp)} MT</p>
   </div></body></html>`;
 
   const res = await fetch('https://api.resend.com/emails', {
