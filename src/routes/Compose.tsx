@@ -29,6 +29,7 @@ import DateRangeCalendar, { type DateRange } from '../components/DateRangeCalend
 import CategoryPicker, { type Category } from '../components/CategoryPicker';
 import TimeField from '../components/TimeField';
 import { todayISO } from '../lib/conciergeApi';
+import { useTopBackFor } from '../lib/topBack';
 import './Compose.css';
 
 
@@ -104,14 +105,13 @@ export default function Compose() {
   const [audienceSpaces, setAudienceSpaces] = useState<Set<string>>(() => new Set(presetSpace ? [presetSpace] : []));
   const [mySpaces, setMySpaces] = useState<{ id: string; name: string; kind: string }[]>([]);
   const [myAdminSpaces, setMyAdminSpaces] = useState<Set<string>>(new Set());
-  // The choice point (founder + Melanie, 2026-07-27): every post is either
-  // SOCIAL — it flows through a Space feed — or ACTIONABLE — it flows through
-  // the Lichen Economy (every actionable post rides the Marketplace; a gift
-  // is simply an offer open to anyone). The old five-way Type row is gone;
-  // legacy content_types survive on old posts (contentType preserves them
-  // through an edit unless the member taps a face).
-  const [face, setFace] = useState<'social' | 'actionable'>(() =>
-    areasFromParam(params.get('area')).length ? 'actionable' : 'social');
+  // THE SOCIAL/ACTIONABLE FORK IS RETIRED (founder 2026-11-04: "let's
+  // definitely remove the social/actionable… this is redundant") — the
+  // WHERE picker is the one driver now: no areas = a feed story (what
+  // Social was), any area = actionable (the terms machinery reveals).
+  // content_type stays in the DB, DERIVED at publish, so the marketplace
+  // auto-add and the ISO matcher keep working untouched; legacy
+  // content_types survive on old posts via contentType.
   const [contentType, setContentType] = useState<ContentType>(() =>
     areasFromParam(params.get('area')).length ? 'actionable' : 'social');
   // "Where": a post can live in several areas at once.
@@ -320,6 +320,17 @@ export default function Compose() {
   // the close (e.g. the door fell back to plain navigation), the ordinary
   // after-post landing still runs.
   const isPopup = params.get('popup') === '1';
+  // THE BACK RIDES THE TOPBAR (founder 2026-11-04, circling the bare
+  // "← Back" pill: "for consistency, isn't this the wrong back button
+  // functionality?" — the worded-chip sunset finally applied here):
+  // Compose broadcasts its back beside the ☰ like every non-section
+  // screen. The in-page chip survives ONLY in ?popup=1, where its words
+  // carry close-this-window semantics.
+  useTopBackFor(() => {
+    if (isPopup) { window.close(); return; }
+    if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
+    else navigate(afterPostDestination(areas.has('events')));
+  });
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
   // Where it happens (founder 2026-07-27): Online and In person are
@@ -456,7 +467,7 @@ export default function Compose() {
 
   function draftSnapshot(): Record<string, unknown> {
     return {
-      face, contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone,
+      contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
@@ -502,7 +513,7 @@ export default function Compose() {
       const d = row.draft as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       hadDraft.current = true;
       const s = <T,>(v: T | undefined | null, set: (x: T) => void) => { if (v !== undefined && v !== null) set(v); };
-      s(d.face, setFace); s(d.contentType, setContentType);
+      s(d.contentType, setContentType);
       s(d.title, setTitle); s(d.body, setBody); s(d.linkName, setLinkName);
       if (Array.isArray(d.invitees)) setInvitees(d.invitees); s(d.genLink, setGenLink);
       s(d.evLichen, setEvLichen); s(d.evAnyone, setEvAnyone);
@@ -603,7 +614,6 @@ export default function Compose() {
       setToMycelium(p.to_mycelium);
       setAudienceSpaces(new Set(p.audience_space_ids ?? []));
       setContentType(p.content_type);
-      setFace(p.content_type === 'actionable' || postAreas(p).length > 0 ? 'actionable' : 'social');
       setAreas(new Set(postAreas(p)));
       setTitle(p.title ?? '');
       setBody(p.body ?? '');
@@ -733,7 +743,18 @@ export default function Compose() {
     // Editing an event post: it's anchored to a real calendar event, so
     // 'events' can't be unchecked (cancel the event instead).
     if (editing && a === 'events' && areas.has('events') && editLinkedEvent.current) return;
-    setAreas((cur) => { const n = new Set(cur); n.has(a) ? n.delete(a) : n.add(a); return n; });
+    setAreas((cur) => {
+      const n = new Set(cur);
+      if (n.has(a)) n.delete(a);
+      else {
+        n.add(a);
+        // The Marketplace is the Commons' catch-all — the FIRST area picked
+        // brings it along pre-checked, a deselectable checkbox (the ?area=
+        // door's rule, carried here when the faces retired 2026-11-04).
+        if (cur.size === 0 && a !== 'marketplace') n.add('marketplace');
+      }
+      return n;
+    });
   };
   const hasMode = (m: OfferMode) => (isEvent ? evMode === m : modes.has(m));
   const toggleMode = (m: OfferMode) => {
@@ -794,17 +815,10 @@ export default function Compose() {
     setAiBusy(false);
   }
 
-  const pickSocial = () => {
-    // An event post can't demote to social — its calendar event anchors it.
-    if (editing && editLinkedEvent.current) return;
-    setFace('social'); setContentType('social'); setAreas(new Set()); setWhereOpen(false);
-  };
-  const pickActionable = () => {
-    setFace('actionable'); setContentType('actionable');
-    setAreas((cur) => (cur.size === 0 ? new Set(['marketplace' as ServiceArea]) : cur));
-    setWhereOpen(true);
-  };
   const isMarket = areas.has('marketplace');
+  // The one driver since the faces retired (2026-11-04): any area picked
+  // makes the post actionable; none = a feed story.
+  const isActionable = areas.size > 0;
   const isEvent = areas.has('events');
   // An EVENT's audience = an explicit visibility pick; the only-those-invited
   // rung additionally needs SOMEONE on the list (founder 2026-11-04: "you
@@ -1026,7 +1040,7 @@ export default function Compose() {
       // person, else the meeting link (SmartLocation renders links as Join).
       const effLocation = inPerson && location.trim() ? location.trim()
         : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
-      if (face === 'actionable') {
+      if (isActionable) {
         if (hasMode('paid')) {
           // The unit rides IN the price text ("$45 per hour", "$500 per 3
           // days") so older surfaces say it without new wiring; skip the
@@ -1148,7 +1162,7 @@ export default function Compose() {
           }
         }
         await updatePost(editPostId, {
-          body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
+          body, title, content_type: isActionable ? 'actionable' : contentType,
           isPublic: effPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
@@ -1188,7 +1202,7 @@ export default function Compose() {
       let createdId: string | null = null;
       try {
         const created = await createPost({
-          body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
+          body, title, content_type: isActionable ? 'actionable' : contentType,
           isPublic: effPublic, toMycelium, audienceSpaceIds: [...audienceSpaces],
           serviceAreas: [...effAreas],
           authorSpaceId: actor.type === 'space' ? actor.id : null,
@@ -1291,19 +1305,17 @@ export default function Compose() {
 
   return (
     <div className="cmp">
-      {/* Way back without posting — real history when we came from inside
-          the app, else the section this composer would land in anyway. */}
-      <button
-        className="cmp__back"
-        onClick={() => {
-          // In a pop-up flow, Back means "never mind" — close the window.
-          if (isPopup) { window.close(); return; }
-          if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
-          else navigate(afterPostDestination(isEvent));
-        }}
-      >
-        <Icon name="arrow-left" size={14} /> Back
-      </button>
+      {/* The way back lives in the TopBar's arrow now (useTopBackFor above).
+          The chip stands only in a pop-up, where Back means "never mind —
+          close this window". */}
+      {isPopup && (
+        <button
+          className="cmp__back"
+          onClick={() => window.close()}
+        >
+          <Icon name="arrow-left" size={14} /> Back
+        </button>
+      )}
       <header className="cmp__head">
         <h1 className="cmp__title">{editing ? (isEvent ? 'Edit event' : 'Edit post') : 'New post'}</h1>
         <p className="cmp__sub">
@@ -1559,33 +1571,12 @@ export default function Compose() {
       })()}
 
 
-      {/* The choice point: a post is Social (a feed story) or Actionable
-          (an exchange — it enters the Lichen Economy and rides the
-          Marketplace). Where-to-post lives beneath the actionable door. */}
-      <label className="cmp__label">What is this?</label>
-      <div className="cmp__faces">
-        <button
-          className={'cmp__face' + (face === 'social' ? ' is-on' : '')}
-          onClick={pickSocial}
-          disabled={editing && !!editLinkedEvent.current}
-          title={editing && editLinkedEvent.current ? 'An event post stays actionable — cancel the event to retire it' : undefined}
-        >
-          <strong>Social</strong>
-          <em>Flows through a Space feed</em>
-        </button>
-        <button
-          className={'cmp__face' + (face === 'actionable' ? ' is-on' : '')}
-          onClick={pickActionable}
-        >
-          <strong>Actionable</strong>
-          <em>Flows through the Lichen Economy</em>
-        </button>
-      </div>
-
-      {face === 'actionable' && (<>
+      {/* WHERE is the one driver (founder 2026-11-04, retiring the
+          Social|Actionable fork as redundant): no areas = a feed story,
+          any area = actionable — the terms machinery reveals itself. */}
       <label className="cmp__label">Where</label>
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
-        {areas.size === 0 ? <span className="cmp__where-none">Nowhere yet — it would only flow through feeds</span> : (
+        {areas.size === 0 ? <span className="cmp__where-none">Just the feeds — a social story</span> : (
           <span className="cmp__where-sel">
             {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
               <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
@@ -1603,7 +1594,7 @@ export default function Compose() {
           ? 'The Marketplace is the Commons\u2019 open square \u2014 check Courses, Library, or others to shelve this there too.'
           : others.length
           ? `Skipping the open Marketplace \u2014 this lives only in ${others.join(' and ')}.`
-          : 'Not placed anywhere \u2014 consider the Marketplace, or a quieter shelf.';
+          : 'Pick an area to make this actionable \u2014 an offer, an event, a listing.';
         return <p className="cmp__hint cmp__where-hint">{hint}</p>;
       })()}
       {whereOpen && (
@@ -1621,7 +1612,6 @@ export default function Compose() {
           ))}
         </div>
       )}
-      </>)}
 
       {(isCourse || isLibrary) && (
         <>
@@ -1670,7 +1660,7 @@ export default function Compose() {
       {/* VANITY LINK (founder 2026-11-04): a sendable address for this post —
           the booking link-name grammar on every section. Identifier field, so
           it declines autocorrect; slugify is the one sanitizer. */}
-      {face === 'actionable' && (() => {
+      {isActionable && (() => {
         const AREA_ROUTE: Record<string, string> = {
           marketplace: 'market', events: 'events', travel: 'travel',
           courses: 'courses', library: 'library', art: 'art', food: 'food',
@@ -1796,7 +1786,7 @@ export default function Compose() {
         </div>
       )}
 
-      {face === 'actionable' && (
+      {isActionable && (
         <div className="cmp__market">
           <p className="cmp__market-head">{isEvent ? 'Event details' : 'Modes of exchange'}</p>
           {isEvent && (
