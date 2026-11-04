@@ -26,6 +26,9 @@ import { postToCard, weaveProps } from '../lib/feedMapping';
 import { resolveIdentityScope } from '../lib/identityScope';
 import './Events.css';
 
+// All-lenses-lit is the default — Marketplace's ALL_CHIPS rule.
+const ALL_EVENT_MODES: EventMode[] = EVENT_MODES.map((m) => m.value);
+
 /** Human "when" for an event post's linked calendar event. */
 function whenLabel(p: FeedPost): string | undefined {
   const ev = p.linked_event;
@@ -61,10 +64,11 @@ export default function Events() {
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  // Lenses speak Home's Feed grammar now (founder 2026-11-04: "buttons for
-  // free, trade, pay with hover text, like marketplace"): empty = ALL (the
-  // lit Feed circle), picking a mode narrows and unlights Feed.
-  const [modes, setModes] = useState<EventMode[]>([]);
+  // Lenses mirror MARKETPLACE (founder 2026-11-04, second pass: "all the
+  // filters are on, and there's no feed to the left, as it implies that no
+  // types have been removed from the feed"): every lens lit by default =
+  // the whole feed, deselecting REMOVES that type. No Feed circle here.
+  const [modes, setModes] = useState<EventMode[]>(ALL_EVENT_MODES);
   const [statuses, setStatuses] = useState<Map<string, MyRsvpStatus>>(new Map());
   const [showPast, setShowPast] = useState(false);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
@@ -108,12 +112,12 @@ export default function Events() {
     setModes((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
 
   const visible = useMemo(() => {
-    // No lens picked = everything (the Feed circle). A picked lens narrows
-    // to DECLARED modes — an undeclared post shows only on the all-view
-    // (the travel-lenses rule). The category word-tabs are RETIRED
-    // (founder 2026-11-04); event_category stays authored data.
+    // Marketplace's filter rule, verbatim: an UNDECLARED post stays visible
+    // while any lens is on — only an explicit mode can be filtered away.
+    // The category word-tabs are RETIRED (founder 2026-11-04);
+    // event_category stays authored data.
     return posts
-      .filter((p) => (modes.length === 0 ? true : p.event_mode != null && modes.includes(p.event_mode)))
+      .filter((p) => (p.event_mode == null ? modes.length > 0 : modes.includes(p.event_mode)))
       .sort((a, b) => {
         const da = a.linked_event?.start_date ?? '9999-12-31';
         const db = b.linked_event?.start_date ?? '9999-12-31';
@@ -293,7 +297,11 @@ export default function Events() {
             <AssistantDoor section="events" size={30} label="Your assistant — your RSVPs, what you're hosting, what's coming up" />
             {!scoped && (
               <>
-                <button className="evt__action evt__action--door" onClick={() => navigate('/events/mine')}
+                {/* The personal doors sit pushed RIGHT (founder 2026-11-04:
+                    "move the events tab and calendar to the right, so
+                    there's a separation") — the gap splits the constant
+                    tools from where-your-own-events-live. */}
+                <button className="evt__action evt__action--door evt__action--push" onClick={() => navigate('/events/mine')}
                   aria-label="My Events" data-tip="My Events">
                   <span className="evt__action-circle"><Icon name="rsvp" size={14} /></span>
                 </button>
@@ -305,18 +313,10 @@ export default function Events() {
             )}
           </ScrollHintRow>
 
-          {/* Free/Trade/Paid as circles, Home's Feed grammar: the lit Feed
-              leads = everything (the default), a picked lens narrows and
-              unlights it; multi-select; the word rides data-tip. */}
+          {/* Free/Trade/Paid as circles, Marketplace's grammar: all lit by
+              default (nothing removed from the feed), deselect to drop a
+              type; multi-select; the word rides data-tip. */}
           <div className="evt__lensrow" role="toolbar" aria-label="Event type filters">
-            <button
-              className={'evt__action' + (modes.length === 0 ? ' is-active' : '')}
-              onClick={() => setModes([])}
-              aria-pressed={modes.length === 0}
-              aria-label="Feed — all events" data-tip="Feed"
-            >
-              <span className="evt__action-circle"><Icon name="newsfeed" size={14} /></span>
-            </button>
             {EVENT_MODES.map((m) => {
               const on = modes.includes(m.value);
               return (
