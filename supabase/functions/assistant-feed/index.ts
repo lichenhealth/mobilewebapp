@@ -2710,8 +2710,12 @@ Deno.serve(async (req) => {
         model: MODEL,
         // 400 silently starved long asks into 'empty-reply' (the wow-window
         // lesson, again — 2026-08-20: a multi-part message got no reply at
-        // all). Headroom is cheap; silence is not.
-        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 1600 : 1200,
+        // all). Headroom is cheap; silence is not. Then 1600 starved a
+        // five-type booking-family build the same way (2026-11-04: a batch
+        // of add_booking_type calls with custom hours is more JSON than
+        // 1600 tokens) — a cap is a ceiling, not a spend, so give tool
+        // threads real room.
+        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 4096 : 2048,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
