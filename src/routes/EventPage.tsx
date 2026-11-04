@@ -456,14 +456,22 @@ export default function EventPage() {
               )}
 
               {/* THE SHAREABLE URL (founder 2026-11-04): one link for
-                  anywhere — recognized invitees land on their own
-                  invitation, new people ASK and the host approves below.
-                  "New link" is the kill switch for a leaked one. */}
+                  anywhere — and it WEARS THE AUDIENCE'S TIER (same day,
+                  the Drive-ladder rule: "generating a link would auto
+                  apply the restrictions of audience to the link"):
+                  Anyone → the link admits directly; Everyone on Lichen →
+                  members RSVP in-app, off-Lichen openers knock; a subset →
+                  on-list recognized, everyone else knocks. Enforced
+                  server-side off the post's visibility in
+                  request_event_spot. "New link" stays the kill switch. */}
               <div className="evp__sharelink">
                 <p className="evp__guests-sub">
-                  Or share one link anywhere — a flyer, a group text, a post. People you invited
-                  directly are recognized and land on their own invitation; anyone new asks to come,
-                  and you approve them right here.
+                  Or share one link anywhere — a flyer, a group text, a post. It follows your
+                  audience: {post.visibility === 'public'
+                    ? 'this event is open to anyone, so whoever opens the link can RSVP straight away.'
+                    : post.visibility === 'lichen'
+                      ? 'members RSVP right away inside Lichen; anyone off Lichen asks to come and you approve them right here.'
+                      : 'people you invited are recognized and land on their own invitation; anyone else asks to come and you approve them right here.'}
                 </p>
                 {shareLink ? (
                   <>

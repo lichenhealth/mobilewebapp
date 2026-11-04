@@ -1424,13 +1424,13 @@ export default function Compose() {
           if (!audienceSpaces.has(id)) setEvLichen(false);
           toggleSpace(id);
         };
-        // Chips render INSIDE their group (members under On Lichen,
-        // email/phone under Off Lichen) — removal is by identity, never
-        // index, since each group is a filtered slice of one list.
+        // ONE chips row, color-coded (founder 2026-11-04: "peach for on
+        // lichen and gray for phone numbers, etc"): member chips PEACH,
+        // email/phone chips GRAY. Removal is by identity, never index.
         const chipRow = (list: EvInvitee[]) => (editing || list.length === 0) ? null : (
           <div className="cmp__invchips">
             {list.map((inv) => (
-              <span key={ikey(inv)} className="cmp__invchip">
+              <span key={ikey(inv)} className={'cmp__invchip' + (inv.kind === 'member' ? '' : ' cmp__invchip--off')}>
                 <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
                 {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
                 <button className="cmp__invchip-x" aria-label="Remove"
@@ -1463,12 +1463,12 @@ export default function Compose() {
                 )}
                 {contact.kind === 'email' && (
                   <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'email', value: contact.email, name: contactLineName(q) })}>
-                    <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>
+                    <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>{invContactHit ? ' · as an off-Lichen guest instead' : ''}
                   </button>
                 )}
                 {contact.kind === 'phone' && (
                   <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'phone', value: contact.digits, sms: contact.sms, name: contactLineName(q) })}>
-                    <Icon name="phone" size={14} /> Text the invitation to <strong>{q}</strong>
+                    <Icon name="phone" size={14} /> Text the invitation to <strong>{q}</strong>{invContactHit ? ' · as an off-Lichen guest instead' : ''}
                   </button>
                 )}
                 {memberHits.map((h) => (
@@ -1485,28 +1485,30 @@ export default function Compose() {
             )}
             </>)}
 
-            {/* ON LICHEN (founder 2026-11-04: "'Off Lichen' and 'On Lichen'
-                where it has checkboxes for Everyone and Mycelium, then
-                Communities, Groups, Etc"). The Everyone checkbox IS the
-                members-only visibility rung (visibility 'lichen'). EITHER/OR
-                (founder, same day: "its either everyone on lichen or
-                mycelium… if you check everyone on lichen and then a
-                community, it unchecks everyone on lichen, as its a
-                contradictory command"): a subset under Everyone is a
-                contradiction, so the LAST click wins — picking My-celium or
-                a circle unchecks Everyone on Lichen and vice versa; circles
-                coexist with My-celium. Anyone (the bigger everyone) and
-                Everyone on Lichen are the same either/or pair. */}
+            {/* ONE BLENDED LIST (founder 2026-11-04, superseding the same
+                day's On|Off Lichen groups: "the audience UI can be
+                simplified by blending on and off lichen? peach for on
+                lichen and gray for phone numbers"): chips color-code the
+                boundary — PEACH = on Lichen (members), GRAY = off-Lichen
+                (emails/phones) — over one checkbox ladder, Anyone →
+                Everyone on Lichen → My-celium → circles. The EITHER/OR
+                pickers stand (a subset under Everyone is a contradiction,
+                last click wins; circles coexist with My-celium and with
+                Anyone). The shareable link INHERITS whatever the ladder
+                says — the Drive-tier rule, no second setting. */}
             <div className="cmp__invgroup">
-              <span className="cmp__invgroup-h">On Lichen</span>
-              {chipRow(invitees.filter((i) => i.kind === 'member'))}
+              {chipRow(invitees)}
+              <label className="cmp__evrow">
+                <input type="checkbox" checked={evAnyone} onChange={(e) => pickEvAnyone(e.target.checked)} />
+                <span><strong>Anyone</strong> — the open web, on Lichen or off.</span>
+              </label>
               <label className="cmp__evrow">
                 <input type="checkbox" checked={evLichen} onChange={(e) => pickEvLichen(e.target.checked)} />
-                <span><strong>Everyone on Lichen</strong> — every member can find it and RSVP; never the open web.</span>
+                <span><strong className="cmp__onlichen">Everyone on Lichen</strong> — every member can find it and RSVP; never the open web.</span>
               </label>
               <label className="cmp__evrow">
                 <input type="checkbox" checked={toMycelium} onChange={(e) => pickMycelium(e.target.checked)} />
-                <span><strong>My-celium</strong> — everyone in your web.</span>
+                <span><strong className="cmp__onlichen">My-celium</strong> — everyone in your web.</span>
               </label>
               <div className="cmp__aud-groups">
                 {([['community', 'Communities'], ['group', 'Groups'], ['organization', 'Organizations'], ['place', 'Places']] as const)
@@ -1527,24 +1529,21 @@ export default function Compose() {
                     );
                   })}
               </div>
-            </div>
-
-            {/* OFF LICHEN — the open web: the Anyone checkbox is the public
-                rung; email/phone guests and the shareable link live here. */}
-            <div className="cmp__invgroup">
-              <span className="cmp__invgroup-h">Off Lichen</span>
-              {chipRow(invitees.filter((i) => i.kind !== 'member'))}
-              <label className="cmp__evrow">
-                <input type="checkbox" checked={evAnyone} onChange={(e) => pickEvAnyone(e.target.checked)} />
-                <span><strong>Anyone</strong> — the open web can see this event, on Lichen or off.</span>
-              </label>
               {!editing && (<>
+              {/* THE LINK WEARS THE AUDIENCE'S TIER (founder 2026-11-04:
+                  "generating a link would auto apply the restrictions of
+                  audience to the link" — the Google Drive ladder): the copy
+                  states the derived tier live; request_event_spot enforces
+                  it off the post's visibility server-side. */}
               <label className="cmp__evrow cmp__genlink">
                 <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
                 <span>
-                  <strong>Generate a shareable link</strong> — anyone can open it;
-                  people on your invite list RSVP straight away, anyone else asks
-                  to come and waits for your yes (the standing default).
+                  <strong>Generate a shareable link</strong> — it follows whoever
+                  you picked above: {evAnyone
+                    ? 'open to anyone — whoever opens it can RSVP straight away.'
+                    : evLichen
+                      ? 'members RSVP right away inside Lichen; anyone off Lichen asks to come and waits for your yes.'
+                      : 'people on your invite list RSVP straight away; anyone else asks to come and waits for your yes.'}
                 </span>
               </label>
               {invitees.some((i) => i.kind === 'phone') && (
