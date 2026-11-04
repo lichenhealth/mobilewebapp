@@ -13,7 +13,7 @@ import { videoServiceOf } from '../_shared/videoHosts.ts';
 import { reconcileBookingZoom, zoomConfigured } from '../_shared/zoomMeeting.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.healthcare>';
+const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.health>';
 const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://lichen.health';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';

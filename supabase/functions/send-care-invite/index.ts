@@ -5,14 +5,14 @@
 // member clicks "Send email" on a pending invite.
 //
 // Requires the secret RESEND_API_KEY (set with `supabase secrets set`).
-// Optional: INVITE_FROM (defaults to "Lichen <care@lichen.healthcare>") and
+// Optional: INVITE_FROM (defaults to "Lichen <hello@lichen.health>") and
 // APP_URL (defaults to https://lichen.healthcare).
 //
 // JWT verification is left ON (the default), so only logged-in members can
 // trigger sends — this keeps the endpoint from being abused anonymously.
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const FROM = Deno.env.get('INVITE_FROM') ?? 'Lichen <care@lichen.healthcare>';
+const FROM = Deno.env.get('INVITE_FROM') ?? 'Lichen <hello@lichen.health>';
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 // A real, monitored inbox (lichen.healthcare is send-only, so replies must land on
 // lichen.health). Replies + an unsubscribe header both improve deliverability.

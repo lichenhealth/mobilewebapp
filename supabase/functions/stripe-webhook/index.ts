@@ -16,7 +16,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 const STRIPE_KEY = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = (Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '').replace(/[^\x21-\x7E]/g, '');
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const RECEIPT_FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
+const RECEIPT_FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.health>';
 const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
 // ── Donation tax receipt (the PROPER 501c3 acknowledgment — carries the EIN

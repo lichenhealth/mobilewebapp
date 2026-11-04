@@ -6,7 +6,7 @@
 // NOT tied to a care team — it just emails a signup link.
 //
 // Requires the secret RESEND_API_KEY. Optional: INVITE_SENDER_FROM (defaults to
-// "Lichen <hello@lichen.healthcare>") and APP_URL (defaults to
+// "Lichen <hello@lichen.health>") and APP_URL (defaults to
 // https://lichen.healthcare). JWT verification stays ON so only logged-in
 // members can trigger sends.
 
@@ -21,7 +21,7 @@ const svc = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   { auth: { persistSession: false } },
 );
-const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.healthcare>';
+const FROM = Deno.env.get('INVITE_SENDER_FROM') ?? 'Lichen <hello@lichen.health>';
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
 // A real, monitored inbox (lichen.healthcare is send-only, so replies must land on
 // lichen.health). Replies + an unsubscribe header both improve deliverability.
