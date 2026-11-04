@@ -1,0 +1,9 @@
+/* The honest miss for a vanity address that resolves to nothing. */
+.vanity-miss {
+  text-align: center;
+  padding: var(--s-8) var(--s-5);
+  color: var(--ink-faint);
+  font-size: 13px;
+  display: flex; flex-direction: column; gap: var(--s-3); align-items: center;
+}
+.vanity-miss strong { color: var(--ink-soft); font-weight: 500; word-break: break-all; }
