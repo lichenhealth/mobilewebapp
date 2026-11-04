@@ -18,6 +18,7 @@ import {
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
+import { slugify } from '../lib/bookingApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
@@ -195,6 +196,23 @@ export default function Compose() {
   // An edit (?post=) overwrites these when the post loads.
   const [title, setTitle] = useState(() => params.get('title') ?? '');
   const [body, setBody] = useState(() => params.get('body') ?? '');
+  // VANITY LINK NAME (founder 2026-11-04: "vanity url structure should be
+  // deployed across platform, so you can share a link for anything") —
+  // posts.slug, the booking link-name grammar: lowercase kebab, unique per
+  // owner, shareable at lichen.health/<section>/<handle>/<link-name>.
+  const [linkName, setLinkName] = useState('');
+  const [ownHandle, setOwnHandle] = useState<string | null>(null);
+  // The address the link name rides on follows the hat: a space's listing
+  // shares at the SPACE's handle, a being's at its own, else yours.
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    const table = actor.type === 'space' ? 'spaces' : 'profiles';
+    const id = actor.type === 'self' ? user.id : actor.id;
+    void supabase.from(table).select('handle').eq('id', id).maybeSingle()
+      .then(({ data }) => { if (live) setOwnHandle((data as { handle: string | null } | null)?.handle ?? null); });
+    return () => { live = false; };
+  }, [user?.id, actor.type, actor.type === 'self' ? '' : actor.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // ?popup=1 — this composer is a POP-UP flow over another screen (the WOW
   // intake's weave doors, founder 2026-09-23): publishing closes the window
   // so the member lands back on the form underneath. If the browser refuses
@@ -337,7 +355,7 @@ export default function Compose() {
 
   function draftSnapshot(): Record<string, unknown> {
     return {
-      face, contentType, title, body,
+      face, contentType, title, body, linkName,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
@@ -384,7 +402,7 @@ export default function Compose() {
       hadDraft.current = true;
       const s = <T,>(v: T | undefined | null, set: (x: T) => void) => { if (v !== undefined && v !== null) set(v); };
       s(d.face, setFace); s(d.contentType, setContentType);
-      s(d.title, setTitle); s(d.body, setBody);
+      s(d.title, setTitle); s(d.body, setBody); s(d.linkName, setLinkName);
       if (Array.isArray(d.areas)) setAreas(new Set(d.areas));
       s(d.isPublic, setIsPublic); s(d.toMycelium, setToMycelium);
       if (Array.isArray(d.audienceSpaces)) setAudienceSpaces(new Set(d.audienceSpaces));
@@ -486,6 +504,7 @@ export default function Compose() {
       setAreas(new Set(postAreas(p)));
       setTitle(p.title ?? '');
       setBody(p.body ?? '');
+      setLinkName(p.slug ?? '');
       if (p.event_category) setEvCategory(p.event_category);
       if (p.event_mode) setEvMode(p.event_mode);
       const ev = p.linked_event;
@@ -1012,6 +1031,7 @@ export default function Compose() {
           eventMode: isEvent ? (evMode as EventMode) : null,
           linkedEventId,
           image_url: firstPhoto, details,
+          slug: linkName,
         });
         navigate(isEvent ? `/events/${editPostId}` : '/home');
         return;
@@ -1048,6 +1068,7 @@ export default function Compose() {
           eventMode: isEvent ? (evMode as EventMode) : null,
           linkedEventId,
           image_url: firstPhoto, details,
+          slug: linkName,
         });
         // In-kind donation offer: record it for the routing desk + the
         // donor's private My-giving dashboard. Fire-and-forget — the post
@@ -1106,7 +1127,10 @@ export default function Compose() {
       navigate(afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
-      setError((e as Error)?.message || 'Couldn’t post. Please try again.');
+      const msg = (e as Error)?.message || '';
+      setError(/posts_slug_per_owner|duplicate key/i.test(msg)
+        ? 'That link name is already on one of your posts — pick another.'
+        : msg || 'Couldn’t post. Please try again.');
     }
   }
 
@@ -1312,6 +1336,35 @@ export default function Compose() {
       <label className="cmp__label" htmlFor="cmp-title">Title (optional)</label>
       <input id="cmp-title" className="cmp__input" value={title}
         onChange={(e) => setTitle(e.target.value)} placeholder="A short headline" />
+
+      {/* VANITY LINK (founder 2026-11-04): a sendable address for this post —
+          the booking link-name grammar on every section. Identifier field, so
+          it declines autocorrect; slugify is the one sanitizer. */}
+      {face === 'actionable' && (() => {
+        const AREA_ROUTE: Record<string, string> = {
+          marketplace: 'market', events: 'events', travel: 'travel',
+          courses: 'courses', library: 'library', art: 'art', food: 'food',
+          work: 'work', places: 'market',
+        };
+        const first = [...areas][0] ?? 'marketplace';
+        const word = AREA_ROUTE[first] ?? 'market';
+        return (
+          <>
+            <label className="cmp__label" htmlFor="cmp-linkname">Link name (optional)</label>
+            <input id="cmp-linkname" className="cmp__input" value={linkName}
+              onChange={(e) => setLinkName(slugify(e.target.value))}
+              placeholder="e.g. review-zion"
+              autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            <p className="cmp__hint-ev">
+              {linkName
+                ? (ownHandle
+                  ? <>Shareable at <strong>lichen.health/{word}/{ownHandle}/{linkName}</strong></>
+                  : <>Needs an address first — set your handle in Profile → Public page (or just ask the brain).</>)
+                : <>A sendable address — lichen.health/{word}/«your-handle»/«link-name».</>}
+            </p>
+          </>
+        );
+      })()}
 
       <label className="cmp__label" htmlFor="cmp-body">Post</label>
       <textarea id="cmp-body" className="cmp__input cmp__textarea" value={body}

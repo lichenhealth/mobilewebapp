@@ -35,7 +35,7 @@ import Calendar from './routes/Calendar';
 import EventComposer from './routes/EventComposer';
 import CalendarSettings from './routes/CalendarSettings';
 import Events from './routes/Events';
-import EventPage from './routes/EventPage';
+import VanityRoute, { CalendarVanity } from './routes/VanityRoute';
 import GuestEvent from './routes/GuestEvent';
 // AboutLichen retired as a live route (founder 2026-08-04): /about is now the
 // static merged marketing page (public/about, weave design). Any in-app
@@ -309,6 +309,9 @@ export default function App() {
           <Route path="/calendar/new" element={<EventComposer />} />
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/calendar/settings" element={<CalendarSettings />} />
+          {/* "sharing your calendar" (founder 2026-11-04) — /calendar/<handle>
+              is the public booking page, the calendar's open face. */}
+          <Route path="/calendar/:handle" element={<CalendarVanity />} />
           <Route path="/posts/:postId" element={<PostPage />} />
           {/* Drive (founder 2026-08-14) — /saved stays as an alias for old
               links and muscle memory. */}
@@ -404,8 +407,11 @@ export default function App() {
 
           {/* Marketplace */}
           <Route path="/market"        element={<Marketplace />} />
-          {/* Legacy kind tabs (goods/services/…) — one market now */}
-          <Route path="/market/:kind"  element={<Navigate to="/market" replace />} />
+          {/* Vanity addresses (2026-11-04) — a handle scopes the market, a
+              handle/link-name opens one listing; old kind-tab URLs miss and
+              land on the honest note with a door to the whole market. */}
+          <Route path="/market/:kind"  element={<VanityRoute area="marketplace" />} />
+          <Route path="/market/:param/:slug" element={<VanityRoute area="marketplace" />} />
 
           {/* Donate */}
           <Route path="/donate" element={<Donate />} />
@@ -453,10 +459,31 @@ export default function App() {
                 addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
             </>
           } />
+          {/* Vanity addresses for the remaining sections (one dispatcher;
+              a curtained section's scoped view lands on its curtain, but a
+              slug always lands on the PIECE — the rooms are curtained, not
+              the content vaulted). */}
+          <Route path="/work/:param" element={<VanityRoute area="work" />} />
+          <Route path="/work/:param/:slug" element={<VanityRoute area="work" />} />
+          <Route path="/art/:param" element={<VanityRoute area="art" />} />
+          <Route path="/art/:param/:slug" element={<VanityRoute area="art" />} />
+          <Route path="/food/:param" element={<VanityRoute area="food" />} />
+          <Route path="/food/:param/:slug" element={<VanityRoute area="food" />} />
+          <Route path="/travel/:param" element={<VanityRoute area="travel" />} />
+          <Route path="/travel/:param/:slug" element={<VanityRoute area="travel" />} />
+          <Route path="/courses/:param" element={<VanityRoute area="courses" />} />
+          <Route path="/courses/:param/:slug" element={<VanityRoute area="courses" />} />
+          <Route path="/library/:param" element={<VanityRoute area="library" />} />
+          <Route path="/library/:param/:slug" element={<VanityRoute area="library" />} />
           <Route path="/events"   element={<Events />} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />
-          <Route path="/events/:postId" element={<EventPage />} />
+          {/* VANITY LINKS (founder 2026-11-04): /<section>/<handle> is that
+              host's section, /<section>/<handle>/<link-name> is one post —
+              the /book grammar on every section. A uuid keeps its old
+              meaning (events → the event page). */}
+          <Route path="/events/:postId" element={<VanityRoute area="events" />} />
+          <Route path="/events/:param/:slug" element={<VanityRoute area="events" />} />
           <Route path="/e/:token" element={<GuestEvent />} />
           <Route path="/about" element={<StaticAboutRedirect />} />
           {/* OFFLINE WHILE THEY'RE MADE BETTER (founder 2026-08-25: "don't

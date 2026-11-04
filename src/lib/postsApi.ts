@@ -69,6 +69,9 @@ export type NewPost = {
   linkedEventId?: string | null;
   image_url?: string | null;
   details?: Record<string, unknown>;
+  /** Vanity link name (founder 2026-11-04) — lichen.health/<section>/<handle>/<slug>.
+   *  Lowercase kebab, unique per owner (posts_slug_per_owner); null = none. */
+  slug?: string | null;
 };
 
 // Upload a file (or recorded blob) into the post-media bucket; returns a public URL.
@@ -109,6 +112,7 @@ export async function createPost(input: NewPost) {
     service_area: input.serviceAreas[0] ?? null,
     image_url: input.image_url ?? null,
     details: input.details ?? {},
+    slug: input.slug?.trim() || null,
   }).select('id').single();
   if (error) throw error;
   return data;
@@ -136,6 +140,7 @@ export async function updatePost(id: string, input: NewPost): Promise<void> {
     service_area: input.serviceAreas[0] ?? null,
     image_url: input.image_url ?? null,
     details: input.details ?? {},
+    slug: input.slug?.trim() || null,
   }).eq('id', id);
   if (error) throw error;
 }
@@ -161,6 +166,7 @@ export type FeedPost = {
   image_url: string | null;
   details: Record<string, unknown>;
   created_at: string;
+  slug: string | null;                   // vanity link name (2026-11-04)
   author: { full_name: string | null; handle: string | null; avatar_url: string | null } | null;
   author_space: { name: string; kind: string } | null;
   event_category: EventCategory | null;
@@ -205,7 +211,7 @@ export async function loadMyRsvpStatuses(eventIds: string[], me: string): Promis
   return map;
 }
 
-const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence, lat, lng)';
+const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, slug, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence, lat, lng)';
 
 /** A set of posts by id (the Saved shelf). RLS applies — hidden ones drop. */
 export async function loadPostsByIds(ids: string[]): Promise<FeedPost[]> {
