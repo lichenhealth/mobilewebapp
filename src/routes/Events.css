@@ -32,45 +32,41 @@
 .evt__past-chevron { display: inline-flex; transition: transform var(--d-fast) var(--ease-out); }
 .evt__past-chevron.is-open { transform: rotate(90deg); }
 
+/* THE STACKED GRAMMAR (founder 2026-11-04, "match the other UI's, like home
+   feed and marketplace"): tools on their own SEAMED row, Free/Trade/Paid as
+   Marketplace's 30px data-tip circles wrapping below, lit light-peach. */
 .evt__actions.h-scroll {
   display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-3) 0 var(--s-2);   /* side gutters live on the wrapper */
+  padding: var(--s-3) 0 10px;   /* side gutters live on the wrapper */
+  border-bottom: 1px solid var(--bone-edge);   /* the platform seam */
 }
 .evt__action {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  background: none; border: 0; cursor: pointer; flex-shrink: 0;
+  background: none; border: 0; cursor: pointer; flex-shrink: 0; padding: 0;
+  transition: transform var(--d-fast) var(--ease-out);
 }
+.evt__action:hover { transform: translateY(-1px); }
+.evt__action:active { transform: scale(0.96); }
 .evt__action-circle {
-  width: 36px; height: 36px; border-radius: var(--r-full);
+  width: 30px; height: 30px; border-radius: var(--r-full);
   background: var(--bone-warm); border: 1px solid var(--bone-edge);
   color: var(--ink-soft);
   display: inline-flex; align-items: center; justify-content: center;
   transition: all var(--d-fast) var(--ease-out);
 }
+/* Lit = the platform light-peach selection (the icon-row__btn--here
+   treatment) — never the retired solid-orange fill. */
 .evt__action.is-active .evt__action-circle {
-  background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
-}
-.evt__action-spacer {
-  flex: 0 0 auto; width: 1px; align-self: center; height: 30px;
-  margin: 0 var(--s-1); background: var(--bone-edge);
+  background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep);
 }
 
-/* Type filters read as signals, not doors — same vocabulary as Marketplace's
-   mode lenses (founder 2026-08-08): text + icon, no circle, a check when
-   it's on. A circle is something you open; text with a check is something
-   that's on. Share the doors' row — Events only has 3, not Marketplace's
-   6-8, so it fits without needing its own line. */
-.evt__lens {
-  flex: 0 0 auto;
-  display: inline-flex; align-items: center; gap: 6px;
-  background: none; border: 0; padding: 4px 2px;
-  font-size: 11.5px; letter-spacing: 0.02em; color: var(--ink-muted);
-  cursor: pointer; white-space: nowrap;
-  transition: color var(--d-fast) var(--ease-out);
+/* The lens row: plain flex-wrap (no scroll, no chevron — every lens always
+   visible), with Marketplace's 30px bottom floor so the hover tip has a
+   clear band to land in. */
+.evt__lensrow {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 12px var(--s-5) 30px;
 }
-.evt__lens svg { width: 16px; height: 16px; }
-.evt__lens:hover { color: var(--ink); }
-.evt__lens.is-on { color: var(--peach-deep); }
 
 .evt__feed { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-2) var(--s-5) var(--s-8); }
 .evt__empty { text-align: center; color: var(--ink-faint); font-size: 13px; padding: var(--s-7) 0; }
@@ -79,60 +75,13 @@
   .evt__feed { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
 }
 
-/* ── One-row nav: category tabs left-aligned, close together, with the
-   personal doors on the right. ─────────────────────────────────────── */
-.evt__nav {
-  display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-3) var(--s-4);
-  border-bottom: 1px solid var(--bone-edge-soft, var(--bone-edge));
-}
-.evt__nav-tabs {
-  flex: 1; min-width: 0;
-  display: flex; justify-content: flex-start; gap: var(--s-4);
-  overflow-x: auto; scrollbar-width: none;
-}
-.evt__nav-tabs::-webkit-scrollbar { display: none; }
-.evt__navtab {
-  flex: 0 0 auto; padding: 6px 2px;
-  background: transparent; border: 0; cursor: pointer;
-  font-family: inherit; font-size: 15px; font-weight: 300;
-  letter-spacing: -0.005em; color: var(--ink-muted);
-  position: relative; white-space: nowrap;
-}
-.evt__navtab:hover { color: var(--ink); }
-.evt__navtab.is-active { color: var(--peach); font-weight: 400; }
-.evt__navtab.is-active::after {
-  content: ''; position: absolute; bottom: -4px; left: 0; right: 0;
-  height: 2px; background: var(--peach); border-radius: var(--r-full);
-}
-.evt__nav-doors { display: inline-flex; gap: 6px; flex-shrink: 0; }
-.evt__navdoor {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: var(--r-full);
-  background: var(--bone-warm); border: 1px solid var(--bone-edge);
-  font-family: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer;
-  white-space: nowrap;
-}
-.evt__navdoor:hover { border-color: var(--peach); color: var(--ink); }
-.evt__navdoor svg { color: var(--peach-deep, var(--peach)); flex-shrink: 0; }
-/* Phones: the doors go icon-only circles; tabs shrink a notch to fit. */
-@media (max-width: 700px) {
-  .evt__navdoor span { display: none; }
-  .evt__navdoor { width: 30px; height: 30px; padding: 0; justify-content: center; }
-  .evt__navtab { font-size: 12.5px; }
-}
+/* The category word-tabs (All/Social/Learning…), their one-row nav and the
+   right-hand worded doors are RETIRED (founder 2026-11-04) — My Events and
+   My Calendar are circles in the tools row now, and event_category stays
+   authored data with no feed filter. */
 
 /* Back chip on the management pages hugs the left, like the calendar's. */
 .mkt__head .mkt__memberback { align-self: flex-start; }
-
-/* Below the icon row now (founder 2026-08-14: icons above, toggles below). */
-.evt__nav--below { margin-top: var(--s-2); }
-
-/* ── Lit Feed door + right-pushed lenses (founder 2026-08-20) ───────────── */
-.evt__action--here .evt__action-circle {
-  background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
-}
-.evt__action-push { flex: 1 1 0; min-width: var(--s-2); }
 
 /* ── The calendar rail: upcoming events by date, beside the feed ────────── */
 .evt__body { display: block; }
