@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import { loadGuestEvent, guestRsvp, type GuestEventInfo, type GuestStatus } from '../lib/eventGuestsApi';
 import AddToCal from '../components/AddToCal';
@@ -26,6 +27,8 @@ function whenText(e: GuestEventInfo): string {
  *  add it to your own calendar, RSVP as a guest, or make a Lichen account. */
 export default function GuestEvent() {
   const { token = '' } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [info, setInfo] = useState<GuestEventInfo | null>(null);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState<string>('invited');
@@ -67,14 +70,37 @@ export default function GuestEvent() {
   return (
     <div className="gev">
       <div className="gev__brand"><LichenMark size={40} /><span>Lichen</span></div>
-      <p className="gev__eyebrow">{info.host_name} invited you{info.guest_name ? `, ${info.guest_name}` : ''}</p>
-      <h1 className="gev__title">{info.title}</h1>
 
-      <div className="gev__facts">
-        <p className="gev__fact"><Icon name="calendar" size={14} /> {whenText(info)}</p>
-        {info.location && <p className="gev__fact"><Icon name="location" size={14} /> {info.location}</p>}
+      {/* THE INVITATION CARD (founder 2026-11-04: "pretty invites, like
+          paperless post or canva"): the event's own cover photo crowns a
+          centered paper card — the emailed invitation wears the same
+          anatomy, so the link lands on what the email promised. */}
+      <div className="gev__card">
+        {info.photo_url && <div className="gev__hero"><img src={info.photo_url} alt="" /></div>}
+        <div className="gev__card-body">
+          <p className="gev__eyebrow">{info.host_name} invited you{info.guest_name ? `, ${info.guest_name}` : ''}</p>
+          <h1 className="gev__title">{info.title}</h1>
+          <div className="gev__facts">
+            <p className="gev__fact"><Icon name="calendar" size={14} /> {whenText(info)}</p>
+            {info.location && <p className="gev__fact"><Icon name="location" size={14} /> {info.location}</p>}
+          </div>
+          {info.description && <p className="gev__desc">{info.description}</p>}
+        </div>
       </div>
-      {info.description && <p className="gev__desc">{info.description}</p>}
+
+      {/* A MEMBER IS RECOGNIZED (founder 2026-11-04: "if you are [a
+          member], it auto fills your info"): signed in, the real event
+          page is one tap away — the RSVP there rides their own account,
+          nothing to type. The guest RSVP below still works either way. */}
+      {user && info.post_id && (
+        <p className="gev__member">
+          You’re signed in to Lichen —{' '}
+          <button className="gev__joinlink" onClick={() => navigate(`/events/${info.post_id}`)}>
+            open this event inside
+          </button>{' '}
+          and RSVP as yourself.
+        </p>
+      )}
 
       <div className="gev__section">
         <p className="gev__label">Add it to your calendar</p>

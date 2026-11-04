@@ -2,6 +2,24 @@
 .gev__brand { display: flex; align-items: center; gap: 8px; margin-bottom: var(--s-5); }
 .gev__brand span { font-family: var(--font-display); font-size: 18px; color: var(--ink); }
 .gev__muted { font-size: 14px; color: var(--ink-soft); }
+/* THE INVITATION CARD (founder 2026-11-04, "pretty invites, like paperless
+   post or canva"): the event's cover photo crowns a centered paper card —
+   display-serif title, soft shadow, Lichen's own palette. */
+.gev__card {
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 18px;
+  overflow: hidden; margin-bottom: var(--s-4);
+  box-shadow: 0 14px 40px rgba(42, 51, 56, 0.08);
+}
+.gev__hero { aspect-ratio: 16 / 9; background: var(--bone-warm); }
+.gev__hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gev__card-body { padding: var(--s-5) var(--s-5) var(--s-4); text-align: center; }
+.gev__card-body .gev__facts { align-items: center; }
+.gev__card-body .gev__fact { justify-content: center; }
+.gev__card-body .gev__desc { margin-bottom: 0; text-align: left; }
+
+/* Signed-in members get the real page — the RSVP there is their own. */
+.gev__member { font-size: 14px; color: var(--ink-soft); margin: 0 0 var(--s-2); text-align: center; }
+
 .gev__eyebrow {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
   text-transform: uppercase; color: var(--peach-deep, var(--peach)); margin-bottom: var(--s-2);
