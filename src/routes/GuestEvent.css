@@ -41,6 +41,17 @@
 }
 .gev__btn:hover { border-color: var(--peach); }
 .gev__btn.is-on { background: var(--green); border-color: var(--green); color: #fff; }
+/* THE OPEN ASK (founder 2026-11-04, the shareable event URL): name +
+   contact; the server recognizes invite-list contacts and gates everyone
+   else on the host's yes. */
+.gev__ask { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-2); }
+.gev__ask-input {
+  padding: 10px 14px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
+  background: #fff; font-family: inherit; font-size: 14px; color: var(--ink);
+}
+.gev__ask-input:focus-visible { outline: none; border-color: var(--peach); }
+.gev__ask-send { align-self: flex-start; border-color: var(--peach); color: var(--peach-deep); }
+
 .gev__join { margin-top: var(--s-6); font-size: 14px; color: var(--ink-soft); }
 /* Graceful rag where supported — no orphaned last words (progressive
  * enhancement; browsers without text-wrap:pretty just wrap as before). */
