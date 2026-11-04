@@ -25,7 +25,7 @@
    + search and brain… more blank space before the … icons … across the
    platform") — the stacked surfaces' one treatment. */
 .afeed__tools {
-  display: flex; gap: 10px; margin: var(--s-2) 0 0;
+  display: flex; gap: 8px 4px; margin: var(--s-2) 0 0;   /* Home's grid gap (2026-11-04) */
   padding-bottom: 10px; border-bottom: 1px solid var(--bone-edge);
 }
 .afeed__search-btn {
@@ -150,7 +150,7 @@
 /* The thread rail WRAPS instead of scrolling (founder 2026-10-12: "multiple
    rows for the subsection icons… instead of a scroll" — the overall UI);
    the roomier top margin is the seam's blank-space half. */
-.afeed__threads.h-scroll { display: flex; flex-wrap: wrap; gap: 8px; row-gap: 8px; margin: 16px 0 var(--s-3); padding-top: 0; }
+.afeed__threads.h-scroll { display: flex; flex-wrap: wrap; gap: 8px 4px; margin: 16px 0 var(--s-3); padding-top: 0; }
 /* The calendar thread's way back to manual setup (founder 2026-11-02;
    second pass the same day: the LINK is the first line alone, the
    explanation plain text under it). */
@@ -196,7 +196,6 @@
 /* Below the 430 shell the row itself narrows — step the circles down to the
    Mycelium nine-lens 30px so all eight still sit whole on small phones. */
 @media (max-width: 429px) {
-  .afeed__threads.h-scroll { gap: 6px; }
 }
 /* A space's build thread wears the space's own face in the same circle. */
 .afeed__thread--space { padding: 0; overflow: visible; border-width: 2px; }

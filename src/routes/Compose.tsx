@@ -1332,6 +1332,78 @@ export default function Compose() {
       )}
       </div>)}
 
+      {/* WHO'S INVITED — the smart box (founder 2026-11-04), AT THE AUDIENCE
+          (her second pass, finding it buried under the date fields: "audience
+          tab for new events also doesn't have type ahead" — it lives right
+          under the Audience fold now). Edits manage invites on the event
+          page itself, where the guest panel already lives. */}
+      {isEvent && !editing && (() => {
+        const q = invQ.trim();
+        const contact = q ? classifyInviteLine(q) : { kind: 'other' as const };
+        const spaceHits = q.length >= 2
+          ? mySpaces.filter((sp) => !audienceSpaces.has(sp.id)
+              && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
+          : [];
+        const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
+        return (
+          <>
+            <label className="cmp__label">Who&rsquo;s invited? (optional)</label>
+            <p className="cmp__hint-ev">Type a member&rsquo;s name, one of your circles, or an email / phone number — the audience fills itself.</p>
+            {invitees.length > 0 && (
+              <div className="cmp__invchips">
+                {invitees.map((inv, i) => (
+                  <span key={i} className="cmp__invchip">
+                    <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
+                    {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
+                    <button className="cmp__invchip-x" aria-label="Remove"
+                      onClick={() => setInvitees((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
+              placeholder="Name, circle, email or phone"
+              autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            {(memberHits.length > 0 || spaceHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
+              <div className="cmp__invsug">
+                {contact.kind === 'email' && (
+                  <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'email', value: contact.email, name: contactLineName(q) })}>
+                    <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>
+                  </button>
+                )}
+                {contact.kind === 'phone' && (
+                  <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'phone', value: contact.digits, sms: contact.sms, name: contactLineName(q) })}>
+                    <Icon name="phone" size={14} /> Text the invitation to <strong>{q}</strong>
+                  </button>
+                )}
+                {memberHits.map((h) => (
+                  <button key={h.id} className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'member', id: h.id, name: h.full_name ?? 'A member' })}>
+                    <Icon name="profile" size={14} /> <strong>{h.full_name ?? 'A member'}</strong> · on Lichen
+                  </button>
+                ))}
+                {spaceHits.map((sp) => (
+                  <button key={sp.id} className="cmp__invsug-row" onClick={() => { toggleSpace(sp.id); setInvQ(''); }}>
+                    <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · adds this {sp.kind} to the audience
+                  </button>
+                ))}
+              </div>
+            )}
+            <label className="cmp__evrow cmp__genlink">
+              <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
+              <span>
+                <strong>Generate a shareable link</strong> — anyone can open it;
+                people on your invite list RSVP straight away, anyone else asks
+                to come and waits for your yes (the standing default).
+              </span>
+            </label>
+            {invitees.some((i) => i.kind === 'phone') && (
+              <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
+            )}
+          </>
+        );
+      })()}
+
+
       {/* The choice point: a post is Social (a feed story) or Actionable
           (an exchange — it enters the Lichen Economy and rides the
           Marketplace). Where-to-post lives beneath the actionable door. */}
@@ -2030,74 +2102,6 @@ export default function Compose() {
               <DateRangeCalendar value={evRange} onChange={setEvRange} />
               <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
 
-              {/* WHO'S INVITED — the smart box (founder 2026-11-04). Edits
-                  manage invites on the event page itself, where the guest
-                  panel already lives. */}
-              {!editing && (() => {
-                const q = invQ.trim();
-                const contact = q ? classifyInviteLine(q) : { kind: 'other' as const };
-                const spaceHits = q.length >= 2
-                  ? mySpaces.filter((sp) => !audienceSpaces.has(sp.id)
-                      && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
-                  : [];
-                const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
-                return (
-                  <>
-                    <label className="cmp__label">Who&rsquo;s invited? (optional)</label>
-                    <p className="cmp__hint-ev">Type a member&rsquo;s name, one of your circles, or an email / phone number — the audience fills itself.</p>
-                    {invitees.length > 0 && (
-                      <div className="cmp__invchips">
-                        {invitees.map((inv, i) => (
-                          <span key={i} className="cmp__invchip">
-                            <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
-                            {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
-                            <button className="cmp__invchip-x" aria-label="Remove"
-                              onClick={() => setInvitees((cur) => cur.filter((_, j) => j !== i))}>×</button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
-                      placeholder="Name, circle, email or phone"
-                      autoCapitalize="none" autoCorrect="off" spellCheck={false} />
-                    {(memberHits.length > 0 || spaceHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
-                      <div className="cmp__invsug">
-                        {contact.kind === 'email' && (
-                          <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'email', value: contact.email, name: contactLineName(q) })}>
-                            <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>
-                          </button>
-                        )}
-                        {contact.kind === 'phone' && (
-                          <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'phone', value: contact.digits, sms: contact.sms, name: contactLineName(q) })}>
-                            <Icon name="phone" size={14} /> Text the invitation to <strong>{q}</strong>
-                          </button>
-                        )}
-                        {memberHits.map((h) => (
-                          <button key={h.id} className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'member', id: h.id, name: h.full_name ?? 'A member' })}>
-                            <Icon name="profile" size={14} /> <strong>{h.full_name ?? 'A member'}</strong> · on Lichen
-                          </button>
-                        ))}
-                        {spaceHits.map((sp) => (
-                          <button key={sp.id} className="cmp__invsug-row" onClick={() => { toggleSpace(sp.id); setInvQ(''); }}>
-                            <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · adds this {sp.kind} to the audience
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <label className="cmp__evrow cmp__genlink">
-                      <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
-                      <span>
-                        <strong>Generate a shareable link</strong> — anyone can open it;
-                        people on your invite list RSVP straight away, anyone else asks
-                        to come and waits for your yes (the standing default).
-                      </span>
-                    </label>
-                    {invitees.some((i) => i.kind === 'phone') && (
-                      <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
-                    )}
-                  </>
-                );
-              })()}
             </>
           )}
         </div>
