@@ -19,6 +19,8 @@ import {
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
 import { slugify } from '../lib/bookingApi';
+import { classifyCareContact } from '../lib/careTeamApi';
+import { inviteEventGuest, inviteEventGuestByPhone, mintEventLink } from '../lib/eventGuestsApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
@@ -32,6 +34,27 @@ import './Compose.css';
 
 type MediaType = 'photo' | 'video' | 'audio';
 type Attached = { type: MediaType; url: string; jobId?: string };
+
+// EVENT INVITEES picked in the composer (founder 2026-11-04: "You should be
+// able to add people by email, phone or on the platform, it should smart
+// fill in the audience"). Members ride createEvent's inviteeIds (seated +
+// belled, the standing machinery); email/phone become event_guests invites
+// on publish (the recruiting-door machinery).
+type EvInvitee =
+  | { kind: 'member'; id: string; name: string }
+  | { kind: 'email'; value: string; name: string }
+  | { kind: 'phone'; value: string; sms: string; name: string };
+
+/** The name LEFT OVER when a contact token is pulled out of a typed line —
+ *  "Rick Countryman rick@barn.com" invites Rick by name. */
+function contactLineName(raw: string): string {
+  return raw
+    .replace(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '')
+    .replace(/[\d()+.\-]+/g, ' ')
+    .replace(/[<>,;]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // ?area= may carry SEVERAL areas now, comma-separated (founder 2026-10-15:
 // Home/My-celium's + follows the lit feed lenses — "all others should be
@@ -213,6 +236,39 @@ export default function Compose() {
       .then(({ data }) => { if (live) setOwnHandle((data as { handle: string | null } | null)?.handle ?? null); });
     return () => { live = false; };
   }, [user?.id, actor.type, actor.type === 'self' ? '' : actor.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // EVENT INVITES FROM THE COMPOSER (founder 2026-11-04: "audience for
+  // events will need to be like booking… type in an audience… add people by
+  // email, phone or on the platform, it should smart fill" + "add 'generate
+  // link' as an invite and have the default be 'approve RSVP's outside of
+  // invite list'"). One smart box: member names smart-fill (findable
+  // type-ahead, the TodoView pattern), a circle's name ticks the audience
+  // checkbox (the existing machinery IS the sub-audience), and an email or
+  // phone (classifyCareContact — the one classifier) becomes an outside
+  // guest invite on publish. genLink mints the shareable open URL, whose
+  // standing default is the approval gate: off-list askers wait for the
+  // host's yes (request_event_spot — built, now the named default).
+  const [invitees, setInvitees] = useState<EvInvitee[]>([]);
+  const [invQ, setInvQ] = useState('');
+  const [invHits, setInvHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [genLink, setGenLink] = useState(false);
+  useEffect(() => {
+    const q = invQ.trim();
+    if (q.length < 2 || !user) { setInvHits([]); return; }
+    const t = window.setTimeout(() => {
+      void supabase.from('profiles').select('id, full_name')
+        .eq('findable', true).ilike('full_name', `%${q}%`).neq('id', user.id).limit(4)
+        .then(({ data }) => setInvHits((data as { id: string; full_name: string | null }[] | null) ?? []));
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [invQ, user?.id]);
+  function addInvitee(inv: EvInvitee) {
+    setInvitees((cur) => {
+      const key = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
+      return cur.some((x) => key(x) === key(inv)) ? cur : [...cur, inv];
+    });
+    setInvQ(''); setInvHits([]);
+  }
   // ?popup=1 — this composer is a POP-UP flow over another screen (the WOW
   // intake's weave doors, founder 2026-09-23): publishing closes the window
   // so the member lands back on the form underneath. If the browser refuses
@@ -355,7 +411,7 @@ export default function Compose() {
 
   function draftSnapshot(): Record<string, unknown> {
     return {
-      face, contentType, title, body, linkName,
+      face, contentType, title, body, linkName, invitees, genLink,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
@@ -403,6 +459,7 @@ export default function Compose() {
       const s = <T,>(v: T | undefined | null, set: (x: T) => void) => { if (v !== undefined && v !== null) set(v); };
       s(d.face, setFace); s(d.contentType, setContentType);
       s(d.title, setTitle); s(d.body, setBody); s(d.linkName, setLinkName);
+      if (Array.isArray(d.invitees)) setInvitees(d.invitees); s(d.genLink, setGenLink);
       if (Array.isArray(d.areas)) setAreas(new Set(d.areas));
       s(d.isPublic, setIsPublic); s(d.toMycelium, setToMycelium);
       if (Array.isArray(d.audienceSpaces)) setAudienceSpaces(new Set(d.audienceSpaces));
@@ -1054,9 +1111,12 @@ export default function Compose() {
           allDay: evAllDay,
           startMin: evStartMin, endMin: evEndMin,
           recurrence: null,
-          inviteeIds: [],
+          // Members picked in the invite box are seated + belled the
+          // standing way (event_attendees invited rows).
+          inviteeIds: invitees.flatMap((i) => (i.kind === 'member' ? [i.id] : [])),
         });
       }
+      let createdId: string | null = null;
       try {
         const created = await createPost({
           body, title, content_type: face === 'actionable' ? 'actionable' : contentType,
@@ -1070,6 +1130,27 @@ export default function Compose() {
           image_url: firstPhoto, details,
           slug: linkName,
         });
+        createdId = created?.id ?? null;
+        // EVENT INVITES (founder 2026-11-04): emails send the pretty
+        // invitation card now; phone invites mint tokened rows the host
+        // texts from the event page (no SMS provider, standing doctrine);
+        // Generate link mints the shareable open URL — off-list askers
+        // wait for host approval, the standing default. None of these can
+        // fail the post — the event page shows whatever landed.
+        if (isEvent && linkedEventId) {
+          const evId = linkedEventId;
+          const sends: Promise<unknown>[] = [];
+          for (const inv of invitees) {
+            if (inv.kind === 'email') {
+              sends.push(inviteEventGuest(evId, inv.name || inv.value.split('@')[0], inv.value));
+            } else if (inv.kind === 'phone') {
+              sends.push(inviteEventGuestByPhone(evId, inv.name, inv.sms));
+            }
+          }
+          if (genLink) sends.push(mintEventLink(evId));
+          const settled = await Promise.allSettled(sends);
+          settled.forEach((r) => { if (r.status === 'rejected') console.error('event invite:', r.reason); });
+        }
         // In-kind donation offer: record it for the routing desk + the
         // donor's private My-giving dashboard. Fire-and-forget — the post
         // never fails over the record; pre-migration this quietly no-ops.
@@ -1124,7 +1205,9 @@ export default function Compose() {
       postedRef.current = true;
       if (hadDraft.current) void deletePostDraft(draftIdRef.current).catch(console.error);
       if (isPopup) window.close();
-      navigate(afterPostDestination(isEvent));
+      // A new EVENT lands on its own page — the guest panel is right there
+      // (phone invites' Text › buttons, the shareable link, the RSVP tab).
+      navigate(isEvent && createdId ? `/events/${createdId}` : afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
       const msg = (e as Error)?.message || '';
@@ -1926,6 +2009,75 @@ export default function Compose() {
               )}
               <DateRangeCalendar value={evRange} onChange={setEvRange} />
               <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
+
+              {/* WHO'S INVITED — the smart box (founder 2026-11-04). Edits
+                  manage invites on the event page itself, where the guest
+                  panel already lives. */}
+              {!editing && (() => {
+                const q = invQ.trim();
+                const contact = q ? classifyCareContact(q) : { kind: 'empty' as const };
+                const spaceHits = q.length >= 2
+                  ? mySpaces.filter((sp) => !audienceSpaces.has(sp.id)
+                      && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
+                  : [];
+                const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
+                return (
+                  <>
+                    <label className="cmp__label">Who&rsquo;s invited? (optional)</label>
+                    <p className="cmp__hint-ev">Type a member&rsquo;s name, one of your circles, or an email / phone number — the audience fills itself.</p>
+                    {invitees.length > 0 && (
+                      <div className="cmp__invchips">
+                        {invitees.map((inv, i) => (
+                          <span key={i} className="cmp__invchip">
+                            <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
+                            {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
+                            <button className="cmp__invchip-x" aria-label="Remove"
+                              onClick={() => setInvitees((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
+                      placeholder="Name, circle, email or phone"
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+                    {(memberHits.length > 0 || spaceHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
+                      <div className="cmp__invsug">
+                        {contact.kind === 'email' && (
+                          <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'email', value: contact.email, name: contactLineName(q) })}>
+                            <Icon name="send" size={14} /> Email the invitation to <strong>{contact.email}</strong>
+                          </button>
+                        )}
+                        {contact.kind === 'phone' && (
+                          <button className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'phone', value: contact.digits, sms: contact.sms, name: contactLineName(q) })}>
+                            <Icon name="phone" size={14} /> Text the invitation to <strong>{q}</strong>
+                          </button>
+                        )}
+                        {memberHits.map((h) => (
+                          <button key={h.id} className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'member', id: h.id, name: h.full_name ?? 'A member' })}>
+                            <Icon name="profile" size={14} /> <strong>{h.full_name ?? 'A member'}</strong> · on Lichen
+                          </button>
+                        ))}
+                        {spaceHits.map((sp) => (
+                          <button key={sp.id} className="cmp__invsug-row" onClick={() => { toggleSpace(sp.id); setInvQ(''); }}>
+                            <Icon name="user-multiple" size={14} /> <strong>{sp.name}</strong> · adds this {sp.kind} to the audience
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <label className="cmp__evrow cmp__genlink">
+                      <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
+                      <span>
+                        <strong>Generate a shareable link</strong> — anyone can open it;
+                        people on your invite list RSVP straight away, anyone else asks
+                        to come and waits for your yes (the standing default).
+                      </span>
+                    </label>
+                    {invitees.some((i) => i.kind === 'phone') && (
+                      <p className="cmp__hint-ev">Phone invites are prepared here — after posting, tap <strong>Text ›</strong> beside each name on the event page to send from your own Messages.</p>
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
         </div>
