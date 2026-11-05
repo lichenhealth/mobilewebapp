@@ -91,6 +91,19 @@ function areasFromParam(raw: string | null): ServiceArea[] {
     .filter((s): s is ServiceArea => (COMPOSE_AREAS as string[]).includes(s));
 }
 
+/** The invitation's date line — a mirror of send-event-invite's whenLabel,
+ *  so the composer's preview reads exactly like the mailed card. */
+const INV_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function inviteWhen(startDate: string, allDay: boolean, startMin: number | null): string {
+  const [y, m, d] = (startDate || '').split('-').map(Number);
+  if (!y || !m || !d) return 'Pick a date';
+  const date = `${INV_MONTHS[m - 1]} ${d}, ${y}`;
+  if (allDay || startMin == null) return date;
+  const h = Math.floor(startMin / 60), mm = startMin % 60;
+  const ap = h < 12 ? 'am' : 'pm'; const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${date} · ${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
+}
+
 export default function Compose() {
   const { loading, user } = useAuth();
   const { actor } = useActing();
@@ -343,6 +356,19 @@ export default function Compose() {
 
   // media
   const [media, setMedia] = useState<Attached[]>([]);
+  // THE INVITATION, PAPERLESS-POST STYLE (founder 2026-11-05: "save the guest
+  // list but do tests and previews for invites sent to myself via my email…
+  // like paperless post — build that into the compose flow"): the event
+  // composer shows the card guests receive, live, and can email a [Test]
+  // copy to the host's OWN inbox (send-event-invite's test mode — the server
+  // picks the recipient, never this client) before anyone else is invited.
+  const [hostName, setHostName] = useState('');
+  const [invTest, setInvTest] = useState<{ state: 'idle' | 'sending' | 'sent' | 'error'; msg?: string }>({ state: 'idle' });
+  useEffect(() => {
+    if (!user) return;
+    void supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setHostName((data as { full_name: string | null } | null)?.full_name ?? ''));
+  }, [user]);
   // Organize-into (courses/library): file this post straight into one of your
   // courses/collections — or start a new one — right from Compose.
   const [myCols, setMyCols] = useState<CollectionRow[]>([]);
@@ -1567,6 +1593,50 @@ export default function Compose() {
             {!hasAudience && (
               <p className="cmp__hint-ev">Nothing picked yet — check a box or invite someone before this event goes live.</p>
             )}
+            {!editing && (() => {
+              const evTitle = title.trim() || body.trim().slice(0, 60) || 'Your event';
+              // The SAME location line the event row stores (publish's effLocation)
+              // — the preview never shows something prettier than the real mail.
+              const where = inPerson && location.trim() ? location.trim()
+                : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
+              const photo = media.find((m) => m.type === 'photo')?.url ?? null;
+              const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin);
+              const sendTest = async () => {
+                setInvTest({ state: 'sending' });
+                const { data, error } = await supabase.functions.invoke('send-event-invite', {
+                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo } },
+                });
+                const d = data as { ok?: boolean; to?: string; error?: string } | null;
+                if (error || !d?.ok) setInvTest({ state: 'error', msg: d?.error ?? 'The test didn’t send — try again in a moment.' });
+                else setInvTest({ state: 'sent', msg: d.to });
+              };
+              return (
+                <div className="cmp__invprev">
+                  <label className="cmp__label">The invitation</label>
+                  <p className="cmp__hint-ev">What your guests receive by email. It wears the event&rsquo;s first photo — add one above to dress it up.</p>
+                  <div className="cmp__invcard" aria-label="Invitation preview">
+                    {photo && <img className="cmp__invcard-photo" src={photo} alt="" />}
+                    <div className="cmp__invcard-body">
+                      <p className="cmp__invcard-eyebrow">You&rsquo;re invited</p>
+                      <p className="cmp__invcard-title">{evTitle}</p>
+                      <p className="cmp__invcard-when">{when}</p>
+                      {where && <p className="cmp__invcard-where">{where}</p>}
+                      <p className="cmp__invcard-host">Hosted by <strong>{hostName || 'you'}</strong></p>
+                      <span className="cmp__invcard-cta">RSVP &amp; see the details</span>
+                    </div>
+                  </div>
+                  <div className="cmp__invtest">
+                    <button type="button" className="cmp__invtest-btn" onClick={() => void sendTest()}
+                      disabled={invTest.state === 'sending' || !evRange.start}>
+                      <Icon name="send" size={14} /> {invTest.state === 'sending' ? 'Sending…' : invTest.state === 'sent' ? 'Send another test' : 'Send me a test'}
+                    </button>
+                    {invTest.state === 'sent' && <span className="cmp__invtest-note">Sent to {invTest.msg} ✓ — only you.</span>}
+                    {invTest.state === 'error' && <span className="cmp__invtest-note cmp__invtest-note--err">{invTest.msg}</span>}
+                  </div>
+                  <p className="cmp__hint-ev">Your guests are only invited when you press <strong>Post</strong>. Not ready? <strong>Save draft</strong> keeps the event and your guest list together.</p>
+                </div>
+              );
+            })()}
           </>
         );
       })()}
