@@ -1452,7 +1452,7 @@ export default function Compose() {
           <>
             <label className="cmp__label">Who&rsquo;s invited?</label>
             {!editing ? (
-              <p className="cmp__hint-ev">Type a member&rsquo;s name, an email or a phone number — or invite whole circles below.</p>
+              <p className="cmp__hint-ev cmp__hint-ev--inv">Type a member&rsquo;s name, an email or a phone number — or invite whole circles below.</p>
             ) : (
               <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
             )}
@@ -1507,6 +1507,10 @@ export default function Compose() {
                 says — the Drive-tier rule, no second setting. */}
             <div className="cmp__invgroup">
               {chipRow(invitees)}
+              {/* The rungs wear the circles' small-caps eyebrow (founder
+                  2026-11-05: "a soft indicator that we're now talking
+                  Lichen audiences"). */}
+              <span className="cmp__aud-kind cmp__aud-kind--lichen">Lichen</span>
               <label className="cmp__evrow">
                 <input type="checkbox" checked={evAnyone} onChange={(e) => pickEvAnyone(e.target.checked)} />
                 <span><strong>Anyone</strong> — the open web, on Lichen or off.</span>
