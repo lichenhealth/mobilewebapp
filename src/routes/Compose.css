@@ -419,6 +419,11 @@
 .cmp__invgroup .cmp__evrow span { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; }
 .cmp__invgroup .cmp__aud-groups { margin-top: 8px; }
 .cmp__onlichen { color: var(--peach-deep); }
+/* Air between the invite hint and its box (founder 2026-11-05). */
+.cmp__hint-ev--inv { margin-bottom: 10px; }
+/* The LICHEN eyebrow over the Anyone / Everyone / My-celium rungs — the
+   circles' own eyebrow grammar, a block so it sits on its own line. */
+.cmp__aud-kind--lichen { display: block; margin: 10px 0 4px; }
 .cmp__invchip--off {
   background: var(--bone-warm); border-color: var(--bone-edge);
   color: var(--ink-soft);
