@@ -197,6 +197,29 @@ export function familyBySlugPrefix<T extends { title: string; duration_min: numb
   ) ?? null;
 }
 
+/** EVERY FAMILY ALIAS ALSO WORKS PER-LENGTH (founder 2026-11-05: "/time-15
+ *  and catch-up-15 … point to a booking flow that is the exact same, e.g. it
+ *  has the same rules but knows that the person is being allowed to book 15
+ *  minutes, because that's what the URL they got sent constrains to"): a slug
+ *  shaped <family alias>-<minutes> resolves DERIVED when the alias names a
+ *  multi-length family (by slugified title, or by its siblings' shared link-
+ *  name prefix) and the minutes equal a real sibling's length — that length
+ *  arrives pre-selected, no storage. Checked AFTER an exact stored slug, so
+ *  a deliberately saved link name is never shadowed; a length no sibling
+ *  carries (/time-14) stays an honest miss. */
+export function lengthByAlias<T extends { title: string; duration_min: number; slug?: string | null }>(
+  groups: { key: string; title: string; variants: T[] }[], low: string,
+): { group: { key: string; title: string; variants: T[] }; variant: T } | null {
+  const m = /^(.+)-(\d+)$/.exec(low);
+  if (!m) return null;
+  const base = m[1];
+  const mins = parseInt(m[2], 10);
+  const fam = groups.find((g) => slugify(g.title) === base && g.variants.length > 1)
+    ?? familyBySlugPrefix(groups, base);
+  const variant = fam?.variants.find((v) => v.duration_min === mins) ?? null;
+  return fam && variant ? { group: fam, variant } : null;
+}
+
 /** "30 minutes" / "1 hour" / "1 hr 30 min" — the length chooser's words. */
 export function sessionLengthLabel(min: number): string {
   if (min % 60 === 0) { const h = min / 60; return h === 1 ? '1 hour' : `${h} hours`; }

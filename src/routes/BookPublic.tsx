@@ -11,7 +11,7 @@ import {
   publicBookingPage, publicBookingBoard, guestCreateBooking, sendBookingMail,
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
-  familyBySlugPrefix, groupTypesByTitle, sessionLengthLabel, slugify,
+  familyBySlugPrefix, groupTypesByTitle, lengthByAlias, sessionLengthLabel, slugify,
   saveBookResume, readBookResume, clearBookResume, emailIsMember, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
@@ -125,6 +125,17 @@ export default function BookPublic() {
         // address, so a renamed title never kills old links.
         const famPre = familyBySlugPrefix(groupsPub, low);
         if (famPre) { setPage(p); setPubKey(famPre.key); setSlugFam(true); setReady(true); return; }
+        // DERIVED LENGTH — <family alias>-<minutes> (founder 2026-11-05:
+        // "/time-15 and catch-up-15 … the same rules but knows the person
+        // is being allowed to book 15 minutes"): any alias that opens the
+        // picker also opens each real length directly, pre-selected with
+        // the switcher standing. A stored slug above always wins first.
+        const laPub = lengthByAlias(groupsPub, low);
+        if (laPub) {
+          setPage(p); setTypeId(laPub.variant.id);
+          setPubKey(laPub.group.key); setSlugFam(true);
+          setReady(true); return;
+        }
         // A single-length family name still answers (slugify(title) match,
         // one variant) — the link teaches itself.
         const famOne = groupsPub.find((g) => slugify(g.title) === low) ?? null;
@@ -179,6 +190,11 @@ export default function BookPublic() {
             if (famPre) {
               setLenKey(famPre.key); setSlugFam(true);
             } else {
+              // Derived length alias (founder 2026-11-05): a member lands
+              // straight on that length's own slot picker, where the
+              // standing length-switcher covers changing their mind.
+              const la = lengthByAlias(groups, low);
+              if (la) { navigate(`/book/${la.variant.id}`, { replace: true }); return; }
               const one = groups.find((g) => slugify(g.title) === low)?.variants[0] ?? null;
               if (one) { navigate(`/book/${one.id}`, { replace: true }); return; }
             }
