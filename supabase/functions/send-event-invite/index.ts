@@ -93,8 +93,48 @@ Deno.serve(async (req) => {
   } catch { /* fall through */ }
   if (!uid) return json({ error: 'Unauthorized' }, 401);
 
-  let body: { event_id?: string; name?: string; email?: string; guest_id?: string };
+  let body: {
+    event_id?: string; name?: string; email?: string; guest_id?: string;
+    test?: { title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null };
+  };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
+
+  // TEST MODE (founder 2026-11-05, "like paperless post"): the host previews
+  // the real card in their own inbox BEFORE the event exists. The recipient
+  // is the CALLER'S OWN account email, read server-side — never caller input
+  // — so a test can only ever reach yourself. No guest row, no token.
+  if (body.test) {
+    const t = body.test;
+    const title = String(t.title ?? '').trim().slice(0, 200) || 'Your event';
+    const sd = String(t.start_date ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sd)) return json({ error: 'Pick a date first' }, 400);
+    const startMin = typeof t.start_min === 'number' && t.start_min >= 0 && t.start_min < 1440 ? Math.round(t.start_min) : null;
+    const where = String(t.location ?? '').trim().slice(0, 200);
+    const photoIn = String(t.photo ?? '');
+    const photo = photoIn.startsWith(`${SUPABASE_URL}/storage/v1/object/public/`) ? photoIn : null;
+    const ures = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
+      headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY!}` },
+    });
+    const to = ((await ures.json().catch(() => null))?.email ?? '').trim();
+    if (!to) return json({ error: 'No email on your account to send a test to' }, 400);
+    const hosts = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
+    const hostName = (Array.isArray(hosts) ? hosts[0]?.full_name : null) || 'A member';
+    const when = whenLabel({ start_date: sd, end_date: sd, all_day: !!t.all_day, start_min: startMin });
+    const link = `${APP_URL}/events`;
+    const text = `[Test — only you received this]\n\n${hostName} invited you to "${title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nYour guests' RSVP button opens their own invitation once you post.\n\n— Lichen`;
+    const html = inviteCard({
+      eyebrow: 'You’re invited', title, when, where, hostName, link, photo,
+      cta: 'RSVP &amp; see the details',
+      fine: '<strong>This is a test, sent only to you.</strong> Your guests receive this same card — their RSVP button opens their own invitation once you post the event.',
+    });
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to: [to], reply_to: REPLY_TO, subject: `[Test] ${hostName} invited you to ${title}`, text, html }),
+    });
+    if (!res.ok) return json({ error: 'Email failed to send', detail: await res.text() }, 502);
+    return json({ ok: true, to });
+  }
 
   // APPROVED MODE (founder 2026-11-04, the open event URL): the host just
   // said yes to a link-born request — mail that EXISTING guest "you're
