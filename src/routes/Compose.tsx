@@ -116,11 +116,11 @@ export default function Compose() {
     areasFromParam(params.get('area')).length ? 'actionable' : 'social');
   // "Where": a post can live in several areas at once.
   const [areas, setAreas] = useState<Set<ServiceArea>>(() => {
-    const list = areasFromParam(params.get('area'));
-    // The Marketplace is the Commons' catch-all — pre-checked wherever an
-    // offer starts, but a CHECKBOX: deselect it to keep goods off the open
-    // square and shelve them only in Courses/Library/etc (founder 2026-07-27).
-    return new Set(list.length ? [...list, 'marketplace' as ServiceArea] : []);
+    // A post lives where it was born (founder 2026-11-05: "Have each post
+    // post to its section… and if you specify that its a paid piece of
+    // content, it also auto populates marketplace") — no catch-all pre-check;
+    // PAID is what carries a post into Marketplace (see publish).
+    return new Set(areasFromParam(params.get('area')));
   });
   const [whereOpen, setWhereOpen] = useState(false);
   // The audience list outgrew the page (founder 2026-10-13: "audience is long
@@ -746,13 +746,7 @@ export default function Compose() {
     setAreas((cur) => {
       const n = new Set(cur);
       if (n.has(a)) n.delete(a);
-      else {
-        n.add(a);
-        // The Marketplace is the Commons' catch-all — the FIRST area picked
-        // brings it along pre-checked, a deselectable checkbox (the ?area=
-        // door's rule, carried here when the faces retired 2026-11-04).
-        if (cur.size === 0 && a !== 'marketplace') n.add('marketplace');
-      }
+      else n.add(a);
       return n;
     });
   };
@@ -820,6 +814,11 @@ export default function Compose() {
   // makes the post actionable; none = a feed story.
   const isActionable = areas.size > 0;
   const isEvent = areas.has('events');
+  // PAID CARRIES A POST INTO MARKETPLACE (founder 2026-11-05): a paid event,
+  // course, stay… lists in Marketplace automatically, on top of its own
+  // section. Explicitly ticking Marketplace still works for anything else.
+  const paidChosen = isEvent ? evMode === 'paid' : modes.has('paid');
+  const marketAuto = isActionable && paidChosen && !isMarket;
   // An EVENT's audience = an explicit visibility pick; the only-those-invited
   // rung additionally needs SOMEONE on the list (founder 2026-11-04: "you
   // could invite no one but have visibility be to anyone or anyone on
@@ -1019,12 +1018,10 @@ export default function Compose() {
     if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
-      // "Everything is an exchange": a course offered for pay/trade/Lichen*
-      // belongs in the Marketplace too (founder + Melanie, 2026-07-26).
-      // The checkboxes are the truth: Marketplace arrives pre-checked with
-      // every offer, but deselecting it is a real choice (quieter shelves
-      // only) — no silent re-add here.
+      // A post lives in the sections it was given; a PAID one also lists in
+      // Marketplace (founder 2026-11-05) — said live under Where, never silent.
       const effAreas = new Set(areas);
+      if (marketAuto) effAreas.add('marketplace');
       const details: Record<string, unknown> = {};
       // Invite-only event (2026-11-04): the label the bridge trigger and
       // honest copy read; the enforcement is RLS (the attendee arm).
@@ -1578,7 +1575,7 @@ export default function Compose() {
       <button className="cmp__input cmp__where-btn" onClick={() => setWhereOpen((o) => !o)} aria-expanded={whereOpen}>
         {areas.size === 0 ? <span className="cmp__where-none">Just the feeds — a social story</span> : (
           <span className="cmp__where-sel">
-            {SERVICE_AREAS.filter((a) => areas.has(a.value)).map((a) => (
+            {SERVICE_AREAS.filter((a) => areas.has(a.value) || (a.value === 'marketplace' && marketAuto)).map((a) => (
               <span key={a.value} className="cmp__where-tag"><Icon name={a.icon} size={12} /> {a.label}</span>
             ))}
           </span>
@@ -1588,12 +1585,14 @@ export default function Compose() {
       {(() => {
         const others = SERVICE_AREAS.filter((a) => a.value !== 'marketplace' && areas.has(a.value)).map((a) => a.label);
         const inMkt = areas.has('marketplace');
-        const hint = inMkt && others.length
-          ? `In the open Marketplace, plus ${others.join(' and ')}.`
+        const hint = marketAuto
+          ? `Lives in ${others.join(' and ')} \u2014 and because it\u2019s paid, it lists in Marketplace too.`
+          : inMkt && others.length
+          ? `In Marketplace, plus ${others.join(' and ')}.`
           : inMkt
-          ? 'The Marketplace is the Commons\u2019 open square \u2014 check Courses, Library, or others to shelve this there too.'
+          ? 'In Marketplace \u2014 check Courses, Events, or others to shelve this there too.'
           : others.length
-          ? `Skipping the open Marketplace \u2014 this lives only in ${others.join(' and ')}.`
+          ? `Lives in ${others.join(' and ')}. Mark it paid and it lists in Marketplace too.`
           : 'Pick an area to make this actionable \u2014 an offer, an event, a listing.';
         return <p className="cmp__hint cmp__where-hint">{hint}</p>;
       })()}
@@ -1603,11 +1602,13 @@ export default function Compose() {
             <label key={a.value} className="cmp__where-row">
               <input
                 type="checkbox"
-                checked={areas.has(a.value)}
+                checked={areas.has(a.value) || (a.value === 'marketplace' && marketAuto)}
                 onChange={() => toggleArea(a.value)}
-                disabled={editing && a.value === 'events' && areas.has('events') && !!editLinkedEvent.current}
+                disabled={(editing && a.value === 'events' && areas.has('events') && !!editLinkedEvent.current)
+                  || (a.value === 'marketplace' && marketAuto)}
               />
               <Icon name={a.icon} size={14} /> {a.label}
+              {a.value === 'marketplace' && marketAuto && <span className="cmp__label-soft"> — added because it&rsquo;s paid</span>}
             </label>
           ))}
         </div>
