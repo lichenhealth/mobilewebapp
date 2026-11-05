@@ -504,7 +504,7 @@ const POST_TOOLS = [
         body: { type: 'string', description: 'The post body, from what they told you.' },
         modes: { type: 'array', items: { type: 'string', enum: ['gift', 'trade', 'paid', 'lend', 'rent', 'borrow', 'iso'] }, description: 'The exchange manner(s) they named — gift, trade, paid (for sale), lend, rent, borrow, or iso (in search of). At least one; several is fine.' },
         price: { type: 'string', description: 'Only when paid/rent: their asking price, their words ("$45", "$45 per hour", "sliding $20–60").' },
-        areas: { type: 'array', items: { type: 'string', enum: ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'] }, description: 'Where it lives. Marketplace is always included (the Commons catch-all); pass extras only when they asked.' },
+        areas: { type: 'array', items: { type: 'string', enum: ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'] }, description: 'The section(s) it lives in — e.g. courses, travel, food. A PAID post also lists in Marketplace automatically when they publish, so never add marketplace just because it is paid. Omit for a plain offer (it lands in Marketplace).' },
         audience: { type: 'string', enum: ['everyone', 'mycelium'], description: 'Who sees it — everyone (default) or just their My-celium.' },
       },
       required: ['title', 'body', 'modes'],
@@ -2437,7 +2437,11 @@ Deno.serve(async (req) => {
       const AREA_OK = ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'];
       const rawAreas = (Array.isArray(input.areas) ? input.areas : []).map(String);
       if (rawAreas.includes('events')) return { ok: false, error: 'Events need the event composer (RSVPs, dates) — hand the events door instead of drafting here.' };
-      const areas = [...new Set(['marketplace', ...rawAreas.filter((a) => AREA_OK.includes(a))])];
+      // A post lives in its own section; PAID ones also list in Marketplace,
+      // added by Compose at publish (founder 2026-11-05). No section named →
+      // Marketplace, the plain offer's home.
+      const picked = [...new Set(rawAreas.filter((a) => AREA_OK.includes(a)))];
+      const areas = picked.length ? picked : ['marketplace'];
       const price = String(input.price ?? '').trim().slice(0, 60);
       const audience = input.audience === 'mycelium' ? 'mycelium' : 'everyone';
       // The draft row IS Compose's own autosave shape — the composer hydrates
