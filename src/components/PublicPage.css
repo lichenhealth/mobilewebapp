@@ -489,3 +489,23 @@
 }
 /* The flip must move the WRAPPER when the builder nests the img (2026-09-08). */
 .ppage__sec--split.is-flip .ppage__ephoto { order: 1; }
+
+/* THE WEBSITE MASTHEAD (founder 2026-11-06: "roll up the profile piece so
+   that it just looks like the website"). The public rendering's big profile
+   block rolls up into one slim header: a small mark + the name as the site
+   title, the nav beside it on wide screens and wrapping under it on phones. */
+.ppage__hero--site { padding-top: calc(var(--safe-top, 0px) + 112px); }
+.ppage__sitehead {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--s-3) var(--s-5); padding: 0 var(--s-2) var(--s-3);
+}
+.ppage__brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.ppage__brand-name {
+  font-family: var(--font-display, inherit); font-size: 22px; line-height: 1.15;
+  color: var(--ink); white-space: nowrap;
+}
+.ppage__sitehead .ppage__nav { padding: 0; gap: var(--s-4); }
+.ppage__hero--site .view-toggle-row { margin-bottom: var(--s-4); }
+@media (max-width: 899px) {
+  .ppage__sitehead { flex-direction: column; align-items: flex-start; }
+}
