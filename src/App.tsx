@@ -37,6 +37,7 @@ import CalendarSettings from './routes/CalendarSettings';
 import Events from './routes/Events';
 import VanityRoute, { CalendarVanity } from './routes/VanityRoute';
 import GuestEvent from './routes/GuestEvent';
+import GuestPost from './routes/GuestPost';
 // AboutLichen retired as a live route (founder 2026-08-04): /about is now the
 // static merged marketing page (public/about, weave design). Any in-app
 // navigate('/about') lands on this redirector, which hard-loads so the
@@ -101,7 +102,7 @@ function BookGate() {
     : <BookPublic />;
 }
 
-const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/book', '/about'];
+const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/p', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -134,7 +135,7 @@ export default function App() {
   // bottom with drive highlighted") — it keeps the TopBar + bottom nav.
   const isChatThread = /^\/chat\/[^/]+/.test(pathname) && !/^\/chat\/[^/]+\/drive/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/intro' || pathname === '/onboarding' || pathname === '/invite/decline';
-  const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/');   // external guest landing — no app chrome
+  const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/') || pathname.startsWith('/p/');   // external guest landing — no app chrome
   // A NAKED-SITE rendering — embed pane, ?preview=1, or a colour trial (one
   // shared decision, src/lib/siteView.ts — founder 2026-09-09 after the
   // builder's Preview showed the side nav and bone ground). The chrome
@@ -485,6 +486,7 @@ export default function App() {
           <Route path="/events/:postId" element={<VanityRoute area="events" />} />
           <Route path="/events/:param/:slug" element={<VanityRoute area="events" />} />
           <Route path="/e/:token" element={<GuestEvent />} />
+          <Route path="/p/:token" element={<GuestPost />} />
           <Route path="/about" element={<StaticAboutRedirect />} />
           {/* OFFLINE WHILE THEY'RE MADE BETTER (founder 2026-08-25: "don't
               want to hold the platform up from going live"): Courses and

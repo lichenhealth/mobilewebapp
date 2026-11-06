@@ -83,3 +83,14 @@
   border-color: var(--peach); color: var(--peach-deep);
 }
 .addcal__btn:hover { background: var(--peach-tint); border-color: var(--peach-deep); }
+
+/* A LISTING SHARED PRIVATELY (/p/:token, founder 2026-11-06) — the
+   invitation card's anatomy with a price and a buy flow. */
+.gpost__dots { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; }
+.gpost__dot { width: 8px; height: 8px; padding: 0; border-radius: 50%; border: 0; background: var(--bone-edge); cursor: pointer; }
+.gpost__dot.is-on { background: var(--peach); }
+.gpost__price { font-size: 17px; font-weight: 600; color: var(--ink); margin: 0 0 var(--s-3); }
+.gpost__acts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: var(--s-2); }
+.gpost__pay { border-color: var(--peach); background: var(--peach); color: #fff; }
+.gpost__quiet { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; }
+.gpost__err { color: var(--red-deep); }

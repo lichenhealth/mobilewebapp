@@ -67,3 +67,9 @@ verify_jwt = false
 # (the guest_token pattern).
 [functions.calendar-feed]
 verify_jwt = false
+
+[functions.send-post-share]
+verify_jwt = false
+
+[functions.post-checkout]
+verify_jwt = false

@@ -22,6 +22,7 @@ import {
 import './PostPage.css';
 import { loadSpaceNames } from '../lib/postsApi';
 import ExchangePanel from '../components/ExchangePanel';
+import GuestSharePanel from '../components/GuestSharePanel';
 import { loadRelatedPosts, railArea } from '../lib/relatedPosts';
 
 /** Where each service area lives — the frozen bar's "relevant places" doors. */
@@ -299,6 +300,16 @@ export default function PostPage() {
           showing what it's waiting on. */}
       {(isMarket || isTravel) && me && (
         <ExchangePanel post={p} me={me} />
+      )}
+
+      {/* SHARE PRIVATELY + SELL OFF LICHEN (founder 2026-11-06): the seller's
+          own panel — private /p/ links for people without an account, and
+          their purchase requests. Renders only for the post's host. */}
+      {me && !p.linked_event_id && (
+        <GuestSharePanel postId={p.id} me={me}
+          title={p.title?.trim() || (p.body ?? '').trim().slice(0, 60) || 'A listing'}
+          sellerName={p.author_space?.name ?? p.author?.full_name ?? 'A Lichen member'}
+          priced={(() => { const m = /[0-9]+(?:\.[0-9]{1,2})?/.exec(String((p.details as { price?: string } | null)?.price ?? '').replace(/,/g, '')); return !!m && Number(m[0]) >= 1; })()} />
       )}
 
       {/* The physical facts moved INTO the card (founder 2026-10-23: "the
