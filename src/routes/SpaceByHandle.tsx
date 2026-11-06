@@ -45,5 +45,5 @@ export default function SpaceByHandle({ handle: handleProp, forcePublic }: { han
   }
   return hit.kind === 'space'
     ? <SpaceProfile spaceId={hit.id} forcePublic={forcePublic} />
-    : <MemberProfile memberId={hit.id} />;
+    : <MemberProfile memberId={hit.id} forcePublic={forcePublic} />;
 }

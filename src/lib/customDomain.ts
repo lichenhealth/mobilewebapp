@@ -3,11 +3,16 @@
 // barn's website, not a redirect. The map is deliberately hardcoded for now
 // (one barn); when more members bring domains this becomes a spaces.domain
 // column + a Vercel Domains API integration (the premium tier).
+// MEMBERS TOO (founder 2026-11-06, galynburke.com off Squarespace): the value
+// is a HANDLE, resolved spaces-first then people — SpaceByHandle's order and
+// api/page.ts's — so a member's own domain serves their public page.
 export const HOST_SPACES: Record<string, string> = {
   'countrymanstables.com': 'countrymanstables',
   'www.countrymanstables.com': 'countrymanstables',
   'countrymanstables.org': 'countrymanstables',
   'www.countrymanstables.org': 'countrymanstables',
+  'galynburke.com': 'galyn',
+  'www.galynburke.com': 'galyn',
 };
 
 /** The space handle a hostname serves, or null on Lichen's own domains.
