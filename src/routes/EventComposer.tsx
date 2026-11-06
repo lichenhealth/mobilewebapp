@@ -18,6 +18,7 @@ import { LinkifiedText } from '../components/CarePostCard';
 import { parseFlex, defaultWindow } from '../lib/flexParse';
 import { createReminder, getReminder, updateReminder, deleteReminder, loadReminderRecipients, type Recipient } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
+import { classifyCareContact } from '../lib/careTeamApi';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -97,6 +98,29 @@ export default function EventComposer() {
     return n;
   }, [range.start, range.end]);
 
+  // A circle's members join the invite list (capped — a huge community
+  // belongs in a formal event's audience, not 200 calendar seats).
+  async function expandSpace(sid: string) {
+    if (expandedSpaces.current.has(sid)) return;
+    expandedSpaces.current.add(sid);
+    const name = spaces.find((s) => s.id === sid)?.name ?? 'that group';
+    const { data } = await supabase.from('space_members')
+      .select('profiles(id, full_name)').eq('space_id', sid).limit(26);
+    const folks = ((data as unknown as { profiles: MemberOpt | null }[] | null) ?? [])
+      .map((r) => r.profiles).filter((x): x is MemberOpt => !!x && x.id !== me);
+    if (folks.length > 25) {
+      setSpaceNotes((n) => [...n, `${name}: too big to seat one by one — make it a formal event to invite the whole circle`]);
+    } else if (folks.length === 0) {
+      setSpaceNotes((n) => [...n, `${name}: no other members yet`]);
+    } else {
+      setInvitees((cur) => {
+        const add = folks.filter((f) => !cur.some((i) => i.id === f.id));
+        return add.length > 0 ? [...cur, ...add] : cur;
+      });
+      setSpaceNotes((n) => [...n, `${name} · ${folks.length} member${folks.length > 1 ? 's' : ''} added`]);
+    }
+  }
+
   // The sentence, applied: length + window + invitees (groups expand to
   // their members, capped so a huge community doesn't flood the invite list).
   useEffect(() => {
@@ -117,26 +141,7 @@ export default function EventComposer() {
           return add.length > 0 ? [...cur, ...add] : cur;
         });
       }
-      for (const sid of p.spaceIds) {
-        if (expandedSpaces.current.has(sid)) continue;
-        expandedSpaces.current.add(sid);
-        const name = spaces.find((s) => s.id === sid)?.name ?? 'that group';
-        const { data } = await supabase.from('space_members')
-          .select('profiles(id, full_name)').eq('space_id', sid).limit(26);
-        const folks = ((data as unknown as { profiles: MemberOpt | null }[] | null) ?? [])
-          .map((r) => r.profiles).filter((x): x is MemberOpt => !!x && x.id !== me);
-        if (folks.length > 25) {
-          setSpaceNotes((n) => [...n, `${name}: too many members to check`]);
-        } else if (folks.length === 0) {
-          setSpaceNotes((n) => [...n, `${name}: no other members yet`]);
-        } else {
-          setInvitees((cur) => {
-            const add = folks.filter((f) => !cur.some((i) => i.id === f.id));
-            return add.length > 0 ? [...cur, ...add] : cur;
-          });
-          setSpaceNotes((n) => [...n, `${name} · ${folks.length} member${folks.length > 1 ? 's' : ''} added`]);
-        }
-      }
+      for (const sid of p.spaceIds) await expandSpace(sid);
     }, 500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,6 +310,52 @@ export default function EventComposer() {
       .filter((m) => (m.full_name ?? '').toLowerCase().includes(q))
       .slice(0, 6);
   }, [query, members, invitees]);
+
+  // Your circles answer the same box (the Compose grammar).
+  const circleMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return spaces.filter((sp) => sp.name.toLowerCase().includes(q)).slice(0, 4);
+  }, [query, spaces]);
+  // An email or phone typed here belongs to someone OFF Lichen — a calendar
+  // seat can't hold them, a formal event's guest list can.
+  const offLichen = useMemo(() => {
+    const raw = query.trim();
+    if (!raw) return null;
+    const c = classifyCareContact(raw);
+    const name = raw.replace(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '')
+      .replace(/\+?[\d\s().-]{7,}/g, '').replace(/[<>,]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (c.kind === 'email') return { kind: 'email' as const, value: c.email, name: name || c.email.split('@')[0], label: c.email };
+    if (c.kind === 'phone') return { kind: 'phone' as const, value: c.digits, sms: c.sms, name: name || c.digits, label: raw };
+    const tail = /(\+?[\d\s().-]{7,})$/.exec(raw);
+    const digits = tail ? tail[1].replace(/\D/g, '') : '';
+    if (tail && digits.length >= 7 && digits.length <= 16) {
+      return { kind: 'phone' as const, value: digits, sms: tail[1].replace(/[^\d+]/g, ''), name: name || digits, label: raw };
+    }
+    return null;
+  }, [query]);
+
+  // MAKE IT A FORMAL EVENT (founder 2026-11-06: "have cal events have this
+  // option, too — with the CTA to create an invite and make this a formal
+  // event … so the compose flows are unified, with Events having a fancier,
+  // deeper set of info and a pretty invite"): everything typed here rides
+  // into Compose's event flow — title, when, where, notes, and the people
+  // (members as seats, an off-Lichen email/phone as a guest).
+  function makeFormal(extra?: { kind: 'email'; value: string; name: string } | { kind: 'phone'; value: string; sms: string; name: string }) {
+    const q = new URLSearchParams({ area: 'events' });
+    if (title.trim()) q.set('title', title.trim());
+    if (description.trim()) q.set('body', description.trim());
+    if (location.trim()) q.set('where', location.trim());
+    if (range.start) q.set('date', range.start);
+    if (range.end && range.end !== range.start) q.set('end', range.end);
+    if (allDay) q.set('allday', '1');
+    else { q.set('start', String(startMin)); q.set('endmin', String(endMin)); }
+    const inv: unknown[] = invitees.map((m) => ({ kind: 'member', id: m.id, name: m.full_name ?? 'Member' }));
+    if (extra) inv.push(extra);
+    if (inv.length) q.set('invite', JSON.stringify(inv));
+    if (calendar !== 'me') q.set('space', calendar);
+    navigate(`/compose?${q.toString()}`);
+  }
 
   async function save() {
     if (!me) return;
@@ -757,7 +808,7 @@ export default function EventComposer() {
 
         {/* Invitees */}
         <div className="cedit__field">
-          <span className="cedit__label">Invite People, Groups, Communities, Organizations, and/or Places</span>
+          <span className="cedit__label">Who&rsquo;s invited?</span>
           {invitees.length > 0 && (
             <div className="calp__invitees">
               {invitees.map((m) => (
@@ -769,9 +820,26 @@ export default function EventComposer() {
             </div>
           )}
           <input
-            className="cedit__input" placeholder="Search members…"
+            className="cedit__input" placeholder="Name, circle, email or phone"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={query} onChange={(e) => setQuery(e.target.value)}
           />
+          {circleMatches.map((sp) => (
+            <button className="calp__match" key={'sp-' + sp.id}
+              onClick={() => { setQuery(''); void expandSpace(sp.id); }}>
+              <Icon name="user-multiple" size={14} /> {sp.name} <span className="calp__match-soft">— adds its members</span>
+            </button>
+          ))}
+          {offLichen && kind === 'event' && !eventId && (
+            <button className="calp__match calp__match--formal"
+              onClick={() => { const { label: _l, ...g } = offLichen; void _l; makeFormal(g); }}>
+              <Icon name="send" size={14} /> Invite {offLichen.label} from off Lichen
+              <span className="calp__match-soft"> — make this a formal event with an invitation ›</span>
+            </button>
+          )}
+          {spaceNotes.length > 0 && dateMode !== 'flex' && (
+            <p className="calp__match-soft">{spaceNotes[spaceNotes.length - 1]}</p>
+          )}
           {matches.map((m) => (
             <button
               className="calp__match" key={m.id}
@@ -782,6 +850,13 @@ export default function EventComposer() {
             </button>
           ))}
         </div>
+
+        {kind === 'event' && !eventId && (
+          <button className="calp__formal" onClick={() => makeFormal()}>
+            <span className="calp__formal-title">Make it a formal event ›</span>
+            <span className="calp__formal-sub">A pretty invitation, RSVPs, guests on and off Lichen, whole circles and a shareable link — your details come along.</span>
+          </button>
+        )}
 
         <div className="only-mobile">{availabilityPanel}</div>
 

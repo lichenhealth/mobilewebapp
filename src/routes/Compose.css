@@ -483,3 +483,7 @@
 .cmp__gl-savebtn:disabled { opacity: 0.5; cursor: default; }
 .cmp__gl-cancel { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-muted); cursor: pointer; flex-shrink: 0; }
 .cmp__gl-msg { margin: 0 0 10px; font-size: 12px; color: var(--green-deep, #4f6b45); }
+
+/* Current-cy only (2026-11-06) — a two-line promise, checkbox at the top. */
+.cmp__ccyonly { align-items: flex-start; line-height: 1.4; }
+.cmp__ccyonly input { margin-top: 3px; }

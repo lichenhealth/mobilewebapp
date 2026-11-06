@@ -182,6 +182,12 @@ export default function Compose() {
   const [fulfillment, setFulfillment] = useState<Set<string>>(new Set());
   const [deliverRadius, setDeliverRadius] = useState('');
   const [paymentPlan, setPaymentPlan] = useState('');
+  // CURRENT-CY ONLY (founder 2026-11-06: guests off Lichen default to paying
+  // in DOLLARS, "or if the seller will only deal in current-cy, which means
+  // they'd need to join the platform"): the seller's switch on a paid
+  // listing. On, a private /p/ link shows the join door instead of Ask to
+  // buy, and guest_request_purchase refuses server-side.
+  const [currentcyOnly, setCurrentcyOnly] = useState(false);
   // Category tags — the real 63-category taxonomy, loaded when opened.
   const [tagsOpen, setTagsOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -205,10 +211,19 @@ export default function Compose() {
     void supabase.from('categories').select('*').order('sort')
       .then(({ data }) => setAllCats((data as Category[] | null) ?? []));
   }, [tagsOpen, allCats]);
-  const [evRange, setEvRange] = useState<DateRange>({ start: todayISO(), end: todayISO() });
-  const [evAllDay, setEvAllDay] = useState(false);
-  const [evStartMin, setEvStartMin] = useState(18 * 60);
-  const [evEndMin, setEvEndMin] = useState(20 * 60);
+  // THE CALENDAR'S "MAKE IT A FORMAL EVENT" DOOR (founder 2026-11-06: "the
+  // compose flows are unified, with Events having a fancier, deeper set of
+  // info and a pretty invite"): EventComposer carries what was typed —
+  // ?date= &end= &start= &endmin= &allday=1 &where= &body= &invite=<json>.
+  const isoParam = (k: string) => { const v = params.get(k); return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; };
+  const minParam = (k: string) => { const n = Number(params.get(k)); return params.get(k) != null && Number.isInteger(n) && n >= 0 && n <= 1440 ? n : null; };
+  const [evRange, setEvRange] = useState<DateRange>(() => {
+    const st = isoParam('date') ?? todayISO();
+    return { start: st, end: isoParam('end') ?? st };
+  });
+  const [evAllDay, setEvAllDay] = useState(() => params.get('allday') === '1');
+  const [evStartMin, setEvStartMin] = useState(() => minParam('start') ?? 18 * 60);
+  const [evEndMin, setEvEndMin] = useState(() => minParam('endmin') ?? 20 * 60);
   const [bookingUrl, setBookingUrl] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [sliding, setSliding] = useState(false);
@@ -281,7 +296,12 @@ export default function Compose() {
   // guest invite on publish. genLink mints the shareable open URL, whose
   // standing default is the approval gate: off-list askers wait for the
   // host's yes (request_event_spot — built, now the named default).
-  const [invitees, setInvitees] = useState<EvInvitee[]>([]);
+  const [invitees, setInvitees] = useState<EvInvitee[]>(() => {
+    try {
+      const raw = JSON.parse(params.get('invite') ?? '[]') as EvInvitee[];
+      return Array.isArray(raw) ? raw.filter((i) => i && (i.kind === 'member' || i.kind === 'email' || i.kind === 'phone')).slice(0, 200) : [];
+    } catch { return []; }
+  });
   // WHO'S INVITED — ON LICHEN / OFF LICHEN (founder 2026-11-04, two passes:
   // "visibility should be Open: Anyone, Anyone on Lichen, then subsets…
   // If you don't put an audience you have to choose one before it goes
@@ -404,12 +424,13 @@ export default function Compose() {
     else navigate(afterPostDestination(areas.has('events')));
   });
   const [price, setPrice] = useState('');
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState(() => (/^https?:/i.test(params.get('where') ?? '') ? '' : params.get('where') ?? ''));
   // Where it happens (founder 2026-07-27): Online and In person are
   // CHECKBOXES — a hybrid offering carries a meeting link AND an address.
-  const [online, setOnline] = useState(false);
-  const [inPerson, setInPerson] = useState(false);
-  const [meetingUrl, setMeetingUrl] = useState('');
+  const [online, setOnline] = useState(() => /^https?:/i.test(params.get('where') ?? ''));
+  // A calendar hand-off's place arrives in person (a link rides as a meeting).
+  const [inPerson, setInPerson] = useState(() => !!params.get('where') && !/^https?:/i.test(params.get('where') ?? ''));
+  const [meetingUrl, setMeetingUrl] = useState(() => (/^https?:/i.test(params.get('where') ?? '') ? params.get('where') ?? '' : ''));
   // Coordinates from a picked LocationField suggestion (null = text-only).
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
 
@@ -557,7 +578,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, catTags,
+      deliverRadius, paymentPlan, currentcyOnly, catTags,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -614,7 +635,7 @@ export default function Compose() {
       if (Array.isArray(d.condition)) setCondition(new Set(d.condition));
       s(d.availFrom, setAvailFrom); s(d.availTo, setAvailTo);
       if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment));
-      s(d.deliverRadius, setDeliverRadius); s(d.paymentPlan, setPaymentPlan);
+      s(d.deliverRadius, setDeliverRadius); s(d.paymentPlan, setPaymentPlan); s(d.currentcyOnly, setCurrentcyOnly);
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -748,6 +769,7 @@ export default function Compose() {
       if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment as string[]));
       if (d.deliverRadiusMi != null) setDeliverRadius(String(d.deliverRadiusMi));
       if (typeof d.paymentPlan === 'string') setPaymentPlan(d.paymentPlan);
+      if (d.currentcyOnly === true) setCurrentcyOnly(true);
       if (Array.isArray(d.categories)) { setCatTags(d.categories as string[]); }
       if (d.travelKind === 'ride' || d.travelKind === 'flight' || d.travelKind === 'stay') setTravelKind(d.travelKind);
       if (typeof d.routeFrom === 'string') setRouteFrom(d.routeFrom);
@@ -1092,7 +1114,7 @@ export default function Compose() {
     if (!canPost) { setError('Add a few words, a title, or attach something first.'); return; }
     if (!hasAudience) {
       setError(isEvent
-        ? 'Choose who this event is for before it goes live — check Everyone on Lichen or Anyone, or invite people or circles.'
+        ? 'Choose who this event is for before it goes live — check Anyone or All of Lichen, or invite people or circles.'
         : 'Pick at least one audience.');
       if (!isEvent) setAudOpen(true);
       return;
@@ -1184,6 +1206,7 @@ export default function Compose() {
             if (Number.isFinite(mi) && mi > 0) details.deliverRadiusMi = mi;
           }
           if (modes.has('paid') && paymentPlan.trim()) details.paymentPlan = paymentPlan.trim();
+          if (modes.has('paid') && currentcyOnly) details.currentcyOnly = true;
           if (catTags.length) details.categories = catTags;
           // Travel facts (founder 2026-10-06): structured so the matcher,
           // the cards, and Maps can read them — never only prose.
@@ -1399,11 +1422,13 @@ export default function Compose() {
         </button>
       )}
       <header className="cmp__head">
-        <h1 className="cmp__title">{editing ? (isEvent ? 'Edit event' : 'Edit post') : 'New post'}</h1>
+        <h1 className="cmp__title">{editing ? (isEvent ? 'Edit event' : 'Edit post') : (isEvent ? 'New event' : 'New post')}</h1>
         <p className="cmp__sub">
           {editing
             ? 'Changes save in place — guests keep their RSVPs.'
-            : 'Share with the whole network, or just your My-celium.'}
+            : isEvent
+              ? 'Invite people on (and off) Lichen — your My-celium, or specific members, communities, groups, organizations and places.'
+              : 'Share with the whole network, or just your My-celium.'}
         </p>
       </header>
 
@@ -1639,14 +1664,17 @@ export default function Compose() {
               {/* The rungs wear the circles' small-caps eyebrow (founder
                   2026-11-05: "a soft indicator that we're now talking
                   Lichen audiences"). */}
-              <span className="cmp__aud-kind cmp__aud-kind--lichen">Lichen</span>
+              {/* ANYONE ISN'T LICHEN (founder 2026-11-06, drawing it above
+                  the eyebrow): the open web leads on its own; Lichen's two
+                  rungs are All and My-celium. */}
               <label className="cmp__evrow">
                 <input type="checkbox" checked={evAnyone} onChange={(e) => pickEvAnyone(e.target.checked)} />
                 <span><strong>Anyone</strong> — the open web, on Lichen or off.</span>
               </label>
+              <span className="cmp__aud-kind cmp__aud-kind--lichen">Lichen</span>
               <label className="cmp__evrow">
                 <input type="checkbox" checked={evLichen} onChange={(e) => pickEvLichen(e.target.checked)} />
-                <span><strong className="cmp__onlichen">Everyone on Lichen</strong> — every member can find it and RSVP; never the open web.</span>
+                <span><strong className="cmp__onlichen">All</strong> — every member can find it and RSVP; never the open web.</span>
               </label>
               <label className="cmp__evrow">
                 <input type="checkbox" checked={toMycelium} onChange={(e) => pickMycelium(e.target.checked)} />
@@ -2285,6 +2313,15 @@ export default function Compose() {
             {modes.has('paid') && (
               <input className="cmp__input" value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)}
                 placeholder="Payment plan (optional — e.g. 6 monthly payments)" />
+            )}
+            {modes.has('paid') && (
+              <label className="cmp__evrow cmp__ccyonly">
+                <input type="checkbox" checked={currentcyOnly} onChange={(e) => setCurrentcyOnly(e.target.checked)} />
+                <span>
+                  <strong>Current-cy only</strong> — people you share it with off Lichen can&rsquo;t pay in dollars;
+                  they&rsquo;d join Lichen to buy it. Unchecked, they can check out as a guest by card.
+                </span>
+              </label>
             )}
             <label className="cmp__label">When <span className="cmp__label-soft">(optional — available between, or needed by)</span></label>
             <div className="cmp__row cmp__avail-row">

@@ -581,6 +581,20 @@
 .calp__invitee:hover { border-color: #c0564f; }
 .calp__match { width: fit-content; }
 .calp__match:hover { border-color: var(--peach); }
+.calp__match { padding-left: 10px; flex-wrap: wrap; text-align: left; }
+.calp__match-soft { color: var(--ink-muted); font-size: 12px; }
+.calp__match--formal { border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep); }
+/* MAKE IT A FORMAL EVENT (2026-11-06) — the calendar's door into Compose's
+   event flow: a whole-surface peach card, the details ride along. */
+.calp__formal {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; text-align: left; padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--peach); border-radius: var(--r-md, 12px);
+  background: var(--peach-tint); cursor: pointer; margin: var(--s-2) 0;
+}
+.calp__formal:hover { border-color: var(--peach-deep); }
+.calp__formal-title { color: var(--peach-deep); font-weight: 600; font-size: 14px; }
+.calp__formal-sub { color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
 
 /* ── Imported (external-calendar) blocks: yours to see, theirs to edit ── */
 .calp__event--external,

@@ -94,3 +94,4 @@
 .gpost__pay { border-color: var(--peach); background: var(--peach); color: #fff; }
 .gpost__quiet { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; }
 .gpost__err { color: var(--red-deep); }
+.gpost__ccy { margin-top: var(--s-3); font-size: 13px; }
