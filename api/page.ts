@@ -105,7 +105,9 @@ export default async function handler(req: Request): Promise<Response> {
   const byHandle = url.pathname.match(/^\/([A-Za-z0-9][A-Za-z0-9_-]*)\/?$/);
   let row: Record<string, unknown> | null = null;
   if (customHandle) {
-    row = await fetchRow('spaces', 'handle', customHandle);
+    // A member's own domain (galynburke.com) resolves to their profile —
+    // spaces first, the same order SpaceByHandle renders in.
+    row = (await fetchRow('spaces', 'handle', customHandle)) ?? (await fetchRow('profiles', 'handle', customHandle));
   } else if (byId) {
     row = await fetchRow(byId[1] === 'spaces' ? 'spaces' : 'profiles', 'id', byId[2]);
   } else if (byHandle) {

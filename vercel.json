@@ -78,6 +78,204 @@
       "permanent": true
     },
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.galynburke.com"
+        }
+      ],
+      "destination": "https://galynburke.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.galynburke.com"
+        }
+      ],
+      "destination": "https://galynburke.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/aboutme",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=about",
+      "permanent": true
+    },
+    {
+      "source": "/about",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=about",
+      "permanent": true
+    },
+    {
+      "source": "/what-i-do",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=custom-what-i-do",
+      "permanent": true
+    },
+    {
+      "source": "/services",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=custom-what-i-do",
+      "permanent": true
+    },
+    {
+      "source": "/how-i-work",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=practice",
+      "permanent": true
+    },
+    {
+      "source": "/how-i-work-1",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=practice",
+      "permanent": true
+    },
+    {
+      "source": "/resources",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=custom-resources",
+      "permanent": true
+    },
+    {
+      "source": "/connect",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=contact",
+      "permanent": true
+    },
+    {
+      "source": "/subscribe",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/?ptab=contact",
+      "permanent": true
+    },
+    {
+      "source": "/blog",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/blog-five",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/blog-five/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/images",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/new-page",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/inno",
+      "has": [
+        {
+          "type": "host",
+          "value": "galynburke.com"
+        }
+      ],
+      "destination": "/",
+      "permanent": true
+    },
+    {
       "source": "/project/:slug",
       "destination": "/:slug",
       "permanent": true

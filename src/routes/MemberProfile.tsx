@@ -34,7 +34,7 @@ import { supabase } from '../lib/supabase';
  *  what they offer, and the two ways to connect (Trust into your mycelium,
  *  or start a conversation). Email, phone, and exact whereabouts stay
  *  private by design. */
-export default function MemberProfile({ memberId }: { memberId?: string } = {}) {
+export default function MemberProfile({ memberId, forcePublic }: { memberId?: string; forcePublic?: boolean } = {}) {
   const { id: paramId = '' } = useParams();
   const id = memberId || paramId;
   const navigate = useNavigate();
@@ -119,11 +119,14 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   const [idTags, setIdTags] = useState<string[]>([]);
   // The open web (and the owner previewing) sees the shared page template.
   const [params, setParams] = useSearchParams();
-  const previewing = params.get('preview') === '1';
+  // forcePublic: on the member's OWN domain (galynburke.com, founder
+  // 2026-11-06) everyone gets the website — the owner too; the app and its
+  // view toggle live on lichen.health. Same posture as SpaceProfile's.
+  const previewing = params.get('preview') === '1' || !!forcePublic;
   // Inside the assistant's side-by-side frame this is meant to read as the
   // PAGE, not as an app you can steer — a view toggle in there would just
   // navigate the frame out from under the conversation.
-  const embedded = params.get('embed') === '1';
+  const embedded = params.get('embed') === '1' || !!forcePublic;
   // PREVIEW THE DRAFT (founder 2026-08-31): ?draft=1 renders the member's
   // unpublished draft in place of the live page — the chat's Preview button
   // opens this. RLS keeps page_drafts to the owner; others see live.
