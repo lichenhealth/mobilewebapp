@@ -244,7 +244,10 @@ the WeavePitch template.
   (booking_types.price_cents, frozen per booking; request types never
   charge before her accept), providers accrue Current 1:1 (float rule
   holds), payout_pref chooses keep-vs-auto-cash-out, the wallet's
-  Cash-out door covers the WHOLE balance (sessions, Marketplace, gifts),
+  Cash-out door covers the WHOLE balance (sessions, Marketplace, gifts,
+  and — since 2026-11-06 — GUEST LISTING SALES: someone off Lichen buys a
+  shared listing by card, seller-accepted first, minted 1:1 as context
+  'sale'; same float rule, same cash-out, same fintech flag),
   and the admin Payouts desk (/admin/supporters#payouts) marks dollars
   paid BY HAND with per-member year totals flagging $600+ 1099
   territory. ⚠ The fintech-attorney flag STANDS — manual founder-paid
