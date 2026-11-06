@@ -1174,6 +1174,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // active tab, and the row stays up on template tabs as the way back.
   const feedSection = (ctx: FeedRenderCtx) => (
     <ContributionsFeed
+      handle={space.handle ?? null}
       spaceId={space.id}
       me={me}
       entityName={space.name}

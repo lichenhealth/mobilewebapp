@@ -23,11 +23,30 @@ interface FeedPostLike { details: Record<string, unknown>; image_url: string | n
 
 /** Where a tapped post opens: its event page when it's an event post, else
  *  the post's own page (Figma 286-6331 — every post has a home). */
+// The section word a vanity link wears, in precedence order (VanityRoute
+// treats it as a door word, not a gate — any of them lands on the piece).
+const VANITY_WORD: [string, string][] = [
+  ['events', 'events'], ['marketplace', 'market'], ['travel', 'travel'],
+  ['courses', 'courses'], ['library', 'library'], ['art', 'art'],
+  ['food', 'food'], ['work', 'work'],
+];
+
 export function postOpenPath(p: FeedPost): string {
-  if (p.linked_event_id) return `/events/${p.id}`;
   // A collection's door-post opens the whole collection (founder 2026-08-14).
   const col = (p.details as { collectionId?: string } | null)?.collectionId;
-  return typeof col === 'string' && col ? `/collections/${col}` : `/posts/${p.id}`;
+  if (typeof col === 'string' && col) return `/collections/${col}`;
+  // FRIENDLY ADDRESSES (founder 2026-11-06: "have all links on the platform
+  // keep their friendly addresses"): a post with a link name opens — and
+  // shares — at /<section>/<owner handle>/<link-name>. A space's post rides
+  // the SPACE's handle (posts_slug_per_owner keys on the space).
+  const owner = p.author_space_id ? p.author_space?.handle : p.author?.handle;
+  if (p.slug && owner) {
+    const areas = p.linked_event_id ? ['events'] : postAreas(p);
+    const word = VANITY_WORD.find(([a]) => areas.includes(a as never))?.[1];
+    if (word) return `/${word}/${owner}/${p.slug}`;
+  }
+  if (p.linked_event_id) return `/events/${p.id}`;
+  return `/posts/${p.id}`;
 }
 
 /** The entity a card's weave mark acts on: the DISPLAYED author — the space

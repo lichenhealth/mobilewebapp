@@ -17,11 +17,13 @@
 // a signed-in caller's actual read still goes through RLS on the landing page).
 // The section word in the URL is a door word, not a gate — a slug found under
 // the wrong section still lands on the right piece.
-import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link, Navigate, UNSAFE_LocationContext, useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import EventPage from './EventPage';
+import PostPage from './PostPage';
+import { useVanityScopeFor, type VanityScope } from '../lib/vanityScope';
 import './VanityRoute.css';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,7 +47,7 @@ type VanityRow = {
   open_link: string | null;
 };
 
-export default function VanityRoute({ area }: { area: string }) {
+export default function VanityRoute({ area, scoped }: { area: string; scoped?: ReactNode }) {
   const params = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -56,10 +58,22 @@ export default function VanityRoute({ area }: { area: string }) {
   const isUuid = UUID_RE.test(param);
   const { root, label } = SECTION_ROOT[area] ?? SECTION_ROOT.marketplace;
   const [miss, setMiss] = useState(false);
+  // THE FRIENDLY ADDRESS STAYS (founder 2026-11-06: "have all links on the
+  // platform keep their friendly addresses"): what a handle resolves to is
+  // RENDERED HERE, never redirected to an id — a post/event page by its id
+  // prop, a scoped section under a synthetic location carrying ?space=/
+  // ?member= (the sections' standing scope grammar), so the bar keeps
+  // /market/galyn and /travel/galyn/review-zion.
+  const [post, setPost] = useState<{ id: string; event: boolean } | null>(null);
+  const [scope, setScope] = useState<VanityScope>(null);
+  useVanityScopeFor(scope);
+  const realLoc = useLocation();
+  const navType = useNavigationType();
 
   useEffect(() => {
     if (isUuid || !param || loading) return;
     let live = true;
+    setPost(null); setScope(null); setMiss(false);
     void (async () => {
       const { data, error } = await supabase.rpc('resolve_post_vanity', {
         p_handle: param, p_slug: slug,
@@ -74,21 +88,41 @@ export default function VanityRoute({ area }: { area: string }) {
           // when the host minted one (RSVP works there; the approval gate
           // covers anyone off the invite list).
           if (!user && row.open_link) navigate(`/e/${row.open_link}`, { replace: true });
-          else navigate(`/events/${row.post_id}`, { replace: true });
+          else setPost({ id: row.post_id, event: true });
         } else {
-          navigate(`/posts/${row.post_id}`, { replace: true });
+          setPost({ id: row.post_id, event: false });
         }
       } else {
         const key = row.host_kind === 'space' ? 'space' : 'member';
-        navigate(`${root}?${key}=${row.host_id}`, { replace: true });
+        if (scoped) setScope({ key, id: row.host_id });
+        else navigate(`${root}?${key}=${row.host_id}`, { replace: true });
       }
     })();
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [param, slug, isUuid, loading, user?.id]);
 
+  // The section sees itself at its root, scoped — any other query the real
+  // address carries (?web=1, a lens) rides along.
+  const synthetic = useMemo(() => {
+    if (!scope) return null;
+    const q = new URLSearchParams(realLoc.search);
+    q.set(scope.key, scope.id);
+    return { ...realLoc, pathname: root, search: `?${q.toString()}` };
+  }, [scope, realLoc, root]);
+
   if (isUuid) {
     return area === 'events' ? <EventPage /> : <Navigate to={`/posts/${param}`} replace />;
+  }
+  if (post) {
+    return post.event ? <EventPage key={post.id} postId={post.id} /> : <PostPage key={post.id} postId={post.id} />;
+  }
+  if (synthetic && scoped) {
+    return (
+      <UNSAFE_LocationContext.Provider value={{ location: synthetic, navigationType: navType }}>
+        {scoped}
+      </UNSAFE_LocationContext.Provider>
+    );
   }
   if (miss) {
     return (

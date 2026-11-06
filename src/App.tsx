@@ -246,6 +246,73 @@ export default function App() {
     return () => { live = false; };
   }, [user, loading, onboarded, isAdmin, pathname, navigate]);
 
+  // Each section's landing element, shared by its own route AND its
+  // vanity handle route (/market/<handle> renders it in place, scoped, so
+  // the friendly address stays in the bar — founder 2026-11-06).
+  const SECTION_EL: Record<string, JSX.Element> = {
+    work: (
+      <AreaFeed area="work" icon="briefcase" crumb="Work"
+              title="Lichen" italic="Work."
+              sub="Help wanted, help offered. Hourly, project-based, and apprenticeships."
+              addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help."
+              browse browseStyle="rows" />
+    ),
+    art: (
+      !isAdmin
+            ? <ComingSoon icon="palette" title="Art." line="Images, sound, words, and crafts from members' own hands — the gallery is being tended before it opens. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="art" icon="palette" crumb="Art"
+                title="Lichen" italic="Art."
+                sub="What members make — images, sound, words, and crafts."
+                addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
+            </>
+    ),
+    food: (
+      <AreaFeed area="food" icon="fork-spoon" crumb="Food"
+              title="Lichen" italic="Food."
+              sub="Meals, harvests, recipes, and nourishment."
+              addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
+    ),
+    travel: (
+      !isAdmin
+            ? <ComingSoon icon="plane" title="Travel." line="Rides, hauls, flights and stays — exchanged between people your web knows. The road is being paved before it opens. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="travel" icon="plane" crumb="Travel"
+                title="Lichen" italic="Travel."
+                sub="Rides, hauls, flights and stays — exchanged between people your web knows."
+                addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
+            </>
+    ),
+    courses: (
+      !isAdmin
+            ? <ComingSoon icon="graduation-cap" title="Courses." line="Trainings, workshops and apprenticeships are being tended before they open — taught by people your web can vouch for. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <Courses />
+            </>
+    ),
+    library: (
+      !isAdmin
+            ? <ComingSoon icon="book" title="Library." line="Essays, field guides, and zines on land, food, and care — being gathered and tended before the doors open. Check back soon." />
+            : <>
+              <AdminGateNote />
+              <AreaFeed area="library" icon="book" crumb="Library"
+                title="Lichen" italic="Library."
+                sub="Essays, field guides, and zines on land, food, and care."
+                addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
+                mediaLenses collections structuredKind="path" browse />
+            </>
+    ),
+    market: (
+      <Marketplace />
+    ),
+    events: (
+      <Events />
+    ),
+  };
+
   return (
     <ConfirmProvider>
     <CollectPromptProvider>
@@ -407,11 +474,11 @@ export default function App() {
           <Route path="/groups"      element={<SpacesDirectory kind="group" />} />
 
           {/* Marketplace */}
-          <Route path="/market"        element={<Marketplace />} />
+          <Route path="/market"        element={SECTION_EL.market} />
           {/* Vanity addresses (2026-11-04) — a handle scopes the market, a
               handle/link-name opens one listing; old kind-tab URLs miss and
               land on the honest note with a door to the whole market. */}
-          <Route path="/market/:kind"  element={<VanityRoute area="marketplace" />} />
+          <Route path="/market/:kind"  element={<VanityRoute area="marketplace" scoped={SECTION_EL.market} />} />
           <Route path="/market/:param/:slug" element={<VanityRoute area="marketplace" />} />
 
           {/* Donate */}
@@ -422,68 +489,39 @@ export default function App() {
           {/* Side-menu passages — placeholders */}
           <Route path="/organizations" element={<SpacesDirectory kind="organization" />} />
           <Route path="/places"   element={<SpacesDirectory kind="place" />} />
-          <Route path="/work"     element={
-            <AreaFeed area="work" icon="briefcase" crumb="Work"
-              title="Lichen" italic="Work."
-              sub="Help wanted, help offered. Hourly, project-based, and apprenticeships."
-              addLabel="Post work" emptyHint="Be the first — offer your hands or ask for help."
-              browse browseStyle="rows" />
-          } />
+          <Route path="/work"     element={SECTION_EL.work} />
           {/* ART + TRAVEL join the alpha curtain (founder 2026-10-26: "Let's
               have Travel, Art and Library have a coming soon sign for alpha
               users, just like Courses does" — Library already wore it, from
               the 2026-08-25 call). Same shape: admins see the real room, the
               gate is this route alone, delete it to reopen. */}
-          <Route path="/art"      element={!isAdmin
-            ? <ComingSoon icon="palette" title="Art." line="Images, sound, words, and crafts from members' own hands — the gallery is being tended before it opens. Check back soon." />
-            : <>
-              <AdminGateNote />
-              <AreaFeed area="art" icon="palette" crumb="Art"
-                title="Lichen" italic="Art."
-                sub="What members make — images, sound, words, and crafts."
-                addLabel="Share art" emptyHint="Be the first — share something you made." mediaLenses />
-            </>
-          } />
-          <Route path="/food"     element={
-            <AreaFeed area="food" icon="fork-spoon" crumb="Food"
-              title="Lichen" italic="Food."
-              sub="Meals, harvests, recipes, and nourishment."
-              addLabel="Share food" emptyHint="Be the first — share a harvest, a recipe, a meal." mediaLenses />
-          } />
-          <Route path="/travel"   element={!isAdmin
-            ? <ComingSoon icon="plane" title="Travel." line="Rides, hauls, flights and stays — exchanged between people your web knows. The road is being paved before it opens. Check back soon." />
-            : <>
-              <AdminGateNote />
-              <AreaFeed area="travel" icon="plane" crumb="Travel"
-                title="Lichen" italic="Travel."
-                sub="Rides, hauls, flights and stays — exchanged between people your web knows."
-                addLabel="Offer or seek" emptyHint="Be the first — offer a stay, a ride, or say where you're headed." browse travelLenses />
-            </>
-          } />
+          <Route path="/art"      element={SECTION_EL.art} />
+          <Route path="/food"     element={SECTION_EL.food} />
+          <Route path="/travel"   element={SECTION_EL.travel} />
           {/* Vanity addresses for the remaining sections (one dispatcher;
               a curtained section's scoped view lands on its curtain, but a
               slug always lands on the PIECE — the rooms are curtained, not
               the content vaulted). */}
-          <Route path="/work/:param" element={<VanityRoute area="work" />} />
+          <Route path="/work/:param" element={<VanityRoute area="work" scoped={SECTION_EL.work} />} />
           <Route path="/work/:param/:slug" element={<VanityRoute area="work" />} />
-          <Route path="/art/:param" element={<VanityRoute area="art" />} />
+          <Route path="/art/:param" element={<VanityRoute area="art" scoped={SECTION_EL.art} />} />
           <Route path="/art/:param/:slug" element={<VanityRoute area="art" />} />
-          <Route path="/food/:param" element={<VanityRoute area="food" />} />
+          <Route path="/food/:param" element={<VanityRoute area="food" scoped={SECTION_EL.food} />} />
           <Route path="/food/:param/:slug" element={<VanityRoute area="food" />} />
-          <Route path="/travel/:param" element={<VanityRoute area="travel" />} />
+          <Route path="/travel/:param" element={<VanityRoute area="travel" scoped={SECTION_EL.travel} />} />
           <Route path="/travel/:param/:slug" element={<VanityRoute area="travel" />} />
-          <Route path="/courses/:param" element={<VanityRoute area="courses" />} />
+          <Route path="/courses/:param" element={<VanityRoute area="courses" scoped={SECTION_EL.courses} />} />
           <Route path="/courses/:param/:slug" element={<VanityRoute area="courses" />} />
-          <Route path="/library/:param" element={<VanityRoute area="library" />} />
+          <Route path="/library/:param" element={<VanityRoute area="library" scoped={SECTION_EL.library} />} />
           <Route path="/library/:param/:slug" element={<VanityRoute area="library" />} />
-          <Route path="/events"   element={<Events />} />
+          <Route path="/events"   element={SECTION_EL.events} />
           {/* /events/mine must precede /events/:postId or "mine" is read as a post id */}
           <Route path="/events/mine" element={<Events />} />
           {/* VANITY LINKS (founder 2026-11-04): /<section>/<handle> is that
               host's section, /<section>/<handle>/<link-name> is one post —
               the /book grammar on every section. A uuid keeps its old
               meaning (events → the event page). */}
-          <Route path="/events/:postId" element={<VanityRoute area="events" />} />
+          <Route path="/events/:postId" element={<VanityRoute area="events" scoped={SECTION_EL.events} />} />
           <Route path="/events/:param/:slug" element={<VanityRoute area="events" />} />
           <Route path="/e/:token" element={<GuestEvent />} />
           <Route path="/p/:token" element={<GuestPost />} />
@@ -494,24 +532,8 @@ export default function App() {
               scoped arrivals (?space=/?identity=) ride these same routes, so
               every door into either room lands on the same honest page.
               To reopen a room: delete its gate here, nothing else. */}
-          <Route path="/courses"  element={!isAdmin
-            ? <ComingSoon icon="graduation-cap" title="Courses." line="Trainings, workshops and apprenticeships are being tended before they open — taught by people your web can vouch for. Check back soon." />
-            : <>
-              <AdminGateNote />
-              <Courses />
-            </>
-          } />
-          <Route path="/library"  element={!isAdmin
-            ? <ComingSoon icon="book" title="Library." line="Essays, field guides, and zines on land, food, and care — being gathered and tended before the doors open. Check back soon." />
-            : <>
-              <AdminGateNote />
-              <AreaFeed area="library" icon="book" crumb="Library"
-                title="Lichen" italic="Library."
-                sub="Essays, field guides, and zines on land, food, and care."
-                addLabel="Contribute" emptyHint="Be the first — tap Contribute and share a piece worth keeping."
-                mediaLenses collections structuredKind="path" browse />
-            </>
-          } />
+          <Route path="/courses"  element={SECTION_EL.courses} />
+          <Route path="/library"  element={SECTION_EL.library} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

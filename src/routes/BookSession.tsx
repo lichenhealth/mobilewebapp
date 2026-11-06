@@ -27,9 +27,14 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  *  declared hours minus every kind of busy (Lichen events, imported
  *  calendars, held bookings), buffered. Picking a slot requests (or books)
  *  through the server, which re-validates before anything is held. */
-export default function BookSession() {
+export default function BookSession(props: {
+  /** Rendered in place by BookPublic so a vanity address stays in the bar. */
+  typeId?: string;
+  /** In-place host's length switch (walks to that length's own link). */
+  onSwitchType?: (t: BookingType, replace: boolean) => void;
+} = {}) {
   const { param = '' } = useParams();
-  const typeId = param;   // /book/:param — a uuid landed here (BookGate)
+  const typeId = props.typeId ?? param;   // /book/:param — a uuid (BookGate), or BookPublic's hand-off
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -280,7 +285,7 @@ export default function BookSession() {
             <button
               key={s.id}
               className={'bkg__slot' + (s.id === t.id ? ' is-on' : '')}
-              onClick={() => { if (s.id !== t.id) navigate(`/book/${s.id}`, { replace: true }); }}
+              onClick={() => { if (s.id === t.id) return; if (props.onSwitchType) props.onSwitchType(s, true); else navigate(`/book/${s.id}`, { replace: true }); }}
             >
               {sessionLengthLabel(s.duration_min)}
             </button>
