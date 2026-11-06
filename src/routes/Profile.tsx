@@ -38,6 +38,7 @@ import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantDoor, { aiWorkHint } from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
+import { ContactSharesList } from '../components/ContactShares';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import type { PageTab } from '../lib/pageTabs';
@@ -1213,6 +1214,11 @@ export default function Profile() {
             collaboration is the premise — and every de-selection is one DB
             row the edge functions check, so a new phone changes nothing. */}
         <AssistantConsentList />
+
+        {/* Per-group contact permission (founder 2026-11-06): who in each
+            group may see your email and phone. Nobody unless you choose. */}
+        <p className="prof__privacy-sub">Who in my groups can see my contact info</p>
+        {user?.id && <ContactSharesList me={user.id} />}
 
         <p className="prof__privacy-sub">What the assistant may change</p>
         <label className="prof__consent">

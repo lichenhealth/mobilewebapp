@@ -1,3 +1,4 @@
+import { ContactShareAsk, SpaceContactsPanel } from '../components/ContactShares';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
@@ -1478,6 +1479,9 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               <>
                 {noticeBanners}
                 {presenceLine}
+                {isMember && space && (
+                  <ContactShareAsk me={me} spaceId={space.id} spaceName={space.name} />
+                )}
               </>
             )}
           </>
@@ -3098,6 +3102,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               </div>
             )}
           </div>
+        )}
+        {/* Contact details + your own choice for this group + the export
+            (founder 2026-11-06). Members only; the server applies each
+            member's level. */}
+        {isMember && space && (
+          <SpaceContactsPanel me={me} spaceId={space.id} spaceName={space.name}
+            steward={myRole === 'admin' || myRole === 'super_admin'} />
         )}
       </MembersShell>
       )}

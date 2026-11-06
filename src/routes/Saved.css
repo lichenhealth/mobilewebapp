@@ -192,7 +192,7 @@
 /* ── DRAFTS (founder 2026-10-15: "we will also need a drafts section") —
    unfinished posts Compose autosaved, as drive rows between Folders and
    Items. Delete is worded and asks twice inline. ── */
-.drive__drafts { margin-top: var(--s-5); }
+.drive__drafts { margin-top: var(--s-5); padding: 0 var(--s-5); }
 .drive__drafts .drive__row { margin-top: var(--s-2); }
 .drive__draft-del {
   background: none; border: none; padding: 2px 4px; cursor: pointer;
