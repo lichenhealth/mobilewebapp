@@ -12,7 +12,12 @@ type Section = { table: string; filter: (q: any) => any; cols?: string };
 
 export async function exportMyLichen(me: string, email: string | null): Promise<{ counts: Record<string, number> }> {
   const sections: Record<string, Section> = {
-    profile: { table: 'profiles', filter: (q) => q.eq('id', me) },
+    // profiles carries column-level grants — name the granted columns; the
+    // private phone/home arrive through their owner-only RPCs below.
+    profile: {
+      table: 'profiles', filter: (q) => q.eq('id', me),
+      cols: 'id, full_name, first_name, last_name, headline, bio, pronouns, handle, identity_tags, avatar_url, page, contact, public_page, findable, location, created_at',
+    },
     posts: { table: 'posts', filter: (q) => q.eq('author_id', me) },
     post_drafts: { table: 'post_drafts', filter: (q) => q.eq('profile_id', me) },
     folders: { table: 'collections', filter: (q) => q.eq('owner_id', me) },
@@ -55,6 +60,10 @@ export async function exportMyLichen(me: string, email: string | null): Promise<
     out[key] = data ?? [];
     counts[key] = (data ?? []).length;
   }));
+
+  // Your own private phone + home, through their owner-only doors.
+  const [ph, home] = await Promise.all([supabase.rpc('my_phone'), supabase.rpc('my_home')]);
+  out.private_contact = { email, phone: ph.error ? null : ph.data, home: home.error ? null : home.data };
 
   // Drive files → 7-day links.
   const { data: files } = await supabase.from('drive_files')
