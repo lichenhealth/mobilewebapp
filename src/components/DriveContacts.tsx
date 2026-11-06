@@ -64,10 +64,15 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
   // on the same stale row and drop one.
   const listsRef = useRef<GuestList[]>([]);
   listsRef.current = lists;
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   async function patch(l: GuestList, p: Partial<Pick<GuestList, 'name' | 'entries' | 'space_ids'>>) {
     listsRef.current = listsRef.current.map((x) => x.id === l.id ? { ...x, ...p } : x);
     setLists(listsRef.current);
-    try { await updateGuestList(l.id, p); setNote(null); }
+    // Saves QUEUE: two quick edits must reach the server in order, or the
+    // older write lands last and erases the newer one.
+    const run = saveChain.current.then(() => updateGuestList(l.id, p));
+    saveChain.current = run.catch(() => undefined);
+    try { await run; setNote(null); }
     catch (e) { setNote((e as Error).message); void refresh(); }
   }
 
