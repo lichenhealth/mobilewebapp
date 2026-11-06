@@ -533,3 +533,5 @@ session billing.
 4. Data stance: the commons owns aggregate; individuals control their data
    and every AI door (default-on, opt-out — the consent doctrine).
 5. Deck + its shared gdoc mirror stay in sync by hand; edits verified live.
+
+- **Guest checkout currency (2026-11-06):** buyers off Lichen pay card DOLLARS by default (minted 1:1 to the seller as Current-cy); a seller may mark a listing Current-cy only, which makes joining Lichen the guest's door to buy — a recruiting path, not a paywall.
