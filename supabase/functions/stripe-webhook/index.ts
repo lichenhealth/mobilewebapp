@@ -320,6 +320,35 @@ Deno.serve(async (req) => {
         }
       }
 
+      // GUEST LISTING PURCHASES (founder 2026-11-06 — someone off Lichen buys
+      // a listing by card): the seller accrues Current 1:1 (a person, or a
+      // space's treasury) via record_post_payment — idempotent per session;
+      // a thrown error 500s so Stripe retries until the mint lands. Bank
+      // debits ride async_payment_succeeded (nothing mints before funds land).
+      if (s.metadata?.kind === 'post_purchase' && s.metadata?.order) {
+        if (s.payment_status === 'paid') {
+          const { error } = await admin.rpc('record_post_payment', {
+            p_order: s.metadata.order,
+            p_session: s.id,
+            p_amount_cents: s.amount_total ?? 0,
+          });
+          if (error) throw new Error(`record_post_payment: ${error.message}`);
+          try {
+            await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-post-share`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order_id: s.metadata.order }),
+            });
+          } catch (e) { console.error('post paid mail:', e); }
+        } else {
+          try {
+            await admin.from('post_orders')
+              .update({ payment_pending_at: new Date().toISOString() })
+              .eq('id', s.metadata.order).is('paid_at', null);
+          } catch (e) { console.error('post order pending stamp:', e); }
+        }
+      }
+
       const giveKind = s.metadata?.kind === 'sponsorship' ? 'sponsorship'
         : s.metadata?.kind === 'donation' ? 'donation' : null;
       if (giveKind && s.payment_status === 'paid') {
@@ -375,6 +404,23 @@ Deno.serve(async (req) => {
         await admin.from('pending_loads')
           .update({ status: 'failed', resolved_at: new Date().toISOString() })
           .eq('stripe_session_id', s.id).eq('status', 'pending');
+      }
+      // A guest listing purchase's bank transfer bounced: reopen the pay door
+      // and re-mail the buyer (the mail derives from the row — it asks again).
+      if (s.metadata?.kind === 'post_purchase' && s.metadata?.order) {
+        const { data: po } = await admin.from('post_orders')
+          .update({ payment_pending_at: null })
+          .eq('id', s.metadata.order).is('paid_at', null)
+          .select('id').maybeSingle();
+        if (po) {
+          try {
+            await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-post-share`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order_id: s.metadata.order }),
+            });
+          } catch (e) { console.error('post bank-fail mail:', e); }
+        }
       }
       // A booking's bank transfer bounced: reopen the pay door, tell the
       // provider, and re-mail the guest — the mail derives from the row, so
