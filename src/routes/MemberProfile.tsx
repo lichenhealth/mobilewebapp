@@ -504,6 +504,7 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
         signedIn={!!me && !previewing && !embedded}
         feed={memberFeed}
         belowIdentity={viewToggleBar ?? undefined}
+        siteMasthead
         beforeContent={me ? identityExtras : undefined}
       />
       </>

@@ -176,6 +176,14 @@ export interface PublicPageProps {
    *  view toggle lives (founder 2026-10-01, second pass: "close, but i'd
    *  like it here", her line landing under the location line). */
   belowIdentity?: React.ReactNode;
+  /** THE WEBSITE MASTHEAD (founder 2026-11-06, previewing her own page:
+   *  "public view preview shouldn't have the profile at the top… roll up
+   *  the profile piece so that it just looks like the website"): in the
+   *  public rendering, the big avatar/name/pronouns/headline/location block
+   *  rolls up into one slim site header — small mark + name as the site
+   *  title, the nav beside it. Opt-in (MemberProfile passes it); the
+   *  in-app Lichen View and the builder keep the full profile masthead. */
+  siteMasthead?: boolean;
   /** Your relationship with this entity — weave, recommend, join. Rendered
    *  INSIDE the hero, under the nav and above the cover image, so it can't be
    *  pushed below a tall photo (founder 2026-08-07: "icons with text, as they
@@ -708,6 +716,8 @@ export default function PublicPage(props: PublicPageProps) {
   // under the icon row, like Home's filters. Guests and previews keep the
   // hero nav: the public website's masthead is its own design.
   const navInHero = !(feedInRow && !asGuest);
+  // The website masthead: public renderings only, never the builder.
+  const siteHead = !!props.siteMasthead && asGuest && !ed;
   const navNode = navItems.length > 0 ? (
     <nav className={'ppage__nav' + (navInHero ? '' : ' ppage__nav--below')}>
       {navItems.map((n) => {
@@ -1033,8 +1043,25 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
           (logo, name, tagline, address), then the nav doors, then the cover
           image. The image stays put while doors switch the content below. */}
-      <header className="ppage__hero">
-        <div className="ppage__hero-body ppage__hero-body--top" data-edit-region="identity">
+      <header className={'ppage__hero' + (siteHead ? ' ppage__hero--site' : '')}>
+        {siteHead && (
+          <>
+            {props.belowIdentity}
+            <div className="ppage__sitehead">
+              <div className="ppage__brand">
+                <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={40} />
+                <span className="ppage__brand-name">{name}</span>
+              </div>
+              {navNode}
+              {navItems.length === 0 && ctas.map((c) => (
+                <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
+                  {c.label}
+                </a>
+              ))}
+            </div>
+          </>
+        )}
+        {!siteHead && <div className="ppage__hero-body ppage__hero-body--top" data-edit-region="identity">
           <span className="ava-edit-wrap">
             <Avatar id={props.id} name={name} url={avatarUrl ?? undefined}
               size={props.signedIn ? 96 : 128} />
@@ -1087,9 +1114,9 @@ export default function PublicPage(props: PublicPageProps) {
           {navItems.length === 0 && props.extraCtas?.map((c, i) => (
             <button className="ppage__cta" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
           ))}
-        </div>
-        {props.belowIdentity}
-        {navInHero && navNode}
+        </div>}
+        {!siteHead && props.belowIdentity}
+        {!siteHead && navInHero && navNode}
         {ed ? (
           <div className={'ppage__ecover' + (coverSrc ? '' : ' is-empty')}>
             {/* One photo-control grammar everywhere (founder 2026-09-08):
@@ -1634,7 +1661,7 @@ export default function PublicPage(props: PublicPageProps) {
             {name} lives on <strong>Lichen</strong> — a member-run network for care, work,
             offerings and a fairer economy, where trust is a path through real relationships,
             not a star rating. Joining this {props.knockSpace.kindLabel.toLowerCase()} means becoming
-            a Lichen member (there&rsquo;s a membership fee), so it&rsquo;s worth a look at
+            a Lichen member (free while Lichen is in alpha), so it&rsquo;s worth a look at
             what you&rsquo;d be part of. Introduce yourself below and {name}&rsquo;s stewards
             write back.
           </p>
@@ -1652,9 +1679,10 @@ export default function PublicPage(props: PublicPageProps) {
           <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
           <p className="ppage__join-sub">
             A member-run network for care, work, offerings and a fairer economy — where trust is
-            a path through real relationships, not a star rating. To recommend {name}, book, message,
-            or join their events, you'll need an account. Lichen grows by invitation; introduce
-            yourself and a real person writes back.
+            a path through real relationships, not a star rating. You don&rsquo;t need an account
+            to book time with {name} or to come to an event you&rsquo;ve been invited to.
+            Recommending, messaging and joining the wider network are for members &mdash; Lichen
+            grows by invitation; introduce yourself and a real person writes back.
           </p>
           <div className="ppage__join-acts">
             <button className="btn btn-primary" onClick={() => go('/signup')}>Request an invitation</button>
