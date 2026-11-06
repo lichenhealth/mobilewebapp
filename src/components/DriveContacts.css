@@ -1,0 +1,36 @@
+/* CONTACTS IN DRIVE (founder 2026-11-06) — guest lists as drive rows that
+   open in place. Rows reuse .drive__row; the panel is a quiet card. */
+.dcon__list.is-open > .drive__row { background: var(--bone-warm); }
+.dcon__panel {
+  margin: 4px 0 10px 53px; padding: 10px 12px; border: 1px solid var(--bone-edge);
+  border-radius: 12px; background: #fff; display: flex; flex-direction: column; gap: 6px;
+}
+.dcon__empty { margin: 0; font-size: 13px; color: var(--ink-muted); }
+.dcon__person { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-soft); min-width: 0; }
+.dcon__person.is-member { color: var(--peach-deep); }
+.dcon__person-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcon__tag { flex-shrink: 0; font-size: 11px; color: var(--ink-muted); }
+.dcon__x { flex-shrink: 0; width: 24px; height: 24px; border: 0; background: none; color: var(--ink-muted); cursor: pointer; border-radius: 50%; font-size: 15px; }
+.dcon__x:hover { background: var(--bone-warm); color: var(--ink); }
+.dcon__add { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.dcon__add--new { margin: var(--s-2) 0; }
+.dcon__input, .dcon__rename {
+  flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--bone-edge); border-radius: 999px;
+  font: inherit; font-size: 13.5px; background: var(--bone); color: var(--ink);
+}
+.dcon__rename { padding: 4px 10px; }
+.dcon__addbtn { flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: 0; background: var(--peach); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.dcon__addbtn:disabled { opacity: 0.5; cursor: default; }
+.dcon__cancel { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-muted); cursor: pointer; }
+.dcon__note { margin: 2px 0; font-size: 12.5px; color: var(--peach-deep); }
+.dcon__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dcon__act {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bone-edge); background: var(--bone);
+  font: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer;
+}
+.dcon__act:hover { border-color: var(--peach); color: var(--peach-deep); }
+.dcon__act--lead { border-color: var(--peach); color: var(--peach-deep); background: var(--peach-tint); }
+.dcon__act--danger { color: var(--red-deep); }
+.dcon__fine { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-muted); }
+.dcon__new { margin: var(--s-2) 0 0 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; }
+@media (max-width: 1023px) { .dcon__panel { margin-left: 0; } }

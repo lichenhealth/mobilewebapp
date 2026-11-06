@@ -25,6 +25,7 @@ import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 import { useActing } from '../acting/ActingProvider';
 import { ActingGate } from '../components/ActingGate';
+import DriveContacts from '../components/DriveContacts';
 
 // DRIVE (founder 2026-08-14): "saving something is different than having it
 // in a drive." The section holds BOTH what you saved and what you created —
@@ -1015,6 +1016,11 @@ export default function Saved() {
           })}
         </section>
       )}
+
+      {/* ── CONTACTS — guest lists, your private address book (founder
+          2026-11-06). Its own section: a list opens in place to manage,
+          export (CSV/vCard) or send to an event. ── */}
+      {me && ready && <DriveContacts me={me} query={query} foldHead={foldHead} foldOpen={foldOpen} />}
 
       {/* ── FILES & DOCS — what Drive's + created or uploaded (founder
           2026-10-21). Private by construction: a private bucket + owner-only
