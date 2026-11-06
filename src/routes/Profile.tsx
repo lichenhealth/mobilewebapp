@@ -1133,7 +1133,11 @@ export default function Profile() {
               </button>
             )}
             <button className="btn" onClick={() => window.open(
-              savedHandle ? `/${savedHandle}?preview=1` : `/members/${user?.id}?preview=1`, '_blank')}>
+              // A pending draft previews AS the draft (founder 2026-11-06:
+              // "when i went into the draft preview on my profile i didn't
+              // see this" — the button opened the LIVE page while the draft
+              // waited unseen). MemberProfile overlays it under ?draft=1.
+              (savedHandle ? `/${savedHandle}` : `/members/${user?.id}`) + `?preview=1${draftPending ? '&draft=1' : ''}`, '_blank')}>
               Preview
             </button>
             {publicPage && (
