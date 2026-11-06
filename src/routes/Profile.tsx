@@ -39,6 +39,7 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import AssistantDoor, { aiWorkHint } from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
 import { ContactSharesList } from '../components/ContactShares';
+import DownloadMyLichen from '../components/DownloadMyLichen';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import type { PageTab } from '../lib/pageTabs';
@@ -1219,6 +1220,11 @@ export default function Profile() {
             group may see your email and phone. Nobody unless you choose. */}
         <p className="prof__privacy-sub">Who in my groups can see my contact info</p>
         {user?.id && <ContactSharesList me={user.id} />}
+
+        {/* Download my Lichen (founder 2026-11-06: "if people wanna leave
+            the platform") — everything that's yours, as a file you keep. */}
+        <p className="prof__privacy-sub">Take your Lichen with you</p>
+        {user?.id && <DownloadMyLichen me={user.id} email={user.email ?? null} />}
 
         <p className="prof__privacy-sub">What the assistant may change</p>
         <label className="prof__consent">
