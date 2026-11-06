@@ -300,6 +300,53 @@ export default function Compose() {
   // members on lichen"): member_by_contact — exact match, findable only.
   const [invContactHit, setInvContactHit] = useState<{ id: string; full_name: string | null } | null>(null);
   const [genLink, setGenLink] = useState(false);
+  // REUSABLE GUEST LISTS (founder 2026-11-06: "build the reusable guest
+  // lists next" — Paperless Post's address book): guest_lists is the
+  // member's own private shelf of invitees (+ circles). Load merges a list
+  // into the chips; Save writes the current chips under a name (same name =
+  // update that list). Owner-only RLS; nothing else ever reads it.
+  type GuestList = { id: string; name: string; entries: EvInvitee[]; space_ids: string[] };
+  const [guestLists, setGuestLists] = useState<GuestList[]>([]);
+  const [glSaving, setGlSaving] = useState(false);
+  const [glName, setGlName] = useState('');
+  const [glMsg, setGlMsg] = useState<string | null>(null);
+  const [glDel, setGlDel] = useState<string | null>(null);
+  async function loadGuestLists() {
+    if (!user) return;
+    const { data } = await supabase.from('guest_lists').select('id, name, entries, space_ids')
+      .eq('owner_id', user.id).order('updated_at', { ascending: false });
+    setGuestLists((data as GuestList[] | null) ?? []);
+  }
+  useEffect(() => { void loadGuestLists(); }, [user?.id]);
+  function applyGuestList(gl: GuestList) {
+    for (const inv of gl.entries) addInvitee(inv);
+    const mine = new Set(mySpaces.map((sp) => sp.id));
+    const add = gl.space_ids.filter((id) => mine.has(id));
+    if (add.length) {
+      setEvLichen(false);
+      setAudienceSpaces((cur) => { const n = new Set(cur); add.forEach((id) => n.add(id)); return n; });
+    }
+    setGlMsg(`Added “${gl.name}” — ${gl.entries.length + add.length} on the list.`);
+  }
+  async function saveGuestList() {
+    const name = glName.trim();
+    if (!user || !name) return;
+    const row = { owner_id: user.id, name, entries: invitees, space_ids: [...audienceSpaces], updated_at: new Date().toISOString() };
+    const existing = guestLists.find((g) => g.name.trim().toLowerCase() === name.toLowerCase());
+    const { error } = existing
+      ? await supabase.from('guest_lists').update(row).eq('id', existing.id)
+      : await supabase.from('guest_lists').insert(row);
+    if (error) { setGlMsg(`Couldn't save the list: ${error.message}`); return; }
+    setGlMsg(existing ? `Updated “${name}” ✓` : `Saved “${name}” to your guest lists ✓`);
+    setGlSaving(false); setGlName('');
+    void loadGuestLists();
+  }
+  async function deleteGuestList(id: string) {
+    if (glDel !== id) { setGlDel(id); return; }
+    await supabase.from('guest_lists').delete().eq('id', id);
+    setGlDel(null);
+    void loadGuestLists();
+  }
   useEffect(() => {
     const q = invQ.trim();
     if (q.length < 2 || !user) { setInvHits([]); setInvContactHit(null); return; }
@@ -1483,6 +1530,23 @@ export default function Compose() {
               <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
             )}
             {!editing && (<>
+            {guestLists.length > 0 && (
+              <div className="cmp__gl">
+                <span className="cmp__gl-lbl">Your guest lists</span>
+                {guestLists.map((gl) => (
+                  <span key={gl.id} className="cmp__gl-chip">
+                    <button className="cmp__gl-use" onClick={() => applyGuestList(gl)}>
+                      <Icon name="user-multiple" size={12} /> {gl.name}
+                      <span className="cmp__gl-n">{gl.entries.length + gl.space_ids.length}</span>
+                    </button>
+                    <button className={'cmp__gl-x' + (glDel === gl.id ? ' is-armed' : '')}
+                      aria-label={`Delete ${gl.name}`} onClick={() => void deleteGuestList(gl.id)}>
+                      {glDel === gl.id ? 'Delete?' : '×'}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
               placeholder="Name, circle, email or phone"
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
@@ -1533,6 +1597,23 @@ export default function Compose() {
                 says — the Drive-tier rule, no second setting. */}
             <div className="cmp__invgroup">
               {chipRow(invitees)}
+              {!editing && (invitees.length > 0 || audienceSpaces.size > 0) && (
+                glSaving ? (
+                  <div className="cmp__gl-save">
+                    <input className="cmp__input" value={glName} autoFocus maxLength={80}
+                      onChange={(e) => setGlName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveGuestList(); } }}
+                      placeholder="Name this list — e.g. Solstice regulars" />
+                    <button className="cmp__gl-savebtn" disabled={!glName.trim()} onClick={() => void saveGuestList()}>Save</button>
+                    <button className="cmp__gl-cancel" aria-label="Cancel" onClick={() => { setGlSaving(false); setGlName(''); }}>×</button>
+                  </div>
+                ) : (
+                  <button className="cmp__gl-open" onClick={() => { setGlSaving(true); setGlMsg(null); }}>
+                    ⊕ Save these people as a guest list
+                  </button>
+                )
+              )}
+              {!editing && glMsg && <p className="cmp__gl-msg">{glMsg}</p>}
               {/* The rungs wear the circles' small-caps eyebrow (founder
                   2026-11-05: "a soft indicator that we're now talking
                   Lichen audiences"). */}
