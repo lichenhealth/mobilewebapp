@@ -77,7 +77,8 @@ export default function GuestPost() {
 
   const title = info.title?.trim() || (info.body ?? '').trim().slice(0, 60) || 'A listing';
   const photo = info.photos[photoIx] ?? null;
-  const buyable = (info.price_cents ?? 0) >= 100 && (info.price_cents ?? 0) <= 500000;
+  const ccyOnly = !!info.currentcy_only;
+  const buyable = !ccyOnly && (info.price_cents ?? 0) >= 100 && (info.price_cents ?? 0) <= 500000;
   const st = info.order_status;
   const paid = !!info.order_paid_at || st === 'paid';
   const inTransit = !paid && !!info.order_pending_at;
@@ -178,7 +179,30 @@ export default function GuestPost() {
               </div>
             </>
           )}
+          {!paid && !user && (
+            <p className="gev__muted gpost__ccy">
+              Rather pay in Current-cy, Lichen&rsquo;s own currency?{' '}
+              <a className="gev__joinlink" href="/signup">Become a member</a> and trade inside the network.
+            </p>
+          )}
           {msg && <p className="gev__muted gpost__err">{msg}</p>}
+        </div>
+      )}
+
+      {/* CURRENT-CY ONLY (founder 2026-11-06): the seller trades this one
+          inside Lichen's economy — the guest's door is joining, not a card. */}
+      {ccyOnly && !paid && (
+        <div className="gev__section">
+          <p className="gev__label">Traded in Current-cy</p>
+          <p className="gev__muted">
+            <span className="nobr">{seller}</span> takes Current-cy for this one — Lichen&rsquo;s own currency,
+            one per dollar. To buy it, join Lichen; your membership is free while we&rsquo;re in alpha.
+          </p>
+          {user ? (
+            <button className="btn gev__btn" onClick={() => navigate(`/posts/${info.post_id}`)}>Open it inside Lichen</button>
+          ) : (
+            <a className="btn gev__btn" href="/signup">Request to join Lichen</a>
+          )}
         </div>
       )}
 

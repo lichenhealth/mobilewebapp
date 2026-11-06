@@ -23,6 +23,8 @@ export interface GuestPostInfo {
   order_price_cents: number | null;
   order_paid_at: string | null;
   order_pending_at: string | null;
+  /** The seller takes Current-cy only — a guest must join Lichen to buy. */
+  currentcy_only: boolean;
 }
 
 /** Surface an edge function's own words from a non-2xx answer. */
