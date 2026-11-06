@@ -318,6 +318,18 @@ export default function Compose() {
     setGuestLists((data as GuestList[] | null) ?? []);
   }
   useEffect(() => { void loadGuestLists(); }, [user?.id]);
+  // Drive's "Invite them to an event ›" arrives with ?list=<id> — the list
+  // loads into the chips once (circles wait for the member's spaces).
+  const listPreloaded = useRef(false);
+  useEffect(() => {
+    const want = params.get('list');
+    if (!want || listPreloaded.current) return;
+    const gl = guestLists.find((g) => g.id === want);
+    if (!gl) return;
+    if (gl.space_ids.length > 0 && mySpaces.length === 0) return;
+    listPreloaded.current = true;
+    applyGuestList(gl);
+  }, [guestLists, mySpaces]);
   function applyGuestList(gl: GuestList) {
     for (const inv of gl.entries) addInvitee(inv);
     const mine = new Set(mySpaces.map((sp) => sp.id));
@@ -1487,6 +1499,11 @@ export default function Compose() {
               && sp.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
           : [];
         const memberHits = invHits.filter((h) => !invitees.some((i) => i.kind === 'member' && i.id === h.id));
+        // Your saved guest lists answer the same box (founder 2026-11-06:
+        // "the type ahead for audiences … should include your lists").
+        const listHits = q.length >= 2
+          ? guestLists.filter((g) => g.name.toLowerCase().includes(q.toLowerCase())).slice(0, 3)
+          : [];
         const ikey = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
         // Either/or pickers (founder 2026-11-04): a subset under Everyone is
         // a contradictory command — the LAST click wins, in both directions.
@@ -1550,7 +1567,7 @@ export default function Compose() {
             <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
               placeholder="Name, circle, email or phone"
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
-            {(memberHits.length > 0 || spaceHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
+            {(memberHits.length > 0 || spaceHits.length > 0 || listHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
               <div className="cmp__invsug">
                 {/* A typed email/phone that belongs to a member files them
                     under ON LICHEN — a seated invite, not a blind guest row
@@ -1573,6 +1590,11 @@ export default function Compose() {
                 {memberHits.map((h) => (
                   <button key={h.id} className="cmp__invsug-row" onClick={() => addInvitee({ kind: 'member', id: h.id, name: h.full_name ?? 'A member' })}>
                     <Icon name="profile" size={14} /> <strong>{h.full_name ?? 'A member'}</strong> · on Lichen
+                  </button>
+                ))}
+                {listHits.map((g) => (
+                  <button key={g.id} className="cmp__invsug-row" onClick={() => { applyGuestList(g); setInvQ(''); }}>
+                    <Icon name="user-multiple" size={14} /> <strong>{g.name}</strong> · your guest list — adds {g.entries.length + g.space_ids.length}
                   </button>
                 ))}
                 {spaceHits.map((sp) => (
