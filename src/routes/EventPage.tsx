@@ -32,8 +32,10 @@ type Tab = 'About' | 'Updates' | 'Chat' | 'RSVP' | 'Book';
 /** Full event page (per the Figma mock): sticky title + tabs; About (hero,
  *  Add-to-Cal / Add-to-Maps cards, unlimited description), Updates (host posts
  *  linked to the same calendar event), RSVP (guest list + action), Book. */
-export default function EventPage() {
-  const { postId = '' } = useParams();
+export default function EventPage(props: { postId?: string } = {}) {
+  // A vanity link renders this page IN PLACE (founder 2026-11-06).
+  const { postId: routeId = '' } = useParams();
+  const postId = props.postId ?? routeId;
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();

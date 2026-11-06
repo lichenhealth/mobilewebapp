@@ -16,6 +16,7 @@ import { clearPromptCache } from '../lib/promptsApi';
 import Avatar from './Avatar';
 import { useTopIdentity } from '../lib/topIdentity';
 import { scopeForPath } from '../lib/sections';
+import { useVanityScope } from '../lib/vanityScope';
 import { markFamily } from '../lib/navFamily';
 import { useTopBack, setTopBarMounted } from '../lib/topBack';
 import NotificationPanel from '../notifications/NotificationPanel';
@@ -91,8 +92,11 @@ export default function TopBar({
   // section's own, so you can see whose shelf you're standing at rather than
   // having to read the title. Design solve, preferred over renaming the page.
   const [topParams] = useSearchParams();
-  const scopeSpace = topParams.get('space');
-  const scopeMember = topParams.get('member');
+  // A vanity handle (/market/galyn) scopes the section without a query —
+  // the route publishes whose section it is (lib/vanityScope).
+  const vScope = useVanityScope();
+  const scopeSpace = topParams.get('space') ?? (vScope?.key === 'space' ? vScope.id : null);
+  const scopeMember = topParams.get('member') ?? (vScope?.key === 'member' ? vScope.id : null);
   const [scopeMark, setScopeMark] = useState<{ id: string; name: string; url: string | null } | null>(null);
   useEffect(() => {
     const id = scopeSpace || scopeMember;

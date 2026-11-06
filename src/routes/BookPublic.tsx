@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import BookSession from './BookSession';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import SlotMonth from '../components/SlotMonth';
@@ -58,6 +59,12 @@ export default function BookPublic() {
     types: BookingType[];
   } | null>(null);
   const [mvReady, setMvReady] = useState(false);
+  // THE ADDRESS STAYS FRIENDLY (founder 2026-11-06: "the vanity url doesn't
+  // persist in the header… is that possible to have the numbers not show
+  // up?"): a signed-in member resolved to one session type gets the member
+  // slot picker RENDERED HERE, in place — the bar keeps /book/galyn/therapy
+  // instead of swapping to /book/<uuid>. The id was only ever a hand-off.
+  const [handoff, setHandoff] = useState<string | null>(null);
   // SESSION LENGTHS (founder 2026-11-01, her Calendly screenshot): types
   // sharing one title are ONE session with a "how long?" step — lenKey is
   // the signed-in menu's open group, pubKey the guest page's picked group.
@@ -160,9 +167,10 @@ export default function BookPublic() {
   }, [handle, slug, user?.id]);
 
   useEffect(() => {
-    if (!user) { setMemberView(null); setMvReady(true); return; }
+    if (!user) { setMemberView(null); setHandoff(null); setMvReady(true); return; }
     let live = true;
     setMvReady(false);
+    setHandoff(null);
     void (async () => {
       const { data } = await supabase.from('profiles')
         .select('id, full_name, avatar_url, headline')
@@ -183,7 +191,7 @@ export default function BookPublic() {
             setLenKey(fam.key); setSlugFam(true);
           } else {
             const hit = types.find((t) => (t.slug ?? '') === low) ?? null;
-            if (hit) { navigate(`/book/${hit.id}`, { replace: true }); return; }
+            if (hit) { setHandoff(hit.id); setMvReady(true); return; }
             // Tier 2b: the siblings' shared link-name prefix is a second
             // picker address (the title match above stays the first).
             const famPre = familyBySlugPrefix(groups, low);
@@ -194,9 +202,9 @@ export default function BookPublic() {
               // straight on that length's own slot picker, where the
               // standing length-switcher covers changing their mind.
               const la = lengthByAlias(groups, low);
-              if (la) { navigate(`/book/${la.variant.id}`, { replace: true }); return; }
+              if (la) { setHandoff(la.variant.id); setMvReady(true); return; }
               const one = groups.find((g) => slugify(g.title) === low)?.variants[0] ?? null;
-              if (one) { navigate(`/book/${one.id}`, { replace: true }); return; }
+              if (one) { setHandoff(one.id); setMvReady(true); return; }
             }
           }
         }
@@ -207,7 +215,7 @@ export default function BookPublic() {
         // real — the SECURITY DEFINER vanity resolver covers that case.
         const id = await resolveBookingVanity(handle, slug);
         if (!live) return;
-        if (id) { navigate(`/book/${id}`, { replace: true }); return; }
+        if (id) { setHandoff(id); setMvReady(true); return; }
       }
       setMvReady(true);
     })();
@@ -231,7 +239,7 @@ export default function BookPublic() {
     if (!user || !mvReady || !memberView) return;
     const r = readBookResume();
     if (r?.typeId && memberView.types.some((t) => t.id === r.typeId)) {
-      navigate(`/book/${r.typeId}`, { replace: true });
+      setHandoff(r.typeId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, mvReady, memberView]);
@@ -243,6 +251,15 @@ export default function BookPublic() {
   // door, restoring on return. The day/slot land through pendingResume
   // AFTER the board arrives, because the typeId effect above rightly
   // clears them on every type change.
+  // Opening a session from the signed-in menu (or switching lengths inside
+  // the picker) walks to that session's OWN vanity link when it has one —
+  // the bar always names what's on screen, and Back returns to the menu.
+  // A link-less type opens in place under the current address.
+  const openType = (t: { id: string; slug?: string | null }, replace = false) => {
+    if (t.slug && handle) navigate(`/book/${handle}/${t.slug}`, { replace });
+    else setHandoff(t.id);
+  };
+
   const pendingResume = useRef<BookResume | null>(null);
   const resumed = useRef(false);
   const parkAndGo = (dest: '/login' | '/signup') => {
@@ -357,6 +374,9 @@ export default function BookPublic() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pick, confH]);
 
+  if (user && handoff) {
+    return <BookSession typeId={handoff} onSwitchType={openType} />;
+  }
   if (!ready || !mvReady) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
 
   // Signed in on the bare handle link: the WHOLE menu, not just the public
@@ -387,7 +407,7 @@ export default function BookPublic() {
                 <p className="bkpub__tz bkpub__pick">{open.title} — how long would you like?</p>
                 <div className="bkpub__types bkpub__types--menu">
                   {open.variants.map((t) => (
-                    <button key={t.id} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
+                    <button key={t.id} className="bkg__slot" onClick={() => openType(t)}>
                       {sessionLengthLabel(t.duration_min)}
                     </button>
                   ))}
@@ -411,7 +431,7 @@ export default function BookPublic() {
                       booking page"). */}
                   if (g.variants.length === 1) {
                     return (
-                      <button key={g.key} className="bkg__slot" onClick={() => navigate(`/book/${t.id}`)}>
+                      <button key={g.key} className="bkg__slot" onClick={() => openType(t)}>
                         {g.title}
                       </button>
                     );

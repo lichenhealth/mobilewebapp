@@ -44,9 +44,12 @@ function whenLabel(p: FeedPost): string | undefined {
  *  only appear for areas present in the stream. People (profileId) show what
  *  they authored; spaces (spaceId) show their wall. `leading` prepends
  *  space-anatomy action circles (Chat, Members) to the icon row. */
-export default function ContributionsFeed({ profileId, spaceId, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantSpace, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, signals, emptyEscape }: {
+export default function ContributionsFeed({ profileId, spaceId, handle, me, leading = [], afterGap = [], assistantSection, assistantMember, assistantSpace, assistantOff, trailing = [], hideAreas = [], entityName, feedDoor, listHidden, interactive = true, onLoaded, navSlot, signals, emptyEscape }: {
   profileId?: string;
   spaceId?: string;
+  /** The entity's handle — area doors then open /<section>/<handle>, the
+   *  friendly address (founder 2026-11-06), instead of ?member=<uuid>. */
+  handle?: string | null;
   me: string;
   /** Circles BEFORE the hairline: search, add — the doors that are about you
    *  acting, not about this entity (founder 2026-08-05). */
@@ -183,6 +186,7 @@ export default function ContributionsFeed({ profileId, spaceId, me, leading = []
   const scopeQS = profileId ? `member=${profileId}` : `space=${spaceId}`;
   const areaDest = (a: ServiceArea) => {
     const route = SECTION_ROUTES[a];
+    if (route && handle) return `${route}/${handle}`;
     return route ? `${route}?${scopeQS}` : `/search?${scopeQS}&area=${a}`;
   };
   const onArea = (a: ServiceArea) => {

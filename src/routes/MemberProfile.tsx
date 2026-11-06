@@ -391,6 +391,7 @@ export default function MemberProfile({ memberId }: { memberId?: string } = {}) 
   // on About/Services as the way back.
   const memberFeed = (ctx: FeedRenderCtx) => (
     <ContributionsFeed
+      handle={pub?.handle ?? null}
       profileId={member.id}
       me={me}
       entityName={name}

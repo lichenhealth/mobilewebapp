@@ -35,8 +35,11 @@ const AREA_HOME: Partial<Record<ServiceArea, string>> = {
 /** The post's own page (Figma 286-6331/286-6469): the full read — complete
  *  body, full-height media — under a FROZEN action bar: back, the areas the
  *  post lives in, and its engagement actions, pinned while you read. */
-export default function PostPage() {
-  const { postId = '' } = useParams();
+export default function PostPage(props: { postId?: string } = {}) {
+  // A vanity link renders this page IN PLACE with the resolved id, so the
+  // friendly address stays in the bar (founder 2026-11-06).
+  const { postId: routeId = '' } = useParams();
+  const postId = props.postId ?? routeId;
   const navigate = useNavigate();
   const { user } = useAuth();
   // The mutual-friend line at the decision moment (founder 2026-07-28).
