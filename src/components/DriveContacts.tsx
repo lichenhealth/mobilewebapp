@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { classifyCareContact } from '../lib/careTeamApi';
@@ -60,8 +60,13 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
       || l.entries.some((e) => entryLabel(e).toLowerCase().includes(q)));
   }, [lists, query]);
 
+  // The freshest lists, synchronously — two quick adds must not both build
+  // on the same stale row and drop one.
+  const listsRef = useRef<GuestList[]>([]);
+  listsRef.current = lists;
   async function patch(l: GuestList, p: Partial<Pick<GuestList, 'name' | 'entries' | 'space_ids'>>) {
-    setLists((cur) => cur.map((x) => x.id === l.id ? { ...x, ...p } : x));
+    listsRef.current = listsRef.current.map((x) => x.id === l.id ? { ...x, ...p } : x);
+    setLists(listsRef.current);
     try { await updateGuestList(l.id, p); setNote(null); }
     catch (e) { setNote((e as Error).message); void refresh(); }
   }
@@ -73,10 +78,20 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
     let entry: ListEntry | null = null;
     if (c.kind === 'email') entry = { kind: 'email', value: c.email, name: nameFrom(line) };
     else if (c.kind === 'phone') entry = { kind: 'phone', value: c.digits, sms: c.sms, name: nameFrom(line) };
+    else {
+      // "Rick 303-555-0123": the classifier reads a BARE phone, so pull a
+      // phone-shaped tail off the line (Compose's invite-box rule).
+      const tail = /(\+?[\d\s().\-]{7,})$/.exec(line);
+      const digits = tail ? tail[1].replace(/\D/g, '') : '';
+      if (tail && digits.length >= 7 && digits.length <= 16) {
+        entry = { kind: 'phone', value: digits, sms: tail[1].replace(/[^\d+]/g, ''), name: nameFrom(line) };
+      }
+    }
     if (!entry) { setNote('Type an email or a phone number (a name in front is fine). Members join a list from an event’s invite box.'); return; }
     const k = entryKey(entry);
-    if (l.entries.some((e) => entryKey(e) === k)) { setNote('Already on this list.'); return; }
-    void patch(l, { entries: [...l.entries, entry] });
+    const cur = listsRef.current.find((x) => x.id === l.id) ?? l;
+    if (cur.entries.some((e) => entryKey(e) === k)) { setNote('Already on this list.'); return; }
+    void patch(cur, { entries: [...cur.entries, entry] });
     setAddLine('');
   }
 
