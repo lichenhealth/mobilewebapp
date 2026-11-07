@@ -16,6 +16,17 @@ import './PublicPage.css';
 // can read them all — and members never face a blank canvas, because most of
 // it fills itself from what they already keep on Lichen.
 
+/** A short standalone line in written prose ("Therapy", "Advocacy &
+ *  Education") is a SUB-HEADING the way a designer would set it — Lichen's
+ *  gray all-caps label — not a stray paragraph (founder 2026-11-07).
+ *  Deliberately narrow: one line, at most 40 characters, no sentence ending
+ *  and no colon, so a list line like "Addiction: In the Realm…" stays a line. */
+function isSubhead(para: string): boolean {
+  const t = para.trim();
+  return t.length > 0 && t.length <= 40 && !t.includes('\n') && !/[.!?,;]$/.test(t)
+    && !t.includes(':') && /^[A-Z0-9"“‘(]/.test(t);
+}
+
 const posToObjectPos = (pos?: string | number): string => {
   if (pos === 'top') return '50% 0%';
   if (pos === 'bottom') return '50% 100%';
@@ -1096,7 +1107,8 @@ export default function PublicPage(props: PublicPageProps) {
                 the images"): a full-bleed band 46vh tall cropped a 2:1 photo
                 to a 4:1 sliver. The photo's own shape is measured on load
                 and the band grows toward it (CSS caps it below the fold). */}
-            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (frontBand ? ' is-home' : '')}
+            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (frontBand ? ' is-home' : '')
+              + (coverSrc && bandAr && bandAr < 1.15 ? ' is-portrait' : '')}
               style={bandAr ? ({ '--band-ar': String(bandAr) } as React.CSSProperties) : undefined}>
               {coverSrc && (
                 <img className="ppage__siteband-img" src={coverSrc} alt="" key={coverSrc}
@@ -1262,7 +1274,9 @@ export default function PublicPage(props: PublicPageProps) {
       {/* A chosen template tab — its lead, then its paragraphs. */}
       {activeChosen && (
         <section className="ppage__sec">
-          <h2 className="ppage__sec-title">{activeChosen.label ?? tabById(activeChosen.id)?.label}</h2>
+          {/* On the website look the photo band already titles the tab —
+              one heading per section (the 08-28 rule), never two. */}
+          {!siteHead && <h2 className="ppage__sec-title">{activeChosen.label ?? tabById(activeChosen.id)?.label}</h2>}
           {ed ? (
             <>
               <EText
@@ -1286,7 +1300,9 @@ export default function PublicPage(props: PublicPageProps) {
             <>
               {activeChosen.lead && <p className="ppage__lead">{activeChosen.lead}</p>}
               {(activeChosen.body ?? '').split(/\n{2,}/).filter(Boolean).map((para, i) => (
-                <p className="ppage__para" key={i}>{para}</p>
+                isSubhead(para)
+                  ? <h3 className="ppage__subhead" key={i}>{para.trim()}</h3>
+                  : <p className="ppage__para" key={i}>{para}</p>
               ))}
             </>
           )}
