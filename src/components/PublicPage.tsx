@@ -728,7 +728,11 @@ export default function PublicPage(props: PublicPageProps) {
   // hero's tall top padding makes room for — without them it's dead air
   // (founder 2026-11-06, circling the blank band above the view toggle).
   const cornerDoors = !props.preview && !props.signedIn && page.join !== 'none';
-  const navNode = navItems.length > 0 ? (
+  // The website look keeps its bar to links alone (founder 2026-11-07,
+  // a draft whose bar wrapped four pills onto two rows): the owner's CTAs
+  // move into the hero as one clear button set, Lichen's join door lives
+  // in the footer + join card.
+  const renderNav = (withCtas: boolean) => navItems.length > 0 ? (
     <nav className={'ppage__nav' + (navInHero ? '' : ' ppage__nav--below')}>
       {navItems.map((n) => {
         const d = doors?.find((x) => x.id === n.id);
@@ -753,7 +757,7 @@ export default function PublicPage(props: PublicPageProps) {
           </button>
         );
       })}
-      {ctas.map((c) => (
+      {withCtas && ctas.map((c) => (
         <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href}
           target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
           {c.label}
@@ -761,11 +765,12 @@ export default function PublicPage(props: PublicPageProps) {
       ))}
       {/* Actions live in ONE place (founder 2026-08-14) — page-owner
           CTAs and app doors like "See it on Maps" sit side by side. */}
-      {props.extraCtas?.map((c, i) => (
+      {withCtas && props.extraCtas?.map((c, i) => (
         <button className="ppage__cta ppage__cta--nav" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
       ))}
     </nav>
   ) : null;
+  const navNode = renderNav(true);
   const activeDoor = doors?.find((d) => d.id === tab) ?? null;
   // ONE RENDERER PER SECTION (founder 2026-08-28: "it says facilities
   // twice", four times over). The five ids in SECTION_IDS are drawn by the
@@ -1074,22 +1079,32 @@ export default function PublicPage(props: PublicPageProps) {
                   onClick={() => chooseTab(homeItem.length ? 'home' : navItems[0]?.id ?? 'about')}>
                   {name}
                 </button>
-                <div className="ppage__sitehead">{navNode}</div>
+                <div className="ppage__sitehead">{renderNav(false)}</div>
                 {cornerDoors && (
                   <div className="ppage__sitedoors">
-                    {page.join === 'full' || page.join === undefined ? (
-                      <button className="ppage__sitedoor" type="button" onClick={() => go('/signup')}>Request an invitation</button>
-                    ) : null}
-                    <button className="ppage__sitedoor ppage__sitedoor--quiet" type="button" onClick={() => go('/login')}>Sign in</button>
+                    <button className="ppage__sitesignin" type="button" onClick={() => go('/login')}>Sign in</button>
                   </div>
                 )}
               </div>
               <div className="ppage__sitehero">
                 {tab === 'home' || !tabbed ? (
                   <>
-                    <h1 className={'ppage__sitehero-title' + ((page.tagline || name).length > 36 ? ' ppage__sitehero-title--long' : '')}>{page.tagline || name}</h1>
-                    {page.tagline && !props.kindIcon && kindLabel && (
-                      <p className="ppage__sitehero-sub">{kindLabel}</p>
+                    {/* Short lines set in caps, /welcome's way; a SENTENCE
+                        stays a sentence — a credentials line in giant caps
+                        reads as shouting (founder 2026-11-07). The person's
+                        app headline doesn't ride under it: the site's own
+                        words carry the hero. */}
+                    <h1 className={'ppage__sitehero-title' + ((page.tagline || name).length > 24 ? ' ppage__sitehero-title--long' : '')}>{page.tagline || name}</h1>
+                    {(ctas.length > 0 || (props.extraCtas?.length ?? 0) > 0) && (
+                      <div className="ppage__siteactions">
+                        {ctas.map((c, i) => (
+                          <a className={'ppage__siteaction' + (i > 0 ? ' ppage__siteaction--quiet' : '')} key={c.kind} href={c.href}
+                            target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">{c.label}</a>
+                        ))}
+                        {props.extraCtas?.map((c, i) => (
+                          <button className="ppage__siteaction ppage__siteaction--quiet" key={'x' + i} type="button" onClick={c.onClick}>{c.label}</button>
+                        ))}
+                      </div>
                     )}
                   </>
                 ) : (
