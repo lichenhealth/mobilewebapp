@@ -50,6 +50,9 @@ export interface PageMeta {
    *  footer). Members always wear it; a space opts in, so a page that is
    *  already somebody's live site never changes look without its owner. */
   look?: 'site';
+  /** 'about' = Home and About are one page: no Home tab, About is the landing
+   *  and wears the front-page hero (founder 2026-11-07). */
+  homeAs?: 'about';
   tagline?: string;
   story?: string;
   /** A live page with the link, but search engines asked to leave it alone
@@ -526,7 +529,10 @@ export default function PublicPage(props: PublicPageProps) {
     if (u.startsWith('http')) window.location.href = u; else navigate(u);
   };
   const { name, kindLabel, avatarUrl, description, location, contact, page } = props;
-  const offerings = props.offerings?.length ? props.offerings : (page.offerings ?? []);
+  // The owner's written list wins on the open-web view (see writtenWins).
+  const offerings = (!props.signedIn || props.preview) && (page.offerings?.length ?? 0) > 0
+    ? page.offerings!
+    : props.offerings?.length ? props.offerings : (page.offerings ?? []);
   // The owner's colours, kept honest. An accent only gets the readability
   // pass when they actually chose one — Lichen's default peach is left
   // exactly as it is rather than silently restyling every existing page
@@ -610,8 +616,14 @@ export default function PublicPage(props: PublicPageProps) {
   // twice: this is the same string either way.
   const oldFacTab = chosen.find((t) => t.id === 'facilities');
   const facilities = page.facilities?.trim() || oldFacTab?.body?.trim() || '';
-  const svcRows = (props.offeringRows ?? []).filter((o) => o.domain === 'service');
-  const goodRows = (props.offeringRows ?? []).filter((o) => o.domain === 'good');
+  // THE PUBLIC SITE SAYS IT IN THE OWNER'S WORDS (founder 2026-11-07: "this
+  // is a marketing website and not Lichen's list"): when the page carries a
+  // hand-written offerings list, the open-web view shows THAT instead of the
+  // Lichen category rows. Lichen View keeps the category rows — they carry
+  // the per-service recommend.
+  const writtenWins = asGuest && (page.offerings?.length ?? 0) > 0;
+  const svcRows = writtenWins ? [] : (props.offeringRows ?? []).filter((o) => o.domain === 'service');
+  const goodRows = writtenWins ? [] : (props.offeringRows ?? []).filter((o) => o.domain === 'good');
   const builtInHasContent = (id: string) =>
     id === 'about' ? !!story
       : id === 'goods' ? goodRows.length > 0
@@ -664,7 +676,11 @@ export default function PublicPage(props: PublicPageProps) {
   // would render nothing there.)
   // Members get Home too now (founder 2026-08-14) — it was guest/preview
   // only, which meant Lichen View had no front page at all.
-  const homeItem = !doors ? [{ id: 'home', label: 'Home' }] : [];
+  // HOME CAN BE ABOUT (founder 2026-11-07: "combine home and about me, so
+  // like the current website, about me is highlighted") — the page still has
+  // a front door to land on; it's simply the About tab.
+  const homeIsAbout = page.homeAs === 'about' && sectionItems.some((n) => n.id === 'about');
+  const homeItem = !doors && !homeIsAbout ? [{ id: 'home', label: 'Home' }] : [];
   const navItems = showFeed && !feedInRow
     ? [{ id: 'feed', label: 'Feed' }, ...homeItem, ...sectionItems]
     : [...homeItem, ...sectionItems];
@@ -673,8 +689,8 @@ export default function PublicPage(props: PublicPageProps) {
   // prefer consistency") — an EMPTY feed says so and kicks you up to the
   // Home tab instead of quietly landing you elsewhere.
   const firstContentDoor = asGuest
-    ? 'home'
-    : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : undefined));
+    ? (homeIsAbout ? 'about' : 'home')
+    : (showFeed ? 'feed' : doors?.find((d) => !d.href)?.id ?? (homeItem.length ? 'home' : homeIsAbout ? 'about' : undefined));
   // SMART PREVIEW LANDING (founder 2026-08-31): ?ptab=<id> opens the page on
   // one tab — the chat's Preview button passes the tab its edit touched, so
   // "push the About photo down" previews on About, not Home. Read from the
@@ -705,7 +721,10 @@ export default function PublicPage(props: PublicPageProps) {
   const showingFeed = showFeed && tab === 'feed';
   // Home shows the lot — it IS the front page; a named tab narrows to its
   // own section.
-  const show = (id: string) => !doors && !showingFeed && (tab === 'home' || !tabbed || tab === id);
+  // About-as-front-page also carries the offerings list under the whole
+  // story — the front page names what the person does.
+  const show = (id: string) => !doors && !showingFeed && (tab === 'home' || !tabbed || tab === id
+    || (homeIsAbout && tab === 'about' && id === 'services'));
   // ROOT AND BRANCHES (founder 2026-08-11): Home teases and routes. A section
   // that has a tab of its own gives a taste on Home with a way through; a
   // section with nowhere to route shows in full, so nothing is ever truncated
@@ -921,6 +940,9 @@ export default function PublicPage(props: PublicPageProps) {
   const usingSectionImage = !doors && !!activeSec?.image && coverSrc === activeSec.image;
   const coverPos = (usingSectionImage ? activeSec?.imagePos : undefined) ?? page.coverPos;
   const coverFull = usingSectionImage && activeSec?.imageSize === 'full';
+  const [bandAr, setBandAr] = useState<number | null>(null);
+  // The front page's big hero: Home, or About when it IS the front page.
+  const frontBand = tab === 'home' || !tabbed || (homeIsAbout && tab === 'about');
 
   // ── The hero photo's in-place controls (builder only) ─────────────────
   // Which slot this tab's photo lives in decides where a change lands:
@@ -1069,14 +1091,21 @@ export default function PublicPage(props: PublicPageProps) {
                 with the owner's words and pictures. Off a cover photo it
                 falls back to the same bar and headline on the page's paper. */}
             {props.belowIdentity && <div className="ppage__siteowner">{props.belowIdentity}</div>}
-            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (tab === 'home' || !tabbed ? ' is-home' : '')}>
+            {/* THE BAND FITS ITS PHOTO (founder 2026-11-07: "hero images for
+                about me and the other tabs are cutoff, can you smart expand
+                the images"): a full-bleed band 46vh tall cropped a 2:1 photo
+                to a 4:1 sliver. The photo's own shape is measured on load
+                and the band grows toward it (CSS caps it below the fold). */}
+            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (frontBand ? ' is-home' : '')}
+              style={bandAr ? ({ '--band-ar': String(bandAr) } as React.CSSProperties) : undefined}>
               {coverSrc && (
                 <img className="ppage__siteband-img" src={coverSrc} alt="" key={coverSrc}
+                  onLoad={(e) => { const i = e.currentTarget; if (i.naturalWidth && i.naturalHeight) setBandAr(i.naturalWidth / i.naturalHeight); }}
                   style={{ objectPosition: posToObjectPos(coverPos) }} />
               )}
               <div className="ppage__sitebar">
                 <button type="button" className="ppage__wordmark"
-                  onClick={() => chooseTab(homeItem.length ? 'home' : navItems[0]?.id ?? 'about')}>
+                  onClick={() => chooseTab(homeItem.length ? 'home' : homeIsAbout ? 'about' : navItems[0]?.id ?? 'about')}>
                   {name}
                 </button>
                 <div className="ppage__sitehead">{renderNav(false)}</div>
@@ -1087,7 +1116,7 @@ export default function PublicPage(props: PublicPageProps) {
                 )}
               </div>
               <div className="ppage__sitehero">
-                {tab === 'home' || !tabbed ? (
+                {frontBand ? (
                   <>
                     {/* Short lines set in caps, /welcome's way; a SENTENCE
                         stays a sentence — a credentials line in giant caps
@@ -1465,11 +1494,11 @@ export default function PublicPage(props: PublicPageProps) {
       {/* A page that gave us plain strings (a space's hand-written offerings)
           keeps the old single list. */}
       {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && splitting('services') && (
-        <SumSplit id="services" label="What we offer" door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
+        <SumSplit id="services" label={props.firstPerson ? 'What we offer' : 'Services'} door={<>See everything {subj.word} {subj.plural ? 'offer' : 'offers'}</>} />
       )}
       {svcRows.length === 0 && goodRows.length === 0 && offerings.length > 0 && show('services') && !splitting('services') && (
         <section className="ppage__sec" data-edit-region="offerings">
-          <h2 className="ppage__h2">What we offer</h2>
+          <h2 className="ppage__h2">{props.firstPerson ? 'What we offer' : 'Services'}</h2>
           {flavor('services')}
           {!summarized('services') && (
           <ul className="ppage__offers">

@@ -185,3 +185,6 @@
 .ptabs__person-acts { display: flex; gap: var(--s-3); align-items: center; }
 .ptabs__person-acts button { font-size: var(--t-xs); color: var(--ink-muted); text-decoration: underline; text-underline-offset: 2px; }
 .ptabs__person-acts .ptabs__person-rm { color: var(--rust); }
+
+.ptabs__homeabout { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 2px 34px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+.ptabs__homeabout input { margin-top: 2px; accent-color: var(--peach); }

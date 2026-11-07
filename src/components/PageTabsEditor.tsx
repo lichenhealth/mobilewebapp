@@ -161,7 +161,7 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
 
 export default function PageTabsEditor({
   tabs, onChange, photos = [], onPhotos, uploaderId, sections, onSections,
-  homeSummary, onHomeSummary, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
+  homeSummary, onHomeSummary, homeAsAbout, onHomeAsAbout, coverStyle, onCoverStyle, cover, onCover, coverPos, onCoverPos,
   entityName, authorId, spaceId, homeExtra, contact, onContact, hasFacilities, team, onTeam,
   facilities, onFacilities, story, onStory, openSignal,
 }: {
@@ -179,6 +179,12 @@ export default function PageTabsEditor({
   /** Home tab styling. */
   homeSummary?: string;
   onHomeSummary?: (text: string) => void;
+  /** page.homeAs === 'about' — Home and About are one page (founder
+   *  2026-11-07, "combine home and about me, so like the current website,
+   *  about me is highlighted"): no separate Home tab, visitors land on
+   *  About, which wears the big front-page hero. */
+  homeAsAbout?: boolean;
+  onHomeAsAbout?: (on: boolean) => void;
   coverStyle?: 'photo' | 'plain' | 'tint';
   onCoverStyle?: (style: 'photo' | 'plain' | 'tint') => void;
   cover?: string;
@@ -347,6 +353,12 @@ export default function PageTabsEditor({
           )}
         </div>
 
+        {onHomeAsAbout && (
+          <label className="ptabs__homeabout">
+            <input type="checkbox" checked={!!homeAsAbout} onChange={(e) => onHomeAsAbout(e.target.checked)} />
+            <span>Make About the front page — no separate Home tab; visitors land on About.</span>
+          </label>
+        )}
         {homeOpen && onHomeSummary && (
           <div className="ptabs__edit">
             <label className="prof__label">Welcome message — what greets a visitor</label>
