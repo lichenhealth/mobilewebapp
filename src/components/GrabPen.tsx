@@ -12,10 +12,17 @@ import './GrabPen.css';
  *  page's Build-with-Claude thread as a pasted photo — the same loop the
  *  founder runs by hand, on-platform.
  *
- *  html2canvas is lazy-loaded so the page pays nothing until the pen is
- *  picked up. Cross-origin images ride useCORS (Supabase storage sends
- *  permissive CORS); an image that still refuses renders as a gap in the
- *  grab, which is honest enough for markup. */
+ *  HOW IT GRABS (founder 2026-11-07: "it shows a blank screenshot… it is
+ *  supposed to replace the screen shot and then markup process I use"):
+ *  a REAL capture of the tab first — getDisplayMedia with preferCurrentTab,
+ *  the browser's own pixels, exactly what Shottr sees (one "Share this tab"
+ *  tap in Chrome/Edge/Firefox). html2canvas REPAINTS the DOM from CSS and
+ *  can't draw the website look's photo bands (object-fit, gradients, the
+ *  #root scroller) — it stays only as the fallback where screen capture
+ *  doesn't exist (iPhone/iPad Safari), and the overlay always offers "Use a
+ *  screenshot I took" (file pick or paste) — the founder's own loop.
+ *  ⚠ The canvas is shown at its OWN aspect (no flex-stretch, no object-fit)
+ *  or pointer→pixel mapping drifts and strokes land beside the finger. */
 export default function GrabPen({ thread, uploaderId }: {
   /** The assistant thread the marked-up shot posts into (space:<id>, or
    *  'profile' for a member's own page). */
@@ -33,25 +40,94 @@ export default function GrabPen({ thread, uploaderId }: {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const strokes = useRef<{ x: number; y: number }[][]>([]);
   const live = useRef<{ x: number; y: number }[] | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const fileInput = (
+    <input ref={fileRef} type="file" accept="image/*" hidden
+      onChange={(e) => { void takeFile(e.target.files?.[0]); e.target.value = ''; }} />
+  );
+
+  const loadShot = (src: string) => new Promise<void>((res, rej) => {
+    const img = new Image();
+    img.onload = () => { strokes.current = []; setShot(img); res(); };
+    img.onerror = () => rej(new Error('bad image'));
+    img.src = src;
+  });
+
+  /** The browser's own capture of this tab — real pixels. */
+  const captureTab = async (): Promise<string> => {
+    const fab = document.querySelector('.grabpen__fab') as HTMLElement | null;
+    fab?.classList.add('grabpen__fab--hidden');
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: 'include',
+        surfaceSwitching: 'exclude',
+      } as DisplayMediaStreamOptions);
+      const video = document.createElement('video');
+      video.srcObject = stream; video.muted = true; video.playsInline = true;
+      await video.play();
+      // Let the share prompt fade and a fresh frame paint before taking it.
+      await new Promise((r) => setTimeout(r, 450));
+      const c = document.createElement('canvas');
+      c.width = video.videoWidth; c.height = video.videoHeight;
+      c.getContext('2d')!.drawImage(video, 0, 0);
+      return c.toDataURL('image/png');
+    } finally {
+      stream?.getTracks().forEach((t) => t.stop());
+      fab?.classList.remove('grabpen__fab--hidden');
+    }
+  };
+
+  /** Fallback where screen capture doesn't exist: repaint the viewport. */
+  const repaintViewport = async (): Promise<string> => {
+    const { default: html2canvas } = await import('html2canvas');
+    const cnv = await html2canvas(document.body, {
+      useCORS: true,
+      // The app scrolls #root, not the window — html2canvas restores element
+      // scroll positions in its clone, so the viewport is simply (0,0).
+      x: 0, y: 0, scrollX: 0, scrollY: 0,
+      width: window.innerWidth, height: window.innerHeight,
+      windowWidth: window.innerWidth, windowHeight: window.innerHeight,
+      ignoreElements: (el) => el.classList?.contains('grabpen__fab'),
+    });
+    return cnv.toDataURL('image/png');
+  };
 
   const grab = async () => {
     setGrabbing(true); setErr('');
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const cnv = await html2canvas(document.body, {
-        useCORS: true,
-        x: window.scrollX, y: window.scrollY,
-        width: window.innerWidth, height: window.innerHeight,
-        // The FAB itself shouldn't be in the shot.
-        ignoreElements: (el) => el.classList?.contains('grabpen__fab'),
-      });
-      const img = new Image();
-      img.onload = () => { strokes.current = []; setShot(img); };
-      img.src = cnv.toDataURL('image/png');
-    } catch {
-      setErr('Could not grab the screen — some browsers block it.');
+      const canCapture = !!navigator.mediaDevices?.getDisplayMedia;
+      await loadShot(canCapture ? await captureTab() : await repaintViewport());
+    } catch (e) {
+      const name = (e as { name?: string })?.name;
+      // Cancelling the share prompt is a choice, not an error.
+      if (name !== 'NotAllowedError' && name !== 'AbortError') {
+        setErr('Could not grab the screen — use a screenshot you took instead.');
+        fileRef.current?.click();
+      }
     } finally { setGrabbing(false); }
   };
+
+  /** "Use a screenshot I took" — a picked or pasted image replaces the shot. */
+  const takeFile = async (f: File | null | undefined) => {
+    if (!f || !f.type.startsWith('image/')) return;
+    setErr(''); setSent(false);
+    const url = URL.createObjectURL(f);
+    try { await loadShot(url); } catch { setErr('That file isn\'t an image this browser can open.'); }
+  };
+  useEffect(() => {
+    if (!shot) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'));
+      if (item) { e.preventDefault(); void takeFile(item.getAsFile()); }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shot]);
 
   // Draw the shot + every stroke. Undo = pop a stroke and repaint.
   const repaint = () => {
@@ -113,17 +189,21 @@ export default function GrabPen({ thread, uploaderId }: {
 
   if (!shot) {
     return (
+      <>
+      {fileInput}
       <button className="grabpen__fab" type="button" onClick={() => void grab()} disabled={grabbing}
         title="Grab this screen and mark it up for Claude">
         <Icon name="image" size={16} />
         {grabbing ? 'Grabbing…' : 'Mark it up'}
         {err && <em>{err}</em>}
       </button>
+      </>
     );
   }
 
   return (
     <div className="grabpen__overlay" role="dialog" aria-label="Mark up the screen grab">
+      {fileInput}
       <div className="grabpen__bar">
         {sent ? (
           <>
@@ -137,6 +217,7 @@ export default function GrabPen({ thread, uploaderId }: {
           <>
             <span className="grabpen__hint">Draw on it — circle what you mean</span>
             <button type="button" onClick={() => { strokes.current.pop(); repaint(); }}>Undo</button>
+            <button type="button" onClick={() => fileRef.current?.click()} title="Or paste one with ⌘V">Use a screenshot I took</button>
             <button type="button" onClick={() => { setShot(null); setNote(''); }}>Throw it away</button>
           </>
         )}

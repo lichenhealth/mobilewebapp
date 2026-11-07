@@ -720,7 +720,18 @@ export default function PublicPage(props: PublicPageProps) {
   // A tab the VIEWER chose sticks; only automatic landings may be replaced.
   // A ?ptab= landing counts as chosen — the person asked for that tab.
   const touched = useRef(wantTabValid);
-  const chooseTab = (id: string) => { touched.current = true; setTab(id); };
+  // A website lands at the TOP of the page a visitor opens (founder
+  // 2026-11-07, countrymanstables.com: Home → Facilities "lands you further
+  // down") — a door or nav click is a page change on the open web, so the
+  // reader starts at its first line. In-app (Lichen View) keeps its place:
+  // there the tabs sit under the feed's icon row, mid-screen by design.
+  const chooseTab = (id: string) => {
+    touched.current = true; setTab(id);
+    if (asGuest && !ed) requestAnimationFrame(() => {
+      window.scrollTo({ top: 0 });
+      document.getElementById('root')?.scrollTo({ top: 0 });
+    });
+  };
   useEffect(() => {
     if (relandInit.current === relandKey) return;
     relandInit.current = relandKey;

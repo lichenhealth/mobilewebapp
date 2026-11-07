@@ -8,6 +8,8 @@
   box-shadow: 0 3px 14px rgba(0, 0, 0, 0.14);
 }
 .grabpen__fab:hover { border-color: var(--peach); }
+/* Out of its own shot while the tab is captured. */
+.grabpen__fab--hidden { visibility: hidden; }
 .grabpen__fab em { font-style: normal; font-size: 11px; color: #a33; }
 
 .grabpen__overlay {
@@ -26,7 +28,9 @@
   font: inherit; font-size: 12px; background: rgba(255, 255, 255, 0.92); color: #222;
 }
 .grabpen__canvas {
-  max-width: 100%; flex: 1; min-height: 0; object-fit: contain;
+  /* Shown at its own aspect — width/height auto + the two caps keep the
+     element box equal to the drawing, so a stroke lands under the pointer. */
+  width: auto; height: auto; max-width: 100%; min-height: 0;
   border-radius: 8px; touch-action: none; cursor: crosshair;
   background: #fff;
   /* The canvas keeps its own aspect: width-limited, height-capped. */
