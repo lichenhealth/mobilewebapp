@@ -130,7 +130,13 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
   // PREVIEW THE DRAFT (founder 2026-08-31): ?draft=1 renders the member's
   // unpublished draft in place of the live page — the chat's Preview button
   // opens this. RLS keeps page_drafts to the owner; others see live.
-  const draftPreview = params.get('draft') === '1';
+  // And PUBLIC VIEW IS THE DRAFT (founder 2026-11-06: "make sure the
+  // platform allows me to preview the changes on the platform, versus you
+  // sending me a link"): the owner previewing their own page sees pending
+  // work automatically — the banner says it's the unpublished draft; with no
+  // draft row it's simply the live page. Never on their own domain (that IS
+  // the live site).
+  const draftPreview = params.get('draft') === '1' || (previewing && isSelf && !forcePublic);
   const [draftOverlay, setDraftOverlay] = useState<PageDraft | null>(null);
   useEffect(() => {
     if (!draftPreview || !me || me !== id) { setDraftOverlay(null); return; }

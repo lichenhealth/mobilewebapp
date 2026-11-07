@@ -718,6 +718,10 @@ export default function PublicPage(props: PublicPageProps) {
   const navInHero = !(feedInRow && !asGuest);
   // The website masthead: public renderings only, never the builder.
   const siteHead = !!props.siteMasthead && asGuest && !ed;
+  // The corner doors (Request an invitation · Sign in) are the only thing the
+  // hero's tall top padding makes room for — without them it's dead air
+  // (founder 2026-11-06, circling the blank band above the view toggle).
+  const cornerDoors = !props.preview && !props.signedIn && page.join !== 'none';
   const navNode = navItems.length > 0 ? (
     <nav className={'ppage__nav' + (navInHero ? '' : ' ppage__nav--below')}>
       {navItems.map((n) => {
@@ -1015,7 +1019,7 @@ export default function PublicPage(props: PublicPageProps) {
           2026-07-29): Sign in for members everywhere; the invitation only
           where the page owner wants it (join !== quiet). Skipped for a
           signed-in viewer — they're already in. */}
-      {!props.preview && !props.signedIn && page.join !== 'none' && (
+      {cornerDoors && (
         <div className="ppage__corner">
           {page.join === 'full' || page.join === undefined ? (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
@@ -1043,15 +1047,14 @@ export default function PublicPage(props: PublicPageProps) {
       {/* 1 · Hero — a proper masthead (founder 2026-07-29): identity first
           (logo, name, tagline, address), then the nav doors, then the cover
           image. The image stays put while doors switch the content below. */}
-      <header className={'ppage__hero' + (siteHead ? ' ppage__hero--site' : '')}>
+      <header className={'ppage__hero' + (siteHead ? ' ppage__hero--site' + (cornerDoors ? '' : ' ppage__hero--nocorner') : '')}>
         {siteHead && (
           <>
             {props.belowIdentity}
+            {/* No avatar, no name (founder 2026-11-06, striking both): the
+                site's own words and cover carry who it is — the masthead is
+                just the nav, centred, like the site it replaces. */}
             <div className="ppage__sitehead">
-              <div className="ppage__brand">
-                <Avatar id={props.id} name={name} url={avatarUrl ?? undefined} size={40} />
-                <span className="ppage__brand-name">{name}</span>
-              </div>
               {navNode}
               {navItems.length === 0 && ctas.map((c) => (
                 <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
