@@ -1431,6 +1431,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         id={space.id}
         name={space.name}
         firstPerson
+        siteMasthead={(draftOverlay?.page ?? pageMeta)?.look === 'site' || searchParams.get('look') === 'site'}
         siteAddress={space.public_page && space.handle
           ? (domainsForHandle(space.handle)[0] ?? `lichen.health/${space.handle}`)
           : null}
@@ -1969,6 +1970,24 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                 Recommending, booking, messaging and events still require joining Lichen.</em>
             </span>
           </label>
+
+          {/* THE WEBSITE LOOK (founder 2026-11-06) — opt-in per space, so a
+              page already serving as someone's live site changes only on its
+              owner's word. ↗ Preview tries it without saving. */}
+          {publicPage && (
+            <label className="sprof__duty">
+              <input type="checkbox" checked={pageEdit.look === 'site'}
+                onChange={(e) => setPageEdit((p) => ({ ...p, look: e.target.checked ? 'site' : undefined }))} />
+              <span>
+                Website look
+                <em>A full-width photo header with the menu over it, large headings, and a
+                  “Powered by Lichen” footer — like a proper website.{' '}
+                  {space.handle && (
+                    <a href={`/${space.handle}?preview=1&look=site`} target="_blank" rel="noopener">↗ Preview it</a>
+                  )}</em>
+              </span>
+            </label>
+          )}
 
           {/* HOW LOUDLY THE PAGE RECRUITS (founder 2026-08-28). A page can go
               live as somebody's actual website before its owner has been
