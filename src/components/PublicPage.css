@@ -508,6 +508,11 @@
 .ppage__siteband { position: relative; isolation: isolate; color: var(--ink); }
 .ppage__siteband.has-cover { color: #fff; min-height: 46vh; display: flex; flex-direction: column; }
 .ppage__siteband.has-cover.is-home { min-height: min(92vh, 860px); }
+/* A tab's band grows toward its photo's own shape (~80% of the photo's
+   height at full width), never under 46vh, never past the fold. */
+.ppage__siteband.has-cover:not(.is-home) {
+  min-height: clamp(46vh, calc(100vw / var(--band-ar, 3) * 0.8), 86vh);
+}
 .ppage__siteband-img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2;
 }

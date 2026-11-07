@@ -1086,6 +1086,38 @@ export default function Profile() {
             </span>
           </label>
 
+          {/* WHAT YOU OFFER, IN YOUR WORDS (founder 2026-11-07): the open-web
+              page lists these instead of your Lichen service categories when
+              any are written — a marketing site says it your way. */}
+          <p className="prof__privacy-sub">What you offer — as your website says it</p>
+          <div className="prof__field">
+            {(pageMeta.offerings ?? []).map((line, i) => {
+              const [oname, ...rest] = line.split(' · ');
+              const terms = rest.join(' · ');
+              const write = (n: string, t: string) => setPageMeta((pm) => {
+                const next = [...(pm.offerings ?? [])];
+                next[i] = t.trim() ? `${n} · ${t}` : n;
+                return { ...pm, offerings: next };
+              });
+              return (
+                <div className="sprof__offer-row" key={i}>
+                  <input className="prof__input" value={oname} placeholder="Trauma-informed psychotherapy"
+                    onChange={(e) => write(e.target.value, terms)} />
+                  <input className="prof__input" value={terms} placeholder="50 min · sliding scale"
+                    onChange={(e) => write(oname, e.target.value)} />
+                  <button type="button" className="sprof__offer-rm" aria-label={`Remove ${oname || 'this line'}`}
+                    onClick={() => setPageMeta((pm) => ({ ...pm, offerings: (pm.offerings ?? []).filter((_, j) => j !== i) }))}>×</button>
+                </div>
+              );
+            })}
+            <button type="button" className="prof__addline"
+              onClick={() => setPageMeta((pm) => ({ ...pm, offerings: [...(pm.offerings ?? []), ''] }))}>+ Add a line</button>
+            <p className="prof__hint">
+              Leave this empty and your public page lists your Lichen service categories instead.
+              The terms side is optional.
+            </p>
+          </div>
+
           <p className="prof__privacy-sub">Your page&rsquo;s tabs</p>
           <PageTabsEditor
             tabs={pageMeta.tabs ?? []}
@@ -1103,6 +1135,8 @@ export default function Profile() {
             team={pageMeta.team ?? []}
             onTeam={(team) => setPage({ team })}
             homeSummary={pageMeta.homeSummary}
+            homeAsAbout={pageMeta.homeAs === 'about'}
+            onHomeAsAbout={(on) => setPage({ homeAs: on ? 'about' : undefined })}
             onHomeSummary={(text) => setPage({ homeSummary: text })}
             coverStyle={pageMeta.coverStyle}
             onCoverStyle={(style: 'photo' | 'plain' | 'tint') => setPage({ coverStyle: style })}
