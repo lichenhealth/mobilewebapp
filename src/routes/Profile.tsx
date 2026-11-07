@@ -458,6 +458,7 @@ export default function Profile() {
   // the address and the "serve this to the open web" switch are not page
   // content and go live with the publish itself.
   const liveBase = useRef<string>('');
+  const draftHydrated = useRef(false);
   const nowRef = useRef<PageDraft>({ page: {}, contact: {} });
   nowRef.current = { page: pageMeta, contact };
   const [draftPending, setDraftPending] = useState(false);
@@ -489,6 +490,13 @@ export default function Profile() {
           setSavedPublicPage(untouched ? true : !!r.public_page);
           setHandleState(r.handle ?? ''); setSavedHandle(r.handle ?? '');
           const live: PageDraft = { page: r.page ?? {}, contact: r.contact ?? {} };
+          // THE AUTOSAVE WAITS FOR THE DRAFT READ (2026-11-07, the founder's
+          // galynburke.com draft vanished): this effect re-runs on an auth
+          // refresh, seeding the form with the LIVE page first — and if the
+          // draft read took longer than the 1.2s debounce, the autosave saw
+          // "form == live" with a draft pending and DELETED the draft. Nothing
+          // may compare or clear until the draft has actually been read.
+          draftHydrated.current = false;
           liveBase.current = normalize(live);
           void readDraft('profile', user.id).then((kept) => {
             if (kept && !sameDraft(kept.draft, live)) {
@@ -498,7 +506,8 @@ export default function Profile() {
             } else if (kept) {
               void clearDraft('profile', user.id);
             }
-          });
+            draftHydrated.current = true;
+          }).catch(() => { /* unreadable → never autosave over an unknown draft */ });
         }
       });
   }, [user]);
@@ -508,7 +517,7 @@ export default function Profile() {
   // racy. A form that matches what's live has nothing pending — the row goes
   // rather than sitting there claiming unpublished work.
   useEffect(() => {
-    if (!user || !liveBase.current) return;
+    if (!user || !liveBase.current || !draftHydrated.current) return;
     const now = normalize(nowRef.current);
     const t = setTimeout(() => {
       if (now === liveBase.current) {
