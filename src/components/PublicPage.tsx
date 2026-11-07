@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { appUrl } from '../lib/customDomain';
 import { resolveSurface, readableAccent } from '../lib/pageColors';
 import { Icon, type IconName } from './Icon';
+import { LichenMark } from './LichenMark';
 import Avatar from './Avatar';
 import ContactFields, { ContactList, type ContactInfo } from './ContactFields';
 import { tabById, tabHasContent, isSectionTab, type PageTab } from '../lib/pageTabs';
@@ -44,6 +45,11 @@ export type FeedRenderCtx = {
 };
 
 export interface PageMeta {
+  /** 'site' = the full website look on public renderings (founder
+   *  2026-11-06 — /welcome's grammar: photo band, overlaid nav, Powered-by
+   *  footer). Members always wear it; a space opts in, so a page that is
+   *  already somebody's live site never changes look without its owner. */
+  look?: 'site';
   tagline?: string;
   story?: string;
   /** A live page with the link, but search engines asked to leave it alone
@@ -983,7 +989,7 @@ export default function PublicPage(props: PublicPageProps) {
 
   return (
     <div
-      className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '')
+      className={'ppage ppage--' + (page.coverStyle ?? 'plain') + (props.signedIn ? ' ppage--in-app' : '') + (siteHead ? ' ppage--site' : '')
         + (ed && tab === 'home' ? ' ppage--edit-home' : '')}
       onClick={routeHomeClick}
       style={{
@@ -1019,7 +1025,7 @@ export default function PublicPage(props: PublicPageProps) {
           2026-07-29): Sign in for members everywhere; the invitation only
           where the page owner wants it (join !== quiet). Skipped for a
           signed-in viewer — they're already in. */}
-      {cornerDoors && (
+      {cornerDoors && !siteHead && (
         <div className="ppage__corner">
           {page.join === 'full' || page.join === undefined ? (
             <button className="ppage__corner-cta" type="button" onClick={() => go('/signup')}>
@@ -1050,17 +1056,48 @@ export default function PublicPage(props: PublicPageProps) {
       <header className={'ppage__hero' + (siteHead ? ' ppage__hero--site' + (cornerDoors ? '' : ' ppage__hero--nocorner') : '')}>
         {siteHead && (
           <>
-            {props.belowIdentity}
-            {/* No avatar, no name (founder 2026-11-06, striking both): the
-                site's own words and cover carry who it is — the masthead is
-                just the nav, centred, like the site it replaces. */}
-            <div className="ppage__sitehead">
-              {navNode}
-              {navItems.length === 0 && ctas.map((c) => (
-                <a className="ppage__cta ppage__cta--nav" key={c.kind} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
-                  {c.label}
-                </a>
-              ))}
+            {/* THE WEBSITE LOOK (founder 2026-11-06: "I'd like our publicly
+                facing versions of lichen websites to look this professional
+                [as lichen.health/welcome]... like a website not a mobile web
+                app"): a full-bleed photo band with the nav laid over it and
+                the page's own line set large — /welcome's grammar, filled
+                with the owner's words and pictures. Off a cover photo it
+                falls back to the same bar and headline on the page's paper. */}
+            {props.belowIdentity && <div className="ppage__siteowner">{props.belowIdentity}</div>}
+            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (tab === 'home' || !tabbed ? ' is-home' : '')}>
+              {coverSrc && (
+                <img className="ppage__siteband-img" src={coverSrc} alt="" key={coverSrc}
+                  style={{ objectPosition: posToObjectPos(coverPos) }} />
+              )}
+              <div className="ppage__sitebar">
+                <button type="button" className="ppage__wordmark"
+                  onClick={() => chooseTab(homeItem.length ? 'home' : navItems[0]?.id ?? 'about')}>
+                  {name}
+                </button>
+                <div className="ppage__sitehead">{navNode}</div>
+                {cornerDoors && (
+                  <div className="ppage__sitedoors">
+                    {page.join === 'full' || page.join === undefined ? (
+                      <button className="ppage__sitedoor" type="button" onClick={() => go('/signup')}>Request an invitation</button>
+                    ) : null}
+                    <button className="ppage__sitedoor ppage__sitedoor--quiet" type="button" onClick={() => go('/login')}>Sign in</button>
+                  </div>
+                )}
+              </div>
+              <div className="ppage__sitehero">
+                {tab === 'home' || !tabbed ? (
+                  <>
+                    <h1 className={'ppage__sitehero-title' + ((page.tagline || name).length > 36 ? ' ppage__sitehero-title--long' : '')}>{page.tagline || name}</h1>
+                    {page.tagline && !props.kindIcon && kindLabel && (
+                      <p className="ppage__sitehero-sub">{kindLabel}</p>
+                    )}
+                  </>
+                ) : (
+                  <h1 className="ppage__sitehero-title ppage__sitehero-title--tab">
+                    {navItems.find((n) => n.id === tab)?.label ?? name}
+                  </h1>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -1144,7 +1181,7 @@ export default function PublicPage(props: PublicPageProps) {
               }))}
             />
           </div>
-        ) : coverSrc && (
+        ) : coverSrc && !siteHead && (
           <img
             className={'ppage__cover' + (coverFull ? ' ppage__cover--full' : '')}
             data-edit-region="cover"
@@ -1153,7 +1190,7 @@ export default function PublicPage(props: PublicPageProps) {
             onClick={() => setLightbox(coverSrc)} key={coverSrc}
           />
         )}
-        {asGuest && tab === 'home' && page.tagline && coverSrc && (
+        {asGuest && !siteHead && tab === 'home' && page.tagline && coverSrc && (
           <p className="ppage__tagline-under">{page.tagline}</p>
         )}
       </header>
@@ -1628,7 +1665,7 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead.
           Skipped entirely for a signed-in viewer — their real join/trust
           controls already rendered above, in `children`. */}
-      {props.signedIn ? null : page.join === 'quiet' || page.join === 'none' ? (
+      {props.signedIn ? null : (page.join === 'quiet' || page.join === 'none') && siteHead ? null : page.join === 'quiet' || page.join === 'none' ? (
         /* THE FLOOR (founder 2026-08-28): every public page carries the
            credit and the invitation, at whatever volume the owner chose.
            Turning the doors off turns them down to this line — it does not
@@ -1696,6 +1733,40 @@ export default function PublicPage(props: PublicPageProps) {
             <button className="ppage__join-quiet-link" onClick={() => go('/login')}>Sign in</button>
           </p>
         </section>
+      )}
+
+      {/* POWERED BY LICHEN (founder 2026-11-06: "at the bottom we can have
+          a powered by lichen, like a powered by squarespace or wix CTA").
+          The website's foot: the owner's name and doors, then Lichen's
+          credit with a way to make one's own — the floor line's job, at a
+          website's volume. Never in the builder. */}
+      {siteHead && (
+        <footer className="ppage__sitefoot">
+          <div className="ppage__sitefoot-in">
+            <div className="ppage__sitefoot-who">
+              <p className="ppage__sitefoot-name">{name}</p>
+              {navItems.length > 0 && (
+                <nav className="ppage__sitefoot-nav">
+                  {navItems.filter((n) => n.id !== 'feed').map((n) => (
+                    <button type="button" key={n.id} onClick={() => { chooseTab(n.id); window.scrollTo({ top: 0 }); document.getElementById('root')?.scrollTo({ top: 0 }); }}>
+                      {n.label}
+                    </button>
+                  ))}
+                </nav>
+              )}
+            </div>
+            <div className="ppage__poweredby">
+              <a className="ppage__poweredby-mark" href={appUrl('/welcome')} target="_blank" rel="noopener">
+                <LichenMark size={22} /> <span>Powered by <strong>Lichen</strong></span>
+              </a>
+              <p className="ppage__poweredby-line">A member-run network for care, work and a fairer economy.</p>
+              <button type="button" className="ppage__poweredby-cta"
+                onClick={() => go(props.knockSpace ? `/signup?from=${props.knockSpace.id}` : '/signup')}>
+                Make your own site on Lichen &rsaquo;
+              </button>
+            </div>
+          </div>
+        </footer>
       )}
     </div>
   );
