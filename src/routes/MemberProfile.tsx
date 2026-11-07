@@ -117,6 +117,10 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
 
   const isSelf = !!me && id === me;
   const [idTags, setIdTags] = useState<string[]>([]);
+  // Identity names → vocabulary ids, so each nested chip is a door to its
+  // gathering (/identities/<id>). A legacy free-text tag stays a plain chip.
+  const [idVocab, setIdVocab] = useState<Map<string, string>>(new Map());
+  const [idOpen, setIdOpen] = useState(false);
   // The open web (and the owner previewing) sees the shared page template.
   const [params, setParams] = useSearchParams();
   // forcePublic: on the member's OWN domain (galynburke.com, founder
@@ -171,6 +175,11 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
   useEffect(() => {
     let live = true;
     void getIdentityTags(id).then((t) => { if (live) setIdTags(t); });
+    void supabase.from('categories').select('id, name').eq('domain', 'identity').then(({ data }) => {
+      if (!live) return;
+      setIdVocab(new Map(((data as { id: string; name: string }[] | null) ?? [])
+        .map((c) => [c.name.trim().toLowerCase(), c.id])));
+    });
     return () => { live = false; };
   }, [id]);
   // Goods & Services addresses the member shows on their page.
@@ -301,11 +310,10 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
           vocabulary exists because the platform uses it, so the open web
           doesn't wear the bubbles — and preview must show what guests
           actually see. The public summary lives in the headline/story. */}
-      {!previewing && idTags.length > 0 && (
-        <p className="mprof__idtags">
-          {idTags.map((t) => <span className="mprof__idtag" key={t}>{t}</span>)}
-        </p>
-      )}
+      {/* The loose chips moved INTO the icon row as the Identities circle
+          (founder 2026-11-07: "an identities circle, should be in the row on
+          my profile. We're using a fingerprint for that. Let's nest therapist
+          and founder under it") — see memberFeed's trailing door. */}
       {/* A distributed being names its scope (founder 2026-08-14): the
           jurisdiction is part of who they are, not settings small-print. */}
       {isBeing && member.jurisdiction && (
@@ -420,7 +428,28 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
       assistantMember={ctx.guest || isSelf ? undefined : member.id}
       assistantOff={member.assistant_enabled === false}
       feedDoor={{ here: ctx.showing, onClick: ctx.open }}
-      navSlot={ctx.navSlot}
+      // The Identities circle (founder 2026-11-07): a fingerprint in the row,
+      // the member's identities nested under it — Lichen View furniture, the
+      // open web doesn't wear it (the 2026-08-26 chips rule carries over).
+      trailing={!ctx.guest && idTags.length > 0
+        ? [{ icon: 'fingerprint' as const, label: 'Identities', on: idOpen, onClick: () => setIdOpen((o) => !o) }]
+        : []}
+      navSlot={<>
+        {!ctx.guest && idOpen && idTags.length > 0 && (
+          <div className="mprof__idnest" role="group" aria-label={`${name}'s identities`}>
+            {idTags.map((t) => {
+              const cat = idVocab.get(t.trim().toLowerCase());
+              return cat
+                ? <button type="button" className="mprof__idtag mprof__idtag--door" key={t}
+                    onClick={() => navigate(`/identities/${cat}`)}>
+                    <Icon name="fingerprint" size={12} /> {t}
+                  </button>
+                : <span className="mprof__idtag" key={t}>{t}</span>;
+            })}
+          </div>
+        )}
+        {ctx.navSlot}
+      </>}
       // The escape is honest about what's behind it (founder 2026-08-17): a
       // homepage with something on it, or — for the owner — the builder; a
       // visitor to a bare page gets ScopeEmpty's own door to Lichen's feed.

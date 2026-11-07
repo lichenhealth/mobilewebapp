@@ -75,7 +75,9 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
   /** Far-right action circles AFTER the area icons — Members sits at the end
    *  of every space row, mirroring Home's Directory-at-the-far-right
    *  (founder 2026-07-25). */
-  trailing?: { icon: IconName; label: string; onClick: () => void }[];
+  /** `on` lights a trailing circle that toggles something open below the
+   *  row (the Identities circle, founder 2026-11-07) — the lit-lens look. */
+  trailing?: { icon: IconName; label: string; onClick: () => void; on?: boolean }[];
   /** Area lenses to leave out because a trailing door already opens that
    *  section properly — a space's Events tab beats an events-only filter,
    *  and two identical circles side by side read as a bug. */
@@ -276,7 +278,8 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
             </button>
           ))}
           {trailing.map((l) => (
-            <button key={l.label} className="cfeed__area" onClick={l.onClick}>
+            <button key={l.label} className={'cfeed__area' + (l.on ? ' is-here' : '')} onClick={l.onClick}
+              aria-pressed={l.on === undefined ? undefined : l.on}>
               <span className="cfeed__area-circle"><Icon name={l.icon} size={14} /></span>
               <span className="cfeed__area-label">{l.label}</span>
             </button>
