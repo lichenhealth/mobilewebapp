@@ -111,6 +111,16 @@
   font-size: 12px; color: var(--ink-soft);
 }
 
+/* The Identities circle's nest (founder 2026-11-07): under the icon row,
+   each identity a door to its gathering. */
+.mprof__idnest { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 var(--s-4); }
+.mprof__idtag--door {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink-soft);
+}
+.mprof__idtag--door svg { color: var(--peach-deep); }
+.mprof__idtag--door:hover { border-color: var(--peach); color: var(--peach-deep); }
+
 /* A being's kind and steward, under the name (founder 2026-08-05). */
 .mprof__being {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
