@@ -193,6 +193,7 @@
   margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
 }
+.ppage__para { margin: 0 0 1em; }
 .ppage__story p { margin: 0 0 12px; font-size: 15.5px; line-height: 1.7; color: var(--ink); max-width: 62ch; }
 .ppage__chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .ppage__chip {
@@ -591,7 +592,17 @@
   .ppage--site .ppage__sec { padding: 72px clamp(20px, 4vw, 48px); }
   .ppage--site .ppage__sec-title { font-size: 48px; }
   .ppage--site .ppage__lead { font-size: 30px; line-height: 1.3; }
-  .ppage--site .ppage__story p, .ppage--site .ppage__para { font-size: 18px; line-height: 1.75; max-width: 66ch; }
+  .ppage--site .ppage__story p, .ppage--site .ppage__para {
+    font-size: clamp(18px, 0.55vw + 10.5px, 21px); line-height: 1.75; max-width: none;
+  }
+  /* THE MEASURE SCALES AND CENTRES (founder 2026-11-07, an arrow drawn into
+     the empty right half of a wide screen): a prose section is one balanced
+     column whose width grows with the window — ~68 characters at any size —
+     never a left-hugging strip beside dead space. Split cards keep the full
+     1080 for their two columns. */
+  .ppage--site .ppage__sec:not(.ppage__sec--split) {
+    max-width: clamp(720px, 52vw + 120px, 980px);
+  }
 }
 .ppage--site .ppage__sec { border-top: none; }
 .ppage--site .ppage__sec + .ppage__sec { border-top: 1px solid var(--bone-edge-soft); }
@@ -639,4 +650,34 @@
   .ppage__sitebar { justify-content: center; text-align: center; }
   .ppage__sitehead { order: 3; flex-basis: 100%; }
   .ppage__wordmark { font-size: 22px; }
+}
+
+/* PARAGRAPHS BREATHE, SUB-HEADS SPEAK LICHEN'S LABEL (founder 2026-11-07:
+   "have a space between paragraphs and make the Headline copy the all caps
+   gray that's on lichen"): every prose paragraph carries a full line of air
+   below it, and a short standalone line (isSubhead in PublicPage) is set as
+   the gray tracked all-caps label — the .ppage__h2 grammar, a step larger —
+   with more air above than below, so it belongs to what follows. */
+.ppage--site .ppage__para, .ppage--site .ppage__story p { margin: 0 0 1.1em; }
+.ppage__subhead {
+  margin: 2em 0 0.9em; font-family: var(--font-mono); font-weight: 500;
+  font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-muted);
+}
+.ppage--site .ppage__subhead { font-size: 13px; }
+.ppage__lead + .ppage__subhead, .ppage__sec > .ppage__subhead:first-child { margin-top: 0.4em; }
+/* A TALL PHOTO IN A WIDE BAND SITS BESIDE THE TITLE (founder 2026-11-07:
+   "smart cropping or expanding of photos… the way a human designer would"):
+   cropping a portrait shot to a wide strip throws most of it away, so on wide
+   screens the photo keeps the right side whole and the title stands on dark
+   paper to its left. Phones keep the full-bleed band — a phone IS portrait. */
+@media (min-width: 900px) {
+  .ppage__siteband.has-cover.is-portrait { background: #1d2326; min-height: min(86vh, 820px); }
+  .ppage__siteband.has-cover.is-portrait .ppage__siteband-img {
+    left: auto; right: 0; width: 46%;
+  }
+  .ppage__siteband.has-cover.is-portrait::after {
+    background: linear-gradient(90deg, #1d2326 0%, #1d2326 50%, rgba(29,35,38,0.5) 58%, rgba(29,35,38,0) 72%),
+      linear-gradient(180deg, rgba(18,22,24,0.5) 0%, transparent 22%);
+  }
+  .ppage__siteband.has-cover.is-portrait .ppage__sitehero > * { max-width: 48%; }
 }
