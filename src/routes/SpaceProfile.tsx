@@ -301,6 +301,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // the public builder drafts and publishes belongs here.
   type SpaceShared = { page: PageMeta; contact: ContactInfo };
   const sharedBase = useRef<string>('');
+  const draftHydrated = useRef(false);
   const sharedNow = useRef<SpaceShared>({ page: {}, contact: {} });
   sharedNow.current = { page: pageEdit, contact };
   const [pageAhead, setPageAhead] = useState<SpaceShared | null>(null);
@@ -408,6 +409,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       setContentAiDefault(s.content_ai_default !== false);
       setContentDownloadDefault(s.content_download_default !== false);
       const loadedPage = ((sx as { page?: PageMeta }).page ?? {}) as PageMeta;
+      // The autosave waits for the draft read (2026-11-07 — see Profile.tsx).
+      draftHydrated.current = false;
       setPageEdit(loadedPage);
       const live: SpaceShared = { page: loadedPage, contact: (sx.contact ?? {}) as ContactInfo };
       sharedBase.current = JSON.stringify(live);
@@ -424,6 +427,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         setDraftPending(false);
         if (kept) void clearDraft('space', id);   // a draft identical to live is noise
       }
+      draftHydrated.current = true;
       setPageMeta(((s as unknown as { page?: PageMeta | null }).page) ?? {});
       if (s.kind === 'community') {
         // Identity vocabulary — names stored on the row map onto picker ids;
@@ -808,7 +812,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // the live page has nothing pending, so the row is deleted rather than
   // kept as an empty promise of unpublished work.
   useEffect(() => {
-    if (!backstage || loading || !sharedBase.current) return;
+    if (!backstage || loading || !sharedBase.current || !draftHydrated.current) return;
     const now = JSON.stringify(sharedNow.current);
     const t = setTimeout(() => {
       if (now === sharedBase.current) {
