@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
+import { loadSpaceMembers } from '../lib/spacesApi';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
@@ -331,6 +332,19 @@ export default function Compose() {
   const [glName, setGlName] = useState('');
   const [glMsg, setGlMsg] = useState<string | null>(null);
   const [glDel, setGlDel] = useState<string | null>(null);
+  // WHERE EACH INVITEE CAME FROM (founder 2026-11-08: "a carrot when you add
+  // more than one list, which expands to the individual members of the list
+  // … so they can remove some members"): key → source ('gl:<list>' or
+  // 'sp:<circle>'), so the chips render GROUPED under their list/circle.
+  // Display only — publishing still reads the flat invitees.
+  const [invSrc, setInvSrc] = useState<Record<string, string>>({});
+  const [srcNames, setSrcNames] = useState<Record<string, string>>({});
+  const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
+  // A checked circle can be OPENED to see who it reaches (members of a
+  // circle you're in are readable to you — space_members RLS). Removing one
+  // person turns the circle into individual invitations for everyone else.
+  const [circleOpen, setCircleOpen] = useState<string | null>(null);
+  const [circleMembers, setCircleMembers] = useState<Record<string, { id: string; name: string }[] | 'loading'>>({});
   async function loadGuestLists() {
     if (!user) return;
     const { data } = await supabase.from('guest_lists').select('id, name, entries, space_ids')
@@ -351,6 +365,7 @@ export default function Compose() {
     applyGuestList(gl);
   }, [guestLists, mySpaces]);
   function applyGuestList(gl: GuestList) {
+    tagSource(`gl:${gl.id}`, gl.name, gl.entries);
     for (const inv of gl.entries) addInvitee(inv);
     const mine = new Set(mySpaces.map((sp) => sp.id));
     const add = gl.space_ids.filter((id) => mine.has(id));
@@ -399,6 +414,39 @@ export default function Compose() {
     }, 250);
     return () => window.clearTimeout(t);
   }, [invQ, user?.id]);
+  const invKey = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
+  /** Remember which list/circle brought these people in (first source wins —
+   *  someone already on the list stays where they were). */
+  function tagSource(src: string, name: string, list: EvInvitee[]) {
+    setSrcNames((cur) => ({ ...cur, [src]: name }));
+    setInvSrc((cur) => {
+      const n = { ...cur };
+      for (const inv of list) { const k = invKey(inv); if (!n[k] && !invitees.some((x) => invKey(x) === k)) n[k] = src; }
+      return n;
+    });
+  }
+  async function openCircle(id: string) {
+    if (circleOpen === id) { setCircleOpen(null); return; }
+    setCircleOpen(id);
+    if (circleMembers[id]) return;
+    setCircleMembers((c) => ({ ...c, [id]: 'loading' }));
+    const rows = await loadSpaceMembers(id);
+    setCircleMembers((c) => ({ ...c, [id]: rows
+      .filter((r) => r.profile_id !== user?.id)
+      .map((r) => ({ id: r.profile_id, name: r.profile?.full_name ?? 'A member' })) }));
+  }
+  /** Leave one person out of a circle invite: the circle becomes individual
+   *  invitations for everyone else, grouped under the circle's name. */
+  function trimCircle(sp: { id: string; name: string }, dropId: string) {
+    const ms = circleMembers[sp.id];
+    if (!Array.isArray(ms)) return;
+    const keep: EvInvitee[] = ms.filter((m) => m.id !== dropId).map((m) => ({ kind: 'member', id: m.id, name: m.name }));
+    tagSource(`sp:${sp.id}`, sp.name, keep);
+    keep.forEach(addInvitee);
+    setAudienceSpaces((cur) => { const n = new Set(cur); n.delete(sp.id); return n; });
+    setSrcOpen((o) => ({ ...o, [`sp:${sp.id}`]: true }));
+    setCircleOpen(null);
+  }
   function addInvitee(inv: EvInvitee) {
     setInvitees((cur) => {
       const key = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
@@ -1551,18 +1599,54 @@ export default function Compose() {
         // ONE chips row, color-coded (founder 2026-11-04: "peach for on
         // lichen and gray for phone numbers, etc"): member chips PEACH,
         // email/phone chips GRAY. Removal is by identity, never index.
-        const chipRow = (list: EvInvitee[]) => (editing || list.length === 0) ? null : (
-          <div className="cmp__invchips">
-            {list.map((inv) => (
-              <span key={ikey(inv)} className={'cmp__invchip' + (inv.kind === 'member' ? '' : ' cmp__invchip--off')}>
-                <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
-                {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
-                <button className="cmp__invchip-x" aria-label="Remove"
-                  onClick={() => setInvitees((cur) => cur.filter((x) => ikey(x) !== ikey(inv)))}>×</button>
-              </span>
-            ))}
-          </div>
+        const chip = (inv: EvInvitee) => (
+          <span key={ikey(inv)} className={'cmp__invchip' + (inv.kind === 'member' ? '' : ' cmp__invchip--off')}>
+            <Icon name={inv.kind === 'member' ? 'profile' : inv.kind === 'email' ? 'send' : 'phone'} size={12} />
+            {inv.kind === 'member' ? inv.name : (inv.name ? `${inv.name} · ${inv.value}` : inv.value)}
+            <button className="cmp__invchip-x" aria-label="Remove"
+              onClick={() => setInvitees((cur) => cur.filter((x) => ikey(x) !== ikey(inv)))}>×</button>
+          </span>
         );
+        // GROUPED BY WHERE THEY CAME FROM (founder 2026-11-08): each list or
+        // trimmed circle is a header with a carrot; its people sit indented
+        // under it. One group stands open; several fold shut (tap to open).
+        const chipRow = (list: EvInvitee[]) => {
+          if (editing || list.length === 0) return null;
+          const order: string[] = [];
+          const bySrc: Record<string, EvInvitee[]> = {};
+          const loose: EvInvitee[] = [];
+          for (const inv of list) {
+            const src = invSrc[ikey(inv)];
+            if (!src) { loose.push(inv); continue; }
+            if (!bySrc[src]) { bySrc[src] = []; order.push(src); }
+            bySrc[src].push(inv);
+          }
+          return (
+            <div className="cmp__invlist">
+              {order.map((src) => {
+                const open = srcOpen[src] ?? order.length === 1;
+                const people = bySrc[src];
+                return (
+                  <div className="cmp__invsrc" key={src}>
+                    <div className="cmp__invsrc-head">
+                      <button className={'cmp__invsrc-fold' + (open ? ' is-open' : '')} aria-expanded={open}
+                        onClick={() => setSrcOpen((o) => ({ ...o, [src]: !open }))}>
+                        <Icon name="chevron-right" size={12} />
+                        <Icon name="user-multiple" size={13} />
+                        <span>{srcNames[src] ?? 'List'}</span>
+                        <span className="cmp__gl-n">{people.length}</span>
+                      </button>
+                      <button className="cmp__invchip-x" aria-label={`Remove everyone from ${srcNames[src] ?? 'this list'}`}
+                        onClick={() => setInvitees((cur) => cur.filter((x) => invSrc[ikey(x)] !== src))}>×</button>
+                    </div>
+                    {open && <div className="cmp__invchips cmp__invchips--sub">{people.map(chip)}</div>}
+                  </div>
+                );
+              })}
+              {loose.length > 0 && <div className="cmp__invchips">{loose.map(chip)}</div>}
+            </div>
+          );
+        };
         return (
           <>
             <label className="cmp__label">Who&rsquo;s invited?</label>
@@ -1572,23 +1656,6 @@ export default function Compose() {
               <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
             )}
             {!editing && (<>
-            {guestLists.length > 0 && (
-              <div className="cmp__gl">
-                <span className="cmp__gl-lbl">Your guest lists</span>
-                {guestLists.map((gl) => (
-                  <span key={gl.id} className="cmp__gl-chip">
-                    <button className="cmp__gl-use" onClick={() => applyGuestList(gl)}>
-                      <Icon name="user-multiple" size={12} /> {gl.name}
-                      <span className="cmp__gl-n">{gl.entries.length + gl.space_ids.length}</span>
-                    </button>
-                    <button className={'cmp__gl-x' + (glDel === gl.id ? ' is-armed' : '')}
-                      aria-label={`Delete ${gl.name}`} onClick={() => void deleteGuestList(gl.id)}>
-                      {glDel === gl.id ? 'Delete?' : '×'}
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
             <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
               placeholder="Name, circle, email or phone"
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
@@ -1643,6 +1710,27 @@ export default function Compose() {
                 Anyone). The shareable link INHERITS whatever the ladder
                 says — the Drive-tier rule, no second setting. */}
             <div className="cmp__invgroup">
+            {!editing && (<>
+            {guestLists.length > 0 && (
+              <div className="cmp__gl">
+                <span className="cmp__gl-lbl">Your guest lists</span>
+                {guestLists.map((gl) => (
+                  <span key={gl.id} className={'cmp__gl-chip' + (invitees.some((x) => invSrc[ikey(x)] === `gl:${gl.id}`) ? ' is-on' : '')}>
+                    <button className="cmp__gl-use" onClick={() => (invitees.some((x) => invSrc[ikey(x)] === `gl:${gl.id}`)
+                      ? setInvitees((cur) => cur.filter((x) => invSrc[ikey(x)] !== `gl:${gl.id}`))
+                      : applyGuestList(gl))}>
+                      <Icon name="user-multiple" size={12} /> {gl.name}
+                      <span className="cmp__gl-n">{gl.entries.length + gl.space_ids.length}</span>
+                    </button>
+                    <button className={'cmp__gl-x' + (glDel === gl.id ? ' is-armed' : '')}
+                      aria-label={`Delete ${gl.name}`} onClick={() => void deleteGuestList(gl.id)}>
+                      {glDel === gl.id ? 'Delete?' : '×'}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            </>)}
               {chipRow(invitees)}
               {!editing && (invitees.length > 0 || audienceSpaces.size > 0) && (
                 glSaving ? (
@@ -1689,11 +1777,41 @@ export default function Compose() {
                       <div className="cmp__aud-group" key={kind}>
                         <span className="cmp__aud-kind">{label}</span>
                         {of.map((sp) => (
-                          <label className="cmp__aud-row" key={sp.id}>
-                            <input type="checkbox" checked={audienceSpaces.has(sp.id)}
-                              onChange={() => pickCircle(sp.id)} />
-                            <span>{sp.name}</span>
-                          </label>
+                          <div key={sp.id}>
+                            <div className="cmp__aud-rowwrap">
+                              <label className="cmp__aud-row">
+                                <input type="checkbox" checked={audienceSpaces.has(sp.id)}
+                                  onChange={() => pickCircle(sp.id)} />
+                                <span>{sp.name}</span>
+                              </label>
+                              {audienceSpaces.has(sp.id) && !editing && (
+                                <button className={'cmp__aud-peek' + (circleOpen === sp.id ? ' is-open' : '')}
+                                  aria-expanded={circleOpen === sp.id} onClick={() => void openCircle(sp.id)}>
+                                  Who <Icon name="chevron-right" size={11} />
+                                </button>
+                              )}
+                            </div>
+                            {circleOpen === sp.id && (() => {
+                              const ms = circleMembers[sp.id];
+                              if (ms === 'loading' || !ms) return <p className="cmp__aud-peeknote">Gathering who&rsquo;s in it…</p>;
+                              if (!ms.length) return <p className="cmp__aud-peeknote">Nobody else is in this {sp.kind} yet.</p>;
+                              if (ms.length > 150) return <p className="cmp__aud-peeknote">{ms.length} people — too many to trim one by one here.</p>;
+                              return (
+                                <div className="cmp__aud-peek-list">
+                                  <p className="cmp__aud-peeknote">Taking someone off turns this {sp.kind} into individual invitations — everyone else stays invited.</p>
+                                  <div className="cmp__invchips cmp__invchips--sub">
+                                    {ms.map((m) => (
+                                      <span key={m.id} className="cmp__invchip">
+                                        <Icon name="profile" size={12} /> {m.name}
+                                        <button className="cmp__invchip-x" aria-label={`Leave ${m.name} out`}
+                                          onClick={() => trimCircle(sp, m.id)}>×</button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
                         ))}
                       </div>
                     );
