@@ -376,8 +376,7 @@ export default function PostPage(props: { postId?: string } = {}) {
         <section className="postp__join">
           <p className="postp__join-lead">This lives on <strong>Lichen</strong>.</p>
           <p className="postp__join-sub">
-            A member-run network for care, work, offerings and a fairer
-            economy — where trust is a path through real relationships, not a
+            A member owned and operated network for health care, community and commerce, coordinated via a reciprocal economy — where trust is a path through real relationships, not a
             star rating. Lichen grows by invitation; introduce yourself and a
             real person writes back.
           </p>
