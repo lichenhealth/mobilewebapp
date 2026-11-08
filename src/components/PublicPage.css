@@ -715,3 +715,26 @@
   background: none; border: none; padding: 0; cursor: pointer; color: inherit; font: inherit;
   text-decoration: underline; text-underline-offset: 3px;
 }
+
+/* MARKUP FIXES (founder 2026-11-08, four grab-pen notes on Countryman's site).
+   Each layout choice is page DATA (page.layout) so the builder and the
+   in-app Claude set it alike. */
+/* The logo: centred over the headline column and nudged up ("move the logo
+   to the middle and up slightly"). 'left' keeps the old flush-left. */
+.ppage__sitelogo-row { display: flex; }
+.ppage__sitelogo-row.is-center { justify-content: center; }
+.ppage__sitelogo-row.is-center .ppage__sitelogo { margin-top: calc(-1 * clamp(12px, 3vh, 32px)); }
+@media (min-width: 900px) {
+  .ppage__siteband.has-cover.is-portrait .ppage__sitehero > .ppage__sitelogo-row { max-width: 48%; }
+}
+/* A tab's band with its summary inside: title and lead stand together in the
+   middle of the dark half, not pinned to the bottom of an empty field. */
+.ppage__sitehero-lead {
+  font-family: var(--font-display); font-size: clamp(20px, 2vw, 28px); line-height: 1.35; max-width: 30ch;
+}
+@media (min-width: 900px) {
+  .ppage__siteband.has-cover.is-portrait.has-lead .ppage__sitehero { margin-block: auto; padding-block: var(--s-6); }
+}
+/* A tab with no photo (Contact): the title leads straight into its content
+   instead of floating over a wide gap ("so it doesn't look so weird"). */
+.ppage__siteband:not(.has-cover):not(.is-home) .ppage__sitehero { padding-bottom: 0; }
