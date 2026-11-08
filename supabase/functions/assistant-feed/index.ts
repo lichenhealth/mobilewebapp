@@ -32,6 +32,7 @@ import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage } from '../_shared/webRead.ts';
 import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
+import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool } from '../_shared/lifeTools.ts';
 import { videoServiceOf } from '../_shared/videoHosts.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
@@ -513,6 +514,9 @@ const READ_INTAKE_DRAFT_TOOL = {
   description: 'Read their in-progress Web of Wellbeing intake — answers typed but not yet woven into their board (per dimension: where they are now, what is in the way, score), plus the money and needs fields when filled. A dimension they ticked "Omit from AI" comes back withheld. Use it to help them think through or finish the intake; weaving stays their tap in the intake.',
   input_schema: { type: 'object', properties: {}, required: [] },
 };
+
+// Reply shapes that send a member off to do by hand what a tool could do.
+const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)/i;
 
 const POST_TOOLS = [
   {
@@ -1041,6 +1045,10 @@ Deno.serve(async (req) => {
   let canCalendar = false;
   let canCourses = false;
   let canPosts = false;
+  // Rung-1 life tools ride the same hand-that-writes flag; each tool bows
+  // to its own section's switch through offSections.
+  const offSections = new Set<string>();
+  let canLife = false;
   let canSpaceEdit = false;
   let handThatWrites = false;
   let isPlatformAdmin = false;
@@ -1072,6 +1080,7 @@ Deno.serve(async (req) => {
     // posts for me"): same flag — draft_post writes the same post_drafts row
     // Compose autosaves, and the PERSON's tap on Post is what publishes.
     canPosts = !spaceId && flag;
+    canLife = !spaceId && flag;
     // Rung 2 (founder 2026-08-22): the same flag arms SPACE page tools in a
     // space's build thread — but only for a steward of the space, and only
     // while the space's own assistant switch is on (checked above; an off
@@ -1085,10 +1094,11 @@ Deno.serve(async (req) => {
   // "AI on for calendar but not profile" must hold from every room. One
   // read of the member's few enabled=false rows (the consent.ts shape);
   // a failed read fails OPEN, the standing default-on doctrine.
-  if (!spaceId && (canEdit || canCalendar || canCourses || canPosts)) {
+  if (!spaceId && (canEdit || canCalendar || canCourses || canPosts || canLife)) {
     try {
       const offRows = await (await sb(`assistant_consent?profile_id=eq.${profile_id}&enabled=eq.false&scope_type=eq.section&select=scope_id`)).json();
       const off = new Set((Array.isArray(offRows) ? offRows : []).map((r: { scope_id: string }) => String(r.scope_id)));
+      off.forEach((x) => offSections.add(x));
       if (off.has('profile')) canEdit = false;
       if (off.has('calendar')) canCalendar = false;
       if (off.has('courses')) canCourses = false;
@@ -1249,9 +1259,13 @@ Deno.serve(async (req) => {
       + '\n- Photos are added in the composer when they review — say so when the thing wants a picture.'
       + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
       + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
-      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one.';
+      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one.'
+      ;
   }
 
+  const lifeRule = canLife
+    ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
+    : '';
   let calendarRule = '';
   if (canCalendar) {
     calendarRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR CALENDAR SETTINGS. They have turned on "Let Claude edit my page directly", which arms your calendar tools here. How to hold it:'
@@ -1341,6 +1355,9 @@ Deno.serve(async (req) => {
     // ── Read a website the member linked (2026-08-24). The guard IS the
     // feature: the host must appear in the member's own words in this
     // thread, so the model can only ever read what it was handed.
+    if (name in LIFE_TOOL_SECTION) {
+      return await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null);
+    }
     if (name === 'read_website') {
       const raw = String(input.url ?? '').trim();
       if (!raw) return { ok: false, error: 'No address given.' };
@@ -2899,6 +2916,7 @@ Deno.serve(async (req) => {
     my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
+    ...LIFE_TOOL_SECTION,
   };
   const touchedSections = new Set<string>();
   const sectionOfTool = (name: string): string | null =>
@@ -2959,6 +2977,11 @@ Deno.serve(async (req) => {
   let inputTokens = 0;
   let outputTokens = 0;
   let round = 0;
+  let deflectRetried = false;
+  let parityFiled = false;
+  const anyToolsArmed = !spaceRoom && (canEdit || canCalendar || canCourses || canPosts || canLife || canSpaceEdit);
+  // They ASKED to do it themselves — pointing at the screen is then the answer.
+  const askedForManual = /\b(manually|myself|by hand|how do i|where do i|show me where)\b/i.test(String(trigger.body ?? ''));
   // THINKING ATE THE WHOLE CEILING (2026-11-08, the Countryman markup ask:
   // 4096 output tokens spent, zero text, zero tool calls): the model thinks
   // by default, and thinking draws from max_tokens. A starved answer gets ONE
@@ -2983,13 +3006,13 @@ Deno.serve(async (req) => {
         // 1600 tokens) — a cap is a ceiling, not a spend, so give tool
         // threads real room.
         ...(starved ? { thinking: { type: 'disabled' } } : {}),
-        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 8192 : 2048,
+        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canLife || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 8192 : 2048,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,
@@ -3012,6 +3035,7 @@ Deno.serve(async (req) => {
                      ...(canCalendar ? CALENDAR_TOOLS : []),
                      ...(canCourses ? COURSE_TOOLS : []),
                      ...(canPosts ? POST_TOOLS : []),
+                     ...(canLife ? LIFE_TOOLS : []),
                      ...(canReadPostDrafts ? [READ_POST_DRAFTS_TOOL] : []),
                      ...(canReadIntake ? [READ_INTAKE_DRAFT_TOOL] : []),
                      ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
@@ -3036,6 +3060,26 @@ Deno.serve(async (req) => {
         console.error('starved-retry', JSON.stringify({ feed_post_id, thread, output_tokens: outputTokens }));
         starved = true;
         continue;
+      }
+      // THE PARITY GUARD (founder 2026-11-08: "these foundational rules…
+      // need to stick and they often don't"). A prose rule drifts; a check in
+      // the loop doesn't. A reply that sends the member off to do it by hand
+      // gets ONE re-think naming the rule — and if it still deflects, the gap
+      // files itself into dev_reports so the builder session sees it.
+      const text = (data?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
+      if (anyToolsArmed && DEFLECT_RE.test(text) && !deflectRetried && !askedForManual) {
+        deflectRetried = true;
+        console.error('parity-deflect-retry', JSON.stringify({ feed_post_id, thread }));
+        messages.push({ role: 'assistant', content: data.content });
+        messages.push({ role: 'user', content: '[System check, not the member:] Your draft reply sends them to do it by hand. Lichen\'s rule: anything a member can do manually, you do from their words with your tools — fill the draft/rows as far as they have said, leave undecided parts blank, and hand the review button; their tap is only for publishing, sending to others, or money. Re-check your tools and use the one that fits. If truly none fits, say plainly that you can\'t do that part yet, and call file_dev_report naming the missing tool. Write the reply to the member now (no mention of this check).' });
+        continue;
+      }
+      if (anyToolsArmed && DEFLECT_RE.test(text) && deflectRetried && !askedForManual && !parityFiled) {
+        parityFiled = true;
+        await fileDevReport(sb, profile_id, `assistant:${thread} [parity-guard]`, {
+          summary: 'Parity gap: assistant sent the member to do it by hand',
+          details: `Member asked: "${String(trigger.body ?? '').slice(0, 800)}"\n\nAssistant replied: "${text.slice(0, 1200)}"`,
+        }).catch(() => {});
       }
       break;
     }
