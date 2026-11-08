@@ -2705,6 +2705,11 @@ Deno.serve(async (req) => {
   let inputTokens = 0;
   let outputTokens = 0;
   let round = 0;
+  // THINKING ATE THE WHOLE CEILING (2026-11-08, the Countryman markup ask:
+  // 4096 output tokens spent, zero text, zero tool calls): the model thinks
+  // by default, and thinking draws from max_tokens. A starved answer gets ONE
+  // re-run with thinking off rather than an "I hit a snag" note.
+  let starved = false;
   let data: {
     content?: { type: string; text?: string; id?: string; name?: string; input?: Record<string, string & string[]> }[];
     usage?: { input_tokens?: number; output_tokens?: number };
@@ -2723,7 +2728,8 @@ Deno.serve(async (req) => {
         // of add_booking_type calls with custom hours is more JSON than
         // 1600 tokens) — a cap is a ceiling, not a spend, so give tool
         // threads real room.
-        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 4096 : 2048,
+        ...(starved ? { thinking: { type: 'disabled' } } : {}),
+        max_tokens: (canEdit || canCalendar || canCourses || canPosts || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 8192 : 2048,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
         // inside the cached block it would bust the doctrine's prompt cache
@@ -2767,7 +2773,16 @@ Deno.serve(async (req) => {
     outputTokens += data?.usage?.output_tokens ?? 0;
 
     const calls = (data?.content ?? []).filter((c) => c.type === 'tool_use');
-    if (!calls.length) break;
+    if (!calls.length) {
+      const said = (data?.content ?? []).some((c) => c.type === 'text' && (c.text ?? '').trim());
+      const stop = (data as { stop_reason?: string })?.stop_reason;
+      if (!said && stop === 'max_tokens' && !starved) {
+        console.error('starved-retry', JSON.stringify({ feed_post_id, thread, output_tokens: outputTokens }));
+        starved = true;
+        continue;
+      }
+      break;
+    }
 
     messages.push({ role: 'assistant', content: data.content });
     // Parallel calls come back in ONE user message — splitting them teaches

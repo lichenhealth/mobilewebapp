@@ -46,7 +46,7 @@
 .ppage--in-app .ppage__hero { padding-top: var(--s-3); }
 .ppage--in-app .ppage__hero-body { padding-top: 0; }
 .ppage__preview {
-  margin: 0; padding: 8px var(--s-5); background: var(--peach-tint);
+  margin: 0; padding: 8px var(--s-5); background: var(--bone);
   color: var(--ink-soft); font-size: 12.5px; text-align: center;
 }
 .ppage__hero { position: relative; }
@@ -681,3 +681,31 @@
   }
   .ppage__siteband.has-cover.is-portrait .ppage__sitehero > * { max-width: 48%; }
 }
+
+/* One beige strip while previewing: the view toggle at the left, the
+   preview note beside it (founder 2026-11-08). Wraps whole on a phone. */
+.ppage__topstrip {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px var(--s-4);
+  padding: 6px var(--s-5); background: var(--bone);
+}
+.ppage__topstrip .view-toggle-row { margin: 0; }
+.ppage__topstrip .mprof__actions { margin-top: 0; }
+.ppage__topstrip-note {
+  margin: 0 0 0 auto; color: var(--ink-soft); font-size: 12.5px;
+}
+@media (max-width: 640px) { .ppage__topstrip-note { margin-left: 0; } }
+/* A space's logo above its front-page headline (founder 2026-11-08). */
+.ppage__sitelogo {
+  display: block; width: clamp(110px, 10vw, 150px); height: auto; max-height: 150px;
+  object-fit: contain; border-radius: 50%; margin: 0 0 clamp(16px, 3vh, 28px);
+  /* A logo drawn in dark ink on transparency vanishes on the dark band
+     (Countryman's did) — it sits on a white disc, the way the app's own
+     corner chip shows it. */
+  aspect-ratio: 1; box-sizing: border-box; padding: clamp(8px, 0.8vw, 12px);
+  background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+}
+/* Desktop only (founder 2026-11-08: "can you have it different on desktop
+   and mobile?"): on a phone the Home band is one full-bleed photo, and a
+   logo there would sit on top of the rider. The bar's wordmark carries the
+   name at that width; the logo appears where the band splits dark/photo. */
+@media (max-width: 899px) { .ppage__sitelogo { display: none; } }
