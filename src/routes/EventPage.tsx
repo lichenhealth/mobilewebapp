@@ -77,6 +77,19 @@ export default function EventPage(props: { postId?: string } = {}) {
   const load = useCallback(async () => {
     setLoading(true);
     const p = await loadPost(postId);
+    // AN EVENTS-ROW ID IS ALSO A FAIR DOOR (founder 2026-11-08: the brain
+    // linked "Kapulli in Mexico" — a calendar-only event, no post — to
+    // /events/<event id> and the page said "isn't available"). No post by
+    // that id: look for an EVENT; walk to its post when one links it, else
+    // to its day on the calendar, where calendar-only events live.
+    if (!p) {
+      const { data: ev } = await supabase.from('events').select('id, start_date').eq('id', postId).maybeSingle();
+      if (ev) {
+        const { data: lp } = await supabase.from('posts').select('id').eq('linked_event_id', ev.id).limit(1).maybeSingle();
+        navigate(lp ? `/events/${lp.id}` : `/calendar?d=${ev.start_date}`, { replace: true });
+        return;
+      }
+    }
     setPost(p);
     if (p?.linked_event_id) {
       const [ev, ups] = await Promise.all([
