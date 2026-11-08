@@ -1596,8 +1596,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
         {!me && (
           <div className="sprof__guest">
             <p className="sprof__guest-lead">
-              This page lives on <strong>Lichen</strong> — a member-run network for care,
-              work and a fairer economy.
+              This page lives on <strong>Lichen</strong> — a member owned and operated network for health care, community and commerce, coordinated via a reciprocal economy.
             </p>
             <p className="sprof__guest-sub">
               To recommend {space.name}, book a time, message them, or join their events,

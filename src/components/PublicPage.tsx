@@ -1769,8 +1769,7 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">Request to join <strong>{name}</strong></p>
           <p className="ppage__join-sub">
-            {name} lives on <strong>Lichen</strong> — a member-run network for care, work,
-            offerings and a fairer economy, where trust is a path through real relationships,
+            {name} lives on <strong>Lichen</strong> — a member owned and operated network for health care, community and commerce, coordinated via a reciprocal economy, where trust is a path through real relationships,
             not a star rating. Joining this {props.knockSpace.kindLabel.toLowerCase()} means becoming
             a Lichen member (free while Lichen is in alpha), so it&rsquo;s worth a look at
             what you&rsquo;d be part of. Introduce yourself below and {name}&rsquo;s stewards
@@ -1789,7 +1788,7 @@ export default function PublicPage(props: PublicPageProps) {
         <section className="ppage__join" data-edit-region="join">
           <p className="ppage__join-lead">This page lives on <strong>Lichen</strong>.</p>
           <p className="ppage__join-sub">
-            A member-run network for care, work, offerings and a fairer economy — where trust is
+            A member owned and operated network for health care, community and commerce, coordinated via a reciprocal economy — where trust is
             a path through real relationships, not a star rating. You don&rsquo;t need an account
             to book time with {name} or to come to an event you&rsquo;ve been invited to.
             Recommending, messaging and joining the wider network are for members &mdash; Lichen
