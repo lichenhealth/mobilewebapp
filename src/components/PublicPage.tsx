@@ -1050,7 +1050,23 @@ export default function PublicPage(props: PublicPageProps) {
         ['--ppage-edge' as string]: surface.edge,
       }}
     >
-      {props.preview && (
+      {/* ONE BEIGE STRIP (founder 2026-11-08, marking up Countryman's
+          preview: "make the peach and white all beige, and move the admin
+          panel up a bit so its not right on top of the website preview"):
+          while previewing, the view toggle rides the banner's own row
+          instead of a white band sitting on the site's top edge. */}
+      {props.preview && (props.aboveHero || props.heroSignals) && !ed && (
+        <div className="ppage__topstrip">
+          {props.aboveHero}
+          {props.heroSignals}
+          <p className="ppage__topstrip-note">
+            {props.draftBanner
+              ? 'Previewing the unpublished draft — the live page still shows what was last published.'
+              : 'Preview — this is what the open web sees.'}
+          </p>
+        </div>
+      )}
+      {props.preview && !((props.aboveHero || props.heroSignals) && !ed) && (
         <p className="ppage__preview">
           {ed
             // The builder is a WORKBENCH, not a preview (founder 2026-09-03:
@@ -1092,7 +1108,7 @@ export default function PublicPage(props: PublicPageProps) {
           page"). Your view toggle and your relationship with this entity sit
           together above the page's own composition — logo, name, tagline,
           address, nav, cover — which now runs uninterrupted. */}
-      {(props.aboveHero || props.heroSignals) && (
+      {(props.aboveHero || props.heroSignals) && !(props.preview && !ed) && (
         <div className="ppage__utility">
           {props.aboveHero}
           {props.heroSignals}
@@ -1141,6 +1157,14 @@ export default function PublicPage(props: PublicPageProps) {
               <div className="ppage__sitehero">
                 {frontBand ? (
                   <>
+                    {/* A SPACE'S LOGO LEADS ITS FRONT PAGE (founder
+                        2026-11-08: "put the countryman stables logo where I
+                        have the red circle") — between the bar and the
+                        headline. Spaces only: a member's avatar is a face,
+                        not a mark. */}
+                    {props.firstPerson && avatarUrl && (
+                      <img className="ppage__sitelogo" src={avatarUrl} alt={name + ' logo'} />
+                    )}
                     {/* Short lines set in caps, /welcome's way; a SENTENCE
                         stays a sentence — a credentials line in giant caps
                         reads as shouting (founder 2026-11-07). The person's
