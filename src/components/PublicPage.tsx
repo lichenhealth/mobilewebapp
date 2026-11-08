@@ -1760,7 +1760,14 @@ export default function PublicPage(props: PublicPageProps) {
           extend it themselves; their pages carry one quiet line instead.
           Skipped entirely for a signed-in viewer — their real join/trust
           controls already rendered above, in `children`. */}
-      {props.signedIn ? null : (page.join === 'quiet' || page.join === 'none') && siteHead ? null : page.join === 'quiet' || page.join === 'none' ? (
+      {props.signedIn ? null : (page.join === 'quiet' || page.join === 'none') && siteHead ? null
+        /* ONE INVITATION PER SITE (founder 2026-11-08, circling the join card
+           above the green footer: "we need to consolidate these messages and
+           have the click thru go to the intro"): on the website look the
+           footer IS the invitation — a person's site drops the separate
+           "This page lives on Lichen" card. A space keeps its knock form,
+           which does a different job (it reaches the stewards). */
+        : siteHead && !props.knockSpace ? null : page.join === 'quiet' || page.join === 'none' ? (
         /* THE FLOOR (founder 2026-08-28): every public page carries the
            credit and the invitation, at whatever volume the owner chose.
            Turning the doors off turns them down to this line — it does not
@@ -1854,10 +1861,18 @@ export default function PublicPage(props: PublicPageProps) {
                 <LichenMark size={22} /> <span>Powered by <strong>Lichen</strong></span>
               </a>
               <p className="ppage__poweredby-line">A member owned and operated network for health care, community and commerce, coordinated via a reciprocal economy.</p>
+              {/* The click-through is the INTRO (founder 2026-11-08: "you
+                  read thru it and then ask to join") — the welcome flight,
+                  whose last cards end at the request form, carrying the
+                  space the visitor came from. */}
               <button type="button" className="ppage__poweredby-cta"
-                onClick={() => go(props.knockSpace ? `/signup?from=${props.knockSpace.id}` : '/signup')}>
+                onClick={() => go(props.knockSpace ? `/intro?from=${props.knockSpace.id}` : '/intro')}>
                 Make your own site on Lichen &rsaquo;
               </button>
+              <p className="ppage__poweredby-member">
+                Already a member?{' '}
+                <button type="button" onClick={() => go('/login')}>Sign in</button>
+              </p>
             </div>
           </div>
         </footer>
