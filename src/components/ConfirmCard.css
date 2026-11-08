@@ -1,0 +1,22 @@
+.ccard {
+  border: 1px solid var(--peach);
+  background: var(--bone-warm, #fbf7f1);
+  border-radius: 14px;
+  padding: var(--s-3) var(--s-4);
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 420px;
+}
+.ccard--done, .ccard--cancelled { border-color: var(--bone-edge); }
+.ccard__what { margin: 0; display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ink); }
+.ccard__btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ccard__btn {
+  border: 1px solid var(--peach); background: #fff; color: var(--peach-deep);
+  border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 14px; cursor: pointer;
+}
+.ccard__btn--go { background: var(--peach); color: #fff; }
+.ccard__btn--quiet { border-color: var(--bone-edge); color: var(--ink-muted); }
+.ccard__btn:disabled { opacity: .55; cursor: default; }
+.ccard__fine { margin: 0; font-size: 12.5px; color: var(--ink-muted); line-height: 1.4; }
+.ccard__state { margin: 0; font-size: 14px; color: var(--ink-soft); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ccard__state--ok { color: var(--green-deep); }
+.ccard__state--bad { color: var(--red-deep); }

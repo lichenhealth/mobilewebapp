@@ -418,8 +418,7 @@
   "exempt": "read-only RPC"
  },
  "ledgerApi:sendCurrentcy": {
-  "gap": "3",
-  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+  "tool": "send_currentcy (confirm card + Always allow, ceilings)"
  },
  "ledgerApi:mintCurrentcy": {
   "exempt": "platform-admin desk"
@@ -456,13 +455,13 @@
   "gap": "3"
  },
  "myceliumApi:setInWeb": {
-  "gap": "3"
+  "tool": "network_signal weave (confirm card)"
  },
  "myceliumApi:setVouch": {
-  "gap": "3"
+  "tool": "network_signal trust (confirm card)"
  },
  "myceliumApi:setRecommend": {
-  "gap": "3"
+  "tool": "network_signal recommend (confirm card)"
  },
  "myceliumApi:loadEndorsements": {
   "exempt": "read-only RPC"
@@ -612,7 +611,7 @@
   "gap": "1"
  },
  "spacesApi:requestToJoin": {
-  "gap": "3"
+  "tool": "space_membership join (confirm card)"
  },
  "spacesApi:removeRequest": {
   "gap": "3"
@@ -630,7 +629,7 @@
   "gap": "3"
  },
  "spacesApi:leaveSpace": {
-  "gap": "3"
+  "tool": "space_membership leave (confirm card)"
  },
  "spacesApi:removeSpaceMember": {
   "gap": "3"
@@ -694,5 +693,14 @@
  },
  "videoApi:uploadVideo": {
   "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantAllowanceApi:confirmProposal": {
+  "exempt": "the person's own tap on a confirm card — never the assistant's"
+ },
+ "assistantAllowanceApi:cancelProposal": {
+  "exempt": "the person's own tap on a confirm card"
+ },
+ "assistantAllowanceApi:revokeAllowance": {
+  "exempt": "the assistant never edits its own permissions (doctrine)"
  }
 }

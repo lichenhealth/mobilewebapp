@@ -409,3 +409,9 @@
 
 /* Is this live? The publish row answers it whether or not anything is pending. */
 .prof__draft-state { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
+
+/* Standing "Always allow"s (founder 2026-11-08) — each revocable. */
+.prof__allow-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.prof__allow-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: var(--t-sm); }
+.prof__linkbtn { background: none; border: 0; padding: 0; color: var(--peach-deep); font: inherit; cursor: pointer; white-space: nowrap; }
+.prof__linkbtn:hover { text-decoration: underline; }
