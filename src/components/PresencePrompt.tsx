@@ -9,11 +9,13 @@ import ConsentBubble from './ConsentBubble';
 import { loadPrompts, promptSeen, promptSeenToday, promptTimesSeen, markPrompt } from '../lib/promptsApi';
 import { readGuide } from '../lib/guide';
 
-/** How many visits the candle gets to teach itself before it goes quiet.
- *  Presence is ON by default now (founder 2026-08-13), so this prompt is the
- *  only thing that makes default-on honest rather than sneaky — it has to land
- *  a few times, and then it has to stop. */
-export const PRESENCE_LESSONS = 3;
+/** The candle asks ONCE, at the start of a member's life on the platform
+ *  (founder 2026-11-08: "dont ask to blow out the candle every time i revisit
+ *  the platform as countryman stables, or as me - just ask once at the
+ *  beginning… and have the hover explanation if people happen to hover over
+ *  it after"). The candle's own data-tip carries the explanation from then
+ *  on. Was 3 visits + a separate ask on every identity switch. */
+export const PRESENCE_LESSONS = 1;
 
 /** "Do you want your light on?" (founder 2026-08-07: "whenever someone logs in
  *  or opens the desktop app, can we have them get a pop up asking them if they
@@ -74,19 +76,9 @@ export default function PresencePrompt({ anchor, onChange }: {
     return () => { live = false; };
   }, [user]);
 
-  // On switching who you're acting as — ONCE, EVER. It teaches one thing ("your
-  // light doesn't change when you switch"), and once that's learned it must
-  // stop: since the space view-toggle now switches your identity for you
-  // (founder 2026-08-07), this would otherwise fire every single time anyone
-  // opened Admin view, which is precisely the prompt-you-stop-reading problem.
-  useEffect(() => {
-    if (!user || !pres) return;
-    const key = actor.type === 'self' ? 'self' : `${actor.type}:${actor.id}`;
-    if (askedFor.current === null) { askedFor.current = key; return; }  // first paint
-    if (askedFor.current === key) return;
-    askedFor.current = key;
-    if (why === null && !promptSeen('presence-switch')) setWhy('switch');
-  }, [actor, user, pres, why]);
+  // The identity-switch ask is RETIRED (founder 2026-11-08) — switching to a
+  // space never re-asks about the candle; the hover tip explains it.
+  void askedFor;
 
   // A PREVIEW is about the page, not presence (founder 2026-09-03: the
   // candle bubble popped over "Preview — this is what the open web sees").
