@@ -1830,7 +1830,7 @@ export default function PublicPage(props: PublicPageProps) {
               <a className="ppage__poweredby-mark" href={appUrl('/welcome')} target="_blank" rel="noopener">
                 <LichenMark size={22} /> <span>Powered by <strong>Lichen</strong></span>
               </a>
-              <p className="ppage__poweredby-line">A member-run network for care, work and a fairer economy.</p>
+              <p className="ppage__poweredby-line">Owned and operated by members.</p>
               <button type="button" className="ppage__poweredby-cta"
                 onClick={() => go(props.knockSpace ? `/signup?from=${props.knockSpace.id}` : '/signup')}>
                 Make your own site on Lichen &rsaquo;
