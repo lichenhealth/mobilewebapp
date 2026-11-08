@@ -121,6 +121,8 @@
   transform-origin: 35% 50%;
 }
 .side-menu__chevron.is-open { transform: rotate(90deg); }
+/* An empty kind still opens — and says so plainly. */
+.side-menu__sub-empty { padding: 6px 0; font-size: 15px; font-weight: 300; color: var(--ink-muted); list-style: none; }
 
 /* ─── Sub-items ─────────────────────────────────────────────────────── */
 .side-menu__sub-list {

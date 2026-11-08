@@ -345,8 +345,11 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                       ? <span className="side-menu__deskbadge">{sum > 9 ? '9+' : sum}</span>
                       : null;
                   })()}
-                  {items.length > 0 && (
-                    <span
+                  {/* Every kind wears its own arrow, even empty (founder
+                      2026-11-07: an arrowless Places read as the header of
+                      the Identities list beneath it — "places shouldn't be
+                      under identities… they need their own drop down"). */}
+                  <span
                       className={
                         'side-menu__chevron' +
                         // The arrow tells the truth about the list below it.
@@ -357,8 +360,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                       }
                       aria-hidden="true"
                     />
-                  )}
                 </button>
+                {expanded[s.key] && items.length === 0 && (
+                  <ul className="side-menu__sub-list">
+                    <li className="side-menu__sub-empty">None yet</li>
+                  </ul>
+                )}
                 {expanded[s.key] && items.length > 0 && (
                   <ul className="side-menu__sub-list">
                     {items.map((item) => (
@@ -397,10 +404,13 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               >
                 <Icon name="fingerprint" size={20} />
                 <span className="side-menu__header-label">Identities</span>
-                {myIdentities.length > 0 && (
-                  <span className={'side-menu__chevron' + (idnExpanded ? ' is-open' : '')} aria-hidden="true" />
-                )}
+                <span className={'side-menu__chevron' + (idnExpanded ? ' is-open' : '')} aria-hidden="true" />
               </button>
+              {idnExpanded && myIdentities.length === 0 && (
+                <ul className="side-menu__sub-list">
+                  <li className="side-menu__sub-empty">None yet</li>
+                </ul>
+              )}
               {idnExpanded && myIdentities.length > 0 && (
                 <ul className="side-menu__sub-list">
                   {myIdentities.map((c) => (
