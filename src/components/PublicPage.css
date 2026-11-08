@@ -709,3 +709,9 @@
    logo there would sit on top of the rider. The bar's wordmark carries the
    name at that width; the logo appears where the band splits dark/photo. */
 @media (max-width: 899px) { .ppage__sitelogo { display: none; } }
+
+.ppage__poweredby-member { margin: 14px 0 0; font-size: 14px; opacity: 0.8; }
+.ppage__poweredby-member button {
+  background: none; border: none; padding: 0; cursor: pointer; color: inherit; font: inherit;
+  text-decoration: underline; text-underline-offset: 3px;
+}
