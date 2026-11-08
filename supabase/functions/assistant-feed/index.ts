@@ -498,6 +498,22 @@ const COURSE_TOOLS = [
 // published post by exact title. ⚠ The standing no-READ rule on drafts
 // holds: minting a draft the member just dictated is write-only — no tool
 // lists or reads existing drafts.
+// DRAFTS ARE READABLE (founder 2026-11-08: "the platform should act like the
+// cloud - it auto saves work and edits, and the Ai assistant can read what's
+// published and what's in draft and support the member with both parts of
+// the process"). READ-ONLY, own rows only, each behind ITS section's AI
+// switch (reading follows the switch, never the edit flag).
+const READ_POST_DRAFTS_TOOL = {
+  name: 'my_post_drafts',
+  description: 'Read their own UNPUBLISHED post drafts (autosaved from the composer, newest first, up to 15) — title, body, sections, exchange manners, price, and when last saved. Use it to help them finish, sharpen or decide on a draft; posting stays their tap in the composer (hand the drive door to reach Drive → Drafts).',
+  input_schema: { type: 'object', properties: {}, required: [] },
+};
+const READ_INTAKE_DRAFT_TOOL = {
+  name: 'my_intake_draft',
+  description: 'Read their in-progress Web of Wellbeing intake — answers typed but not yet woven into their board (per dimension: where they are now, what is in the way, score), plus the money and needs fields when filled. A dimension they ticked "Omit from AI" comes back withheld. Use it to help them think through or finish the intake; weaving stays their tap in the intake.',
+  input_schema: { type: 'object', properties: {}, required: [] },
+};
+
 const POST_TOOLS = [
   {
     name: 'my_posts',
@@ -1043,6 +1059,16 @@ Deno.serve(async (req) => {
       if (off.has('courses')) canCourses = false;
       if (off.has('marketplace')) canPosts = false;
     } catch { /* fail open */ }
+  }
+  let canReadPostDrafts = !spaceId;
+  let canReadIntake = !spaceId;
+  if (!spaceId) {
+    try {
+      const offRows = await (await sb(`assistant_consent?profile_id=eq.${profile_id}&enabled=eq.false&scope_type=eq.section&select=scope_id`)).json();
+      const off = new Set((Array.isArray(offRows) ? offRows : []).map((r: { scope_id: string }) => String(r.scope_id)));
+      if (off.has('marketplace')) canReadPostDrafts = false;
+      if (off.has('concierge')) canReadIntake = false;
+    } catch { /* fail open — the default-on doctrine */ }
   }
   // The small hands (Drive save, task) ride every PERSONAL thread behind the
   // same flag — the pulse names what's happening, these let the assistant
@@ -2453,6 +2479,64 @@ Deno.serve(async (req) => {
     }
 
     // ── Post tools (founder 2026-10-15: "draft, post and edit posts") ────
+    if (name === 'my_post_drafts') {
+      if (!canReadPostDrafts) return { ok: false, error: 'They have AI switched off for Marketplace, so their drafts stay unread.' };
+      const rows = await (await sb(`post_drafts?profile_id=eq.${profile_id}&select=draft,updated_at&order=updated_at.desc&limit=15`)).json();
+      const list = (Array.isArray(rows) ? rows : []) as { draft: Record<string, unknown>; updated_at: string }[];
+      if (!list.length) return { ok: true, drafts: 'none — nothing unpublished is waiting' };
+      return {
+        ok: true,
+        drafts: list.map(({ draft: d, updated_at }) => {
+          const areas = Array.isArray(d.areas) ? (d.areas as unknown[]).join(', ') : '';
+          const modes = Array.isArray(d.modes) ? (d.modes as unknown[]).join('/') : '';
+          const price = typeof d.price === 'string' ? d.price : '';
+          const media = Array.isArray(d.media) ? d.media.length : 0;
+          return {
+            title: typeof d.title === 'string' ? d.title : '',
+            body: typeof d.body === 'string' ? d.body.slice(0, 1500) : '',
+            sections: areas || 'just the feeds',
+            manners: modes, price, attachments: media,
+            saved: updated_at.slice(0, 16).replace('T', ' '),
+          };
+        }),
+      };
+    }
+
+    if (name === 'my_intake_draft') {
+      if (!canReadIntake) return { ok: false, error: 'They have AI switched off for Concierge, so the intake stays unread.' };
+      const rows = await (await sb(`wow_intake_drafts?profile_id=eq.${profile_id}&select=draft,updated_at`)).json();
+      const row = Array.isArray(rows) ? rows[0] as { draft: Record<string, unknown>; updated_at: string } | undefined : undefined;
+      if (!row) return { ok: true, intake: 'nothing in progress — no unwoven answers are waiting' };
+      const d = row.draft ?? {};
+      const dimsIn = (d.dims ?? {}) as Record<string, Record<string, unknown>>;
+      const dims: Record<string, unknown> = {};
+      for (const [dim, a] of Object.entries(dimsIn)) {
+        if (a?.omit) { dims[dim] = 'withheld — they ticked Omit from AI for this one'; continue; }
+        const pick = (k: string) => (typeof a?.[k] === 'string' && (a[k] as string).trim()) ? (a[k] as string).trim().slice(0, 1500) : undefined;
+        dims[dim] = {
+          where_now: pick('where'), in_the_way_inner: pick('inner'), in_the_way_outer: pick('outer'),
+          diagnoses: pick('extra'), giving_back: pick('give'), relationship_to_money: pick('asked'),
+          score: typeof a?.score === 'number' ? a.score : undefined,
+        };
+      }
+      // Money fields honor the financial profile's own per-field holds.
+      let held = new Set<string>();
+      try {
+        const fp = await (await sb(`financial_positions?profile_id=eq.${profile_id}&select=ai_omit_fields`)).json();
+        held = new Set(((Array.isArray(fp) && fp[0]?.ai_omit_fields) || []) as string[]);
+      } catch { /* none held */ }
+      const moneyIn = (d.money ?? {}) as Record<string, unknown>;
+      const money: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(moneyIn)) {
+        if (v === '' || v == null) continue;
+        money[k] = held.has(k) ? 'withheld — they keep this field from AI' : v;
+      }
+      return {
+        ok: true, step: d.step ?? 'welcome', last_saved: row.updated_at.slice(0, 16).replace('T', ' '),
+        dimensions: dims, money, needs: d.needs ?? [], obstacles: typeof d.obstacles === 'string' ? d.obstacles.slice(0, 1500) : '',
+      };
+    }
+
     if (name === 'my_posts') {
       const rows = await (await sb(`posts?author_id=eq.${profile_id}&author_space_id=is.null&select=id,title,body,service_areas,details,linked_event_id,created_at&order=created_at.desc&limit=20`)).json();
       const list = (Array.isArray(rows) ? rows : []) as { title: string | null; body: string; service_areas: string[] | null; details: Record<string, unknown> | null; linked_event_id: string | null; created_at: string }[];
@@ -2804,6 +2888,8 @@ Deno.serve(async (req) => {
                      ...(canCalendar ? CALENDAR_TOOLS : []),
                      ...(canCourses ? COURSE_TOOLS : []),
                      ...(canPosts ? POST_TOOLS : []),
+                     ...(canReadPostDrafts ? [READ_POST_DRAFTS_TOOL] : []),
+                     ...(canReadIntake ? [READ_INTAKE_DRAFT_TOOL] : []),
                      ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
              ...(round >= MAX_TOOL_ROUNDS ? { tool_choice: { type: 'none' } } : {}) },
       }),
