@@ -473,3 +473,7 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
   flex-wrap: wrap;
   row-gap: 8px;
 }
+
+/* Claude's **bold** (renderBold): body type is 300, where a bare <strong>
+ * only climbs to 400 and reads unbolded — say it plainly. */
+.afeed__entry-text strong, .abrief__text strong, .bubble__text strong { font-weight: 600; }

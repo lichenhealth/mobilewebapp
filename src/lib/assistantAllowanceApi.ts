@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 // Always allow stores a standing allowance for that kind of act. Allowances
 // are listed — and revoked — in Profile → Privacy.
 
-export type ProposalKind = 'send_currentcy' | 'trust' | 'recommend' | 'weave' | 'join_space' | 'leave_space';
+export type ProposalKind = 'send_currentcy' | 'trust' | 'recommend' | 'weave' | 'join_space' | 'leave_space' | 'set_floor';
 
 export interface Proposal {
   id: string; kind: ProposalKind; summary: string; amount: number | null;
@@ -20,6 +20,9 @@ export const ALLOWANCE_LABELS: Record<ProposalKind, string> = {
   weave: 'Weave into my web for me',
   join_space: 'Ask to join communities and groups for me',
   leave_space: 'Leave communities and groups for me',
+  // Never stored — a floor change always waits on the tap (the safeguard
+  // would be decorative otherwise). Listed only to keep the record total.
+  set_floor: 'Change my Current-cy floor',
 };
 
 /** The ceilings under the money allowance (founder 2026-11-08). */

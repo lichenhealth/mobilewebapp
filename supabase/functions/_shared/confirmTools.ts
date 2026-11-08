@@ -53,10 +53,20 @@ export const CONFIRM_TOOLS = [
       required: ['action', 'space_name'],
     },
   },
+  {
+    name: 'set_money_floor',
+    description: 'Set (or clear, with 0) the member\'s Current-cy FLOOR — "never take me below ⚡N". Once set, the ledger itself refuses any send, trade or purchase that would cross it, by hand or by you. The amount must be a figure the member said. Always proposes a confirm card (a floor change never runs on Always allow — it is the safeguard). Lives in Current-cy → Money safeguards.',
+    input_schema: {
+      type: 'object',
+      properties: { floor: { type: 'number', description: 'The floor in Current, as the member said it. 0 clears the floor.' } },
+      required: ['floor'],
+    },
+  },
 ];
 
 export const CONFIRM_TOOL_SECTION: Record<string, string> = {
   send_currentcy: 'currentcy', network_signal: 'mycelium', space_membership: 'mycelium',
+  set_money_floor: 'currentcy',
 };
 
 const enc = encodeURIComponent;
@@ -152,6 +162,14 @@ export async function runConfirmTool(
     }
     if (isMember) return { ok: false, error: `They're already a member of ${s.name}.` };
     return propose('join_space', { space_id: s.id }, `Ask to join ${s.name}`);
+  }
+
+  if (name === 'set_money_floor') {
+    const floor = Math.round(Number(input.floor) * 100) / 100;
+    if (!(floor >= 0) || floor > 1000000) return { ok: false, error: 'A floor is an amount from 0 (no floor) up.' };
+    const fStr = String(floor).replace(/\.0+$/, '');
+    if (floor > 0 && !said.includes(fStr)) return { ok: false, error: `The figure ${fStr} isn't in their own words — a floor is theirs to name. Ask them.` };
+    return propose('set_floor', { floor }, floor > 0 ? `Set your Current-cy floor to ⚡${fStr} — nothing takes you below it` : 'Clear your Current-cy floor');
   }
 
   return { ok: false, error: 'Unknown tool.' };

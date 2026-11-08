@@ -3,6 +3,7 @@ import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
 import BudgetCard from '../components/BudgetCard';
 import CashOutCard from '../components/CashOutCard';
+import MoneySafeguards from '../components/MoneySafeguards';
 import './Concierge.css';
 import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive's shape)
 
@@ -47,6 +48,7 @@ export default function Currentcy() {
       <CashOutCard />
       {/* Budget (founder 2026-10-02) — wallet page only for now; Profile's
           drawer stays the compact card, deliberately. */}
+      <MoneySafeguards />
       <BudgetCard />
     </div>
   );
