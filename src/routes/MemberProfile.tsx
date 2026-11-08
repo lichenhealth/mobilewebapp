@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import { useTopIdentityFor } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
-import { useActing } from '../acting/ActingProvider';
+import { useActing, useSelfLinkHat } from '../acting/ActingProvider';
 import { getIdentityTags } from '../lib/meansApi';
 import { loadSteward } from '../lib/stewardshipApi';
 import { CLAUDE_PROFILE_ID, ensureDirectChat } from '../lib/chatApi';
@@ -116,6 +116,8 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
   }, [id, me]);
 
   const isSelf = !!me && id === me;
+  // Your own page puts your own hat back on (founder 2026-11-08).
+  useSelfLinkHat(isSelf ? id : null);
   const [idTags, setIdTags] = useState<string[]>([]);
   // Identity names → vocabulary ids, so each nested chip is a door to its
   // gathering (/identities/<id>). A legacy free-text tag stays a plain chip.
