@@ -9,7 +9,8 @@
     "preview": "vite preview --host",
     "lint": "tsc --noEmit",
     "check:icons": "node scripts/check-icons.mjs",
-    "check:sections": "node scripts/check-sections.mjs"
+    "check:sections": "node scripts/check-sections.mjs",
+    "check:parity": "node scripts/check-parity.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

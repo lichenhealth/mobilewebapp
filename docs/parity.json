@@ -1,0 +1,698 @@
+{
+ "_doc": "THE PARITY REGISTRY — see scripts/check-parity.mjs. Every member-facing write is tool | gap (ladder rung 1 private write, 2 member-sent draft, 3 confirm card) | exempt (why). npm run check:parity -- --list prints the open ladder.",
+ "assistantApi:askAssistant": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantConsentApi:setConsent": {
+  "exempt": "the assistant never flips its own consent (doctrine — the person taps)"
+ },
+ "assistantConsentApi:careConsent": {
+  "exempt": "read-only RPC"
+ },
+ "assistantConsentApi:syncAssistantConsent": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantFeedApi:markThreadRead": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantFeedApi:postToAssistantFeed": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantFeedApi:postAssistantHandoff": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "assistantFeedApi:renameConvo": {
+  "gap": "1"
+ },
+ "avatarApi:uploadAvatar": {
+  "tool": "place_uploaded_photo / save_web_image (profile_photo)"
+ },
+ "avatarApi:imageFocusPct": {
+  "exempt": "read-only RPC"
+ },
+ "avatarApi:brandSchemeFromLogo": {
+  "tool": "set_space_page_colours_from_logo"
+ },
+ "bookingApi:saveBookingType": {
+  "tool": "add_booking_type, update_booking_type"
+ },
+ "bookingApi:saveMeetingLink": {
+  "tool": "add/update_booking_type video_link + unique_zoom"
+ },
+ "bookingApi:deleteBookingType": {
+  "gap": "1"
+ },
+ "bookingApi:saveTypeSpaces": {
+  "gap": "3"
+ },
+ "bookingApi:saveTypeHours": {
+  "tool": "add/update_booking_type custom_hours"
+ },
+ "bookingApi:saveTypeConditions": {
+  "gap": "3"
+ },
+ "bookingApi:loadBookingBoard": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:nudgeAvailability": {
+  "gap": "2"
+ },
+ "bookingApi:createBooking": {
+  "gap": "2"
+ },
+ "bookingApi:rescheduleBooking": {
+  "gap": "2"
+ },
+ "bookingApi:respondBooking": {
+  "tool": "respond_booking_request"
+ },
+ "bookingApi:cancelBooking": {
+  "gap": "2"
+ },
+ "bookingApi:emailIsMember": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:resolveBookingVanity": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:publicBookingPage": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:publicBookingBoard": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:guestCreateBooking": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "bookingApi:guestRescheduleBooking": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "bookingApi:loadGuestBooking": {
+  "exempt": "read-only RPC"
+ },
+ "bookingApi:guestCancelBooking": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "bookingApi:sendBookingMail": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "bookingApi:startBookingCheckout": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "bookingApi:setBookingPayChoice": {
+  "gap": "2"
+ },
+ "bookingApi:requestCashout": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "bookingApi:cancelCashout": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "bookingApi:markPayoutPaid": {
+  "exempt": "platform-admin desk"
+ },
+ "bookingApi:savePayoutPref": {
+  "gap": "1"
+ },
+ "budgetApi:addBudgetPost": {
+  "gap": "1"
+ },
+ "budgetApi:removeBudgetPost": {
+  "gap": "1"
+ },
+ "budgetApi:addBudgetManual": {
+  "tool": "budget_line"
+ },
+ "budgetApi:removeBudgetItem": {
+  "tool": "budget_line"
+ },
+ "calendarApi:createEvent": {
+  "tool": "draft_event (Compose creates it on the member's Post)"
+ },
+ "calendarApi:deleteEvent": {
+  "gap": "3"
+ },
+ "calendarApi:updateEventDetails": {
+  "gap": "1"
+ },
+ "calendarApi:updateEvent": {
+  "gap": "1"
+ },
+ "calendarApi:rsvp": {
+  "tool": "rsvp"
+ },
+ "calendarApi:addAvailability": {
+  "tool": "add_hours"
+ },
+ "calendarApi:updateAvailability": {
+  "gap": "1"
+ },
+ "calendarApi:deleteAvailability": {
+  "tool": "remove_hours"
+ },
+ "calendarApi:upsertShare": {
+  "gap": "3"
+ },
+ "calendarApi:deleteEveryoneShare": {
+  "gap": "3"
+ },
+ "calendarApi:deleteShare": {
+  "gap": "3"
+ },
+ "calendarApi:freeBusy": {
+  "exempt": "read-only RPC"
+ },
+ "calendarApi:availabilityOf": {
+  "exempt": "read-only RPC"
+ },
+ "calendarApi:addExternalCalendar": {
+  "gap": "1"
+ },
+ "calendarApi:removeExternalCalendar": {
+  "gap": "1"
+ },
+ "calendarApi:syncExternalCalendars": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "calendarApi:startGoogleConnect": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "calendarApi:disconnectGoogle": {
+  "gap": "1"
+ },
+ "calendarApi:addCalendarPin": {
+  "gap": "1"
+ },
+ "calendarApi:removeCalendarPin": {
+  "gap": "1"
+ },
+ "calendarApi:mintCalendarFeedToken": {
+  "tool": "calendar_feed_link"
+ },
+ "careTeamApi:loadCareLinks": {
+  "exempt": "read-only RPC"
+ },
+ "careTeamApi:inviteCare": {
+  "gap": "2"
+ },
+ "careTeamApi:addCareCaregiverById": {
+  "gap": "2"
+ },
+ "careTeamApi:remindCareRequest": {
+  "gap": "2"
+ },
+ "careTeamApi:approveCare": {
+  "gap": "3"
+ },
+ "careTeamApi:removeCare": {
+  "gap": "3"
+ },
+ "careTeamApi:cancelCareInvite": {
+  "gap": "2"
+ },
+ "careTeamApi:sendCareInviteEmail": {
+  "gap": "2"
+ },
+ "careTeamApi:prepareCareText": {
+  "gap": "2"
+ },
+ "careTeamApi:inviteCareByPhone": {
+  "gap": "2"
+ },
+ "careTeamApi:offerCareFor": {
+  "gap": "2"
+ },
+ "chatApi:loadUnreadCounts": {
+  "exempt": "read-only RPC"
+ },
+ "chatApi:markChatRead": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:ensureSpaceChat": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:ensureSuggestionChat": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:ensureDirectChat": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:ensureSelfChat": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:ensureHelpChat": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "chatApi:toggleReaction": {
+  "gap": "2"
+ },
+ "chatDocsApi:createChatDoc": {
+  "gap": "2"
+ },
+ "chatDocsApi:saveChatDoc": {
+  "gap": "1"
+ },
+ "chatDocsApi:setChatDocAi": {
+  "gap": "2"
+ },
+ "chatDocsApi:deleteChatDoc": {
+  "gap": "2"
+ },
+ "chatDocsApi:castVote": {
+  "gap": "3"
+ },
+ "chatDocsApi:retractVote": {
+  "gap": "3"
+ },
+ "chatDocsApi:createPersonalDoc": {
+  "gap": "1"
+ },
+ "collectionsApi:createCollection": {
+  "tool": "create_course (courses), drive_folder (folders)"
+ },
+ "collectionsApi:updateCollection": {
+  "tool": "update_course (courses only)"
+ },
+ "collectionsApi:reorderItems": {
+  "gap": "1"
+ },
+ "collectionsApi:enroll": {
+  "gap": "1"
+ },
+ "collectionsApi:setLessonDone": {
+  "gap": "1"
+ },
+ "collectionsApi:suggestToCollection": {
+  "gap": "3"
+ },
+ "collectionsApi:resolveSuggestion": {
+  "exempt": "read-only RPC"
+ },
+ "collectionsApi:deleteCollection": {
+  "gap": "1"
+ },
+ "collectionsApi:duplicateCollection": {
+  "gap": "1"
+ },
+ "collectionsApi:addToCollection": {
+  "tool": "drive_folder"
+ },
+ "collectionsApi:removeFromCollection": {
+  "tool": "drive_folder"
+ },
+ "collectionsApi:addCourseNote": {
+  "gap": "1"
+ },
+ "collectionsApi:updateCourseNote": {
+  "gap": "1"
+ },
+ "collectionsApi:deleteCourseNote": {
+  "gap": "1"
+ },
+ "conciergeApi:ensureOpenAssessment": {
+  "gap": "1"
+ },
+ "conciergeApi:submitAssessment": {
+  "gap": "2"
+ },
+ "conciergeApi:adoptWowEntry": {
+  "gap": "1"
+ },
+ "conciergeApi:setWowWindowAuto": {
+  "gap": "1"
+ },
+ "conciergeApi:tuneWowWindow": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "conciergeApi:createCarePost": {
+  "gap": "2"
+ },
+ "conciergeApi:deleteCarePost": {
+  "gap": "2"
+ },
+ "conciergeApi:updateWowCarePost": {
+  "gap": "2"
+ },
+ "conciergeApi:loadOnCallRoster": {
+  "exempt": "read-only RPC"
+ },
+ "conciergeApi:loadMyPhone": {
+  "exempt": "read-only RPC"
+ },
+ "conciergeApi:resolvePreviews": {
+  "exempt": "read-only RPC"
+ },
+ "contactSharesApi:setContactShare": {
+  "gap": "3"
+ },
+ "contactSharesApi:loadSpaceMemberContacts": {
+  "exempt": "read-only RPC"
+ },
+ "driveFilesApi:uploadDriveFile": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "driveFilesApi:deleteDriveFile": {
+  "gap": "1"
+ },
+ "eventGuestsApi:loadGuestEvent": {
+  "exempt": "read-only RPC"
+ },
+ "eventGuestsApi:loadOpenEvent": {
+  "exempt": "read-only RPC"
+ },
+ "eventGuestsApi:requestEventSpot": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "eventGuestsApi:mintEventLink": {
+  "gap": "2"
+ },
+ "eventGuestsApi:approveEventGuest": {
+  "gap": "3"
+ },
+ "eventGuestsApi:declineEventGuest": {
+  "gap": "3"
+ },
+ "eventGuestsApi:guestRsvp": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "eventGuestsApi:inviteEventGuest": {
+  "gap": "2"
+ },
+ "eventGuestsApi:inviteEventGuestByPhone": {
+  "gap": "2"
+ },
+ "exchangeApi:requestExchange": {
+  "gap": "2"
+ },
+ "exchangeApi:decideExchange": {
+  "gap": "3"
+ },
+ "exchangeApi:approveAsGuardian": {
+  "gap": "3"
+ },
+ "exchangeApi:completeExchange": {
+  "gap": "3"
+ },
+ "exchangeApi:cancelExchange": {
+  "gap": "3"
+ },
+ "exchangeApi:isClaimed": {
+  "exempt": "read-only RPC"
+ },
+ "guestListsApi:createGuestList": {
+  "tool": "draft_event save_guest_list_as"
+ },
+ "guestListsApi:updateGuestList": {
+  "tool": "draft_event save_guest_list_as"
+ },
+ "guestListsApi:deleteGuestList": {
+  "gap": "1"
+ },
+ "hiddenApi:setHidden": {
+  "tool": "save_or_hide_post"
+ },
+ "ledgerApi:balanceOf": {
+  "exempt": "read-only RPC"
+ },
+ "ledgerApi:sendCurrentcy": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "ledgerApi:mintCurrentcy": {
+  "exempt": "platform-admin desk"
+ },
+ "ledgerApi:setOperatingRate": {
+  "exempt": "platform-admin desk"
+ },
+ "ledgerApi:startLoadCheckout": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "locationApi:loadMyHome": {
+  "exempt": "read-only RPC"
+ },
+ "locationApi:saveMyHome": {
+  "gap": "3"
+ },
+ "locationApi:upsertLocationShare": {
+  "gap": "3"
+ },
+ "locationApi:deleteLocationShare": {
+  "gap": "3"
+ },
+ "locationApi:loadMappableMembers": {
+  "exempt": "read-only RPC"
+ },
+ "meansApi:saveFinancialPosition": {
+  "gap": "3"
+ },
+ "meansApi:requestFinancialCoordinator": {
+  "gap": "2"
+ },
+ "meansApi:saveIdentityTags": {
+  "gap": "3"
+ },
+ "myceliumApi:setInWeb": {
+  "gap": "3"
+ },
+ "myceliumApi:setVouch": {
+  "gap": "3"
+ },
+ "myceliumApi:setRecommend": {
+  "gap": "3"
+ },
+ "myceliumApi:loadEndorsements": {
+  "exempt": "read-only RPC"
+ },
+ "notificationsApi:markNotificationRead": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "notificationsApi:markScopeReadRemote": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "postDraftsApi:savePostDraft": {
+  "tool": "draft_post, draft_event"
+ },
+ "postDraftsApi:deletePostDraft": {
+  "gap": "1"
+ },
+ "postGuestsApi:loadGuestPost": {
+  "exempt": "read-only RPC"
+ },
+ "postGuestsApi:requestPurchase": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "postGuestsApi:cancelPurchase": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "postGuestsApi:startPostCheckout": {
+  "gap": "3",
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
+ },
+ "postGuestsApi:addPostGuest": {
+  "gap": "2"
+ },
+ "postGuestsApi:emailPostGuest": {
+  "gap": "2"
+ },
+ "postGuestsApi:removePostGuest": {
+  "gap": "2"
+ },
+ "postGuestsApi:respondPostOrder": {
+  "gap": "3"
+ },
+ "postsApi:createPost": {
+  "tool": "draft_post, draft_event (published by the member's tap)"
+ },
+ "postsApi:updatePost": {
+  "tool": "update_post"
+ },
+ "postsApi:deletePost": {
+  "gap": "3"
+ },
+ "postsApi:rsvpToEvent": {
+  "tool": "rsvp"
+ },
+ "postsApi:unRsvp": {
+  "tool": "rsvp"
+ },
+ "presenceApi:presentList": {
+  "exempt": "read-only RPC"
+ },
+ "presenceApi:availableList": {
+  "exempt": "read-only RPC"
+ },
+ "presenceApi:setAlwaysPresent": {
+  "gap": "1"
+ },
+ "presenceApi:lightPresence": {
+  "tool": "set_candle"
+ },
+ "presenceApi:snuffPresence": {
+  "tool": "set_candle"
+ },
+ "presenceApi:spacePresentCount": {
+  "exempt": "read-only RPC"
+ },
+ "presenceApi:spacePresentList": {
+  "exempt": "read-only RPC"
+ },
+ "promptsApi:markPrompt": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "remindersApi:leaveReminder": {
+  "gap": "1"
+ },
+ "remindersApi:createReminder": {
+  "tool": "add_task"
+ },
+ "remindersApi:updateReminder": {
+  "tool": "change_task"
+ },
+ "remindersApi:deleteReminder": {
+  "tool": "change_task"
+ },
+ "remindersApi:setDone": {
+  "tool": "change_task"
+ },
+ "resourcesApi:createResource": {
+  "gap": "1"
+ },
+ "resourcesApi:deleteResource": {
+  "gap": "1"
+ },
+ "resourcesApi:resourceBusy": {
+  "exempt": "read-only RPC"
+ },
+ "resourcesApi:requestResourceBooking": {
+  "gap": "2"
+ },
+ "resourcesApi:decideResourceBooking": {
+  "gap": "3"
+ },
+ "resourcesApi:resourceSpanContact": {
+  "exempt": "read-only RPC"
+ },
+ "savedApi:setSaved": {
+  "tool": "save_or_hide_post, save_post_to_drive"
+ },
+ "snapshotApi:requestSnapshot": {
+  "tool": "read_website"
+ },
+ "snapshotApi:applySnapshot": {
+  "tool": "set_* profile tools + read_website"
+ },
+ "snapshotApi:requestHomeSummary": {
+  "tool": "set_home_summary"
+ },
+ "spacesApi:setSpaceLocation": {
+  "gap": "1"
+ },
+ "spacesApi:setMemberRole": {
+  "gap": "3"
+ },
+ "spacesApi:createSpaceTopicRoom": {
+  "gap": "3"
+ },
+ "spacesApi:deleteSpaceTopicRoom": {
+  "gap": "3"
+ },
+ "spacesApi:setRoomAssistantEnabled": {
+  "gap": "3"
+ },
+ "spacesApi:updateSpaceProfile": {
+  "tool": "set_space_* page tools"
+ },
+ "spacesApi:createSpaceWithLocation": {
+  "gap": "1"
+ },
+ "spacesApi:requestToJoin": {
+  "gap": "3"
+ },
+ "spacesApi:removeRequest": {
+  "gap": "3"
+ },
+ "spacesApi:inviteMember": {
+  "gap": "2"
+ },
+ "spacesApi:endorseSuggestion": {
+  "gap": "3"
+ },
+ "spacesApi:approveJoin": {
+  "gap": "3"
+ },
+ "spacesApi:acceptInvite": {
+  "gap": "3"
+ },
+ "spacesApi:leaveSpace": {
+  "gap": "3"
+ },
+ "spacesApi:removeSpaceMember": {
+  "gap": "3"
+ },
+ "spacesApi:deleteSpace": {
+  "gap": "3"
+ },
+ "spacesApi:takeSpaceOffline": {
+  "gap": "3"
+ },
+ "spacesApi:restoreSpace": {
+  "gap": "3"
+ },
+ "spacesApi:listMyOfflineSpaces": {
+  "exempt": "read-only RPC"
+ },
+ "spacesApi:proposeNesting": {
+  "gap": "2"
+ },
+ "spacesApi:approveNesting": {
+  "gap": "3"
+ },
+ "spacesApi:removeNesting": {
+  "gap": "3"
+ },
+ "spacesApi:ejectGroup": {
+  "gap": "3"
+ },
+ "spacesApi:decideSectionShare": {
+  "gap": "3"
+ },
+ "spacesApi:createCohort": {
+  "gap": "3"
+ },
+ "spacesApi:decideSpaceKnock": {
+  "gap": "3"
+ },
+ "spacesApi:inviteKnocker": {
+  "gap": "3"
+ },
+ "stewardshipApi:createBeing": {
+  "gap": "1"
+ },
+ "tasksApi:upsertTaskShare": {
+  "gap": "3"
+ },
+ "tasksApi:deleteTaskShare": {
+  "gap": "3"
+ },
+ "tasksApi:visibleTasksOf": {
+  "exempt": "read-only RPC"
+ },
+ "todosApi:createTodo": {
+  "tool": "add_task"
+ },
+ "todosApi:setTodoDone": {
+  "tool": "change_task"
+ },
+ "todosApi:deleteTodo": {
+  "tool": "change_task"
+ },
+ "videoApi:uploadVideo": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ }
+}
