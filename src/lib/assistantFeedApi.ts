@@ -52,6 +52,10 @@ export interface FeedPostRow {
   body: string;
   source_post_id: string | null;
   thread: string;
+  /** Whose turn this entry belongs to. In a space's build thread several
+   *  stewards share the stream (founder 2026-11-08), so a member row whose
+   *  profile_id isn't yours is a FELLOW steward speaking. */
+  profile_id?: string;
   /** Which CONVERSATION inside the thread this entry belongs to (founder
    *  2026-10-05: a thread is a newest-first list of conversations now, the
    *  email grammar). Minted client-side on a fresh conversation's first
@@ -264,8 +268,12 @@ export function threadForSection(section?: string | null): string {
 export async function loadAssistantFeed(profileId: string, thread?: string): Promise<FeedPostRow[]> {
   let q = supabase
     .from('assistant_feed_posts')
-    .select('id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections')
-    .eq('profile_id', profileId);
+    .select('id, profile_id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections');
+  // A space's BUILD thread is shared by its stewards (founder 2026-11-08:
+  // "keep all conversations in there for all admins to see") — RLS's
+  // steward arm decides who reads it, so it isn't narrowed to your own rows.
+  // Every other thread stays yours alone.
+  if (!(thread && isSharedSpaceThread(thread))) q = q.eq('profile_id', profileId);
   if (thread) q = q.eq('thread', thread);
   const { data, error } = await q.order('created_at', { ascending: true });
   if (error) throw error;
@@ -589,6 +597,11 @@ const SPACE_THREAD_RE = /^space:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 export function spaceIdOfThread(thread: string): string | null {
   const m = SPACE_THREAD_RE.exec(thread);
   return m ? m[1] : null;
+}
+/** A space's BUILD thread (`space:<uuid>`, no room suffix) — the one stream
+ *  every current steward of the space reads together (founder 2026-11-08). */
+export function isSharedSpaceThread(thread: string): boolean {
+  return !!spaceIdOfThread(thread) && spaceRoomOfThread(thread) === null;
 }
 /** Which ROOM of the space a thread is — null = the build thread. */
 export function spaceRoomOfThread(thread: string): 'currentcy' | null {

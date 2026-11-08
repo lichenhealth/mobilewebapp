@@ -74,6 +74,15 @@
 }
 .afeed__entry:not(.afeed__entry--claude) .afeed__entry-shots { justify-content: flex-end; }
 .afeed__entry-body { flex: 1; min-width: 0; }
+/* A FELLOW STEWARD in a space's shared build thread (founder 2026-11-08):
+   their words sit LEFT on bone, the chat grammar for someone who isn't you. */
+.afeed__entry.afeed__entry--peer { align-self: flex-start; flex-direction: row; }
+.afeed__entry.afeed__entry--peer .afeed__entry-meta { justify-content: flex-start; }
+.afeed__entry.afeed__entry--peer .afeed__entry-text {
+  background: var(--bone-deep);
+  border-radius: 4px 14px 14px 14px;
+}
+.afeed__entry.afeed__entry--peer .afeed__entry-shots { justify-content: flex-start; }
 .afeed__entry-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 /* SAME LANGUAGE AS A CHAT ROOM (founder 2026-08-28: "let's have the claude
    chat have the white background, and the speaker the peach, just like in

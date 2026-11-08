@@ -12,6 +12,7 @@ import {
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { useTopBackFor } from '../lib/topBack';
 import { useAuth } from '../auth/AuthProvider';
+import { useActing } from '../acting/ActingProvider';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import {
   listMyAdminDeskCounts, listMyMemberSpaces,
@@ -93,7 +94,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   // ONE SPACE, not a section (founder 2026-08-22: the brain on Countryman
   // Stables' page said "Your organizations", which briefed everything except
   // the place the member was standing in). Reached with ?space=<id>.
-  space: { title: 'This space', frame: 'You are briefing the member on ONE space — an organization, community, group or place. The snapshot holds what it is in its own words, where THIS member stands with it (member or steward, their own web and recommendation signals — never anyone else\'s), its recent activity, and — when they steward it — what is waiting at its desks and the state of its public page. Lead with what is alive and what needs them; for a steward, name one concrete act of tending worth doing. Never invent activity, never score the space, and never describe another member\'s standing.' },
+  space: { title: 'This space', frame: 'You are briefing the member on ONE space — an organization, community, group or place. The snapshot holds what it is in its own words, where THIS member stands with it (member or steward, their own web and recommendation signals — never anyone else\'s), its recent activity, and — when they steward it — what is waiting at its desks and the state of its public page. Lead with what is alive and what needs them; for a steward, name one concrete act of tending worth doing. Never invent activity, never score the space, and never describe another member\'s standing. The snapshot\'s who_is_reading names the person reading — address them by THAT name or not at all; a space is run by several stewards, so never take a name from the space\'s own page or story.' },
   member: { title: 'A briefing', frame: 'You are preparing the member to meet ONE person — a relationship briefing, the way a trusted assistant preps you before a meeting. The snapshot holds who they are in their own words, where the relationship stands (web/trust/recommendation signals — the member\'s own, never anyone else\'s), spaces you share, what they\'ve been offering lately, their bookable sessions, and recent conversation if there is any. Lead with where things stand and anything alive between you; then what\'s new with them worth knowing. Warm, factual, short. Use the pronouns given in the snapshot and never infer them from a name. Never invent, never score the person, and if their messages are withheld from assistants say so plainly.' },
 };
 
@@ -170,7 +171,13 @@ export default function AssistantBrief() {
   const memberId = params.get('member');
   // ?space=<id> — the briefing on one space (founder 2026-08-22): the brain
   // on a space's page briefs THAT space, not the whole section.
-  const spaceParam = params.get('space');
+  // UNDER A SPACE'S HAT the profile brain IS that space's brain (founder
+  // 2026-11-08: a message sent from the profile brief while acting as
+  // Countryman Stables filed into her PERSONAL profile thread) — the hat
+  // supplies the space, the thread=profile choke point's twin on the brief.
+  const { actor: briefActor, self: briefSelf } = useActing();
+  const spaceParam = params.get('space')
+    ?? (rawSection === 'profile' && briefActor.type === 'space' ? briefActor.id : null);
   // ?back= — the way home to whatever sent you here (a builder's "Back to
   // manual mode"); ?intent=build — you came from a Build-with-Claude door,
   // so the page leads with the build card (founder 2026-08-17: the same
@@ -417,6 +424,14 @@ export default function AssistantBrief() {
               findable: s.findable !== false,
             };
             found.push({ label: s.name, to: `/spaces/${spaceParam}` });
+            // WHO IS READING (founder 2026-11-08: the brief greeted her as
+            // "Katie" — it guessed a name off the page's own words). A space
+            // is run by several stewards; the brief speaks to the one
+            // actually reading, by the name on their own account.
+            extras.who_is_reading = {
+              name: briefSelf.name || undefined,
+              acting_as_this_space: briefActor.type === 'space' && briefActor.id === spaceParam,
+            };
             extras.where_you_stand = {
               your_role: role ?? 'not a member',
               in_your_web: mine.web.has(`space:${spaceParam}`),
@@ -879,13 +894,50 @@ export default function AssistantBrief() {
   const [briefRaw, setBriefRaw] = useState<FeedPostRow[]>([]);
   const [briefNames, setBriefNames] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!me || spaceParam) { setBriefRaw([]); return; }
+    if (!me) { setBriefRaw([]); return; }
     let live = true;
-    void Promise.all([loadAssistantFeed(me), loadConvoNames().catch(() => ({}))])
-      .then(([rows, names]) => {
+    // A space's build stream is SHARED by its stewards (founder 2026-11-08,
+    // migration 20261108120000): load it by thread so every admin's
+    // exchanges arrive, not just your own rows.
+    const sharedStreams = async (): Promise<FeedPostRow[]> => {
+      if (spaceParam) return loadAssistantFeed(me, `space:${spaceParam}`);
+      const { data } = await supabase.from('space_members').select('space_id')
+        .eq('profile_id', me).in('role', ['admin', 'super_admin']);
+      const threads = ((data as { space_id: string }[] | null) ?? []).map((r) => `space:${r.space_id}`);
+      if (!threads.length) return [];
+      const { data: rows } = await supabase.from('assistant_feed_posts')
+        .select('id, profile_id, author, body, source_post_id, thread, convo_id, created_at, attachments, sections')
+        .in('thread', threads).order('created_at', { ascending: true });
+      return (rows as FeedPostRow[] | null) ?? [];
+    };
+    void Promise.all([loadAssistantFeed(me), loadConvoNames().catch(() => ({})), sharedStreams().catch(() => [])])
+      .then(async ([own, names, shared]) => {
         if (!live) return;
-        setBriefRaw(rows.filter((r) => !r.thread.startsWith('space:')));
-        setBriefNames(names);
+        const seen = new Set(own.map((r) => r.id));
+        const rows = [...own, ...shared.filter((r) => !seen.has(r.id))]
+          .sort((a, b) => a.created_at.localeCompare(b.created_at));
+        // A SPACE'S BRAIN CARRIES ITS OWN HISTORY, AND THE WHOLE BRAIN CARRIES
+        // EVERY SPACE'S (founder 2026-11-08: "my historical profile
+        // conversations should be logged here… logged as text conversations
+        // in the Ai assistant for profile, and then the meta log for the
+        // overall assistant"): a space brief lists that space's build
+        // stream; the home brief lists every build stream beside the
+        // personal threads. A stream is one row, titled by its space.
+        const build = (t: string) => /^space:[0-9a-f-]{36}$/i.test(t);
+        const keep = spaceParam
+          ? rows.filter((r) => r.thread === `space:${spaceParam}`)
+          : rows.filter((r) => !r.thread.startsWith('space:') || build(r.thread));
+        const ids = [...new Set(keep.filter((r) => build(r.thread)).map((r) => r.thread.slice(6)))];
+        const titled: Record<string, string> = { ...names };
+        if (ids.length) {
+          const { data } = await supabase.from('spaces').select('id, name').in('id', ids);
+          ((data as { id: string; name: string }[] | null) ?? []).forEach((sp) => {
+            titled[`loose:space:${sp.id}`] = `${sp.name} — page conversations`;
+          });
+        }
+        if (!live) return;
+        setBriefRaw(keep);
+        setBriefNames(titled);
       })
       .catch(() => {});
     return () => { live = false; };
@@ -899,10 +951,11 @@ export default function AssistantBrief() {
   // conversation is named everywhere) — derived in a memo so a rename made
   // right here re-titles the list, and clearing one restores its slot.
   const briefConvos = useMemo(() => {
-    if (!me || spaceParam || briefRaw.length === 0) return [];
+    if (!me || briefRaw.length === 0) return [];
     const groups = groupConvos(briefRaw, briefNames);
     const pertains = (g: ConvoGroup) =>
-      section === 'home' ? true
+      spaceParam ? true
+      : section === 'home' ? true
       : sectionTag ? g.sections.includes(sectionTag)
       : g.thread === feedThread || g.sections.includes(section);
     // THE WHOLE LIST (founder 2026-10-13: "Always a summary, then the gray
