@@ -329,6 +329,8 @@ export default function Compose() {
   type GuestList = { id: string; name: string; entries: EvInvitee[]; space_ids: string[] };
   const [guestLists, setGuestLists] = useState<GuestList[]>([]);
   const [glSaving, setGlSaving] = useState(false);
+  // Renaming an existing list in place (null = the save-new box).
+  const [glRenaming, setGlRenaming] = useState<string | null>(null);
   const [glName, setGlName] = useState('');
   const [glMsg, setGlMsg] = useState<string | null>(null);
   const [glDel, setGlDel] = useState<string | null>(null);
@@ -380,12 +382,39 @@ export default function Compose() {
     if (!user || !name) return;
     const row = { owner_id: user.id, name, entries: invitees, space_ids: [...audienceSpaces], updated_at: new Date().toISOString() };
     const existing = guestLists.find((g) => g.name.trim().toLowerCase() === name.toLowerCase());
-    const { error } = existing
-      ? await supabase.from('guest_lists').update(row).eq('id', existing.id)
-      : await supabase.from('guest_lists').insert(row);
+    const { data: savedRow, error } = existing
+      ? await supabase.from('guest_lists').update(row).eq('id', existing.id).select('id').single()
+      : await supabase.from('guest_lists').insert(row).select('id').single();
     if (error) { setGlMsg(`Couldn't save the list: ${error.message}`); return; }
+    // The people on screen now ARE this list — group them under it, so the
+    // foot names it instead of offering to save it again.
+    const sid = (savedRow as { id: string } | null)?.id;
+    if (sid) {
+      setSrcNames((cur) => ({ ...cur, [`gl:${sid}`]: name }));
+      setInvSrc((cur) => { const n = { ...cur }; invitees.forEach((x) => { n[invKey(x)] = `gl:${sid}`; }); return n; });
+    }
     setGlMsg(existing ? `Updated “${name}” ✓` : `Saved “${name}” to your guest lists ✓`);
     setGlSaving(false); setGlName('');
+    void loadGuestLists();
+  }
+  async function renameGuestList(id: string) {
+    const name = glName.trim();
+    if (!name) return;
+    const clash = guestLists.find((g) => g.id !== id && g.name.trim().toLowerCase() === name.toLowerCase());
+    if (clash) { setGlMsg(`You already have a list called “${name}”.`); return; }
+    const { error } = await supabase.from('guest_lists').update({ name, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { setGlMsg(`Couldn't rename it: ${error.message}`); return; }
+    setSrcNames((cur) => ({ ...cur, [`gl:${id}`]: name }));
+    setGlMsg(`Renamed to “${name}” ✓`);
+    setGlRenaming(null); setGlName('');
+    void loadGuestLists();
+  }
+  /** Write the chips now on screen back into the list they came from. */
+  async function updateGuestList(gl: GuestList, people: EvInvitee[]) {
+    const { error } = await supabase.from('guest_lists')
+      .update({ entries: people, updated_at: new Date().toISOString() }).eq('id', gl.id);
+    if (error) { setGlMsg(`Couldn't update the list: ${error.message}`); return; }
+    setGlMsg(`Updated “${gl.name}” ✓`);
     void loadGuestLists();
   }
   async function deleteGuestList(id: string) {
@@ -425,6 +454,24 @@ export default function Compose() {
       return n;
     });
   }
+  // A draft the BRAIN built with save_guest_list_as arrives as plain chips;
+  // when every person on a saved list is already on the invite (and none of
+  // them is grouped yet), group them under that list — so the screen knows
+  // the list exists and never offers to save it again (founder 2026-11-08:
+  // "since i asked the brain to save this as a guest list, it shouldn't ask
+  // me again").
+  useEffect(() => {
+    if (!guestLists.length || !invitees.length) return;
+    const have = new Set(invitees.map(invKey));
+    for (const gl of guestLists) {
+      if (!gl.entries.length) continue;
+      const keys = gl.entries.map(invKey);
+      if (keys.every((k) => have.has(k) && !invSrc[k])) {
+        setSrcNames((cur) => ({ ...cur, [`gl:${gl.id}`]: gl.name }));
+        setInvSrc((cur) => { const n = { ...cur }; keys.forEach((k) => { if (!n[k]) n[k] = `gl:${gl.id}`; }); return n; });
+      }
+    }
+  }, [guestLists, invitees]);
   async function openCircle(id: string) {
     if (circleOpen === id) { setCircleOpen(null); return; }
     setCircleOpen(id);
@@ -1732,8 +1779,41 @@ export default function Compose() {
             )}
             </>)}
               {chipRow(invitees)}
-              {!editing && (invitees.length > 0 || audienceSpaces.size > 0) && (
-                glSaving ? (
+              {!editing && (invitees.length > 0 || audienceSpaces.size > 0) && (() => {
+                // ONE LIST ON SCREEN = THAT LIST, NOT A NEW ONE (founder
+                // 2026-11-08): when every chip came from a single saved list,
+                // the foot says so and offers Rename — or Update when the
+                // people changed — instead of "Save these people" again.
+                const srcs = new Set(invitees.map((x) => invSrc[ikey(x)] ?? ''));
+                const only = srcs.size === 1 ? [...srcs][0] : '';
+                const gl = only.startsWith('gl:') ? guestLists.find((g) => `gl:${g.id}` === only) : undefined;
+                const same = !!gl && gl.entries.length === invitees.length
+                  && gl.entries.every((e) => invitees.some((x) => ikey(x) === ikey(e)));
+                if (glRenaming && gl && glRenaming === gl.id) return (
+                  <div className="cmp__gl-save">
+                    <input className="cmp__input" value={glName} autoFocus maxLength={80}
+                      onChange={(e) => setGlName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void renameGuestList(gl.id); } }}
+                      placeholder={gl.name} />
+                    <button className="cmp__gl-savebtn" disabled={!glName.trim()} onClick={() => void renameGuestList(gl.id)}>Rename</button>
+                    <button className="cmp__gl-cancel" aria-label="Cancel" onClick={() => { setGlRenaming(null); setGlName(''); }}>×</button>
+                  </div>
+                );
+                if (gl && !glSaving) return (
+                  <p className="cmp__gl-saved">
+                    {same
+                      ? <>Saved as your guest list <strong>{gl.name}</strong> ✓</>
+                      : <>Changed from your guest list <strong>{gl.name}</strong></>}
+                    {!same && (
+                      <button className="cmp__gl-link" onClick={() => void updateGuestList(gl, invitees)}>Update the list</button>
+                    )}
+                    <button className="cmp__gl-link" onClick={() => { setGlRenaming(gl.id); setGlName(''); setGlMsg(null); }}>Rename</button>
+                    {!same && (
+                      <button className="cmp__gl-link" onClick={() => { setGlSaving(true); setGlMsg(null); }}>Save as a new list</button>
+                    )}
+                  </p>
+                );
+                return glSaving ? (
                   <div className="cmp__gl-save">
                     <input className="cmp__input" value={glName} autoFocus maxLength={80}
                       onChange={(e) => setGlName(e.target.value)}
@@ -1746,8 +1826,8 @@ export default function Compose() {
                   <button className="cmp__gl-open" onClick={() => { setGlSaving(true); setGlMsg(null); }}>
                     ⊕ Save these people as a guest list
                   </button>
-                )
-              )}
+                );
+              })()}
               {!editing && glMsg && <p className="cmp__gl-msg">{glMsg}</p>}
               {/* The rungs wear the circles' small-caps eyebrow (founder
                   2026-11-05: "a soft indicator that we're now talking

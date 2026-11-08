@@ -512,3 +512,9 @@
 .cmp__aud-peek.is-open svg { transform: rotate(90deg); }
 .cmp__aud-peeknote { font-size: 12px; color: var(--ink-muted); margin: 4px 0 6px 26px; line-height: 1.4; }
 .cmp__aud-peek-list .cmp__invchips--sub { padding-left: 26px; }
+/* One saved list on screen: the foot names it instead of offering to save
+   it again; worded edit prompts hover peach (the edit-affordance rule). */
+.cmp__gl-saved { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 10px; font-size: 13px; color: var(--ink-soft); }
+.cmp__gl-saved strong { color: var(--ink); font-weight: 500; }
+.cmp__gl-link { padding: 0; font: inherit; font-size: 13px; color: var(--ink-muted); background: none; border: 0; cursor: pointer; }
+.cmp__gl-link:hover { color: var(--peach-deep); }
