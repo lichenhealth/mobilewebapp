@@ -31,7 +31,10 @@
   /* Shown at its own aspect — width/height auto + the two caps keep the
      element box equal to the drawing, so a stroke lands under the pointer. */
   width: auto; height: auto; max-width: 100%; min-height: 0;
-  border-radius: 8px; touch-action: none; cursor: crosshair;
+  border-radius: 8px; touch-action: none;
+  /* A PEN, so markup mode reads as markup mode (founder 2026-11-08) — the
+     hotspot is the nib (3,25), where the stroke actually lands. */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M3 25l2.2-7.4L19.6 3.2a2.6 2.6 0 0 1 3.7 0l1.5 1.5a2.6 2.6 0 0 1 0 3.7L10.4 22.8z' fill='%23fff' stroke='%23222' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M17.4 5.4l5.2 5.2' stroke='%23222' stroke-width='1.6'/%3E%3Cpath d='M3 25l2.2-7.4 5.2 5.2z' fill='%23f0356b' stroke='%23222' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") 3 25, crosshair;
   background: #fff;
   /* The canvas keeps its own aspect: width-limited, height-capped. */
   max-height: calc(100vh - 130px);
