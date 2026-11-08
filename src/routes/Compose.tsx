@@ -5,6 +5,9 @@ import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { supabase } from '../lib/supabase';
 import { loadSpaceMembers } from '../lib/spacesApi';
+import { InviteCard } from '../components/InviteCard';
+import { InviteStudio, InvitePreview } from '../components/InviteStudio';
+import { readInvite, type InviteDesign } from '../lib/inviteDesign';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
@@ -189,6 +192,12 @@ export default function Compose() {
   // listing. On, a private /p/ link shows the join door instead of Ask to
   // buy, and guest_request_purchase refuses server-side.
   const [currentcyOnly, setCurrentcyOnly] = useState(false);
+  // THE INVITATION STUDIO (founder 2026-11-08): the event's invite design,
+  // kept on the door-post as details.invite — read by the guest page /e/
+  // and the emailed card. null = the Classic template.
+  const [inviteDesign, setInviteDesign] = useState<InviteDesign | null>(null);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   // Category tags — the real 63-category taxonomy, loaded when opened.
   const [tagsOpen, setTagsOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -708,7 +717,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, currentcyOnly, catTags,
+      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -766,6 +775,7 @@ export default function Compose() {
       s(d.availFrom, setAvailFrom); s(d.availTo, setAvailTo);
       if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment));
       s(d.deliverRadius, setDeliverRadius); s(d.paymentPlan, setPaymentPlan); s(d.currentcyOnly, setCurrentcyOnly);
+      if (d.inviteDesign) setInviteDesign(readInvite(d.inviteDesign));
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -900,6 +910,7 @@ export default function Compose() {
       if (d.deliverRadiusMi != null) setDeliverRadius(String(d.deliverRadiusMi));
       if (typeof d.paymentPlan === 'string') setPaymentPlan(d.paymentPlan);
       if (d.currentcyOnly === true) setCurrentcyOnly(true);
+      if (d.invite) setInviteDesign(readInvite(d.invite));
       if (Array.isArray(d.categories)) { setCatTags(d.categories as string[]); }
       if (d.travelKind === 'ride' || d.travelKind === 'flight' || d.travelKind === 'stay') setTravelKind(d.travelKind);
       if (typeof d.routeFrom === 'string') setRouteFrom(d.routeFrom);
@@ -1263,6 +1274,7 @@ export default function Compose() {
       // Invite-only event (2026-11-04): the label the bridge trigger and
       // honest copy read; the enforcement is RLS (the attendee arm).
       if (isEvent && !evAnyone && !evLichen) details.inviteOnly = true;
+      if (isEvent && inviteDesign) details.invite = inviteDesign;
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
@@ -2006,7 +2018,7 @@ export default function Compose() {
             {!hasAudience && (
               <p className="cmp__hint-ev">Nothing picked yet — check a box or invite someone before this event goes live.</p>
             )}
-            {!editing && (() => {
+            {(() => {
               const evTitle = title.trim() || body.trim().slice(0, 60) || 'Your event';
               // The SAME location line the event row stores (publish's effLocation)
               // — the preview never shows something prettier than the real mail.
@@ -2017,7 +2029,7 @@ export default function Compose() {
               const sendTest = async () => {
                 setInvTest({ state: 'sending' });
                 const { data, error } = await supabase.functions.invoke('send-event-invite', {
-                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo } },
+                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo, invite: inviteDesign } },
                 });
                 const d = data as { ok?: boolean; to?: string; error?: string } | null;
                 if (error || !d?.ok) setInvTest({ state: 'error', msg: d?.error ?? 'The test didn’t send — try again in a moment.' });
@@ -2026,19 +2038,17 @@ export default function Compose() {
               return (
                 <div className="cmp__invprev">
                   <label className="cmp__label">The invitation</label>
-                  <p className="cmp__hint-ev">What your guests receive by email. It wears the event&rsquo;s first photo — add one above to dress it up.</p>
-                  <div className="cmp__invcard" aria-label="Invitation preview">
-                    {photo && <img className="cmp__invcard-photo" src={photo} alt="" />}
-                    <div className="cmp__invcard-body">
-                      <p className="cmp__invcard-eyebrow">You&rsquo;re invited</p>
-                      <p className="cmp__invcard-title">{evTitle}</p>
-                      <p className="cmp__invcard-when">{when}</p>
-                      {where && <p className="cmp__invcard-where">{where}</p>}
-                      <p className="cmp__invcard-host">Hosted by <strong>{hostName || 'you'}</strong></p>
-                      <span className="cmp__invcard-cta">RSVP &amp; see the details</span>
-                    </div>
+                  <p className="cmp__hint-ev">What your guests receive — by email, and on their invitation link, where it arrives in an envelope. <strong>Edit design</strong> picks a template, the words, colours and envelope.</p>
+                  <div className="cmp__invstage">
+                    <InviteCard design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }} />
                   </div>
                   <div className="cmp__invtest">
+                    <button type="button" className="cmp__invtest-btn" onClick={() => setPreviewOpen(true)}>
+                      <Icon name="rsvp" size={14} /> Preview
+                    </button>
+                    <button type="button" className="cmp__invtest-btn" onClick={() => setStudioOpen(true)}>
+                      <Icon name="palette" size={14} /> Edit design
+                    </button>
                     <button type="button" className="cmp__invtest-btn" onClick={() => void sendTest()}
                       disabled={invTest.state === 'sending' || !evRange.start}>
                       <Icon name="send" size={14} /> {invTest.state === 'sending' ? 'Sending…' : invTest.state === 'sent' ? 'Send another test' : 'Send me a test'}
@@ -2046,7 +2056,18 @@ export default function Compose() {
                     {invTest.state === 'sent' && <span className="cmp__invtest-note">Sent to {invTest.msg} ✓ — only you.</span>}
                     {invTest.state === 'error' && <span className="cmp__invtest-note cmp__invtest-note--err">{invTest.msg}</span>}
                   </div>
-                  <p className="cmp__hint-ev">Your guests are only invited when you press <strong>Post</strong>. Not ready? <strong>Save draft</strong> keeps the event and your guest list together.</p>
+                  {studioOpen && (
+                    <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
+                      onClose={() => setStudioOpen(false)}
+                      onDone={(dz) => { setInviteDesign(dz); setStudioOpen(false); setInvTest({ state: 'idle' }); }} />
+                  )}
+                  {previewOpen && (
+                    <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
+                      onClose={() => setPreviewOpen(false)} />
+                  )}
+                  {editing
+                    ? <p className="cmp__hint-ev">A new design reaches everyone who opens their invitation link once you save. Emails already sent keep the card they went out with.</p>
+                    : <p className="cmp__hint-ev">Your guests are only invited when you press <strong>Post</strong>. Not ready? <strong>Save draft</strong> keeps the event, its design and your guest list together.</p>}
                 </div>
               );
             })()}

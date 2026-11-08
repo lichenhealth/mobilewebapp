@@ -22,6 +22,8 @@ export interface GuestEventInfo {
   post_id: string | null;
   /** The event post's cover photo — what makes the invite pretty. */
   photo_url: string | null;
+  /** The host's invitation design (posts.details.invite) — the Studio. */
+  invite: unknown;
 }
 
 export type GuestStatus = 'going' | 'tentative' | 'declined';

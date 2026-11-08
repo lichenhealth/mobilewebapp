@@ -572,6 +572,9 @@ const POST_TOOLS = [
         visibility: { type: 'string', enum: ['invited', 'mycelium', 'lichen', 'anyone'], description: 'invited = only the people invited (default when there are guests); mycelium = their web; lichen = everyone on Lichen; anyone = the open web.' },
         share_link: { type: 'boolean', description: 'Mint a shareable event link when they post.' },
         save_guest_list_as: { type: 'string', description: 'If they asked to save these guests for reuse: the list name (e.g. "Family"). Saved now, in their Drive → Contacts — saving a list sends nothing.' },
+        invite_template: { type: 'string', enum: ['classic', 'garden', 'celebration', 'birthday', 'evening', 'minimal', 'earth', 'blush', 'harvest', 'winter'], description: 'The invitation design (the Studio). Pick one that fits what they described — a birthday → birthday, a dinner → evening, outdoors → garden — or the one they named. They can change it with Edit design before posting.' },
+        invite_headline: { type: 'string', description: 'The invitation\'s top line if they gave one ("Join us for…"); otherwise the template\'s own.' },
+        invite_message: { type: 'string', description: 'A short note from them on the invitation, in their words.' },
       },
       required: ['title'],
     },
@@ -597,6 +600,7 @@ const POST_TOOLS = [
 // for a steward of that space, only while the space's own assistant switch is
 // on, and only behind the member's hand-that-writes flag. The space id comes
 // from the THREAD, never from the model — no tool takes a target.
+const INVITE_TEMPLATE_IDS = ['classic', 'garden', 'celebration', 'birthday', 'evening', 'minimal', 'earth', 'blush', 'harvest', 'winter'];
 const SPACE_EDIT_TOOLS = [PLACE_PHOTO_TOOL, ...SPACE_PAGE_TOOLS];
 
 // THE GENERAL THREAD CAN ACT ON A STEWARDED SPACE (founder 2026-10-06, after
@@ -2716,6 +2720,16 @@ Deno.serve(async (req) => {
         ...(startMin != null ? { evStartMin: startMin, evEndMin: endMin } : {}),
         ...(input.location ? { location: String(input.location).trim().slice(0, 200), inPerson: true } : {}),
         ...(meetingUrl ? { meetingUrl, online: true } : {}),
+        // The Studio (2026-11-08): a template + their own words, the same
+        // details.invite shape Compose's Edit design writes.
+        ...(INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? ''))
+          || input.invite_message || input.invite_headline
+          ? { inviteDesign: {
+              template: INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? '')) ? String(input.invite_template) : 'classic',
+              ...(input.invite_headline ? { headline: String(input.invite_headline).slice(0, 80) } : {}),
+              ...(input.invite_message ? { message: String(input.invite_message).slice(0, 600) } : {}),
+            } }
+          : {}),
       };
       const draftId = crypto.randomUUID();
       const r = await sb('post_drafts', {
