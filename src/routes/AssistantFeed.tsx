@@ -10,7 +10,7 @@ import { useTopBackFor } from '../lib/topBack';
 import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
-  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
+  loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors, isSnagNote,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId, isSharedSpaceThread,
   loadSectionPresence, groupConvos, loadConvoNames, renameConvo,
   ASSISTANT_THREADS, BRAIN_RAIL, threadLabel, sectionIcon, sectionLabel,
@@ -388,7 +388,7 @@ export default function AssistantFeed() {
     const floor = cursorAt > 0
       ? Math.max(cursorAt, lastMine)
       : Math.max(lastMine, Date.now() - 7 * 86_400_000);
-    return c.entries.filter((e) => e.author === 'claude' && +new Date(e.created_at) > floor).length;
+    return c.entries.filter((e) => e.author === 'claude' && !isSnagNote(e.body) && +new Date(e.created_at) > floor).length;
   };
 
   useEffect(() => { feedSeen.current = 0; }, [thread, openConvo]);
