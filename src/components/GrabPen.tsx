@@ -23,6 +23,42 @@ import './GrabPen.css';
  *  screenshot I took" (file pick or paste) — the founder's own loop.
  *  ⚠ The canvas is shown at its OWN aspect (no flex-stretch, no object-fit)
  *  or pointer→pixel mapping drifts and strokes land beside the finger. */
+/* One tab share kept open across grabs (see captureTab). Module-level so a
+   remount of the button doesn't drop it. */
+const IDLE_MS = 20 * 60 * 1000;
+let shared: { stream: MediaStream; video: HTMLVideoElement } | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+function stopShare() {
+  shared?.stream.getTracks().forEach((t) => t.stop());
+  shared = null;
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+}
+function armIdleStop() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(stopShare, IDLE_MS);
+}
+async function openShare(): Promise<{ video: HTMLVideoElement; fresh: boolean }> {
+  if (shared && shared.stream.getVideoTracks().some((t) => t.readyState === 'live')) {
+    return { video: shared.video, fresh: false };
+  }
+  stopShare();
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: { displaySurface: 'browser' },
+    audio: false,
+    preferCurrentTab: true,
+    selfBrowserSurface: 'include',
+    surfaceSwitching: 'exclude',
+  } as DisplayMediaStreamOptions);
+  const video = document.createElement('video');
+  video.srcObject = stream; video.muted = true; video.playsInline = true;
+  await video.play();
+  // Chrome's own Stop button ends the share — forget it so the next grab asks.
+  stream.getVideoTracks().forEach((t) => t.addEventListener('ended', () => { if (shared?.stream === stream) { shared = null; } }));
+  shared = { stream, video };
+  return { video, fresh: true };
+}
+if (typeof window !== 'undefined') window.addEventListener('pagehide', stopShare);
+
 export default function GrabPen({ thread, uploaderId }: {
   /** The assistant thread the marked-up shot posts into (space:<id>, or
    *  'profile' for a member's own page). */
@@ -53,30 +89,27 @@ export default function GrabPen({ thread, uploaderId }: {
     img.src = src;
   });
 
-  /** The browser's own capture of this tab — real pixels. */
+  /** The browser's own capture of this tab — real pixels. ASK ONCE PER VISIT
+   *  (founder 2026-11-08: "can we remove the permissions step… or only ask
+   *  once"): Chrome asks on every getDisplayMedia call and gives a site no
+   *  way to skip or remember it, so the share is KEPT OPEN between grabs —
+   *  the first grab asks, later ones reuse it. Chrome shows its own "sharing
+   *  this tab" bar meanwhile (its Stop ends it; the next grab asks again),
+   *  and an idle share closes itself after IDLE_MS. */
   const captureTab = async (): Promise<string> => {
     const fab = document.querySelector('.grabpen__fab') as HTMLElement | null;
     fab?.classList.add('grabpen__fab--hidden');
-    let stream: MediaStream | null = null;
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'browser' },
-        audio: false,
-        preferCurrentTab: true,
-        selfBrowserSurface: 'include',
-        surfaceSwitching: 'exclude',
-      } as DisplayMediaStreamOptions);
-      const video = document.createElement('video');
-      video.srcObject = stream; video.muted = true; video.playsInline = true;
-      await video.play();
-      // Let the share prompt fade and a fresh frame paint before taking it.
-      await new Promise((r) => setTimeout(r, 450));
+      const share = await openShare();
+      // Let the FAB hide (and, the first time, the prompt fade) before the frame.
+      await new Promise((r) => setTimeout(r, share.fresh ? 450 : 180));
+      const { video } = share;
       const c = document.createElement('canvas');
       c.width = video.videoWidth; c.height = video.videoHeight;
       c.getContext('2d')!.drawImage(video, 0, 0);
+      armIdleStop();
       return c.toDataURL('image/png');
     } finally {
-      stream?.getTracks().forEach((t) => t.stop());
       fab?.classList.remove('grabpen__fab--hidden');
     }
   };
