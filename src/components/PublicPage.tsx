@@ -61,6 +61,13 @@ export interface PageMeta {
    *  footer). Members always wear it; a space opts in, so a page that is
    *  already somebody's live site never changes look without its owner. */
   look?: 'site';
+  /** Website-look layout choices (founder 2026-11-08, from her markups —
+   *  page DATA so the builder and the in-app Claude can both set them).
+   *  logo: where a space's logo sits on the front band ('center' default =
+   *  centred over the headline column). bandLead: a tab's summary line rides
+   *  inside the photo band under the title ('auto' default = on for the
+   *  split portrait bands, where the dark half otherwise stands empty). */
+  layout?: { logo?: 'left' | 'center'; bandLead?: 'auto' | 'on' | 'off' };
   /** 'about' = Home and About are one page: no Home tab, About is the landing
    *  and wears the front-page hero (founder 2026-11-07). */
   homeAs?: 'about';
@@ -859,6 +866,7 @@ export default function PublicPage(props: PublicPageProps) {
         />
       );
     }
+    if (leadInBand && tab === id) return null;   // it rides in the photo band
     return lead ? <p className="ppage__lead">{lead}</p> : null;
   };
   // SMART SUMMARIES (founder 2026-08-26): Home used to tease a tab by
@@ -965,6 +973,14 @@ export default function PublicPage(props: PublicPageProps) {
   const [bandAr, setBandAr] = useState<number | null>(null);
   // The front page's big hero: Home, or About when it IS the front page.
   const frontBand = tab === 'home' || !tabbed || (homeIsAbout && tab === 'about');
+  const portraitBand = !!(coverSrc && bandAr && bandAr < 1.15);
+  const bandLeadMode = page.layout?.bandLead ?? 'auto';
+  const bandLeadText = !siteHead || frontBand ? undefined : (
+    (['about', 'services', 'goods', 'facilities'] as const).includes(tab as 'about')
+      ? secLead(tab as 'about')
+      : activeChosen?.lead?.trim()
+  ) || undefined;
+  const leadInBand = !!bandLeadText && (bandLeadMode === 'on' || (bandLeadMode === 'auto' && portraitBand));
 
   // ── The hero photo's in-place controls (builder only) ─────────────────
   // Which slot this tab's photo lives in decides where a change lands:
@@ -1134,7 +1150,7 @@ export default function PublicPage(props: PublicPageProps) {
                 the images"): a full-bleed band 46vh tall cropped a 2:1 photo
                 to a 4:1 sliver. The photo's own shape is measured on load
                 and the band grows toward it (CSS caps it below the fold). */}
-            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (frontBand ? ' is-home' : '')
+            <div className={'ppage__siteband' + (coverSrc ? ' has-cover' : '') + (frontBand ? ' is-home' : '') + (leadInBand ? ' has-lead' : '')
               + (coverSrc && bandAr && bandAr < 1.15 ? ' is-portrait' : '')}
               style={bandAr ? ({ '--band-ar': String(bandAr) } as React.CSSProperties) : undefined}>
               {coverSrc && (
@@ -1163,7 +1179,9 @@ export default function PublicPage(props: PublicPageProps) {
                         headline. Spaces only: a member's avatar is a face,
                         not a mark. */}
                     {props.firstPerson && avatarUrl && (
-                      <img className="ppage__sitelogo" src={avatarUrl} alt={name + ' logo'} />
+                      <div className={'ppage__sitelogo-row' + ((page.layout?.logo ?? 'center') === 'center' ? ' is-center' : '')}>
+                        <img className="ppage__sitelogo" src={avatarUrl} alt={name + ' logo'} />
+                      </div>
                     )}
                     {/* Short lines set in caps, /welcome's way; a SENTENCE
                         stays a sentence — a credentials line in giant caps
@@ -1184,9 +1202,17 @@ export default function PublicPage(props: PublicPageProps) {
                     )}
                   </>
                 ) : (
-                  <h1 className="ppage__sitehero-title ppage__sitehero-title--tab">
-                    {navItems.find((n) => n.id === tab)?.label ?? name}
-                  </h1>
+                  <>
+                    <h1 className="ppage__sitehero-title ppage__sitehero-title--tab">
+                      {navItems.find((n) => n.id === tab)?.label ?? name}
+                    </h1>
+                    {/* THE TAB'S SUMMARY RIDES THE BAND (founder 2026-11-08,
+                        markups on About/Services: "move the text up and the
+                        title goes under it, so there's not so much blank
+                        black space") — the lead sits under the title on the
+                        dark half instead of below the band. */}
+                    {leadInBand && <p className="ppage__sitehero-sub ppage__sitehero-lead">{bandLeadText}</p>}
+                  </>
                 )}
               </div>
             </div>
@@ -1333,7 +1359,7 @@ export default function PublicPage(props: PublicPageProps) {
             </>
           ) : (
             <>
-              {activeChosen.lead && <p className="ppage__lead">{activeChosen.lead}</p>}
+              {activeChosen.lead && !leadInBand && <p className="ppage__lead">{activeChosen.lead}</p>}
               {(activeChosen.body ?? '').split(/\n{2,}/).filter(Boolean).map((para, i) => (
                 isSubhead(para)
                   ? <h3 className="ppage__subhead" key={i}>{para.trim()}</h3>

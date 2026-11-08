@@ -336,6 +336,26 @@ export const SPACE_PAGE_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'set_space_website_layout',
+    description:
+      'The public page\'s WEBSITE-LOOK layout — the same choices the page builder offers. '
+      + 'website_look: true = the full website look (photo header with the menu over it, big headings, '
+      + 'Powered-by footer), false = the plain page. logo: "center" centres the logo over the front '
+      + 'headline, "left" keeps it flush left. band_lead: "auto" (default — on when a tab\'s photo sits '
+      + 'to one side), "on" always puts each tab\'s summary line inside its photo header under the '
+      + 'title, "off" keeps the summary below the header. Pass only what should change. These land in '
+      + 'the DRAFT like every page edit.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        website_look: { type: 'boolean' },
+        logo: { type: 'string', enum: ['center', 'left'] },
+        band_lead: { type: 'string', enum: ['auto', 'on', 'off'] },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** True when `name` is one of the SPACE_PAGE_TOOLS.
@@ -840,6 +860,33 @@ export async function runSpacePageTool(
     if (!touched) return { ok: false, error: 'Nothing to change — pass a style, a position, or both.' };
     await patchSpace({ page });
     return { ok: true, previous, change: `changed ${spaceName}'s cover` };
+  }
+
+  if (name === 'set_space_website_layout') {
+    const { page } = await readSpacePage();
+    const layout = { ...(page.layout ?? {}) };
+    const previous = { website_look: page.look === 'site', logo: layout.logo ?? 'center', band_lead: layout.bandLead ?? 'auto' };
+    let touched = false;
+    if (input.website_look !== undefined) {
+      if (input.website_look) page.look = 'site'; else delete page.look;
+      touched = true;
+    }
+    if (input.logo !== undefined) {
+      const v = String(input.logo);
+      if (!['center', 'left'].includes(v)) return { ok: false, error: 'logo must be "center" or "left".' };
+      if (v === 'center') delete layout.logo; else layout.logo = v;
+      touched = true;
+    }
+    if (input.band_lead !== undefined) {
+      const v = String(input.band_lead);
+      if (!['auto', 'on', 'off'].includes(v)) return { ok: false, error: 'band_lead must be "auto", "on" or "off".' };
+      if (v === 'auto') delete layout.bandLead; else layout.bandLead = v;
+      touched = true;
+    }
+    if (!touched) return { ok: false, error: 'Nothing to change — pass website_look, logo or band_lead.' };
+    if (Object.keys(layout).length) page.layout = layout; else delete page.layout;
+    await patchSpace({ page });
+    return { ok: true, previous, change: `changed ${spaceName}'s website layout` };
   }
 
   return { ok: false, error: `No such space tool: ${name}` };

@@ -136,6 +136,16 @@ const EDIT_TOOLS = [
     },
   },
   {
+    name: 'set_website_layout',
+    description:
+      'Their public page\'s website layout — the same choice the page builder offers. band_lead: "auto" (default — on when a tab\'s photo sits to one side), "on" always puts each tab\'s summary line inside its photo header under the title, "off" keeps the summary below the header. Lands in the draft like every page edit.',
+    input_schema: {
+      type: 'object',
+      properties: { band_lead: { type: 'string', enum: ['auto', 'on', 'off'] } },
+      required: ['band_lead'],
+    },
+  },
+  {
     name: 'add_categories',
     description: 'Add to what they offer, by category id from the list in your instructions. Adding a service category declares them a service provider, and a goods category a goods provider — that follows automatically, do not describe it as a separate step.',
     input_schema: {
@@ -1518,6 +1528,18 @@ Deno.serve(async (req) => {
       };
     }
 
+    if (name === 'set_website_layout') {
+      const v = String(input.band_lead ?? '');
+      if (!['auto', 'on', 'off'].includes(v)) return { ok: false, error: 'band_lead must be "auto", "on" or "off".' };
+      const { page } = await readPage();
+      const layout = { ...((page.layout as Record<string, unknown> | undefined) ?? {}) };
+      const previous = (layout.bandLead as string | undefined) ?? 'auto';
+      if (v === 'auto') delete layout.bandLead; else layout.bandLead = v;
+      if (Object.keys(layout).length) page.layout = layout; else delete page.layout;
+      await patchMe({ page });
+      return { ok: true, previous, change: `set their website's summary-in-header layout to ${v}` };
+    }
+
     // The public/private switch is a COLUMN, not page content — a live
     // write (the space twin's pattern): there is no draft state for "the
     // page answers to the web or it doesn't".
@@ -2656,7 +2678,7 @@ Deno.serve(async (req) => {
   const SECTION_BY_TOOL: Record<string, string> = {
     set_tagline: 'profile', set_home_summary: 'profile', set_story: 'profile',
     set_contact_field: 'profile', add_categories: 'profile', remove_categories: 'profile',
-    set_page_tab: 'profile', set_page_published: 'profile', set_handle: 'profile',
+    set_page_tab: 'profile', set_page_published: 'profile', set_website_layout: 'profile', set_handle: 'profile',
     move_section_photo: 'profile', move_photo_to_home_cover: 'profile',
     set_section_photo_position: 'profile', place_uploaded_photo: 'profile',
     save_web_image: 'profile', select_space: 'profile',
@@ -2681,7 +2703,7 @@ Deno.serve(async (req) => {
   // while a blocklist would put Publish buttons under calendar edits.
   const SECTION_TABS = ['about', 'services', 'goods', 'contact', 'facilities'];
   const TAB_BY_TOOL: Record<string, string> = {
-    set_tagline: 'home', set_space_tagline: 'home',
+    set_tagline: 'home', set_website_layout: 'about', set_space_tagline: 'home',
     set_home_summary: 'home', set_space_home_summary: 'home',
     set_story: 'about', set_space_story: 'about',
     set_contact_field: 'contact', set_space_contact_field: 'contact',
@@ -2689,7 +2711,7 @@ Deno.serve(async (req) => {
     set_space_offerings: 'services',
     set_space_facilities: 'facilities',
     move_photo_to_home_cover: 'home', move_space_photo_to_home_cover: 'home',
-    set_space_cover_style: 'home', set_space_page_colours: 'home',
+    set_space_cover_style: 'home', set_space_website_layout: 'home', set_space_page_colours: 'home',
     set_space_page_colours_from_logo: 'home', set_space_join_level: 'home',
     set_space_page_visibility: 'home',
   };

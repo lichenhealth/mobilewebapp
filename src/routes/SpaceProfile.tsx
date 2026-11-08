@@ -1996,6 +1996,25 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             </label>
           )}
 
+          {/* WEBSITE-LOOK LAYOUT (founder 2026-11-08) — page data, so the
+              in-app Claude can set the same two choices by conversation. */}
+          {publicPage && pageEdit.look === 'site' && (
+            <div className="prof__field">
+              <label className="prof__label">Website layout</label>
+              <label className="sprof__duty">
+                <input type="checkbox" checked={(pageEdit.layout?.logo ?? 'center') === 'center'}
+                  onChange={(e) => setPageEdit((p) => ({ ...p, layout: { ...p.layout, logo: e.target.checked ? undefined : 'left' } }))} />
+                <span>Centre the logo over the headline<em>Off keeps it flush left.</em></span>
+              </label>
+              <label className="sprof__duty">
+                <input type="checkbox" checked={(pageEdit.layout?.bandLead ?? 'auto') !== 'off'}
+                  onChange={(e) => setPageEdit((p) => ({ ...p, layout: { ...p.layout, bandLead: e.target.checked ? undefined : 'off' } }))} />
+                <span>Put each tab’s summary line in its photo header
+                  <em>On pages where the photo sits to one side, the summary moves up under the title instead of below the photo.</em></span>
+              </label>
+            </div>
+          )}
+
           {/* HOW LOUDLY THE PAGE RECRUITS (founder 2026-08-28). A page can go
               live as somebody's actual website before its owner has been
               walked through Lichen — Countryman Stables went up on its own
