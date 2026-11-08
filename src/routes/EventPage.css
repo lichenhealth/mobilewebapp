@@ -144,3 +144,12 @@
 }
 .evp__guest-retext:hover { color: var(--peach-deep); }
 .evp__guest-status { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
+.evp__extras { margin: 12px 0 16px; padding: 14px; border: 1px solid var(--bone-edge); border-radius: 14px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
+.evp__extras-h { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+.evp__xfield { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.evp__xfield > span { color: var(--ink-soft); }
+.evp__xfield select, .evp__xfield textarea { font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--bone-edge); border-radius: 10px; background: var(--bone-warm, #fff); }
+.evp__meals { display: flex; flex-wrap: wrap; gap: 6px; }
+.evp__meal { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--bone-edge); background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+.evp__meal.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.evp__xsave { align-self: flex-start; }

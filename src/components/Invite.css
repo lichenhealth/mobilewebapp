@@ -133,3 +133,57 @@
 .invpv__stage { width: 100%; max-width: 480px; }
 .invpv__again { margin-top: 18px; padding: 0; border: 0; background: none; color: var(--peach-deep); font: inherit; font-size: 14px; cursor: pointer; }
 .invenv__card-eyebrow.is-script { text-transform: none; letter-spacing: 0; font-size: 15px; }
+
+/* ── Registry & info links on the card ─────────────────────────────── */
+.invc__links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 14px; }
+.invc__link {
+  display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 13px;
+  border: 1px solid var(--invc-accent); color: var(--invc-accent); text-decoration: none;
+  font-family: Archivo, system-ui, sans-serif;
+}
+.invc__link:hover { background: color-mix(in srgb, var(--invc-accent) 10%, transparent); }
+
+/* ── The host's own uploaded card ──────────────────────────────────── */
+.invc--art { background: #fff; padding: 0; text-align: center; border-radius: 16px; overflow: hidden; }
+.invc__art { display: block; width: 100%; height: auto; }
+.invc__artfacts { padding: 18px 20px 22px; color: #2b2b28; font-family: Archivo, system-ui, sans-serif; }
+.invc__arttitle { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+.invc__artline { font-size: 14px; color: #5a554c; margin: 0 0 2px; }
+.invc__artline--msg { margin: 10px auto 6px; max-width: 360px; white-space: pre-wrap; line-height: 1.5; }
+.invc--art .invc__cta { margin-top: 12px; }
+
+/* ── The animated backdrop ─────────────────────────────────────────── */
+.invbd { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.invbd__m {
+  position: absolute; top: -8%; line-height: 1; opacity: 0.75;
+  animation-name: invbd-fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+.invbd--snow .invbd__m { text-shadow: 0 0 2px rgba(42, 51, 56, 0.25); }
+.invbd__m.is-rise { top: auto; bottom: -8%; animation-name: invbd-rise; opacity: 0.5; }
+.invbd__m.is-twinkle { animation-name: invbd-twinkle; animation-timing-function: ease-in-out; }
+@keyframes invbd-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(18px, 55vh, 0) rotate(160deg); }
+  100% { transform: translate3d(-10px, 112vh, 0) rotate(320deg); }
+}
+@keyframes invbd-rise {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-14px, -55vh, 0); }
+  100% { transform: translate3d(10px, -112vh, 0); }
+}
+@keyframes invbd-twinkle { 0%, 100% { opacity: 0.15; transform: scale(0.8); } 50% { opacity: 0.9; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .invbd__m { animation: none; } .invbd__m:not(.is-twinkle) { top: auto; } }
+.invst__stage { position: relative; overflow: hidden; }
+.invst__stage > :not(.invbd), .invpv > :not(.invbd) { position: relative; z-index: 1; }
+.invst__own { margin: 0 0 16px; }
+.invst__own-up { display: block; padding: 14px; border: 1.5px dashed var(--peach); border-radius: 12px; color: var(--peach-deep); font-size: 14px; font-weight: 500; cursor: pointer; text-align: center; }
+.invst__own-sub { display: block; font-weight: 300; font-size: 12.5px; color: var(--ink-muted); margin-top: 4px; }
+.invst__own { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.invst__own > .invst__own-up { flex: 1 1 100%; }
+.invst__own-thumb { width: 54px; height: 70px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.invst__own-txt { flex: 1; font-size: 13px; color: var(--ink-soft); min-width: 140px; }
+.invst__linkrow { display: flex; gap: 6px; margin: 0 0 8px; align-items: center; }
+.invst__linkrow input { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--bone-edge); border-radius: 10px; background: var(--bone-warm, #fff); }
+.invst__linkrow input:first-child:not(:only-of-type) { flex: 0 1 34%; }
+.invst__x { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--bone-edge); background: #fff; cursor: pointer; font-size: 16px; line-height: 1; color: var(--ink-soft); }
+.invst__field select { width: 100%; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; }

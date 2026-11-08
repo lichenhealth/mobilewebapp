@@ -511,3 +511,8 @@
 .cmp__invadd { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--peach); font: inherit; font-size: 18px; line-height: 1; background: #fff; color: var(--peach-deep); cursor: pointer; }
 .cmp__invadd:hover { background: var(--peach-tint); }
 .cmp__gl-link--go { color: var(--peach-deep); font-weight: 500; }
+.cmp__invsched { margin: 14px 0 4px; }
+.cmp__invsched-opt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; margin: 0 0 6px; }
+.cmp__invsched-at { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; }
+.cmp__evtz { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 12px; font-size: 14px; }
+.cmp__evtz-lab { color: var(--ink-soft); }

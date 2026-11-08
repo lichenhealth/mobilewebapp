@@ -26,6 +26,8 @@ export interface EventRow {
   start_min: number | null;        // minutes since local midnight
   end_min: number | null;
   recurrence: Recurrence | null;
+  /** Whose wall clock the minutes are (IANA); null = the creator's zone. */
+  timezone?: string | null;
   created_at: string;
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
@@ -50,7 +52,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -126,6 +128,7 @@ export interface EventInput {
   endMin?: number;
   recurrence?: Recurrence | null;
   inviteeIds: string[];
+  timezone?: string | null;
 }
 
 export async function createEvent(me: string, input: EventInput): Promise<string> {
@@ -145,6 +148,7 @@ export async function createEvent(me: string, input: EventInput): Promise<string
     start_min: input.allDay ? null : input.startMin,
     end_min: input.allDay ? null : input.endMin,
     recurrence: input.recurrence ?? null,
+    ...(input.timezone ? { timezone: input.timezone } : {}),
   }).select('id').single();
   if (error) throw error;
   const id = (data as { id: string }).id;
@@ -177,9 +181,10 @@ export async function loadEvent(id: string): Promise<EventRow | null> {
  *  the guest list and everyone's RSVPs; Compose's event editing must not.) */
 export async function updateEventDetails(
   id: string,
-  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin'>,
+  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin' | 'timezone'>,
 ): Promise<void> {
   const { error } = await supabase.from('events').update({
+    ...(input.timezone ? { timezone: input.timezone } : {}),
     title: input.title,
     description: input.description,
     location: input.location,
@@ -551,4 +556,11 @@ export async function mintCalendarFeedToken(rotate = false): Promise<string> {
 
 export function calendarFeedUrl(token: string): string {
   return `https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/calendar-feed?t=${token}`;
+}
+
+/** The member's own calendar zone (profiles.timezone, stamped from their
+ *  device); null when unknown — callers fall back to the browser's. */
+export async function myTimezone(): Promise<string | null> {
+  const { data } = await supabase.rpc('my_timezone');
+  return (data as string | null) ?? null;
 }

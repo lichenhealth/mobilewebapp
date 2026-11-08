@@ -73,3 +73,6 @@ verify_jwt = false
 
 [functions.post-checkout]
 verify_jwt = false
+
+[functions.event-mail]
+verify_jwt = false

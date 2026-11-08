@@ -628,6 +628,18 @@ export function zoneSlotLabel(
   } catch { return null; }
 }
 
+/** A zone's short name at a given wall time ("MST", "GMT+2") — the label an
+ *  event's time wears so nobody guesses whose clock it is. '' when unknown. */
+export function zoneAbbr(tz: string | null | undefined, iso?: string, min?: number | null): string {
+  if (!tz) return '';
+  try {
+    const at = (iso && slotInstant(iso, min ?? 12 * 60, tz)) || new Date();
+    const v = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+      .formatToParts(at).find((x) => x.type === 'timeZoneName')?.value ?? '';
+    return v;
+  } catch { return ''; }
+}
+
 /** Every IANA zone the browser knows — the timezone dropdown's vocabulary. */
 export function allTimeZones(): string[] {
   try {

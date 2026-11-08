@@ -194,7 +194,7 @@ export type FeedPost = {
     id: string; start_date: string; end_date: string; all_day: boolean;
     start_min: number | null; end_min: number | null;
     recurrence: import('./recurrence').Recurrence | null;
-    lat: number | null; lng: number | null;
+    lat: number | null; lng: number | null; timezone?: string | null;
   } | null;
 };
 
@@ -229,7 +229,7 @@ export async function loadMyRsvpStatuses(eventIds: string[], me: string): Promis
   return map;
 }
 
-const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, slug, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind, handle), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence, lat, lng)';
+const FEED_SELECT = 'id, author_id, author_space_id, title, body, content_type, service_area, service_areas, visibility, is_public, to_mycelium, audience_space_ids, image_url, details, created_at, slug, author:profiles!posts_author_id_fkey(full_name, handle, avatar_url), author_space:spaces!posts_author_space_id_fkey(name, kind, handle), event_category, event_mode, linked_event_id, linked_event:events!posts_linked_event_id_fkey(id, start_date, end_date, all_day, start_min, end_min, recurrence, lat, lng, timezone)';
 
 /** A set of posts by id (the Saved shelf). RLS applies — hidden ones drop. */
 export async function loadPostsByIds(ids: string[]): Promise<FeedPost[]> {

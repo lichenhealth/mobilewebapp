@@ -562,7 +562,7 @@ const POST_TOOLS = [
         end_min: { type: 'integer', description: 'End time, minutes after midnight. Omit to default to two hours after the start.' },
         all_day: { type: 'boolean' },
         location: { type: 'string', description: 'A place, in their words ("Our house", an address). Not a link.' },
-        meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. Lichen does not mint a fresh Zoom room for events — if they want one, say so and suggest they paste their own link.' },
+        meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. Lichen does not mint a fresh Zoom room for EVENTS yet (only for bookings) — if they want one, say so plainly, suggest they paste their own link, and file it with file_dev_report as a wanted feature.' },
         price: { type: 'string', enum: ['free', 'trade', 'paid'], description: 'How admission works. Default free.' },
         guests: {
           type: 'array',
@@ -575,6 +575,13 @@ const POST_TOOLS = [
         invite_template: { type: 'string', enum: ['classic', 'garden', 'celebration', 'birthday', 'evening', 'minimal', 'earth', 'blush', 'harvest', 'winter'], description: 'The invitation design (the Studio). Pick one that fits what they described — a birthday → birthday, a dinner → evening, outdoors → garden — or the one they named. They can change it with Edit design before posting.' },
         invite_headline: { type: 'string', description: 'The invitation\'s top line if they gave one ("Join us for…"); otherwise the template\'s own.' },
         invite_message: { type: 'string', description: 'A short note from them on the invitation, in their words.' },
+        plus_ones: { type: 'integer', description: 'How many extra guests each reply may bring (0–20), only if they said.' },
+        meal_choices: { type: 'array', items: { type: 'string' }, description: 'Meal options guests pick from on the RSVP, in their words (≤8).' },
+        rsvp_questions: { type: 'array', items: { type: 'string' }, description: 'Their own questions the RSVP asks ("Any allergies?"), ≤5.' },
+        reminders: { type: 'boolean', description: 'false only if they asked for NO day-before reminder; on by default.' },
+        links: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, url: { type: 'string' } }, required: ['url'] }, description: 'Registry / gift / info links worn on the card — a URL only if THEY wrote it in this conversation (https).' },
+        backdrop: { type: 'string', enum: ['confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'], description: 'An animated backdrop behind the envelope on the guest page, if they asked for one.' },
+        time_zone: { type: 'string', description: 'IANA zone (e.g. "America/Denver") ONLY when they said the event runs in a zone other than their own; otherwise omit — the composer defaults to their calendar\'s zone.' },
       },
       required: ['title'],
     },
@@ -2709,6 +2716,26 @@ Deno.serve(async (req) => {
       const vis = ['invited', 'mycelium', 'lichen', 'anyone'].includes(String(input.visibility))
         ? String(input.visibility) : (invitees.length ? 'invited' : 'lichen');
       const evMode = ['free', 'trade', 'paid'].includes(String(input.price)) ? String(input.price) : 'free';
+      // THE REST OF THE STUDIO (2026-11-08): the RSVP form, links, backdrop,
+      // time zone — the same keys Compose's Edit design + When write.
+      const strList = (v: unknown, max: number, len: number) => Array.isArray(v)
+        ? [...new Set(v.map((x) => String(x ?? '').trim().slice(0, len)).filter(Boolean))].slice(0, max) : [];
+      const form: Record<string, unknown> = {};
+      const po = Number(input.plus_ones); if (Number.isFinite(po) && po > 0) form.plusOnes = Math.min(20, Math.round(po));
+      const ml = strList(input.meal_choices, 8, 60); if (ml.length) form.meals = ml;
+      const qs = strList(input.rsvp_questions, 5, 200); if (qs.length) form.questions = qs;
+      if (input.reminders === false) form.remind = false;
+      const designExtra: Record<string, unknown> = {};
+      if (Object.keys(form).length) designExtra.form = form;
+      const linkIn = Array.isArray(input.links) ? input.links as { label?: string; url?: string }[] : [];
+      const linksOk = linkIn.map((l) => ({ label: String(l.label ?? '').trim().slice(0, 40) || 'Registry', url: String(l.url ?? '').trim() }))
+        .filter((l) => /^https:\/\/[^\s<>"]+$/i.test(l.url) && memberLower.includes(l.url.toLowerCase().replace(/\/$/, ''))).slice(0, 3);
+      if (linksOk.length) designExtra.links = linksOk;
+      if (['confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'].includes(String(input.backdrop))) designExtra.backdrop = String(input.backdrop);
+      let evTzIn = '';
+      if (typeof input.time_zone === 'string' && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)+$/.test(input.time_zone.trim())) {
+        try { new Intl.DateTimeFormat('en-US', { timeZone: input.time_zone.trim() }); evTzIn = input.time_zone.trim(); } catch { /* unknown zone */ }
+      }
       const draft: Record<string, unknown> = {
         contentType: 'actionable', title, body, areas: ['events'],
         isPublic: vis === 'lichen' || vis === 'anyone', toMycelium: vis === 'mycelium', audienceSpaces: [],
@@ -2722,12 +2749,14 @@ Deno.serve(async (req) => {
         ...(meetingUrl ? { meetingUrl, online: true } : {}),
         // The Studio (2026-11-08): a template + their own words, the same
         // details.invite shape Compose's Edit design writes.
-        ...(INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? ''))
+        ...(evTzIn ? { evTz: evTzIn } : {}),
+        ...(Object.keys(designExtra).length || INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? ''))
           || input.invite_message || input.invite_headline
           ? { inviteDesign: {
               template: INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? '')) ? String(input.invite_template) : 'classic',
               ...(input.invite_headline ? { headline: String(input.invite_headline).slice(0, 80) } : {}),
               ...(input.invite_message ? { message: String(input.invite_message).slice(0, 600) } : {}),
+              ...designExtra,
             } }
           : {}),
       };
@@ -2753,7 +2782,7 @@ Deno.serve(async (req) => {
         change: `drafted the event "${title}"${date ? ` on ${date}` : ' (no date yet)'}${startMin != null ? ` at minute ${startMin}` : ''}, ${invitees.length} guest${invitees.length === 1 ? '' : 's'} ready, visible to ${vis}${listLine}`,
         ...(unplaced.length ? { unplaced: `couldn't place: ${unplaced.join(', ')} — ask for an email or phone` } : {}),
         ...(notes.length ? { notes } : {}),
-        note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. Lichen mints unique Zoom rooms for bookings, not events — if they want a video room, they paste their own link.',
+        note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. Lichen mints unique Zoom rooms for bookings, not events (yet) — if they want a video room, they paste their own link. RSVP questions, plus-ones, meal choices, registry links, backdrop and time zone, when passed, are in the design already — they can change any of it with Edit design before posting.',
       };
     }
 

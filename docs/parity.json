@@ -708,5 +708,26 @@
  },
  "moneySafeguardsApi:saveMoneySafeguards": {
   "tool": "set_money_floor (confirm card, never Always allow); pacing switch is the member's own off-switch, like AI consent"
+ },
+ "calendarApi:myTimezone": {
+  "exempt": "a read of the member's own zone, not an act"
+ },
+ "eventGuestsApi:markGuestOpened": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "eventGuestsApi:loadGuestMessages": {
+  "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "eventGuestsApi:saveMyRsvpExtras": {
+  "gap": "1"
+ },
+ "eventGuestsApi:sendHostMessage": {
+  "gap": "2"
+ },
+ "eventGuestsApi:addCohost": {
+  "gap": "3"
+ },
+ "eventGuestsApi:removeCohost": {
+  "gap": "3"
  }
 }

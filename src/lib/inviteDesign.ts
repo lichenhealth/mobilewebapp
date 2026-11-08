@@ -24,7 +24,29 @@ export interface InviteDesign {
   envelope?: string;   // hex — the envelope on the guest page
   liner?: InviteLiner; // the envelope's inner pattern
   photo?: boolean;     // wear the event's cover photo (default true)
+  /** THE RSVP FORM (Paperless Post parity, 2026-11-08): what the reply asks. */
+  form?: RsvpForm;
+  /** Registry / gift / info links worn on the card — https only, ≤3. */
+  links?: InviteLink[];
+  /** The host's OWN uploaded card (our storage URL) — it IS the card. */
+  artwork?: string;
+  /** An animated backdrop behind the envelope on the guest page. */
+  backdrop?: InviteBackdrop;
 }
+
+export interface RsvpForm {
+  plusOnes?: number;      // how many extra guests each reply may bring (0 = none)
+  meals?: string[];       // meal choices offered (empty = not asked)
+  questions?: string[];   // custom questions, ≤5
+  remind?: boolean;       // the automatic day-before reminder (default on)
+}
+export interface InviteLink { label: string; url: string }
+export type InviteBackdrop = 'none' | 'confetti' | 'snow' | 'petals' | 'stars' | 'bubbles' | 'leaves';
+export const INVITE_BACKDROPS: { id: InviteBackdrop; label: string }[] = [
+  { id: 'none', label: 'None' }, { id: 'confetti', label: 'Confetti' }, { id: 'snow', label: 'Snow' },
+  { id: 'petals', label: 'Petals' }, { id: 'stars', label: 'Twinkle' }, { id: 'bubbles', label: 'Bubbles' },
+  { id: 'leaves', label: 'Falling leaves' },
+];
 
 export interface InviteTemplate {
   id: string;
@@ -100,6 +122,7 @@ export interface ResolvedInvite {
   fontCss: string; font: InviteFont;
   accent: string; paper: string; ink: string; inkSoft: string;
   envelope: string; liner: InviteLiner; photo: boolean;
+  form: Required<RsvpForm>; links: InviteLink[]; artwork: string | null; backdrop: InviteBackdrop;
 }
 
 export function resolveInvite(d?: Partial<InviteDesign> | null): ResolvedInvite {
@@ -119,7 +142,45 @@ export function resolveInvite(d?: Partial<InviteDesign> | null): ResolvedInvite 
     envelope: d?.envelope || t.envelope,
     liner: d?.liner || t.liner,
     photo: d?.photo !== false,
+    form: {
+      plusOnes: clampInt(d?.form?.plusOnes, 0, 20),
+      meals: cleanList(d?.form?.meals, 8, 60),
+      questions: cleanList(d?.form?.questions, 5, 200),
+      remind: d?.form?.remind !== false,
+    },
+    links: cleanLinks(d?.links),
+    artwork: isOurImage(d?.artwork) ? d!.artwork! : null,
+    backdrop: INVITE_BACKDROPS.some((b) => b.id === d?.backdrop) ? d!.backdrop! : 'none',
   };
+}
+
+const clampInt = (v: unknown, lo: number, hi: number) =>
+  typeof v === 'number' && isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : lo;
+function cleanList(v: unknown, max: number, len: number): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    const t = typeof x === 'string' ? x.trim().slice(0, len) : '';
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+export function cleanLinks(v: unknown): InviteLink[] {
+  if (!Array.isArray(v)) return [];
+  const out: InviteLink[] = [];
+  for (const x of v) {
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    const url = typeof o.url === 'string' ? o.url.trim() : '';
+    if (!/^https:\/\/[^\s<>"]+$/i.test(url) || url.length > 500) continue;
+    out.push({ label: (typeof o.label === 'string' ? o.label.trim().slice(0, 40) : '') || 'Registry', url });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+/** An uploaded card lives in our own public storage — never a hotlink. */
+export function isOurImage(v: unknown): v is string {
+  return typeof v === 'string' && /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\//i.test(v);
 }
 
 /** Normalize anything that came off a post's details into a design (or null). */
@@ -135,8 +196,26 @@ export function readInvite(raw: unknown): InviteDesign | null {
     accent: hex(r.accent), paper: hex(r.paper), envelope: hex(r.envelope),
     liner: INVITE_LINERS.some((l) => l.id === r.liner) ? (r.liner as InviteLiner) : undefined,
     photo: r.photo === false ? false : undefined,
+    form: readForm(r.form),
+    links: (() => { const l = cleanLinks(r.links); return l.length ? l : undefined; })(),
+    artwork: isOurImage(r.artwork) ? r.artwork : undefined,
+    backdrop: INVITE_BACKDROPS.some((b) => b.id === r.backdrop) && r.backdrop !== 'none' ? (r.backdrop as InviteBackdrop) : undefined,
   };
 }
+
+function readForm(v: unknown): RsvpForm | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const f = v as Record<string, unknown>;
+  const out: RsvpForm = {};
+  const p = clampInt(f.plusOnes, 0, 20); if (p) out.plusOnes = p;
+  const m = cleanList(f.meals, 8, 60); if (m.length) out.meals = m;
+  const q = cleanList(f.questions, 5, 200); if (q.length) out.questions = q;
+  if (f.remind === false) out.remind = false;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Does the reply ask anything beyond going / maybe / can't? */
+export const formAsks = (f: Required<RsvpForm>) => f.plusOnes > 0 || f.meals.length > 0 || f.questions.length > 0;
 
 /** The envelope liner as a CSS background (guest page + studio swatches). */
 export function linerCss(l: InviteLiner, accent: string): string {

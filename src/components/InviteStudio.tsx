@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { InviteCard, InviteEnvelope, type InviteFacts } from './InviteCard';
+import { InviteCard, InviteEnvelope, InviteBackdropLayer, type InviteFacts } from './InviteCard';
 import {
-  INVITE_TEMPLATES, INVITE_FONTS, INVITE_ACCENTS, INVITE_PAPERS, INVITE_ENVELOPES, INVITE_LINERS,
-  linerCss, resolveInvite, templateById, type InviteDesign,
+  INVITE_TEMPLATES, INVITE_FONTS, INVITE_ACCENTS, INVITE_PAPERS, INVITE_ENVELOPES, INVITE_LINERS, INVITE_BACKDROPS,
+  linerCss, resolveInvite, templateById, type InviteDesign, type RsvpForm, type InviteLink,
 } from '../lib/inviteDesign';
+import { uploadPageImage } from '../lib/avatarApi';
 import './Invite.css';
 
 // THE STUDIO (founder 2026-11-08: "The edit goes to a template to build out an
@@ -13,12 +14,13 @@ import './Invite.css';
 // Envelope (colour · liner · photo). Done hands the design back; nothing is
 // sent from here — the event's Post (or Save) is what keeps it.
 
-type Tab = 'design' | 'words' | 'style' | 'envelope';
+type Tab = 'design' | 'words' | 'replies' | 'style' | 'envelope';
 const OCCASIONS = ['All', 'Celebrations', 'Gatherings', 'Seasonal', 'Simple'] as const;
 
-export function InviteStudio({ design, facts, onDone, onClose }: {
+export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
   design: InviteDesign | null;
   facts: InviteFacts;
+  uploaderId?: string;
   onDone: (d: InviteDesign) => void;
   onClose: () => void;
 }) {
@@ -27,6 +29,21 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
   const [occ, setOcc] = useState<(typeof OCCASIONS)[number]>('All');
   const r = resolveInvite(d);
   const set = (p: Partial<InviteDesign>) => setD((cur) => ({ ...cur, ...p }));
+  const setForm = (p: Partial<RsvpForm>) => setD((cur) => ({ ...cur, form: { ...(cur.form ?? {}), ...p } }));
+  const [artBusy, setArtBusy] = useState(false);
+  const [artErr, setArtErr] = useState('');
+  async function uploadArt(f: File | undefined) {
+    if (!f || !uploaderId) return;
+    if (!f.type.startsWith('image/')) { setArtErr('That isn’t an image.'); return; }
+    setArtBusy(true); setArtErr('');
+    try { const url = await uploadPageImage(uploaderId, f); set({ artwork: url }); }
+    catch (e) { setArtErr((e as Error).message || 'Upload failed.'); }
+    finally { setArtBusy(false); }
+  }
+  const links: InviteLink[] = d.links ?? [];
+  const setLinks = (l: InviteLink[]) => set({ links: l });
+  const meals = d.form?.meals ?? [];
+  const questions = d.form?.questions ?? [];
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);
@@ -35,7 +52,9 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
   }, [onClose]);
 
   // Picking a template starts fresh from IT — the words the host typed stay.
-  const pick = (id: string) => setD((cur) => ({ template: id, message: cur.message, photo: cur.photo }));
+  const pick = (id: string) => setD((cur) => ({
+    template: id, message: cur.message, photo: cur.photo, form: cur.form, links: cur.links, backdrop: cur.backdrop,
+  }));
 
   return (
     <div className="invst" role="dialog" aria-modal="true" aria-label="Design your invitation">
@@ -46,13 +65,14 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
       </div>
       <div className="invst__main">
         <div className="invst__stage" style={{ background: `color-mix(in srgb, ${r.envelope} 35%, var(--bone))` }}>
+          <InviteBackdropLayer kind={r.backdrop} accent={r.accent} />
           <InviteCard design={d} facts={facts} />
         </div>
         <div className="invst__panel">
           <div className="invst__tabs" role="tablist">
-            {(['design', 'words', 'style', 'envelope'] as Tab[]).map((t) => (
+            {(['design', 'words', 'replies', 'style', 'envelope'] as Tab[]).map((t) => (
               <button key={t} role="tab" aria-selected={tab === t} className={'invst__tab' + (tab === t ? ' is-on' : '')}
-                onClick={() => setTab(t)}>{t === 'design' ? 'Design' : t === 'words' ? 'Words' : t === 'style' ? 'Style' : 'Envelope'}</button>
+                onClick={() => setTab(t)}>{t === 'design' ? 'Design' : t === 'words' ? 'Words' : t === 'replies' ? 'Replies' : t === 'style' ? 'Style' : 'Envelope'}</button>
             ))}
           </div>
 
@@ -61,6 +81,24 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
               {OCCASIONS.map((o) => (
                 <button key={o} className={'invst__chip' + (occ === o ? ' is-on' : '')} onClick={() => setOcc(o)}>{o}</button>
               ))}
+            </div>
+            {/* UPLOAD YOUR OWN (Paperless Post's own-artwork card): the image
+                IS the card; the event's facts ride beneath it. */}
+            <div className="invst__own">
+              {d.artwork ? (
+                <>
+                  <img className="invst__own-thumb" src={d.artwork} alt="" />
+                  <span className="invst__own-txt">Your own card is on. The event’s details ride beneath it.</span>
+                  <button className="invst__reset" onClick={() => set({ artwork: undefined })}>Use a template instead</button>
+                </>
+              ) : uploaderId ? (
+                <label className="invst__own-up">
+                  <input type="file" accept="image/*" hidden onChange={(e) => { void uploadArt(e.target.files?.[0]); e.target.value = ''; }} />
+                  {artBusy ? 'Uploading…' : '⊕ Upload your own card'}
+                  <span className="invst__own-sub">A finished design from Canva, a painting, a photo — it becomes the whole card.</span>
+                </label>
+              ) : null}
+              {artErr && <p className="invst__note">{artErr}</p>}
             </div>
             <div className="invst__grid">
               {INVITE_TEMPLATES.filter((t) => occ === 'All' || t.occasion === occ).map((t) => {
@@ -98,6 +136,56 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
               <span className="invst__label">Button words</span>
               <input value={d.rsvp ?? templateById(d.template).rsvp} maxLength={40}
                 onChange={(e) => set({ rsvp: e.target.value })} />
+            </label>
+            <span className="invst__label">Registry & links</span>
+            <p className="invst__note">A gift registry, a wish list, directions, a dress-code page — worn on the card as buttons.</p>
+            {links.map((l, i) => (
+              <div className="invst__linkrow" key={i}>
+                <input placeholder="Label" value={l.label} maxLength={40}
+                  onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                <input placeholder="https://…" value={l.url} maxLength={500}
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))} />
+                <button className="invst__x" aria-label="Remove link" onClick={() => setLinks(links.filter((_, j) => j !== i))}>×</button>
+              </div>
+            ))}
+            {links.length > 0 && links.some((l) => l.url && !/^https:\/\//i.test(l.url.trim())) && (
+              <p className="invst__note">Links need to start with https:// to show on the card.</p>
+            )}
+            {links.length < 3 && (
+              <button className="invst__reset" onClick={() => setLinks([...links, { label: links.length ? 'Link' : 'Registry', url: '' }])}>⊕ Add a link</button>
+            )}
+          </>)}
+
+          {tab === 'replies' && (<>
+            <p className="invst__note">What the RSVP asks, beyond going, maybe or can’t. Guests answer on their invitation; you see every reply on the event’s RSVP tab.</p>
+            <label className="invst__field">
+              <span className="invst__label">Extra guests each reply may bring</span>
+              <select value={d.form?.plusOnes ?? 0} onChange={(e) => setForm({ plusOnes: Number(e.target.value) })}>
+                {[0, 1, 2, 3, 4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n === 0 ? 'None — just them' : `Up to ${n}`}</option>)}
+              </select>
+            </label>
+            <span className="invst__label">Meal choices</span>
+            {meals.map((m, i) => (
+              <div className="invst__linkrow" key={i}>
+                <input value={m} maxLength={60} placeholder="e.g. Vegetarian"
+                  onChange={(e) => setForm({ meals: meals.map((x, j) => (j === i ? e.target.value : x)) })} />
+                <button className="invst__x" aria-label="Remove choice" onClick={() => setForm({ meals: meals.filter((_, j) => j !== i) })}>×</button>
+              </div>
+            ))}
+            {meals.length < 8 && <button className="invst__reset" onClick={() => setForm({ meals: [...meals, ''] })}>⊕ Add a meal choice</button>}
+            <span className="invst__label" style={{ marginTop: 16 }}>Questions for your guests</span>
+            {questions.map((q, i) => (
+              <div className="invst__linkrow" key={i}>
+                <input value={q} maxLength={200} placeholder="e.g. Any allergies we should know?"
+                  onChange={(e) => setForm({ questions: questions.map((x, j) => (j === i ? e.target.value : x)) })} />
+                <button className="invst__x" aria-label="Remove question" onClick={() => setForm({ questions: questions.filter((_, j) => j !== i) })}>×</button>
+              </div>
+            ))}
+            {questions.length < 5 && <button className="invst__reset" onClick={() => setForm({ questions: [...questions, ''] })}>⊕ Add a question</button>}
+            <label className="invst__check" style={{ marginTop: 18 }}>
+              <input type="checkbox" checked={d.form?.remind !== false} onChange={(e) => setForm({ remind: e.target.checked })} />
+              Remind everyone who said yes or maybe, the day before
             </label>
           </>)}
 
@@ -145,6 +233,14 @@ export function InviteStudio({ design, facts, onDone, onClose }: {
                   aria-label={`${l.label} liner`} data-tip={l.label} onClick={() => set({ liner: l.id })} />
               ))}
             </div>
+            <span className="invst__label">Backdrop</span>
+            <p className="invst__note">Gentle motion behind the envelope on the guest page.</p>
+            <div className="invst__chips" style={{ marginBottom: 18 }}>
+              {INVITE_BACKDROPS.map((b) => (
+                <button key={b.id} className={'invst__chip' + (r.backdrop === b.id ? ' is-on' : '')}
+                  onClick={() => set({ backdrop: b.id === 'none' ? undefined : b.id })}>{b.label}</button>
+              ))}
+            </div>
             <label className="invst__check">
               <input type="checkbox" checked={r.photo} onChange={(e) => set({ photo: e.target.checked })} />
               Wear the event&rsquo;s cover photo{facts.photo ? '' : ' (add one in the composer)'}
@@ -178,6 +274,7 @@ export function InvitePreview({ design, facts, onClose }: {
         <span className="invpv__tag">Preview — what your guests see</span>
         <button className="invst__close" onClick={onClose} aria-label="Close preview">×</button>
       </div>
+      <InviteBackdropLayer kind={r.backdrop} accent={r.accent} />
       <div className="invpv__stage">
         <InviteEnvelope key={run} design={design} peek={facts.title}>
           <InviteCard design={design} facts={facts} />

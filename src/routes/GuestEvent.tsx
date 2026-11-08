@@ -4,13 +4,14 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import {
-  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot,
+  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot, markGuestOpened, loadGuestMessages,
   type GuestEventInfo, type GuestStatus, type OpenEventInfo,
 } from '../lib/eventGuestsApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import AddToCal from '../components/AddToCal';
-import { InviteCard, InviteEnvelope } from '../components/InviteCard';
-import { readInvite, resolveInvite } from '../lib/inviteDesign';
+import { zoneAbbr } from '../lib/bookingApi';
+import { InviteCard, InviteEnvelope, InviteBackdropLayer } from '../components/InviteCard';
+import { readInvite, resolveInvite, formAsks } from '../lib/inviteDesign';
 import './GuestEvent.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -26,7 +27,8 @@ function whenText(e: OpenEventInfo): string {
   const date = `${dow}, ${MONTHS[m - 1]} ${d}, ${y}`;
   if (e.all_day || e.start_min == null) return date;
   const end = e.end_min != null ? `–${minLabel(e.end_min)}` : '';
-  return `${date} · ${minLabel(e.start_min)}${end}`;
+  const tz = zoneAbbr(e.event_tz, e.start_date, e.start_min);
+  return `${date} · ${minLabel(e.start_min)}${end}${tz ? ' ' + tz : ''}`;
 }
 
 /** Public guest landing for an external event invite (/e/:token). No account:
@@ -48,13 +50,28 @@ export default function GuestEvent() {
   const [oName, setOName] = useState('');
   const [oContact, setOContact] = useState('');
   const [oMsg, setOMsg] = useState('');
+  // RSVP EXTRAS (the Paperless Post audit): plus-ones, a meal, the host's questions.
+  const [plus, setPlus] = useState(0);
+  const [meal, setMeal] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [xSaved, setXSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [xErr, setXErr] = useState('');
+  const [notes, setNotes] = useState<{ body: string; author_name: string; created_at: string }[]>([]);
 
   useEffect(() => {
     let live = true;
     (async () => {
       const i = await loadGuestEvent(token);
       if (!live) return;
-      if (i) { setInfo(i); setOpen(null); setStatus(i.guest_status ?? 'invited'); setReady(true); return; }
+      if (i) {
+        setInfo(i); setOpen(null); setStatus(i.guest_status ?? 'invited');
+        setPlus(i.guest_plus_ones ?? 0); setMeal(i.guest_meal ?? '');
+        setAnswers(Object.fromEntries((i.guest_answers ?? []).map((a) => [a.q, a.a])));
+        setReady(true);
+        void markGuestOpened(token);
+        void loadGuestMessages(token).then((m) => { if (live) setNotes(m); });
+        return;
+      }
       const o = await loadOpenEvent(token);
       if (!live) return;
       setInfo(null); setOpen(o); setReady(true);
@@ -87,6 +104,18 @@ export default function GuestEvent() {
     start_min: evSrc.start_min, end_min: evSrc.end_min,
   }), [evSrc]);
 
+  async function saveExtras() {
+    if (busy || (status !== 'going' && status !== 'tentative')) return;
+    setXSaved('saving'); setXErr('');
+    try {
+      await guestRsvp(token, status as GuestStatus, {
+        plus_ones: plus, meal: meal || null,
+        answers: Object.entries(answers).filter(([, a]) => a.trim()).map(([q, a]) => ({ q, a: a.trim() })),
+      });
+      setXSaved('saved');
+    } catch (e) { setXSaved('error'); setXErr((e as Error).message || 'Couldn’t save that.'); }
+  }
+
   async function rsvp(s: GuestStatus) {
     if (busy) return;
     setBusy(true);
@@ -107,9 +136,13 @@ export default function GuestEvent() {
   const ev = (info ?? open)!;
   const requested = !!info && status === 'requested';
   const design = readInvite(ev.invite);
+  const rd = resolveInvite(design);
+  const form = rd.form;
+  const asks = formAsks(form);
 
   return (
-    <div className="gev">
+    <div className="gev gev--card">
+      <div className="gev__backdrop"><InviteBackdropLayer kind={rd.backdrop} accent={rd.accent} /></div>
       <div className="gev__brand"><LichenMark size={40} /><span>Lichen</span></div>
 
       {/* THE INVITATION, AS THE HOST DESIGNED IT (founder 2026-11-08, the
@@ -122,11 +155,24 @@ export default function GuestEvent() {
           cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : (
             <button type="button" className="invc__cta gev__cardcta"
               onClick={() => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-              {info ? resolveInvite(design).rsvp : 'Ask to come'}
+              {info ? rd.rsvp : 'Ask to come'}
             </button>
           )} />
       </InviteEnvelope>
       {ev.description && <p className="gev__desc gev__desc--below">{ev.description}</p>}
+
+      {/* FROM THE HOST (the host's messages to everyone) — newest first. */}
+      {notes.length > 0 && (
+        <div className="gev__section">
+          <p className="gev__label">From the host</p>
+          {notes.map((n, i) => (
+            <div key={i} className="gev__note">
+              <p className="gev__note-body">{n.body}</p>
+              <p className="gev__note-by">{n.author_name} · {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* A MEMBER IS RECOGNIZED (founder 2026-11-04: "if you are [a
           member], it auto fills your info"): signed in, the real event
@@ -159,6 +205,42 @@ export default function GuestEvent() {
             <button className={'btn gev__btn' + (status === 'tentative' ? ' is-on' : '')} onClick={() => rsvp('tentative')} disabled={busy}>Maybe</button>
             <button className={'btn gev__btn' + (status === 'declined' ? ' is-on' : '')} onClick={() => rsvp('declined')} disabled={busy}>Can’t make it</button>
           </div>
+          {asks && (status === 'going' || status === 'tentative') && (
+            <div className="gev__extras">
+              {form.plusOnes > 0 && (
+                <label className="gev__xfield">
+                  <span>Bringing anyone?</span>
+                  <select value={plus} onChange={(e) => { setPlus(Number(e.target.value)); setXSaved('idle'); }}>
+                    {Array.from({ length: form.plusOnes + 1 }, (_, n) => (
+                      <option key={n} value={n}>{n === 0 ? 'Just me' : `Me + ${n}`}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {form.meals.length > 0 && (
+                <div className="gev__xfield">
+                  <span>Meal</span>
+                  <div className="gev__meals">
+                    {form.meals.map((m) => (
+                      <button key={m} type="button" className={'gev__meal' + (meal === m ? ' is-on' : '')}
+                        onClick={() => { setMeal(meal === m ? '' : m); setXSaved('idle'); }}>{m}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {form.questions.map((q) => (
+                <label className="gev__xfield" key={q}>
+                  <span>{q}</span>
+                  <textarea rows={2} maxLength={500} value={answers[q] ?? ''}
+                    onChange={(e) => { setAnswers({ ...answers, [q]: e.target.value }); setXSaved('idle'); }} />
+                </label>
+              ))}
+              <button className="btn gev__btn gev__xsave" onClick={() => void saveExtras()} disabled={xSaved === 'saving'}>
+                {xSaved === 'saving' ? 'Saving…' : xSaved === 'saved' ? 'Saved ✓' : 'Send my answers'}
+              </button>
+              {xSaved === 'error' && <p className="gev__muted">{xErr}</p>}
+            </div>
+          )}
         </div>
       )}
 

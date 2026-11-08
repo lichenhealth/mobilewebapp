@@ -50,6 +50,7 @@ function isDark(h: string): boolean {
 export interface ResolvedInvite {
   id: string; headline: string; message: string; rsvp: string; font: InviteFont; fontCss: string;
   accent: string; paper: string; ink: string; soft: string; ornament: string; border: string; photo: boolean;
+  artwork: string | null; links: { label: string; url: string }[];
 }
 
 /** Resolve whatever sits in posts.details.invite (or a test payload). */
@@ -70,7 +71,29 @@ export function resolveInvite(raw: unknown): ResolvedInvite {
     soft: dark ? '#CFC8B8' : '#5A554C',
     ornament: t.ornament, border: t.border,
     photo: r.photo !== false,
+    artwork: artworkUrl(r.artwork),
+    links: readLinks(r.links),
   };
+}
+
+/** An uploaded card is ONLY ever our own public storage — never a hotlink. */
+function artworkUrl(v: unknown): string | null {
+  const base = (Deno.env.get('SUPABASE_URL') ?? '') + '/storage/v1/object/public/';
+  return typeof v === 'string' && base.length > 30 && v.startsWith(base) ? v.slice(0, 600) : null;
+}
+/** The registry / gift / info links — https only, three at most. */
+function readLinks(v: unknown): { label: string; url: string }[] {
+  if (!Array.isArray(v)) return [];
+  const out: { label: string; url: string }[] = [];
+  for (const x of v) {
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    const url = typeof o.url === 'string' ? o.url.trim() : '';
+    if (!/^https:\/\/[^\s<>"]+$/i.test(url) || url.length > 500) continue;
+    const label = (typeof o.label === 'string' ? o.label.trim().slice(0, 40) : '') || 'Registry';
+    out.push({ label, url });
+    if (out.length >= 3) break;
+  }
+  return out;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -93,12 +116,29 @@ export function inviteCardHtml(design: unknown, o: {
   const confetti = d.id === 'celebration'
     ? `<div style="height:14px;line-height:14px;font-size:14px;letter-spacing:6px;text-align:center;padding-top:14px"><span style="color:#D9573F">●</span> <span style="color:#C9892B">●</span> <span style="color:#5E7A4E">●</span> <span style="color:#4A6E8C">●</span> <span style="color:#D9573F">●</span> <span style="color:#C9892B">●</span></div>`
     : '';
+  const links = d.links.length
+    ? `<p style="margin:0 0 16px">${d.links.map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 4px 6px;padding:7px 14px;border:1px solid ${d.accent};border-radius:999px;color:${d.accent};text-decoration:none;font-size:13px">${esc(l.label)}</a>`).join('')}</p>`
+    : '';
+  // AN UPLOADED CARD (the host's own artwork) IS the card: the image leads
+  // whole, the event's facts ride below it in plain type, then the button.
+  const artCard = d.artwork ? `
+    <div style="background:#ffffff;border-radius:16px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.10);border:1px solid #e6e1d8">
+      <img src="${esc(d.artwork)}" alt="${esc(o.title)}" width="520" style="display:block;width:100%;height:auto">
+      <div style="padding:20px 22px 24px;text-align:center">
+        <p style="font-size:16px;font-weight:600;margin:0 0 4px;color:#2b2b28">${esc(o.title)}</p>
+        <p style="font-size:14px;color:#5a554c;margin:0 0 2px">${esc(o.when)}</p>
+        ${o.where ? `<p style="font-size:14px;color:#5a554c;margin:0 0 2px">${esc(o.where)}</p>` : ''}
+        <p style="font-size:13px;color:#5a554c;margin:8px 0 16px">Hosted by <strong>${esc(o.hostName)}</strong></p>
+        ${links}
+        <a href="${o.link}" style="display:inline-block;background:${d.accent};color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:999px;font-weight:600">${esc(cta)}</a>
+      </div>
+    </div>` : '';
   return `<!doctype html><html><head><meta name="color-scheme" content="light only">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500&family=Great+Vibes&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet"></head>
   <body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
     <p style="font-size:22px;font-weight:600;margin:0 0 14px">Lichen</p>
-    <div style="background:${d.paper};border-radius:16px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.10);border:1px solid #e6e1d8">
+    ${artCard || `<div style="background:${d.paper};border-radius:16px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.10);border:1px solid #e6e1d8">
       ${d.photo && o.photo ? `<img src="${esc(o.photo)}" alt="" width="520" style="display:block;width:100%;max-height:300px;object-fit:cover">` : ''}
       ${confetti}
       <div style="padding:${frame ? '14px' : '0'}">
@@ -110,9 +150,10 @@ export function inviteCardHtml(design: unknown, o: {
         ${o.where ? `<p style="font-size:14px;color:${d.soft};margin:0 0 4px">${esc(o.where)}</p>` : ''}
         ${d.message ? `<p style="font-size:15px;line-height:1.6;color:${d.soft};margin:14px auto 0;max-width:380px;white-space:pre-wrap">${esc(d.message)}</p>` : ''}
         <p style="font-size:14px;color:${d.soft};margin:14px 0 18px">Hosted by <strong style="color:${d.ink}">${esc(o.hostName)}</strong></p>
+        ${links}
         <a href="${o.link}" style="display:inline-block;background:${d.accent};color:${d.paper};text-decoration:none;padding:12px 26px;border-radius:999px;font-weight:600">${esc(cta)}</a>
       </div></div>
-    </div>
+    </div>`}
     <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0 0 6px">${o.fine}</p>
     <p style="font-size:11px;color:#b5b0a6;margin:10px 0 0">Sent ${esc(stamp)} MT</p>
   </div></body></html>`;
