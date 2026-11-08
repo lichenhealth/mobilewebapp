@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors,
-  loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId,
+  loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId, isSharedSpaceThread,
   loadSectionPresence, groupConvos, loadConvoNames, renameConvo,
   ASSISTANT_THREADS, BRAIN_RAIL, threadLabel, sectionIcon, sectionLabel,
   type FeedPostRow, type ProfileContext, type SpaceContext,
@@ -519,6 +519,25 @@ export default function AssistantFeed() {
     return () => { live = false; };
   }, [me, claudeReplies]);
 
+  // FELLOW STEWARDS in a space's shared build thread (founder 2026-11-08):
+  // whoever else wrote here is named and faced, so every admin can see who
+  // asked for what — the thread belongs to the space's stewards together.
+  const [peers, setPeers] = useState<Record<string, { name: string; url: string | null }>>({});
+  const peerIds = useMemo(() => [...new Set(posts
+    .filter((p) => p.author === 'member' && p.profile_id && p.profile_id !== me)
+    .map((p) => p.profile_id as string))].sort().join(','), [posts, me]);
+  useEffect(() => {
+    if (!peerIds) return;
+    void supabase.from('profiles').select('id, full_name, avatar_url').in('id', peerIds.split(','))
+      .then(({ data }) => {
+        const next: Record<string, { name: string; url: string | null }> = {};
+        for (const r of (data as { id: string; full_name: string | null; avatar_url: string | null }[] | null) ?? []) {
+          next[r.id] = { name: r.full_name || 'A fellow steward', url: r.avatar_url };
+        }
+        setPeers(next);
+      });
+  }, [peerIds]);
+
   useEffect(() => {
     if (!me) return;
     void supabase.from('profiles').select('id, avatar_url').in('id', [me, CLAUDE_PROFILE_ID])
@@ -538,7 +557,10 @@ export default function AssistantFeed() {
       .channel(`assistant-feed:${me}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'assistant_feed_posts', filter: `profile_id=eq.${me}` },
+        // A space's shared build thread listens to the THREAD — a fellow
+        // steward's words (and Claude's answer to them) land live too.
+        { event: 'INSERT', schema: 'public', table: 'assistant_feed_posts',
+          filter: isSharedSpaceThread(thread) ? `thread=eq.${thread}` : `profile_id=eq.${me}` },
         (payload) => {
           const row = payload.new as FeedPostRow;
           if ((row.thread ?? 'general') !== thread) {
@@ -1298,9 +1320,12 @@ export default function AssistantFeed() {
           // claude to claude?"): a delivered Claude note carrying the
           // manual-mode state — same left bubble, dressed as a baton pass.
           const handoff = (p.attachments ?? []).some((a) => a.type === 'handoff');
+          const peer = p.author === 'member' && !!p.profile_id && p.profile_id !== me
+            ? (peers[p.profile_id] ?? { name: 'A fellow steward', url: null }) : null;
           return (
             <div
               className={'afeed__entry' + (p.author === 'claude' ? ' afeed__entry--claude' : '')
+                + (peer ? ' afeed__entry--peer' : '')
                 + (handoff ? ' afeed__entry--handoff' : '')}
               key={p.id}
             >
@@ -1315,7 +1340,9 @@ export default function AssistantFeed() {
                   name={sctx?.name ?? 'This space'}
                   url={sctx?.avatarUrl}
                   size={30}
-                  stewardFace={{ id: me, name: 'You', url: avatars.me }}
+                  stewardFace={peer
+                    ? { id: p.profile_id as string, name: peer.name, url: peer.url }
+                    : { id: me, name: 'You', url: avatars.me }}
                 />
               ) : (
                 <Avatar
@@ -1337,7 +1364,7 @@ export default function AssistantFeed() {
                 {(p.author === 'claude' || spaceId) && (
                   <div className="afeed__entry-meta">
                     <span className="afeed__entry-name">
-                      {p.author === 'claude' ? 'Claude' : 'You'}
+                      {p.author === 'claude' ? 'Claude' : peer ? peer.name : 'You'}
                     </span>
                     <span className="afeed__entry-role">
                       · {p.author === 'claude'
