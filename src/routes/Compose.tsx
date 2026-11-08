@@ -331,6 +331,16 @@ export default function Compose() {
   const [glSaving, setGlSaving] = useState(false);
   // Renaming an existing list in place (null = the save-new box).
   const [glRenaming, setGlRenaming] = useState<string | null>(null);
+  // EDITING A LIST IN PLACE (founder 2026-11-08: "edit pulls all the names up
+  // so you can edit each entry… the 'x' to remove a member, as well as a '+'
+  // circle to add members. The changes are reflected everywhere, including
+  // drive - so its one list in the cloud"): while a list is being edited, every
+  // × under it and everything added through the smart box writes straight to
+  // its guest_lists row — the same row Drive → Contacts edits.
+  const [glEditing, setGlEditing] = useState<string | null>(null);
+  const glEditingRef = useRef<string | null>(null);
+  glEditingRef.current = glEditing;
+  const invInputRef = useRef<HTMLInputElement | null>(null);
   const [glName, setGlName] = useState('');
   const [glMsg, setGlMsg] = useState<string | null>(null);
   const [glDel, setGlDel] = useState<string | null>(null);
@@ -472,6 +482,26 @@ export default function Compose() {
       }
     }
   }, [guestLists, invitees]);
+  // The list being edited follows its people on screen, saved to the cloud
+  // row a beat after each change (one list, edited anywhere).
+  useEffect(() => {
+    if (!glEditing) return;
+    const gl = guestLists.find((g) => g.id === glEditing);
+    if (!gl) return;
+    const people = invitees.filter((x) => invSrc[invKey(x)] === `gl:${gl.id}`);
+    const a = people.map(invKey).sort().join('|');
+    const b = gl.entries.map(invKey).sort().join('|');
+    if (a === b) return;
+    const t = window.setTimeout(() => {
+      void supabase.from('guest_lists')
+        .update({ entries: people, updated_at: new Date().toISOString() }).eq('id', gl.id)
+        .then(({ error }) => {
+          if (error) { setGlMsg(`Couldn't save the list: ${error.message}`); return; }
+          setGuestLists((cur) => cur.map((g) => (g.id === gl.id ? { ...g, entries: people } : g)));
+        });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [glEditing, invitees, invSrc, guestLists]);
   async function openCircle(id: string) {
     if (circleOpen === id) { setCircleOpen(null); return; }
     setCircleOpen(id);
@@ -495,6 +525,11 @@ export default function Compose() {
     setCircleOpen(null);
   }
   function addInvitee(inv: EvInvitee) {
+    const editingList = glEditingRef.current;
+    if (editingList) {
+      const k = inv.kind === 'member' ? `m:${inv.id}` : `${inv.kind}:${inv.value}`;
+      setInvSrc((cur) => (cur[k] ? cur : { ...cur, [k]: `gl:${editingList}` }));
+    }
     setInvitees((cur) => {
       const key = (x: EvInvitee) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`;
       return cur.some((x) => key(x) === key(inv)) ? cur : [...cur, inv];
@@ -1668,11 +1703,34 @@ export default function Compose() {
             if (!bySrc[src]) { bySrc[src] = []; order.push(src); }
             bySrc[src].push(inv);
           }
+          const glOpen = order.filter((src) => src.startsWith('gl:') && (srcOpen[src] ?? order.length === 1));
           return (
             <div className="cmp__invlist">
               {order.map((src) => {
                 const open = srcOpen[src] ?? order.length === 1;
                 const people = bySrc[src];
+                // A SAVED LIST's header IS its chip above (founder 2026-11-08:
+                // "we don't need to list it twice, put the arrow to the right
+                // in the box") — only its people render here, indented.
+                if (src.startsWith('gl:')) {
+                  if (!open) return null;
+                  const editingThis = glEditing === src.slice(3);
+                  return (
+                    <div className="cmp__invsrc" key={src}>
+                      {glOpen.length > 1 && <span className="cmp__invsrc-lbl">{srcNames[src] ?? 'List'}</span>}
+                      <div className="cmp__invchips cmp__invchips--sub">
+                        {people.map(chip)}
+                        {editingThis && (
+                          <button className="cmp__invadd" aria-label={`Add someone to ${srcNames[src] ?? 'this list'}`}
+                            data-tip="Add someone"
+                            onClick={() => { invInputRef.current?.focus(); invInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }}>
+                            <span aria-hidden="true">+</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div className="cmp__invsrc" key={src}>
                     <div className="cmp__invsrc-head">
@@ -1703,8 +1761,8 @@ export default function Compose() {
               <p className="cmp__hint-ev">People are invited from the event page&rsquo;s guest panel — circles and visibility still edit here.</p>
             )}
             {!editing && (<>
-            <input className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
-              placeholder="Name, circle, email or phone"
+            <input ref={invInputRef} className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
+              placeholder={glEditing ? `Add to ${guestLists.find((g) => g.id === glEditing)?.name ?? 'the list'} — name, email or phone` : 'Name, circle, email or phone'}
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
             {(memberHits.length > 0 || spaceHits.length > 0 || listHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
               <div className="cmp__invsug">
@@ -1767,8 +1825,22 @@ export default function Compose() {
                       ? setInvitees((cur) => cur.filter((x) => invSrc[ikey(x)] !== `gl:${gl.id}`))
                       : applyGuestList(gl))}>
                       <Icon name="user-multiple" size={12} /> {gl.name}
-                      <span className="cmp__gl-n">{gl.entries.length + gl.space_ids.length}</span>
+                      <span className="cmp__gl-n">{invitees.some((x) => invSrc[ikey(x)] === `gl:${gl.id}`)
+                        ? invitees.filter((x) => invSrc[ikey(x)] === `gl:${gl.id}`).length
+                        : gl.entries.length + gl.space_ids.length}</span>
                     </button>
+                    {invitees.some((x) => invSrc[ikey(x)] === `gl:${gl.id}`) && (() => {
+                      const src = `gl:${gl.id}`;
+                      const glCount = new Set(invitees.map((x) => invSrc[ikey(x)]).filter((v) => v?.startsWith('gl:') || v?.startsWith('sp:'))).size;
+                      const open = srcOpen[src] ?? glCount === 1;
+                      return (
+                        <button className={'cmp__gl-fold' + (open ? ' is-open' : '')} aria-expanded={open}
+                          aria-label={open ? `Hide who's on ${gl.name}` : `Show who's on ${gl.name}`}
+                          onClick={() => setSrcOpen((o) => ({ ...o, [src]: !open }))}>
+                          <Icon name="chevron-right" size={12} />
+                        </button>
+                      );
+                    })()}
                     <button className={'cmp__gl-x' + (glDel === gl.id ? ' is-armed' : '')}
                       aria-label={`Delete ${gl.name}`} onClick={() => void deleteGuestList(gl.id)}>
                       {glDel === gl.id ? 'Delete?' : '×'}
@@ -1799,6 +1871,12 @@ export default function Compose() {
                     <button className="cmp__gl-cancel" aria-label="Cancel" onClick={() => { setGlRenaming(null); setGlName(''); }}>×</button>
                   </div>
                 );
+                if (gl && glEditing === gl.id) return (
+                  <p className="cmp__gl-saved">
+                    <>Editing your guest list <strong>{gl.name}</strong> — changes save to the list everywhere it&rsquo;s used</>
+                    <button className="cmp__gl-link cmp__gl-link--go" onClick={() => setGlEditing(null)}>Done</button>
+                  </p>
+                );
                 if (gl && !glSaving) return (
                   <p className="cmp__gl-saved">
                     {same
@@ -1808,6 +1886,12 @@ export default function Compose() {
                       <button className="cmp__gl-link" onClick={() => void updateGuestList(gl, invitees)}>Update the list</button>
                     )}
                     <button className="cmp__gl-link" onClick={() => { setGlRenaming(gl.id); setGlName(''); setGlMsg(null); }}>Rename</button>
+                    {same && (
+                      <button className="cmp__gl-link" onClick={() => {
+                        setGlEditing(gl.id); setGlMsg(null);
+                        setSrcOpen((o) => ({ ...o, [`gl:${gl.id}`]: true }));
+                      }}>Edit</button>
+                    )}
                     {!same && (
                       <button className="cmp__gl-link" onClick={() => { setGlSaving(true); setGlMsg(null); }}>Save as a new list</button>
                     )}
