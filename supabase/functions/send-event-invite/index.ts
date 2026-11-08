@@ -10,6 +10,8 @@
 // Env: RESEND_API_KEY (+ optional NOTIF_FROM, INVITE_REPLY_TO, APP_URL).
 // SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are provided automatically.
 
+import { inviteCardHtml } from '../_shared/inviteDesign.ts';
+
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.health>';
 const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
@@ -44,40 +46,30 @@ const sb = (path: string, init?: RequestInit) =>
 /** The event's door-post cover photo (public URLs by construction) —
  *  what makes the invite pretty; a miss never blocks a send. */
 async function coverPhoto(event_id: string): Promise<string | null> {
+  return (await eventLook(event_id)).photo;
+}
+/** The event's cover photo AND the host's Studio design (details.invite). */
+async function eventLook(event_id: string): Promise<{ photo: string | null; design: unknown }> {
   try {
     const posts = await (await sb(`posts?linked_event_id=eq.${event_id}&select=details,image_url&limit=1`)).json();
     const po = Array.isArray(posts) ? posts[0] : null;
-    if (!po) return null;
+    if (!po) return { photo: null, design: null };
     const media: { type?: string; url?: string }[] = Array.isArray(po.details?.media) ? po.details.media : [];
-    return media.find((m) => m?.type === 'photo' && m?.url)?.url ?? po.image_url ?? null;
-  } catch { return null; }
+    return { photo: media.find((m) => m?.type === 'photo' && m?.url)?.url ?? po.image_url ?? null, design: po.details?.invite ?? null };
+  } catch { return { photo: null, design: null }; }
 }
 
 /** ONE invitation-card anatomy for every mail this fn sends (cover photo,
  *  serif title, peach button, per-send stamp — the Gmail-folds-repeated-
  *  tails rule), so the invite and the approved "you're in" can't drift. */
 function inviteCard(o: {
-  eyebrow: string; title: string; when: string; where: string;
-  hostName: string; link: string; photo: string | null; cta: string; fine: string;
+  eyebrow?: string; title: string; when: string; where: string;
+  hostName: string; link: string; photo: string | null; cta?: string; fine: string; design?: unknown;
 }): string {
-  const stamp = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver' });
-  return `<!doctype html><html><body style="margin:0;background:#f3efe9;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
-  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
-    <p style="font-size:22px;font-weight:600;margin:0 0 14px">Lichen</p>
-    <div style="background:#fff;border:1px solid #e6e1d8;border-radius:18px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.08)">
-      ${o.photo ? `<img src="${esc(o.photo)}" alt="" width="520" style="display:block;width:100%;max-height:300px;object-fit:cover">` : ''}
-      <div style="padding:26px 24px 22px;text-align:center">
-        <p style="font-family:'Iowan Old Style',Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#c06b3e;margin:0 0 10px">${esc(o.eyebrow)}</p>
-        <p style="font-family:'Iowan Old Style',Georgia,'Times New Roman',serif;font-size:28px;font-weight:400;line-height:1.2;margin:0 0 14px">${esc(o.title)}</p>
-        <p style="font-size:15px;color:#2b2b28;margin:0 0 4px">${esc(o.when)}</p>
-        ${o.where ? `<p style="font-size:14px;color:#5a554c;margin:0 0 4px">${esc(o.where)}</p>` : ''}
-        <p style="font-size:14px;color:#5a554c;margin:12px 0 18px">Hosted by <strong>${esc(o.hostName)}</strong></p>
-        <a href="${o.link}" style="display:inline-block;background:#e8956b;color:#fff;text-decoration:none;padding:12px 24px;border-radius:999px;font-weight:600">${o.cta}</a>
-      </div>
-    </div>
-    <p style="font-size:13px;color:#8a857c;line-height:1.5;margin:0 0 6px">${o.fine}</p>
-    <p style="font-size:11px;color:#b5b0a6;margin:10px 0 0">Sent ${esc(stamp)} MT</p>
-  </div></body></html>`;
+  return inviteCardHtml(o.design ?? null, {
+    title: o.title, when: o.when, where: o.where, hostName: o.hostName, link: o.link, photo: o.photo,
+    fine: o.fine, eyebrow: o.eyebrow, cta: o.cta,
+  });
 }
 
 Deno.serve(async (req) => {
@@ -95,7 +87,7 @@ Deno.serve(async (req) => {
 
   let body: {
     event_id?: string; name?: string; email?: string; guest_id?: string;
-    test?: { title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null };
+    test?: { title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null; invite?: unknown };
   };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
 
@@ -123,8 +115,7 @@ Deno.serve(async (req) => {
     const link = `${APP_URL}/events`;
     const text = `[Test — only you received this]\n\n${hostName} invited you to "${title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nYour guests' RSVP button opens their own invitation once you post.\n\n— Lichen`;
     const html = inviteCard({
-      eyebrow: 'You’re invited', title, when, where, hostName, link, photo,
-      cta: 'RSVP &amp; see the details',
+      title, when, where, hostName, link, photo, design: t.invite ?? null,
       fine: '<strong>This is a test, sent only to you.</strong> Your guests receive this same card — their RSVP button opens their own invitation once you post the event.',
     });
     const res = await fetch('https://api.resend.com/emails', {
@@ -155,9 +146,10 @@ Deno.serve(async (req) => {
     const when = whenLabel(ev);
     const where = (ev.location || '').trim();
     const text = `Good news — ${hostName} said yes: you're in for "${ev.title}".\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nRSVP and add it to your calendar:\n${link}\n\n— Lichen`;
+    const look = await eventLook(g.event_id);
     const html = inviteCard({
       eyebrow: 'You’re in', title: ev.title, when, where, hostName,
-      link, photo: await coverPhoto(g.event_id), cta: 'RSVP &amp; see the details',
+      link, photo: look.photo, design: look.design, cta: 'RSVP & see the details',
       fine: `${esc(hostName)} approved your request to come. RSVP as a guest and add it to your own calendar in one tap — no account needed.`,
     });
     const res = await fetch('https://api.resend.com/emails', {
@@ -185,7 +177,8 @@ Deno.serve(async (req) => {
   // THE PRETTY INVITE (founder 2026-11-04: "pretty invites, like paperless
   // post or canva"): the event's door-post cover photo crowns the emailed
   // card.
-  const photo = await coverPhoto(event_id);
+  const look = await eventLook(event_id);
+  const photo = look.photo;
 
   // Mint the guest row + token.
   const insRes = await sb('event_guests', {
@@ -203,8 +196,8 @@ Deno.serve(async (req) => {
   const subject = `${hostName} invited you to ${ev.title}`;
   const text = `${hostName} invited you to "${ev.title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nSee the details, add it to your calendar, or RSVP — no account needed:\n${link}\n\n— Lichen`;
   const html = inviteCard({
-    eyebrow: 'You’re invited', title: ev.title, when, where, hostName,
-    link, photo, cta: 'RSVP &amp; see the details',
+    title: ev.title, when, where, hostName,
+    link, photo, design: look.design,
     fine: 'No account needed — RSVP as a guest and add it to your own calendar in one tap. Lichen is a community for healing, growing and creating; you can request to join from the invitation.',
   });
 

@@ -9,6 +9,8 @@ import {
 } from '../lib/eventGuestsApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import AddToCal from '../components/AddToCal';
+import { InviteCard, InviteEnvelope } from '../components/InviteCard';
+import { readInvite, resolveInvite } from '../lib/inviteDesign';
 import './GuestEvent.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -104,31 +106,27 @@ export default function GuestEvent() {
 
   const ev = (info ?? open)!;
   const requested = !!info && status === 'requested';
+  const design = readInvite(ev.invite);
 
   return (
     <div className="gev">
       <div className="gev__brand"><LichenMark size={40} /><span>Lichen</span></div>
 
-      {/* THE INVITATION CARD (founder 2026-11-04: "pretty invites, like
-          paperless post or canva"): the event's own cover photo crowns a
-          centered paper card — the emailed invitation wears the same
-          anatomy, so the link lands on what the email promised. */}
-      <div className="gev__card">
-        {ev.photo_url && <div className="gev__hero"><img src={ev.photo_url} alt="" /></div>}
-        <div className="gev__card-body">
-          <p className="gev__eyebrow">
-            {info
-              ? (requested ? `Your request is with ${ev.host_name}` : `${ev.host_name} invited you${info.guest_name ? `, ${info.guest_name}` : ''}`)
-              : `${ev.host_name} is hosting`}
-          </p>
-          <h1 className="gev__title">{ev.title}</h1>
-          <div className="gev__facts">
-            <p className="gev__fact"><Icon name="calendar" size={14} /> {whenText(ev)}</p>
-            {ev.location && <p className="gev__fact"><Icon name="location" size={14} /> {ev.location}</p>}
-          </div>
-          {ev.description && <p className="gev__desc">{ev.description}</p>}
-        </div>
-      </div>
+      {/* THE INVITATION, AS THE HOST DESIGNED IT (founder 2026-11-08, the
+          Studio — Paperless Post parity): it arrives sealed in the host's
+          envelope, the flap lifts, the card settles in. The card's own
+          button walks down to the RSVP below. */}
+      <InviteEnvelope design={design} peek={ev.title}>
+        <InviteCard design={design}
+          facts={{ title: ev.title, when: whenText(ev), where: ev.location || undefined, host: ev.host_name, photo: ev.photo_url }}
+          cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : (
+            <button type="button" className="invc__cta gev__cardcta"
+              onClick={() => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+              {info ? resolveInvite(design).rsvp : 'Ask to come'}
+            </button>
+          )} />
+      </InviteEnvelope>
+      {ev.description && <p className="gev__desc gev__desc--below">{ev.description}</p>}
 
       {/* A MEMBER IS RECOGNIZED (founder 2026-11-04: "if you are [a
           member], it auto fills your info"): signed in, the real event
@@ -154,7 +152,7 @@ export default function GuestEvent() {
       )}
 
       {info && !requested && (
-        <div className="gev__section">
+        <div className="gev__section" id="gev-act">
           <p className="gev__label">Can you come? {status !== 'invited' && <em className="gev__status">— you said {status === 'going' ? "you're going" : status === 'tentative' ? 'maybe' : "you can't make it"}</em>}</p>
           <div className="gev__rsvp">
             <button className={'btn gev__btn' + (status === 'going' ? ' is-on' : '')} onClick={() => rsvp('going')} disabled={busy}>Going</button>
@@ -182,7 +180,7 @@ export default function GuestEvent() {
           name + contact. A contact already on the invite list is handed
           straight to their own invitation. */}
       {!info && open && (
-        <div className="gev__section">
+        <div className="gev__section" id="gev-act">
           <p className="gev__label">Want to come?</p>
           <p className="gev__muted">
             Tell {open.host_name} who you are — if they invited you directly, your invitation
