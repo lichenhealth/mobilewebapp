@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSelfLinkHat } from '../acting/ActingProvider';
 import { useNavigate, useParams } from 'react-router-dom';
 import BookSession from './BookSession';
 import { Icon } from '../components/Icon';
@@ -59,6 +60,8 @@ export default function BookPublic() {
     types: BookingType[];
   } | null>(null);
   const [mvReady, setMvReady] = useState(false);
+  // Your own booking link puts your own hat back on (founder 2026-11-08).
+  useSelfLinkHat(memberView?.provider.id ?? page?.provider?.id);
   // THE ADDRESS STAYS FRIENDLY (founder 2026-11-06: "the vanity url doesn't
   // persist in the header… is that possible to have the numbers not show
   // up?"): a signed-in member resolved to one session type gets the member

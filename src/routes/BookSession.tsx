@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSelfLinkHat } from '../acting/ActingProvider';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHead } from '../components/PageHead';
 import { Icon } from '../components/Icon';
@@ -44,6 +45,7 @@ export default function BookSession(props: {
   const rescheduleId = params.get('reschedule');
 
   const [board, setBoard] = useState<BookingBoard | null>(null);
+  useSelfLinkHat(board?.type.provider_id);
   // SESSION LENGTHS (founder 2026-11-01): this type's same-NAME siblings —
   // the provider's other lengths of the same session. More than one renders
   // a length-switcher row, so arriving on any length still offers the rest.

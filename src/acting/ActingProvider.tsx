@@ -146,3 +146,21 @@ export function ActingProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ actor, setActor, options, beings, self, refreshSelf, ready }), [actor, options, beings, self, ready]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+/** A LINK THAT IS YOU PUTS YOUR OWN HAT BACK ON (founder 2026-11-08, opening
+ *  lichen.health/book/galyn while the last hat worn was Countryman Stables:
+ *  "if a link is tied to someone and we put it in a browser and we're that
+ *  person, it logs us in as that person"). A screen whose subject is the
+ *  signed-in PERSON — their booking link, their own member page — flips the
+ *  hat to self in place, once it has restored (ready). Person links only:
+ *  stewarding a space while acting as yourself stays the normal case, so a
+ *  space's own link never puts its hat on anyone. */
+export function useSelfLinkHat(subjectProfileId: string | null | undefined) {
+  const { user } = useAuth();
+  const { actor, setActor, ready } = useActing();
+  useEffect(() => {
+    if (!ready || !user || !subjectProfileId) return;
+    if (subjectProfileId === user.id && actor.type !== 'self') setActor({ type: 'self' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user?.id, subjectProfileId, actor.type]);
+}
