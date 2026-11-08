@@ -522,7 +522,7 @@ const POST_TOOLS = [
   },
   {
     name: 'draft_post',
-    description: 'Write a POST for them as a DRAFT: it lands in their drafts (Drive → Drafts) with everything you pass already loaded, and your reply carries a "Review & post" button that opens it in the composer — THEIR tap on Post is what publishes, so never claim the post is live. Shape title and body from their own words in this conversation. Not for events (RSVPs/dates need the event composer — hand the events door).',
+    description: 'Write a POST for them as a DRAFT: it lands in their drafts (Drive → Drafts) with everything you pass already loaded, and your reply carries a "Review & post" button that opens it in the composer — THEIR tap on Post is what publishes, so never claim the post is live. Shape title and body from their own words in this conversation. For EVENTS use draft_event instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -534,6 +534,41 @@ const POST_TOOLS = [
         audience: { type: 'string', enum: ['everyone', 'mycelium'], description: 'Who sees it — everyone (default) or just their My-celium.' },
       },
       required: ['title', 'body', 'modes'],
+    },
+  },
+  {
+    // EVENTS DRAFT TOO (founder 2026-11-08, after the brain kept telling her
+    // to "go create the event manually": "when i toggle to events it should
+    // be filled out as a draft as much as i've given instructions"). The
+    // event composer IS Compose with Events in Where, and its autosave
+    // snapshot already carries dates, times, place, guests and visibility —
+    // so this writes that same post_drafts row. Nothing is sent and nobody
+    // is invited until THEIR tap on Post.
+    name: 'draft_event',
+    description: 'Write an EVENT for them as a DRAFT — the same draft the event composer autosaves — filled with everything they told you: title, description, date(s), time, place or video link, who is invited (members by name, people off Lichen by email/phone), who can see it, a shareable link, and optionally saving the guests as a reusable guest list. Your reply carries a "Review & post" button that opens it in the composer; NOTHING is sent and NOBODY is invited until THEIR tap on Post. Use it whenever they describe an event — never send them to create it by hand. Leave out anything they have not decided (no date yet = leave date out; the composer shows today as a placeholder and they set it).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The event name, in their words.' },
+        body: { type: 'string', description: 'What it is — from what they told you. May be short.' },
+        date: { type: 'string', description: 'YYYY-MM-DD, only if they named a day.' },
+        end_date: { type: 'string', description: 'YYYY-MM-DD for a multi-day event; omit for one day.' },
+        start_min: { type: 'integer', description: 'Start time as minutes after midnight (7pm = 1140), only if they named a time.' },
+        end_min: { type: 'integer', description: 'End time, minutes after midnight. Omit to default to two hours after the start.' },
+        all_day: { type: 'boolean' },
+        location: { type: 'string', description: 'A place, in their words ("Our house", an address). Not a link.' },
+        meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. Lichen does not mint a fresh Zoom room for events — if they want one, say so and suggest they paste their own link.' },
+        price: { type: 'string', enum: ['free', 'trade', 'paid'], description: 'How admission works. Default free.' },
+        guests: {
+          type: 'array',
+          description: 'Who to invite. Each guest: a name, plus an email and/or phone exactly as they wrote it. A guest with no contact is looked up as a Lichen member by name (exactly one findable match, or it comes back unplaced — ask them for an email or phone).',
+          items: { type: 'object', properties: { name: { type: 'string' }, email: { type: 'string' }, phone: { type: 'string' } }, required: ['name'] },
+        },
+        visibility: { type: 'string', enum: ['invited', 'mycelium', 'lichen', 'anyone'], description: 'invited = only the people invited (default when there are guests); mycelium = their web; lichen = everyone on Lichen; anyone = the open web.' },
+        share_link: { type: 'boolean', description: 'Mint a shareable event link when they post.' },
+        save_guest_list_as: { type: 'string', description: 'If they asked to save these guests for reuse: the list name (e.g. "Family"). Saved now, in their Drive → Contacts — saving a list sends nothing.' },
+      },
+      required: ['title'],
     },
   },
   {
@@ -1213,8 +1248,8 @@ Deno.serve(async (req) => {
       + '\n- When they describe something to offer or ask for, draft_post it from THEIR words — never send them to the + button to do it by hand. The draft lands in their drafts with a Review & post button under your reply; THEIR tap on Post is what publishes. Never say a drafted post is live.'
       + '\n- Photos are added in the composer when they review — say so when the thing wants a picture.'
       + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
-      + '\n- Events are not posts here: RSVPs and dates need the event composer — hand the events door.'
-      + '\n- You never read their drafts — a draft is theirs alone until they post it. You can only mint a new one from what they tell you.';
+      + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
+      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one.';
   }
 
   let calendarRule = '';
@@ -2561,7 +2596,7 @@ Deno.serve(async (req) => {
       if (!modesIn.length) return { ok: false, error: 'Name at least one exchange manner from what they asked for: gift, trade, paid, lend, rent, borrow, or iso.' };
       const AREA_OK = ['marketplace', 'courses', 'library', 'work', 'places', 'art', 'food', 'travel'];
       const rawAreas = (Array.isArray(input.areas) ? input.areas : []).map(String);
-      if (rawAreas.includes('events')) return { ok: false, error: 'Events need the event composer (RSVPs, dates) — hand the events door instead of drafting here.' };
+      if (rawAreas.includes('events')) return { ok: false, error: 'For an event use draft_event — it fills the event composer (dates, guests, visibility).' };
       // A post lives in its own section; PAID ones also list in Marketplace,
       // added by Compose at publish (founder 2026-11-05). No section named →
       // Marketplace, the plain offer's home.
@@ -2591,6 +2626,95 @@ Deno.serve(async (req) => {
         ok: true,
         change: `drafted the post "${title}" (${modesIn.join(', ')}${price ? `, ${price}` : ''}, to ${audience === 'mycelium' ? 'their My-celium' : 'everyone'})`,
         note: 'A "Review & post" button rides under this reply, and the draft also waits in Drive → Drafts. THEIR tap on Post publishes — never say it is live. Photos are added in the composer.',
+      };
+    }
+
+    if (name === 'draft_event') {
+      const title = String(input.title ?? '').trim().slice(0, 120);
+      if (!title) return { ok: false, error: 'An event needs a name.' };
+      const body = String(input.body ?? '').trim().slice(0, 5000);
+      const iso = (v: unknown) => { const t = String(v ?? '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null; };
+      const date = iso(input.date);
+      const endDate = iso(input.end_date);
+      const mins = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1440 ? v as number : null);
+      const startMin = mins(input.start_min);
+      let endMin = mins(input.end_min);
+      if (startMin != null && (endMin == null || endMin <= startMin)) endMin = Math.min(1440, startMin + 120);
+      const memberText = rows.filter((p: { author: string }) => p.author !== 'claude')
+        .map((p: { body?: string }) => p.body ?? '').join(' ');
+      const memberLower = memberText.toLowerCase();
+      const memberDigits = memberText.replace(/\D/g, '');
+      const notes: string[] = [];
+      let meetingUrl = '';
+      if (input.meeting_link) {
+        const ml = String(input.meeting_link).trim();
+        if (!/^https:\/\//i.test(ml) || !memberLower.includes(ml.toLowerCase())) {
+          notes.push('the meeting link was left out — only a link they typed themselves can go in; ask them to paste it');
+        } else meetingUrl = ml;
+      }
+      // Guests — contacts must be ones THEY wrote (an invite reaches a real
+      // person); a bare name resolves to exactly one findable member.
+      const invitees: Record<string, unknown>[] = [];
+      const unplaced: string[] = [];
+      for (const g of (Array.isArray(input.guests) ? input.guests : []).slice(0, 60)) {
+        const gname = String((g as { name?: unknown }).name ?? '').trim().slice(0, 80);
+        const email = String((g as { email?: unknown }).email ?? '').trim().toLowerCase();
+        const phoneRaw = String((g as { phone?: unknown }).phone ?? '').trim();
+        const digits = phoneRaw.replace(/\D/g, '');
+        let placed = false;
+        if (email && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) {
+          if (memberLower.includes(email)) { invitees.push({ kind: 'email', value: email, name: gname }); placed = true; }
+          else notes.push(`${gname || email}'s email isn't in their own words — left out`);
+        }
+        if (digits.length >= 7 && digits.length <= 16) {
+          if (memberDigits.includes(digits)) { invitees.push({ kind: 'phone', value: digits, sms: phoneRaw.replace(/[^\d+]/g, ''), name: gname }); placed = true; }
+          else notes.push(`${gname || phoneRaw}'s phone isn't in their own words — left out`);
+        }
+        if (!placed && !email && !digits && gname) {
+          const hits = await (await sb(`profiles?full_name=ilike.${encodeURIComponent(gname)}&findable=eq.true&onboarded=eq.true&select=id,full_name&limit=2`)).json();
+          const list = Array.isArray(hits) ? hits : [];
+          if (list.length === 1 && list[0].id !== profile_id) { invitees.push({ kind: 'member', id: list[0].id, name: list[0].full_name }); placed = true; }
+        }
+        if (!placed && gname) unplaced.push(gname);
+      }
+      const vis = ['invited', 'mycelium', 'lichen', 'anyone'].includes(String(input.visibility))
+        ? String(input.visibility) : (invitees.length ? 'invited' : 'lichen');
+      const evMode = ['free', 'trade', 'paid'].includes(String(input.price)) ? String(input.price) : 'free';
+      const draft: Record<string, unknown> = {
+        contentType: 'actionable', title, body, areas: ['events'],
+        isPublic: vis === 'lichen' || vis === 'anyone', toMycelium: vis === 'mycelium', audienceSpaces: [],
+        evLichen: vis === 'lichen', evAnyone: vis === 'anyone',
+        invitees, genLink: !!input.share_link,
+        evMode, modes: [evMode], media: [],
+        evAllDay: !!input.all_day,
+        ...(date ? { evRange: { start: date, end: endDate && endDate >= date ? endDate : date } } : {}),
+        ...(startMin != null ? { evStartMin: startMin, evEndMin: endMin } : {}),
+        ...(input.location ? { location: String(input.location).trim().slice(0, 200), inPerson: true } : {}),
+        ...(meetingUrl ? { meetingUrl, online: true } : {}),
+      };
+      const draftId = crypto.randomUUID();
+      const r = await sb('post_drafts', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ id: draftId, profile_id, draft }),
+      });
+      if (!r.ok) return { ok: false, error: `The draft would not save: ${(await r.text()).slice(0, 140)}` };
+      postDraftDoors.push({ id: draftId, title });
+      let listLine = '';
+      const listName = String(input.save_guest_list_as ?? '').trim().slice(0, 60);
+      if (listName && invitees.length) {
+        const existing = await (await sb(`guest_lists?owner_id=eq.${profile_id}&name=ilike.${encodeURIComponent(listName)}&select=id&limit=1`)).json();
+        const row = Array.isArray(existing) && existing[0];
+        const lr = row
+          ? await sb(`guest_lists?id=eq.${row.id}&owner_id=eq.${profile_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ entries: invitees, updated_at: new Date().toISOString() }) })
+          : await sb('guest_lists', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: profile_id, name: listName, entries: invitees, space_ids: [] }) });
+        listLine = lr.ok ? `; saved the guest list "${listName}" (${invitees.length} people) in Drive → Contacts` : `; the guest list didn't save (${(await lr.text()).slice(0, 80)})`;
+      }
+      return {
+        ok: true,
+        change: `drafted the event "${title}"${date ? ` on ${date}` : ' (no date yet)'}${startMin != null ? ` at minute ${startMin}` : ''}, ${invitees.length} guest${invitees.length === 1 ? '' : 's'} ready, visible to ${vis}${listLine}`,
+        ...(unplaced.length ? { unplaced: `couldn't place: ${unplaced.join(', ')} — ask for an email or phone` } : {}),
+        ...(notes.length ? { notes } : {}),
+        note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. Lichen mints unique Zoom rooms for bookings, not events — if they want a video room, they paste their own link.',
       };
     }
 
@@ -2772,7 +2896,7 @@ Deno.serve(async (req) => {
     set_booking_type_active: 'calendar', add_task: 'calendar',
     calendar_feed_link: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
-    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace',
+    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
   };
